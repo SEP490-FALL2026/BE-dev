@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import type { AuditValue } from '../../audit/public/audit.types';
-import { personnelAuditEvent, personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { personnelAuditEvent, personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import type { PersonnelActor } from '../public/personnel.types';
 import type { OffboardingRecord } from './offboarding.types';
 
@@ -10,7 +10,7 @@ type Snapshot = { [key: string]: AuditValue } | null;
 
 /**
  * The audit events of the record of a departure, written in the transaction of the command. Every change names the case and what it
- * moved, and who did it: a person signed in, or the controlled procedure with its ticket (spec L.2); what the system does for the
+ * moved, and who did it: a person signed in, or the controlled procedure with its ticket; what the system does for the
  * person (the reminder to lock the account) is written as the system.
  */
 @Injectable()

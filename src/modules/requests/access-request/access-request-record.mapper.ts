@@ -115,7 +115,7 @@ export type RequestRow = Prisma.AccessRequestGetPayload<{ select: typeof SELECT_
 /**
  * A request that is read as a request has been sent, so it has the moment it was sent: only a draft has none (the table checks it),
  * and a draft is never read here (`AccessRequestRepo.findById` leaves it out). Its Cost Center is the one it is charged to; a free
- * internal request of a department that has none carries none (the table checks that too, F91).
+ * internal request of a department that has none carries none (the table checks that too).
  */
 function sentColumns(row: RequestRow): { costCenterId: string | null; submittedAt: Date } {
   if (row.submittedAt === null) {

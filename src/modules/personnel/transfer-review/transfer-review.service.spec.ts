@@ -18,7 +18,7 @@ const review = {
 };
 
 /**
- * `T-11` (review, race of a kept notice and the assignment of a first head): the notice of the deadline of a review is told to the head
+ * The race of a kept notice and the assignment of a first head: the notice of the deadline of a review is told to the head
  * of the department, or kept for the first one. The department is taken `FOR SHARE` before the head is read, so the assignment of a
  * first head (department `FOR UPDATE`, hands over what was kept before it commits) cannot interleave with this writer.
  */

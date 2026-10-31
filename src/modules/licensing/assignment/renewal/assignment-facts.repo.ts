@@ -34,7 +34,7 @@ export class AssignmentFactsRepo {
     });
     if (!row) return null;
 
-    // A grant task can follow one that ended (completed, closed as failed or cancelled, F07): the one that counts is the one that
+    // A grant task can follow one that ended (completed, closed as failed or cancelled): the one that counts is the one that
     // is not over, and otherwise the latest.
     const grants = row.provisioningTasks.filter((task) => task.kind === 'GRANT');
     const grant =

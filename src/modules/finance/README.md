@@ -9,7 +9,7 @@ catalog, installation, operating-parameters, requests ([module-graph](../../../d
 ## Public API (`public/`)
 
 - `FinanceApi` ([public/finance.api.ts](public/finance.api.ts)):
-  - `listCurrencies`, `findCurrency` — các tiền tệ hệ thống định giá được, kèm số chữ số lẻ.
+  - `findCurrency` — một tiền tệ hệ thống định giá được, kèm số chữ số lẻ.
   - `parseMoney` — đọc `{ amount: "1200.50", currency }` thành minor units theo tiền tệ đó.
   - `snapshotMoney` — giá trị quy về tiền tệ báo cáo tại một ngày, đóng băng để bên gọi lưu; thiếu tỷ giá đúng ngày thì
     trả `MISSING_RATE`.
@@ -38,8 +38,11 @@ catalog, installation, operating-parameters, requests ([module-graph](../../../d
   `exchange-rate.service.ts`; `exchange-rate.policy.ts` (ngày của tỷ giá), `exchange-rate-ledger.service.ts` (sổ).
 - `tax-profile/` — `tax-profile.service.ts`, `tax-profile.policy.ts`. Không có route riêng: `/vendors/{id}/tax-profile*`
   nằm ở catalog (`catalog/vendor/vendor-tax.service.ts`) và gọi `FinanceApi`.
-- `mappers/` — `finance.http-errors.ts`, `finance-audit-event.mapper.ts`.
-- Nest: `finance.module.ts` (facade), `finance-http.module.ts` (controller, chỉ API mount).
+- Gốc module (dùng chung nhiều capability): `finance.http-errors.ts` (lỗi tiền và rate, database không trả lời),
+  `finance-audit-event.mapper.ts`. Lỗi riêng của tỷ giá ở `exchange-rate/exchange-rate.http-errors.ts`, gọi lại mapper của gốc.
+  Capability gọi nhau, không gọi facade của module mình: `exchange-rate` → `currency` (R6).
+- Nest: `finance.module.ts` (facade; xuất `FinanceApi`, `ExchangeRateService` và `CurrencyService` cho `CurrenciesController`; `CurrencyService` chỉ module HTTP cùng thư mục dùng, R10),
+  `finance-http.module.ts` (controller, chỉ API mount).
 
 ## Bất biến quan trọng
 

@@ -5,7 +5,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 
 /**
- * H7-VRF-01: a test run reads no `.env` file. A developer's ignored `.env` (here a hostile one, written to a scratch
+ * A test run reads no `.env` file. A developer's ignored `.env` (here a hostile one, written to a scratch
  * directory used as the working directory — the repository's own `.env` is never read) must not change the configuration
  * of the application under test, must not be copied into `process.env` where the harness would pick it up, and must not
  * change the database the Prisma CLI of the harness migrates. Development keeps reading `.env`.

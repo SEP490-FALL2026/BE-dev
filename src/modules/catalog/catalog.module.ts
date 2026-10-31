@@ -10,13 +10,15 @@ import { CatalogApi } from './public/catalog.api';
 import { SeatOccupancyHook } from './public/catalog.extension-points';
 import { ApplicationLookupService } from './catalog-entry/application-lookup.service';
 import { ApplicationOwnerService } from './catalog-entry/application-owner.service';
-import { ApplicationRetirementController } from './catalog-entry/retirement/application-retirement.controller';
-import { ApplicationRetirementRepo } from './catalog-entry/retirement/application-retirement.repo';
-import { ApplicationRetirementService } from './catalog-entry/retirement/application-retirement.service';
+import { ApplicationRetirementController } from './application-retirement/application-retirement.controller';
+import { ApplicationRetirementRepo } from './application-retirement/application-retirement.repo';
+import { ApplicationRetirementService } from './application-retirement/application-retirement.service';
 import { ApplicationOwnersController } from './catalog-entry/application-owners.controller';
 import { ApplicationRepo } from './catalog-entry/application.repo';
 import { ApplicationListService } from './catalog-entry/application-list.service';
+import { ApplicationWriteGuards } from './catalog-entry/application-write-guards.service';
 import { ApplicationService } from './catalog-entry/application.service';
+import { ApplicationPlans } from './catalog-entry/application-plans.types';
 import { ApplicationViewService } from './catalog-entry/application-view.service';
 import { ApplicationVendorLinkService } from './catalog-entry/application-vendor-link.service';
 import { ApplicationsController } from './catalog-entry/applications.controller';
@@ -46,6 +48,8 @@ import { SubscriptionLookupService } from './subscription/subscription-lookup.se
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
 import { SubscriptionObligationService } from './subscription/subscription-obligation.service';
 import { SubscriptionRepo } from './subscription/subscription.repo';
+import { SubscriptionChangeGuard } from './subscription/subscription-change-guard.service';
+import { SubscriptionChangeService } from './subscription/subscription-change.service';
 import { SubscriptionService } from './subscription/subscription.service';
 import { SubscriptionPricingService } from './subscription/subscription-pricing.service';
 import { SubscriptionViewService } from './subscription/subscription-view.service';
@@ -59,7 +63,7 @@ import { VendorProposalRepo } from './vendor-dictionary/vendor-proposal.repo';
 import { VendorProposalService } from './vendor-dictionary/vendor-proposal.service';
 import { VendorRecognitionService } from './vendor-dictionary/vendor-recognition.service';
 import { VendorDirectoryService } from './vendor/vendor-directory.service';
-import { InternalSoftwareRegistrationService } from './catalog-entry/internal-software-registration.service';
+import { InternalSoftwareRegistrationService } from './internal-software-registration/internal-software-registration.service';
 import { VendorLookupService } from './vendor/vendor-lookup.service';
 import { VendorQueryService } from './vendor/vendor-query.service';
 import { VendorTaxService } from './vendor/vendor-tax.service';
@@ -108,6 +112,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     FunctionalGroupService,
     FunctionalGroupRepo,
     FunctionalGroupLookupService,
+    ApplicationWriteGuards,
     ApplicationService,
     ApplicationViewService,
     ApplicationListService,
@@ -122,6 +127,10 @@ import { VendorRepo } from './vendor/vendor.repo';
     VendorQueryService,
     VendorTaxService,
     PlanLookupService,
+    // the application names the plans it reads (catalog-entry/application-plans.types.ts); the plans answer
+    { provide: ApplicationPlans, useExisting: PlanLookupService },
+    SubscriptionChangeGuard,
+    SubscriptionChangeService,
     SubscriptionService,
     SubscriptionPricingService,
     SubscriptionObligationService,

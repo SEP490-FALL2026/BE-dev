@@ -110,6 +110,28 @@ DEFINER`, không `GRANT`/`OWNER TO`. `audit_events` chỉ ghi thêm bằng hai t
 
 ## Verification and handoff
 
+### Prompt 09 — `H7-SEQ`: quyền sequence BM-09/BM-11 bền vững (30–31/10/2026)
+
+Làm trong hạng mục [be-architecture-readability-hardening](../be-architecture-readability-hardening/plan.md) (Task 8.1 của
+addendum; bằng chứng chi tiết ở đó, không chép lại). Tóm tắt cho hồ sơ H7:
+
+- Sự cố: sau reconcile, API nhận `42501 permission denied for sequence saas_issue_seq` ở `SaasIssueRepo.nextCode` (BM-11),
+  cùng lớp lỗi với `personnel_notice_seq` (BM-09). Đỏ trước sửa trên `f498c74`: unit role 18/41 đỏ; integration `_serial`
+  13/27 đỏ; hai đường ứng dụng 6/6 HTTP 500.
+- Sửa: provisioner và verifier dùng chung một chính sách — đúng hai sequence cũ được `SELECT, UPDATE` (giữ đọc và `setval`
+  của ứng dụng), sequence khác và default tương lai vẫn chỉ `USAGE`; thứ tự trong một transaction: `USAGE` chung → `REVOKE`
+  từng sequence → `GRANT`, chạy lại không đổi kết quả; schema cũ không có sequence (`relkind = 'S'`) thì không cấp; không
+  quyền owner/superuser, không `UPDATE` cho mọi sequence. `deploy-release.sh` vẫn migrate rồi reconcile trước khi container
+  mới chạy.
+- Xanh focused trên PG 17.11 (`slm-p09-impl-pg`): unit `src/infrastructure/database` 121; ba spec `_serial` mới 27; hai
+  đường BM-09/BM-11 6/6; spec H7 lân cận 42 + 5; gate `runtime-sequence-privileges` 3. Reviewer độc lập (Opus) xác nhận
+  chính sách, thứ tự và tính lặp lại; không finding H7.
+- Kiểm cuối của Prompt 09 trên cây local (Tester, PG 17.11 riêng, 31/10/2026): `test:integration:serial` 11 suite / 92
+  test, 0 skip — gồm `database-runtime-sequences` 27, `database-runtime-role-notice-write` 3,
+  `database-runtime-role-saas-issue-write` 3; image `runtime` dựng mới: provision → preflight → `migrate deploy` →
+  reconcile không finding, API `health/ready` 200 với role runtime. Còn lại: trên VPS cần một lần deploy thường để
+  reconcile cấp quyền mới — `remote-verification-pending`, không chạm VPS trong prompt này.
+
 ### Prompt 02 — `H7-TEST-RV-08` trên merge `0da8f56` (26/10/2026)
 
 Preflight: `HEAD = dev = 0da8f56` (cha `471de5e`, `44aef331`), `origin/dev = 471de5e`, ahead/behind `0/2`, không

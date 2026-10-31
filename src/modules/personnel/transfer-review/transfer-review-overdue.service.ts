@@ -3,7 +3,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { overdueDaysOf } from './transfer-review.policy';
 import { TransferReviewRepo } from './transfer-review.repo';
 

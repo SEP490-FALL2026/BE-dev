@@ -110,6 +110,10 @@ biến thể literal vẫn bị từ chối theo tên. Hiện thực (`src/cli/b
 `bootstrap.command.ts` chỉ nối. Người dùng cờ này là [bootstrap wrapper](../../scripts/ops/bootstrap-installation.sh) trên VPS
 (`.env.bootstrap` riêng, owner-only, parse như dữ liệu): [containers](../guides/containers.md#bootstrap-wrapper-prompt-06).
 
+**Giới hạn của tài khoản demo `FINANCE` (`dev:seed`, Owner 30/10/2026):** cấp vai `FINANCE` phát thay đổi vai trò phê duyệt mà graph của
+lệnh không có listener của `requests` trả lời, nên một step đang chờ Finance không được thử lại (đường API thì thử lại); trên database
+local mà lệnh nhắm tới chưa có step nào chờ Finance (`ops:demo-dataset` có cùng giới hạn, xem [demo-dataset](../guides/demo-dataset.md)).
+
 **`ops:demo-dataset` (dataset demo của VPS dùng chung):** không phải lệnh ghi local và không nới chốt nào của `dev:seed`.
 Nó ghi qua **HTTP API đang chạy** bằng đúng vai của từng bước (Super Admin, Finance, IT Admin, trưởng phòng, Người duyệt chi,
 nhân viên), nên validation, chuyển trạng thái và Audit Trail là của ứng dụng; không SQL nghiệp vụ, không endpoint seed. Phần duy

@@ -108,7 +108,7 @@ export class OperatingParametersRepo {
     return rows.map((row) => ({ date: fromDateColumn(row.date), reason: row.reason }));
   }
 
-  /** One page of the days nobody works, by date, and the total for the same range, from one snapshot (`LD-15`). */
+  /** One page of the days nobody works, by date, and the total for the same range, from one snapshot. */
   async pageNonWorkingDates(
     range: { from?: BusinessDate; to?: BusinessDate },
     skip: number,

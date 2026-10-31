@@ -1,9 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-
-const businessDate = z.string().refine(isBusinessDate, { message: 'The day must be a real date as YYYY-MM-DD.' });
+import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
 
 /**
  * The basis a change rests on. Every part is optional here and judged after: a basis that is empty or lacks a part has its own
@@ -25,13 +23,13 @@ const successorBodySchema = z.discriminatedUnion('kind', [
 const recordBodySchema = z.strictObject({
   employeeId: z.uuid(),
   toDepartmentId: z.uuid(),
-  effectiveOn: businessDate,
+  effectiveOn: businessDay,
   grounds: groundsBodySchema.optional(),
   successor: successorBodySchema.optional(),
 });
 
 const rescheduleBodySchema = z.strictObject({
-  newEffectiveOn: businessDate,
+  newEffectiveOn: businessDay,
   reason: z.string().max(1000).optional(),
   grounds: groundsBodySchema.optional(),
   successor: successorBodySchema.optional(),
@@ -45,8 +43,8 @@ const cancelBodySchema = z.strictObject({
 const listQuerySchema = z.strictObject({
   employeeId: z.uuid().optional(),
   status: z.enum(['PENDING', 'EFFECTIVE', 'CANCELLED']).optional(),
-  effectiveFrom: businessDate.optional(),
-  effectiveTo: businessDate.optional(),
+  effectiveFrom: businessDay.optional(),
+  effectiveTo: businessDay.optional(),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
@@ -86,11 +84,11 @@ export const transferSummarySchema = z.strictObject({
 });
 
 export const transferDetailSchema = transferSummarySchema.extend({
-  /** The basis of the transfer. Null in the minimal projection an IT Admin reads (F12). */
+  /** The basis of the transfer. Null in the minimal projection an IT Admin reads. */
   grounds: groundsSchema.nullable(),
   /** Who follows the head of the old department; null when the person did not head the department they leave, and in the minimal projection. */
   headSuccessor: z.strictObject({ kind: z.enum(['EMPLOYEE', 'NONE']), employee: employeeBrief.nullable() }).nullable(),
-  /** The account that recorded it; null when the controlled procedure did (`recordedByProcedure`, spec L.2). */
+  /** The account that recorded it; null when the controlled procedure did (`recordedByProcedure`). */
   recordedByAppUserId: z.uuid().nullable(),
   /** True when the event was recorded by the controlled procedure `pnpm ops:record-super-admin-event` and not by an account. */
   recordedByProcedure: z.boolean(),
@@ -124,7 +122,7 @@ const changeSchema = z.strictObject({
   newEffectiveOn: z.string().nullable(),
   reason: z.string(),
   grounds: groundsSchema,
-  /** The account that changed it; null when the controlled procedure did (`changedByProcedure`, spec L.2). */
+  /** The account that changed it; null when the controlled procedure did (`changedByProcedure`). */
   changedByAppUserId: z.uuid().nullable(),
   changedByProcedure: z.boolean(),
   changedAt: z.iso.datetime(),

@@ -45,7 +45,7 @@ export function toSubscriptionApiException(error: unknown): unknown {
   if (error instanceof SubscriptionApplicationRetiredError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.APPLICATION_RETIRED', error.message);
   }
-  // The owner department has no Cost Center in use yet and the change would create, raise or extend what is owed (F26, `QĐ-88a`(2)).
+  // The owner department has no Cost Center in use yet and the change would create, raise or extend what is owed (`QĐ-88a`(2)).
   if (error instanceof FinanceSetupIncompleteError) {
     return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
   }
@@ -82,7 +82,7 @@ export function toSubscriptionApiException(error: unknown): unknown {
 
 const example = (error: Error) => errorExampleOf(toSubscriptionApiException(error));
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const SUBSCRIPTION_ERROR_EXAMPLES = {
   NOT_FOUND: example(new SubscriptionNotFoundError()),
   PLAN_NOT_FOUND: example(new SubscriptionPlanNotFoundError()),

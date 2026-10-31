@@ -55,7 +55,7 @@ export class RetireOnTimeoutClient extends Client {
   private retired = false;
 
   constructor(config?: string | ClientConfig) {
-    // Refused before pg sees the configuration (INF.1 / F-30): pg itself warns that a custom Promise is deprecated, and
+    // Refused before pg sees the configuration: pg itself warns that a custom Promise is deprecated, and
     // pipelined queries survive end() until they drain while a custom Promise breaks the .then below.
     const options = (typeof config === 'object' ? config : undefined) as
       { pipeline?: unknown; Promise?: unknown } | undefined;

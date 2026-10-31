@@ -1,6 +1,5 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import {
   PROJECT_LABEL_MAX_LENGTH,
@@ -10,6 +9,7 @@ import {
   moneySchema,
   pricingSchema,
 } from '../access-request/access-request.dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** A web address with a host: the homepage of the software, which a screen links to. */
 function isWebAddress(value: string): boolean {
@@ -22,7 +22,6 @@ function isWebAddress(value: string): boolean {
   }
 }
 
-const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 const text = (max: number) => z.string().trim().min(1).max(max);
 
 /**
@@ -32,7 +31,9 @@ const text = (max: number) => z.string().trim().min(1).max(max);
  */
 export const proposalBodySchema = z.strictObject({
   softwareName: text(200),
-  homepageUrl: z.string().trim().max(500).refine(isWebAddress, { message: 'Must be an http or https address.' }),
+  homepageUrl: z.string().trim().max(500).refine(isWebAddress, { message: 'Must be an http or https address.' }).meta({
+    description: 'An absolute web address, http or https, with a host; surrounding whitespace is trimmed first.',
+  }),
   purpose: text(REASON_MAX_LENGTH),
   dataDescription: text(REASON_MAX_LENGTH),
   expectedUsers: z.number().int().min(1).max(1_000_000),
@@ -82,7 +83,12 @@ export const assessmentPatchSchema = z
     quote: quoteInput.nullable(),
   })
   .partial()
-  .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' });
+  .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
+  .meta({
+    minProperties: 1,
+    description:
+      'Give at least one field; a field that is present is written, and the ones that can be cleared take null.',
+  });
 
 export const catalogLinkBodySchema = z.strictObject({ planId: z.uuid() });
 

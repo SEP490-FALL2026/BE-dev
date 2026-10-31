@@ -20,7 +20,7 @@ export class SubscriptionOwnerDepartmentInactiveError extends Error {
   }
 }
 
-/** The application of the plan is retired: a purchase of it is no longer declared (`US-04-01` AC-8, AC-9, F23). */
+/** The application of the plan is retired: a purchase of it is no longer declared (`US-04-01` AC-8, AC-9). */
 export class SubscriptionApplicationRetiredError extends Error {
   constructor() {
     super('The application of the plan is retired: no subscription is declared for it.');

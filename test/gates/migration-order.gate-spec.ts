@@ -50,7 +50,8 @@ describe('migrationOrderProblems', () => {
     expect(migrationOrderProblems(merged, [...merged, '20261003000000_third'])).toEqual([]);
   });
 
-  it('names a new migration that sorts before the last merged one (the F51 failure)', () => {
+  // F51
+  it('names a new migration that sorts before the last merged one', () => {
     expect(migrationOrderProblems(merged, [...merged, '20261001120000_backwards'])).toEqual([
       '20261001120000_backwards: a new migration must sort after the last merged one (20261002000000_second)',
     ]);

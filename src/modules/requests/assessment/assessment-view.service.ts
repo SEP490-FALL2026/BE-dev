@@ -3,18 +3,18 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
+import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
+import type { AssessmentRecord, ProposalRecord, Quote } from '../access-request/assessment-record.types';
 import { judgeCompletion } from './assessment.policy';
-import { AssessmentRepo, type AssessmentRecord, type ProposalRecord } from './assessment.repo';
-import { AssessmentStepRepo, type AssessmentStepRecord } from '../access-request/assessment-step.repo';
-import { PricingViewService } from '../access-request/pricing-view.service';
-import type { Quote } from './quote-pricing.policy';
+import { AssessmentStepRepo, type AssessmentStepRecord } from './assessment-step.repo';
+import { PricingViewService } from '../request-view/pricing-view.service';
 import type { AssessmentWire } from './assessment.dto';
 
 /** The assessment as a reader sees it: the declaration, what the IT Admin has filled, the quote, the price, the refusal. */
 @Injectable()
 export class AssessmentViewService {
   constructor(
-    private readonly assessments: AssessmentRepo,
+    private readonly assessments: AssessmentReadRepo,
     private readonly steps: AssessmentStepRepo,
     private readonly organization: OrganizationApi,
     private readonly catalog: CatalogApi,
@@ -22,10 +22,8 @@ export class AssessmentViewService {
   ) {}
 
   async of(request: AccessRequestRecord, assessment: AssessmentRecord, tx?: DbTx): Promise<AssessmentWire> {
-    const [proposal, step] = await Promise.all([
-      this.assessments.findProposal(request.id, tx),
-      this.steps.find(request.id, tx),
-    ]);
+    const proposal = await this.assessments.findProposal(request.id, tx);
+    const step = await this.steps.find(request.id, tx);
     if (!proposal) throw new Error(`The proposal ${request.id} has no declaration.`);
 
     const peopleIds = [
@@ -37,13 +35,11 @@ export class AssessmentViewService {
     const planIds = [assessment.equivalentPlanId, assessment.alternativePlanId].filter(
       (id): id is string => id !== null,
     );
-    const [people, plans, priceView, costEstimate, quote] = await Promise.all([
-      this.organization.getEmployees([...new Set(peopleIds)], tx),
-      planIds.length > 0 ? this.catalog.getPlanSummaries(planIds) : Promise.resolve([]),
-      this.pricing.view(request.pricing),
-      this.pricing.costEstimate(request.pricing, assessment.vendorId, tx),
-      assessment.quote ? this.quoteView(assessment.quote) : Promise.resolve(null),
-    ]);
+    const people = await this.organization.getEmployees([...new Set(peopleIds)], tx);
+    const plans = planIds.length > 0 ? await this.catalog.getPlanSummaries(planIds) : [];
+    const priceView = await this.pricing.view(request.pricing);
+    const costEstimate = await this.pricing.costEstimate(request.pricing, assessment.vendorId, tx);
+    const quote = assessment.quote ? await this.quoteView(assessment.quote) : null;
     const person = (id: string | null | undefined) => {
       const found = id ? people.find((candidate) => candidate.id === id) : undefined;
 

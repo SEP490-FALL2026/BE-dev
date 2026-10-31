@@ -17,8 +17,9 @@ import {
   BatchDecisionBodyDto,
   BatchDecisionResponseDto,
   SpendDecisionBodyDto,
-} from './spend-approval.dto';
-import { SpendApprovalViewService } from './spend-approval-view.service';
+} from '../spend-approval-view/spend-approval.dto';
+import { SpendApprovalQueueService } from '../spend-approval-view/spend-approval-queue.service';
+import { SpendApprovalViewService } from '../spend-approval-view/spend-approval-view.service';
 import { SpendBatchDecisionService } from './spend-batch-decision.service';
 import { SpendDecisionService } from './spend-decision.service';
 import { IdParamDto } from '../spend/spend-submission.dto';
@@ -46,6 +47,7 @@ const NOT_FOUND = {
 @Controller({ version: '1' })
 export class SpendApprovalsController {
   constructor(
+    private readonly queues: SpendApprovalQueueService,
     private readonly views: SpendApprovalViewService,
     private readonly decisions: SpendDecisionService,
     private readonly batchDecisions: SpendBatchDecisionService,
@@ -62,7 +64,7 @@ export class SpendApprovalsController {
   @ApiErrorResponses(...AUTH_ERRORS, INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ApprovalQueryDto) {
     try {
-      return await this.views.queue(actor, query);
+      return await this.queues.queue(actor, query);
     } catch (error) {
       throw toSpendApiException(error);
     }

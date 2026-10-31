@@ -6,8 +6,8 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier, type PersonnelEventKind } from '../event-notice/personnel-notifier.service';
-import { groundsSnapshot, normalizedGrounds } from '../policies/grounds.policy';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { groundsSnapshot, normalizedGrounds } from '../personnel-grounds.policy';
+import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { LeaveRefusedError } from './leave.errors';
@@ -26,7 +26,7 @@ import type { ChangeReturnDateInput, ConfirmReturnInput, LeaveRecord, StartLeave
  * that day, the day moves on a new basis, and the person is recorded back (on the approved day without a new document, on any other
  * day with one). One transaction for each, under the lock of the employee; the work state of the person moves with it through the
  * organization. Only the Super Admin writes them, never about themselves; the controlled procedure writes them for the Super Admin
- * with a ticket (F13, F19, F40). Everyone concerned is told in the same transaction (F17). Nothing here changes by the calendar: a
+ * with a ticket. Everyone concerned is told in the same transaction. Nothing here changes by the calendar: a
  * late return is only told (`LeaveOverdueService`). The reason for a leave is never asked for nor kept.
  */
 @Injectable()
@@ -264,7 +264,7 @@ export class LeaveService {
     }
   }
 
-  /** The person and the head of their department are told, in the transaction of the write (F17). */
+  /** The person and the head of their department are told, in the transaction of the write. */
   private async tell(
     tx: DbTx,
     leave: LeaveRecord,

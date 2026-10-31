@@ -43,7 +43,7 @@ export interface MoneyView {
   currency: string;
 }
 
-/** The audit event for a change made by `actor`, correlated by their session; `before` is what the change replaced (F66). */
+/** The audit event for a change made by `actor`, correlated by their session; `before` is what the change replaced. */
 export function budgetAuditEvent(
   actor: AuthenticatedPrincipal,
   organizationId: string,
@@ -99,7 +99,7 @@ export class BudgetSupportService {
     return holders.spendingApproverEmployeeId === employeeId || holders.conflictSubstituteEmployeeId === employeeId;
   }
 
-  /** Throws BudgetNotFinanceError: what Finance builds is Finance's, whatever route it was reached by (F13). */
+  /** Throws BudgetNotFinanceError: what Finance builds is Finance's, whatever route it was reached by. */
   requireFinance(actor: AuthenticatedPrincipal): void {
     if (!actor.roles.includes('FINANCE')) throw new BudgetNotFinanceError();
   }
@@ -111,7 +111,7 @@ export class BudgetSupportService {
     throw new BudgetNotAReaderError();
   }
 
-  /** Throws BudgetPlanNotFoundError when a line names a plan the catalog does not have: a line points at a plan, it never makes one (F37). */
+  /** Throws BudgetPlanNotFoundError when a line names a plan the catalog does not have: a line points at a plan, it never makes one. */
   async requirePlans(planIds: readonly (string | null | undefined)[]): Promise<void> {
     const wanted = [...new Set(planIds.filter((id): id is string => typeof id === 'string'))];
     if (wanted.length === 0) return;
@@ -153,7 +153,7 @@ export class BudgetSupportService {
 
   /**
    * The Cost Center of a budget that is still in use, with the department it belongs to. Throws BudgetCostCenterNotFoundError, and
-   * FinanceSetupIncompleteError when the Cost Center was retired, so the department has none in use (F27, `QĐ-87d(1)`).
+   * FinanceSetupIncompleteError when the Cost Center was retired, so the department has none in use (`QĐ-87d(1)`).
    */
   async costCenterInUse(id: string, tx?: DbTx): Promise<CostCenterRef & { departmentId: string }> {
     const [found] = await this.organization.costCentersByIds([id], tx);
@@ -186,7 +186,7 @@ export class BudgetSupportService {
 
   /**
    * The Cost Center the person answers for as the head of its department. Throws BudgetNotYourCostCenterError when they head no
-   * department, and FinanceSetupIncompleteError when the department has no Cost Center in use yet (F27): that is told before
+   * department, and FinanceSetupIncompleteError when the department has no Cost Center in use yet: that is told before
    * anything else is looked at, because the head cannot propose until Finance has made one.
    */
   async requireHeadedCostCenter(employeeId: string, today: BusinessDate, tx?: DbTx): Promise<string> {
@@ -199,7 +199,7 @@ export class BudgetSupportService {
 
   /**
    * Whether the person heads a department that has no Cost Center in use and the Cost Center is one that department had: the head
-   * still owns what was sent for it, and `send` tells them the setup is incomplete (F83) instead of that the proposal does not exist.
+   * still owns what was sent for it, and `send` tells them the setup is incomplete instead of that the proposal does not exist.
    */
   async headsDepartmentWithNoneInUse(
     employeeId: string,
@@ -227,7 +227,7 @@ export class BudgetSupportService {
   }
 
   /**
-   * The same, for a notice that is KEPT when nobody heads the department (`T-11`, rows 53 and 55): the department is taken `FOR SHARE`
+   * The same, for a notice that is KEPT when nobody heads the department (rows 53 and 55): the department is taken `FOR SHARE`
    * before the head is read, in this transaction. The assignment of a head takes it `FOR UPDATE` and hands over what was kept before it
    * commits, so a writer either commits its kept notice before the assignment hands over, or waits and then reads the new head and
    * tells them directly: no notice is left undelivered for a department that has a head. Departments are never locked before budget

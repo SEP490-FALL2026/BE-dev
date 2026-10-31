@@ -6,7 +6,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import type { SeatTarget, SeatTargetRef } from '../../catalog/public/catalog.types';
 import { AssignmentConflictError, SeatBaselineClosedError } from '../../licensing/public/licensing.errors';
-import { LicensingApi } from '../../licensing/public/licensing.api';
+import { LicensingSeatBaselineApi } from '../../licensing/public/licensing-seat-baseline.api';
 import type { BaselineFacts, NewBaselineAssignment } from '../../licensing/public/licensing.types';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import {
@@ -61,7 +61,7 @@ export class SeatBaselineImportService {
   constructor(
     private readonly repo: SeatBaselineImportRepo,
     private readonly organization: OrganizationApi,
-    private readonly licensing: LicensingApi,
+    private readonly licensingBaseline: LicensingSeatBaselineApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -78,9 +78,9 @@ export class SeatBaselineImportService {
   ): Promise<SeatImportView> {
     const organization = await this.requireOrganization();
     const { rows, ignored } = readSeatFile(input.bytes);
-    const ref = this.licensing.seatTargetRef(input);
-    const target = await this.licensing.resolveBaselineTarget(ref);
-    const base = await this.licensing.baselineFacts(target);
+    const ref = this.licensingBaseline.seatTargetRef(input);
+    const target = await this.licensingBaseline.resolveBaselineTarget(ref);
+    const base = await this.licensingBaseline.baselineFacts(target);
     if (base.closed) throw new SeatBaselineClosedError();
 
     const judged = await this.evaluate(rows, base);
@@ -184,8 +184,8 @@ export class SeatBaselineImportService {
       if (current.previewVersion !== input.previewVersion)
         throw new SeatImportPreviewOutdatedError(current.previewVersion);
 
-      const target = await this.licensing.lockBaselineTarget(tx, refOf(current));
-      const base = await this.licensing.baselineFacts(target, tx);
+      const target = await this.licensingBaseline.lockBaselineTarget(tx, refOf(current));
+      const base = await this.licensingBaseline.baselineFacts(target, tx);
       if (base.closed) throw new SeatBaselineClosedError();
 
       const stored = await this.repo.rows(tx, id);
@@ -197,7 +197,7 @@ export class SeatBaselineImportService {
       const valid = fresh.filter((row) => row.outcome === 'VALID' && row.parsed);
       const rows: NewBaselineAssignment[] = valid.map((row) => ({ ...(row.parsed as NonNullable<typeof row.parsed>) }));
       try {
-        await this.licensing.createBaselineAssignments(tx, actor, { importId: id, target, rows });
+        await this.licensingBaseline.createBaselineAssignments(tx, actor, { importId: id, target, rows });
       } catch (error) {
         // The database refused a row the judgement accepted: someone wrote in between, so the preview is stale.
         if (error instanceof AssignmentConflictError)

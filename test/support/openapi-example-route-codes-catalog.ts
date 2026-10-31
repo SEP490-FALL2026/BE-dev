@@ -1,0 +1,262 @@
+import type { RouteErrorStatus } from './openapi-example-manifest';
+
+/** Part of ROUTE_ERROR_CODES (catalog), traced on BE `ea73c2f` (25/10/2026): see openapi-example-manifest.ts. */
+export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> =
+  {
+    applicationBusinessOwnerHistory: {
+      '404': ['APPLICATION.NOT_FOUND'],
+    },
+    applicationCreate: {
+      '409': ['APPLICATION.DICTIONARY_GROUP_CHANGED', 'APPLICATION.DICTIONARY_LINE_TAKEN', 'APPLICATION.NAME_TAKEN'],
+      '422': [
+        'APPLICATION.BUSINESS_OWNER_INVALID',
+        'APPLICATION.DICTIONARY_LINE_MISMATCH',
+        'APPLICATION.DICTIONARY_LINE_NOT_FOUND',
+        'APPLICATION.DOMAIN_INVALID',
+        'APPLICATION.FUNCTIONAL_GROUP_INVALID',
+        'APPLICATION.INTERNAL_HAS_NO_VENDOR',
+        'APPLICATION.NAME_INVALID',
+        'APPLICATION.NOTE_INVALID',
+        'APPLICATION.TOO_MANY_DOMAINS',
+        'APPLICATION.VENDOR_NAME_INVALID',
+        'APPLICATION.VENDOR_REQUIRED',
+        'APPLICATION.VENDOR_SOURCE_AMBIGUOUS',
+      ],
+    },
+    applicationGet: {
+      '404': ['APPLICATION.NOT_FOUND'],
+    },
+    applicationRetire: {
+      '404': ['APPLICATION.NOT_FOUND'],
+      '409': ['APPLICATION.ALREADY_RETIRED', 'APPLICATION.RETIREMENT_BLOCKED'],
+      '422': ['APPLICATION.RETIREMENT_NEEDS_CONFIRMATION'],
+    },
+    applicationRetirementConfirm: {
+      '404': ['APPLICATION.NOT_FOUND'],
+      '409': ['APPLICATION.ALREADY_RETIRED'],
+      '422': ['APPLICATION.RETIREMENT_NOTE_REQUIRED', 'APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER'],
+    },
+    applicationRetirementGet: {
+      '404': ['APPLICATION.NOT_FOUND'],
+    },
+    applicationUpdate: {
+      '404': ['APPLICATION.NOT_FOUND'],
+      '409': ['APPLICATION.DICTIONARY_GROUP_CHANGED', 'APPLICATION.DICTIONARY_LINE_TAKEN', 'APPLICATION.NAME_TAKEN'],
+      '422': [
+        'APPLICATION.BUSINESS_OWNER_INVALID',
+        'APPLICATION.DICTIONARY_LINE_MISMATCH',
+        'APPLICATION.DICTIONARY_LINE_NOT_FOUND',
+        'APPLICATION.DOMAIN_INVALID',
+        'APPLICATION.FUNCTIONAL_GROUP_INVALID',
+        'APPLICATION.INTERNAL_HAS_NO_VENDOR',
+        'APPLICATION.NAME_INVALID',
+        'APPLICATION.NOTE_INVALID',
+        'APPLICATION.TOO_MANY_DOMAINS',
+        'APPLICATION.UPDATE_EMPTY',
+      ],
+    },
+    contractCreate: {
+      '422': ['CONTRACT.NAME_REQUIRED'],
+    },
+    contractGet: {
+      '404': ['CONTRACT.NOT_FOUND'],
+    },
+    documentAttach: {
+      '404': ['CONTRACT.NOT_FOUND', 'DOCUMENT.NOT_FOUND'],
+      '409': ['DOCUMENT.ALREADY_ATTACHED', 'DOCUMENT.NOT_READY_TO_ATTACH'],
+    },
+    documentComplete: {
+      '404': ['DOCUMENT.NOT_FOUND'],
+      '409': ['DOCUMENT.NOT_AWAITING_UPLOAD', 'DOCUMENT.UPLOAD_EXPIRED', 'DOCUMENT.UPLOAD_PENDING'],
+      '422': ['DOCUMENT.UPLOAD_MISMATCH'],
+    },
+    documentCreate: {
+      '403': ['DOCUMENT.PURPOSE_FORBIDDEN'],
+      '409': ['DOCUMENT.PURPOSE_NOT_AVAILABLE'],
+      '422': ['DOCUMENT.FILE_INVALID', 'DOCUMENT.TOO_LARGE', 'DOCUMENT.TYPE_NOT_ALLOWED'],
+    },
+    documentGet: {
+      '404': ['DOCUMENT.NOT_FOUND'],
+    },
+    documentLink: {
+      '404': ['DOCUMENT.NOT_FOUND'],
+    },
+    functionalGroupCreate: {
+      '409': ['FUNCTIONAL_GROUP.NAME_TAKEN'],
+      '422': ['FUNCTIONAL_GROUP.NAME_INVALID'],
+    },
+    functionalGroupUpdate: {
+      '404': ['FUNCTIONAL_GROUP.NOT_FOUND'],
+      '409': ['FUNCTIONAL_GROUP.NAME_TAKEN'],
+      '422': ['FUNCTIONAL_GROUP.NAME_INVALID', 'FUNCTIONAL_GROUP.UPDATE_EMPTY'],
+    },
+    planCreate: {
+      '409': ['PLAN.NAME_TAKEN'],
+      '422': [
+        'PLAN.APPLICATION_NOT_FOUND',
+        'PLAN.APPLICATION_RETIRED',
+        'PLAN.CONTROL_LEVEL_REQUIRED',
+        'PLAN.DATA_LOSS_NOTE_REQUIRED',
+        'PLAN.NAME_INVALID',
+        'PLAN.NOTE_INVALID',
+        'PLAN.PRICING_MODEL_NOT_APPLICABLE',
+        'PLAN.PRICING_MODEL_REQUIRED',
+        'PLAN.PROVISIONING_TYPE_MISMATCH',
+        'PLAN.PROVISIONING_TYPE_NOT_SUPPORTED',
+      ],
+    },
+    planGet: {
+      '404': ['PLAN.NOT_FOUND'],
+    },
+    planTermOpinionList: {
+      '404': ['PLAN.NOT_FOUND'],
+    },
+    planTermOpinionRecord: {
+      '404': ['PLAN.NOT_FOUND'],
+      '422': ['PLAN_TERMS.NOT_APPLICABLE', 'PLAN_TERMS.TEXT_INVALID'],
+    },
+    planTermsGet: {
+      '404': ['PLAN.NOT_FOUND'],
+    },
+    planTermsSet: {
+      '404': ['PLAN.NOT_FOUND'],
+      '422': [
+        'PLAN_TERMS.INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4',
+        'PLAN_TERMS.NOT_APPLICABLE',
+        'PLAN_TERMS.REVIEW_DATE_IN_FUTURE',
+        'PLAN_TERMS.TEXT_INVALID',
+        'PLAN_TERMS.URL_INVALID',
+      ],
+    },
+    planUpdate: {
+      '404': ['PLAN.NOT_FOUND'],
+      '409': [
+        'PLAN.IN_USE_BLOCKS_CHANGE',
+        'PLAN.NAME_TAKEN',
+        'PLAN.TERMS_BLOCK_TYPE_CHANGE',
+        'PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE',
+      ],
+      '422': [
+        'PLAN.CONTROL_LEVEL_REQUIRED',
+        'PLAN.DATA_LOSS_NOTE_REQUIRED',
+        'PLAN.NAME_INVALID',
+        'PLAN.NOTE_INVALID',
+        'PLAN.PRICING_MODEL_NOT_APPLICABLE',
+        'PLAN.PRICING_MODEL_REQUIRED',
+        'PLAN.PROVISIONING_TYPE_MISMATCH',
+        'PLAN.PROVISIONING_TYPE_NOT_SUPPORTED',
+        'PLAN.UPDATE_EMPTY',
+      ],
+    },
+    planWorkspaceProfileSet: {
+      '404': ['PLAN.NOT_FOUND'],
+      '422': [
+        'PLAN.PRIMARY_OWNER_NOT_LISTED',
+        'PLAN.WORKSPACE_LIMIT_EXCEEDED',
+        'PLAN.WORKSPACE_MEMBER_DUPLICATE',
+        'PLAN.WORKSPACE_PERSON_INVALID',
+        'PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE',
+        'PLAN.WORKSPACE_TEXT_INVALID',
+      ],
+    },
+    subscriptionComplete: {
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
+      '409': ['REPORTING_CURRENCY_NOT_SUPPORTED'],
+      '422': ['MONEY_OUT_OF_RANGE', 'SUBSCRIPTION.STILL_DRAFT'],
+    },
+    subscriptionCreate: {
+      '409': ['REPORTING_CURRENCY_NOT_SUPPORTED'],
+      '422': [
+        'CURRENCY_NOT_SUPPORTED',
+        'MONEY_OUT_OF_RANGE',
+        'MONEY_SCALE_EXCEEDED',
+        'SUBSCRIPTION.APPLICATION_RETIRED',
+        'SUBSCRIPTION.DATES_INVALID',
+        'SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE',
+        'SUBSCRIPTION.PERPETUAL_HAS_NO_TERM',
+        'SUBSCRIPTION.PERPETUAL_NEEDS_LICENSED_APPLICATION',
+        'SUBSCRIPTION.PLAN_HAS_NO_SUBSCRIPTION',
+        'SUBSCRIPTION.PLAN_NOT_FOUND',
+      ],
+    },
+    subscriptionGet: {
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
+    },
+    subscriptionUpdate: {
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
+      '409': ['FINANCE.SETUP_INCOMPLETE', 'REPORTING_CURRENCY_NOT_SUPPORTED'],
+      '422': [
+        'CURRENCY_NOT_SUPPORTED',
+        'MONEY_OUT_OF_RANGE',
+        'MONEY_SCALE_EXCEEDED',
+        'SUBSCRIPTION.DATES_INVALID',
+        'SUBSCRIPTION.PERPETUAL_HAS_NO_TERM',
+        'SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED',
+        'SUBSCRIPTION.STILL_DRAFT',
+        'SUBSCRIPTION.UPDATE_EMPTY',
+      ],
+    },
+    vendorGroupCreate: {
+      '409': ['VENDOR_DICTIONARY.GROUP_NAME_TAKEN'],
+      '422': [
+        'VENDOR_DICTIONARY.DOMAIN_INVALID',
+        'VENDOR_DICTIONARY.NAME_INVALID',
+        'VENDOR_DICTIONARY.TOO_MANY_VALUES',
+      ],
+    },
+    vendorGroupUpdate: {
+      '404': ['VENDOR_DICTIONARY.GROUP_NOT_FOUND'],
+      '409': ['VENDOR_DICTIONARY.GROUP_NAME_TAKEN'],
+      '422': [
+        'VENDOR_DICTIONARY.DOMAIN_INVALID',
+        'VENDOR_DICTIONARY.NAME_INVALID',
+        'VENDOR_DICTIONARY.TOO_MANY_VALUES',
+        'VENDOR_DICTIONARY.UPDATE_EMPTY',
+      ],
+    },
+    vendorProposalResolve: {
+      '404': ['VENDOR_DICTIONARY.PROPOSAL_NOT_FOUND', 'VENDOR_DICTIONARY.SERVICE_LINE_NOT_FOUND'],
+      '409': ['VENDOR_DICTIONARY.PROPOSAL_ALREADY_RESOLVED'],
+      '422': ['VENDOR_DICTIONARY.PROPOSAL_RESOLUTION_INVALID'],
+    },
+    vendorServiceLineCreate: {
+      '404': ['VENDOR_DICTIONARY.GROUP_NOT_FOUND'],
+      '409': ['VENDOR_DICTIONARY.SERVICE_LINE_NAME_TAKEN'],
+      '422': [
+        'VENDOR_DICTIONARY.DOMAIN_INVALID',
+        'VENDOR_DICTIONARY.NAME_INVALID',
+        'VENDOR_DICTIONARY.PATTERN_INVALID',
+        'VENDOR_DICTIONARY.TOO_MANY_VALUES',
+      ],
+    },
+    vendorServiceLineUpdate: {
+      '404': ['VENDOR_DICTIONARY.SERVICE_LINE_NOT_FOUND'],
+      '409': ['VENDOR_DICTIONARY.SERVICE_LINE_NAME_TAKEN'],
+      '422': [
+        'VENDOR_DICTIONARY.DOMAIN_INVALID',
+        'VENDOR_DICTIONARY.NAME_INVALID',
+        'VENDOR_DICTIONARY.PATTERN_INVALID',
+        'VENDOR_DICTIONARY.TOO_MANY_VALUES',
+        'VENDOR_DICTIONARY.UPDATE_EMPTY',
+      ],
+    },
+    vendorTaxEstimate: {
+      '404': ['VENDOR.NOT_FOUND'],
+      '422': ['CURRENCY_NOT_SUPPORTED', 'MONEY_OUT_OF_RANGE', 'MONEY_SCALE_EXCEEDED'],
+    },
+    vendorTaxProfileGet: {
+      '404': ['VENDOR.NOT_FOUND'],
+    },
+    vendorTaxProfileHistory: {
+      '404': ['VENDOR.NOT_FOUND'],
+    },
+    vendorTaxProfileSet: {
+      '404': ['VENDOR.NOT_FOUND'],
+      '422': [
+        'VENDOR_TAX_PROFILE.RATE_INVALID',
+        'VENDOR_TAX_PROFILE.TAX_TYPE_DUPLICATE',
+        'VENDOR_TAX_PROFILE.TAX_TYPE_INVALID',
+        'VENDOR_TAX_PROFILE.TOO_MANY_LINES',
+      ],
+    },
+  };

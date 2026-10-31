@@ -13,12 +13,12 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CreateEmployeeBodyDto, EmployeeResponseDto } from './employee.dto';
 import { EmployeeManualService } from './employee-manual.service';
-import { ORGANIZATION_ERROR_EXAMPLES, toOrganizationApiException } from '../mappers/organization.http-errors';
+import { EMPLOYEE_ERROR_EXAMPLES, toEmployeeApiException } from './employee.http-errors';
 
 /**
  * Entering people by hand (`US-02-02` AC-14). Super Admin only, on an HR basis (`QĐ-82i`, `US-01-05` AC-14): the IT
- * Admin, a department head and Finance do not enter new records, whatever the route lets through (`F13`). It creates the person
- * and their one placement and tells the head of the department and the IT Admin in charge (`F17`); it never creates a login, a
+ * Admin, a department head and Finance do not enter new records, whatever the route lets through. It creates the person
+ * and their one placement and tells the head of the department and the IT Admin in charge; it never creates a login, a
  * role or an invitation.
  */
 @ApiTags('employees')
@@ -46,7 +46,7 @@ export class EmployeesController {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         "The body is malformed or lacks a part of the HR basis (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code, among them OWN_RECORD for the Super Admin's own code or email).",
-      examples: [VALIDATION_EXAMPLE, ORGANIZATION_ERROR_EXAMPLES.EMPLOYEE_ROW_INVALID],
+      examples: [VALIDATION_EXAMPLE, EMPLOYEE_ERROR_EXAMPLES.EMPLOYEE_ROW_INVALID],
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )
@@ -54,7 +54,7 @@ export class EmployeesController {
     try {
       return await this.employees.create(actor, body);
     } catch (error) {
-      throw toOrganizationApiException(error);
+      throw toEmployeeApiException(error);
     }
   }
 }

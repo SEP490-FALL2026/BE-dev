@@ -60,7 +60,7 @@ export class LicenseKeyRepo {
     });
   }
 
-  /** One page, the total for the filter and the keys still usable, all from one snapshot (`LD-11`): a key imported meanwhile is in none or in all. */
+  /** One page, the total for the filter and the keys still usable, all from one snapshot: a key imported meanwhile is in none or in all. */
   async page(input: {
     subscriptionId: string;
     status?: LicenseKeyStatus;

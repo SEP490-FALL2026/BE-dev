@@ -5,13 +5,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OrganizationChangeSweeper } from './change-announcement/organization-change.job';
 import { CostCenterService } from './cost-center/cost-center.service';
 import { CostCentersController } from './cost-center/cost-centers.controller';
-import { DepartmentHeadService } from './department/department-head.service';
-import { DepartmentHeadsController } from './department/department-heads.controller';
-import { DepartmentTechnicalMembersRepo } from './department/department-technical-members.repo';
+import { DepartmentHeadService } from './department-management/department-head.service';
+import { DepartmentHeadsController } from './department-management/department-heads.controller';
+import { DepartmentTechnicalMembersRepo } from './department-management/department-technical-members.repo';
 import { HeldNoticeHandoverListener } from './department/held-notice-handover.listener';
-import { DepartmentQueryService } from './department/department-query.service';
-import { DepartmentService } from './department/department.service';
-import { DepartmentsController } from './department/departments.controller';
+import { DepartmentQueryService } from './department-management/department-query.service';
+import { DepartmentService } from './department-management/department.service';
+import { DepartmentsController } from './department-management/departments.controller';
 import { EmployeeMaintenanceController } from './employee/employee-maintenance.controller';
 import { EmployeeMaintenanceService } from './employee/employee-maintenance.service';
 import { EmployeeManualService } from './employee/employee-manual.service';
@@ -44,7 +44,7 @@ import { ProjectsController } from './project/projects.controller';
     DepartmentQueryService,
     DepartmentService,
     DepartmentHeadService,
-    // Hands the notices kept for a department with no head to the head whose period starts (T-11), added to the change listeners.
+    // Hands the notices kept for a department with no head to the head whose period starts, added to the change listeners.
     HeldNoticeHandoverListener,
     DepartmentTechnicalMembersRepo,
     ProjectService,

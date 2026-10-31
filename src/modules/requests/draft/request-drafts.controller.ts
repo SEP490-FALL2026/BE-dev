@@ -19,8 +19,8 @@ import {
   ACCESS_REQUEST_ERROR_EXAMPLES as EXAMPLES,
   toAccessRequestApiException,
 } from '../access-request/access-request.http-errors';
-import { AccessRequestQueryService } from '../access-request/access-request-query.service';
-import { toWire } from '../access-request/access-request.mapper';
+import { AccessRequestQueryService } from '../request-view/access-request-query.service';
+import { toWire } from '../request-view/access-request.mapper';
 import {
   AccessRequestDraftPageResponseDto,
   AccessRequestDraftResponseDto,
@@ -30,7 +30,7 @@ import {
   DraftSubmitBodyDto,
   DraftSubmitResponseDto,
 } from './request-draft.dto';
-import type { DraftKind } from './request-draft.policy';
+import type { DraftKind } from '../request-draft/request-draft.policy';
 import { RequestDraftSubmitService } from './request-draft-submit.service';
 import { RequestDraftService } from './request-draft.service';
 
@@ -60,7 +60,7 @@ const SUBMITTED_MESSAGE: Readonly<Record<DraftKind, string>> = {
 };
 
 /**
- * The drafts of paid requests (spec L.1, F27): what a person saves when their department has no Cost Center yet and a paid request
+ * The drafts of paid requests: what a person saves when their department has no Cost Center yet and a paid request
  * cannot be sent. A draft is the sender's alone: it is listed, sent and deleted only by them, and it is never a request until it is
  * sent (no queue, no `KPI-2`, no count of open work, no reader of a request sees it). Saving runs no gate; sending runs every gate of
  * the operation that sends that kind of request. There is no operation that changes a draft: delete it and save it again. The Super
@@ -183,7 +183,7 @@ export class RequestDraftsController {
       return { request: toWire(await this.queries.view(sent.record)) };
     } catch (error) {
       // The answer is the one of the operation that sends this kind of request: its own refusals (a group, a service account) keep
-      // their own codes, and every other error is mapped as the request routes map it (spec L.1).
+      // their own codes, and every other error is mapped as the request routes map it.
       throw toServiceAccountApiException(toGroupRequestApiException(error));
     }
   }

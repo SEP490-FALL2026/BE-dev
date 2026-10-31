@@ -10,7 +10,7 @@ import { DevSeedApi, LOCAL_PASSWORD_GENERATOR } from '../public/dev-seed.api';
 import { generateLocalPassword } from './local-password.service';
 
 /**
- * The graph of `pnpm dev:seed` (H6.2). Database settings only, the owning services it writes through and nothing of
+ * The graph of `pnpm dev:seed`. Database settings only, the owning services it writes through and nothing of
  * the API. Never imported by the API, the worker or another command (module-graph.spec.ts).
  */
 @Module({

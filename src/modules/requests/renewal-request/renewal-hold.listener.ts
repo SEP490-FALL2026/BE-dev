@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { RenewalHoldHook, type RenewalHold } from '../../licensing/public/licensing.extension-points';
 import type { PendingRenewal } from '../../licensing/public/licensing-renewal.types';
-import { RenewalRequestRepo } from './renewal-request.repo';
+import { RenewalRequestRepo } from '../renewal-apply/renewal-request.repo';
 
 /**
  * What licensing asks of the module of requests about a seat whose right is reaching its end (`RenewalHold`, bound to licensing's
@@ -11,6 +11,9 @@ import { RenewalRequestRepo } from './renewal-request.repo';
  */
 @Injectable()
 export class RenewalHoldReader implements RenewalHold, OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [RenewalHoldHook] as const;
+
   constructor(
     private readonly renewals: RenewalRequestRepo,
     private readonly hook: RenewalHoldHook,

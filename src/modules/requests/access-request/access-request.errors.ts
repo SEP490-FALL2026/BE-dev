@@ -1,7 +1,5 @@
-import type { DelegationRefusal } from '../delegated-request/delegated-request.policy';
-import type { CancellationRefusal } from '../cancellation/cancellation.policy';
-import type { WithdrawalRefusal } from '../withdraw/withdrawal.policy';
-import type { HeldAccess } from './access-request.types';
+import type { WithdrawalRefusal } from './withdrawal.policy';
+import type { CancellationRefusal, DelegationRefusal, HeldAccess } from './access-request.types';
 
 /** The request does not exist, or the caller has no part in it: the two answer alike so a request cannot be probed. */
 export class AccessRequestNotFoundError extends Error {

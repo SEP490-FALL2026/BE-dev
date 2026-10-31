@@ -13,7 +13,7 @@ export interface OutcomeSubject {
 }
 
 /**
- * Tells the contexts that listen how a request ended for its people (`RequestOutcomeListeners`, F43), in the transaction of the end.
+ * Tells the contexts that listen how a request ended for its people (`RequestOutcomeListeners`), in the transaction of the end.
  * Every service that ends a request, or one line of a request for a group, tells it here in the same transaction: the grant that
  * completes says `granted`, every other end says `ended`. With nobody listening nothing is read and nothing is written. A request for
  * one person is one event; a request for a group is one event for each person whose line ends, each naming only that person.

@@ -1,5 +1,5 @@
 import type { Client } from 'pg';
-import { budgetYearLockKey } from '../../../src/core/budget-year-lock-key';
+import { budgetYearLockKey } from '../../../src/modules/budgets/public/budget-year-lock-key.policy';
 import { waitForLockWaiters } from '../../support/lock-wait';
 import { StatusHarness } from '../../support/status-harness';
 import type { Unit } from '../../support/spend-harness';

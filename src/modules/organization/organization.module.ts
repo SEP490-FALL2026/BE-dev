@@ -13,6 +13,7 @@ import { ImportLookupRepo } from './employee/import-lookup.repo';
 import { AnnouncementRepo } from './change-announcement/announcement.repo';
 import { OrganizationChangeService } from './change-announcement/organization-change.service';
 import { OrganizationHistoryApi } from './public/organization-history.api';
+import { OrganizationContextService } from './organization-context.service';
 import { OrganizationRepo } from './organization.repo';
 import { OrganizationApi } from './public/organization.api';
 import {
@@ -27,6 +28,7 @@ import {
   imports: [DatabaseModule],
   providers: [
     OrganizationApi,
+    OrganizationContextService,
     OrganizationRepo,
     CostCenterRepo,
     CostCenterCatalogueService,
@@ -48,15 +50,22 @@ import {
     EmployeeDepartureRepo,
   ],
   // OrganizationApi is the facade other modules use. EmployeeRepo, ImportLookupRepo and
-  // DepartmentHeadRepo stay private behind their capability services, which only the facade injects. The three exported
-  // repos stay exported under Owner decision E4 (a scoped legacy exception, reviewed at G3), so `OrganizationHttpModule`
+  // DepartmentHeadRepo stay private behind their capability services. The capability services the use cases of
+  // `OrganizationHttpModule` call (the context, the directories of departments and employees, the use readers and the announcement
+  // of changes) are exported for that module in the same folder, so no use case goes through the facade. The three exported
+  // repos stay exported under an Owner decision (a scoped legacy exception, reviewed at G3), so `OrganizationHttpModule`
   // in the same folder shares one instance: CostCenterService injects CostCenterRepo; DepartmentService,
   // DepartmentQueryService and DepartmentHeadService inject DepartmentRepo. OrganizationRepo has no HTTP consumer
-  // since Wave 2; E4 keeps its export until G3 reviews the decision. The extension points (`public/organization.extension-points.ts`)
+  // since the use cases left the facade; that exception keeps its export until G3 reviews the decision. The extension points (`public/organization.extension-points.ts`)
   // are exported so the modules above bind or add to the one instance of the application.
   exports: [
     OrganizationApi,
     OrganizationHistoryApi,
+    OrganizationContextService,
+    DepartmentDirectoryService,
+    DepartmentUseService,
+    EmployeeDirectoryService,
+    OrganizationChangeService,
     OrganizationRepo,
     CostCenterRepo,
     DepartmentRepo,

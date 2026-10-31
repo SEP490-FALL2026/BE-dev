@@ -4,7 +4,7 @@ import { readinessDiagnostic } from './readiness-diagnostics';
 const CANARY = 'canary-4f1c2d9e7a6b-postgres://svc:hunter2@db.internal:5432/slm';
 
 /**
- * F93: a failed readiness check is logged by which dependency failed and what kind of error it was, never by what the error says. The
+ * A failed readiness check is logged by which dependency failed and what kind of error it was, never by what the error says. The
  * canary is a connection string with a password in every place an error can carry one: its message, its stack, the body of the answer
  * and its cause.
  */

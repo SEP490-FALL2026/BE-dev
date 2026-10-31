@@ -55,7 +55,7 @@ export function toOperatingParametersApiException(error: unknown): unknown {
 
 const example = (error: Error) => errorExampleOf(toOperatingParametersApiException(error));
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const OPERATING_PARAMETERS_ERROR_EXAMPLES = {
   PARAMETER_NOT_FOUND: example(new ParameterNotFoundError('<parameter-key>')),
   PARAMETER_VALUE_INVALID: example(new ParameterValueInvalidError('<parameter-key>', 'OUT_OF_RANGE')),

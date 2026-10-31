@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { normalizeAccountIdentifier } from '../../../../core/account-identifier';
+import { normalizeAccountIdentifier } from '../../public/account-identifier.policy';
 import { addDays, type BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -7,7 +7,7 @@ import { AuditApi } from '../../../audit/public/audit.api';
 import { OrganizationApi } from '../../../organization/public/organization.api';
 import { AssignmentNotFoundError, AssignmentRenewalRefusedError } from '../../public/licensing.errors';
 import type { AssignmentFacts, RenewAssignmentInput, RenewedAssignment } from '../../public/licensing-renewal.types';
-import { licensingAuditEvent } from '../../mappers/licensing-audit-event.mapper';
+import { licensingAuditEvent } from '../../licensing-audit-event.mapper';
 import { toAssignmentFailure } from '../assignment-conflicts.repo';
 import { AssignmentEndService } from '../assignment-end.service';
 import { AssignmentFactsRepo } from './assignment-facts.repo';

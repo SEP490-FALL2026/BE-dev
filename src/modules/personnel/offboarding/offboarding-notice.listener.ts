@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { NoticeRefusedError } from '../notice/notice.errors';
-import type { NoticeEventRef, NoticeRecord } from '../notice/notice.types';
+import type { NoticeEventRef, NoticeRecord } from '../personnel-notice.types';
 import {
   NoticeRecorderContributions,
   type NoticeEventRecorder,
@@ -18,10 +18,13 @@ import { OffboardingService } from './offboarding.service';
  * a sudden departure that is `LEFT` at once. The rules of the departure judge the day, the head who goes, the transfer that waits and
  * the handover, exactly as they do for a departure recorded from a document, and what they refuse comes back with their own codes.
  * A person already handing over answers as a duplicate event. A race the database refuses answers `CONCURRENT_CHANGE` (409), never a
- * 500 (F37).
+ * 500.
  */
 @Injectable()
 export class OffboardingNoticeRecorder implements OnModuleInit, NoticeEventRecorder {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [NoticeRecorderContributions] as const;
+
   readonly eventKind = 'OFFBOARDING_CASE' as const;
 
   constructor(

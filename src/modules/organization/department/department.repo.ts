@@ -4,10 +4,11 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
-import { CostCenterStatus } from '../cost-center/cost-center.types';
+import { CostCenterStatus } from '../organization-structure.types';
 import { CreateDepartmentInput, EmployeeStatus, EmployeeWorkState } from '../public/organization.types';
 import { DepartmentCodeTakenError } from './department.errors';
-import { DepartmentMemberRecord, DepartmentRecord, DepartmentStatus } from './department.types';
+import { DepartmentMemberRecord, DepartmentRecord } from './department.types';
+import { DepartmentStatus } from '../organization-structure.types';
 
 interface DepartmentRow {
   id: string;
@@ -64,7 +65,7 @@ function toRecord(row: DepartmentRow): DepartmentRecord {
 export interface DepartmentListFilter {
   status?: DepartmentStatus;
   search?: string;
-  /** Only these departments: what an IT Admin may read (`F12`). An empty list matches none. */
+  /** Only these departments: what an IT Admin may read. An empty list matches none. */
   ids?: readonly string[];
   skip: number;
   take: number;

@@ -48,33 +48,31 @@ export class SpendRequestRepo {
       state: 'AWAITING_SPEND_SUBMISSION' as const,
       policy: { path: ['chain'], array_contains: 'SPEND_APPROVAL' },
     };
-    const [rows, total] = await Promise.all([
-      db.accessRequest.findMany({
-        where,
-        orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
-        skip,
-        take,
-        select: {
-          id: true,
-          planId: true,
-          requesterEmployeeId: true,
-          amountMinor: true,
-          amountCurrency: true,
-          expectedSpendOn: true,
-          budgetYear: true,
-          offPlan: true,
-          planLineVersionId: true,
-          pricingStatus: true,
-          type: true,
-          updatedAt: true,
-          spendQueuedAt: true,
-          proposal: { select: { softwareName: true } },
-          beneficiaries: { select: { employeeId: true }, orderBy: { position: 'asc' }, take: 1 },
-          _count: { select: { beneficiaries: true } },
-        },
-      }),
-      db.accessRequest.count({ where }),
-    ]);
+    const rows = await db.accessRequest.findMany({
+      where,
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      skip,
+      take,
+      select: {
+        id: true,
+        planId: true,
+        requesterEmployeeId: true,
+        amountMinor: true,
+        amountCurrency: true,
+        expectedSpendOn: true,
+        budgetYear: true,
+        offPlan: true,
+        planLineVersionId: true,
+        pricingStatus: true,
+        type: true,
+        updatedAt: true,
+        spendQueuedAt: true,
+        proposal: { select: { softwareName: true } },
+        beneficiaries: { select: { employeeId: true }, orderBy: { position: 'asc' }, take: 1 },
+        _count: { select: { beneficiaries: true } },
+      },
+    });
+    const total = await db.accessRequest.count({ where });
 
     return { rows, total };
   }

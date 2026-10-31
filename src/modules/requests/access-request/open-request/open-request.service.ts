@@ -24,11 +24,12 @@ export class OpenRequestService {
   ): Promise<{ items: OpenRequestOfBeneficiary[]; total: number }> {
     const { items, total } = await this.repo.pageOf(employeeId, page, tx);
     const planIds = [...new Set(items.flatMap((item) => (item.planId === null ? [] : [item.planId])))];
-    const [people, plans, beneficiary] = await Promise.all([
-      this.organization.getEmployees([...new Set(items.map((item) => item.requesterEmployeeId))], tx),
-      planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
-      this.organization.getEmployees([employeeId], tx),
-    ]);
+    const people = await this.organization.getEmployees(
+      [...new Set(items.map((item) => item.requesterEmployeeId))],
+      tx,
+    );
+    const plans = planIds.length === 0 ? [] : await this.catalog.getPlanSummaries(planIds);
+    const beneficiary = await this.organization.getEmployees([employeeId], tx);
     const left = beneficiary[0]?.status === 'TERMINATED';
 
     return {

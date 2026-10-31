@@ -1,5 +1,5 @@
 /**
- * What a failed readiness check says in the log (F93): which dependency failed, the class and the code of the error and the status of
+ * What a failed readiness check says in the log: which dependency failed, the class and the code of the error and the status of
  * the answer. Never the stack, a message or the body of the answer: they can carry a host name, a role, a connection string or a
  * secret, and a log is read by more people than the database is. Every value is kept only when it has the shape of an identifier and
  * the list is bounded: what is written is short identifier-shaped text, so it cannot carry a message, a host or a connection string.
@@ -9,7 +9,7 @@ export interface ReadinessDiagnostic {
   error: string;
   /** The HTTP status the error carries, when it is an HTTP exception. */
   statusCode: number | null;
-  /** A short machine code of the error or of its cause (`P1001`, `ECONNREFUSED`, a SQLSTATE), when it has one. */
+  /** A short machine code of the error or of its cause (01`, `ECONNREFUSED`, a SQLSTATE), when it has one. */
   code: string | null;
   /** The names of the dependencies that reported themselves down. */
   failed: string[];

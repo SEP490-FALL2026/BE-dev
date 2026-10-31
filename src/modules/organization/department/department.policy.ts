@@ -2,7 +2,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import { DepartmentForbiddenError, type HeadAssignmentProblem } from './department.errors';
 
 /**
- * Who may do what with departments, decided in the service so no route is the only thing between a caller and the data (`F13`).
+ * Who may do what with departments, decided in the service so no route is the only thing between a caller and the data.
  * The Super Admin owns the organization's data and changes it on an HR basis; the IT Admin reads a minimum, and only of the
  * departments they answer for (`QĐ-87a`, `QĐ-87b(4)`); a department head reads the one they head (`SoD-2`). Pure: no store, no clock.
  */

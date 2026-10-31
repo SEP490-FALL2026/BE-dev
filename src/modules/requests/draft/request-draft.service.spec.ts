@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { RequestDraftRepo, type DraftRow } from '../access-request/request-draft.repo';
+import { RequestDraftRepo, type DraftRow } from '../request-draft/request-draft.repo';
 import { RequestDraftService } from './request-draft.service';
 
 const PLAN = '0b3f7f4e-5f6c-4d6e-9d8b-2f4f4f4f4f01';
@@ -33,7 +33,7 @@ const row = (over: Partial<DraftRow> = {}): DraftRow => ({
 });
 
 /**
- * Reading a draft through `accessRequestGet` (spec L.1, F92): the person who saved it reads what the list of drafts shows of it, and a
+ * Reading a draft through `accessRequestGet`: the person who saved it reads what the list of drafts shows of it, and a
  * request that was sent, a draft of another person and an id that is not there are one answer.
  */
 describe('RequestDraftService.readOwn', () => {
@@ -84,7 +84,7 @@ describe('RequestDraftService.readOwn', () => {
 });
 
 /**
- * A draft of the kind `SERVICE_ACCOUNT` is saved as the plain request it is until it is sent (F86): the row of that type needs its detail
+ * A draft of the kind `SERVICE_ACCOUNT` is saved as the plain request it is until it is sent: the row of that type needs its detail
  * row when the transaction commits, and a draft has none, so the type is `GRANT` and the kind it will be is kept with its content.
  */
 describe('RequestDraftService.save', () => {

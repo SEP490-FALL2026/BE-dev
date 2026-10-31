@@ -12,8 +12,8 @@ import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/a
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { PasswordChangeService } from '../auth/password-change.service';
-import { ChangePasswordBodyDto, PasswordChangedResponseDto } from '../dto/auth.dto';
-import { AUTH_ERROR_EXAMPLES, toPasswordApiException } from '../mappers/auth.http-errors';
+import { ChangePasswordBodyDto, PasswordChangedResponseDto } from '../auth/auth.dto';
+import { AUTH_ERROR_EXAMPLES, toPasswordApiException } from '../auth/auth.http-errors';
 import { MeResponseDto } from './me.dto';
 import { MeService, MeView } from './me.service';
 
@@ -37,7 +37,7 @@ export class MeController {
     try {
       return await this.me.get(principal);
     } catch (error) {
-      // The guard already read the database; it can still stop answering before MeService does (R-15).
+      // The guard already read the database; it can still stop answering before MeService does.
       throw toUnavailableApiException(error) ?? error;
     }
   }

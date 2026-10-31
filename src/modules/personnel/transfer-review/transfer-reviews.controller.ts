@@ -36,7 +36,7 @@ const NOT_FOUND = {
 
 /**
  * The review the head of the department a person was transferred to makes of the tools the person holds: one line for every personal
- * seat, paid or internal, whatever the department that owns its subscription (`QĐ-89b`, F42). Any signed-in person may ask: what a person sees and does is judged from the review, because the head
+ * seat, paid or internal, whatever the department that owns its subscription (`QĐ-89b`). Any signed-in person may ask: what a person sees and does is judged from the review, because the head
  * of a department is a position held on a day and not a role of an account. The IT Admin reads every review and decides none.
  */
 @ApiTags('transfer-reviews')

@@ -16,10 +16,15 @@
  *   its examples and removes the entry.
  */
 
-import { ROUTE_ERROR_CODES_A_TO_L } from './openapi-example-route-codes-a-l';
 import { ROUTE_ERROR_CODES_BUDGETS } from './openapi-example-route-codes-budgets';
+import { ROUTE_ERROR_CODES_CATALOG } from './openapi-example-route-codes-catalog';
+import { ROUTE_ERROR_CODES_DATA_IMPORT } from './openapi-example-route-codes-data-import';
+import { ROUTE_ERROR_CODES_FINANCE } from './openapi-example-route-codes-finance';
+import { ROUTE_ERROR_CODES_HEALTH } from './openapi-example-route-codes-health';
+import { ROUTE_ERROR_CODES_IDENTITY_ACCESS } from './openapi-example-route-codes-identity-access';
 import { ROUTE_ERROR_CODES_LICENSING } from './openapi-example-route-codes-licensing';
-import { ROUTE_ERROR_CODES_M_TO_Z } from './openapi-example-route-codes-m-z';
+import { ROUTE_ERROR_CODES_OPERATING_PARAMETERS } from './openapi-example-route-codes-operating-parameters';
+import { ROUTE_ERROR_CODES_ORGANIZATION } from './openapi-example-route-codes-organization';
 import { ROUTE_ERROR_CODES_PERSONNEL } from './openapi-example-route-codes-personnel';
 import { ROUTE_ERROR_CODES_REQUESTS } from './openapi-example-route-codes-requests';
 import { ROUTE_ERROR_CODES_REQUESTS_SPEND } from './openapi-example-route-codes-requests-spend';
@@ -322,17 +327,22 @@ export const BODYLESS_RESPONSES: Readonly<Record<string, string>> = {
 export const NO_EXAMPLE_RESPONSES: Readonly<Record<string, string>> = {};
 
 /**
- * The route-specific codes, in several files to keep each support file small (TEST-HARDEN.1): the routes up to G4 by
- * operationId, those G5/G6 added by area. An operationId listed twice is a mistake the inventory test reports.
+ * The route-specific codes, in one file per owning module to keep each support file small (TEST-HARDEN.1); a module whose
+ * routes do not fit one file has a second named by its area. An operationId listed twice is a mistake the inventory test reports.
  */
 const PARTS = [
-  ROUTE_ERROR_CODES_A_TO_L,
-  ROUTE_ERROR_CODES_M_TO_Z,
   ROUTE_ERROR_CODES_BUDGETS,
+  ROUTE_ERROR_CODES_CATALOG,
+  ROUTE_ERROR_CODES_DATA_IMPORT,
+  ROUTE_ERROR_CODES_FINANCE,
+  ROUTE_ERROR_CODES_HEALTH,
+  ROUTE_ERROR_CODES_IDENTITY_ACCESS,
+  ROUTE_ERROR_CODES_LICENSING,
+  ROUTE_ERROR_CODES_OPERATING_PARAMETERS,
+  ROUTE_ERROR_CODES_ORGANIZATION,
+  ROUTE_ERROR_CODES_PERSONNEL,
   ROUTE_ERROR_CODES_REQUESTS,
   ROUTE_ERROR_CODES_REQUESTS_SPEND,
-  ROUTE_ERROR_CODES_PERSONNEL,
-  ROUTE_ERROR_CODES_LICENSING,
 ];
 export const ROUTE_ERROR_CODE_PARTS: readonly string[][] = PARTS.map((part) => Object.keys(part));
 export const ROUTE_ERROR_CODES: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> =

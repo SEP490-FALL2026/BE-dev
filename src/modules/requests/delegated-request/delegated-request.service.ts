@@ -12,16 +12,19 @@ import {
   AccessRequestSuperAdminCannotRequestError,
   DelegatedRequestRefusedError,
 } from '../access-request/access-request.errors';
-import { hasSpendStep, mayRequest } from '../access-request/access-request.policy';
+import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
+import { LONG_TERM_MONTHS, nextRequestState } from '../access-request/need-decision.policy';
+import { RequestFactsService } from '../access-request/request-facts.service';
 import type { DelegatedBodyDto } from './delegated-request.dto';
 import { checkDelegation, isHeadOwnShare } from './delegated-request.policy';
-import { LONG_TERM_MONTHS, nextRequestState } from '../access-request/need-decision.policy';
-import { RequestAssessmentService, type Assessment } from '../access-request/request-assessment.service';
-
-/** The row of the routing table of `US-05-03` for a head who sends for somebody else of the department (`AC-6`). */
-const DELEGATED_ROW = 5;
+import {
+  delegatedRequestOf,
+  delegatedRoutedDetail,
+  delegatedSubmittedDetail,
+  type DelegatedSubmission,
+} from './delegated-request-submission.mapper';
 
 /**
  * A head sends requests for the people of the department (`US-03-02`, `US-05-03` rows 5 to 7): one request for every person
@@ -37,7 +40,7 @@ export class DelegatedRequestService {
     private readonly runner: TransactionRunner,
     private readonly repo: AccessRequestRepo,
     private readonly organization: OrganizationApi,
-    private readonly assessment: RequestAssessmentService,
+    private readonly assessment: RequestFactsService,
     private readonly audit: AuditApi,
   ) {}
 
@@ -63,45 +66,10 @@ export class DelegatedRequestService {
 
       const records: AccessRequestRecord[] = [];
       for (const beneficiaryId of body.beneficiaryEmployeeIds) {
-        // A person who is not in the company is outside the department as far as the head is concerned.
-        const exists = await this.organization.getEmployee(beneficiaryId, tx);
-        if (!exists) throw new DelegatedRequestRefusedError('OUTSIDE_DEPARTMENT', beneficiaryId);
-        await this.organization.lockEmployeeForShare(tx, beneficiaryId);
-        const person = await this.organization.getEmployee(beneficiaryId, tx);
-        const unit = (await this.organization.getOwningUnits([beneficiaryId], today, tx)).get(beneficiaryId);
-        const refusal = person
-          ? checkDelegation({
-              actorEmployeeId: actor.employeeId,
-              actorHeadedDepartmentId: headedDepartmentId,
-              beneficiaryEmployeeId: beneficiaryId,
-              beneficiaryDepartmentId: unit?.departmentId ?? null,
-              beneficiaryActive: person.status === 'ACTIVE',
-              beneficiaryWorkEmail: person.workEmail ?? null,
-              beneficiaryEmploymentType: person.employmentType,
-              beneficiaryHireDate: person.hireDate,
-              today,
-              expectedEndDate: body.expectedEndDate,
-              termMonths: body.termMonths,
-              termConfirmed: (body.termConfirmation?.reason ?? '').trim() !== '',
-              longTermMonths: LONG_TERM_MONTHS,
-            })
-          : headedDepartmentId === null
-            ? 'NOT_HEAD'
-            : 'OUTSIDE_DEPARTMENT';
-        if (refusal) throw new DelegatedRequestRefusedError(refusal, beneficiaryId);
-
+        await this.requireDelegable(tx, actor, { beneficiaryId, headedDepartmentId, today }, body);
         for (const item of body.items) {
-          records.push(
-            await this.createOne(tx, actor, {
-              organizationId: head.organizationId,
-              beneficiaryId,
-              item,
-              body,
-              batchId,
-              now,
-              settings,
-            }),
-          );
+          const input = { organizationId: head.organizationId, beneficiaryId, item, body, batchId, now, settings };
+          records.push(await this.createOne(tx, actor, input));
         }
       }
 
@@ -118,6 +86,41 @@ export class DelegatedRequestService {
     return heads.get(own.departmentId)?.employeeId === employeeId ? own.departmentId : null;
   }
 
+  /** The person is locked while the head sends for them; a person who is not in the company is outside the department as far as the head is concerned. */
+  private async requireDelegable(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    who: { beneficiaryId: string; headedDepartmentId: string | null; today: BusinessDate },
+    body: DelegatedBodyDto,
+  ): Promise<void> {
+    const { beneficiaryId, headedDepartmentId, today } = who;
+    const exists = await this.organization.getEmployee(beneficiaryId, tx);
+    if (!exists) throw new DelegatedRequestRefusedError('OUTSIDE_DEPARTMENT', beneficiaryId);
+    await this.organization.lockEmployeeForShare(tx, beneficiaryId);
+    const person = await this.organization.getEmployee(beneficiaryId, tx);
+    const unit = (await this.organization.getOwningUnits([beneficiaryId], today, tx)).get(beneficiaryId);
+    const refusal = person
+      ? checkDelegation({
+          actorEmployeeId: actor.employeeId,
+          actorHeadedDepartmentId: headedDepartmentId,
+          beneficiaryEmployeeId: beneficiaryId,
+          beneficiaryDepartmentId: unit?.departmentId ?? null,
+          beneficiaryActive: person.status === 'ACTIVE',
+          beneficiaryWorkEmail: person.workEmail ?? null,
+          beneficiaryEmploymentType: person.employmentType,
+          beneficiaryHireDate: person.hireDate,
+          today,
+          expectedEndDate: body.expectedEndDate,
+          termMonths: body.termMonths,
+          termConfirmed: (body.termConfirmation?.reason ?? '').trim() !== '',
+          longTermMonths: LONG_TERM_MONTHS,
+        })
+      : headedDepartmentId === null
+        ? 'NOT_HEAD'
+        : 'OUTSIDE_DEPARTMENT';
+    if (refusal) throw new DelegatedRequestRefusedError(refusal, beneficiaryId);
+  }
+
   private async createOne(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
@@ -128,7 +131,7 @@ export class DelegatedRequestService {
       body: DelegatedBodyDto;
       batchId: string;
       now: Date;
-      settings: Awaited<ReturnType<RequestAssessmentService['settings']>>;
+      settings: Awaited<ReturnType<RequestFactsService['settings']>>;
     },
   ): Promise<AccessRequestRecord> {
     const { beneficiaryId, item, body, batchId, now } = input;
@@ -144,51 +147,20 @@ export class DelegatedRequestService {
     });
     if (assessed.heldAccess) throw new AccessRequestAlreadyHoldsAccessError(assessed.heldAccess);
 
-    const own = isHeadOwnShare({ actorEmployeeId: actor.employeeId, beneficiaryEmployeeId: beneficiaryId });
-    const { policy, pricing, unit, routing } = assessed;
-    const { decision } = routing;
-    const confirmedBySending = !own;
-    const assigned = confirmedBySending || decision.outcome === 'ASSIGNED';
-    const needStep: Parameters<AccessRequestRepo['insert']>[1]['needStep'] = confirmedBySending
-      ? {
-          state: 'PENDING' as const,
-          assigneeEmployeeId: actor.employeeId,
-          routingRow: DELEGATED_ROW,
-          waitingReason: null,
-          samePersonAsSpend: false,
-          slaWorkingDays: policy.slaWorkingDays,
-        }
-      : this.routedNeedStep(decision, policy.slaWorkingDays);
-    const created = await this.repo.insert(tx, {
+    const sent: DelegatedSubmission = {
+      actor,
       organizationId: input.organizationId,
-      branch: policy.branch,
-      state: assigned ? 'PENDING' : 'WAITING_CONTROLLED',
-      planId: item.planId,
-      requesterEmployeeId: actor.employeeId,
-      beneficiaryEmployeeIds: [beneficiaryId],
-      departmentId: unit.departmentId,
-      costCenterId: unit.costCenter?.id ?? null,
-      businessReason: body.businessReason,
-      termMonths: body.termMonths,
-      projectLabel: body.projectLabel ?? null,
-      pricing,
-      policy,
-      delegatedBatchId: batchId,
-      expectedEndDate: confirmedBySending ? (body.expectedEndDate ?? null) : null,
-      createdByAppUserId: actor.appUserId,
-      now,
-      needStep,
-    });
-
-    await this.recordSubmitted(tx, actor, input.organizationId, created, assessed, {
-      batchId,
-      delegated: confirmedBySending,
-      state: assigned ? 'PENDING' : 'WAITING_CONTROLLED',
       beneficiaryId,
+      delegated: !isHeadOwnShare({ actorEmployeeId: actor.employeeId, beneficiaryEmployeeId: beneficiaryId }),
       item,
       body,
-    });
-    if (confirmedBySending) await this.confirmNeed(tx, actor, input.organizationId, created, assessed, body, now);
+      batchId,
+      now,
+      assessed,
+    };
+    const created = await this.repo.insert(tx, delegatedRequestOf(sent));
+    await this.auditSubmitted(tx, actor, sent, created);
+    if (sent.delegated) await this.confirmNeed(tx, actor, { sent, created, confirmation: body.termConfirmation });
 
     const record = await this.repo.findById(created.id, tx);
     if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
@@ -196,45 +168,31 @@ export class DelegatedRequestService {
     return record;
   }
 
-  private routedNeedStep(
-    decision: Assessment['routing']['decision'],
-    slaWorkingDays: number,
-  ): Parameters<AccessRequestRepo['insert']>[1]['needStep'] {
-    const assigned = decision.outcome === 'ASSIGNED';
-
-    return {
-      state: assigned ? 'PENDING' : 'WAITING',
-      assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
-      routingRow: decision.row,
-      waitingReason: assigned ? null : decision.reason,
-      samePersonAsSpend: assigned && decision.samePersonAsSpend,
-      slaWorkingDays,
-    };
-  }
-
   /** The need step is approved by the head in the moment of sending: the record is the head's, for the person (`AC-1`, `US-05-03` AC-6). */
   private async confirmNeed(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    organizationId: string,
-    created: { id: string; needStepId: string },
-    assessed: Assessment,
-    body: DelegatedBodyDto,
-    now: Date,
+    done: {
+      sent: DelegatedSubmission;
+      created: { id: string; needStepId: string };
+      confirmation: DelegatedBodyDto['termConfirmation'];
+    },
   ): Promise<void> {
-    const requestState = nextRequestState(assessed.policy.branch);
+    const { sent, created, confirmation } = done;
+    const { organizationId, now } = sent;
+    const requestState = nextRequestState(sent.assessed.policy.branch);
     await this.repo.recordNeedDecision(tx, {
       organizationId,
       requestId: created.id,
       stepId: created.needStepId,
       requestState,
-      departmentId: assessed.unit.departmentId,
+      departmentId: sent.assessed.unit.departmentId,
       record: {
         decision: 'APPROVED',
         decidedByEmployeeId: actor.employeeId,
         deciderRole: 'MANAGER',
         reason: null,
-        termConfirmationReason: body.termConfirmation?.reason.trim() ?? null,
+        termConfirmationReason: confirmation?.reason.trim() ?? null,
         decidedAt: now,
       },
     });
@@ -252,81 +210,42 @@ export class DelegatedRequestService {
           assigneeEmployeeId: actor.employeeId,
           decidedByEmployeeId: actor.employeeId,
           deciderRole: 'MANAGER',
-          departmentId: assessed.unit.departmentId,
+          departmentId: sent.assessed.unit.departmentId,
           requestState,
-          termConfirmed: body.termConfirmation !== undefined,
+          termConfirmed: confirmation !== undefined,
           delegated: true,
         },
       ),
     );
   }
 
-  private async recordSubmitted(
+  /** The request is sent, and the need step is routed (or confirmed by the sending): two entries in the transaction of the request. */
+  private async auditSubmitted(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    organizationId: string,
+    sent: DelegatedSubmission,
     created: { id: string; needStepId: string },
-    assessed: Assessment,
-    extra: {
-      batchId: string;
-      delegated: boolean;
-      state: string;
-      beneficiaryId: string;
-      item: DelegatedBodyDto['items'][number];
-      body: DelegatedBodyDto;
-    },
   ): Promise<void> {
-    const { policy, pricing, unit, routing } = assessed;
-    const { decision } = routing;
     await this.audit.record(
       tx,
-      accessRequestAuditEvent(actor, organizationId, 'ACCESS_REQUEST.SUBMITTED', 'ACCESS_REQUEST', created.id, {
-        branch: policy.branch,
-        state: extra.state,
-        planId: extra.item.planId,
-        termMonths: extra.body.termMonths,
-        requesterEmployeeId: actor.employeeId,
-        beneficiaryEmployeeIds: [extra.beneficiaryId],
-        departmentId: unit.departmentId,
-        costCenterId: unit.costCenter?.id ?? null,
-        policyVersion: policy.version,
-        hasSpendStep: hasSpendStep(policy),
-        slaWorkingDays: policy.slaWorkingDays,
-        pricingStatus: pricing.status,
-        amountMinor: pricing.amount?.amountMinor.toString() ?? null,
-        amountCurrency: pricing.amount?.currency ?? null,
-        budgetYear: pricing.budgetYear,
-        expectedSpendOn: pricing.expectedSpendOn,
-        delegated: extra.delegated,
-        delegatedBatchId: extra.batchId,
-        expectedEndDate: extra.body.expectedEndDate ?? null,
-      }),
+      accessRequestAuditEvent(
+        actor,
+        sent.organizationId,
+        'ACCESS_REQUEST.SUBMITTED',
+        'ACCESS_REQUEST',
+        created.id,
+        delegatedSubmittedDetail(sent),
+      ),
     );
     await this.audit.record(
       tx,
       accessRequestAuditEvent(
         actor,
-        organizationId,
+        sent.organizationId,
         'ACCESS_REQUEST.NEED_STEP_ROUTED',
         'ACCESS_REQUEST_STEP',
         created.needStepId,
-        {
-          requestId: created.id,
-          routingRow: extra.delegated ? DELEGATED_ROW : decision.row,
-          outcome: extra.delegated ? 'CONFIRMED_BY_SENDING' : decision.outcome,
-          assigneeEmployeeId: extra.delegated
-            ? actor.employeeId
-            : decision.outcome === 'ASSIGNED'
-              ? decision.assigneeEmployeeId
-              : null,
-          role: extra.delegated ? 'MANAGER' : decision.outcome === 'ASSIGNED' ? decision.role : null,
-          waitingReason: !extra.delegated && decision.outcome === 'WAITING' ? decision.reason : null,
-          samePersonAsSpend: !extra.delegated && decision.outcome === 'ASSIGNED' && decision.samePersonAsSpend,
-          requesterEmployeeId: actor.employeeId,
-          beneficiaryEmployeeId: extra.beneficiaryId,
-          departmentId: unit.departmentId,
-          departmentHeadEmployeeId: routing.departmentHeadEmployeeId,
-        },
+        delegatedRoutedDetail(sent, created.id),
       ),
     );
   }

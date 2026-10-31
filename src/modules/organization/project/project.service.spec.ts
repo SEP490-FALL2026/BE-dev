@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../public/organization.api';
+import { OrganizationContextService } from '../organization-context.service';
 import { HR_BASIS } from '../../../../test/support/hr-basis';
 import { ProjectForbiddenError, ProjectInvalidError, ProjectNotFoundError } from './project.errors';
 import { ProjectRepo } from './project.repo';
@@ -11,7 +11,7 @@ import { ProjectRecord } from './project.types';
 
 /**
  * What the project service does around its repository (`US-03-06` AC-14), pinned before the project capability moved
- * out of the module root (H4.2): the order of lock, check, write and audit inside one transaction, the read-back after
+ * out of the module root: the order of lock, check, write and audit inside one transaction, the read-back after
  * it, and the cases that write nothing. Driven through the public methods with an in-memory repository.
  */
 describe('ProjectService', () => {
@@ -70,7 +70,7 @@ describe('ProjectService', () => {
       providers: [
         ProjectService,
         { provide: ProjectRepo, useValue: repo },
-        { provide: OrganizationApi, useValue: organization },
+        { provide: OrganizationContextService, useValue: { findOrganization: organization.getOrganization } },
         { provide: AuditApi, useValue: audit },
         { provide: TransactionRunner, useValue: runner },
       ],

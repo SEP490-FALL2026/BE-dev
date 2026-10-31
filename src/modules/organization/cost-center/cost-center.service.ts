@@ -11,7 +11,8 @@ import {
 } from './cost-center-name.policy';
 import { assertMayMaintainCostCenters, assertMayReadCostCenters } from './cost-center.policy';
 import { CostCenterRepo } from './cost-center.repo';
-import { CostCenterKind, CostCenterRecord, CostCenterStatus } from './cost-center.types';
+import { CostCenterRecord } from './cost-center.types';
+import { CostCenterKind, CostCenterStatus } from '../organization-structure.types';
 import {
   CostCenterDepartmentAlreadyLinkedError,
   CostCenterDepartmentNotActiveError,
@@ -21,8 +22,9 @@ import {
   CostCenterNameReservedError,
   CostCenterNotFoundError,
 } from './cost-center.errors';
-import { organizationAuditEvent } from '../mappers/audit-event.mapper';
-import { OrganizationApi } from '../public/organization.api';
+import { organizationAuditEvent } from '../organization-audit-event.mapper';
+import { OrganizationContextService } from '../organization-context.service';
+import { DepartmentUseService } from '../department/department-use.service';
 
 /** How many of each kind of open obligation the refusal to retire a cost center lists. */
 const IN_USE_LISTED = 20;
@@ -37,7 +39,8 @@ const IN_USE_LISTED = 20;
 export class CostCenterService {
   constructor(
     private readonly repo: CostCenterRepo,
-    private readonly organization: OrganizationApi,
+    private readonly context: OrganizationContextService,
+    private readonly use: DepartmentUseService,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -158,7 +161,7 @@ export class CostCenterService {
       if (!current) throw new CostCenterNotFoundError();
       if (current.status === 'INACTIVE') return current;
 
-      const open = await this.organization.getCostCenterUse(id, IN_USE_LISTED, tx);
+      const open = await this.use.readCostCenter(id, IN_USE_LISTED, tx);
       if (open.requests.total > 0 || open.commitments.total > 0)
         throw new CostCenterInUseError(current.department, open);
 
@@ -231,7 +234,7 @@ export class CostCenterService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.context.findOrganization();
     if (!organization) throw new Error('The cost center catalogue was used before installation');
 
     return organization;

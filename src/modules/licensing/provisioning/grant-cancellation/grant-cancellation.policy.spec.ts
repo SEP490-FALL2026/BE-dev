@@ -23,7 +23,7 @@ describe('what cancelling the grant of a request does to its task (US-05-08, US-
     ['COMPLETED', 'BENEFICIARY_LEFT', true, 'COMPLETED'],
     ['CLOSED_FAILED', 'BENEFICIARY_LEFT', true, 'ENDED'],
     ['CANCELLED', 'REQUESTER_WITHDREW', false, 'ENDED'],
-    // A beneficiary who was transferred needs the confirmation of the check with the vendor for every open task, in any state (F29, spec E).
+    // A beneficiary who was transferred needs the confirmation of the check with the vendor for every open task, in any state.
     ['QUEUED', 'BENEFICIARY_TRANSFERRED', false, 'EVIDENCE_REQUIRED'],
     ['QUEUED', 'BENEFICIARY_TRANSFERRED', true, 'CANCEL'],
     ['RETRY_SCHEDULED', 'BENEFICIARY_TRANSFERRED', false, 'EVIDENCE_REQUIRED'],

@@ -7,7 +7,7 @@ import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { ProvisioningTaskNotFoundError } from '../public/licensing.errors';
 import type { SelfExecutionMode } from '../public/licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { assertItAdmin, selfExecution } from './provisioning.policy';
 import type { ProvisioningTaskRecord } from './provisioning-task.types';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
@@ -24,10 +24,10 @@ export interface TaskWorkContext {
 
 /**
  * The shared frame of what a person does to a task, whichever action it is: the role of the person (only an IT Admin, judged
- * here and not only by the guard of the route, F13), the task locked, the rule of the action on its state, the rule for an IT
+ * here and not only by the guard of the route), the task locked, the rule of the action on its state, the rule for an IT
  * Admin who is the beneficiary (`QĐ-77m`), then the write and its audit event in the same transaction. The audit event carries
  * the state before, the person in charge by default and whether the IT Admin served themselves; the Super Admin is told once for
- * a task an IT Admin served themselves (`SoD-5`, F24). A write that returns false changed nothing and records nothing.
+ * a task an IT Admin served themselves (`SoD-5`). A write that returns false changed nothing and records nothing.
  */
 @Injectable()
 export class ProvisioningTaskFrame {

@@ -7,7 +7,7 @@ import { CostCenterDirectionRepo } from '../cost-center-direction/cost-center-di
 import type { ActivateCommand, ActivateResult, LinkCommand, LinkResult } from './cost-center-direction.types';
 
 /**
- * The two procedures that finish the move of the Cost Center link (F01, `QĐ-87d(1)`, spec L.11): `activate` records, once,
+ * The two procedures that finish the move of the Cost Center link (`QĐ-87d(1)`): `activate` records, once,
  * that this installation runs the compatibility release, and `link` gives ONE Cost Center that has no department its
  * department on the basis Finance approved. Each is one transaction with an Audit Trail event; nothing is inferred and
  * nothing is written when anything is refused. There is no principal: the command is the operator's (`OPERATOR`).
@@ -79,7 +79,7 @@ export class CostCenterDirectionApi {
       const organizationId = await this.repo.organizationOf(tx, command.costCenterId);
       if (!organizationId) throw new DirectionRefusedError('COST_CENTER_NOT_FOUND');
 
-      // Lock order (T-11): the department, then the Cost Center, as `costCenterCreate` takes them for the same department.
+      // Lock order: the department, then the Cost Center, as `costCenterCreate` takes them for the same department.
       const department = await this.repo.lockDepartmentByCode(tx, organizationId, command.departmentCode);
       const costCenter = await this.repo.lockCostCenter(tx, command.costCenterId);
       if (!costCenter || costCenter.organizationId !== organizationId) {

@@ -26,7 +26,7 @@ export interface ApplicationRecord {
   updatedAt: Date;
 }
 
-/** What a row of the application list shows (`LD-04`): no domains, no communication note, no dictionary line. */
+/** What a row of the application list shows: no domains, no communication note, no dictionary line. */
 export interface ApplicationSummaryRecord {
   id: string;
   name: string;

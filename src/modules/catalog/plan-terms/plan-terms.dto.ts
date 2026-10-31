@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /**
  * Only the shape and a generous bound are checked here. Whether a link is an http or https address, a text is within 2000
@@ -9,7 +9,6 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
  * answers with its own `PLAN_TERMS.*` code. The object is strict: there is no field for a legal conclusion, and the sharing
  * policy is not a field here because it is entered once, on the plan.
  */
-const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 const text = z.string().max(10000).nullable().optional();
 
 export const planTermsBodySchema = z.strictObject({

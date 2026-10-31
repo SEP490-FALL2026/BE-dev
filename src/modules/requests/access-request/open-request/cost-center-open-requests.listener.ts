@@ -8,11 +8,14 @@ import type { UseGroup } from '../../../organization/public/organization-use.typ
 import { RequestUseRepo, toUseGroup } from './request-use.repo';
 
 /**
- * The requests with a cost, charged to a Cost Center, that are not over keep it in use (`REQUESTS`, `QĐ-87d(2)`, F16): the commitments
- * still held are told by budgets. A free internal request charges nothing (F91) and a draft has no Cost Center, so neither is one of them.
+ * The requests with a cost, charged to a Cost Center, that are not over keep it in use (`REQUESTS`, `QĐ-87d(2)`): the commitments
+ * still held are told by budgets. A free internal request charges nothing and a draft has no Cost Center, so neither is one of them.
  */
 @Injectable()
 export class CostCenterOpenRequestsReader implements CostCenterUseReader, OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [CostCenterUseContributions] as const;
+
   readonly group = 'REQUESTS';
 
   constructor(

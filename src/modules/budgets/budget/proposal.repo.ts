@@ -26,7 +26,7 @@ export interface ProposalRecord {
   year: number;
   state: ProposalState;
   previousProposalId: string | null;
-  /** The proposal this one follows, when the version made from that one was refused and the need changed (F63). */
+  /** The proposal this one follows, when the version made from that one was refused and the need changed. */
   successorOfProposalId: string | null;
   /** The proposal that follows this one, if any: at most one. */
   successorProposalId: string | null;
@@ -40,7 +40,7 @@ export interface ProposalRecord {
   withdrawnAt: Date | null;
   /** When a successor was sent; null while there is none. */
   succeededAt: Date | null;
-  /** When the closure of the year closed it (F62). */
+  /** When the closure of the year closed it. */
   closedAt: Date | null;
 }
 
@@ -49,7 +49,7 @@ export interface NewProposal {
   costCenterId: string;
   year: number;
   previousProposalId: string | null;
-  /** Set by the system when this proposal follows a reviewed one whose version was refused (F63); never by a client. */
+  /** Set by the system when this proposal follows a reviewed one whose version was refused; never by a client. */
   successorOfProposalId?: string | null;
   currency: string;
   totalMinor: bigint;
@@ -152,7 +152,7 @@ export class ProposalRepo {
     return row ? toRecord(row) : null;
   }
 
-  /** Locked `FOR NO KEY UPDATE` until the transaction ends, so a withdrawal and a return of the same proposal queue (F69: no lock that conflicts with a `KEY SHARE` of a foreign key). */
+  /** Locked `FOR NO KEY UPDATE` until the transaction ends, so a withdrawal and a return of the same proposal queue (no lock that conflicts with a `KEY SHARE` of a foreign key). */
   async lockById(tx: DbTx, id: string): Promise<ProposalRecord | null> {
     const locked = await tx.$queryRaw<
       { id: string }[]

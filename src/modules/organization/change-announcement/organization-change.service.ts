@@ -29,7 +29,7 @@ export class OrganizationChangeService {
     private readonly runner: TransactionRunner,
   ) {}
 
-  /** F47 (`ops:inspect`): the changes that had taken effect at `asOf` in their organization's calendar and were never marked as told. */
+  /** For `ops:inspect`: the changes that had taken effect at `asOf` in their organization's calendar and were never marked as told. */
   countUnmarkedAsOf(
     tx: DbTx,
     asOf: Date,

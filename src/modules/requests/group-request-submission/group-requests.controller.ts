@@ -10,9 +10,9 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AccessRequestQueryService } from '../access-request/access-request-query.service';
-import { toWire } from '../access-request/access-request.mapper';
-import { PricingViewService } from '../access-request/pricing-view.service';
+import { AccessRequestQueryService } from '../request-view/access-request-query.service';
+import { toWire } from '../request-view/access-request.mapper';
+import { PricingViewService } from '../request-view/pricing-view.service';
 import { GroupCandidateService } from './group-candidate.service';
 import {
   GroupBodyDto,

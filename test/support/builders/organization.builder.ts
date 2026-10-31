@@ -5,12 +5,12 @@ import {
 } from '../../../src/modules/identity-access/approval-roles/approval-role.dto';
 import { CostCenterService } from '../../../src/modules/organization/cost-center/cost-center.service';
 import { CreateCostCenterBodyDto } from '../../../src/modules/organization/cost-center/cost-center.dto';
-import { DepartmentHeadService } from '../../../src/modules/organization/department/department-head.service';
-import { DepartmentService } from '../../../src/modules/organization/department/department.service';
+import { DepartmentHeadService } from '../../../src/modules/organization/department-management/department-head.service';
+import { DepartmentService } from '../../../src/modules/organization/department-management/department.service';
 import {
   AssignHeadBodyDto,
   CreateDepartmentBodyDto,
-} from '../../../src/modules/organization/department/department.dto';
+} from '../../../src/modules/organization/department-management/department.dto';
 import { EmployeeManualService } from '../../../src/modules/organization/employee/employee-manual.service';
 import { CreateEmployeeBodyDto } from '../../../src/modules/organization/employee/employee.dto';
 import type { HttpTestApp } from '../http-test-app';

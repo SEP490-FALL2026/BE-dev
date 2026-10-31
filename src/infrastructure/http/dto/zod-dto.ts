@@ -12,7 +12,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 /**
  * The application's DTO factory: nestjs-zod's `createZodDto`, unchanged at runtime (same schema, validation,
- * serialization and `Output` variant), with one correction to what @nestjs/swagger reads (OPENAPI-EXAMPLE.1-F3).
+ * serialization and `Output` variant), with one correction to what @nestjs/swagger reads.
  *
  * Since Zod 4.6 a bare union of types — a refined or plain `string().nullable()` — is emitted as `type: ["string",
  * "null"]`. nestjs-zod passes each top-level property's `type` to Swagger as it is, and Swagger reads a `type` array as

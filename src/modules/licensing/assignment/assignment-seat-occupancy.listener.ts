@@ -13,6 +13,9 @@ import { AssignmentRepo } from './assignment.repo';
  */
 @Injectable()
 export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [SeatOccupancyHook] as const;
+
   constructor(
     private readonly repo: AssignmentRepo,
     private readonly hook: SeatOccupancyHook,

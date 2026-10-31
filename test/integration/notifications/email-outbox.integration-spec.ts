@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { SMTPServer } from 'smtp-server';
 import { fakeSmtpEnvironment, listenOnLoopback } from '../../support/fake-smtp';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { EmailDispatcher } from '../../../src/modules/notifications/email-dispatcher.service';
+import { EmailDispatcher } from '../../../src/modules/notifications/email/email-dispatcher.service';
 import { NotificationsApi } from '../../../src/modules/notifications/public/notifications.api';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
 

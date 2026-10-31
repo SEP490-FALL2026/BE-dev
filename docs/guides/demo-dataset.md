@@ -29,6 +29,9 @@ không có endpoint seed, không dùng `dev:seed`, không thay image API/worker,
   `IdentityAccessApi.prepareCredential`, và ghi Audit Trail `DEMO_DATASET.ACCOUNT_CREATED` với
   `operatorReference = DEMO_DATASET:<fixture>:<tham chiếu operator>`. Phần này chạy bằng **runtime role** của API: với
   `NODE_ENV=production` lệnh kiểm vai PostgreSQL trước mọi việc và dừng nếu là superuser, owner hay deploy role.
+- **Giới hạn của tài khoản `FINANCE` (Owner 30/10/2026):** cấp vai `FINANCE` phát thay đổi vai trò phê duyệt mà graph của lệnh
+  không có listener của `requests` trả lời, nên một step đang chờ Finance **không** được thử lại (đường API thì thử lại); trên
+  database dataset nhắm tới chưa có step nào chờ Finance.
 - **Trước khi ghi**, lệnh chứng minh đúng đích: database có tổ chức đúng tên `DEMO_ORGANIZATION_NAME`, tiền tệ báo cáo
   là `VND`, và API ở URL đã cho phục vụ đúng database đó (Super Admin đăng nhập qua API phải là người giữ vai mà
   database ghi). Sai bất kỳ điều nào: từ chối (exit 3), không ghi bản ghi nào của dataset.

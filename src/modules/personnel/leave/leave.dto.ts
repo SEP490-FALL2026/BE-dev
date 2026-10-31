@@ -1,9 +1,8 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
 
-const businessDate = z.string().refine(isBusinessDate, { message: 'The day must be a real date as YYYY-MM-DD.' });
 const flag = z.enum(['true', 'false']).transform((value) => value === 'true');
 
 /**
@@ -20,18 +19,18 @@ const groundsBodySchema = z.strictObject({
 /** Strict: a field the route does not know, such as the reason for the leave, is refused and never kept. */
 const startBodySchema = z.strictObject({
   employeeId: z.uuid(),
-  startedOn: businessDate,
-  approvedReturnOn: businessDate,
+  startedOn: businessDay,
+  approvedReturnOn: businessDay,
   grounds: groundsBodySchema.optional(),
 });
 
 const changeReturnDateBodySchema = z.strictObject({
-  newApprovedReturnOn: businessDate,
+  newApprovedReturnOn: businessDay,
   grounds: groundsBodySchema.optional(),
 });
 
 const confirmReturnBodySchema = z.strictObject({
-  returnedOn: businessDate,
+  returnedOn: businessDay,
   grounds: groundsBodySchema.optional(),
 });
 
@@ -77,11 +76,11 @@ export const leaveSummarySchema = z.strictObject({
 });
 
 export const leaveDetailSchema = leaveSummarySchema.extend({
-  /** The basis of the approved day of return in force. Null in the minimal projection an IT Admin reads (F12). */
+  /** The basis of the approved day of return in force. Null in the minimal projection an IT Admin reads. */
   grounds: groundsSchema.nullable(),
   endKind: z.enum(['RETURNED', 'DEPARTURE_STARTED']).nullable(),
   resumesLeaveId: z.uuid().nullable(),
-  /** The account that started it; null when the controlled procedure did (`startedByProcedure`, spec L.2). */
+  /** The account that started it; null when the controlled procedure did (`startedByProcedure`). */
   startedByAppUserId: z.uuid().nullable(),
   /** True when the leave was recorded by the controlled procedure `pnpm ops:record-super-admin-event` and not by an account. */
   startedByProcedure: z.boolean(),
@@ -96,7 +95,7 @@ const changeSchema = z.strictObject({
   returnedOn: z.string().nullable(),
   onSchedule: z.boolean().nullable(),
   grounds: groundsSchema.nullable(),
-  /** The account that recorded it; null when the controlled procedure did (`recordedByProcedure`, spec L.2). */
+  /** The account that recorded it; null when the controlled procedure did (`recordedByProcedure`). */
   recordedByAppUserId: z.uuid().nullable(),
   recordedByProcedure: z.boolean(),
   recordedAt: z.iso.datetime(),

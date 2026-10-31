@@ -2,7 +2,7 @@ import type { Command } from './run-command';
 
 /**
  * The out-of-HTTP commands: the one list `src/cli.ts` dispatches on and `scripts/build/emit-cli-aliases.mjs` writes the
- * old entry files from (OD-A7). A command's code lives in `src/cli/<name>/`; `load` imports it only when it runs, so
+ * old entry files from. A command's code lives in `src/cli/<name>/`; `load` imports it only when it runs, so
  * reading this table loads no command, module graph or environment.
  */
 export interface CommandEntry {

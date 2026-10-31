@@ -24,7 +24,7 @@ export const LOCAL_SEED_OPERATOR_REFERENCE = 'LOCAL_SEED';
 type Credentials = Map<string, { password: string; hash: string; hashPolicyVersion: number }>;
 
 /**
- * `pnpm dev:seed` (H6.2): the local demo data, through the owning services and the Audit Trail. The department is written
+ * `pnpm dev:seed`: the local demo data, through the owning services and the Audit Trail. The department is written
  * before the Cost Center created for it (`QĐ-87d`(1)), the people carry no job title and no Cost Center activation row is
  * written (the final code never reads one). The three local guards
  * are checked first; then a plan is read, the new passwords are hashed outside any transaction, and one transaction

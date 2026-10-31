@@ -11,8 +11,8 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AccessRequestQueryService } from '../access-request/access-request-query.service';
-import { toWire } from '../access-request/access-request.mapper';
+import { AccessRequestQueryService } from '../request-view/access-request-query.service';
+import { toWire } from '../request-view/access-request.mapper';
 import { LineClosureBodyDto, LineParamsDto } from '../group-request/group-decision.dto';
 import { GroupLineClosureService } from './group-line-closure.service';
 import { GroupResponseDto } from '../group-request/group-request.dto';

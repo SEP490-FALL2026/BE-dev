@@ -5,7 +5,8 @@ import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { CostCenterCodeTakenError, CostCenterDepartmentAlreadyLinkedError } from './cost-center.errors';
 import { CostCenterBrief, CreateCostCenterInput } from '../public/organization.types';
-import { CostCenterKind, CostCenterRecord, CostCenterStatus } from './cost-center.types';
+import { CostCenterRecord } from './cost-center.types';
+import { CostCenterKind, CostCenterStatus } from '../organization-structure.types';
 
 interface CostCenterRow {
   id: string;
@@ -67,7 +68,7 @@ export class CostCenterRepo {
     });
   }
 
-  /** Whether the operator has activated the Cost Center link (`ops:cost-center-direction activate`, spec L.11): one organization per installation. */
+  /** Whether the operator has activated the Cost Center link (`ops:cost-center-direction activate`): one organization per installation. */
   async isDirectionActivated(tx?: DbTx): Promise<boolean> {
     return (await (tx ?? this.prisma).costCenterDirectionActivation.count()) > 0;
   }
@@ -103,7 +104,7 @@ export class CostCenterRepo {
 
   /**
    * A Cost Center for a department, linked in the same statement: the link begins when the Cost Center is created, so
-   * `linkedAt` is the same moment as `createdAt` and never before the department's own (F68). Throws
+   * `linkedAt` is the same moment as `createdAt` and never before the department's own. Throws
    * CostCenterCodeTakenError, or CostCenterDepartmentAlreadyLinkedError when the department already has one in use.
    */
   async insert(

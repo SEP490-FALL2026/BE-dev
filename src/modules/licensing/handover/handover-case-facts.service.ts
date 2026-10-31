@@ -14,7 +14,7 @@ const CALENDAR_WINDOW_DAYS = 90;
 
 /**
  * What the opening of a duty reads of the organization and the calendar: today, the department a person is in, who heads it, and
- * the deadline of a short handover (`OQ-D-05`: one parameter for the short cases, one for the hold after an abrupt departure).
+ * the deadline of a short handover (one parameter for the short cases, one for the hold after an abrupt departure).
  */
 @Injectable()
 export class HandoverCaseFacts {

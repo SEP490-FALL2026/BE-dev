@@ -5,12 +5,12 @@ import type { SeatBaselineClosedEvent } from '../../licensing/public/licensing.e
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { TransferReviewRepo } from './transfer-review.repo';
 import { TransferReviewService } from './transfer-review.service';
 
 /**
- * The review after the setup (F21, `QĐ-89e`): when the IT Admin closes the seat baseline, every person who holds a seat on a
+ * The review after the setup (`QĐ-89e`): when the IT Admin closes the seat baseline, every person who holds a seat on a
  * subscription that ANOTHER department owns gets a review of those seats, decided by the head of the department of the HOLDER today,
  * with the same deadline, the same reminders and the same rule as the review after a transfer: nothing is revoked by itself, a late
  * review is only told, and a tool no longer needed opens a revocation whose source is `POST_SETUP_REVIEW`. It reuses the model of the

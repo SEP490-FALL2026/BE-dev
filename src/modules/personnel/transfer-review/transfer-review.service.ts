@@ -7,7 +7,7 @@ import { OperatingParametersApi } from '../../operating-parameters/public/operat
 import { OrganizationApi } from '../../organization/public/organization.api';
 import type { OrganizationChange } from '../../organization/public/organization.types';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { reviewDueOn } from './transfer-review.policy';
 import { TransferReviewRepo } from './transfer-review.repo';
 
@@ -20,7 +20,7 @@ const CALENDAR_WINDOW_DAYS = 90;
  * `QĐ-90b`): one line for every personal seat they hold, paid or internal, whatever any list says. It runs in the transaction of the
  * change, once for each placement: a person who holds no seat gets no review and their head no work. The seats are never touched
  * here: they stay as they were until the head decides. The head of the department the person came to is told the deadline in the same
- * transaction; a department that has no head yet keeps the notice for the first one (`QĐ-62c`, F17).
+ * transaction; a department that has no head yet keeps the notice for the first one (`QĐ-62c`).
  */
 @Injectable()
 export class TransferReviewService {
@@ -93,7 +93,7 @@ export class TransferReviewService {
     review: { id: string; organizationId: string; employeeId: string; departmentId: string; dueOn: string },
   ): Promise<void> {
     const today = await this.organization.businessToday(new Date(), tx);
-    // The department is taken FOR SHARE before its head is read (T-11): the assignment of a first head holds it FOR UPDATE and hands
+    // The department is taken FOR SHARE before its head is read: the assignment of a first head holds it FOR UPDATE and hands
     // over the notices kept before it commits, so a notice is never kept for a department that has a head by then.
     await this.organization.lockDepartmentShared(tx, review.departmentId);
     const head = (await this.organization.getDepartmentHeads([review.departmentId], today, tx)).get(

@@ -38,7 +38,9 @@ try {
 }
 ```
 
-Bốn suite vai PostgreSQL của H7 (`database-roles-*`, `database-runtime-*`) đóng vai quản trị cluster: chúng tạo/xóa vai
+Các suite vai PostgreSQL của H7 trong `test/integration/_serial/` (`database-roles-*`: provision, refusals, upgrade-rehearsal;
+`database-runtime-*`: quyền tối thiểu, API và worker dưới runtime role, đường ghi budgets/leave/BM-09/BM-11 và quyền sequence)
+đóng vai quản trị cluster: chúng tạo/xóa vai
 `slm_<hex>_deploy`/`slm_<hex>_runtime` và database `slm_<hex>_test` qua `support/role-separated-database.ts`, nên cần thêm
 `TEST_DATABASE_BOOTSTRAP_URL` = **superuser** của đúng server test cô lập đó (ví dụ trên:
 `postgresql://ci_bootstrap:ci-bootstrap-only@127.0.0.1:55432/postgres`; CI đặt cùng giá trị cho service container). Thiếu
@@ -216,6 +218,10 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
 - `support/placement-coverage.ts`: truy vấn kiểm coverage của placement (bắt khoảng trống mà exclusion
   constraint cho phép). Chạy ở cuối test ghi dữ liệu tổ chức.
 - `support/test-config.ts`: `ConfigService` có kiểu cho test tự dựng service.
+- `support/pretend-today.ts`: `pretendBusinessToday(app, day)`, cách **duy nhất** để test nói tổ chức đang ở ngày nào: stub
+  `OrganizationContextService.businessToday`, chỗ capability của `organization` đọc ngày trực tiếp và `OrganizationApi.businessToday`
+  ủy quyền vào. Spy trên facade chỉ điều khiển module khác, capability của `organization` vẫn đọc ngày thật; các harness
+  (`pretendToday(day)`, `today(day)`) đều đi qua helper này.
 - `support/pg-relay.ts`: `PgRelay`, relay TCP trước PostgreSQL trên `127.0.0.1` (cổng ngẫu nhiên) để mô phỏng
   database ngừng trả lời mà không cần pause container. `pause()`/`resume()` dừng và nối lại mọi byte hai chiều (không
   lỗi, không phản hồi). `holdWhen(regex)` cho lưu lượng đi qua tới khi một kết nối gửi câu lệnh có **văn bản SQL**

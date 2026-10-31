@@ -3,7 +3,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event.mapper';
+import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { ContractNotFoundError } from './contract.errors';
 import { cleanContractName } from './contract.policy';
 import { ContractRepo, type ContractRecord } from './contract.repo';

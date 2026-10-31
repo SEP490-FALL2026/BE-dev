@@ -1,4 +1,10 @@
-import { checkNeedDecision, deciderRoleOf, nextRequestState, type DecisionFacts } from './need-decision.policy';
+import {
+  checkNeedDecision,
+  deciderRoleOf,
+  needDecisionOutcome,
+  nextRequestState,
+  type DecisionFacts,
+} from './need-decision.policy';
 
 const facts = (patch: Partial<DecisionFacts> = {}): DecisionFacts => ({
   actorEmployeeId: 'head',
@@ -83,5 +89,60 @@ describe('what a decision leads to', () => {
 
   it('has no role for a row that gives the step to nobody', () => {
     expect(() => deciderRoleOf(8)).toThrow();
+  });
+});
+
+describe('what a decision of the need step leads to (US-05-04 AC-12, AC-16, US-06-14)', () => {
+  const asked = (
+    branch: 'INTERNAL_FREE' | 'PAID_IN_CATALOG' | 'NEW_SOFTWARE',
+    routingRow = 1,
+    hasSpendStep = true,
+  ) => ({
+    branch,
+    routingRow,
+    hasSpendStep,
+  });
+
+  it('sends an approved request on by its branch, in the role of the row, and a refused one to REJECTED', () => {
+    expect(needDecisionOutcome(asked('INTERNAL_FREE', 1, false), approve)).toMatchObject({
+      approved: true,
+      requestState: 'AWAITING_EXECUTION',
+      deciderRole: 'MANAGER',
+    });
+    expect(needDecisionOutcome(asked('NEW_SOFTWARE', 3), approve)).toMatchObject({
+      requestState: 'AWAITING_IT_ASSESSMENT',
+      deciderRole: 'FALLBACK_APPROVER',
+    });
+    expect(needDecisionOutcome(asked('PAID_IN_CATALOG', 2), { decision: 'REJECT' })).toMatchObject({
+      approved: false,
+      requestState: 'REJECTED',
+      deciderRole: 'SPENDING_APPROVER',
+    });
+  });
+
+  it('has the head choose the line only when a head approves a request that costs money', () => {
+    expect(needDecisionOutcome(asked('PAID_IN_CATALOG', 1), approve).headChoosesLine).toBe(true);
+    expect(needDecisionOutcome(asked('PAID_IN_CATALOG', 1), { decision: 'REJECT' }).headChoosesLine).toBe(false);
+    expect(needDecisionOutcome(asked('PAID_IN_CATALOG', 2), approve).headChoosesLine).toBe(false);
+    expect(needDecisionOutcome(asked('INTERNAL_FREE', 1, false), approve).headChoosesLine).toBe(false);
+  });
+
+  it('keeps the reason for a long term only for an approval, trimmed, and none when it is blank', () => {
+    expect(
+      needDecisionOutcome(asked('INTERNAL_FREE'), { ...approve, termConfirmationReason: ' Cần 18 tháng ' }),
+    ).toMatchObject({
+      termConfirmationReason: 'Cần 18 tháng',
+    });
+    expect(
+      needDecisionOutcome(asked('INTERNAL_FREE'), { ...approve, termConfirmationReason: '  ' }).termConfirmationReason,
+    ).toBeNull();
+    expect(
+      needDecisionOutcome(asked('INTERNAL_FREE'), { decision: 'REJECT', termConfirmationReason: 'x' })
+        .termConfirmationReason,
+    ).toBeNull();
+  });
+
+  it('has no decider for a row that gives the step to nobody', () => {
+    expect(() => needDecisionOutcome(asked('INTERNAL_FREE', 8), approve)).toThrow();
   });
 });

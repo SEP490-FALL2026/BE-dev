@@ -1,6 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { EmployeeRecord } from '../../organization/public/organization.types';
-import type { ReadAccess } from '../policies/personnel-self-action.policy';
+import type { ReadAccess } from '../personnel-self-action.policy';
 import type { LeaveChangeWire, LeaveDetailWire, LeaveSummaryWire } from './leave.dto';
 import { isReturnOverdue } from './leave.policy';
 import type { LeaveChangeRecord, LeaveRecord, LeaveSummaryRecord } from './leave.types';
@@ -29,7 +29,7 @@ export function toSummary(
   };
 }
 
-/** The leave in full for the Super Admin; for the IT Admin without the basis of the approved day (F12). */
+/** The leave in full for the Super Admin; for the IT Admin without the basis of the approved day. */
 export function toDetail(
   record: LeaveRecord,
   employees: ReadonlyMap<string, EmployeeRecord>,

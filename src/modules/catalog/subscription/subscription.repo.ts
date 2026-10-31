@@ -14,7 +14,7 @@ import type {
   UnitPriceRecord,
 } from './subscription.types';
 
-/** The plan, its application and the vendor of it, only as far as a subscription is answered with them (`LD-01`). */
+/** The plan, its application and the vendor of it, only as far as a subscription is answered with them. */
 const WITH_PLAN = {
   plan: {
     select: {

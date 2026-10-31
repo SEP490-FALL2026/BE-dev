@@ -5,7 +5,7 @@ import { readSqlState, TransactionRunner, type DbTx } from '../../../infrastruct
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { financeAuditEvent } from '../mappers/finance-audit-event.mapper';
+import { financeAuditEvent } from '../finance-audit-event.mapper';
 import { TaxProfileVendorNotFoundError } from '../public/finance.errors';
 import {
   DEFAULT_TAX_PROFILE,

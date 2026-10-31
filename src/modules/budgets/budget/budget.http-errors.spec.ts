@@ -62,7 +62,7 @@ const answer = (error: unknown) => {
 };
 
 /**
- * One code, one message (Owner, Prompt 02, 26/10/2026): the writer that loses the race at the unique index answers exactly
+ * One code, one message (Owner, 26/10/2026): the writer that loses the race at the unique index answers exactly
  * what the check before it answers, so the contract shows a single message for each of these codes.
  */
 describe('toBudgetApiException: the loser of a race answers as the check does', () => {

@@ -7,7 +7,7 @@ import { NotificationsApi } from '../../notifications/public/notifications.api';
 import type { InAppNotificationCode, InAppParamValue } from '../../notifications/public/notifications.types';
 import { OrganizationApi } from '../../organization/public/organization.api';
 
-/** What happened to a person that the people concerned are told (`F17`, spec B "Thông báo bù"). Codes only: no name, no basis. */
+/** What happened to a person that the people concerned are told. Codes only: no name, no basis. */
 export type PersonnelEventKind =
   | 'TRANSFER_RECORDED'
   | 'TRANSFER_RESCHEDULED'
@@ -27,7 +27,7 @@ interface Common {
 }
 
 /**
- * Writes the in-app notices that the personnel context owes (F17, spec B), always in the transaction of the event so a notice exists
+ * Writes the in-app notices that the personnel context owes, always in the transaction of the event so a notice exists
  * exactly when the event commits. Who is told is decided here and nowhere else: the person the event is about and the heads
  * concerned for a recorded or changed event, the Super Admin for a notice of a head that is new or late and for a departure that
  * leaves a role with nobody to take it, the Super Admin and the IT Admin in charge for an abrupt departure, and the head of the

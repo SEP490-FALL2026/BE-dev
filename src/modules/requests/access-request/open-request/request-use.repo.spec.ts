@@ -2,7 +2,7 @@ import type { PrismaService } from '../../../../infrastructure/database/prisma.s
 import { RequestUseRepo } from './request-use.repo';
 
 /**
- * What keeps a department and a Cost Center in use (`QĐ-90e`, `QĐ-87d(2)`, F15, F16, F91): a department by every request not over, a Cost
+ * What keeps a department and a Cost Center in use (`QĐ-90e`, `QĐ-87d(2)`): a department by every request not over, a Cost
  * Center only by a request with a cost. A free internal request carries the Cost Center of its department but charges nothing.
  */
 describe('RequestUseRepo', () => {

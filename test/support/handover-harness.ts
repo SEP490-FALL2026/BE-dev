@@ -5,6 +5,7 @@ import { TransactionRunner } from '../../src/infrastructure/database/transaction
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { HandoverOverdueService } from '../../src/modules/licensing/handover/handover-overdue.service';
 import { LicensingApi } from '../../src/modules/licensing/public/licensing.api';
+import { LicensingHandoverApi } from '../../src/modules/licensing/public/licensing-handover.api';
 import type {
   OpenedHandoverDuties,
   OpenHandoverDutiesInput,
@@ -154,11 +155,11 @@ export class HandoverHarness extends TransferHarness {
   ): Promise<OpenedHandoverDuties> =>
     this.ctx.app
       .get(TransactionRunner)
-      .run((tx) => this.ctx.app.get(LicensingApi).openHandoverDuties(tx, actor, { caseRefId: null, ...input }));
+      .run((tx) => this.ctx.app.get(LicensingHandoverApi).openHandoverDuties(tx, actor, { caseRefId: null, ...input }));
 
   reconcileDuties = (caseRefId: string, dueOn: string, lastWorkingDay?: string) =>
     this.ctx.app.get(TransactionRunner).run((tx) =>
-      this.ctx.app.get(LicensingApi).reconcileHandoverDuties(tx, this.actorOf(this.it1), {
+      this.ctx.app.get(LicensingHandoverApi).reconcileHandoverDuties(tx, this.actorOf(this.it1), {
         caseRefId,
         dueOn,
         ...(lastWorkingDay ? { lastWorkingDay } : {}),
@@ -169,7 +170,7 @@ export class HandoverHarness extends TransferHarness {
     this.ctx.app
       .get(TransactionRunner)
       .run((tx) =>
-        this.ctx.app.get(LicensingApi).cancelHandoverDuties(tx, this.actorOf(this.it1), { caseRefId, reason }),
+        this.ctx.app.get(LicensingHandoverApi).cancelHandoverDuties(tx, this.actorOf(this.it1), { caseRefId, reason }),
       );
 
   /** The reminder of the hour, run by hand. */

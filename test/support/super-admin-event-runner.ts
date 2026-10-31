@@ -6,9 +6,13 @@ import { NotificationsApi } from '../../src/modules/notifications/public/notific
 import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
 import { LeaveService } from '../../src/modules/personnel/leave/leave.service';
 import { NoticeHandlingService } from '../../src/modules/personnel/notice/notice-handling.service';
-import { OffboardingChangeService } from '../../src/modules/personnel/offboarding/offboarding-change.service';
+import { OffboardingChangeService } from '../../src/modules/personnel/offboarding/change/offboarding-change.service';
 import { OffboardingService } from '../../src/modules/personnel/offboarding/offboarding.service';
 import { ProfileCorrectionService } from '../../src/modules/personnel/super-admin-event/profile-correction.service';
+import { SuperAdminDepartureEvents } from '../../src/modules/personnel/super-admin-event/super-admin-departure-events.service';
+import { SuperAdminEventAnchor } from '../../src/modules/personnel/super-admin-event/super-admin-event-anchor.service';
+import { SuperAdminLeaveEvents } from '../../src/modules/personnel/super-admin-event/super-admin-leave-events.service';
+import { SuperAdminTransferEvents } from '../../src/modules/personnel/super-admin-event/super-admin-transfer-events.service';
 import { SuperAdminEventRepo } from '../../src/modules/personnel/super-admin-event/super-admin-event.repo';
 import { SuperAdminEventApi } from '../../src/modules/personnel/public/super-admin-event.api';
 import type {
@@ -32,17 +36,25 @@ export const SUPER_ADMIN_EVENT_BASIS = {
  * record for them (`PERSONNEL.SELF_CHANGE_FORBIDDEN`). No assertion lives here.
  */
 export function superAdminEventService(app: INestApplicationContext): SuperAdminEventApi {
+  const tickets = new SuperAdminEventRepo();
+  const anchor = new SuperAdminEventAnchor(tickets, app.get(NoticeHandlingService, { strict: false }));
+
   return new SuperAdminEventApi(
     app.get(TransactionRunner, { strict: false }),
     app.get(OrganizationApi, { strict: false }),
     app.get(IdentityAccessApi, { strict: false }),
-    new SuperAdminEventRepo(),
-    app.get(TransferService, { strict: false }),
-    app.get(TransferChangeService, { strict: false }),
-    app.get(LeaveService, { strict: false }),
-    app.get(OffboardingService, { strict: false }),
-    app.get(OffboardingChangeService, { strict: false }),
-    app.get(NoticeHandlingService, { strict: false }),
+    tickets,
+    new SuperAdminTransferEvents(
+      anchor,
+      app.get(TransferService, { strict: false }),
+      app.get(TransferChangeService, { strict: false }),
+    ),
+    new SuperAdminLeaveEvents(anchor, app.get(LeaveService, { strict: false })),
+    new SuperAdminDepartureEvents(
+      anchor,
+      app.get(OffboardingService, { strict: false }),
+      app.get(OffboardingChangeService, { strict: false }),
+    ),
     new ProfileCorrectionService(
       app.get(OrganizationApi, { strict: false }),
       app.get(AuditApi, { strict: false }),

@@ -6,7 +6,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { ApplicationLookupService } from '../catalog-entry/application-lookup.service';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event.mapper';
+import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   PlanApplicationNotFoundError,
   PlanApplicationRetiredError,

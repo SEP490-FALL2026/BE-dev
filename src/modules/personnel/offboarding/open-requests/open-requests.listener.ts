@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../../audit/public/audit.api';
 import { OrganizationApi } from '../../../organization/public/organization.api';
-import { personnelSystemAuditEvent } from '../../mappers/personnel-audit-event.mapper';
+import { personnelSystemAuditEvent } from '../../personnel-audit-event.mapper';
 import {
   OffboardingWarningContributions,
   PersonnelFileHookContributions,
@@ -14,11 +14,16 @@ import { OpenRequestsService } from './open-requests.service';
 /**
  * Tells the IT Admin which requests and grants of a person who leaves are still open (`US-03-04` AC-24): beside the case as a warning (the
  * count is the requests plus the grants not finished, read when the case is shown) and, when the departure is recorded, in the audit event
- * `OFFBOARDING_CASE.OPEN_REQUESTS_FOUND` with how many of each, which is where the reminder to the IT Admin is taken from. It never holds
- * the record back and never changes a request or a task: closing them is the IT Admin's act, one at a time, after the person has left.
+ * `OFFBOARDING_CASE.OPEN_REQUESTS_FOUND` with how many of each, which is where the reminder to the IT Admin is taken from. By its rules it
+ * never holds the record back and never changes a request or a task: closing them is the IT Admin's act, one at a time, after the person
+ * has left. (A failure of the hook itself, a bug or a statement the database refuses, is not a rule: it rolls the record back like any
+ * failure inside the transaction.)
  */
 @Injectable()
 export class OpenRequestsSource implements OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [OffboardingWarningContributions, PersonnelFileHookContributions] as const;
+
   constructor(
     private readonly warnings: OffboardingWarningContributions,
     private readonly hooks: PersonnelFileHookContributions,

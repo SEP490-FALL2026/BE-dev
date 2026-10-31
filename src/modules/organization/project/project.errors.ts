@@ -1,4 +1,4 @@
-/** The caller is not the Super Admin: projects are organization data and the Super Admin's alone, decided in the service whatever the route let through (`F13`). */
+/** The caller is not the Super Admin: projects are organization data and the Super Admin's alone, decided in the service whatever the route let through. */
 export class ProjectForbiddenError extends Error {
   constructor() {
     super('You do not have permission to perform this action on projects.');

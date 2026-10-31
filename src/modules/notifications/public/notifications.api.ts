@@ -10,7 +10,7 @@ import {
   HeldDepartmentNotificationInput,
   InAppNotificationInput,
 } from './notifications.types';
-import { PayloadCipher } from '../payload-cipher.service';
+import { PayloadCipher } from '../email/payload-cipher.service';
 
 /** Public facade of the notifications module. */
 @Injectable()
@@ -55,7 +55,7 @@ export class NotificationsApi {
   }
 
   /**
-   * Keeps a notice for a department that has no head yet, in the caller's transaction (F67, T-11); true when it was kept, false
+   * Keeps a notice for a department that has no head yet, in the caller's transaction; true when it was kept, false
    * when this event key is already held. Nobody is told until the first head is named. Throws InvalidInAppNotificationError for a
    * notice the closed table refuses.
    */

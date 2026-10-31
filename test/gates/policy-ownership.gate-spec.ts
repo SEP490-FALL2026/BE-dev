@@ -33,11 +33,20 @@ const PUBLIC_ROOT_POLICY_FILES: ReadonlyMap<string, PolicyContract> = new Map([
       entry: 'placementReasons',
       consumers: [
         'data-import/employee-import/row-validation/employee-import-row-validation.policy.ts',
-        'organization/employee/employee-maintenance.service.ts',
+        'organization/employee/employee-correction.policy.ts',
         'organization/employee/employee-row.policy.ts',
         'personnel/super-admin-event/profile-correction.policy.ts',
         'personnel/transfer/transfer.policy.ts',
       ],
+    },
+  ],
+  [
+    'budgets/public/budget-year-lock-key.policy.ts',
+    {
+      reason:
+        'the budget of one Cost Center and year is serialised by one advisory lock that budgets takes in its repos and requests takes for the budget check of a request: both must name the same key',
+      entry: 'budgetYearLockKey',
+      consumers: ['budgets/budget/budget-year-lock.repo.ts', 'requests/spend/budget-check.repo.ts'],
     },
   ],
 ]);
@@ -159,7 +168,8 @@ export function callsEntry(fileName: string, source: string, entry: string): boo
   return called;
 }
 
-describe('BEH.1: a shared business policy has one owner (A4-11)', () => {
+// BEH.1, A4-11
+describe('a shared business policy has one owner', () => {
   const sources = listSources(modulesRoot).map((file) => ({ file, source: readFileSync(file, 'utf8') }));
 
   it('writes the placement reasons in the policy alone; any other file is a registered different decision', () => {

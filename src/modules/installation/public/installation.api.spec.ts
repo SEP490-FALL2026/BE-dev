@@ -7,7 +7,7 @@ import { AlreadyInstalledError, InstallationInputError } from './installation.er
 import { InstallationApi } from './installation.api';
 
 /*
- * Characterization of the installation use case (H6.3 Phase 0): the order of hash, lock, read and writes, the one
+ * Characterization of the installation use case: the order of hash, lock, read and writes, the one
  * transaction, the audit records and the two refusals. The collaborators are in-memory stand-ins at the boundary.
  */
 

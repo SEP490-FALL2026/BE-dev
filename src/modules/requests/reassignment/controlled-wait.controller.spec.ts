@@ -20,7 +20,7 @@ const QUERY: ControlledWaitListQueryDto = { page: 1, pageSize: 20 };
 const controllerOver = (page: jest.Mock) =>
   new ControlledWaitController({ page } as unknown as ControlledWaitQueryService);
 
-/** The queue of controlled waits answers a database outage with 503 like every guarded route (Prompt 02, 26/10/2026). */
+/** The queue of controlled waits answers a database outage with 503 like every guarded route (26/10/2026). */
 describe('ControlledWaitController.list', () => {
   it('answers a database outage with 503 SERVICE_UNAVAILABLE', async () => {
     const list = controllerOver(jest.fn().mockRejectedValue(new TransientDatabaseError('40001', new Error('reset'))));

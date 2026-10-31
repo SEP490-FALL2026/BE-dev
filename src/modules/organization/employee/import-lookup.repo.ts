@@ -19,17 +19,19 @@ export class ImportLookupRepo {
     today: BusinessDate,
   ): Promise<EmployeeImportLookupData> {
     const db = client ?? this.prisma;
-    const [departments, employees, emailOwners] = await Promise.all([
+    // One statement at a time on the client, in the order the people file names them: the departments, the people, the emails.
+    const departments =
       names.departmentCodes.length === 0
         ? []
         : // Whether the department has a Cost Center is not asked: a department with none takes people in (`QĐ-87d(3)`).
-          db.$queryRaw<{ id: string; code: string; status: string }[]>`
+          await db.$queryRaw<{ id: string; code: string; status: string }[]>`
             SELECT d.id, d.code, d.status::text AS status
               FROM departments d
-             WHERE d.code = ANY(${names.departmentCodes}::text[])`,
+             WHERE d.code = ANY(${names.departmentCodes}::text[])`;
+    const employees =
       names.employeeCodes.length === 0
         ? []
-        : db.$queryRaw<
+        : await db.$queryRaw<
             {
               id: string;
               employee_code: string;
@@ -47,13 +49,13 @@ export class ImportLookupRepo {
               LEFT JOIN employee_placements p ON p.employee_id = e.id
                    AND p.valid_from <= ${today}::date AND (p.valid_to IS NULL OR p.valid_to > ${today}::date)
               LEFT JOIN departments d ON d.id = p.department_id
-             WHERE e.employee_code = ANY(${names.employeeCodes}::text[])`,
+             WHERE e.employee_code = ANY(${names.employeeCodes}::text[])`;
+    const emailOwners =
       names.normalizedEmails.length === 0
         ? []
-        : db.$queryRaw<{ normalized_work_email: string; employee_code: string }[]>`
+        : await db.$queryRaw<{ normalized_work_email: string; employee_code: string }[]>`
             SELECT normalized_work_email, employee_code FROM employees
-             WHERE normalized_work_email = ANY(${names.normalizedEmails}::text[])`,
-    ]);
+             WHERE normalized_work_email = ANY(${names.normalizedEmails}::text[])`;
 
     return {
       departments: departments.map((row) => ({

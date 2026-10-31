@@ -10,7 +10,7 @@ const yearOf = (event: StatusEvent): number | null => {
 
 /**
  * The loop between Finance and the head of the department about the money of a request, told in the inbox (rows 41, 47 and 48 of the
- * table of events, `QĐ-92b`, F67): a request enters the review of Finance, Finance gives it back, it waits for a budget, and the
+ * table of events, `QĐ-92b`): a request enters the review of Finance, Finance gives it back, it waits for a budget, and the
  * version it waited for ends. Only ids and codes: never an amount, a figure of the budget, a code of the check, an opinion or the
  * direction of Finance. The head is told where the request stands, not why the budget has no room; the reason Finance gives for giving
  * a request back is theirs to read, as on the request.

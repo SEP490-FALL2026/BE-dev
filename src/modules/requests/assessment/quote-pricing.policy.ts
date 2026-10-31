@@ -1,6 +1,7 @@
 import type { BusinessDate } from '../../../core/business-date';
 import { addMonths, fiscalYearOf } from '../../../core/fiscal-year';
 import { MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
+import type { Quote, QuoteCycle } from '../access-request/assessment-record.types';
 import type { PaymentPeriod } from '../access-request/pricing.policy';
 
 /**
@@ -11,23 +12,7 @@ import type { PaymentPeriod } from '../access-request/pricing.policy';
  * the commitment is a forecast that goes the way of a renewal, so the amount of the request is the payments that bind.
  */
 
-export type QuoteCycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
-export type QuotePaymentFrequency = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'UPFRONT_ONCE';
-
 const MONTHS: Readonly<Record<QuoteCycle, number>> = { MONTHLY: 1, QUARTERLY: 3, ANNUAL: 12 };
-
-export interface Quote {
-  /** The price before tax of one person for one billing cycle. */
-  unitPrice: Money;
-  billingCycle: QuoteCycle;
-  validFrom: BusinessDate;
-  validUntil: BusinessDate | null;
-  /** How many months the contract binds the company; null when the whole term is paid up front. */
-  commitmentMonths: number | null;
-  paymentFrequency: QuotePaymentFrequency | null;
-  /** The day of the first payment; the day the money is expected to go out when the quote does not say. */
-  firstPaymentOn: BusinessDate | null;
-}
 
 export interface QuotePricingInput {
   quote: Quote;
@@ -43,7 +28,7 @@ export type QuoteRefusal =
   | { reason: 'QUOTE_NOT_IN_FORCE' }
   /** The term has more than one billing cycle and the quote does not say how it is paid: the fields still to give. */
   | { reason: 'SCHEDULE_REQUIRED'; missing: string[] }
-  /** The payments that bind come to nothing: a paid request never costs 0, so the price data is incomplete (F34). */
+  /** The payments that bind come to nothing: a paid request never costs 0, so the price data is incomplete. */
   | { reason: 'PRICE_REQUIRED'; missing: string[] }
   /** The payment frequency is shorter than the billing cycle of the price, so a payment would be a fraction of a price. */
   | { reason: 'PAYMENT_FREQUENCY_INVALID' }

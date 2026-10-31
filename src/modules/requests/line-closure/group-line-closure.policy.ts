@@ -1,4 +1,4 @@
-import { isEnded, type LineState } from '../group-request/group-request.types';
+import { isEnded, type LineState } from '../access-request/group-request.types';
 
 /**
  * Whether the IT Admin may remove one person who left from a request for a group, and which person a whole-request closing means, as
@@ -14,7 +14,7 @@ export type LineClosureRefusal =
   | 'WITHDRAWAL_PENDING'
   /** The person still works, handing over included: the line is only listed until they have left. */
   | 'BENEFICIARY_NOT_LEFT'
-  /** The line is closed because its person was transferred, and they were not: they still sit where the request was sent from, or left (F29). */
+  /** The line is closed because its person was transferred, and they were not: they still sit where the request was sent from, or left. */
   | 'BENEFICIARY_NOT_TRANSFERRED';
 
 export interface LineClosureFacts {
@@ -38,7 +38,7 @@ export interface LineTransferClosureFacts {
   beneficiaryTransferred: boolean;
 }
 
-/** The first reason the line is not closed because its person was transferred, or null when it is (F29); the same order as above. */
+/** The first reason the line is not closed because its person was transferred, or null when it is; the same order as above. */
 export function checkLineTransferClosure(facts: LineTransferClosureFacts): LineClosureRefusal | null {
   if (isEnded(facts.lineState)) return 'ALREADY_ENDED';
   if (facts.lineState === 'AWAITING_IT_CLOSE') return 'WITHDRAWAL_PENDING';
@@ -56,4 +56,35 @@ export function soleLiveLine(lines: readonly { employeeId: string; state: LineSt
   const live = lines.filter((line) => !isEnded(line.state));
 
   return live.length === 1 ? live[0].employeeId : null;
+}
+
+/**
+ * A task of the grant that is open, in any state, is cancelled for a transfer only on the confirmation of the check with the vendor: an
+ * early answer that is the rule licensing applies to the task (`grantCancelAction`), never a weaker one.
+ */
+export const needsEvidenceAtOnce = (
+  cause: 'BENEFICIARY_LEFT' | 'BENEFICIARY_TRANSFERRED',
+  lineState: LineState,
+  evidence: string | undefined,
+): boolean => cause === 'BENEFICIARY_TRANSFERRED' && lineState === 'EXECUTING' && evidence === undefined;
+
+/** What the audit entry `ACCESS_REQUEST.LINE_CANCELLED` says: the line from its state to cancelled, why, by whom, and the task and money that went with it. */
+export function lineCancelledDetail(
+  request: { id: string; requesterEmployeeId: string },
+  line: { employeeId: string; from: LineState; cause: string; actorEmployeeId: string },
+  task: { taskId: string; taskStatus: string } | null,
+  released: boolean,
+): { [key: string]: string | boolean | null } {
+  return {
+    requestId: request.id,
+    beneficiaryEmployeeId: line.employeeId,
+    from: line.from,
+    to: 'CANCELLED',
+    reasonKind: line.cause,
+    cancelledByEmployeeId: line.actorEmployeeId,
+    requesterEmployeeId: request.requesterEmployeeId,
+    taskId: task?.taskId ?? null,
+    taskStatusBefore: task?.taskStatus ?? null,
+    released,
+  };
 }

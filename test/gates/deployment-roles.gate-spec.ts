@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { runtimePackagesOf, runtimePackagesOfTree } from '../support/runtime-imports';
 
 /**
  * Gate of H7 (F-15, DB-04, Q9; docs/guides/containers.md#postgresql-roles-h7): which PostgreSQL identity each production
@@ -68,7 +69,8 @@ const service = (name: string): string => {
 
 const ADMIN_CREDENTIALS = /POSTGRES_USER|POSTGRES_PASSWORD|DATABASE_DEPLOY_|DATABASE_BOOTSTRAP_/;
 
-describe('production PostgreSQL identities (H7: F-15, DB-04, Q9)', () => {
+// H7: F-15, DB-04, Q9
+describe('production PostgreSQL identities', () => {
   it.each(['api', 'worker'])('gives %s the runtime role only, and none of the administration credentials', (name) => {
     const block = service(name);
 
@@ -170,7 +172,8 @@ describe('production PostgreSQL identities (H7: F-15, DB-04, Q9)', () => {
       expect(hostScript).not.toMatch(/^\s*set\s+(?:-[a-z]*x|-o\s+xtrace)/m);
     });
 
-    it('checks readiness with bounded defaults that the workflow does not override (H7-OPS-RV-04)', () => {
+    // H7-OPS-RV-04
+    it('checks readiness with bounded defaults that the workflow does not override', () => {
       // Owner, 28/10/2026 (Prompt 04 section 9.10): the default is 300 s and the workflow still does not override it.
       expect(hostScript).toMatch(/^READY_TIMEOUT=300$/m);
       expect(hostScript).toMatch(/^STABILITY_WINDOW=20$/m);
@@ -186,7 +189,8 @@ describe('production PostgreSQL identities (H7: F-15, DB-04, Q9)', () => {
       expect(workflow).not.toMatch(/--ready-timeout|--stability-window|--poll-interval|--first-rollout-env/);
     });
 
-    it('gives every deployment attempt its own rollback evidence and never rewrites an earlier one (H7-OPS-RV-05)', () => {
+    // H7-OPS-RV-05
+    it('gives every deployment attempt its own rollback evidence and never rewrites an earlier one', () => {
       const deploy = job('deploy');
 
       expect(deploy).toMatch(/^\s+ATTEMPT: \$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}$/m);
@@ -202,7 +206,8 @@ describe('production PostgreSQL identities (H7: F-15, DB-04, Q9)', () => {
       expect(hostScript).not.toMatch(/rm [^\n]*\$(?:REPLACED|ATTEMPT_DIR)/);
     });
 
-    it('serializes every deployment on the host with one lock, taken without waiting and held until the script exits (H7-OPS-RV-07)', () => {
+    // H7-OPS-RV-07
+    it('serializes every deployment on the host with one lock, taken without waiting and held until the script exits', () => {
       expect(hostScript).toMatch(/^LOCK_FILE="\$APP_DIR\/releases\/\.deploy\.lock"$/m);
       const open = position(/^\{ exec 9<> "\$LOCK_FILE"; \} 2> \/dev\/null \|\| refuse /m);
       const take = position(/^flock -n -E 3 9 \|\| LOCK_STATUS=\$\?$/m);
@@ -239,7 +244,8 @@ describe('production PostgreSQL identities (H7: F-15, DB-04, Q9)', () => {
       expect(runbook).not.toMatch(/Deployments run one at a time\./);
     });
 
-    it('publish-only builds and pushes the commit image and never reaches the VPS or moves latest (H7-OPS-02)', () => {
+    // H7-OPS-02
+    it('publish-only builds and pushes the commit image and never reaches the VPS or moves latest', () => {
       expect(workflow).toMatch(
         /workflow_dispatch:\r?\n\s+inputs:\r?\n\s+mode:[\s\S]*?options:\r?\n\s+- publish-only\r?\n\s+- deploy\r?\n\s+default: publish-only/,
       );
@@ -255,7 +261,8 @@ describe('production PostgreSQL identities (H7: F-15, DB-04, Q9)', () => {
       );
     });
 
-    it('moves latest only after the host deployment succeeded, one deployment at a time (H7-OPS-RV-02)', () => {
+    // H7-OPS-RV-02
+    it('moves latest only after the host deployment succeeded, one deployment at a time', () => {
       const deploy = job('deploy');
       const host = deploy.indexOf('- name: Deploy the release on the VPS');
       const mark = deploy.indexOf('- name: Mark the deployed release as latest');
@@ -275,7 +282,8 @@ describe('production PostgreSQL identities (H7: F-15, DB-04, Q9)', () => {
       expect(deploy).toMatch(/^\s+concurrency:\r?\n\s+group: production-deploy\r?\n\s+cancel-in-progress: false$/m);
     });
 
-    it('validates the candidate Caddyfile through the candidate Compose, never the live file (H7-OPS-RV-01)', () => {
+    // H7-OPS-RV-01
+    it('validates the candidate Caddyfile through the candidate Compose, never the live file', () => {
       expect(list(service('caddy'), 'volumes')).toContain('${CADDYFILE_PATH:-./Caddyfile}:/etc/caddy/Caddyfile:ro');
       expect(hostScript).toMatch(
         /^candidate\(\) \{ CADDYFILE_PATH="\$RELEASE_DIR\/Caddyfile" docker compose --project-directory "\$APP_DIR" -f "\$RELEASE_DIR\/docker-compose\.prod\.yml" "\$@"; \}$/m,
@@ -289,7 +297,8 @@ describe('production PostgreSQL identities (H7: F-15, DB-04, Q9)', () => {
       );
     });
 
-    it('removes no image, volume or orphan container, and nothing by pattern (H7-OPS-RV-03)', () => {
+    // H7-OPS-RV-03
+    it('removes no image, volume or orphan container, and nothing by pattern', () => {
       const guide = read('docs/guides/containers.md');
       const start = guide.indexOf('## PostgreSQL roles (H7)');
       const runbook = guide.slice(start, guide.indexOf('\n## ', start + 1));
@@ -305,7 +314,8 @@ describe('production PostgreSQL identities (H7: F-15, DB-04, Q9)', () => {
       }
     });
 
-    it('deploy copies a candidate beside the live files and hands the host the immutable image, nothing else (H7-OPS-02)', () => {
+    // H7-OPS-02
+    it('deploy copies a candidate beside the live files and hands the host the immutable image, nothing else', () => {
       const deploy = job('deploy');
 
       expect(deploy).toMatch(
@@ -318,7 +328,8 @@ describe('production PostgreSQL identities (H7: F-15, DB-04, Q9)', () => {
       expect(deploy).not.toMatch(/docker compose|\bmv\b|\bcp\b/);
     });
 
-    it('documents a rollback from the exact attempt, and the first H7 rollout with its old environment (H7-OPS-RV-05, RV-06)', () => {
+    // H7-OPS-RV-05, RV-06
+    it('documents a rollback from the exact attempt, and the first rollout of the separated roles with its old environment', () => {
       const guide = read('docs/guides/containers.md');
       const start = guide.indexOf('## PostgreSQL roles (H7)');
       const runbook = guide.slice(start, guide.indexOf('\n## ', start + 1));
@@ -331,5 +342,141 @@ describe('production PostgreSQL identities (H7: F-15, DB-04, Q9)', () => {
         /deploy-release\.sh --app-dir <APP_DIR> --release <SHA> --image <IMAGE>:<SHA> --attempt <ATTEMPT> --first-rollout-env \.env\.pre-h7/,
       );
     });
+  });
+});
+
+/** The stages of a Dockerfile: the name after `AS` (or the index) → the text of the stage, its `FROM` line included. */
+export function dockerfileStages(source: string): Map<string, string> {
+  const stages = new Map<string, string>();
+  let name = '';
+  let lines: string[] = [];
+  let index = 0;
+  const close = (): void => {
+    if (name) stages.set(name, lines.join('\n'));
+  };
+  for (const line of source.split(/\r?\n/)) {
+    const from = /^FROM\s+\S+(?:\s+AS\s+(\S+))?/i.exec(line);
+    if (from) {
+      close();
+      name = from[1] ?? String(index);
+      index += 1;
+      lines = [];
+    }
+    if (name) lines.push(line);
+  }
+  close();
+
+  return stages;
+}
+
+// OD-R9, Task 2.7 of be-architecture-readability-hardening
+describe('the production image carries the production dependencies only', () => {
+  const stages = dockerfileStages(read('Dockerfile'));
+  const manifest = JSON.parse(read('package.json')) as {
+    dependencies: Record<string, string>;
+    devDependencies: Record<string, string>;
+  };
+
+  it('installs the production dependencies in a stage of their own, with the lockfile frozen, and the runtime stage copies node_modules from it', () => {
+    const runtime = stages.get('runtime') ?? '';
+
+    expect(stages.get('production-dependencies')).toMatch(/RUN pnpm install --prod --frozen-lockfile/);
+    expect(runtime).toMatch(/COPY --from=production-dependencies [^\n]*\/app\/node_modules \.\/node_modules/);
+    expect(runtime).not.toMatch(/COPY --from=build [^\n]*node_modules/);
+  });
+
+  it('puts the tools of the checks in devDependencies only, so no development tool reaches the image', () => {
+    const tools = ['jest', 'ts-jest', 'eslint', 'typescript', 'prettier', 'dependency-cruiser', 'supertest'];
+
+    expect(tools.filter((tool) => tool in manifest.dependencies)).toEqual([]);
+    expect(tools.filter((tool) => !(tool in manifest.devDependencies))).toEqual([]);
+  });
+
+  // OD-R5
+  it('keeps in dependencies what the image runs: the Prisma CLI of `migrate deploy`, the client, the native hash, and the standby queue', () => {
+    const needed = [
+      'prisma',
+      '@prisma/client',
+      '@prisma/adapter-pg',
+      '@node-rs/argon2',
+      'dotenv',
+      'bullmq',
+      '@nestjs/bullmq',
+    ];
+
+    expect(needed.filter((name) => !(name in manifest.dependencies))).toEqual([]);
+    expect('prisma' in manifest.devDependencies).toBe(false);
+  });
+
+  it('lists in dependencies every package that src imports at runtime, so none the image leaves out can crash it at start', () => {
+    const runtime = runtimePackagesOfTree(join(projectRoot, 'src'));
+
+    expect([...runtime.keys()].length).toBeGreaterThan(15);
+    expect(
+      [...runtime]
+        .filter(([name]) => !(name in manifest.dependencies))
+        .map(([name, files]) => `${name} <- ${files[0]}`),
+    ).toEqual([]);
+  });
+
+  it('reads a runtime import in each form it can take, and not a type, a node builtin or a relative import', () => {
+    const source = [
+      "import Default from 'pkg-default';",
+      "import { named } from '@scope/pkg-named/deep/path';",
+      "import * as everything from 'pkg-namespace';",
+      "import 'pkg-side-effect';",
+      "import { type OnlyType } from 'pkg-all-types';",
+      "import type { Erased } from 'pkg-type-import';",
+      "import { type Erased as Alias, value } from 'pkg-mixed';",
+      "export { exported } from 'pkg-export-from';",
+      "export type { ErasedExport } from 'pkg-export-type';",
+      "const lazy = import('pkg-dynamic');",
+      "const old = require('pkg-require');",
+      "import { readFileSync } from 'node:fs';",
+      "import { join } from 'path';",
+      "import { sibling } from './sibling';",
+    ].join('\n');
+
+    expect(runtimePackagesOf(source).sort()).toEqual([
+      '@scope/pkg-named',
+      'pkg-default',
+      'pkg-dynamic',
+      'pkg-export-from',
+      'pkg-mixed',
+      'pkg-namespace',
+      'pkg-require',
+      'pkg-side-effect',
+    ]);
+  });
+
+  it('names a package the code imports at runtime that only devDependencies holds, or that no manifest lists', () => {
+    const runtime = new Map([
+      ['bullmq', ['src/a.ts']],
+      ['supertest', ['src/b.ts']],
+      ['unlisted', ['src/c.ts']],
+    ]);
+    const dependencies = { bullmq: '5' };
+
+    expect(
+      [...runtime].filter(([name]) => !(name in dependencies)).map(([name, files]) => `${name} <- ${files[0]}`),
+    ).toEqual(['supertest <- src/b.ts', 'unlisted <- src/c.ts']);
+  });
+
+  it('sees a runtime stage that still copies node_modules from the build stage (self-test of the stage reader)', () => {
+    const wrong = dockerfileStages(
+      [
+        'FROM node:24 AS base',
+        'FROM base AS production-dependencies',
+        'RUN pnpm install --prod --frozen-lockfile',
+        'FROM base AS build',
+        'RUN pnpm install --frozen-lockfile',
+        'FROM node:24 AS runtime',
+        'COPY --from=build --chown=node:node /app/node_modules ./node_modules',
+      ].join('\n'),
+    );
+
+    expect([...wrong.keys()]).toEqual(['base', 'production-dependencies', 'build', 'runtime']);
+    expect(wrong.get('runtime')).toMatch(/COPY --from=build [^\n]*node_modules/);
+    expect(wrong.get('runtime')).not.toMatch(/COPY --from=production-dependencies/);
   });
 });

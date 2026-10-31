@@ -134,7 +134,8 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
       expect({ folder, exists: existsSync(join(sourceRoot, folder)) }).toEqual({ folder, exists: true });
   });
 
-  it('rule 3: no import chain from the API or the worker reaches a command entry, graph or command-only contract', () => {
+  // rule 3
+  it('no import chain from the API or the worker reaches a command entry, graph or command-only contract', () => {
     for (const root of ['main.ts', 'worker.ts']) {
       const reachable = reachableFrom(join(sourceRoot, root));
 
@@ -149,7 +150,8 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
     }
   });
 
-  it('rule 4: keeps Prisma, raw SQL and transactions out of command entries and orchestration files', () => {
+  // rule 4
+  it('keeps Prisma, raw SQL and transactions out of command entries and orchestration files', () => {
     const files = [
       join(sourceRoot, 'cli.ts'),
       ...listFiles(cliRoot, isSource),
@@ -162,7 +164,8 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
     expect(findings).toEqual([]);
   });
 
-  it('rule 2: offers no --force or other bypass option on any command', () => {
+  // rule 2
+  it('offers no --force or other bypass option on any command', () => {
     const argumentFiles = listFiles(cliRoot, (file) => isSource(file) && file.endsWith('.arguments.ts'));
     expect(argumentFiles.map(toPath).sort()).toEqual(
       COMMANDS.map((command) => `cli/${command.name}/${command.name}.arguments.ts`).sort(),
@@ -174,7 +177,8 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
     expect(findings.map(toPath)).toEqual([]);
   });
 
-  it('rule 2: the seed checks its three local guards before it opens any transaction', () => {
+  // rule 2
+  it('the seed checks its three local guards before it opens any transaction', () => {
     // The seed runs in the facade public/dev-seed.api.ts (OD-A6); its guards are the pure local-seed.policy.ts.
     const service = readFileSync(join(installationRoot, 'public', 'dev-seed.api.ts'), 'utf8');
     const guard = readFileSync(join(installationRoot, 'dev-seed', 'local-seed.policy.ts'), 'utf8');
@@ -190,7 +194,8 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
     expect(guard).not.toMatch(/\.includes\(['"]localhost/);
   });
 
-  it('rule 5: commits no password literal in command code, and no known weak default anywhere it could ship', () => {
+  // rule 5
+  it('commits no password literal in command code, and no known weak default anywhere it could ship', () => {
     const commandFiles = [
       join(sourceRoot, 'cli.ts'),
       ...listFiles(cliRoot, isSource),
@@ -213,7 +218,8 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
     expect(weak.map((file) => relative(projectRoot, file).split(sep).join('/'))).toEqual([]);
   });
 
-  describe('OD-A7: one command process, and the old entries dist/<alias>.js written from its table', () => {
+  // OD-A7
+  describe('one command process, and the old entries dist/<alias>.js written from its table', () => {
     const names = COMMANDS.map((command) => command.name);
     const aliases = COMMANDS.map((command) => command.alias);
     const read = (path: string): string => readFileSync(join(projectRoot, path), 'utf8');
@@ -292,7 +298,8 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
     });
   });
 
-  it('rule 8: starts child processes in tests only through test/support/cli-process.ts', () => {
+  // rule 8
+  it('starts child processes in tests only through test/support/cli-process.ts', () => {
     // migration-deploy.ts: the harness's one Prisma CLI runner (H7-RUN-01), split from disposable-database.ts.
     const allowed = new Set([
       'test/support/cli-process.ts',
@@ -311,7 +318,8 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
     expect(findings).toEqual([]);
   });
 
-  it('rule 8: the process helper records each child and directory before use and removes them on exit', () => {
+  // rule 8
+  it('the process helper records each child and directory before use and removes them on exit', () => {
     const helper = readFileSync(join(projectRoot, 'test', 'support', 'cli-process.ts'), 'utf8');
 
     expect(helper).toMatch(/process\.once\('exit'/);

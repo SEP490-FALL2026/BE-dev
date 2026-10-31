@@ -44,7 +44,7 @@ const queueSchema = Joi.object({
 
 /**
  * The queue's own validation, run when QueueInfrastructureModule is mounted: the API and worker schema does not carry
- * these keys while no Story uses the queue (E2 = A), so mounting the module again restores the strict production rules.
+ * these keys while no Story uses the queue, so mounting the module again restores the strict production rules.
  */
 export function validateQueueEnvironment(input: Record<string, unknown>): QueueEnvironmentVariables {
   const result = validateWithSchema(queueSchema, input) as QueueEnvironmentVariables & { NODE_ENV: string };

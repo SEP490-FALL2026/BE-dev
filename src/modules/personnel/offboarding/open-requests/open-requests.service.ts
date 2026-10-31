@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
-import { LicensingApi } from '../../../licensing/public/licensing.api';
+import { LicensingOpenGrantsApi } from '../../../licensing/public/licensing-open-grants.api';
 import { RequestsApi } from '../../../requests/public/requests.api';
 import type { OpenGrantTaskWire, OpenRequestWire } from './open-requests.dto';
 import { OffboardingRefusedError } from '../offboarding.errors';
@@ -34,7 +34,7 @@ export class OpenRequestsService {
   constructor(
     private readonly cases: OffboardingRepo,
     private readonly requests: RequestsApi,
-    private readonly licensing: LicensingApi,
+    private readonly licensingOpenGrants: LicensingOpenGrantsApi,
   ) {}
 
   /** Throws OffboardingRefusedError (`NOT_FOUND`). */
@@ -50,7 +50,7 @@ export class OpenRequestsService {
 
   /** Throws OffboardingRefusedError (`NOT_FOUND`). */
   async grantTasksOf(caseId: string, page: Page): Promise<Paged<OpenGrantTaskWire>> {
-    const { items, total } = await this.licensing.listOpenGrantTasksOfBeneficiary(
+    const { items, total } = await this.licensingOpenGrants.listOpenGrantTasksOfBeneficiary(
       await this.employeeOf(caseId),
       slice(page),
     );
@@ -64,10 +64,12 @@ export class OpenRequestsService {
 
   /** How many of each the person has open, for the audit event of the record and the warning beside the case. */
   async countsOf(employeeId: string, tx?: DbTx): Promise<{ requests: number; grantTasks: number }> {
-    const [requests, grantTasks] = await Promise.all([
-      this.requests.listOpenOfBeneficiary(employeeId, { skip: 0, take: 0 }, tx),
-      this.licensing.listOpenGrantTasksOfBeneficiary(employeeId, { skip: 0, take: 0 }, tx),
-    ]);
+    const requests = await this.requests.listOpenOfBeneficiary(employeeId, { skip: 0, take: 0 }, tx);
+    const grantTasks = await this.licensingOpenGrants.listOpenGrantTasksOfBeneficiary(
+      employeeId,
+      { skip: 0, take: 0 },
+      tx,
+    );
 
     return { requests: requests.total, grantTasks: grantTasks.total };
   }

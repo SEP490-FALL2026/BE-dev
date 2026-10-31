@@ -34,25 +34,29 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
 - Mở `CommitmentReleaseGuardHook` (`budgets.commitment-release-guard`, Hook) — requests
   `spend/commitment-release.listener.ts`. Chưa bind thì nhả phần dư thất bại thay vì cho qua.
 - Đăng ký vào: `organization.change-listeners` (`budgets.head-change`) —
-  `budget/proposal/budget-head-change.listener.ts`; `organization.cost-center-use-readers` (`budgets.commitments`) —
-  `budget/commitment/budget-cost-center-use.listener.ts`.
+  `proposal/budget-head-change.listener.ts`; `organization.cost-center-use-readers` (`budgets.commitments`) —
+  `commitment/budget-cost-center-use.listener.ts`.
 
 ## Capability → file chính
 
-Một capability `budget/`; repo, policy và notifier dùng chung nằm ngay trong nó (`proposal.repo.ts`, `version.repo.ts`,
-`commitment.repo.ts`, `budget-year-lock.repo.ts`, `budget-facts.repo.ts`, `budget.policy.ts`,
-`budget-notifier.service.ts`).
+Một lõi `budget/` và năm capability cùng cấp với nó. Lõi giữ repo, policy, dto, lỗi và notifier dùng chung (`proposal.repo.ts`,
+`version.repo.ts`, `commitment.repo.ts`, `budget-year-lock.repo.ts`, `budget-facts.repo.ts`, `budget.policy.ts`,
+`budget-notifier.service.ts`, `version-view.service.ts`, `budget.dto.ts`); lõi không import capability nào, mỗi capability chỉ
+import lõi (`pnpm arch:capabilities --module budgets`: năm cạnh, không vòng).
 
-- `budget/proposal/` — đề xuất của trưởng phòng: gửi, rút, Finance trả lại, gửi lại (US-06-10);
+- `proposal/` — đề xuất của trưởng phòng: gửi, rút, Finance trả lại, gửi lại (US-06-10);
   `budget-proposals.controller.ts`; `ProposalService`, `ProposalViewService`.
-- `budget/version/` — version: tạo, sửa dòng, import file dòng, gửi duyệt, quyết định, lịch sử (US-06-09, US-06-11);
+- `version/` — version: tạo, sửa dòng, import file dòng, gửi duyệt, quyết định, lịch sử (US-06-09, US-06-11);
   `budget-versions.controller.ts`, `budget-version-lines.controller.ts`; `VersionService`, `VersionLineService`,
-  `VersionDecisionService`, `LineImportService`.
-- `budget/commitment/` — commitment của request, Finance xem và nhả phần dư (US-06-06, US-06-07);
+  `VersionDecisionService`, `LineImportService`. `VersionDecisionService` điều phối `VersionDecisionJudge` (xét) và
+  `VersionDecisionWriter` (ghi); các bước còn lại tách theo việc: `VersionCreationService`, `VersionRevisionService`,
+  `VersionWindowService`, `VersionFigures`, `VersionTrail`, `VersionLineMovedNotifier`, `VersionAccessService` (khóa và
+  kiểm lại). Quyết định, nhả cam kết và đổi dòng là hàm thuần trong `budget/budget.policy.ts`.
+- `commitment/` — commitment của request, Finance xem và nhả phần dư (US-06-06, US-06-07);
   `budget-commitments.controller.ts`; `CommitmentService`.
-- `budget/budget-view/` — trưởng phòng đọc ngân sách phòng mình, Finance đọc bảng mọi version hiện hành;
+- `budget-view/` — trưởng phòng đọc ngân sách phòng mình, Finance đọc bảng mọi version hiện hành;
   `budgets.controller.ts`; `BudgetViewService`.
-- `budget/year-end/` — đóng ngân sách của năm đã hết (F62, `QĐ-91c`); `year-end.job.ts` chạy mỗi giờ trong tiến
+- `year-end/` — đóng ngân sách của năm đã hết (F62, `QĐ-91c`); `year-end.job.ts` chạy mỗi giờ trong tiến
   trình API (ADR-0018), `year-end.service.ts`.
 
 ## Bất biến quan trọng

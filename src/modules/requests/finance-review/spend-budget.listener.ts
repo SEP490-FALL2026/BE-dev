@@ -15,7 +15,7 @@ import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { BudgetCheckRepo } from '../spend/budget-check.repo';
 import { BUDGET_LACKING_CODES } from './finance-review.policy';
-import { FinanceReviewService } from './finance-review.service';
+import { FinanceReviewWriter } from './finance-review-writer.service';
 import { SpendRequestRepo } from '../spend/spend-request.repo';
 import { SpendRoutingService } from '../spend/spend-routing.service';
 
@@ -27,17 +27,20 @@ type VersionEnd = BudgetRefusalEvent['decision'] | 'EXPIRED';
  * Finance moving a plan line ends the review that waited on it and checks the request again; a version of a budget that is approved
  * checks again every request that waits for one in that year. A version that is refused, sent back or expires before it was ever
  * current changes nothing for those requests: they keep waiting, under control, and Finance is told so, to give the request back to its
- * head or give its opinion when it chooses (J.3, F65, `QĐ-92a`); no review is opened by the change, and no spend step is made from a
+ * head or give its opinion when it chooses (J.3, `QĐ-92a`); no review is opened by the change, and no spend step is made from a
  * version that did not become current. Each request is locked and judged on what it is now. It adds itself to the change listeners of
  * the budgets when the module starts, so the budgets never import this module (ADR-0016).
  */
 @Injectable()
 export class SpendBudgetListener implements BudgetChangeListener, OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [BudgetChangeListeners] as const;
+
   constructor(
     private readonly requests: AccessRequestRepo,
     private readonly found: SpendRequestRepo,
     private readonly checks: BudgetCheckRepo,
-    private readonly reviews: FinanceReviewService,
+    private readonly reviews: FinanceReviewWriter,
     private readonly routing: SpendRoutingService,
     private readonly audit: AuditApi,
     private readonly budgetChanges: BudgetChangeListeners,
@@ -49,7 +52,7 @@ export class SpendBudgetListener implements BudgetChangeListener, OnModuleInit {
 
   /**
    * The requests that wait for a version of the year are locked by id, and then every budget year they bind (with the year of the
-   * version) earliest first, all before the lock the budget takes for itself (F31, F69). The years are taken here, not one by one
+   * version) earliest first, all before the lock the budget takes for itself. The years are taken here, not one by one
    * as each request is checked again: a request that binds an earlier year would otherwise take that lock while the later one is
    * held, against a holder of both in the order the system keeps.
    */
@@ -61,7 +64,7 @@ export class SpendBudgetListener implements BudgetChangeListener, OnModuleInit {
   async planLineMoved(tx: DbTx, actor: AuthenticatedPrincipal, event: PlanLineMovedEvent): Promise<void> {
     // Every request is locked, by id, and every year they bind, before the first one is checked again: checking one takes the budget
     // year lock and keeps it, and a request or an earlier year locked after that would be waited for while a holder of it waits for
-    // the year (F31, F70).
+    // the year.
     const ids = [...(await this.found.awaitingReviewOnLine(tx, event.versionIds, event.position))].sort();
     const latest = await this.checks.latestOf(ids, tx);
     const years = ids.flatMap((id) => latest.get(id)?.years.map((entry) => entry.year) ?? []);
@@ -143,7 +146,7 @@ export class SpendBudgetListener implements BudgetChangeListener, OnModuleInit {
   /**
    * The requests of the Cost Center that wait, under control, for a version of the budget of this year: the request was moved to wait
    * by the outcome Finance recorded (a budget asked for), and its check had this year with no budget or with too little. A request that
-   * waits is never one that waits for a year the check found enough for (F33), whatever the code that put it in front of Finance.
+   * waits is never one that waits for a year the check found enough for, whatever the code that put it in front of Finance.
    */
   private async waitingForYear(tx: DbTx, event: BudgetVersionEvent): Promise<AccessRequestRecord[]> {
     const waiting: AccessRequestRecord[] = [];

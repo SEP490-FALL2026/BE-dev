@@ -1,7 +1,7 @@
 /**
- * BEH.1 (A4-11): whether the department and the job title a row names can take a person in — the one decision the manual form
+ * Whether the department and the job title a row names can take a person in — the one decision the manual form
  * (`employee/employee-row.validator.ts`) and the import preview
- * (`data-import/employee-import/row-validation/employee-import-row-validation.policy.ts`) share (T-16, `US-02-02` AC-14), and
+ * (`data-import/employee-import/row-validation/employee-import-row-validation.policy.ts`) share (`US-02-02` AC-14), and
  * the one the transfer of a person asks for its destination. It is semantic only: it knows no form
  * field, file column, DTO, database row or repository. Each adapter tells what it found, maps `subject` to its own field or column,
  * and adds the reasons of its own workflow (taken keys, duplicates in a file, other cells).

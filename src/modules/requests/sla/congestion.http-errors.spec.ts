@@ -4,7 +4,7 @@ import { ApiException } from '../../../infrastructure/http/errors/api.exception'
 import { CongestionHolderNotFoundError } from './congestion.errors';
 import { toCongestionApiException } from './congestion.http-errors';
 
-/** The board of the Super Admin answers a database outage with 503 like every guarded route (Prompt 02, 26/10/2026). */
+/** The board of the Super Admin answers a database outage with 503 like every guarded route (26/10/2026). */
 describe('toCongestionApiException', () => {
   it('answers a database outage with 503 SERVICE_UNAVAILABLE', () => {
     const mapped = toCongestionApiException(new TransientDatabaseError('40001', new Error('connection reset')));

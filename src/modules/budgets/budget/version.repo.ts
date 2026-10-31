@@ -30,12 +30,12 @@ export interface VersionRecord {
   createdAt: Date;
   sentByEmployeeId: string | null;
   sentAt: Date | null;
-  /** When the draft was detached from the proposal that was withdrawn or given back (F36); null for any other version. */
+  /** When the draft was detached from the proposal that was withdrawn or given back; null for any other version. */
   detachedAt: Date | null;
-  /** Closed with its year without ever being the budget of the year (F62). */
+  /** Closed with its year without ever being the budget of the year. */
   neverCurrent: boolean;
   expiredAt: Date | null;
-  /** The refused version this one follows, when it is made again from the same proposal (F63). */
+  /** The refused version this one follows, when it is made again from the same proposal. */
   rejectedPredecessorId: string | null;
 }
 
@@ -109,7 +109,7 @@ const quarterColumns = (quarters: [bigint, bigint, bigint, bigint] | null) => ({
 
 /**
  * The version that is the budget of a year as it is read: the current one, or the one that was current when the year ended
- * (the reference budget, `QĐ-91c`). A version that never became current is never read as the budget (F62).
+ * (the reference budget, `QĐ-91c`). A version that never became current is never read as the budget.
  */
 export const REFERENCE_VERSION: Prisma.BudgetVersionWhereInput = {
   OR: [{ state: 'APPROVED' }, { state: 'EXPIRED', neverCurrent: false }],
@@ -176,7 +176,7 @@ export class VersionRepo {
   }
 
   /**
-   * `FOR NO KEY UPDATE`, not `FOR UPDATE` (F69): a commitment attached to the current version takes `FOR KEY SHARE` on its row through
+   * `FOR NO KEY UPDATE`, not `FOR UPDATE`: a commitment attached to the current version takes `FOR KEY SHARE` on its row through
    * the foreign key while it holds the budget year lock, and this lock is taken before that one, so a lock that conflicts with
    * `KEY SHARE` would wait for the year lock and the commitment would wait for the version in a circle. Two writers of a version
    * still queue: this mode conflicts with itself, and every change of a version is a change of a non-key column.

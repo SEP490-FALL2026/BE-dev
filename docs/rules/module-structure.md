@@ -17,6 +17,12 @@
 
 `src/main.ts`, `src/worker.ts`, `src/cli.ts` là ba điểm vào tiến trình; xem [src/README](../../src/README.md).
 
+**`src/core` chỉ chứa primitive dùng chung (R7).** Một file của `core` mà chưa tới hai vùng (một module, `infrastructure`, `app`,
+`worker`, `cli`) import là khái niệm của riêng vùng đó và thuộc thư mục của nó. Gate
+[capability-graph](../../test/gates/capability-graph.gate-spec.ts) đỏ khi có file như vậy, trừ file nằm trong
+`CORE_PRIMITIVES_OF_ONE_AREA` kèm lý do (hiện có `core/money/convert.ts`); danh sách chỉ thu hẹp, mục không còn đúng cũng đỏ.
+`pnpm arch:capabilities --core` in ai dùng từng file.
+
 ## Tầng module
 
 Module chỉ import module **tầng thấp hơn**, hoặc module cùng tầng có ghi trong bảng. Nguồn duy nhất:
@@ -40,8 +46,9 @@ Cần gọi ngược chiều (module dưới cần biết điều module trên g
 src/modules/<m>/
   README.md                 # module card: mục đích, tầng, public API, bảng sở hữu, extension point
   <m>.module.ts             # wiring Nest (và <m>-http.module.ts … nếu cần tách graph API/worker/CLI)
+  <m>-<…>.<vai trò>.ts      # chỉ khi nhiều capability dùng chung: <m>-audit-event.mapper.ts, <m>.http-errors.ts …
   public/                   # cửa DUY NHẤT cho module khác và composition root
-    <m>.api.ts              # facade: class <M>Api
+    <m>.api.ts              # facade: class <M>Api (một module có thể mở nhiều facade: <x>.api.ts → <X>Api)
     <m>.types.ts  <m>.errors.ts  <m>.extension-points.ts
   <capability>/             # nhóm theo năng lực: department/, spend/, offboarding/ …
     <capability>.controller.ts  .repo.ts  .types.ts  .errors.ts  .http-errors.ts  .mapper.ts   # điểm vào + lõi chung
@@ -59,7 +66,24 @@ src/modules/<m>/
   năng không chia sẻ gì là hai capability (ví dụ `requests/status/` và `requests/timing/`).
 - Capability trong cùng module được import nhau; module card ghi file nào là "lõi chung" (ví dụ
   `requests/access-request/`).
-- Không có thư mục catch-all `src/common`, `src/shared`, `utils`, `helpers`, `errors` toàn cục.
+- Không có thư mục catch-all `src/common`, `src/shared`, `utils`, `helpers`, `errors` toàn cục, và **không thư mục tên tầng kỹ
+  thuật ở bất kỳ cấp nào dưới module** (`mappers`, `dto`, `dtos`, `policies`, `services`, `repos`, `types`, `errors`,
+  `controllers`, `common`, `shared`, `utils`, `helpers`; R3): file nằm ở nơi chức năng của nó nằm.
+- **Gốc module (R5, `OD-R2`).** Module có thư mục capability chỉ giữ ở gốc `README.md`, `*.module.ts` và file dùng chung toàn
+  module có tên bắt đầu bằng tên module (`finance.http-errors.ts`, `catalog-audit-event.mapper.ts`, `personnel-grounds.policy.ts`);
+  một file chỉ vài capability dùng đặt vào capability thấp nhất mà các bên đã import, không tạo cạnh mới. Module chưa có thư
+  mục capability (hiện `audit`, `onboarding`, `operating-parameters`) được phẳng, chỉ chịu trần 25 file.
+- **Cửa công khai (R4).** `*.api.ts` và `*.extension-points.ts` chỉ nằm trong `public/`; mỗi `public/<x>.api.ts` export đúng một
+  lớp `<X>Api` (tên file viết PascalCase + `Api`), một module được mở nhiều facade.
+- **Capability không vòng (R6, `OD-R3`).** Capability trong một module được import nhau nhưng không theo vòng: `a → b → a` là lỗi, ở
+  **mọi** module. `pnpm arch:capabilities [--module <m>]` in cạnh và vòng của từng module kèm cạnh file; gate `capability-graph` đỏ
+  và nêu chu trình cùng cạnh file cần gỡ. File ở gốc module và trong `public/` không phải capability nhưng không chặn đồ thị: capability
+  import facade của module (`public/<m>.api.ts`) hoặc một file gốc thì được tính cạnh tới mọi capability file đó chạm, in
+  `(via <file>)`. Vì vậy capability **không import facade của chính module mình** (facade là cửa cho module khác; capability tiêm
+  service mà facade gọi; gate `module-layout`). Riêng `requests`: lõi (`access-request`,
+  `outcome`) không import capability nào, và capability có controller không bị capability khác import trừ danh sách có lý do (tiêu chí thay thế của Task 4.3, Owner 31/10/2026). Gỡ một
+  cạnh ngược bằng cách đưa kiểu hoặc file thuần xuống capability thấp, hoặc đưa dịch vụ điều phối lên capability mới đặt tên theo
+  use case; không dùng barrel, facade giả hay thư mục dùng chung. `*.errors.ts` không import policy của capability khác.
 
 **Khi nào tách nhóm.** Mục tiêu: mở một capability là thấy các chức năng của nó, không phải một danh sách file dài. Tách
 theo **chức năng**, không theo loại file (không `services/`, `types/`, `errors/` trong capability — đó là dựng lại tầng
@@ -68,7 +92,7 @@ theo tên (upload và preview, xác nhận, bảng luật) và ra khỏi cấp c
 file chỉ là tín hiệu để xem lại, không tự nó là lý do. File mà mọi nhóm dùng — repo, types, errors, http-errors, mapper,
 policy quyền — ở cấp capability; controller ở cấp capability là điểm vào HTTP và điều phối sang các nhóm. Service gánh
 nhiều use case thì tách theo nhóm, không chỉ dời file; không thêm "service chính" chỉ để gọi lại service khác, không tạo
-Nest module cho nhóm, không barrel. Mẫu: `catalog/catalog-entry/retirement/`, `data-import/employee-import/`
+Nest module cho nhóm, không barrel. Mẫu: `data-import/employee-import/`
 (`row-validation/`, `preview/`, `confirmation/`), `requests/status/rules/`.
 
 ## Từ vựng file
@@ -102,8 +126,13 @@ Spec unit nằm cạnh file: `x.policy.ts` → `x.policy.spec.ts`. Tên file keb
   `field`/`column`); mỗi adapter tự ánh xạ sang vị trí trình bày. File policy dùng liên module nằm trong `public/`, đăng
   ký chính xác ở `PUBLIC_ROOT_POLICY_FILES` của [policy-ownership](../../test/gates/policy-ownership.gate-spec.ts). Ví
   dụ: `organization/public/employee-placement.policy.ts` dùng cho form nhập tay và preview import.
-- Nest module nghiệp vụ chỉ export contract công khai; danh sách chính xác ở `PUBLIC_CONTRACT_EXPORTS` của
-  [module-graph](../../test/gates/module-graph.gate-spec.ts).
+- **Export của Nest module nghiệp vụ (R10).** Một export nằm ngoài `PUBLIC_CONTRACT_EXPORTS` của
+  [module-graph](../../test/gates/module-graph.gate-spec.ts) (facade, port cho infrastructure, service của CLI entry module)
+  chỉ hợp lệ khi mọi consumer của token đó nằm trong thư mục của chính module export. Consumer là provider hoặc controller
+  của một Nest module import module export, mà constructor inject token (kiểu tham số, `@Inject`, `inject` của factory
+  provider) hoặc alias `useExisting` trỏ tới token đó, đọc từ DI metadata của mọi graph tiến trình (`test/support/process-graphs.ts`); thư mục của consumer là thư
+  mục của Nest module khai báo nó. Consumer ngoài thư mục là lỗi code phải sửa (đi qua facade hoặc extension point), không
+  có ngoại lệ ghi sổ.
 
 ## Extension point
 
@@ -118,9 +147,14 @@ Ba kiểu, định nghĩa một lần ở `src/core/extension/`:
 - Bên mở khai một provider trong `public/<m>.extension-points.ts`
   (`@Injectable() export class XHook extends Hook<X> { constructor() { super('<m>.x'); } }`) và export nó từ Nest
   module.
-- Bên đăng ký có một `<tên>.listener.ts` inject provider đó và `bind`/`add` trong `onModuleInit`.
-- `Hook` chưa bind thì ném lỗi có tên. Chỉ khai `whenUnbound` khi một graph hợp lệ chạy thiếu bên đăng ký (lệnh CLI chỉ
-  nạp một phần app) — giá trị đó nằm ngay chỗ khai báo, không giấu trong lớp "Refusing".
+- Bên đăng ký có một `<tên>.listener.ts` inject provider đó và `bind`/`add` trong `onModuleInit`. Mỗi lớp `@Injectable` của
+  file đó khai `static readonly binds = [<LớpExtensionPoint>] as const;` đúng các điểm nó đăng ký (gate đối chiếu với
+  `onModuleInit`).
+- `Hook` chưa bind thì ném lỗi có tên, không có giá trị thay thế. Gate `extension-wiring` (`pnpm test:gates`) kiểm **từng graph
+  tiến trình** (API, worker, mọi lệnh có Nest graph): extension point nào có provider hoặc controller trong graph dùng, mọi
+  bên đăng ký của nó trong `src/` phải có mặt trong graph đó. Graph không cần một bên đăng ký vì luồng phát không chạy trong
+  tiến trình ấy thì ghi vào `GRAPH_WIRING_EXCEPTIONS` của gate, kèm lý do nêu mã phát và mọi đường tới nó; thêm mục cần Owner
+  đồng ý, và mục hết đúng (bên đăng ký đã có mặt) làm gate đỏ. Lệnh mới có Nest graph phải vào `PROCESS_GRAPHS` ở [process-graphs](../../test/support/process-graphs.ts) (gate `extension-wiring` và luật R10 đọc cùng danh sách).
 - Không dùng event bus bất đồng bộ: người nghe có quyền từ chối và phải hoàn tác cùng transaction.
 - Module card liệt kê điểm mở và người đăng ký, để đọc được luồng ngược mà không cần chạy code.
 
@@ -135,7 +169,8 @@ Ba kiểu, định nghĩa một lần ở `src/core/extension/`:
 
 ## Kích thước và độ phức tạp
 
-ESLint (`eslint.config.mjs`) đo trên `src/**` trừ spec và mã sinh:
+ESLint (`eslint.config.mjs`) đo trên `src/**` trừ spec và mã sinh. Mọi rule dưới đây là **`error`**: không còn mức `warn` và
+không còn `--max-warnings` (một directive `eslint-disable` thừa cũng là `error`).
 
 | Rule                     | Ngưỡng                                 |
 | ------------------------ | -------------------------------------- |
@@ -146,23 +181,66 @@ ESLint (`eslint.config.mjs`) đo trên `src/**` trừ spec và mã sinh:
 | `max-depth`              | 4                                      |
 
 Vượt ngưỡng là tín hiệu tách use case hoặc đưa nhánh vào policy thuần — **không** cắt file theo chữ cái hay theo con số.
-Ngoại lệ ghi tại chỗ: `// eslint-disable-next-line complexity -- <lý do>`; không có ledger riêng. Một ngoại lệ theo mẫu
-file: `*.http-errors.ts` không đo `complexity`/`max-lines-per-function` — đó là bảng `instanceof` → câu trả lời HTTP,
-mỗi lỗi một nhánh, thứ tự có nghĩa với lớp con; độ dài của nó là số lỗi, không phải logic. `pnpm lint` chạy với
-`--max-warnings N` (`package.json`): ESLint chỉ thoát lỗi khi **tổng** số cảnh báo của mọi rule mức `warn` vượt N — nó
-không chặn một hàm đã vượt ngưỡng dài thêm, không chặn cảnh báo mới được bù bằng cảnh báo vừa sửa, và không tự hạ N. Hai
-quy ước review (không phải gate): PR chạm vào một hàm vượt ngưỡng để lại nó nhỏ hơn; PR làm giảm số cảnh báo hạ N ngay
-trong PR đó. Spec unit của module tối đa 400 dòng (H8-RV-01, gate `module-layout`): dài hơn thì tách
-theo use case, harness có kiểu đặt ở `test/support/`.
+Nợ có sẵn lúc các rule thành `error` (`OD-R4`) nằm trong [eslint-suppressions.json](../../eslint-suppressions.json) do
+`eslint --suppress-all` sinh, đếm theo từng file và rule; tổng các số đếm là nợ còn lại (229 lúc ghi; 113 sau remediation 30/10:
+59 `complexity`, 54 `max-lines-per-function`, 0 `max-params`; riêng `src/modules/requests` 37). Hệ quả:
+
+- Vi phạm mới ở bất kỳ file nào làm `pnpm lint` đỏ; file đã có nợ mà vượt số đếm của nó cũng đỏ (ESLint báo mọi vi phạm của
+  file và rule đó).
+- Sửa một vi phạm cũ cũng làm `pnpm lint` đỏ ("suppressions left that do not occur anymore") cho tới khi `pnpm lint:prune`
+  gỡ mục của nó; commit file đã gỡ cùng thay đổi. Nợ chỉ có thể giảm.
+- Không sửa tay file đó, không `--suppress-all` lại trên cây đang có vi phạm mới, không `--pass-on-unpruned-suppressions`.
+- Gate `test/gates/lint-debt.gate-spec.ts` (TG-2) đọc cấu hình ESLint **hiệu lực** của từng file `.ts` trong `src`, `test`, `scripts`
+  (`scripts/arch/eslint-effective-config.mjs`, sau khi gộp mọi override, không đọc chữ của `eslint.config.mjs`), nên một override
+  `warn` hay `off` thêm sau làm gate đỏ. Gate giữ mức `error` và tùy chọn: `complexity` 12, `max-lines-per-function` 60 (bỏ dòng trống và
+  comment), `max-params` 8, `max-lines` 500, `max-depth` 4 ở mọi file `src` không phải spec; ba rule kiểu ở mọi file; `reportUnusedDisableDirectives:
+'error'` ở mọi file; chỉ `*.http-errors.ts` tắt hai rule kích thước; script `lint` không có `--max-warnings` hay tùy chọn hạ mức. Gate còn giữ
+  không `eslint-disable` cho ba rule trong `src`, mọi mục trong file suppression trỏ tới file còn tồn tại, và tổng số đếm theo rule
+  (`complexity` 59, `max-lines-per-function` 54), `complexity` + `max-lines-per-function` (113), và riêng `src/modules/requests` (37)
+  không vượt trần ghi trong gate. `max-params` không còn nợ: không file nào được mang suppression của nó (gate đòi không có khóa
+  `max-params`), một constructor hay hàm quá 8 tham số phải được tách chứ không ghi nợ. Trần bằng số đã đạt: gỡ được suppression
+  thì hạ trần trong cùng thay đổi (gate đòi trần đúng bằng số hiện có), không bao giờ nâng.
+- Ngoại lệ đáng giữ lâu dài ghi tại chỗ: `// eslint-disable-next-line complexity -- <lý do>`. Một ngoại lệ theo mẫu file:
+  `*.http-errors.ts` không đo `complexity`/`max-lines-per-function` — đó là bảng `instanceof` → câu trả lời HTTP, mỗi lỗi một
+  nhánh, thứ tự có nghĩa với lớp con; độ dài của nó là số lỗi, không phải logic.
+
+`@typescript-eslint/no-explicit-any`, `no-floating-promises` và `no-unsafe-argument` cũng là `error`, với 0 vi phạm và không có
+suppression nào. Spec unit của module tối đa 400 dòng (H8-RV-01, gate `module-layout`): dài hơn thì tách theo use case, harness
+có kiểu đặt ở `test/support/`.
+
+## Luật máy kiểm (R1–R10) và luật review
+
+Mỗi luật có một câu ở đây và một gate; luật không có máy kiểm ghi "review". Chi tiết ở các mục trên.
+
+| #   | Luật                                                                                                                                      | Gate                                                   |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| R1  | Mỗi graph tiến trình có mặt đủ bên đăng ký của extension point nó dùng; ngoại lệ ghi kèm lý do (mục Extension point)                      | `extension-wiring`                                     |
+| R2  | Client của một transaction chạy một truy vấn một lúc, không `Promise.all` trên `tx` ([database rules](database-business.md))              | `module-layout`                                        |
+| R3  | Không thư mục tên tầng kỹ thuật ở bất kỳ cấp nào dưới module                                                                              | `module-layout`                                        |
+| R4  | `*.api.ts` và `*.extension-points.ts` chỉ trong `public/`; mỗi facade export đúng một lớp `<X>Api`, ≤ 8 phụ thuộc                         | `module-layout`; ESLint `max-params`                   |
+| R5  | Gốc module có thư mục capability chỉ giữ `README.md`, `*.module.ts` và file mang tên module                                               | `module-layout`                                        |
+| R6  | Capability không import nhau theo vòng, ở mọi module; capability không import facade của chính module                                     | `capability-graph`, `module-layout`                    |
+| R7  | `src/core` chỉ giữ primitive ít nhất hai vùng dùng                                                                                        | `capability-graph` (TG-9)                              |
+| R8  | `complexity` 12, `max-lines-per-function` 60, `max-params` 8 là `error`; nợ cũ chỉ giảm, `max-params` về 0                                | `lint-debt` (TG-2), `pnpm lint`                        |
+| R9  | Spec unit của module ≤ 400 dòng; spec database/server (`test/integration`, `test/http`, `test/e2e`) ≤ 800 dòng; `test/support` ≤ 400 dòng | `module-layout`, `test-size`, `test-support-structure` |
+| R10 | Export Nest ngoài hợp đồng công khai chỉ hợp lệ khi mọi consumer cùng thư mục module                                                      | `module-graph`                                         |
+|     | Mọi package `src` import lúc chạy nằm trong `dependencies` của `package.json`                                                             | `deployment-roles` (TG-3)                              |
+|     | Tầng module, cửa `public/`, nhóm chỉ qua điểm vào, không vòng import, controller không import controller                                  | `pnpm arch:check`                                      |
+
+Luật chỉ có review (không có máy kiểm): tách nhóm khi nào (mục Layout), module card cập nhật khi public API hay extension point đổi,
+kiểm lại thứ tự khóa của luồng ghi mới, và **comment nói lý do, không nói mã nội bộ** — giữ mã yêu cầu (`US-xx-yy`, `AC-n`, `QĐ-n`,
+`FR-n`, `INV-n`, `SoD-n`, `ADR-n`, `BR-n`) và mã nghiệp vụ hợp lệ (`G1`–`G5`, `K1`–`K5`, `T1`–`T6`), thay mã finding hay lát
+(`F13`, `T-11`, `P23-RV`, `GATE.2`, `H6.4`…) bằng một câu lý do; `node scripts/arch/comment-codes.mjs` chỉ in danh sách để người đọc,
+không phải gate. Test trong `test/` được giữ mã tham chiếu ở dòng chú thích trên test, không ở tên test.
 
 ## Gate
 
-| Lệnh                   | Kiểm                                                                                                                       |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm arch:check`      | Tầng module, cửa `public/`, composition root, nhóm chỉ qua điểm vào, không vòng import, controller không import controller |
-| `pnpm test:gates`      | Layout và từ vựng file, chỗ đặt lỗi/SQL/HTTP, sở hữu bảng Prisma, export Nest, lệnh vận hành                               |
-| `pnpm arch:docs:check` | `docs/generated/module-graph.md` và `docs/generated/routes.md` khớp code (`pnpm arch:graph`, `pnpm arch:routes`)           |
-| `pnpm lint`            | Kích thước và độ phức tạp (mục trên)                                                                                       |
+| Lệnh                   | Kiểm                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm arch:check`      | Tầng module, cửa `public/`, composition root, nhóm chỉ qua điểm vào, không vòng import, controller không import controller                                                                                                                                                                                                             |
+| `pnpm test:gates`      | Layout và từ vựng file (R3 → R5), capability không vòng (R6), `src/core` chỉ primitive dùng chung (R7), export Nest chỉ được module cùng thư mục dùng (R10), chỗ đặt lỗi/SQL/HTTP, sở hữu bảng Prisma, lệnh vận hành, dependency chạy thật của `src` nằm trong `dependencies`, cỡ spec database/server ≤ 800 dòng, trần nợ lint (TG-2) |
+| `pnpm arch:docs:check` | `docs/generated/module-graph.md` và `docs/generated/routes.md` khớp code (`pnpm arch:graph`, `pnpm arch:routes`)                                                                                                                                                                                                                       |
+| `pnpm lint`            | Kích thước và độ phức tạp (mục trên)                                                                                                                                                                                                                                                                                                   |
 
 ## Thêm một use case
 

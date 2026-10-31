@@ -8,12 +8,12 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import { userActor } from '../public/personnel.types';
 import { NoticeRefusedError } from './notice.errors';
 import { isPriorityKind, pendingRefusal, sendRefusal } from './notice.policy';
 import { NoticeRepo } from './notice.repo';
-import type { NoticeRecord, SendNoticeInput } from './notice.types';
+import type { NoticeRecord, SendNoticeInput } from '../personnel-notice.types';
 
 const REVIEW_DAYS = 'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS';
 /** The parameter is at most thirty working days: ninety calendar days hold them with the holidays in between. */
@@ -140,7 +140,7 @@ export class NoticeService {
         after,
       ),
     );
-    // The Super Admin handles the notices (`QĐ-87a`): a new one is told to them in the transaction that sends it (F17).
+    // The Super Admin handles the notices (`QĐ-87a`): a new one is told to them in the transaction that sends it.
     await this.notifier.noticeReceived(tx, {
       organizationId: organization.id,
       employeeId: employee.id,

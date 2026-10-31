@@ -1,5 +1,6 @@
 import { IdentityAccessApi } from '../../../src/modules/identity-access/public/identity-access.api';
 import { ProvisioningDecisionService } from '../../../src/modules/licensing/provisioning/tasks/provisioning-decision.service';
+import { ProvisioningGrantService } from '../../../src/modules/licensing/provisioning/tasks/provisioning-grant.service';
 import { ProvisioningItAdminRequiredError } from '../../../src/modules/licensing/provisioning/provisioning.errors';
 import { ProvisioningService } from '../../../src/modules/licensing/provisioning/tasks/provisioning.service';
 import type { AuthenticatedPrincipal } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
@@ -111,6 +112,7 @@ describe('the grant of a seat and the work on a task: the department of the seat
       const outsider = principalOf(person, ['FINANCE']);
       const decisions = h.ctx.app.get(ProvisioningDecisionService, { strict: false });
       const queue = h.ctx.app.get(ProvisioningService, { strict: false });
+      const grants = h.ctx.app.get(ProvisioningGrantService, { strict: false });
       const before = await counts();
 
       const attempts = [
@@ -122,7 +124,7 @@ describe('the grant of a seat and the work on a task: the department of the seat
         () => decisions.closeFailed(outsider, task.id, { reason: 'x' }),
         () => decisions.cancel(outsider, task.id),
         () =>
-          queue.grant(outsider, {
+          grants.grant(outsider, {
             requestId: h.gate.grantable(person, own.planId),
             subscriptionId: own.subscriptionId,
           }),

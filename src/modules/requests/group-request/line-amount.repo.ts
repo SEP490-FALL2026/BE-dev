@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { LineAmountRecord } from './group-request.types';
+import type { LineAmountRecord } from '../access-request/group-request.types';
 
 export interface NewLineAmount {
   requestId: string;

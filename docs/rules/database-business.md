@@ -38,6 +38,18 @@
 - Bảng mới cần quyền runtime khác DML thường (chỉ ghi thêm, chỉ đọc) thêm vào `RUNTIME_TABLE_EXCEPTIONS` của
   [database-role-judgement.ts](../../src/infrastructure/database/database-role-judgement.ts) trong cùng thay đổi. Không tạo hàm
   `SECURITY DEFINER` trong `public`: nó chạy với quyền owner cho runtime role (`reconcile` báo `SECURITY_DEFINER_ROUTINE`).
+- **Sequence (H7-SEQ):** runtime chỉ có `USAGE` trên mọi sequence và trong default privileges của sequence tương lai, **trừ** hai
+  sequence mà việc đánh số còn đọc và nâng bằng `setval` để image tương thích không bao giờ lặp một số đã cấp:
+  `personnel_notice_seq` (`NoticeRepo.nextCode`, BM-09) và `saas_issue_seq` (`SaasIssueRepo.nextCode`, BM-11) giữ đúng
+  `SELECT, UPDATE`. `setval` cần `UPDATE` và `nextval` chấp nhận `UPDATE` hoặc `USAGE`
+  ([PostgreSQL 17](https://www.postgresql.org/docs/17/functions-sequence.html)), nên không cấp thêm `USAGE`. Đọc trạng thái
+  (`SELECT … FROM <sequence>`) cần `SELECT`: hướng dẫn chỉ nêu `currval`, còn PostgreSQL 17 từ chối `42501` khi thiếu và test
+  `database-runtime-sequences` khóa điều đó. Chính sách là `RUNTIME_SEQUENCE_EXCEPTIONS` trong
+  [database-role-judgement.ts](../../src/infrastructure/database/database-role-judgement.ts), một nguồn cho cả lệnh cấp quyền
+  (`provision`, `reconcile`) lẫn `verify`: thiếu hay thừa đều là `RUNTIME_SEQUENCE_PRIVILEGES`. Sequence khác mà code đọc trạng
+  thái hay gọi `setval` thì thêm vào đó trong cùng thay đổi (gate `runtime-sequence-privileges` bắt cả thiếu lẫn dư). Không
+  `GRANT` tay sau deploy: `reconcile` thu lại mọi quyền ngoài chính sách. Sequence chưa có ở baseline cũ không bị `GRANT`; migration tạo
+  nó xong thì `reconcile` kế tiếp mới cấp, và tới lúc đó runtime bị từ chối `42501` (fail closed).
 - Trigger vẫn là nơi giữ bất biến (`INV-05`, …); quyền chỉ là lớp chặn thêm — owner vẫn bị trigger từ chối.
 
 ## Transaction và hành vi
@@ -50,6 +62,10 @@
   [transaction-runner.ts](../../src/infrastructure/database/transaction-runner.ts).
   Facade nhận cùng `tx`; khóa dữ liệu của module khác cũng qua facade. Runner dùng
   Read Committed, đặt lock/statement timeout theo giao dịch; không tự mở giao dịch con.
+- Một client transaction chạy **một truy vấn một lúc**: không `Promise.all` (cũng `allSettled`, `race`, `any`) trên `tx` hay biến gán từ
+  `tx ?? …`, dù là `tx.model.x()` hay `repo.x(tx)` (gate `module-layout`, R2). pg 8.23 xếp hàng chúng và in cảnh báo deprecated
+  ("Calling client.query() when the client is already executing a query"); thứ tự đọc là thứ tự `await`, và một câu lỗi không còn
+  để các câu khác chạy tiếp trong transaction đã hỏng. Đọc song song trên pool (`this.prisma`, không `tx`) vẫn được.
 - Required audit/durable delivery intent cùng transaction với business write; gọi
   network sau commit. Thiết kế này phải được implement/test khi workflow được thêm.
 - PostgreSQL mặc định Read Committed: hai SELECT trong một transaction vẫn có thể

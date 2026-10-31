@@ -4,7 +4,7 @@ import { DatabaseEnvironmentVariables } from '../config/env-schema';
 import { PrismaService } from './prisma.service';
 import { RuntimeIdentityFacts, judgeRuntimeIdentity } from './database-role-judgement';
 
-/** The API or the worker was started with a login that may administer the database (H7: F-15, DB-04, Q9). */
+/** The API or the worker was started with a login that may administer the database (DB-04, Q9). */
 export class RuntimeDatabaseRoleRefusedError extends Error {
   constructor(role: string, reasons: readonly string[]) {
     super(

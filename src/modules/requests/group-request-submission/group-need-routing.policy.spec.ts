@@ -1,5 +1,11 @@
 import type { RoutingFacts } from '../access-request/routing.policy';
-import { planNeedSteps, SENT_BY_EMPLOYEE_ROW, SENT_BY_HEAD_ROW } from './group-need-routing.policy';
+import {
+  groupLineRowsOf,
+  groupStartState,
+  planNeedSteps,
+  SENT_BY_EMPLOYEE_ROW,
+  SENT_BY_HEAD_ROW,
+} from './group-need-routing.policy';
 
 const people = (...ids: string[]) => ids.map((employeeId) => ({ employeeId }));
 const facts = (patch: Partial<RoutingFacts> = {}): RoutingFacts => ({
@@ -133,5 +139,63 @@ describe('the steps the people of a group go to (US-05-03 AC-8, AC-14, US-05-17 
     const planned = plan({ sender: 'head', head: 'head', lines: ['e3', 'head', 'e1', 'e2'] });
 
     expect(planned[0].lines.map((line) => line.employeeId)).toEqual(['e3', 'e1', 'e2']);
+  });
+});
+
+describe('the state a request for a group starts in, and the rows of its lines (US-05-17, US-05-03 AC-8)', () => {
+  const step = (state: 'PENDING' | 'WAITING') => ({
+    state,
+    assigneeEmployeeId: null,
+    routingRow: 1,
+    waitingReason: null,
+    samePersonAsSpend: false,
+    slaWorkingDays: 2,
+  });
+  const entry = (state: 'PENDING' | 'WAITING', confirmedBySending: boolean, ...ids: string[]) => ({
+    lines: people(...ids),
+    step: step(state),
+    confirmedBySending,
+  });
+
+  it('goes on at once to what follows the need when the head confirmed every person by sending', () => {
+    expect(groupStartState([entry('PENDING', true, 'a', 'b')], 'PAID_IN_CATALOG')).toBe('AWAITING_SPEND_SUBMISSION');
+    expect(groupStartState([entry('PENDING', true, 'a')], 'INTERNAL_FREE')).toBe('AWAITING_EXECUTION');
+  });
+
+  it('waits under control only when every step that is still open waits for somebody, and is pending otherwise', () => {
+    expect(groupStartState([entry('WAITING', false, 'a')], 'PAID_IN_CATALOG')).toBe('WAITING_CONTROLLED');
+    expect(groupStartState([entry('WAITING', false, 'a'), entry('PENDING', false, 'b')], 'PAID_IN_CATALOG')).toBe(
+      'PENDING',
+    );
+    expect(groupStartState([entry('PENDING', true, 'a'), entry('WAITING', false, 'b')], 'PAID_IN_CATALOG')).toBe(
+      'WAITING_CONTROLLED',
+    );
+  });
+
+  it('writes a line for each person under the step that holds them, confirmed by sending or waiting for their need', () => {
+    const planned = [entry('PENDING', true, 'a', 'b'), entry('PENDING', false, 'c')];
+
+    expect(
+      groupLineRowsOf('req-1', planned, ['step-1', 'step-2']).map((row) => [row.employeeId, row.state, row.needStepId]),
+    ).toEqual([
+      ['a', 'NEED_CONFIRMED', 'step-1'],
+      ['b', 'NEED_CONFIRMED', 'step-1'],
+      ['c', 'AWAITING_NEED', 'step-2'],
+    ]);
+  });
+
+  it('keeps the end each person asked for, and none when they gave none', () => {
+    const planned = [
+      {
+        lines: [{ employeeId: 'a', expectedEndDate: '2027-03-31' }, { employeeId: 'b' }],
+        step: step('PENDING'),
+        confirmedBySending: false,
+      },
+    ];
+
+    expect(groupLineRowsOf('req-1', planned, ['step-1']).map((row) => row.expectedEndDate)).toEqual([
+      '2027-03-31',
+      null,
+    ]);
   });
 });

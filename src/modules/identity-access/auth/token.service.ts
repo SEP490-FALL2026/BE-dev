@@ -44,7 +44,7 @@ export class TokenService {
     }
 
     // Both ids end up in a UUID column. A validly signed token with anything else is still a bad token
-    // (401); letting it reach the database would turn the driver's type error into a 503 (R-04).
+    // (401); letting it reach the database would turn the driver's type error into a 503.
     if (!isUuid(payload.sub) || !isUuid(payload.sid)) throw new InvalidAccessTokenError();
 
     return { sub: payload.sub, sid: payload.sid };

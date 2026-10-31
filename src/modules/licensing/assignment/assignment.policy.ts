@@ -25,7 +25,7 @@ export const assignmentCreatedSnapshot = (record: AssignmentRecord, importId: st
 });
 
 /**
- * A seat sits on a subscription of its own department (`QĐ-89a`, F20): a subscription takes no seat of another department. What
+ * A seat sits on a subscription of its own department (`QĐ-89a`): a subscription takes no seat of another department. What
  * is compared is the department of the seat (the owning department of a service account, the department of the request for a
  * grant) with the department that owns the subscription; an internal plan has no subscription and no owner, and nothing is
  * compared. Throws AssignmentConflictError (`SUBSCRIPTION_DEPARTMENT_MISMATCH`) before anything is written; `index` is the row of
@@ -45,7 +45,7 @@ export function assertSubscriptionDepartment(
 const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
- * The people who hold a seat on a subscription another department owns, with those seats (F21, `QĐ-89e`): the seats are grouped
+ * The people who hold a seat on a subscription another department owns, with those seats (`QĐ-89e`): the seats are grouped
  * by person; a person whose department on the day is unknown, or is the one that owns the subscription, is left out. One entry
  * for each person, sorted by employee id and then assignment id, so the same facts always give the same event.
  */

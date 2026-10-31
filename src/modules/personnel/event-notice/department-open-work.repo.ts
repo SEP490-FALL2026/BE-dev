@@ -6,7 +6,7 @@ import type { UseGroup, UseItem } from '../../organization/public/organization-u
 
 /**
  * The events of the personnel context that are not over for a department, told to the organization when it asks whether the
- * department may be retired (F15, `OPEN_WORK`): a transfer that still waits and leaves or enters it, a departure that is still being
+ * department may be retired (`OPEN_WORK`): a transfer that still waits and leaves or enters it, a departure that is still being
  * handed over for a person of it, and a notice of a head (`BM-09`) not yet verified that it sent or that names it as the target. A
  * transfer that took effect or was cancelled, a departure that has left or was cancelled, and a notice that was recorded, rejected or
  * withdrawn are over. A long leave of a member is not told: the members already keep the department in use. Always six statements,
@@ -29,14 +29,16 @@ export class DepartmentOpenWorkRepo {
       OR: [{ senderDepartmentId: departmentId }, { targetDepartmentId: departmentId }],
     };
     const first = { orderBy: { id: 'asc' }, take: limit } as const;
-    const [transferRows, transferTotal, caseRows, caseTotal, noticeRows, noticeTotal] = await Promise.all([
-      db.departmentTransfer.findMany({ where: transfers, select: { id: true }, ...first }),
-      db.departmentTransfer.count({ where: transfers }),
-      db.offboardingCase.findMany({ where: cases, select: { id: true }, ...first }),
-      db.offboardingCase.count({ where: cases }),
-      db.personnelNotice.findMany({ where: notices, select: { id: true, code: true }, ...first }),
-      db.personnelNotice.count({ where: notices }),
-    ]);
+    const transferRows = await db.departmentTransfer.findMany({ where: transfers, select: { id: true }, ...first });
+    const transferTotal = await db.departmentTransfer.count({ where: transfers });
+    const caseRows = await db.offboardingCase.findMany({ where: cases, select: { id: true }, ...first });
+    const caseTotal = await db.offboardingCase.count({ where: cases });
+    const noticeRows = await db.personnelNotice.findMany({
+      where: notices,
+      select: { id: true, code: true },
+      ...first,
+    });
+    const noticeTotal = await db.personnelNotice.count({ where: notices });
     const items: UseItem[] = [
       ...transferRows.map((row) => ({ kind: 'DEPARTMENT_TRANSFER', id: row.id, label: null })),
       ...caseRows.map((row) => ({ kind: 'OFFBOARDING_CASE', id: row.id, label: null })),

@@ -10,8 +10,7 @@ import { createRequire } from 'node:module';
  * What the request parsers throw before any handler runs, and what the client did wrong when they do. Express's JSON and
  * URL-encoded parsers (body-parser 2 on raw-body 3) refuse a request with an http-errors object that carries a documented
  * `type`, and multer refuses a form that breaks its limits with a MulterError; Nest turns none of these into an
- * HttpException (except a JSON SyntaxError, which it maps to 400 itself), so the filter would answer 500 (P29-N1, P29-N2,
- * P29-N4).
+ * HttpException (except a JSON SyntaxError, which it maps to 400 itself), so the filter would answer 500.
  *
  * Recognized by their exact signature — the documented `type` and the shape its creator gives it, the multer class —
  * never by a `status`, a name or a message alone: an arbitrary thrown object that claims a client status is still an

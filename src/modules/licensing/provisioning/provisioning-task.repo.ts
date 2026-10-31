@@ -27,7 +27,7 @@ export interface TaskPageFilter {
 /**
  * What a task that waits in the queue again cannot carry (the status check of the table: no taker, no failed day or person, no
  * retry time). A hand-off clears only this: the last error, the kind and the reason of the failure and the tries made stay with the
- * task for the person who takes it (F08); the table asks only that the kind and the reason come together.
+ * task for the person who takes it; the table asks only that the kind and the reason come together.
  */
 const QUEUED_AGAIN = {
   claimedByAppUserId: null,

@@ -1,6 +1,6 @@
 /**
  * The caller is not the Super Admin: employee records are entered and corrected by the Super Admin alone, on an HR basis (`QĐ-87a`),
- * decided in the service whatever the route let through (`F13`).
+ * decided in the service whatever the route let through.
  */
 export class EmployeeForbiddenError extends Error {
   constructor() {
@@ -10,7 +10,7 @@ export class EmployeeForbiddenError extends Error {
 }
 
 /**
- * Nobody changes their own record here (`QĐ-87c`, `F19`): when the Super Admin is the subject, the change is made through the
+ * Nobody changes their own record here (`QĐ-87c`): when the Super Admin is the subject, the change is made through the
  * controlled procedure outside the application and nothing is written by this route.
  */
 export class EmployeeSelfChangeForbiddenError extends Error {
@@ -30,7 +30,7 @@ export class EmployeeUpdateEmptyError extends Error {
   }
 }
 
-/** A row cannot become an employee; carries every reason at once (T-16). */
+/** A row cannot become an employee; carries every reason at once. */
 export class EmployeeRowInvalidError extends Error {
   constructor(readonly reasons: { field: string; code: string }[]) {
     super('The employee row is not valid.');

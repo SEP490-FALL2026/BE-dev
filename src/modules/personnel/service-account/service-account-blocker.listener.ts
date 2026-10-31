@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { LicensingApi } from '../../licensing/public/licensing.api';
+import { LicensingServiceAccountApi } from '../../licensing/public/licensing-service-account.api';
 import { OffboardingBlockerContributions } from '../public/personnel.extension-points';
 import { SERVICE_ACCOUNT_UNASSIGNED } from '../public/personnel.types';
 
@@ -11,9 +11,12 @@ import { SERVICE_ACCOUNT_UNASSIGNED } from '../public/personnel.types';
  */
 @Injectable()
 export class ServiceAccountBlockerSource implements OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [OffboardingBlockerContributions] as const;
+
   constructor(
     private readonly blockers: OffboardingBlockerContributions,
-    private readonly licensing: LicensingApi,
+    private readonly licensingServiceAccounts: LicensingServiceAccountApi,
   ) {}
 
   onModuleInit(): void {
@@ -25,6 +28,6 @@ export class ServiceAccountBlockerSource implements OnModuleInit {
 
   /** How many open service accounts the person still answers for. */
   async countOf(employeeId: string, tx?: DbTx): Promise<number> {
-    return (await this.licensing.listServiceAccountDuties([employeeId], tx)).length;
+    return (await this.licensingServiceAccounts.listServiceAccountDuties([employeeId], tx)).length;
   }
 }

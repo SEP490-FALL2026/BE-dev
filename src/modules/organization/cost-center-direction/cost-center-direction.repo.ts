@@ -18,7 +18,7 @@ export interface LockedDepartment {
 }
 
 /**
- * The persistence of `pnpm ops:cost-center-direction` (F01, spec L.11): the one writer of `cost_center_direction_activations`
+ * The persistence of `pnpm ops:cost-center-direction`: the one writer of `cost_center_direction_activations`
  * and `cost_center_department_links`, and the writer of the link on `cost_centers` the procedure makes. The command may run
  * against a database that has not yet got the compatibility migration, so it asks the catalog first and names the columns
  * and tables only after it has seen them all.

@@ -12,10 +12,7 @@ import { RequireRoles } from '../../../../infrastructure/security/decorators/acc
 import { CurrentPrincipal } from '../../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { SuperAdminTransferBodyDto, SuperAdminTransferResponseDto } from './super-admin-transfer.dto';
-import {
-  SUPER_ADMIN_TRANSFER_ERROR_EXAMPLES,
-  toSuperAdminTransferApiException,
-} from '../../mappers/account.http-errors';
+import { SUPER_ADMIN_TRANSFER_ERROR_EXAMPLES, toSuperAdminTransferApiException } from '../account.http-errors';
 import { SuperAdminTransferService } from './super-admin-transfer.service';
 
 /**

@@ -32,7 +32,7 @@ Lệnh nằm ở `src/cli/<lệnh>/` (bảng lệnh: `src/cli/commands.ts`) và 
   `DemoAccountsChangedError`), Audit `DEMO_DATASET.ACCOUNT_CREATED` + `ROLE.GRANTED` với `actorKind OPERATOR`; và
   `holdApplyLock`: khóa advisory phiên của fixture trên database (kết nối riêng, `trySessionAdvisoryLock` của
   infrastructure) để hai `apply` không chạy cùng lúc; type ở `demo-accounts.types.ts`.
-- `InstallationInspectionApi` ([public/inspection.api.ts](public/inspection.api.ts)) — `inspect`: đếm và liệt kê vi phạm
+- `InstallationInspectionApi` ([public/installation-inspection.api.ts](public/installation-inspection.api.ts)) — `inspect`: đếm và liệt kê vi phạm
   bất biến; type ở `inspection.types.ts`.
 - `MigrationPreflightApi` ([public/migration-preflight.api.ts](public/migration-preflight.api.ts)) — `judge`: lịch sử
   migration có đưa được database tới Cost Center chỉ cho Unit; `recoveryTarget`: một image có phục vụ được database này.

@@ -9,7 +9,7 @@ import { ActionLinkRevocation } from '../action-link-revocation.service';
 import { ActionLinkService } from '../action-link.service';
 
 /**
- * The invitation an administrator sends (slice 1b): a new link, its mail and the audit event, in the caller's
+ * The invitation an administrator sends: a new link, its mail and the audit event, in the caller's
  * transaction. Sending again first ends every link the account could still use, an expired one that still holds the
  * place included (spec base).
  */

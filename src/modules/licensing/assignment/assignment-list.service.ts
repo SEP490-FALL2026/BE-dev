@@ -7,7 +7,7 @@ import { AssignmentRepo } from './assignment.repo';
 import { toAssignmentView } from './assignment.policy';
 
 /**
- * The assignments an IT Admin browses (`US-02-05`, `LD-10`): a page cut and counted in one snapshot, each row with the
+ * The assignments an IT Admin browses (`US-02-05`): a page cut and counted in one snapshot, each row with the
  * person, the plan and the Cost Center it names, read once for the whole page instead of one at a time. Three reads of
  * other capabilities at most, whatever the page size.
  */

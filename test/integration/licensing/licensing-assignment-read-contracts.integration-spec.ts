@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { PgRelay } from '../../support/pg-relay';
 import { QueryCounter, dataStatements, tablesOf } from '../../support/query-count';
 import { AssignmentWire, SeatHarness } from '../../support/seat-baseline-harness';
@@ -16,7 +16,6 @@ interface ListedAssignment extends AssignmentWire {
 describe('assignment and license key read contracts (integration, real PostgreSQL)', () => {
   let relay: PgRelay;
   let counter: QueryCounter;
-  let organization: OrganizationApi;
 
   beforeAll(async () => {
     await h.start({
@@ -29,8 +28,7 @@ describe('assignment and license key read contracts (integration, real PostgreSQ
       },
     });
     counter = QueryCounter.on(relay);
-    organization = h.ctx.app.get(OrganizationApi, { strict: false });
-    jest.spyOn(organization, 'businessToday').mockResolvedValue('2026-12-01');
+    pretendBusinessToday(h.ctx.app, '2026-12-01');
   }, 120000);
 
   afterAll(async () => {

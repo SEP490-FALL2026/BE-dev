@@ -1,21 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { SeatHarness, ImportWire } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
 const DAY = '2026-10-01';
 
 describe('the seat baseline import over HTTP (integration, real PostgreSQL)', () => {
-  let organization: OrganizationApi;
-
   beforeAll(async () => {
     await h.start();
-    organization = h.ctx.app.get(OrganizationApi, { strict: false });
   }, 180000);
 
   beforeEach(() => {
-    jest.spyOn(organization, 'businessToday').mockResolvedValue(DAY);
+    pretendBusinessToday(h.ctx.app, DAY);
   });
 
   afterEach(() => {

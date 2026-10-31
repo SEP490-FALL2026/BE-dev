@@ -6,7 +6,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { AssignmentNotFoundError, AssignmentNotOpenError } from '../public/licensing.errors';
 import type { AssignmentRecord } from '../public/licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { AssignmentRepo } from './assignment.repo';
 
 interface EndInput {

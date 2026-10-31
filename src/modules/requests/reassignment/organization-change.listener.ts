@@ -7,8 +7,8 @@ import {
 } from '../../organization/public/organization.extension-points';
 import type { OrganizationChange } from '../../organization/public/organization.types';
 import { RequestDraftDepartureService } from '../draft/request-draft-departure.service';
-import type { ReassignmentTrigger } from './reassignment.policy';
-import { StepReassignmentRepo } from './step-reassignment.repo';
+import type { ReassignmentTrigger } from '../step-routing/reassignment.policy';
+import { StepReassignmentRepo } from '../step-routing/step-reassignment.repo';
 import { StepReassignmentService } from './step-reassignment.service';
 
 /**
@@ -21,6 +21,9 @@ import { StepReassignmentService } from './step-reassignment.service';
  */
 @Injectable()
 export class RequestsOrganizationChangeListener implements OrganizationChangeListener, OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [OrganizationChangeListeners] as const;
+
   constructor(
     private readonly repo: StepReassignmentRepo,
     private readonly reassignment: StepReassignmentService,
@@ -34,7 +37,7 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
   }
 
   async onChange(tx: DbTx, change: OrganizationChange): Promise<void> {
-    // The drafts of a person who left are theirs alone and go with them, whoever else the change moves a step of (spec L.1).
+    // The drafts of a person who left are theirs alone and go with them, whoever else the change moves a step of.
     if (change.kind === 'EMPLOYEE_LEFT') await this.drafts.deleteOf(tx, change.employeeId, change.id);
     const concerned = await this.concernedBy(tx, change);
     if (concerned === null) return;
@@ -71,7 +74,7 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
 
         return {
           requestIds: [
-            // The internal requests of the people who sit in the department now, and everything sent for the department (F28).
+            // The internal requests of the people who sit in the department now, and everything sent for the department.
             ...(await this.repo.needRequestIdsOfRequesters(members, tx)),
             ...(await this.repo.needRequestIdsOfDepartment(change.departmentId, tx)),
           ],

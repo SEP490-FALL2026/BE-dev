@@ -4,7 +4,7 @@ import { Page, pageOf } from '../../../../core/application/pagination';
 import { TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
-import { LicensingApi } from '../../../licensing/public/licensing.api';
+import { LicensingSeatBaselineApi } from '../../../licensing/public/licensing-seat-baseline.api';
 import { OrganizationApi } from '../../../organization/public/organization.api';
 import { importCancelledEvent, importUploadedEvent } from '../employee-import-audit.mapper';
 import type { EmployeeRowOutcome } from '../employee-import-row.types';
@@ -34,7 +34,7 @@ export class EmployeeImportPreviewService {
     private readonly organization: OrganizationApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
-    private readonly licensing: LicensingApi,
+    private readonly licensing: LicensingSeatBaselineApi,
     private readonly rowValidation: EmployeeImportRowValidationService,
   ) {}
 

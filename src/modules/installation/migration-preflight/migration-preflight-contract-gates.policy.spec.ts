@@ -3,7 +3,7 @@ import { formatPreflight } from '../public/migration-preflight-report.mapper';
 import type { ContractGateFacts, PreflightReport } from '../public/migration-preflight.types';
 
 /**
- * The contract gates of `g0-g6-final-business-baseline-remediation`, as the FINAL release judges them (spec L.3, L.10, L.11):
+ * The contract gates of `g0-g6-final-business-baseline-remediation`, as the FINAL release judges them:
  * what its migrations need from the data, judged beside the unit-only conversion. A database that skipped the expansion of the
  * compatibility release, a subscription with no owner department, a Cost Center with no department or an organization whose
  * link was not activated, and a waiting row of a kind that is gone, each block; only the proposals the migration can reconcile

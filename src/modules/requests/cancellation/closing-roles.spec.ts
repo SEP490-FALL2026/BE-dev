@@ -3,7 +3,7 @@ import { AccessRequestRoleRequiredError } from '../access-request/access-request
 import { DepartureCancellationService } from './departure-cancellation.service';
 
 /**
- * The IT Admin closes a request because its beneficiary left or was transferred (F13, F29): the role is judged by the service itself,
+ * The IT Admin closes a request because its beneficiary left or was transferred: the role is judged by the service itself,
  * before it reads or locks anything, so a caller that does not come through the controller is refused as the guard refuses.
  * Every dependency is a stub that fails when touched: a refusal that read a request first would be seen.
  */

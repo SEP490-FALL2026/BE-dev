@@ -1,17 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { AssignmentWire, SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
 
 describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
-  let organization: OrganizationApi;
-  const today = (day: string) => jest.spyOn(organization, 'businessToday').mockResolvedValue(day);
+  const today = (day: string) => pretendBusinessToday(h.ctx.app, day);
 
   beforeAll(async () => {
     await h.start();
-    organization = h.ctx.app.get(OrganizationApi, { strict: false });
   }, 180000);
 
   afterEach(() => {

@@ -1,8 +1,12 @@
 import {
   cancelRefusal,
+  headSuccessorLabel,
   newTransferRefusal,
+  placementHeld,
+  previousSuccessorChoice,
   rescheduleRefusal,
   retiredDestinationRefusal,
+  subjectRefusal,
   successorRefusal,
   type NewTransferFacts,
   type PendingTransferFacts,
@@ -185,5 +189,40 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
     expect(cancelRefusal(pending({ effectiveOn: '2026-11-19' }))?.code).toBe('ALREADY_EFFECTIVE');
     expect(cancelRefusal(pending({ reason: '' }))?.code).toBe('REASON_REQUIRED');
     expect(cancelRefusal(pending({ grounds: { ...GROUNDS, type: '' } }))?.code).toBe('GROUNDS_INCOMPLETE');
+  });
+});
+
+describe('what a change of department needs before and after the locks', () => {
+  it.each([
+    ['nobody', null, 'EMPLOYEE_NOT_FOUND'],
+    ['a person who is terminated', { status: 'TERMINATED' }, 'EMPLOYEE_LEFT'],
+    ['a person who works', { status: 'ACTIVE' }, null],
+  ])('refuses %s at once (subjectRefusal)', (_label, seen, code) => {
+    expect(subjectRefusal(seen)).toBe(code);
+  });
+
+  it.each([
+    ['the placement is gone', null, 'p-1', false],
+    ['another placement is in force', { placementId: 'p-2' }, 'p-1', false],
+    ['the same placement is in force', { placementId: 'p-1' }, 'p-1', true],
+  ])('knows the placement is still the one seen when %s (placementHeld)', (_label, current, seenId, held) => {
+    expect(placementHeld(current, seenId)).toBe(held);
+  });
+
+  it('names the successor of a head handover, NONE when nobody takes over, and nothing when the person did not head', () => {
+    expect(headSuccessorLabel({ successorEmployeeId: 'e-2' })).toBe('e-2');
+    expect(headSuccessorLabel({ successorEmployeeId: null })).toBe('NONE');
+    expect(headSuccessorLabel(null)).toBeNull();
+  });
+});
+
+describe('who follows the head when the day of a handover is moved (US-03-01 AC-19, US-03-04 AC-22)', () => {
+  it('keeps the choice of who follows the head when the move names nobody: the person chosen, or nobody', () => {
+    expect(previousSuccessorChoice({ successorEmployeeId: 'e-2' })).toEqual({ kind: 'EMPLOYEE', employeeId: 'e-2' });
+    expect(previousSuccessorChoice({ successorEmployeeId: null })).toEqual({ kind: 'NONE' });
+  });
+
+  it('has no choice to keep when the person did not head the department', () => {
+    expect(previousSuccessorChoice(null)).toBeUndefined();
   });
 });

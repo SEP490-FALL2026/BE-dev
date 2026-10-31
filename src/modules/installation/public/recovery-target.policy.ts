@@ -1,8 +1,8 @@
 import { RecoveryTargetLabelsError } from './installation.errors';
 
 /**
- * P04-CPE-04 (g0-g6-final-business-baseline-remediation, spec L.12): which runtime image may serve this database again — the
- * way back of a deployment (H7 automatic recovery, scripts/ops/deploy-release.sh) or of a rollback by hand. A green readiness
+ * Which runtime image may serve this database again — the
+ * way back of a deployment (the automatic recovery of scripts/ops/deploy-release.sh) or of a rollback by hand. A green readiness
  * probe does not say it: readiness pings the database, it reads no business row.
  *
  * A data representation is a shape of stored rows that this source writes and a runtime before it cannot read. Each release
@@ -24,7 +24,7 @@ export const DATA_READS_LABEL = 'io.github.baophipham.slm.data-reads';
  * this source lists exactly these (recovery-target.policy.spec.ts).
  */
 export const DATA_REPRESENTATIONS = {
-  // F91 (QĐ-87g(2)): a sent internal free request of a department that has no Cost Center keeps no Cost Center. The
+  // `QĐ-87g(2)`: a sent internal free request of a department that has no Cost Center keeps no Cost Center. The
   // compatibility image `fba4dfe` types the column as required, so it fails on the row (impact matrix 3.11).
   'access-request-null-cost-center': 'a sent request that has no Cost Center (internal free software, F91)',
 } as const;

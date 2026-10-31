@@ -13,6 +13,9 @@ import { TransferSettlementService } from './transfer-settlement.service';
  */
 @Injectable()
 export class TransferEffectiveListener implements OrganizationChangeListener, OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [OrganizationChangeListeners] as const;
+
   constructor(
     private readonly changes: OrganizationChangeListeners,
     private readonly settlement: TransferSettlementService,

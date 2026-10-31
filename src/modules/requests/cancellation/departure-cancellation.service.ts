@@ -13,17 +13,12 @@ import {
   AccessRequestRoleRequiredError,
 } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
-import type { AccessRequestRecord } from '../access-request/access-request.types';
-import {
-  checkCancellation,
-  checkTransferCancellation,
-  wasTransferredFrom,
-  type CancellationRefusal,
-} from './cancellation.policy';
-import { RequestEndService } from '../access-request/request-end.service';
+import type { AccessRequestRecord, CancellationRefusal } from '../access-request/access-request.types';
+import { checkCancellation, checkTransferCancellation, wasTransferredFrom } from './cancellation.policy';
+import { RequestEndService } from '../request-end/request-end.service';
 import { RequestOutcomeService } from '../outcome/request-outcome.service';
 
-/** Why the IT Admin closes the request: the person it is for left, or was transferred while it was still open (F29). */
+/** Why the IT Admin closes the request: the person it is for left, or was transferred while it was still open. */
 export type CancellationCause = 'BENEFICIARY_LEFT' | 'BENEFICIARY_TRANSFERRED';
 
 /**
@@ -39,8 +34,8 @@ export interface CancellationInput {
 
 /**
  * The IT Admin closes a request because the person it was for left (`US-03-04` AC-25, `QĐ-77f`), or was transferred while it was still
- * open (`QĐ-90b`, F29): the request ends as cancelled, neither refused nor failed nor withdrawn. The role is judged here, not only by
- * the guard of the route (F13). Nothing closes by itself and nothing closes more than one request: the list of what is open is for
+ * open (`QĐ-90b`): the request ends as cancelled, neither refused nor failed nor withdrawn. The role is judged here, not only by
+ * the guard of the route. Nothing closes by itself and nothing closes more than one request: the list of what is open is for
  * the IT Admin to act on. One transaction, locked as the withdrawal is, the task of the grant first and then the request: a task nobody
  * has worked or that failed is cancelled with its assignment so the seat is free, a task being worked only with the evidence that the
  * IT Admin took the invitation back or stopped the work, and a task that is done is not closed here at all (the request is completed;

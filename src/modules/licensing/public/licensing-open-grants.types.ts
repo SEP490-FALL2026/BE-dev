@@ -1,6 +1,6 @@
 /**
  * Why the grant of a request is cancelled: the requester withdrew it (`US-05-08`), the person it was for left (`US-03-04` AC-25) or
- * was transferred to another department (F29, `QĐ-89b`: the IT Admin closes the part not yet granted, with evidence).
+ * was transferred to another department (`QĐ-89b`: the IT Admin closes the part not yet granted, with evidence).
  */
 export type GrantCancelCause = 'REQUESTER_WITHDREW' | 'BENEFICIARY_LEFT' | 'BENEFICIARY_TRANSFERRED';
 

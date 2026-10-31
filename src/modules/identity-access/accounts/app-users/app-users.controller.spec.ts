@@ -26,7 +26,7 @@ import { AccountQueryService } from './account-query.service';
 import { AccountStatusService } from './account-status.service';
 import { AppUsersController } from './app-users.controller';
 
-// H5.0 characterization: the error answers of account administration, route by route.
+// Characterization: the error answers of account administration, route by route.
 
 const actor = { appUserId: '00000000-0000-4000-8000-000000000001' } as AuthenticatedPrincipal;
 const id = '00000000-0000-4000-8000-000000000002';

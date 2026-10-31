@@ -3,13 +3,13 @@ import type { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AccessRequestState } from '../access-request.types';
-import { ENDED_STATES } from '../../cancellation/cancellation.policy';
+import { ENDED_STATES } from '../access-request.types';
 import type { UseGroup } from '../../../organization/public/organization-use.types';
 
 /**
- * The requests that are not over, as what keeps a department or a Cost Center in use (`QĐ-90e`, `QĐ-87d(2)`, F15, F16): every state
+ * The requests that are not over, as what keeps a department or a Cost Center in use (`QĐ-90e`, `QĐ-87d(2)`): every state
  * but the ones a request ends in, and but `DRAFT`. A request that waits for the IT Admin to close the task of its withdrawal
- * (`AWAITING_IT_CLOSE`) is not over: the work is still there. A draft is not work yet (spec L.1): no step, no check, no commitment, and
+ * (`AWAITING_IT_CLOSE`) is not over: the work is still there. A draft is not work yet: no step, no check, no commitment, and
  * the department it will be sent from is the one of the day it is sent, so a draft keeps nothing in use; it has no Cost Center at all.
  */
 const NOT_OVER: { notIn: AccessRequestState[] } = { notIn: ['DRAFT', ...ENDED_STATES] };
@@ -35,7 +35,7 @@ export class RequestUseRepo {
 
   /**
    * The requests with a cost, charged to the Cost Center, that are not over (`QĐ-87d(2)`: _Request có chi phí chưa kết thúc_). A free
-   * internal request charges nothing, though it carries the Cost Center its department has (F91), so it does not keep it in use; a draft
+   * internal request charges nothing, though it carries the Cost Center its department has, so it does not keep it in use; a draft
    * has none.
    */
   ofCostCenter(costCenterId: string, limit: number, tx?: DbTx): Promise<RequestUse> {

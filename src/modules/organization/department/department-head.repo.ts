@@ -3,7 +3,8 @@ import { BusinessDate, fromDateColumn, toDateColumn } from '../../../core/busine
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { ClearedHeadSuccessor } from '../public/organization.types';
-import { DepartmentHeadRecord, HeadPeriodChanges, HeadPeriodRecord } from './department.types';
+import { DepartmentHeadRecord, HeadPeriodChanges } from './department.types';
+import { HeadPeriodRecord } from '../organization-structure.types';
 
 /**
  * The one writer of `department_head_periods` (US-03-06 AC-5 → AC-9, US-01-02): who heads a department, on which

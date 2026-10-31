@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import { normalizeDisplayName } from '../../../core/display-name';
-import type { HrBasis } from '../../../core/hr-basis';
+import type { HrBasis } from '../public/hr-basis.types';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { organizationAuditEvent } from '../mappers/audit-event.mapper';
-import { OrganizationApi } from '../public/organization.api';
+import { organizationAuditEvent } from '../organization-audit-event.mapper';
+import { OrganizationContextService } from '../organization-context.service';
 import { ProjectInvalidError, ProjectNotFoundError } from './project.errors';
 import { assertMayKeepProjects } from './project.policy';
 import { ProjectRepo } from './project.repo';
@@ -24,12 +24,12 @@ export const PROJECT_DESCRIPTION_MAX_LENGTH = 2000;
 export class ProjectService {
   constructor(
     private readonly repo: ProjectRepo,
-    private readonly organization: OrganizationApi,
+    private readonly context: OrganizationContextService,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
-  /** One page of projects by name, the description left to `get` (`LD-12`). Throws ProjectForbiddenError. */
+  /** One page of projects by name, the description left to `get`. Throws ProjectForbiddenError. */
   async list(
     actor: AuthenticatedPrincipal,
     query: { departmentId?: string; page: number; pageSize: number },
@@ -185,7 +185,7 @@ export class ProjectService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.context.findOrganization();
     if (!organization) throw new Error('Projects were used before installation');
 
     return organization;

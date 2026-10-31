@@ -6,12 +6,12 @@ import { IdentityAccessApi } from '../../identity-access/public/identity-access.
 import { AssignmentNotOpenError, RevocationRefusedError } from '../../licensing/public/licensing.errors';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import type { RequestOutcomeEvent } from '../../requests/public/requests.extension-points';
-import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { TransferReviewRepo } from './transfer-review.repo';
 import type { StillNeededLine } from './transfer-review.types';
 
 /**
- * What becomes of the old seat of a tool the new head said is still needed (`STILL_NEEDED`, T-6, F43). It waits for a new Request of
+ * What becomes of the old seat of a tool the new head said is still needed (`STILL_NEEDED`). It waits for a new Request of
  * the department the person is in now, and goes when that Request ends: when its grant task completes (the seat the person now has is
  * the one of the new department, so the old one is released and becomes a free seat of the old department when the vendor has not
  * reduced it) or when it ends without a grant (nothing came to replace it). Until then, and for a tool nobody decided about, nothing

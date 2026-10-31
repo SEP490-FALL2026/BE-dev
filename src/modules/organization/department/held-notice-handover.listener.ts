@@ -1,12 +1,12 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
-import { OrganizationApi } from '../public/organization.api';
+import { OrganizationContextService } from '../organization-context.service';
 import { OrganizationChangeListeners, type OrganizationChangeListener } from '../public/organization.extension-points';
 import type { OrganizationChange } from '../public/organization.types';
 
 /**
- * Hands the notices kept for a department while nobody headed it to the person whose head period STARTS (`T-11`, F67): in the
+ * Hands the notices kept for a department while nobody headed it to the person whose head period STARTS: in the
  * transaction of the assignment when the period begins today, and when the change `HEAD_PERIOD_START` is announced for a period
  * dated for a later day. A period that is still to begin hands over nothing, so a department named a head for next week still
  * keeps what happens in between; a period taken back by a later assignment before its day is never announced, and the head who
@@ -19,8 +19,11 @@ import type { OrganizationChange } from '../public/organization.types';
  */
 @Injectable()
 export class HeldNoticeHandoverListener implements OrganizationChangeListener, OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [OrganizationChangeListeners] as const;
+
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly context: OrganizationContextService,
     private readonly notifications: NotificationsApi,
     private readonly changes: OrganizationChangeListeners,
   ) {}
@@ -31,7 +34,7 @@ export class HeldNoticeHandoverListener implements OrganizationChangeListener, O
 
   async onChange(tx: DbTx, change: OrganizationChange): Promise<void> {
     if (change.kind !== 'HEAD_PERIOD_START') return;
-    const organization = await this.organization.getOrganization(tx);
+    const organization = await this.context.findOrganization(tx);
     if (!organization) return;
     await this.notifications.deliverHeldToHead(tx, {
       organizationId: organization.id,

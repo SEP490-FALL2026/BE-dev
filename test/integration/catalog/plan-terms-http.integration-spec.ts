@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import {
   HttpTestApp,
@@ -66,7 +66,6 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
   let finance: ApiAccount;
   let employee: ApiAccount;
   let businessOwner: { employeeId: string; code: string };
-  let organization: OrganizationApi;
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
@@ -85,7 +84,6 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
     employee = await createActivatedAccount(ctx, seed, { code: 'E-EMP', email: 'emp@acme.vn', roles: [], admin });
     const owner = await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' });
     businessOwner = { employeeId: owner.employeeId, code: 'E-OWN' };
-    organization = ctx.app.get(OrganizationApi, { strict: false });
   }, 120000);
 
   afterEach(() => {
@@ -99,7 +97,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
   const unique = (prefix: string): string => `${prefix} ${(counter += 1)}`;
   const dataOf = <T>(response: request.Response): T => (response.body as { data: T }).data;
   const codeOf = (response: request.Response): string => (response.body as { error: { code: string } }).error.code;
-  const today = (day: string) => jest.spyOn(organization, 'businessToday').mockResolvedValue(day);
+  const today = (day: string) => pretendBusinessToday(ctx.app, day);
 
   interface PlanSetup {
     kind?: 'SAAS' | 'LICENSED' | 'INTERNAL';

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { groundsRefusal } from '../policies/grounds.policy';
+import { groundsRefusal } from '../personnel-grounds.policy';
 import { SuperAdminEventRefusedError } from '../public/super-admin-event.errors';
 import type {
   SuperAdminEventContext,
@@ -16,7 +16,7 @@ const FREE_TEXT_REFERENCE = /^[\x20-\x7e¡-￿]{2,100}$/;
 const squash = (value: string): string => value.replace(/\s+/g, '').toLowerCase();
 
 /**
- * What needs no database, judged before anything is opened (spec L.2): the ticket has the shape of one, the two references are short
+ * What needs no database, judged before anything is opened: the ticket has the shape of one, the two references are short
  * written references, the basis is whole (a part missing is `BASIS_INVALID`; the code of a notice is refused later, by the event, with
  * its own code), and in `SHARED` the person who runs the command is not the person who approved it. `LOCAL_TEST` lets one person do
  * both; the Audit Trail records the environment.
@@ -41,7 +41,7 @@ export interface SubjectIdentifiers {
 }
 
 /**
- * The split of persons, in every environment (spec L.2): neither the person who runs the command nor the person who approved it is
+ * The split of persons, in every environment: neither the person who runs the command nor the person who approved it is
  * the person the event is about, by employee code, login email or work email. Without case and without spaces.
  */
 export function assertSplit(context: SuperAdminEventContext, subject: SubjectIdentifiers): void {
@@ -79,7 +79,7 @@ function canonical(value: unknown): string {
 }
 
 /**
- * The SHA-256 of the parameters of the mode, normalized (spec L.2): the mode and its own parameters, the person and the basis. The
+ * The SHA-256 of the parameters of the mode, normalized: the mode and its own parameters, the person and the basis. The
  * approver, the operator and the environment are not in it: the same ticket run again by someone else with the same parameters is the
  * same run. A different digest under the same ticket is `TICKET_PARAMETERS_DIFFER`.
  */

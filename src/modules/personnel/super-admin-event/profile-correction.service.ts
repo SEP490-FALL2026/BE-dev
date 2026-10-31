@@ -3,20 +3,20 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import type { PersonnelActor } from '../public/personnel.types';
 import { planProfileCorrection } from './profile-correction.policy';
 import { SuperAdminEventRefusedError } from '../public/super-admin-event.errors';
 import type { EventBasis, ProfileCorrection } from '../public/super-admin-event.types';
 
 /**
- * The tenth mode of `pnpm ops:record-super-admin-event` (spec L.2, `QĐ-87c`): the correction of the official fields of the record of
+ * The tenth mode of `pnpm ops:record-super-admin-event` (`QĐ-87c`): the correction of the official fields of the record of
  * the Super Admin, which the application refuses to make for a Super Admin about themselves (`EMPLOYEE.SELF_CHANGE_FORBIDDEN`). It
  * makes the same correction as the application makes of anyone else's record, through the facade of the organization, in the
  * transaction of the command (the employee row is already held `FOR UPDATE` by the caller): the official fields that differ, the
  * Audit Trail event `EMPLOYEE.OFFICIAL_FIELDS_CHANGED` with actor `OPERATOR` (the ticket as its reference and correlation, and what the
  * command added, on `after`, since the record of an employee has no column for the ticket), and the notice `EMPLOYEE_PROFILE_UPDATED`
- * to the people the organization says are concerned (`F17`). A correction that changes nothing is refused, so no ticket is spent on it.
+ * to the people the organization says are concerned. A correction that changes nothing is refused, so no ticket is spent on it.
  * Throws SuperAdminEventRefusedError; the errors of the organization are named by `refusalOf`.
  */
 @Injectable()

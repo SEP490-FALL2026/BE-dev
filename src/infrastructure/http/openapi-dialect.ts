@@ -1,5 +1,5 @@
 /**
- * OPENAPI-EXAMPLE.1-F3: the exported document declares OpenAPI 3.0, so every schema in it must be an OpenAPI 3.0 Schema
+ * The exported document declares OpenAPI 3.0, so every schema in it must be an OpenAPI 3.0 Schema
  * Object — the JSON Schema subset 3.0 defines, not JSON Schema 2020-12 (OpenAPI 3.1). Client generators validate the
  * whole document against the declared version and refuse a mixed one (FE/Mobile Orval). This checker names each shape
  * outside the dialect by JSON pointer and reason; it reads the document and never changes it.

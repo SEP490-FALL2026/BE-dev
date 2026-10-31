@@ -67,7 +67,7 @@ export interface BootstrapSuperAdminInput {
   hashPolicyVersion: number;
 }
 
-// --- account management (slice 1b) --------------------------------------------------
+// --- account management --------------------------------------------------
 
 export type ActionTokenRevokedReason = 'SUPERSEDED' | 'ACCOUNT_LOCKED' | 'CREDENTIAL_CHANGED';
 export type ActionTokenPurpose = 'INVITE' | 'RESET_PASSWORD';

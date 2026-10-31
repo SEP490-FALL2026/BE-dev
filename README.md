@@ -1,7 +1,9 @@
 # Software License Management — Backend
 
-Foundation để triển khai User Story bằng NestJS 11, TypeScript và PostgreSQL/Prisma. Source hạ tầng Redis/BullMQ và
-Kho đối tượng S3-compatible do API mount cho tệp của hợp đồng (ADR-0014); worker không mount nó và BullMQ chưa mount (E2 = A, H6.4). Module mới đặt file theo [module structure](docs/rules/module-structure.md) và
+Foundation để triển khai User Story bằng NestJS 11, TypeScript và PostgreSQL/Prisma. Kho đối tượng S3-compatible do API
+mount cho tệp của hợp đồng (ADR-0014); worker không mount nó. Redis/BullMQ (`src/infrastructure/queue`) là **hạ tầng dự phòng,
+chưa có consumer**, Owner giữ lại cho tương lai (`OD-R5`, 30/10/2026): chưa process nào mount nó, và chỉ khi một module mount nó
+thì cấu hình Redis mới được kiểm (E2 = A, H6.4). Module mới đặt file theo [module structure](docs/rules/module-structure.md) và
 architecture gate, không copy layout của một module cụ thể.
 
 **Đã có trong code:** lệnh khởi tạo `pnpm ops:bootstrap`, đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ
@@ -119,7 +121,7 @@ Xem [container guide](docs/guides/containers.md).
 
 - [CONTRIBUTING](CONTRIBUTING.md): workflow, lệnh và tiêu chí bàn giao.
 - [ARCHITECTURE](ARCHITECTURE.md): code đang có và ranh giới module.
-- [Hướng dẫn code](docs/guides/kien-truc-backend-va-cach-viet-code.md).
+- [Hướng dẫn dev mới](docs/guides/huong-dan-dev-moi.md).
 - [Hướng dẫn AI](docs/guides/ai-tools.md) và [AGENTS](AGENTS.md).
 - [Tài liệu](docs/README.md), [scripts](scripts/README.md), [tests](test/README.md).
 

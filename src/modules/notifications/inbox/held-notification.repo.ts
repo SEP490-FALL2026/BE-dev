@@ -14,7 +14,7 @@ export interface HeldNotificationRow {
 }
 
 /**
- * The only writer of `held_department_notifications` (F67, T-11): a notice for a department that has no head yet is kept
+ * The only writer of `held_department_notifications`: a notice for a department that has no head yet is kept
  * here, written in the transaction of the event, and handed to the first head the Super Admin names, once, in the
  * transaction of that assignment. This repo changes only the delivery columns, and only while they are empty.
  */

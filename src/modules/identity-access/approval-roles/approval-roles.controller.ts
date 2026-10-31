@@ -25,6 +25,17 @@ const COMMON_ERRORS = [
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
 
+/** The list is the Super Admin's to read, as the setting is to write. */
+const READ_ERRORS = [
+  UNAUTHENTICATED_RESPONSE,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the Super Admin reads the approval roles and their holders.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+] as const;
+
 function toWire(views: ApprovalRoleView[]) {
   return {
     items: views.map((view) => ({
@@ -59,7 +70,7 @@ export class ApprovalRolesController {
     message: 'APPROVAL_ROLE.LISTED',
     description: 'The three approval roles, who holds each now (or nobody) and who held it before.',
   })
-  @ApiErrorResponses(...COMMON_ERRORS)
+  @ApiErrorResponses(...READ_ERRORS)
   async list() {
     try {
       return toWire(await this.roles.list());

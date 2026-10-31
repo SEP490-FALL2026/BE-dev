@@ -1,8 +1,8 @@
 import { JOB_TITLE_MAX_LENGTH, PlacementFacts, isJobTitleTooLong, placementReasons } from './employee-placement.policy';
 
 /*
- * BEH.1 (A4-11): the one decision the manual form, the import preview, the correction of a record and the transfer share —
- * whether the department a row names can take a person in (a department with no Cost Center does: QĐ-87d(3), F44), and whether the
+ * The one decision the manual form, the import preview, the correction of a record and the transfer share —
+ * whether the department a row names can take a person in (a department with no Cost Center does: QĐ-87d(3)), and whether the
  * job title (optional free text since QĐ-87e) fits. Every expectation is a literal: nothing here is computed by the policy or by an
  * adapter.
  */

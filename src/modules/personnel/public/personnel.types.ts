@@ -3,7 +3,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import type { AuditValue } from '../../audit/public/audit.types';
 
 /**
- * Who does an event of the personnel context (spec L.2): a person signed in to the application, or the ticket of the controlled
+ * Who does an event of the personnel context: a person signed in to the application, or the ticket of the controlled
  * procedure `pnpm ops:record-super-admin-event`, which records an event about the Super Admin when the application cannot. Only the
  * HTTP controllers build `USER`; only the command builds `OPERATOR`, and the policy accepts it only when the person the event is
  * about holds the `SUPER_ADMIN` role. `context` is what the Audit Trail adds to the `after` of every event the command writes

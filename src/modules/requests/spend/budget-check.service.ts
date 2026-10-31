@@ -9,8 +9,8 @@ import { OperatingParametersApi } from '../../operating-parameters/public/operat
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { chargedCostCenterId } from '../access-request/access-request.policy';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { AssessmentRepo } from '../assessment/assessment.repo';
-import { scaleSchedule } from '../group-request/line-allocation.policy';
+import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
+import { scaleSchedule } from './line-allocation.policy';
 import { checkBudget, type CheckResult, type YearBudget, type YearSlice } from './budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord, type CheckTrigger } from './budget-check.repo';
 
@@ -42,13 +42,13 @@ export class BudgetCheckService {
     private readonly catalog: CatalogApi,
     private readonly organization: OrganizationApi,
     private readonly parameters: OperatingParametersApi,
-    private readonly assessments: AssessmentRepo,
+    private readonly assessments: AssessmentReadRepo,
   ) {}
 
   /**
    * Makes a check of the request and keeps it. The caller holds the lock of the request; this takes the lock of the Cost Center and
    * each year the request binds in, in ascending order, before it reads a figure of the budget, and keeps it to the end of the
-   * transaction, which is also where the commitment of an approval is written (F31).
+   * transaction, which is also where the commitment of an approval is written.
    */
   async run(
     tx: DbTx,

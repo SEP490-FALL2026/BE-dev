@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { contentOf, draftSnapshot } from './request-draft-content.mapper';
-import { RequestDraftRepo } from '../access-request/request-draft.repo';
+import { RequestDraftRepo } from '../request-draft/request-draft.repo';
 
 /**
- * The drafts of a person who leaves go with them (spec L.1, `US-03-04`): when the departure takes effect, in the transaction in which the
+ * The drafts of a person who leaves go with them (`US-03-04`): when the departure takes effect, in the transaction in which the
  * organization says so, every draft the person saved is deleted with what hangs from it, and the Audit Trail says so for each, by the
  * system. A draft is nobody else's: no other person sent it, decides it or is told of it, so nothing is left to close and nobody to warn.
  */

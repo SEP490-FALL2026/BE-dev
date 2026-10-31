@@ -12,8 +12,9 @@ import { TaxProfileRepo } from './tax-profile/tax-profile.repo';
 import { TaxProfileService } from './tax-profile/tax-profile.service';
 
 /**
- * The finance context (C7, G3 part): currencies, exchange rates, vendor tax profiles and the money contract. Only the facade and the audited
- * rate use case are exported; the repos and the raw ledger stay behind them (a rate is never written without its audit event). The HTTP side is `FinanceHttpModule`, which only the API mounts.
+ * The finance context (C7, G3 part): currencies, exchange rates, vendor tax profiles and the money contract. Only the facade, the audited
+ * rate use case and the currency list that `FinanceHttpModule` serves are exported; the repos and the raw ledger stay behind them (a rate
+ * is never written without its audit event). The HTTP side is `FinanceHttpModule`, which only the API mounts.
  */
 @Module({
   imports: [DatabaseModule, AuditModule, OrganizationModule],
@@ -27,6 +28,6 @@ import { TaxProfileService } from './tax-profile/tax-profile.service';
     TaxProfileRepo,
     TaxProfileService,
   ],
-  exports: [FinanceApi, ExchangeRateService],
+  exports: [FinanceApi, ExchangeRateService, CurrencyService],
 })
 export class FinanceModule {}

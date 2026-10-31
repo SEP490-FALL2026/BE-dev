@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 /**
  * The causes of closing a request because of what became of the person it is for: they left the company (`US-03-04` AC-25), or they
- * were transferred to another department while the part not yet granted was still open (F29, `QĐ-90b`).
+ * were transferred to another department while the part not yet granted was still open (`QĐ-90b`).
  */
 export const CANCEL_CAUSES = ['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED'] as const;
 
@@ -18,7 +18,7 @@ const closingFields = {
   evidence: z.string().trim().min(1).max(1000).optional(),
 };
 
-/** A closing for a transfer gives its reason: the note is required then (F29). */
+/** A closing for a transfer gives its reason: the note is required then. */
 export const transferNeedsReason = (
   body: { cause: (typeof CANCEL_CAUSES)[number]; note?: string },
   ctx: z.RefinementCtx,
@@ -31,6 +31,7 @@ export const transferNeedsReason = (
 /** The body of closing a request because its beneficiary left or was transferred. */
 export const cancelBodySchema = z
   .strictObject({ cause: z.enum(CANCEL_CAUSES), ...closingFields })
-  .superRefine(transferNeedsReason);
+  .superRefine(transferNeedsReason)
+  .meta({ description: 'A closing for a transfer (cause BENEFICIARY_TRANSFERRED) gives its reason in note.' });
 
 export class CancelBodyDto extends createZodDto(cancelBodySchema) {}

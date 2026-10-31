@@ -12,7 +12,7 @@ import type {
   ExistingAssignment,
 } from '../public/licensing.types';
 
-/** The columns an assignment is answered with: a list reads these and nothing else (`LD-10`). */
+/** The columns an assignment is answered with: a list reads these and nothing else. */
 const RECORD_SELECT = {
   id: true,
   source: true,
@@ -227,10 +227,13 @@ export class AssignmentRepo {
     if (planIds.length === 0) return { items: [], byPlan: [] };
     const db = tx ?? this.prisma;
     const where = { planId: { in: [...planIds] }, ...HOLDING(day) };
-    const [rows, groups] = await Promise.all([
-      db.licenseAssignment.findMany({ where, orderBy: [{ validFrom: 'asc' }, { id: 'asc' }], take }),
-      db.licenseAssignment.groupBy({ by: ['planId'], where, _count: { _all: true }, orderBy: { planId: 'asc' } }),
-    ]);
+    const rows = await db.licenseAssignment.findMany({ where, orderBy: [{ validFrom: 'asc' }, { id: 'asc' }], take });
+    const groups = await db.licenseAssignment.groupBy({
+      by: ['planId'],
+      where,
+      _count: { _all: true },
+      orderBy: { planId: 'asc' },
+    });
 
     return {
       items: rows.map(toRecord),
@@ -260,10 +263,13 @@ export class AssignmentRepo {
 
     return this.prisma.$transaction(
       async (tx) => {
-        const [rows, total] = await Promise.all([
-          tx.licenseAssignment.findMany({ where, orderBy: [{ validFrom: 'asc' }, { id: 'asc' }], skip, take }),
-          tx.licenseAssignment.count({ where }),
-        ]);
+        const rows = await tx.licenseAssignment.findMany({
+          where,
+          orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
+          skip,
+          take,
+        });
+        const total = await tx.licenseAssignment.count({ where });
 
         return { items: rows.map(toRecord), total };
       },
@@ -309,15 +315,13 @@ export class AssignmentRepo {
       cancelledAt: null,
       OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
     };
-    const [rows, total] = await Promise.all([
-      db.licenseAssignment.findMany({
-        where,
-        select: { id: true, accountIdentifier: true },
-        orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
-        take,
-      }),
-      db.licenseAssignment.count({ where }),
-    ]);
+    const rows = await db.licenseAssignment.findMany({
+      where,
+      select: { id: true, accountIdentifier: true },
+      orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
+      take,
+    });
+    const total = await db.licenseAssignment.count({ where });
 
     return { items: rows.map((row) => ({ assignmentId: row.id, accountIdentifier: row.accountIdentifier })), total };
   }

@@ -2,6 +2,7 @@ import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CostCenterCatalogueService } from '../cost-center/cost-center-catalogue.service';
 import { DepartmentDirectoryService } from '../department/department-directory.service';
 import { EmployeeDirectoryService } from '../employee/employee-directory.service';
+import { OrganizationContextService } from '../organization-context.service';
 import { OrganizationRepo } from '../organization.repo';
 import { DepartmentUseService } from '../department/department-use.service';
 import { AnnouncementRepo } from '../change-announcement/announcement.repo';
@@ -10,12 +11,11 @@ import type { TransactionRunner } from '../../../infrastructure/database/transac
 import { OrganizationApi } from './organization.api';
 import {
   CostCenterUseContributions,
-  DepartmentServiceAccountReaderHook,
   DepartmentUseContributions,
   OrganizationChangeListeners,
 } from './organization.extension-points';
 
-/** P23-RV-02: with a transaction, every read behind the onboarding facts runs in it; without one, none is passed. */
+/** With a transaction, every read behind the onboarding facts runs in it; without one, none is passed. */
 describe('OrganizationApi.getOnboardingFacts', () => {
   const TX = { name: 'caller transaction' } as unknown as DbTx;
 
@@ -33,7 +33,7 @@ describe('OrganizationApi.getOnboardingFacts', () => {
       activeWithoutHead: jest.fn(recorded('activeWithoutHead', [{ id: 'd-1', code: 'P', name: 'P' }])),
       activeWithItAdmin: jest.fn(recorded('activeWithItAdmin', [])),
     };
-    // The Cost Center side of the facts: the departments with none yet (the link's activation is not read any more, F14).
+    // The Cost Center side of the facts: the departments with none yet (the link's activation is not read any more).
     const costCenters = {
       departmentsWithoutCostCenter: jest.fn(
         recorded('departmentsWithoutCostCenter', [{ id: 'd-1', code: 'P', name: 'P' }]),
@@ -45,9 +45,9 @@ describe('OrganizationApi.getOnboardingFacts', () => {
       departments as unknown as DepartmentDirectoryService,
       employees as unknown as EmployeeDirectoryService,
       costCenters as unknown as CostCenterCatalogueService,
-      new DepartmentServiceAccountReaderHook(),
       new DepartmentUseService(new DepartmentUseContributions(), new CostCenterUseContributions()),
       new OrganizationChangeService(new OrganizationChangeListeners(), {} as AnnouncementRepo, {} as TransactionRunner),
+      new OrganizationContextService(repo as unknown as OrganizationRepo),
     );
     return { service, calls };
   }

@@ -27,7 +27,7 @@ Module nhỏ, chưa chia capability; mọi file ở gốc module.
 
 - `onboarding.controller.ts` — `GET /onboarding-checklist` (`SUPER_ADMIN`, `IT_ADMIN`) → `onboarding.service.ts`.
 - `onboarding.service.ts` — đọc `OrganizationApi.getOnboardingFacts`, `DataImportApi.latestEmployeeImport`,
-  `CatalogApi.getOnboardingFacts`, `LicensingApi.getBaselineProgress`, `IdentityAccessApi.findUsableItAdminEmployeeIds`.
+  `CatalogApi.getOnboardingFacts`, `LicensingSeatBaselineApi.getBaselineProgress`, `IdentityAccessApi.findUsableItAdminEmployeeIds`.
 - `onboarding.policy.ts` — ai được đọc; `onboarding.errors.ts` — `OnboardingForbiddenError`.
 - Nest: `onboarding.module.ts` (controller + service, chỉ API mount).
 

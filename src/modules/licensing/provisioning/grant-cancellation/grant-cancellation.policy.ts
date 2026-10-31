@@ -7,7 +7,7 @@ import {
 
 /**
  * What cancelling the grant of a request does to its task, by the state the task is in and why the request ends (`US-05-08` AC-3,
- * AC-5, AC-9; `US-03-04` AC-25; F29). A task nobody has worked is cancelled with its assignment. A task that failed is cancelled by
+ * AC-5, AC-9; `US-03-04` AC-25). A task nobody has worked is cancelled with its assignment. A task that failed is cancelled by
  * the IT Admin who closes a request whose beneficiary left or was transferred, and waits for the IT Admin when the requester
  * withdrew. A task being worked is cancelled only for a beneficiary who left or was transferred, and only with the evidence that the
  * IT Admin took the invitation back or stopped the work (confirmed with the vendor): the work is not done by this call, so the
@@ -16,7 +16,7 @@ import {
  *
  * For a beneficiary who was transferred that confirmation is asked for every task that is open, whatever its state (queued, waiting
  * for its retry, failed or being worked): the vendor may already have sent the invitation, so the grant task of a transferred person
- * is cancelled only after the IT Admin confirmed the check with the vendor (spec E). A person who left, and a requester who
+ * is cancelled only after the IT Admin confirmed the check with the vendor. A person who left, and a requester who
  * withdrew, are judged as before.
  */
 export type GrantCancelAction =

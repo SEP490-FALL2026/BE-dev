@@ -53,7 +53,7 @@ export class CommitmentRepo {
    * database refuses a second commitment for the same request and year.
    *
    * The budget of each Cost Center and year is locked first, the earliest year first, after the row of the request the caller
-   * holds (F31): what the decision of a version attaches and what is held here never read the current budget at the same moment,
+   * holds: what the decision of a version attaches and what is held here never read the current budget at the same moment,
    * so a commitment never waits for a budget that was approved while it was being made.
    */
   async hold(tx: DbTx, input: CommitmentHoldInput): Promise<HeldCommitment[]> {

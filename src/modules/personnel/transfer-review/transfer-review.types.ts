@@ -11,7 +11,7 @@ export type WaitingReason = 'NO_HEAD';
 
 /**
  * Where a review came from: the transfer of the person to another department, or the closing of the seat baseline at the setup, when
- * a person holds a seat on a subscription another department owns (F21). Both are decided by the head of the department of the person
+ * a person holds a seat on a subscription another department owns. Both are decided by the head of the department of the person
  * today; only the source of the revocation a decision opens differs.
  */
 export type ReviewOrigin = 'TRANSFER' | 'POST_SETUP';
@@ -92,7 +92,7 @@ export interface ReviewListQuery {
   pageSize: number;
 }
 
-/** A line a head said is still needed (`STILL_NEEDED`, T-6): the old seat waits for the new Request of the department of the person. */
+/** A line a head said is still needed (`STILL_NEEDED`): the old seat waits for the new Request of the department of the person. */
 export interface StillNeededLine {
   reviewId: string;
   organizationId: string;

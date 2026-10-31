@@ -74,7 +74,7 @@ export function toVendorDictionaryApiException(error: unknown): unknown {
 
 const example = (error: Error) => errorExampleOf(toVendorDictionaryApiException(error));
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const VENDOR_DICTIONARY_ERROR_EXAMPLES = {
   GROUP_NOT_FOUND: example(new VendorGroupNotFoundError()),
   SERVICE_LINE_NOT_FOUND: example(new VendorServiceLineNotFoundError()),

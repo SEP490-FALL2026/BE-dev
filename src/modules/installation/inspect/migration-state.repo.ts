@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AppliedMigrationRow } from '../public/inspection.types';
 
-/** The migration that marked what the organization already had as told, with the date of the database session (F47). */
+/** The migration that marked what the organization already had as told, with the date of the database session. */
 export const CHANGE_ANNOUNCEMENTS_MIGRATION = '20261024140100_organization_change_announcements';
 
 /** `prisma/migrations` of this checkout or image: four levels up from both `src/modules/...` and `dist/modules/...`. */

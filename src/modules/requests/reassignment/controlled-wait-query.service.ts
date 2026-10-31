@@ -4,12 +4,12 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { ControlledWaitRepo } from './controlled-wait.repo';
 import type { ControlledWaitWire } from './controlled-wait.dto';
-import { configurationHintOf } from './reassignment.policy';
+import { configurationHintOf } from '../step-routing/reassignment.policy';
 
 /**
  * The queue of the steps that wait under control (`US-05-11`): the Super Admin sees every one, an IT Admin the requests sent
  * for the departments they are in charge of, and nobody else reads it (the route admits no other role). A page is one query
- * for the steps and one for the people and the departments in it, whatever its size (`LD-07`).
+ * for the steps and one for the people and the departments in it, whatever its size.
  */
 @Injectable()
 export class ControlledWaitQueryService {

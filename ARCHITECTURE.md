@@ -31,10 +31,14 @@ Alias `dist/<tên>-cli.js` sinh lúc build và giữ vĩnh viễn: script deploy
 
 ```text
 src/core            TypeScript thuần (ngày nghiệp vụ, tiền, extension point) — không phụ thuộc gì
-src/infrastructure  adapter kỹ thuật (config, database, HTTP, bảo mật, mail, storage) — chỉ dùng core
+src/infrastructure  adapter kỹ thuật (config, database, HTTP, bảo mật, mail, storage, queue dự phòng) — chỉ dùng core
 src/modules/*       bounded context nghiệp vụ, xếp theo tầng dưới đây
 src/app, worker, cli  ghép tiến trình; chỉ chạm module qua public/ và *.module.ts
 ```
+
+`src/infrastructure/queue` (BullMQ/Redis) là **hạ tầng dự phòng, chưa có consumer** (Owner `OD-R5`: giữ cho tương lai). Chưa
+process nào mount `QueueInfrastructureModule`, nên API, worker và lệnh không cần Redis và không kiểm cấu hình Redis; module nào
+mount nó sau này mới có validation chặt (`REDIS_HOST`, `REDIS_PASSWORD` ở production).
 
 | Tầng | Module                                    | Ý nghĩa                                                  |
 | ---- | ----------------------------------------- | -------------------------------------------------------- |
@@ -65,7 +69,14 @@ src/modules/requests/
 - Hậu tố file nói vai trò: `.controller` map HTTP, `.service` một use case, `.policy` quy tắc thuần, `.repo` mọi SQL,
   `.mapper`, `.dto`, `.types`, `.errors`/`.http-errors`, `.listener` (đăng ký extension point), `.job` (việc định kỳ).
 - Tối đa 2 cấp thư mục dưới module, 25 file mỗi thư mục. Thư mục con của capability là nhóm chức năng, gọi qua file
-  mang tên nhóm; phần còn lại của nhóm riêng tư. Kích thước/độ phức tạp đo bằng ESLint, không bằng gate dòng.
+  mang tên nhóm; phần còn lại của nhóm riêng tư. Capability trong một module import nhau nhưng không theo vòng (R6).
+- `src/core` chỉ giữ primitive ít nhất hai vùng dùng (R7). Một Nest module chỉ export ra ngoài facade và port; export còn lại
+  chỉ module cùng thư mục được inject (R10).
+- Kích thước/độ phức tạp đo bằng ESLint: `complexity` 12, hàm 60 dòng, 8 tham số (cả constructor) là `error`; nợ cũ nằm ở
+  `eslint-suppressions.json` và chỉ giảm (gate TG-2). Mọi luật máy kiểm có một câu và một gate ở
+  [module structure](docs/rules/module-structure.md#luật-máy-kiểm-r1r10-và-luật-review).
+- Mọi graph tiến trình (API, worker, mỗi lệnh có Nest graph) phải có đủ bên đăng ký của extension point nó dùng (R1, gate
+  `extension-wiring`). Comment trong `src` nói lý do, không nói mã finding hay lát (review).
 
 ## Một request HTTP đi qua đâu
 
@@ -106,14 +117,16 @@ lỗi → HttpExceptionFilter → envelope { success: false, error: { code, mess
 | Integration | `test/integration/<module>/` | ràng buộc DB, SQL, transaction, khóa, role, CLI     | `pnpm test:integration` |
 | E2E smoke   | `test/e2e/`                  | vài hành trình nghiệp vụ đầu-cuối                   | `pnpm test:e2e`         |
 
-CI: `dev` chạy integration của module bị ảnh hưởng, `main` chạy đủ; deploy chỉ khi mọi job test xanh
-([test guide](test/README.md)).
+Một file trong `test/integration`, `test/http`, `test/e2e` tối đa 800 dòng (gate `test-size`); dài hơn thì tách theo use case và
+đặt phần dựng chung ở `test/support/`. CI: `dev` chạy integration của module bị ảnh hưởng, `main` chạy đủ; deploy chỉ khi mọi
+job test xanh ([test guide](test/README.md)).
 
 ## Quyết định và tài liệu
 
 - ADR: [docs/decisions](docs/decisions/) — 0001 monolith, 0005 ràng buộc DB, 0011 xác thực, 0013
   catalog/finance/licensing, 0015 requests, 0016 budgets, 0017 personnel, 0018 sweeper, 0019 tầng module và cửa công
   khai.
-- Quy ước theo chủ đề: [docs/rules](docs/rules/README.md). Tiến độ và trạng thái: [roadmap](docs/roadmap.md).
+- Quy ước theo chủ đề: [docs/rules](docs/rules/README.md). Tiến độ và trạng thái: [roadmap](docs/roadmap.md). Dev mới đọc
+  [hướng dẫn dev mới](docs/guides/huong-dan-dev-moi.md) trước.
 - Ảnh chụp bản `ARCHITECTURE.md` trước 29/10/2026 (danh sách năng lực, bản đồ source cũ) nằm trong lịch sử git; nội dung
   kỹ thuật còn hiệu lực đã chuyển sang [runtime details](docs/guides/runtime-details.md).

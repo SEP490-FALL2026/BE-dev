@@ -16,7 +16,7 @@ export function toInboxApiException(error: unknown): unknown {
 
 const example = (error: Error) => errorExampleOf(toInboxApiException(error));
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const INBOX_ERROR_EXAMPLES = {
   NOT_FOUND: example(new NotificationNotFoundError()),
 } as const;

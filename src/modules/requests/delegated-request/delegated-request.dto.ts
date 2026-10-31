@@ -1,13 +1,12 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { PROJECT_LABEL_MAX_LENGTH, REASON_MAX_LENGTH, requestSchema } from '../access-request/access-request.dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** The most requests one sending may make: every person for every tool. A bound against a typo, not a rule of the BRD. */
 export const DELEGATED_REQUESTS_MAX = 50;
 
-const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 const reason = z.string().trim().min(1).max(REASON_MAX_LENGTH);
 
 /**
@@ -21,7 +20,8 @@ export const delegatedBodySchema = z
       .array(z.uuid())
       .min(1)
       .max(DELEGATED_REQUESTS_MAX)
-      .refine((ids) => new Set(ids).size === ids.length, { message: 'A person is named once.' }),
+      .refine((ids) => new Set(ids).size === ids.length, { message: 'A person is named once.' })
+      .meta({ uniqueItems: true }),
     items: z
       .array(
         z.strictObject({
@@ -33,7 +33,8 @@ export const delegatedBodySchema = z
       .max(DELEGATED_REQUESTS_MAX)
       .refine((items) => new Set(items.map((item) => item.planId)).size === items.length, {
         message: 'A tool is named once.',
-      }),
+      })
+      .meta({ description: 'Each tool is named once: no two items carry the same planId.' }),
     businessReason: reason,
     termMonths: z.number().int().min(1).max(120),
     projectLabel: z.string().trim().min(1).max(PROJECT_LABEL_MAX_LENGTH).optional(),
@@ -50,6 +51,9 @@ export const delegatedBodySchema = z
         message: `At most ${DELEGATED_REQUESTS_MAX} requests are sent at once.`,
       });
     }
+  })
+  .meta({
+    description: `One request is made for every person and every tool, so the people times the tools is at most ${DELEGATED_REQUESTS_MAX}.`,
   });
 
 export class DelegatedBodyDto extends createZodDto(delegatedBodySchema) {}

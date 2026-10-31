@@ -142,7 +142,7 @@ export class SaasIssueRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * The next code for `year`: `BM11-<year>-<six digits>`, numbered again from 1 every year (F48, spec K and L.10). The number is taken
+   * The next code for `year`: `BM11-<year>-<six digits>`, numbered again from 1 every year. The number is taken
    * under the lock of the row of the year in `saas_issue_counters`: one more than the greater of the counter and the highest number
    * already in a code of that year (so a number the compatibility image drew from the old sequence is never issued again), and the old
    * sequence is lifted to it in the same transaction (never lowered), so that image never draws one the counter has issued either.

@@ -5,7 +5,7 @@ import { CostCenterDirectionRepo } from './cost-center-direction.repo';
 import { CostCenterDirectionApi } from '../public/cost-center-direction.api';
 
 /**
- * The Cost Center link procedures (`pnpm ops:cost-center-direction`, F01, spec L.11): their own repository and service, reached by
+ * The Cost Center link procedures (`pnpm ops:cost-center-direction`): their own repository and service, reached by
  * the command only, never by the API or the worker. The repository stays private.
  */
 @Module({

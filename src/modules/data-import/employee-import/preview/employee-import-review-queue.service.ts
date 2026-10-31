@@ -1,4 +1,4 @@
-import type { LicensingApi } from '../../../licensing/public/licensing.api';
+import type { LicensingSeatBaselineApi } from '../../../licensing/public/licensing-seat-baseline.api';
 import type { OrganizationApi } from '../../../organization/public/organization.api';
 import type { EmployeeCells } from '../employee-import-row.types';
 import type { ImportSummary } from '../employee-import.types';
@@ -6,7 +6,7 @@ import { clean } from '../row-validation/employee-import-row-validation.policy';
 
 /** The people who hold a seat, still work here and are not in the file (`US-02-02` AC-4), by code, at most 200. */
 export async function reviewQueueOf(
-  licensing: LicensingApi,
+  licensing: LicensingSeatBaselineApi,
   organization: OrganizationApi,
   rows: readonly { cells: EmployeeCells }[],
 ): Promise<ImportSummary['reviewQueue']> {

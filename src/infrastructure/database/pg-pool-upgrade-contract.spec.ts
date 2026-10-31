@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { Client, Pool } from 'pg';
 
 /**
- * INF.1 / F-30, the upgrade contract: the release guard of `createPostgresPool` relies on two behaviours of the locked
+ * The upgrade contract: the release guard of `createPostgresPool` relies on two behaviours of the locked
  * `pg` 8.23 / `pg-pool` 3.14 that are not a documented API (pg-pool marks them "TODO: expose a proper, public
  * interface"). The versions are not pinned: CI and the image install `--frozen-lockfile`, so a newer pg or pg-pool only
  * arrives with a lockfile change, and these tests (with the integration suite `pg-pool.integration-spec.ts`, I1/I11) are

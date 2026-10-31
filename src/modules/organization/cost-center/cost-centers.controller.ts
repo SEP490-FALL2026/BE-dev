@@ -23,7 +23,7 @@ import {
   ListCostCentersQueryDto,
   RenameCostCenterBodyDto,
 } from './cost-center.dto';
-import { ORGANIZATION_ERROR_EXAMPLES, toOrganizationApiException } from '../mappers/organization.http-errors';
+import { COST_CENTER_ERROR_EXAMPLES, toCostCenterApiException } from './cost-center.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 
@@ -33,10 +33,17 @@ const FINANCE_ONLY = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
+/** Reading the people of a cost center is Finance's too: no other role, the Super Admin included, reads them. */
+const FINANCE_READS_ONLY = {
+  status: HttpStatus.FORBIDDEN,
+  description: 'Only Finance reads the people in a cost center (the IT Admin and the Super Admin do not).',
+  examples: [FORBIDDEN_EXAMPLE],
+} as const;
+
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The cost center does not exist.',
-  examples: [ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_NOT_FOUND],
+  examples: [COST_CENTER_ERROR_EXAMPLES.COST_CENTER_NOT_FOUND],
 } as const;
 
 const VALIDATION_ERROR_DESCRIPTION =
@@ -48,10 +55,10 @@ const CREATE_INVALID = {
   description: VALIDATION_ERROR_DESCRIPTION,
   examples: [
     VALIDATION_EXAMPLE,
-    ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_DEPARTMENT_NOT_ACTIVE,
-    ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_KIND_NOT_SUPPORTED,
-    ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_NAME_INVALID,
-    ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_NAME_RESERVED,
+    COST_CENTER_ERROR_EXAMPLES.COST_CENTER_DEPARTMENT_NOT_ACTIVE,
+    COST_CENTER_ERROR_EXAMPLES.COST_CENTER_KIND_NOT_SUPPORTED,
+    COST_CENTER_ERROR_EXAMPLES.COST_CENTER_NAME_INVALID,
+    COST_CENTER_ERROR_EXAMPLES.COST_CENTER_NAME_RESERVED,
   ],
 } as const;
 
@@ -61,9 +68,16 @@ const RENAME_INVALID = {
   description: VALIDATION_ERROR_DESCRIPTION,
   examples: [
     VALIDATION_EXAMPLE,
-    ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_NAME_INVALID,
-    ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_NAME_RESERVED,
+    COST_CENTER_ERROR_EXAMPLES.COST_CENTER_NAME_INVALID,
+    COST_CENTER_ERROR_EXAMPLES.COST_CENTER_NAME_RESERVED,
   ],
+} as const;
+
+/** The read of the people of a cost center takes an id and a paging query, no kind and no name. */
+const ID_OR_QUERY_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The id or the query is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
 /** The routes that take no kind or name: only the request itself can be invalid. */
@@ -91,7 +105,7 @@ function toWire(record: CostCenterRecord) {
 /**
  * The Cost Center catalogue (`US-04-09`). Finance creates, renames and retires; the Super Admin, who owns the departments, may
  * read it to see which still have none; the IT Admin has no operation on it (AC-2, `QĐ-87a`). Every other role is refused. Who may
- * is decided by the policy of the service as well as by the role of the route (`F13`). There is no route that deletes a cost
+ * is decided by the policy of the service as well as by the role of the route. There is no route that deletes a cost
  * center: a code that has been used is kept.
  */
 @ApiTags('cost-centers')
@@ -125,7 +139,7 @@ export class CostCentersController {
 
       return { items: page.items.map(toWire), pagination: page.pagination };
     } catch (error) {
-      throw toOrganizationApiException(error);
+      throw toCostCenterApiException(error);
     }
   }
 
@@ -143,15 +157,15 @@ export class CostCentersController {
     description:
       'The code is already taken (COST_CENTER.CODE_TAKEN), or the department already has a cost center in use (COST_CENTER.DEPARTMENT_ALREADY_LINKED).',
     examples: [
-      ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_CODE_TAKEN,
-      ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_DEPARTMENT_ALREADY_LINKED,
+      COST_CENTER_ERROR_EXAMPLES.COST_CENTER_CODE_TAKEN,
+      COST_CENTER_ERROR_EXAMPLES.COST_CENTER_DEPARTMENT_ALREADY_LINKED,
     ],
   })
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateCostCenterBodyDto) {
     try {
       return toWire(await this.costCenters.create(actor, body));
     } catch (error) {
-      throw toOrganizationApiException(error);
+      throw toCostCenterApiException(error);
     }
   }
 
@@ -171,7 +185,7 @@ export class CostCentersController {
     try {
       return toWire(await this.costCenters.rename(actor, params.id, body.name));
     } catch (error) {
-      throw toOrganizationApiException(error);
+      throw toCostCenterApiException(error);
     }
   }
 
@@ -187,13 +201,13 @@ export class CostCentersController {
     status: HttpStatus.CONFLICT,
     description:
       'Open obligations sit on it (COST_CENTER.IN_USE; details lists the department and, with their totals, the Requests with a cost that are not over and the commitments still held). The people in the department do not block it.',
-    examples: [ORGANIZATION_ERROR_EXAMPLES.COST_CENTER_IN_USE],
+    examples: [COST_CENTER_ERROR_EXAMPLES.COST_CENTER_IN_USE],
   })
   async deactivate(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: CostCenterIdParamDto) {
     try {
       return toWire(await this.costCenters.deactivate(actor, params.id));
     } catch (error) {
-      throw toOrganizationApiException(error);
+      throw toCostCenterApiException(error);
     }
   }
 
@@ -205,7 +219,7 @@ export class CostCentersController {
     description:
       'The people in the cost center today, reduced to code, name and that they are working: no email, contract, dates or manager.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, VALIDATION_ERROR, NOT_FOUND)
+  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_READS_ONLY, ID_OR_QUERY_INVALID, NOT_FOUND)
   async employees(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: CostCenterIdParamDto,
@@ -214,7 +228,7 @@ export class CostCentersController {
     try {
       return await this.costCenters.employees(actor, params.id, query);
     } catch (error) {
-      throw toOrganizationApiException(error);
+      throw toCostCenterApiException(error);
     }
   }
 }

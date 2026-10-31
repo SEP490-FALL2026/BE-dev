@@ -64,7 +64,7 @@ export class SeatTargetService {
     return subscription ? this.withPlan(subscription) : null;
   }
 
-  /** The seat targets of many plans in one read, without a lock; a plan that does not exist is absent (`LD-08`). */
+  /** The seat targets of many plans in one read, without a lock; a plan that does not exist is absent. */
   async findPlans(planIds: readonly string[], tx?: DbTx): Promise<SeatTarget[]> {
     return (await this.plans.lookups(planIds, tx)).map(ofPlan);
   }

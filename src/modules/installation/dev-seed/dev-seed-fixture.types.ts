@@ -1,7 +1,7 @@
 import type { DemoAccountRole } from '../../identity-access/public/identity-access.types';
 
 /**
- * The local demo data of `pnpm dev:seed` (H6.2): stable keys, so a rerun finds what an earlier run created. Emails use
+ * The local demo data of `pnpm dev:seed`: stable keys, so a rerun finds what an earlier run created. Emails use
  * the reserved `.test` top-level domain; no mailbox exists. Only direct roles: MANAGER and SPENDING_APPROVER derive from
  * department and approval-role data and are never granted (operational-commands rule 6). The department comes first and the
  * Cost Center is created for it (`QĐ-87d`(1)); the people have no job title (it is optional free text, `QĐ-87e`) and nothing

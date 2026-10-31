@@ -4,7 +4,7 @@ import type { NextFunction, Request, Response } from 'express';
 
 /**
  * The one limit of a parsed request body — JSON and URL-encoded alike: 100 KiB, the size Express applied by default
- * before it was written down (P29-N1). A body over it is refused by the parser, before routing, guards or validation,
+ * before it was written down. A body over it is refused by the parser, before routing, guards or validation,
  * with 413 HTTP_PAYLOAD_TOO_LARGE (the filter recognizes the parser's refusal). Multipart uploads have their own limits
  * on their routes. Changing this number changes the API contract (docs/rules/api-contract.md).
  */

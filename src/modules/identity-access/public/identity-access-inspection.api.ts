@@ -18,7 +18,7 @@ const zeroes = <K extends string>(keys: readonly K[]): Record<K, number> =>
   Object.fromEntries(keys.map((key) => [key, 0])) as Record<K, number>;
 
 /**
- * The read-only contract of the installation inspection (`ops:inspect`, H6.1). Declared only in
+ * The read-only contract of the installation inspection (`ops:inspect`). Declared only in
  * IdentityAccessInspectionFacadeModule, which nothing but the inspection graph loads. Counts and one account state;
  * every read runs in the caller's (read-only) transaction.
  */

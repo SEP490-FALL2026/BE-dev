@@ -30,8 +30,7 @@ function priceRaised(current: ObligationState, next: ObligationState): boolean {
 }
 
 /**
- * Whether a change creates, raises or extends what the company owes for a subscription (`QĐ-88a`(2), `QĐ-89a`(3), P03-D09 = A,
- * spec L.7): more seats bought than stored (or a quantity where there was none), the end or the renewal date later than the stored
+ * Whether a change creates, raises or extends what the company owes for a subscription (`QĐ-88a`(2), `QĐ-89a`(3)): more seats bought than stored (or a quantity where there was none), the end or the renewal date later than the stored
  * one (or a date where there was none), auto renewal switched on, a higher unit price (or a price where there was none). A decrease,
  * a correction that raises or extends nothing and the descriptive fields are not obligations. Pure; `current` is the state under
  * the lock of the subscription row.

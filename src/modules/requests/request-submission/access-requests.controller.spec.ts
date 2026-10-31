@@ -14,21 +14,13 @@ const DRAFT = {
 };
 
 /**
- * Reading a request through `accessRequestGet` (spec L.1, F92): the request when the caller may see it, else the caller's own draft,
+ * Reading a request through `accessRequestGet`: the request when the caller may see it, else the caller's own draft,
  * else the one answer of a request that does not exist. Only a miss reaches for the draft; any other failure is not a miss.
  */
 describe('AccessRequestsController.get', () => {
   const queries = { get: jest.fn() };
   const drafts = { readOwn: jest.fn() };
-  const controller = new AccessRequestsController(
-    {} as never,
-    {} as never,
-    queries as never,
-    {} as never,
-    {} as never,
-    {} as never,
-    drafts as never,
-  );
+  const controller = new AccessRequestsController({} as never, {} as never, queries as never, drafts as never);
 
   beforeEach(() => jest.resetAllMocks());
 

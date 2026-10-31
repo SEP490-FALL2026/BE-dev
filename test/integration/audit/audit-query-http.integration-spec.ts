@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { AuditApi } from '../../../src/modules/audit/public/audit.api';
-import { PayloadCipher } from '../../../src/modules/notifications/payload-cipher.service';
+import { PayloadCipher } from '../../../src/modules/notifications/email/payload-cipher.service';
 import { bodyOf } from '../../support/api-body';
 import {
   HttpTestApp,

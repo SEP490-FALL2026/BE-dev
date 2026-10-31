@@ -12,7 +12,7 @@ import { ApprovalRoleDirectoryService } from '../approval-roles/approval-role-di
 import { SessionDirectoryService } from '../auth/session-directory.service';
 import { TokenService } from '../auth/token.service';
 import { PrincipalContext } from '../public/identity-access.types';
-import { employeeHasNotLeft } from '../policies/account.policy';
+import { employeeHasNotLeft } from '../accounts/account.policy';
 import { resolveEffectiveRoles } from './effective-roles.policy';
 
 /**

@@ -16,7 +16,7 @@ Tầng: T3 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit,
   - `today()` — ngày nghiệp vụ hiện tại của tổ chức.
   - `list`, `history`, `set` — phục vụ route của Super Admin.
 - `public/` chỉ có file facade; lỗi ở `operating-parameters.errors.ts`. `OperatingParametersModule` export thêm
-  `NonWorkingDatesService`, ngoài `public/`.
+  `NonWorkingDatesService`, ngoài `public/` (chỉ module HTTP cùng thư mục dùng, R10).
 
 ## Bảng sở hữu
 

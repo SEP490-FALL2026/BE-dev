@@ -6,14 +6,14 @@ import { OrganizationApi } from '../../organization/public/organization.api';
 import { AssignmentService } from '../assignment/assignment.service';
 import { SeatBaselineClosedError } from '../public/licensing.errors';
 import { SeatBaselineClosedListeners } from '../public/licensing.extension-points';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { SeatBaselineRepo } from './seat-baseline.repo';
 
 /**
  * Whether the seat baseline, step 4 of the installation, is closed (`US-02-05` AC-6, `OI-10`, `BR-01.7`). Closing is
  * the IT Admin saying the step is done; from then on no assignment is taken without a request, whatever route it would
  * come by. It is final: nothing reopens it, and the database refuses to. Closing tells the modules listening for it, in its own
- * transaction, which people hold a seat on another department's subscription, for the review their own head makes (F21, `QĐ-89e`).
+ * transaction, which people hold a seat on another department's subscription, for the review their own head makes (`QĐ-89e`).
  */
 @Injectable()
 export class SeatBaselineService {

@@ -3,7 +3,7 @@ import type { CatalogOnboardingFacts } from '../catalog/public/catalog.types';
 import { DataImportApi } from '../data-import/public/data-import.api';
 import { LatestEmployeeImport } from '../data-import/public/data-import.types';
 import { IdentityAccessApi } from '../identity-access/public/identity-access.api';
-import { LicensingApi } from '../licensing/public/licensing.api';
+import { LicensingSeatBaselineApi } from '../licensing/public/licensing-seat-baseline.api';
 import type { BaselineProgress } from '../licensing/public/licensing.types';
 import { OnboardingFacts } from '../organization/public/organization.types';
 import { OrganizationApi } from '../organization/public/organization.api';
@@ -54,7 +54,7 @@ function serviceWith(
     } as unknown as IdentityAccessApi,
     { latestEmployeeImport: () => Promise.resolve(latest) } as unknown as DataImportApi,
     { getOnboardingFacts: () => Promise.resolve(catalog) } as unknown as CatalogApi,
-    { getBaselineProgress: () => Promise.resolve(baseline) } as unknown as LicensingApi,
+    { getBaselineProgress: () => Promise.resolve(baseline) } as unknown as LicensingSeatBaselineApi,
   );
 
   return { reads, checklist: (roles: readonly string[] = ['IT_ADMIN']) => service.checklist({ roles }) };

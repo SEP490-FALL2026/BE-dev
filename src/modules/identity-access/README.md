@@ -15,7 +15,8 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
   - `prepareCredential` — kiểm chính sách và băm mật khẩu; gọi trước khi mở transaction.
   - `createBootstrapSuperAdmin` — chỉ cho lệnh cài đặt (FR-9.8).
   - `isActionLinkUsable` — worker hỏi trước khi gửi mail có link.
-  - `inspectEmployeeAccount` — tài khoản của nhân viên: có không, dùng được không, vai trò gì (khóa `FOR SHARE`).
+  - `inspectEmployeeAccount` — tài khoản của nhân viên: có không, dùng được không, vai trò gì (khóa `FOR SHARE`); thân hàm ở
+    `accounts/account-directory.service.ts`, facade và `employee-accounts.listener.ts` cùng gọi nó.
   - `markEmployeeLeft` — ghi ngày người rời đi lên tài khoản của họ.
   - `findUsableItAdminEmployeeIds`, `findUsableFinanceEmployeeId`, `countUsableItAdminsExcept`, `getSuperAdminHolder`,
     `listRoleHoldersAmong` — ai đang giữ vai trò nào.
@@ -40,8 +41,14 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
   `accounts/role-grant.service.ts` và `approval-roles/approval-role.service.ts` — bên đăng ký: requests
   `reassignment/approval-role.listener.ts`.
 - Đăng ký vào: `organization.employee-accounts` (`EmployeeAccountsHook`) — `accounts/employee-accounts.listener.ts`.
-- Token DI nội bộ, không phải point liên module: `ACCOUNT_SESSIONS` (`account-sessions.extension-points.ts`),
+- Token DI nội bộ, không phải point liên module: `ACCOUNT_SESSIONS` (`accounts/account-sessions.types.ts`),
   `APPROVAL_ROLE_HOLDINGS` (`accounts/account.types.ts`); gate `test/gates/module-graph.gate-spec.ts` ghim chúng.
+
+## Hướng phụ thuộc giữa capability (R6)
+
+Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capability-graph`). Từ thấp lên cao: `credentials` →
+`accounts` → `approval-roles`, `recovery` → `auth` → `access`. Thứ gì `accounts/` và `recovery/` cùng cần thì ở `accounts/`
+(ví dụ `account-sessions.types.ts`), không đặt ở `auth/` vì `auth/` đứng trên cả hai.
 
 ## Capability → file chính
 
@@ -55,6 +62,9 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
   `account-invitation.service.ts`, `account-status.service.ts`, `account-query.service.ts`,
   `account-administration.policy.ts`; `super-admin-transfers/` (`POST /super-admin-transfers`); `role-grant.service.ts`,
   `action-link.service.ts`.
+- `credentials/` — mật khẩu của tài khoản: `credential.service.ts`, `credential.repo.ts`, `password-hasher.service.ts` (Argon2id),
+  `password.policy.ts`; không import capability nào, `accounts/`, `auth/` và `recovery/` import nó (tách khỏi `accounts/` để thư
+  mục đó dưới trần 25 file sau khi `mappers/`, `dto/`, `policies/` được dời vào).
 - `approval-roles/` — `approval-roles.controller.ts` (`GET /approval-roles`, `PUT /approval-roles/{role}`) →
   `approval-role.service.ts`. `recovery/` — các bước của `pnpm ops:recover` (không có controller).
 - Nest: `identity-access.module.ts` (API: controller, JWT), `identity-access-facade.module.ts` (facade, mọi graph),

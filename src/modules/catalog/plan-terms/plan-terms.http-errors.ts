@@ -38,7 +38,7 @@ export function toPlanTermsApiException(error: unknown): unknown {
 
 const example = (error: Error) => errorExampleOf(toPlanTermsApiException(error));
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const PLAN_TERMS_ERROR_EXAMPLES = {
   PLAN_NOT_FOUND: example(new PlanTermsPlanNotFoundError()),
   NOT_APPLICABLE: example(new PlanTermsNotApplicableError()),

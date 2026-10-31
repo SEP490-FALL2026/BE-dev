@@ -1,25 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { hasSpendStep } from '../access-request/access-request.policy';
-import type { AccessRequestRecord } from '../access-request/access-request.types';
+import type { AccessRequestRecord, SpendStage } from '../access-request/access-request.types';
 import { BudgetCheckRepo, type CheckRecord } from './budget-check.repo';
 import { FinanceReviewRepo, type FinanceReviewRecord } from './finance-review.repo';
 import { SpendDecisionRepo } from './spend-decision.repo';
 import { SpendStepRepo } from './spend-step.repo';
-
-/**
- * Where a request that costs money stands on its way to the spending approver, as the people with a part in it read it
- * (`US-06-14` AC-9, AC-13). It says what is waiting and, for a request that stopped, why: and it is never a figure of a
- * budget, a code of the check that is not a problem with the head's own data, or what is left (`QĐ-82m` `INF-06`).
- */
-export type SpendStage =
-  | 'NOT_SUBMITTED'
-  | 'BLOCKED'
-  | 'RETURNED_BY_FINANCE'
-  | 'WAITING_FINANCE_REVIEW'
-  | 'WAITING_BUDGET'
-  | 'WAITING_SPEND_DECISION'
-  /** The spending approver refused it, with the reason (`US-06-01` AC-4). */
-  | 'REFUSED';
 
 /** The two problems of the data a head or the IT Admin can mend; the figures of the budget are not among them. */
 export type BlockedReason = 'STALE_COST_EVIDENCE' | 'CLOSED_OR_EXPIRED_BUDGET_PERIOD';

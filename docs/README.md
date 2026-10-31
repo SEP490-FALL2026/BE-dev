@@ -1,13 +1,14 @@
 # Tài liệu backend
 
 Bắt đầu ở [README](../README.md), [CONTRIBUTING](../CONTRIBUTING.md)
-và [ARCHITECTURE](../ARCHITECTURE.md). Đây là foundation để triển khai US,
+và [ARCHITECTURE](../ARCHITECTURE.md); dev mới đọc thêm
+[hướng dẫn dev mới](guides/huong-dan-dev-moi.md). Đây là foundation để triển khai US,
 không phải bộ chức năng đã hoàn thành.
 
 | Thư mục    | Mục đích                                                                  |
 | ---------- | ------------------------------------------------------------------------- |
 | rules/     | Quy tắc ngắn phải tuân thủ theo phần code thay đổi                        |
-| guides/    | Cách thực hiện: thêm endpoint, dùng AI, chạy container, vận hành kho khóa |
+| guides/    | Cách thực hiện: hướng dẫn dev mới, dùng AI, chạy container, kho khóa      |
 | decisions/ | Vì sao chọn một hướng kỹ thuật; ghi rõ accepted khác implemented          |
 | examples/  | Dữ liệu mẫu/template tham khảo, không phải runtime hay acceptance đã pass |
 | reviews/   | Kết quả review và phạm vi đã kiểm chứng                                   |

@@ -4,7 +4,7 @@ import type { RevocationSource } from './licensing.types';
 
 /**
  * Who the Audit Trail names for the handover events when the caller is the controlled procedure `ops:record-super-admin-event`
- * (spec L.2): an operator working a ticket, never an account. The `actor` the facade is given then only fills the columns that
+ *: an operator working a ticket, never an account. The `actor` the facade is given then only fills the columns that
  * still demand an account; the events say `OPERATOR`, no account, the ticket as the reference and as the correlation. `context`
  * is what the command adds to the `after` of every event it writes (references only).
  */
@@ -15,7 +15,7 @@ export interface OperatorAuditActor {
 }
 
 /**
- * What a source that knows the person who leaves ahead of time hands to `LicensingApi.openHandoverDuties`: the planned
+ * What a source that knows the person who leaves ahead of time hands to `LicensingHandoverApi.openHandoverDuties`: the planned
  * departure opens the handover when it is recorded, before any revocation task exists (`US-03-09` AC-1). Every other source opens
  * its duty through the hook of the revocation and needs none of this.
  */

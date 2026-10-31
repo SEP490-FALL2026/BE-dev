@@ -22,7 +22,7 @@ describe('TokenService.verifyAccessToken', () => {
   });
 
   // A correctly signed token whose ids are not UUIDs must be refused as a bad token (401), not
-  // passed on to the database, where the malformed id would surface as a 503 and an error log (R-04).
+  // passed on to the database, where the malformed id would surface as a 503 and an error log.
   it.each([
     ['sid is not a UUID', { sid: 'not-a-uuid' }, SUB],
     ['sid is a number', { sid: 42 }, SUB],

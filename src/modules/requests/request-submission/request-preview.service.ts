@@ -6,8 +6,8 @@ import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccessRequestNoDepartmentError } from '../access-request/access-request.errors';
 import type { PreviewBodyDto, PreviewWire } from './request-preview.dto';
 import { buildChain, spendSubmissionOf, termNeedsConfirmation } from './request-preview.policy';
-import { PricingViewService } from '../access-request/pricing-view.service';
-import { RequestAssessmentService } from '../access-request/request-assessment.service';
+import { PricingViewService } from '../request-view/pricing-view.service';
+import { RequestFactsService } from '../access-request/request-facts.service';
 
 /**
  * What a person is shown before they send a request (`US-05-01`): the cost with its estimated tax, the chain of people who
@@ -18,7 +18,7 @@ import { RequestAssessmentService } from '../access-request/request-assessment.s
 export class RequestPreviewService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly assessment: RequestAssessmentService,
+    private readonly assessment: RequestFactsService,
     private readonly organization: OrganizationApi,
     private readonly catalog: CatalogApi,
     private readonly pricing: PricingViewService,

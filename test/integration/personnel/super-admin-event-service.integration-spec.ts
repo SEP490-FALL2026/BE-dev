@@ -1,26 +1,13 @@
-import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { AuditApi } from '../../../src/modules/audit/public/audit.api';
-import { IdentityAccessApi } from '../../../src/modules/identity-access/public/identity-access.api';
-import { NotificationsApi } from '../../../src/modules/notifications/public/notifications.api';
-import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
-import { LeaveService } from '../../../src/modules/personnel/leave/leave.service';
-import { NoticeHandlingService } from '../../../src/modules/personnel/notice/notice-handling.service';
-import { OffboardingChangeService } from '../../../src/modules/personnel/offboarding/offboarding-change.service';
-import { OffboardingService } from '../../../src/modules/personnel/offboarding/offboarding.service';
-import { ProfileCorrectionService } from '../../../src/modules/personnel/super-admin-event/profile-correction.service';
 import { SuperAdminEventRefusedError } from '../../../src/modules/personnel/public/super-admin-event.errors';
-import { SuperAdminEventRepo } from '../../../src/modules/personnel/super-admin-event/super-admin-event.repo';
-import { SuperAdminEventApi } from '../../../src/modules/personnel/public/super-admin-event.api';
 import type {
   ProfileCorrection,
   SuperAdminEventParameters,
   SuperAdminEventResult,
 } from '../../../src/modules/personnel/public/super-admin-event.types';
-import { TransferChangeService } from '../../../src/modules/personnel/transfer/transfer-change.service';
-import { TransferService } from '../../../src/modules/personnel/transfer/transfer.service';
 import { NoticeHarness } from '../../support/notice-harness';
 import type { Department } from '../../support/request-harness';
 
+import { superAdminEventService } from '../../support/super-admin-event-runner';
 const h = new NoticeHarness();
 const SUBJECT_CODE = 'E-ADMIN';
 const BASIS = { type: 'DECISION', reference: 'QD-31/2026', issuer: 'Board of Directors', issuedOn: '2026-10-20' };
@@ -45,27 +32,7 @@ describe('the controlled procedure for an event about the Super Admin (integrati
     await h.stop();
   });
 
-  const service = () => {
-    const app = h.ctx.app;
-
-    return new SuperAdminEventApi(
-      app.get(TransactionRunner, { strict: false }),
-      app.get(OrganizationApi, { strict: false }),
-      app.get(IdentityAccessApi, { strict: false }),
-      new SuperAdminEventRepo(),
-      app.get(TransferService, { strict: false }),
-      app.get(TransferChangeService, { strict: false }),
-      app.get(LeaveService, { strict: false }),
-      app.get(OffboardingService, { strict: false }),
-      app.get(OffboardingChangeService, { strict: false }),
-      app.get(NoticeHandlingService, { strict: false }),
-      new ProfileCorrectionService(
-        app.get(OrganizationApi, { strict: false }),
-        app.get(AuditApi, { strict: false }),
-        app.get(NotificationsApi, { strict: false }),
-      ),
-    );
-  };
+  const service = () => superAdminEventService(h.ctx.app);
   const context = (patch: Record<string, unknown> = {}) => ({
     ticketRef: `R-2026-${String((ticketNumber += 1)).padStart(3, '0')}`,
     approvedBy: 'cto-office',

@@ -5,7 +5,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { GroupSupplementDropRefusedError } from './group-request.errors';
-import { pricedPeople } from './group-request.types';
+import { pricedPeople } from '../access-request/group-request.types';
 import { GroupResolutionService } from './group-resolution.service';
 import { RequestLineRepo } from './request-line.repo';
 import { RequestOutcomeService } from '../outcome/request-outcome.service';
@@ -94,7 +94,7 @@ export class GroupSupplementService {
           },
         ),
       );
-      // The line of a person the head left out of the file ended for them without a grant (F43).
+      // The line of a person the head left out of the file ended for them without a grant.
       await this.outcomes.ended(tx, request, [employeeId], now);
     }
     await this.drops.insertMany(tx, request.id, number, employeeIds);

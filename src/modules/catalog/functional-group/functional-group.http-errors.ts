@@ -33,7 +33,7 @@ export function toFunctionalGroupApiException(error: unknown): unknown {
 
 const example = (error: Error) => errorExampleOf(toFunctionalGroupApiException(error));
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const FUNCTIONAL_GROUP_ERROR_EXAMPLES = {
   NOT_FOUND: example(new FunctionalGroupNotFoundError()),
   NAME_TAKEN: example(new FunctionalGroupNameTakenError()),

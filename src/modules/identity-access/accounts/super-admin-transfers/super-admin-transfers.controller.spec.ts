@@ -6,7 +6,7 @@ import { SuperAdminTransferProblem, SuperAdminTransferRefusedError } from '../ac
 import { SuperAdminTransferService } from './super-admin-transfer.service';
 import { SuperAdminTransfersController } from './super-admin-transfers.controller';
 
-// H5.0 characterization: the error answers of the Super Admin transfer.
+// Characterization: the error answers of the Super Admin transfer.
 
 const actor = { appUserId: '00000000-0000-4000-8000-000000000001' } as AuthenticatedPrincipal;
 

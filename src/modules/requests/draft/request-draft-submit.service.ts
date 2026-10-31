@@ -8,15 +8,15 @@ import {
   AccessRequestSuperAdminCannotRequestError,
 } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
-import { AccessRequestService } from '../request-submission/access-request.service';
+import { AccessRequestService } from '../request-intake/access-request.service';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { contentOf } from './request-draft-content.mapper';
-import type { DraftKind } from './request-draft.policy';
-import { draftVerdict } from './request-draft.policy';
-import { RequestDraftRepo } from '../access-request/request-draft.repo';
+import type { DraftKind } from '../request-draft/request-draft.policy';
+import { draftVerdict } from '../request-draft/request-draft.policy';
+import { RequestDraftRepo } from '../request-draft/request-draft.repo';
 
 /**
- * Sends a draft (spec L.1, F27): the request that was saved is sent by the operation that sends that kind of request, with every gate it
+ * Sends a draft: the request that was saved is sent by the operation that sends that kind of request, with every gate it
  * has (the Super Admin, the finance setup of the department of the sender on the day, the plan and its application, the price, the
  * check of the budget, the routing, the locks), on the content that was saved. It is not a copy: the row of the draft becomes the
  * request, so it is the same request from the day it was saved, and `submittedAt` is the moment it is sent. Everything is one

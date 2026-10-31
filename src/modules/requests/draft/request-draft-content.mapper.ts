@@ -4,12 +4,12 @@ import { groupBodySchema } from '../group-request/group-request.dto';
 import { serviceAccountSubmitSchema } from '../service-account-request/service-account-request.dto';
 import { submitBodySchema } from '../access-request/access-request.dto';
 import type { DraftSaveBody } from './request-draft.dto';
-import { beneficiaryCountOf } from './request-draft.policy';
-import type { DraftRow } from '../access-request/request-draft.repo';
+import { beneficiaryCountOf } from '../request-draft/request-draft.policy';
+import type { DraftRow } from '../request-draft/request-draft.repo';
 
 /**
  * What a draft is sent from: the body of the operation that sends that kind of request, exactly as it was validated when the draft was
- * saved (spec L.1). It is kept in the `policy` column, which has no other use while the request is a draft: the table has no column for
+ * saved. It is kept in the `policy` column, which has no other use while the request is a draft: the table has no column for
  * the people of a group with the day each one's access ends, for the confirmation of a long term or for the day the money is expected to
  * go out, and a draft has no line and no price to keep them in.
  */

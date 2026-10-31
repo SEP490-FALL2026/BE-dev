@@ -10,10 +10,14 @@ import {
   type OpenStep,
   type ReassignableStepKind,
   type ReassignmentTrigger,
-} from './reassignment.policy';
+} from '../step-routing/reassignment.policy';
 import { reassignmentAuditEvent } from './reassignment-audit.mapper';
-import { StepReassignmentRepo, type ReassignableRequest, type ReassignableStep } from './step-reassignment.repo';
-import { StepTargetService, type TodayFacts } from './step-target.service';
+import {
+  StepReassignmentRepo,
+  type ReassignableRequest,
+  type ReassignableStep,
+} from '../step-routing/step-reassignment.repo';
+import { StepTargetService, type TodayFacts } from '../step-routing/step-target.service';
 
 /** The events a pass of the worker looks again at a request for. */
 export type SweepTrigger = 'WAITING_RETRY' | 'HOLDER_LEFT' | 'EFFECTIVE_DATE_REACHED';

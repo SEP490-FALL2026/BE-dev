@@ -2,13 +2,13 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { pricedPeople } from '../group-request/group-request.types';
+import { pricedPeople } from '../access-request/group-request.types';
 import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
 import { AssessmentIncompleteError, AssessmentQuoteRefusedError } from './assessment.errors';
-import { AssessmentRepo } from './assessment.repo';
+import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import { QuoteService } from './quote.service';
-import { RequestAssessmentService } from '../access-request/request-assessment.service';
+import { RequestFactsService } from '../access-request/request-facts.service';
 
 /** The people a request is priced for: all of them, and for a group those who have not been refused, withdrawn or left out. */
 const peopleOf = (request: AccessRequestRecord): number =>
@@ -25,9 +25,9 @@ const peopleOf = (request: AccessRequestRecord): number =>
 @Injectable()
 export class RepricingService {
   constructor(
-    private readonly assessment: RequestAssessmentService,
+    private readonly assessment: RequestFactsService,
     private readonly quotes: QuoteService,
-    private readonly assessments: AssessmentRepo,
+    private readonly assessments: AssessmentReadRepo,
   ) {}
 
   /** Throws AccessRequestNotPriceableError when the request has no price for that day. */

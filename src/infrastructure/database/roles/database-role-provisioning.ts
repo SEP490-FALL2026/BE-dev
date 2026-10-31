@@ -7,12 +7,19 @@ import {
   readRole,
   readSeparationFacts,
 } from './database-role-catalog';
-import { RUNTIME_TABLE_EXCEPTIONS, RoleFinding, judgeRole, judgeSeparation } from '../database-role-judgement';
+import {
+  RUNTIME_SEQUENCE_DEFAULT,
+  RUNTIME_SEQUENCE_EXCEPTIONS,
+  RUNTIME_TABLE_EXCEPTIONS,
+  RoleFinding,
+  judgeRole,
+  judgeSeparation,
+} from '../database-role-judgement';
 import { ProvisionSettings } from './database-role-settings';
 import { scramSha256Verifier } from './scram-verifier';
 
 /**
- * The three workflows of `ops:db-roles` (H7, docs/guides/containers.md#postgresql-roles-h7). Each is one transaction that
+ * The three workflows of `ops:db-roles` (docs/guides/containers.md#postgresql-roles-h7). Each is one transaction that
  * ends with `judgeSeparation` on what it is about to commit: any finding rolls everything back, so a run either leaves the
  * role matrix complete or leaves the database as it found it.
  */
@@ -37,18 +44,26 @@ export interface DatabaseRoleReport {
 const quote = (identifier: string): string => `"${identifier.replaceAll('"', '""')}"`;
 const ROLE_ATTRIBUTES = 'LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT';
 
+/** The objects with a privilege exception (`RUNTIME_TABLE_EXCEPTIONS`, `RUNTIME_SEQUENCE_EXCEPTIONS`) that this schema has yet. */
+export interface PresentExceptions {
+  tables: string[];
+  sequences: string[];
+}
+
 /**
  * The privileges of the matrix, idempotent: each grant is preceded by a revoke of everything on the same objects, so a
  * stray privilege (TRUNCATE, TEMPORARY, CREATE…) disappears and a second run yields the same ACLs. Run by the deploy role
- * (owner of every object) or by the bootstrap superuser on its behalf.
+ * (owner of every object) or by the bootstrap superuser on its behalf. An exception is granted only on an object that
+ * exists (`present`): an older schema baseline, before the migration that creates it, is supported.
  */
 export function grantStatements(
   database: string,
   deploy: string,
   runtime: string,
-  presentExceptions: string[],
+  present: PresentExceptions,
 ): string[] {
   const [db, owner, role] = [database, deploy, runtime].map(quote);
+  const sequenceDefault = RUNTIME_SEQUENCE_DEFAULT.join(', ');
   return [
     `REVOKE ALL ON DATABASE ${db} FROM PUBLIC`,
     `REVOKE ALL ON DATABASE ${db} FROM ${role}`,
@@ -59,7 +74,7 @@ export function grantStatements(
     'REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC',
     `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${role}`,
     `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${role}`,
-    ...presentExceptions.flatMap((table) => [
+    ...present.tables.flatMap((table) => [
       `REVOKE ALL ON TABLE public.${quote(table)} FROM ${role}`,
       ...(RUNTIME_TABLE_EXCEPTIONS[table].length > 0
         ? [`GRANT ${RUNTIME_TABLE_EXCEPTIONS[table].join(', ')} ON TABLE public.${quote(table)} TO ${role}`]
@@ -67,22 +82,33 @@ export function grantStatements(
     ]),
     'REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC',
     `REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM ${role}`,
-    `GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO ${role}`,
+    `GRANT ${sequenceDefault} ON ALL SEQUENCES IN SCHEMA public TO ${role}`,
+    // H7-SEQ: the two sequences that the numbering of BM-09 and BM-11 reads and lifts hold more (the one policy of the judgement).
+    ...present.sequences.flatMap((sequence) => [
+      `REVOKE ALL ON SEQUENCE public.${quote(sequence)} FROM ${role}`,
+      `GRANT ${RUNTIME_SEQUENCE_EXCEPTIONS[sequence].join(', ')} ON SEQUENCE public.${quote(sequence)} TO ${role}`,
+    ]),
     // Future objects of the deploy role (the next migration) are usable by the runtime role before any reconcile.
     `ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} IN SCHEMA public REVOKE ALL ON TABLES FROM ${role}`,
     `ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${role}`,
     `ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} IN SCHEMA public REVOKE ALL ON SEQUENCES FROM ${role}`,
-    `ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} IN SCHEMA public GRANT USAGE ON SEQUENCES TO ${role}`,
+    `ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} IN SCHEMA public GRANT ${sequenceDefault} ON SEQUENCES TO ${role}`,
   ];
 }
 
-async function presentExceptions(client: ClientBase): Promise<string[]> {
-  const { rows } = await client.query<{ name: string }>(
-    `SELECT c.relname AS name FROM pg_class c
+async function presentExceptions(client: ClientBase): Promise<PresentExceptions> {
+  const { rows } = await client.query<{ name: string; sequence: boolean }>(
+    `SELECT c.relname AS name, c.relkind = 'S' AS sequence FROM pg_class c
       WHERE c.relnamespace = 'public'::regnamespace AND c.relname = ANY($1::text[]) ORDER BY 1`,
-    [Object.keys(RUNTIME_TABLE_EXCEPTIONS)],
+    [[...Object.keys(RUNTIME_TABLE_EXCEPTIONS), ...Object.keys(RUNTIME_SEQUENCE_EXCEPTIONS)]],
   );
-  return rows.map((row) => row.name);
+  return {
+    tables: rows.filter((row) => Object.hasOwn(RUNTIME_TABLE_EXCEPTIONS, row.name)).map((row) => row.name),
+    // A relation that merely bears the name of an exception sequence is not a sequence: nothing is granted on it as one.
+    sequences: rows
+      .filter((row) => row.sequence && Object.hasOwn(RUNTIME_SEQUENCE_EXCEPTIONS, row.name))
+      .map((row) => row.name),
+  };
 }
 
 async function currentDatabase(client: ClientBase): Promise<string> {

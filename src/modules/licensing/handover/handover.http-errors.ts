@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { toLicensingApiException } from '../licensing.http-errors';
 import { HandoverDutyError, type HandoverDutyProblem } from './handover.errors';
 
 const ANSWERS: Readonly<Record<HandoverDutyProblem, { status: HttpStatus; message: string }>> = {

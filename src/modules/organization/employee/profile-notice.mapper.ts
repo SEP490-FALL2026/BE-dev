@@ -15,7 +15,7 @@ export interface ProfileNoticeFacts {
 }
 
 /**
- * The notices an employee record owes (`F17`, `QĐ-87b(3)`, `US-02-02` AC-17): a new record tells the head of the department and the
+ * The notices an employee record owes (`QĐ-87b(3)`, `US-02-02` AC-17): a new record tells the head of the department and the
  * IT Admin in charge, who prepare the grants; a corrected one tells the employee, while they work, and their head. Nobody is told
  * twice and a department with nobody in a role tells nobody in it. Ids only: no name, no value that changed.
  */

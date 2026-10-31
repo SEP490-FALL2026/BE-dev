@@ -1,3 +1,5 @@
+import type { AccessRequestBranchCode } from '../access-request/access-request.policy';
+import { nextRequestState } from '../access-request/need-decision.policy';
 import type { NewNeedStep } from '../access-request/access-request.types';
 import { routeNeedStep, type RoutingFacts } from '../access-request/routing.policy';
 
@@ -102,4 +104,41 @@ export function planNeedSteps<Line extends { employeeId: string }>(
   }
 
   return planned;
+}
+
+/**
+ * The state the request starts in: with every person confirmed by sending it goes on to what follows the need; otherwise it waits under
+ * control when every step still open waits for somebody, and is pending when any has somebody who can decide it.
+ */
+export function groupStartState<Line extends { employeeId: string }>(
+  planned: readonly PlannedNeedStep<Line>[],
+  branch: AccessRequestBranchCode,
+): ReturnType<typeof nextRequestState> | 'WAITING_CONTROLLED' | 'PENDING' {
+  const open = planned.filter((entry) => !entry.confirmedBySending);
+  if (open.length === 0) return nextRequestState(branch);
+
+  return open.every((entry) => entry.step.state === 'WAITING') ? 'WAITING_CONTROLLED' : 'PENDING';
+}
+
+/** The row of each person of the request: confirmed when the head confirmed them by sending, waiting for their need otherwise. */
+export function groupLineRowsOf<Line extends { employeeId: string; expectedEndDate?: string | null }>(
+  requestId: string,
+  planned: readonly PlannedNeedStep<Line>[],
+  stepIds: readonly string[],
+): {
+  requestId: string;
+  employeeId: string;
+  state: 'AWAITING_NEED' | 'NEED_CONFIRMED';
+  needStepId: string;
+  expectedEndDate: string | null;
+}[] {
+  return planned.flatMap((entry, index) =>
+    entry.lines.map((line) => ({
+      requestId,
+      employeeId: line.employeeId,
+      state: entry.confirmedBySending ? ('NEED_CONFIRMED' as const) : ('AWAITING_NEED' as const),
+      needStepId: stepIds[index],
+      expectedEndDate: line.expectedEndDate ?? null,
+    })),
+  );
 }

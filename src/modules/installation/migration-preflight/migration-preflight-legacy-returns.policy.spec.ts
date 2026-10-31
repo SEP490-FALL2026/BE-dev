@@ -3,7 +3,7 @@ import { formatPreflight } from '../public/migration-preflight-report.mapper';
 import type { ContractGateFacts, PreflightReport } from '../public/migration-preflight.types';
 
 /**
- * The proposals `7c28e75` gave back because their first version was refused (F63, spec J.2), as `ops:preflight` judges them: R1 and R2
+ * The proposals `7c28e75` gave back because their first version was refused, as `ops:preflight` judges them: R1 and R2
  * are information (the migration `…_budget_lifecycle_structure` reconciles them), every other case is a blocker named by id, and nothing
  * is guessed. The same expressions as the first block of that migration; the facts are read only until it has run.
  */

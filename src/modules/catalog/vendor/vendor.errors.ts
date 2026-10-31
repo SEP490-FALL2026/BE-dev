@@ -7,7 +7,7 @@ export class VendorNotFoundError extends Error {
 
 /**
  * The vendor of a dictionary group's name already holds another dictionary group, so it cannot be the vendor of the
- * group (P29-N3). The same answer every time it is asked: not a race.
+ * group. The same answer every time it is asked: not a race.
  */
 export class VendorNameHeldByAnotherGroupError extends Error {
   constructor() {

@@ -3,7 +3,7 @@ import type { LocalSeedRefusal } from '../dev-seed/local-seed.policy';
 
 export type SeedItemKind = 'DEPARTMENT' | 'COST_CENTER' | 'EMPLOYEE' | 'ACCOUNT';
 
-/** A fixture item that exists under its stable key but differs, and how (P23-RV-01). */
+/** A fixture item that exists under its stable key but differs, and how. */
 export type SeedConflict =
   | 'COST_CENTER_NAME_DIFFERS'
   | 'COST_CENTER_NOT_UNIT'

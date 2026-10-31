@@ -1,7 +1,7 @@
 import { hash } from '@node-rs/argon2';
 import type { Algorithm } from '@node-rs/argon2';
-import { PasswordHasher } from '../../src/modules/identity-access/accounts/password-hasher.service';
-import { canonicalizePassword } from '../../src/modules/identity-access/accounts/password.policy';
+import { PasswordHasher } from '../../src/modules/identity-access/credentials/password-hasher.service';
+import { canonicalizePassword } from '../../src/modules/identity-access/credentials/password.policy';
 
 /*
  * OD-T3: integration suites outside identity-access sign people in to build their fixtures, and each production

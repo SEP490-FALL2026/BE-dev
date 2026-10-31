@@ -6,7 +6,7 @@ import { ApplicationRepo } from './application.repo';
 import type { ApplicationKind, ApplicationSummaryView, BusinessOwnerView, CatalogStatus } from './application.types';
 
 /**
- * The application list (`LD-04`): a page of summaries. It reads only the columns a row of the list shows (no domains, no
+ * The application list: a page of summaries. It reads only the columns a row of the list shows (no domains, no
  * communication note) and the Business Owners of the whole page in one read; the detail (`ApplicationService.get`) is
  * where the rest of an application is read.
  */

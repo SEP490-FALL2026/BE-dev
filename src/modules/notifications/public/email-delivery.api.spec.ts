@@ -1,4 +1,4 @@
-import { EmailDispatcher } from '../email-dispatcher.service';
+import { EmailDispatcher } from '../email/email-dispatcher.service';
 import { EmailDeliveryApi } from './email-delivery.api';
 
 describe('EmailDeliveryApi', () => {

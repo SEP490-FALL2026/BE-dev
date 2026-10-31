@@ -1,6 +1,6 @@
 import type { EmploymentType } from '../../organization/public/organization.types';
 
-/** The ten modes of `pnpm ops:record-super-admin-event` (spec L.2), the tenth being the correction of the official fields of the record. */
+/** The ten modes of `pnpm ops:record-super-admin-event`, the tenth being the correction of the official fields of the record. */
 export const SUPER_ADMIN_EVENT_MODES = [
   'transfer-record',
   'transfer-reschedule',

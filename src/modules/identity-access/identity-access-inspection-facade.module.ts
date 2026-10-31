@@ -6,7 +6,7 @@ import { IdentityAccessFacadeModule } from './identity-access-facade.module';
 import { IdentityAccessInspectionApi } from './public/identity-access-inspection.api';
 
 /**
- * The account side of `ops:inspect` (H6.1). Only the inspection graph loads it (module-graph.spec.ts), so the approval
+ * The account side of `ops:inspect`. Only the inspection graph loads it (module-graph.spec.ts), so the approval
  * role persistence it declares appears once per graph, as in RecoveryModule. Exports the read-only contract alone.
  */
 @Module({

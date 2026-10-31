@@ -18,7 +18,7 @@ import { VendorLookupService } from '../vendor/vendor-lookup.service';
 import {
   InternalSoftwareRegistrationService,
   type InternalRegistration,
-} from '../catalog-entry/internal-software-registration.service';
+} from '../internal-software-registration/internal-software-registration.service';
 
 /**
  * The catalog facade other modules call (ADR-0013: `licensing → catalog`). It exposes what the assignments of seats
@@ -59,7 +59,7 @@ export class CatalogApi {
 
   /**
    * What a plan is bought at for a department (unit price and billing cycle), from the newest priced active subscription that
-   * department owns; null when it has none. The price of another department's subscription is never used (F38).
+   * department owns; null when it has none. The price of another department's subscription is never used.
    */
   getPlanPrice(planId: string, ownerDepartmentId: string, tx?: DbTx) {
     return this.subscriptions.priceOfPlan(planId, ownerDepartmentId, tx);

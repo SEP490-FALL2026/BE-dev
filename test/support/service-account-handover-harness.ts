@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { ServiceAccountDutyService } from '../../src/modules/licensing/assignment/service-account-duty/service-account-duty.service';
-import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import { pretendBusinessToday } from './pretend-today';
 import type { ApiAccount } from './api-accounts';
 import { OffboardingHarness } from './offboarding-harness';
 import type { Department, Person } from './request-harness';
@@ -118,8 +118,7 @@ export class ServiceAccountHandoverHarness extends OffboardingHarness {
 
   /** The organization says today is `day` until the returned function is called; the dates the data was written for stay as they are. */
   pretendToday(day: string): () => void {
-    const spy = jest.spyOn(this.ctx.app.get(OrganizationApi, { strict: false }), 'businessToday');
-    spy.mockResolvedValue(day);
+    const spy = pretendBusinessToday(this.ctx.app, day);
 
     return () => spy.mockRestore();
   }

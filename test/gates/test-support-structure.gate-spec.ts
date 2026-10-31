@@ -164,7 +164,8 @@ function listSupportFiles(directory: string): string[] {
   });
 }
 
-describe('TEST-HARDEN.1: test/support holds fixtures and harnesses only', () => {
+// TEST-HARDEN.1
+describe('test/support holds fixtures and harnesses only', () => {
   it('finds the support files it checks', () => {
     expect(listSupportFiles(supportRoot).length).toBeGreaterThan(0);
   });
@@ -251,5 +252,28 @@ describe('TEST-HARDEN.1: test/support holds fixtures and harnesses only', () => 
       expect(check(`${'// line\n'.repeat(400)}export const x = 1;\n`)).toEqual(['401 lines (max 400)']);
       expect(check(`${'// line\n'.repeat(399)}export const x = 1;\n`)).toEqual([]);
     });
+  });
+});
+
+/** FR-06: the one seam of the day of the organization, `OrganizationContextService.businessToday`, is pretended in `pretend-today.ts` only. */
+describe('the day of the organization is pretended in one place', () => {
+  const testRoot = join(projectRoot, 'test');
+  const allTestFiles = (directory: string): string[] =>
+    readdirSync(directory).flatMap((entry) => {
+      const path = join(directory, entry);
+
+      return statSync(path).isDirectory() ? allTestFiles(path) : entry.endsWith('.ts') ? [path] : [];
+    });
+
+  it('has no spy on businessToday outside the helper: a spy on the facade leaves the organization capabilities on the real day', () => {
+    const spies = allTestFiles(testRoot)
+      .filter(
+        (path) => basename(path) !== 'pretend-today.ts' && basename(path) !== 'test-support-structure.gate-spec.ts',
+      )
+      .filter((path) => /spyOn\([\s\S]{0,200}?['"]businessToday['"]/.test(readFileSync(path, 'utf8')))
+      .map((path) => relative(projectRoot, path).split(sep).join('/'));
+
+    expect(spies).toEqual([]);
+    expect(readFileSync(join(supportRoot, 'pretend-today.ts'), 'utf8')).toMatch(/spyOn\([\s\S]*?'businessToday'/);
   });
 });

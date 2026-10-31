@@ -14,8 +14,35 @@
 ## Business outcome
 
 Sau hạng mục này mỗi push lên `dev`/`main` lại chứng minh được hành vi HTTP và ràng buộc PostgreSQL trước khi deploy, trong
-thời gian chờ chấp nhận được: HTTP contract ≤ 3 phút, integration bị ảnh hưởng ≤ 8 phút trên `dev`, đầy đủ ≤ 15 phút trên
-`main`. Kiểm bằng thời gian job trên GitHub Actions và job `deploy` phụ thuộc các job đó.
+thời gian chờ đo được: HTTP contract ≤ 3 phút (đo 136–170 s); integration **theo số đo trên GitHub Actions**, không theo con
+số 15 phút của bản thiết kế đầu, vốn không đạt (mục _Ngân sách thời gian CI_ ngay dưới). Kiểm bằng thời gian job trên GitHub
+Actions và job `deploy` phụ thuộc các job đó.
+
+## Ngân sách thời gian CI (31/10/2026, `OD-R8` = B)
+
+Mục tiêu thiết kế đầu "integration đầy đủ ≤ 15 phút" (P5) **chưa đạt và không còn là mục tiêu của spec này**. Hướng B của
+`OD-R8` (người thực hiện chọn ở phụ lục của `be-architecture-readability-hardening`, chưa có ghi nhận Owner xác nhận): giữ một
+runner 2 vCPU (`OD-T2`), không shard, không tối ưu P7/P8, và ghi mục tiêu theo số đo. Số đo đọc bằng `gh run view` (chỉ đọc) trên `SEP490-FALL2026/BE-dev`:
+
+| Run (push `dev`) | Commit    | Job `integration`      | Bước song song (`--maxWorkers=2`) | Timing | `_serial` |
+| ---------------- | --------- | ---------------------- | --------------------------------- | ------ | --------- |
+| `40923299529`    | `25d5244` | 31 phút 26 s (1 886 s) | 27 phút 56 s (1 676 s)            | 56 s   | 61 s      |
+| `40945441332`    | `f498c74` | 30 phút 25 s (1 825 s) | 27 phút 04 s (1 624 s)            | 54 s   | 59 s      |
+
+Cùng hai run: `quality` 416 s và 473 s, `http-contract` 136 s và 170 s. Cả hai lượt chạy `ALL` (cây chạm `test/support` và
+`.github`), nên **chưa có số đo của lượt "module bị ảnh hưởng"** (mục tiêu ≤ 8 phút của thiết kế chưa được kiểm), và
+`e2e-smoke` chưa từng chạy trên CI. Chỉ có **hai mẫu**; p95 của hai mẫu không có ý nghĩa thống kê nên tạm lấy mẫu lớn nhất.
+
+**Quy tắc timeout (thay "gấp đôi mục tiêu"): `timeout-minutes` = p95 đo được của job + 50 %, làm tròn lên phút.** Áp vào job
+`integration`: 1 886 s × 1,5 = 2 829 s ≈ 47,2 phút, tức khoảng 47–48 phút. `ci.yml` đang đặt **40 phút** (Owner, 30/10/2026,
+trước khi có hai mẫu này): hai lượt xong trong 30–31 phút, dư khoảng 27–31 % so với 40, **ít hơn quy tắc khoảng 7 phút**.
+Giữ 40 hay đổi theo quy tắc là quyết định của Owner; hạng mục này **không đổi `timeout-minutes` nào** trong
+`.github/workflows`. `nightly.yml` (job `integration` gồm cả E2E, Owner đặt 50 phút) chưa có run nào để áp quy tắc.
+
+**Phải đo lại.** Task 7.4 của `be-architecture-readability-hardening` tách 6 file integration thành 20: thêm database phải sao
+và xóa, nên số trên (đo ở `25d5244`, `f498c74`, trước lần tách) không còn đảm bảo; sau lần chạy CI kế tiếp áp lại quy tắc với
+mẫu mới. P7 và P8 vẫn `owner-waived / not-required-for-this-checkpoint` (không phải đã đạt); CI vẫn
+`remote-verification-pending` cho tới khi Owner đẩy và đọc run mới.
 
 ## Sizing decision
 
@@ -222,17 +249,20 @@ it.each(SUPER_ADMIN_ONLY)('%s as an employee is 403', async (_name, call) => {
 push/PR dev ─┬─ quality (hiện có ~6')  : rules, format, prisma, lint, typecheck, unit, gates, build, drift, openapi, audit
              ├─ http-contract (≤ 3')   : test/http, song song
              └─ integration-affected   : test/integration/<module> của module đổi + module phụ thuộc theo bảng tầng,
-                                         cộng integration-serial nếu chạm thư mục đó (≤ 8')
+                                         cộng integration-serial nếu chạm thư mục đó (≤ 8', chưa đo)
 push main ───┬─ quality, http-contract
-             ├─ integration (đầy đủ)   : 1 runner --maxWorkers=2 (≤ 15') hoặc 3 shard nếu OD-T2 cho phép
+             ├─ integration (đầy đủ)   : 1 runner --maxWorkers=2 (thiết kế ≤ 15'; đo 30–31', mục Ngân sách thời gian CI)
              ├─ e2e-smoke
              └─ deploy  needs: [quality, http-contract, integration, e2e-smoke]
 nightly (dev) ─ toàn bộ integration + e2e-smoke + test:mutation + báo cáo thời gian từng file
 ```
 
-- `timeout-minutes` đặt theo ngân sách của từng job (gấp đôi mục tiêu), không còn một timeout chung.
+- `timeout-minutes` của từng job = p95 đo được + 50 %, làm tròn lên phút (mục _Ngân sách thời gian CI_); không còn một timeout
+  chung và không còn quy tắc "gấp đôi mục tiêu", vì mục tiêu 15 phút không đạt.
 - Không `continue-on-error`, không `|| true` (giữ nguyên tắc hiện có của ci.yml).
-- Ước phút Actions mỗi lần push `dev`: ~6 + 3 + ≤ 8 ≈ 17 phút; push `main` ≈ 6 + 3 + 15 + 5 ≈ 29 phút (một runner).
+- Phút Actions đo được mỗi lần push `dev` với integration `ALL`: quality 7–8 + http-contract 2–3 + integration 30–31 ≈ 40 phút
+  (cộng dồn thời gian job, chưa làm tròn theo phút tính phí); lượt chỉ module bị ảnh hưởng và push `main` (thêm `e2e-smoke`)
+  chưa có số đo. Ước tính cũ (~17 và ~29 phút) dựa trên mục tiêu 15 phút nên không còn dùng.
 
 ### Owner decisions
 
@@ -260,7 +290,8 @@ nightly (dev) ─ toàn bộ integration + e2e-smoke + test:mutation + báo cáo
 ## Definition of Done
 
 - Không HTTP spec nào dựng app trong `it`/`beforeEach`; job `http-contract` ≤ 3 phút trên CI.
-- Integration song song có project `serial` rõ ràng; trung vị ≤ 4 s/file, không `beforeAll` timeout > 60 s; job đầy đủ ≤ 15 phút.
+- Integration song song có project `serial` rõ ràng; job đầy đủ trong `timeout-minutes` theo quy tắc p95 đo được + 50 % (P5 ghi
+  số đo, không phải 15 phút). Trung vị ≤ 4 s/file và `beforeAll` ≤ 60 s (P7, P8): `owner-waived`, không phải đã đạt.
 - `test/e2e` smoke 8–12 hành trình xanh trên `main`.
 - `deploy` phụ thuộc `quality`, `http-contract`, `integration`, `e2e-smoke`; nightly chạy đủ + mutation.
 - Số test không giảm, trừ test trùng đã ghi lý do; `test/README.md` ≤ 200 dòng mô tả năm tầng, lệnh và khi nào dùng tầng nào.

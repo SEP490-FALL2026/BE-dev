@@ -6,7 +6,7 @@ export type PersonnelAccessProblem =
   | 'SELF_CHANGE_FORBIDDEN';
 
 /**
- * The actor may not write the event or handle the notice (F13, F19). It is raised by the policy of each capability at the service,
+ * The actor may not write the event or handle the notice. It is raised by the policy of each capability at the service,
  * so a route that forgot its guard is still closed. The same error is shared by the transfer, the long leave, the departure and the
  * notices of the heads; each capability maps it to the same two answers.
  */

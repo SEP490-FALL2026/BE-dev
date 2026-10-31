@@ -23,8 +23,8 @@ import { AssignmentServiceAccountReader } from './assignment/assignment-service-
 import { AssignmentListService } from './assignment/assignment-list.service';
 import { AssignmentService } from './assignment/assignment.service';
 import { AssignmentsController } from './assignment/assignments.controller';
-import { DepartmentToolsController } from './assignment/department-tools/department-tools.controller';
-import { DepartmentToolsService } from './assignment/department-tools/department-tools.service';
+import { DepartmentToolsController } from './department-tools/department-tools.controller';
+import { DepartmentToolsService } from './department-tools/department-tools.service';
 import { SubscriptionSeatsController } from './assignment/subscription-seats.controller';
 import { ExpiryController } from './expiry/expiry.controller';
 import { ExpiryQueueRepo } from './expiry/expiry-queue.repo';
@@ -57,10 +57,18 @@ import {
   SeatBaselineClosedListeners,
 } from './public/licensing.extension-points';
 import { LicensingApi } from './public/licensing.api';
+import { LicensingHandoverApi } from './public/licensing-handover.api';
+import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
+import { LicensingRenewalApi } from './public/licensing-renewal.api';
+import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
+import { LicensingServiceAccountApi } from './public/licensing-service-account.api';
 import { ProvisioningCancellationService } from './provisioning/grant-cancellation/provisioning-cancellation.service';
 import { ProvisioningDecisionService } from './provisioning/tasks/provisioning-decision.service';
 import { ProvisioningFailureService } from './provisioning/provisioning-failure.service';
 import { ProvisioningHolderService } from './provisioning/tasks/provisioning-holder.service';
+import { ProvisioningGrantPlanner } from './provisioning/tasks/provisioning-grant-planner.service';
+import { ProvisioningGrantService } from './provisioning/tasks/provisioning-grant.service';
+import { ProvisioningGrantWriter } from './provisioning/tasks/provisioning-grant-writer.service';
 import { ProvisioningService } from './provisioning/tasks/provisioning.service';
 import { ProvisioningTaskFrame } from './provisioning/provisioning-task-frame.service';
 import { ProvisioningTaskViewService } from './provisioning/provisioning-task-view.service';
@@ -74,6 +82,8 @@ import { OpenGrantTaskRepo } from './provisioning/open-grants/open-grant-task.re
 import { OpenGrantTaskService } from './provisioning/open-grants/open-grant-task.service';
 import { RevocationReadRepo } from './provisioning/revocation-read.repo';
 import { RevocationReadService } from './provisioning/revocation-read.service';
+import { RevocationRecorder } from './provisioning/revocation-recorder.service';
+import { RevocationTaskFactory } from './provisioning/revocation-task-factory.service';
 import { RevocationService } from './provisioning/revocation.service';
 import { ProvisioningTaskReasonRepo } from './provisioning/provisioning-task-reason.repo';
 import { SaasIssueCalendar } from './saas-issue/saas-issue-calendar.service';
@@ -145,12 +155,17 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     ProvisioningTaskFrame,
     ProvisioningHolderService,
     ProvisioningTaskViewService,
+    ProvisioningGrantPlanner,
+    ProvisioningGrantWriter,
+    ProvisioningGrantService,
     ProvisioningService,
     ProvisioningDecisionService,
     ProvisioningCancellationService,
     ProvisioningFailureService,
     ProvisioningTaskReasonRepo,
     RevocationListeners,
+    RevocationTaskFactory,
+    RevocationRecorder,
     RevocationService,
     RevocationCompletionService,
     RevocationReadRepo,
@@ -203,10 +218,20 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     // The extension points licensing opens (public/licensing.extension-points.ts): requests binds the gate.
     GrantRequestGateHook,
     LicensingApi,
+    LicensingHandoverApi,
+    LicensingOpenGrantsApi,
+    LicensingRenewalApi,
+    LicensingSeatBaselineApi,
+    LicensingServiceAccountApi,
   ],
   // Other modules read through the facade and bind the extension points; the capability services and the repos stay private.
   exports: [
     LicensingApi,
+    LicensingHandoverApi,
+    LicensingOpenGrantsApi,
+    LicensingRenewalApi,
+    LicensingSeatBaselineApi,
+    LicensingServiceAccountApi,
     GrantRequestGateHook,
     RevocationListeners,
     RenewalHoldHook,

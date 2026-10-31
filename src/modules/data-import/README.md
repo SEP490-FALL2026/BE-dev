@@ -40,7 +40,7 @@ notifications. Được dùng bởi: onboarding; gốc `src/app/app.module.ts`.
 - `seat-baseline-import/` — nhập seat baseline (US-02-05): upload, preview, xác nhận, hủy;
   `seat-baseline-imports.controller.ts` (`/seat-baseline-imports…`, chỉ IT Admin); `SeatBaselineImportService`.
   Policy: `seat-baseline-file.policy.ts`, `seat-baseline-rows.policy.ts`. Ghi assignment qua
-  `LicensingApi.createBaselineAssignments`.
+  `LicensingSeatBaselineApi.createBaselineAssignments`.
 
 ## Bất biến quan trọng
 

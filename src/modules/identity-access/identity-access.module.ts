@@ -11,7 +11,7 @@ import { AccountInvitationService } from './accounts/app-users/account-invitatio
 import { AccountQueryService } from './accounts/app-users/account-query.service';
 import { AccountStatusService } from './accounts/app-users/account-status.service';
 import { APPROVAL_ROLE_HOLDINGS } from './accounts/account.types';
-import { ACCOUNT_SESSIONS } from './account-sessions.extension-points';
+import { ACCOUNT_SESSIONS } from './accounts/account-sessions.types';
 import { ActionLinkRevocation } from './accounts/action-link-revocation.service';
 import { AppUsersController } from './accounts/app-users/app-users.controller';
 import { InvitationMailService } from './accounts/app-users/invitation-mail.service';

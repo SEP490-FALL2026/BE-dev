@@ -13,7 +13,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { toLicensingApiException } from '../licensing.http-errors';
 import { SeatBaselineService } from './seat-baseline.service';
 
 class SeatBaselineResponseDto extends createZodDto(

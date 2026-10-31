@@ -12,6 +12,9 @@ import { RoleDutiesService } from './role-duties.service';
  */
 @Injectable()
 export class WorkspaceBlockerSource implements OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [OffboardingBlockerContributions] as const;
+
   constructor(
     private readonly blockers: OffboardingBlockerContributions,
     private readonly roles: RoleDutiesService,

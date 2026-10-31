@@ -85,9 +85,9 @@ export function judgeConversion(history: PreflightHistory, facts: ConversionFact
 }
 
 /**
- * The contract gates (spec L.3, L.10, L.11), judged beside the conversion, as the FINAL release reads them: the
+ * The contract gates, judged beside the conversion, as the FINAL release reads them: the
  * expansion and the data an operator records are prerequisites of its migrations, so each one that is not met blocks.
- * Subscription owner department (F02, spec L.3): a database before the expansion migration that holds a subscription
+ * Subscription owner department: a database before the expansion migration that holds a subscription
  * blocks (deploy the compatibility release and assign first); after it, a subscription with no owner department and no
  * valid assignment blocks, whatever created it (the operator, a recovered old image, a late row), because the migration
  * of this release would refuse to run over it.
@@ -107,7 +107,7 @@ export function judgeContractGates(facts: ContractGateFacts): {
 }
 
 /**
- * The proposals `7c28e75` gave back because their first version was refused (F63, spec J.2). A proposal given back with no refusal on
+ * The proposals `7c28e75` gave back because their first version was refused. A proposal given back with no refusal on
  * its versions was given back by Finance and is left alone. One whose refusal matches the return exactly (`traced`) is reconciled by the
  * migration of this release: R1 when nothing was sent after the return, R2 when exactly one proposal sends it again and every
  * proposal sent after the return belongs to the chain of that one; both are information. Every other case (a refusal that does not match,
@@ -163,7 +163,7 @@ function ruleOf(proposalId: string, later: Neighbour[], resending: Neighbour[]):
 
 /**
  * A notice of a change of job title, a transfer of the job title only and a proposal to move a service account are not taken any
- * more (`QĐ-87e`, `QĐ-89c`, spec L.4, L.5). One that still waits blocks, whatever the schema, because the migrations of this
+ * more (`QĐ-87e`, `QĐ-89c`). One that still waits blocks, whatever the schema, because the migrations of this
  * release refuse to run over it: it is rejected or cancelled on the running release with the fixed reasons, never converted into
  * something it was not. Ids only. After those migrations the tables or the rows are gone, and nothing is read or listed.
  */
@@ -200,7 +200,7 @@ function judgeSubscriptionOwner(facts: ContractGateFacts['subscriptionOwner']): 
 }
 
 /**
- * Every Cost Center belongs to one department (F01, `QĐ-87d(1)`, spec L.11). A database before the compatibility migration
+ * Every Cost Center belongs to one department (`QĐ-87d(1)`). A database before the compatibility migration
  * that holds an organization blocks (deploy the compatibility release first). On the compatibility schema a Cost Center with
  * no department blocks — whoever created it, a recovered old image included — and so does a department whose own column
  * contradicts the link, and an organization whose link the operator has not activated (the migration of this release raises

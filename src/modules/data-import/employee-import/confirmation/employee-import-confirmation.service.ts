@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { HrBasis } from '../../../../core/hr-basis';
+import type { HrBasis } from '../../../organization/public/hr-basis.types';
 import { DbTx, TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
@@ -37,7 +37,7 @@ type JudgedRow = { lineNumber: number; cells: EmployeeCells } & EmployeeRowResul
  * Confirming a people preview (`US-02-01`, `US-02-02`, `US-02-03`): only a confirmation of the preview that is still current
  * creates the people, once, in one transaction. A row that is a person already there is never changed by an import: it is
  * reported as the same or as different. Importing creates no account, role or invitation, and tells, for each person created,
- * the head of their department and the IT Admin in charge, in the same transaction (`US-02-02` AC-17, `F17`). Only the Super
+ * the head of their department and the IT Admin in charge, in the same transaction (`US-02-02` AC-17). Only the Super
  * Admin imports people: `employee-import.policy.ts` says so first.
  */
 @Injectable()

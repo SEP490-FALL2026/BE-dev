@@ -82,7 +82,7 @@ describe('parallel safety of the integration and e2e suites', () => {
     expect(unscopedLockQueries(files)).toEqual([]);
   });
 
-  it('acts on the whole cluster (H7 roles, the bootstrap superuser) only from test/integration/_serial', () => {
+  it('acts on the whole cluster (the database roles, the bootstrap superuser) only from test/integration/_serial', () => {
     expect(clusterActionsOutsideSerial(files)).toEqual([]);
   });
 

@@ -96,3 +96,58 @@ export function mayReadReturn(facts: {
     facts.actorHeadedDepartmentId === facts.returnDepartmentId
   );
 }
+
+/**
+ * Whether the person may confirm the handover of the data of a return (`US-05-13` AC-6, `QĐ-62f`): only the person who sent it, while the
+ * revocation is awaited, for a plan whose removal loses data, and once. The first that is wrong, in the order a caller should learn it.
+ */
+export function handoverConfirmRefusal(
+  actorEmployeeId: string,
+  found: {
+    requestedByEmployeeId: string;
+    state: string;
+    handoverRequired: boolean;
+    handoverConfirmedAt: Date | null;
+  },
+): 'NOT_REQUESTER' | 'NOT_AWAITING' | 'HANDOVER_NOT_REQUIRED' | 'HANDOVER_ALREADY_CONFIRMED' | null {
+  if (actorEmployeeId !== found.requestedByEmployeeId) return 'NOT_REQUESTER';
+  if (found.state !== 'AWAITING_REVOCATION') return 'NOT_AWAITING';
+  if (!found.handoverRequired) return 'HANDOVER_NOT_REQUIRED';
+  if (found.handoverConfirmedAt !== null) return 'HANDOVER_ALREADY_CONFIRMED';
+
+  return null;
+}
+
+/** Whether the handover is confirmed by its deadline: there is none, or today is not after it. */
+export const handoverOnTime = (dueOn: string | null, today: string): boolean => dueOn === null || today <= dueOn;
+
+/** What the audit entry `RETURN_REQUEST.SUBMITTED` says: who, which seat and which task; the reason is never in it. */
+export function returnSubmittedDetail(created: {
+  id: string;
+  assignmentId: string;
+  planId: string;
+  holderEmployeeId: string;
+  requestedByEmployeeId: string;
+  source: string;
+  departmentId: string;
+  revocationTaskId: string;
+  revocationTaskCreated: boolean;
+  handoverRequired: boolean;
+  handoverDueOn: string | null;
+  originRequestId: string | null;
+}): { [key: string]: string | boolean | null } {
+  return {
+    returnRequestId: created.id,
+    assignmentId: created.assignmentId,
+    planId: created.planId,
+    holderEmployeeId: created.holderEmployeeId,
+    requestedByEmployeeId: created.requestedByEmployeeId,
+    source: created.source,
+    departmentId: created.departmentId,
+    revocationTaskId: created.revocationTaskId,
+    revocationTaskCreated: created.revocationTaskCreated,
+    handoverRequired: created.handoverRequired,
+    handoverDueOn: created.handoverDueOn,
+    originRequestId: created.originRequestId,
+  };
+}

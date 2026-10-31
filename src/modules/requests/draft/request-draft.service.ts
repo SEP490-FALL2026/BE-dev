@@ -16,16 +16,16 @@ import {
 import { mayRequest, policyFor } from '../access-request/access-request.policy';
 import { beneficiaryCountOfContent, contentOf, draftSnapshot, toContentJson } from './request-draft-content.mapper';
 import type { AccessRequestDraftWire, DraftSaveBody } from './request-draft.dto';
-import { draftVerdict, REQUEST_TYPE_OF_KIND } from './request-draft.policy';
-import { RequestDraftRepo, type DraftRow } from '../access-request/request-draft.repo';
+import { draftVerdict, REQUEST_TYPE_OF_KIND } from '../request-draft/request-draft.policy';
+import { RequestDraftRepo, type DraftRow } from '../request-draft/request-draft.repo';
 
 /**
- * The drafts of paid requests (spec L.1, F27): a person saves what they cannot yet send (their department has no Cost Center), lists
+ * The drafts of paid requests: a person saves what they cannot yet send (their department has no Cost Center), lists
  * what they saved, and deletes it; sending a draft is `RequestDraftSubmitService`. Saving runs no gate: it checks that the person
  * belongs to a department and that the plan exists, which are what a row of the table needs, and writes the draft with no Cost Center,
  * no moment it was sent, no price, no step, no check and no commitment. A draft is the sender's alone: it is never listed, read or
  * decided as a request. Nothing is changed in a draft: to change one, delete it and save it again. The Super Admin sends no request, so
- * keeps no draft of one (F30), judged here and not by the route.
+ * keeps no draft of one, judged here and not by the route.
  */
 @Injectable()
 export class RequestDraftService {
@@ -106,7 +106,7 @@ export class RequestDraftService {
   }
 
   /**
-   * The draft of the caller by its id, for the read of a request (`accessRequestGet`, spec L.1, F92). A request that was sent, a draft of
+   * The draft of the caller by its id, for the read of a request (`accessRequestGet`). A request that was sent, a draft of
    * somebody else and an id that is not there are all null: one answer, so nothing says whether another person's draft exists.
    */
   async readOwn(actor: AuthenticatedPrincipal, id: string): Promise<AccessRequestDraftWire | null> {

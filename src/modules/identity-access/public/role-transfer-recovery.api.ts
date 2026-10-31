@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { employeeHasNotLeft } from '../policies/account.policy';
+import { employeeHasNotLeft } from '../accounts/account.policy';
 import { assertContext, assertSeparation, checkSameTicket } from '../recovery/recovery-procedure.policy';
 import { RecoveryTargets } from '../recovery/recovery-targets.service';
 import { RecoveryRefusedError } from './recovery.errors';

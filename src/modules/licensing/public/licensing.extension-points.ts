@@ -130,7 +130,7 @@ export class ResponsibleDeadlineHook extends Hook<ResponsibleDeadlineProvider> {
 
 /**
  * What closing the seat baseline (step 4 of the installation) tells the modules that act on it, in the transaction of the closing
- * (F21), once, after the closing is written and audited. `holders` are only the people who hold a seat on a subscription owned by
+ *, once, after the closing is written and audited. `holders` are only the people who hold a seat on a subscription owned by
  * another department than their own, one entry for each person, sorted by employee id.
  */
 export interface SeatBaselineClosedEvent {

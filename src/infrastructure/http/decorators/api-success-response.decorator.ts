@@ -14,7 +14,7 @@ export const SUCCESS_MESSAGE_OVERRIDE = 'successMessage';
 
 /**
  * The success envelope of a route. The one resolved `message` is both what the interceptor answers with and the
- * example the OpenAPI document shows (OPENAPI-EXAMPLE.1): it travels on the response as an internal extension that
+ * example the OpenAPI document shows: it travels on the response as an internal extension that
  * `withSuccessMessageExamples` turns into an `allOf` overlay on the DTO reference, so `success` and `data` stay described
  * by the DTO itself and the DTO is registered exactly as before.
  */

@@ -12,6 +12,9 @@ import { RoleDutiesService } from './role-duties.service';
  */
 @Injectable()
 export class RoleWarningSource implements OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [OffboardingWarningContributions] as const;
+
   constructor(
     private readonly warnings: OffboardingWarningContributions,
     private readonly repo: RoleDutiesRepo,

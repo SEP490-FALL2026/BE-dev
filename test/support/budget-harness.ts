@@ -1,7 +1,7 @@
 import { Client } from 'pg';
 import request from 'supertest';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
-import { BudgetYearEndService } from '../../src/modules/budgets/budget/year-end/year-end.service';
+import { BudgetYearEndService } from '../../src/modules/budgets/year-end/year-end.service';
 import type { ApiAccount } from './api-accounts';
 import { Department, Person, RequestHarness } from './request-harness';
 

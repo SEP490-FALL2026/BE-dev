@@ -4,7 +4,7 @@ import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '..
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
 import { SpendDecisionService } from './spend-decision.service';
 import { SpendBatchNotFoundError, SpendDecisionRefusedError } from '../spend/spend.errors';
-import type { BatchDecisionResultWire } from './spend-approval.dto';
+import type { BatchDecisionResultWire } from '../spend-approval-view/spend-approval.dto';
 
 /**
  * The spending approver decides the requests they hold in a batch together, approving or refusing them one by one, in the

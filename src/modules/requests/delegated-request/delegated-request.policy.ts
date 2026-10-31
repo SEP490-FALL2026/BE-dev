@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
-import { checkBeneficiary } from './beneficiary-eligibility.policy';
+import type { DelegationRefusal } from '../access-request/access-request.types';
+import { checkBeneficiary } from '../group-request/beneficiary-eligibility.policy';
 
 /**
  * The rules of a head sending requests for the people of the department (`US-03-02`, `US-05-03` rows 5 to 7), as pure
@@ -7,22 +8,6 @@ import { checkBeneficiary } from './beneficiary-eligibility.policy';
  * confirmed by the sending itself, because the head is the one who would have confirmed it; the head who is among the people
  * it is for is not confirmed that way (`AC-8`).
  */
-
-export type DelegationRefusal =
-  /** The caller does not head the department they belong to today (`AC-11`). */
-  | 'NOT_HEAD'
-  /** The person is not in the department of the head: the request is refused at once, with no request for them (`US-05-03` row 7, `AC-5`). */
-  | 'OUTSIDE_DEPARTMENT'
-  /** The person has no work email yet (`AC-3`). */
-  | 'EMAIL_REQUIRED'
-  /** The person has left the company. */
-  | 'BENEFICIARY_NOT_ACTIVE'
-  /** A contractor, freelancer or intern needs the day the access ends (`AC-10`). */
-  | 'END_DATE_REQUIRED'
-  /** The day the access ends is before the day it can begin. */
-  | 'END_DATE_TOO_EARLY'
-  /** A long term is confirmed in so many words by whoever confirms the need (`OI-07a`). */
-  | 'TERM_CONFIRMATION_REQUIRED';
 
 export interface DelegationFacts {
   actorEmployeeId: string;

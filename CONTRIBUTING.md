@@ -54,14 +54,14 @@ mọi checkout, kể cả Windows `core.autocrlf=true`. Checkout có từ trư�
 
 ## Chọn tài liệu theo tác vụ
 
-| Đang làm                              | Đọc thêm                                                                                                              |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Thêm endpoint                         | [Hướng dẫn viết code](docs/guides/kien-truc-backend-va-cach-viet-code.md), [API contract](docs/rules/api-contract.md) |
-| Persistence/nghiệp vụ                 | [Database và nghiệp vụ](docs/rules/database-business.md)                                                              |
-| Auth, upload hoặc job                 | [Security và jobs](docs/rules/security-jobs.md)                                                                       |
-| Lệnh vận hành ngoài HTTP, seed local  | [Lệnh vận hành](docs/rules/operational-commands.md)                                                                   |
-| Tài liệu hoặc quyết định              | [Quy ước tài liệu](docs/rules/documentation.md)                                                                       |
-| Tìm ADR hoặc thiết kế chưa triển khai | [Chỉ mục tài liệu](docs/README.md)                                                                                    |
+| Đang làm                              | Đọc thêm                                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Thêm endpoint                         | [Hướng dẫn dev mới](docs/guides/huong-dan-dev-moi.md), [API contract](docs/rules/api-contract.md) |
+| Persistence/nghiệp vụ                 | [Database và nghiệp vụ](docs/rules/database-business.md)                                          |
+| Auth, upload hoặc job                 | [Security và jobs](docs/rules/security-jobs.md)                                                   |
+| Lệnh vận hành ngoài HTTP, seed local  | [Lệnh vận hành](docs/rules/operational-commands.md)                                               |
+| Tài liệu hoặc quyết định              | [Quy ước tài liệu](docs/rules/documentation.md)                                                   |
+| Tìm ADR hoặc thiết kế chưa triển khai | [Chỉ mục tài liệu](docs/README.md)                                                                |
 
 Yêu cầu nghiệp vụ đến từ task và BRD/User Stories được team cung cấp. Checkout BE
 độc lập không bắt buộc có thư mục Docs/FE bên cạnh hoặc cài skill/plugin của người khác.

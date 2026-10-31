@@ -101,7 +101,7 @@ export const canResubmit = (state: ProposalState): boolean => state === 'RETURNE
 
 /**
  * Whether a version can still be changed by Finance: while it is a draft or was sent back to them, and not detached from a
- * proposal that was withdrawn or given back (F36, `QĐ-91a`): that draft only waits for its year to end.
+ * proposal that was withdrawn or given back (`QĐ-91a`): that draft only waits for its year to end.
  */
 export const isEditable = (state: VersionStateName, detached = false): boolean =>
   !detached && (state === 'DRAFT' || state === 'CHANGES_REQUESTED');
@@ -193,7 +193,7 @@ export function yearEndOfVersion(state: VersionStateName): { neverCurrent: boole
 export const closesAtYearEnd = (state: ProposalState): boolean => state === 'SUBMITTED' || state === 'RETURNED';
 
 /**
- * How a version is built from a proposal (spec J.1): the first one from a proposal that waits (`FIRST`), or a new one from a
+ * How a version is built from a proposal: the first one from a proposal that waits (`FIRST`), or a new one from a
  * proposal that stayed reviewed because the version made from it was refused and nobody has taken its place (`AFTER_REFUSAL`).
  */
 export type VersionSource = 'FIRST' | 'AFTER_REFUSAL';
@@ -212,3 +212,123 @@ export const proposalIsSucceedable = (
   proposal: { state: ProposalState; succeededAt: Date | null },
   latestVersionState: VersionStateName | null,
 ): boolean => proposal.state === 'REVIEWED' && proposal.succeededAt === null && latestVersionState === 'REJECTED';
+
+/** What each decision of the spending approver on a version is recorded as, and the state the version goes to (`US-06-11`). */
+export function decisionOutcomeOf(decision: 'APPROVE' | 'REJECT' | 'REQUEST_CHANGES'): {
+  decision: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
+  state: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
+} {
+  switch (decision) {
+    case 'APPROVE':
+      return { decision: 'APPROVED', state: 'APPROVED' };
+    case 'REJECT':
+      return { decision: 'REJECTED', state: 'REJECTED' };
+    case 'REQUEST_CHANGES':
+      return { decision: 'CHANGES_REQUESTED', state: 'CHANGES_REQUESTED' };
+  }
+}
+
+/** What the audit entry `BUDGET_VERSION.<decision>` says: the version, what it replaced (amounts as text), and the reason when one was given. */
+export function versionDecidedDetail(
+  version: { costCenterId: string; year: number; totalMinor: bigint },
+  previous: { totalMinor: bigint } | undefined,
+  reason: string | null | undefined,
+): { [key: string]: string | number | null } {
+  return {
+    costCenterId: version.costCenterId,
+    year: version.year,
+    totalMinor: version.totalMinor.toString(),
+    previousTotalMinor: previous?.totalMinor.toString() ?? null,
+    ...(reason ? { reason } : {}),
+  };
+}
+
+/** What the audit entry `BUDGET_COMMITMENT.ATTACHED` says of a commitment that waited for a budget and was attached to the approved version. */
+export function commitmentAttachedAfter(
+  commitment: { requestId: string; amountMinor: bigint },
+  to: { versionId: string; costCenterId: string; year: number },
+): { [key: string]: string | number } {
+  return {
+    requestId: commitment.requestId,
+    versionId: to.versionId,
+    costCenterId: to.costCenterId,
+    year: to.year,
+    amountMinor: commitment.amountMinor.toString(),
+  };
+}
+
+/** The fields of a line of a version that an adjustment can change. */
+export interface LineFields {
+  description: string;
+  planId: string | null;
+  seats: number | null;
+  amountMinor: bigint;
+  windowFrom: string;
+  windowTo: string;
+  servicePeriodMonths: number;
+  repeatCycle: string;
+  quoteValidUntil: string | null;
+}
+
+const ADJUSTABLE_FIELDS = [
+  'description',
+  'planId',
+  'seats',
+  'amountMinor',
+  'windowFrom',
+  'windowTo',
+  'servicePeriodMonths',
+  'repeatCycle',
+  'quoteValidUntil',
+] as const satisfies readonly (keyof LineFields)[];
+
+/** Whether the patch changes what the line of the proposal said: its words, its money, its window, its service or its cycle. */
+export function patchChangesLine(line: LineFields, patch: Partial<LineFields>): boolean {
+  return ADJUSTABLE_FIELDS.some((field) => patch[field] !== undefined && patch[field] !== line[field]);
+}
+
+/** The line of a version made from a line before it (of a proposal, or of the current budget): where it came from, and none of the work on it. */
+export function copiedLineOf<R extends string>(
+  line: {
+    description: string;
+    planId: string | null;
+    seats: number | null;
+    amountMinor: bigint;
+    windowFrom: string;
+    windowTo: string;
+    servicePeriodMonths: number;
+    repeatCycle: R;
+    quoteValidUntil: string | null;
+  },
+  origin: { proposalId: string | null; proposalPosition: number | null },
+) {
+  return {
+    proposalId: origin.proposalId,
+    proposalPosition: origin.proposalPosition,
+    description: line.description,
+    planId: line.planId,
+    seats: line.seats,
+    amountMinor: line.amountMinor,
+    windowFrom: line.windowFrom,
+    windowTo: line.windowTo,
+    servicePeriodMonths: line.servicePeriodMonths,
+    repeatCycle: line.repeatCycle,
+    quoteValidUntil: line.quoteValidUntil,
+    financeComment: null,
+    adjustmentReason: null,
+  };
+}
+
+/**
+ * Whether the quarters, as they are after an edit, no longer add up to the base and the reserve as they are after it (`QĐ-82e`): the total
+ * of the edit when it gives one, the version's when it does not; quarters taken away have nothing to keep honest.
+ */
+export function quartersMismatchAfter(
+  version: { baseMinor: bigint; reserveMinor: bigint; quarters: [bigint, bigint, bigint, bigint] | null },
+  next: { baseMinor?: bigint; reserveMinor?: bigint; quarters?: [bigint, bigint, bigint, bigint] | null },
+): boolean {
+  const total = (next.baseMinor ?? version.baseMinor) + (next.reserveMinor ?? version.reserveMinor);
+  const quarters = next.quarters === undefined ? version.quarters : next.quarters;
+
+  return quarters !== null && !quartersMatch(total, quarters);
+}

@@ -1,8 +1,8 @@
 /**
- * `pnpm ops:preflight` (P28-01, `P29-MIGRATION=B-FORWARD`): whether `prisma migrate deploy` can carry this database
+ * `pnpm ops:preflight` : whether `prisma migrate deploy` can carry this database
  * through the merged migration `20261022120000_cost_centers_unit_only`, which stays byte for byte, and the forward
  * migration that brings every history to the rule of the application. In the final release of
- * `g0-g6-final-business-baseline-remediation` it also judges the contract gates (spec L.3, L.10, L.11): the expansion of the
+ * `g0-g6-final-business-baseline-remediation` it also judges the contract gates: the expansion of the
  * compatibility release, the data an operator assigns or links, and the rows of the kinds that are gone must be in place before
  * the migrations of this release run, and each one that is not is a blocker.
  */
@@ -71,7 +71,7 @@ export type SubscriptionOwnerSchema = 'NO_TABLE' | 'ABSENT' | 'READY' | 'PARTIAL
 export type CostCenterDirectionSchema = 'NO_TABLE' | 'ABSENT' | 'READY' | 'PARTIAL';
 
 /**
- * What the contract gates read (spec L.10): the data the release after this one needs in its final shape. The facts are
+ * What the contract gates read: the data the release after this one needs in its final shape. The facts are
  * read in the schema the database has **now**, after a probe — a gate never names an object the schema may not have.
  */
 export interface ContractGateFacts {
@@ -80,19 +80,19 @@ export interface ContractGateFacts {
     /**
      * `ABSENT`: every subscription (the database skipped the expansion: each is a reason to stop). `READY`: the subscriptions
      * that still have none — no owner department and no valid assignment, or an assignment that conflicts with the owner
-     * department (spec L.3, _dòng gán hợp lệ_); none once the final migration made the column required. Empty for the
+     * department (_dòng gán hợp lệ_); none once the final migration made the column required. Empty for the
      * other schemas.
      */
     subscriptionIds: string[];
   };
-  /** Every Cost Center belongs to exactly one department (F01, `QĐ-87d(1)`, spec L.11). */
+  /** Every Cost Center belongs to exactly one department (`QĐ-87d(1)`). */
   costCenterDirection: {
     schema: CostCenterDirectionSchema;
     /** `ABSENT`: the organizations of the database (it skipped the compatibility release: each is a reason to stop). */
     organizationIds: string[];
     /**
      * The three lists below are read only while the old column `departments.cost_center_id` still exists, that is until the
-     * final migration of F01 has run: from then on the schema itself requires the link and no activation row is read
+     * final migration of the Cost Center link has run: from then on the schema itself requires the link and no activation row is read
      * (the final installation writes none), so nothing about the direction can be open and they stay empty.
      * `READY`: every Cost Center with no department — the rows `7c28e75` wrote, **including the ones it writes after the
      * migration or after a recovery**.
@@ -100,12 +100,12 @@ export interface ContractGateFacts {
     costCenterIds: string[];
     /** `READY`: a department whose own column names a Cost Center that belongs to another department (the sync triggers prevent it). */
     mismatches: Array<{ costCenterId: string; departmentId: string }>;
-    /** `READY`: the organizations whose link has not been activated by the operator (the final migration of F01 refuses them). */
+    /** `READY`: the organizations whose link has not been activated by the operator (the final migration of the Cost Center link refuses them). */
     notActivated: string[];
   };
   /** The waiting rows of the kinds that are gone: the migration of the release after this one refuses to run over them. */
   retiredKinds: RetiredKindFacts;
-  /** The proposals `7c28e75` gave back because their first version was refused (F63, spec J.2). */
+  /** The proposals `7c28e75` gave back because their first version was refused. */
   legacyReturns: LegacyReturnFacts;
 }
 
@@ -124,13 +124,13 @@ export interface LegacyReturnFacts {
   neighbours: Array<{ proposalId: string; id: string; previousProposalId: string | null; submittedAfter: boolean }>;
 }
 
-/** The rows of the kinds the release after this one no longer takes (`QĐ-87e`, spec L.4): nothing is inferred from them. */
+/** The rows of the kinds the release after this one no longer takes (`QĐ-87e`): nothing is inferred from them. */
 export interface RetiredKindFacts {
   /** A notice of a head about a change of job title that still waits for the IT Admin (`BM-09`). */
   pendingNoticeIds: string[];
   /** A transfer that changes the job title only (the department stays) and still waits for its day. */
   pendingTransferIds: string[];
-  /** A proposal to move a service account to another department that still waits for the receiving head (`QĐ-89c`, spec L.5). */
+  /** A proposal to move a service account to another department that still waits for the receiving head (`QĐ-89c`). */
   pendingMoveIds: string[];
 }
 
@@ -191,6 +191,6 @@ export interface PreflightReport {
   blockers: PreflightBlocker[];
   corrections: PreflightCorrection[];
   companyCostCentersRemoved: Array<{ code: string; status: string }>;
-  /** What the contract gates list without blocking: the rows the migrations of this release reconcile by themselves (spec J.2). */
+  /** What the contract gates list without blocking: the rows the migrations of this release reconcile by themselves. */
   information: PreflightInformation[];
 }

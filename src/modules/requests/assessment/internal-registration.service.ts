@@ -1,36 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
-import { CURRENT_POLICY_VERSION } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
-import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
-import {
-  AssessmentIncompleteError,
-  AssessmentRefusedError,
-  InternalRegistrationRefusedError,
-} from './assessment.errors';
-import { checkAssessor } from './assessment.policy';
-import { AssessmentRepo } from './assessment.repo';
-import { AssessmentStepRepo } from '../access-request/assessment-step.repo';
-import { QuoteService } from './quote.service';
-import { RequestAssessmentService } from '../access-request/request-assessment.service';
+import type { AccessRequestRecord } from '../access-request/access-request.types';
+import { RequestFactsService } from '../access-request/request-facts.service';
 import type { InternalRegistrationBodyDto } from './assessment.dto';
-
-const NOT_APPLICABLE: PricingRecord = {
-  status: 'NOT_APPLICABLE',
-  missingReason: null,
-  expectedSpendOn: null,
-  budgetYear: null,
-  amount: null,
-  unitPrice: null,
-  billingCycle: null,
-  schedule: null,
-};
+import { AssessmentIncompleteError, InternalRegistrationRefusedError } from './assessment.errors';
+import { internalRegistrationBasis, registeredShapeOf } from './assessment.policy';
+import { AssessmentRepo } from './assessment.repo';
+import { AssessmentGate } from './assessment-gate.service';
+import { AssessmentPricingService } from './assessment-pricing.service';
 
 /**
  * Registering internal software for a proposal (`US-05-20` AC-3→AC-5, AC-8→AC-10): when the IT Admin has classified what
@@ -47,11 +30,10 @@ export class InternalRegistrationService {
     private readonly runner: TransactionRunner,
     private readonly requests: AccessRequestRepo,
     private readonly assessments: AssessmentRepo,
-    private readonly steps: AssessmentStepRepo,
+    private readonly gate: AssessmentGate,
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
-    private readonly quotes: QuoteService,
-    private readonly settings: RequestAssessmentService,
+    private readonly pricing: AssessmentPricingService,
+    private readonly settings: RequestFactsService,
     private readonly audit: AuditApi,
   ) {}
 
@@ -69,96 +51,79 @@ export class InternalRegistrationService {
     return this.runner.run(async (tx) => {
       const request = await this.requests.lockById(tx, requestId);
       if (!request) throw new AccessRequestNotFoundError();
-      const refusal = checkAssessor({
-        actorEmployeeId: actor.employeeId,
-        requesterEmployeeId: request.requesterEmployeeId,
-        beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
-        requestState: request.state,
-      });
-      if (refusal) throw new AssessmentRefusedError(refusal);
-
-      const assessment = await this.assessments.findAssessment(requestId, tx);
-      const proposal = await this.assessments.findProposal(requestId, tx);
-      if (!assessment || !proposal) throw new AccessRequestNotFoundError();
-      // Only software the company built itself goes this way; whatever else it is stays in the third branch (`AC-8`).
-      if (assessment.classification !== 'INTERNAL') throw new InternalRegistrationRefusedError('NOT_INTERNAL');
-      const dataSensitivity = body.dataSensitivity ?? assessment.dataSensitivity;
-      if (dataSensitivity === null) throw new AssessmentIncompleteError(['dataSensitivity']);
+      this.gate.requireAssessor(actor, request);
+      const { assessment, proposal } = await this.gate.requireProposalFacts(tx, requestId);
+      const basis = internalRegistrationBasis(assessment, body.dataSensitivity);
+      if (basis.kind === 'NOT_INTERNAL') throw new InternalRegistrationRefusedError('NOT_INTERNAL');
+      if (basis.kind === 'DATA_SENSITIVITY_MISSING') throw new AssessmentIncompleteError(['dataSensitivity']);
 
       const now = new Date();
-      const today = await this.organization.businessToday(now, tx);
-      const quote = body.spend ? await this.quotes.read(body.spend.quote) : null;
-      const pricing = quote
-        ? this.quotes.price(
-            quote,
-            {
-              termMonths: request.termMonths,
-              beneficiaries: request.beneficiaryEmployeeIds.length,
-              expectedSpendOn: request.pricing.expectedSpendOn ?? today,
-            },
-            { today, fiscalYearStartMonth },
-          )
-        : NOT_APPLICABLE;
-
+      const { quote, pricing } = await this.pricing.registrationPricing(tx, request, body.spend?.quote, {
+        now,
+        fiscalYearStartMonth,
+      });
       const registered = await this.catalog.registerInternalSoftware(tx, actor, {
         name: body.softwareName ?? proposal.softwareName,
         businessOwnerEmployeeId: body.businessOwnerEmployeeId,
-        dataSensitivity,
+        dataSensitivity: basis.dataSensitivity,
       });
       if (registered.status === 'REFUSED') throw new InternalRegistrationRefusedError(registered.reason);
 
       const withSpend = quote !== null;
       await this.requests.setRegistered(tx, requestId, {
         planId: registered.planId,
-        branch: withSpend ? 'NEW_SOFTWARE' : 'INTERNAL_FREE',
-        // The way that has no spend drops the spend step from the chain; with a payment the chain stays as it was sent.
-        policy: withSpend
-          ? request.policy
-          : {
-              version: CURRENT_POLICY_VERSION,
-              branch: 'INTERNAL_FREE',
-              chain: ['NEED', 'IT_ASSESSMENT', 'IT_EXECUTION'],
-              slaWorkingDays: request.policy.slaWorkingDays,
-            },
+        ...registeredShapeOf(withSpend, request.policy),
         pricing,
-        state: withSpend ? 'AWAITING_SPEND_SUBMISSION' : 'AWAITING_EXECUTION',
       });
       await this.assessments.patch(
         tx,
         requestId,
         {
-          dataSensitivity,
+          dataSensitivity: basis.dataSensitivity,
           proposedBusinessOwnerEmployeeId: body.businessOwnerEmployeeId,
           ...(quote ? { quote } : {}),
         },
         actor.employeeId,
       );
-      const step = await this.steps.find(requestId, tx);
-      if (step) await this.steps.finish(tx, step.id, actor.employeeId, now);
+      const standsIn = await this.gate.finishStep(tx, requestId, actor, { now });
       await this.assessments.complete(tx, requestId, actor.employeeId, now);
-      await this.audit.record(
-        tx,
-        accessRequestAuditEvent(
-          actor,
-          request.organizationId,
-          'ACCESS_REQUEST.INTERNAL_SOFTWARE_REGISTERED',
-          'ACCESS_REQUEST',
-          requestId,
-          {
-            requestId,
-            applicationId: registered.applicationId,
-            planId: registered.planId,
-            businessOwnerEmployeeId: body.businessOwnerEmployeeId,
-            withSpend,
-            actingForAssignee: step !== null && step.assigneeEmployeeId !== actor.employeeId,
-          },
-        ),
-      );
+      await this.auditRegistered(tx, actor, request, { registered, body, withSpend, standsIn });
 
       const record = await this.requests.findById(requestId, tx);
       if (!record) throw new Error(`The request ${requestId} was not found after its software was registered.`);
 
       return record;
     });
+  }
+
+  private async auditRegistered(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+    done: {
+      registered: { applicationId: string; planId: string };
+      body: InternalRegistrationBodyDto;
+      withSpend: boolean;
+      standsIn: boolean;
+    },
+  ): Promise<void> {
+    await this.audit.record(
+      tx,
+      accessRequestAuditEvent(
+        actor,
+        request.organizationId,
+        'ACCESS_REQUEST.INTERNAL_SOFTWARE_REGISTERED',
+        'ACCESS_REQUEST',
+        request.id,
+        {
+          requestId: request.id,
+          applicationId: done.registered.applicationId,
+          planId: done.registered.planId,
+          businessOwnerEmployeeId: done.body.businessOwnerEmployeeId,
+          withSpend: done.withSpend,
+          actingForAssignee: done.standsIn,
+        },
+      ),
+    );
   }
 }

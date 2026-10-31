@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import { groundsRefusal, type GroundsInput } from '../policies/grounds.policy';
+import { groundsRefusal, type GroundsInput } from '../personnel-grounds.policy';
 import {
   TRANSFER_KINDS,
   type NoticeEventField,
@@ -8,7 +8,7 @@ import {
   type NoticeKind,
   type NoticeStatus,
   type VerificationInput,
-} from './notice.types';
+} from '../personnel-notice.types';
 
 /** A refusal the notice rules give: the semantic code and what a person needs to put it right. */
 export interface NoticeRefusal {

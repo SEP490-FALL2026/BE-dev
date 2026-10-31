@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
-import { readAccessOf, type ReadAccess } from '../policies/personnel-self-action.policy';
+import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
 import { LeaveRefusedError } from './leave.errors';
 import type { LeaveChangeWire, LeaveDetailWire, LeaveSummaryWire } from './leave.dto';
 import { toChange, toDetail, toSummary } from './leave.mapper';
@@ -28,7 +28,7 @@ const paged = <T>(items: T[], total: number, page: { page: number; pageSize: num
 });
 
 /**
- * Reads long leaves (F12): the Super Admin reads all of them in full; the IT Admin only the minimal projection (no basis) of the
+ * Reads long leaves: the Super Admin reads all of them in full; the IT Admin only the minimal projection (no basis) of the
  * leaves of people in the departments they are in charge of or stand in for (one with no usable IT Admin named is every IT
  * Admin's), and the rest do not exist for them (404); nobody else reads them. The
  * log carries the basis of every day, so it is the Super Admin's alone.
@@ -41,7 +41,7 @@ export class LeaveQueryService {
     private readonly identity: IdentityAccessApi,
   ) {}
 
-  /** One page of summaries; the names of the page are read in one statement whatever the page size (`LD-07`). */
+  /** One page of summaries; the names of the page are read in one statement whatever the page size. */
   async list(
     actor: AuthenticatedPrincipal,
     filter: {

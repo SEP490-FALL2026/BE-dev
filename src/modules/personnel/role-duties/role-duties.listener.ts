@@ -3,7 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { PersonnelFileHookContributions, type PersonnelFileEvent } from '../public/personnel.extension-points';
 import { isHighPriority, sameFlags } from './role-duties.policy';
 import { RoleDutiesRepo } from './role-duties.repo';
@@ -16,14 +16,19 @@ type Stage = 'RECORDED' | 'DUE_CHANGED' | 'LEFT';
  * AC-28): when the departure is recorded the audit event `OFFBOARDING_CASE.ROLE_HOLDER_FLAGGED` names the roles once, and the snapshot of
  * the flags is written to the case for the filter of the list. When the day moves the snapshot is written again, and the event again only
  * if the roles changed. When the person has left, a Super Admin role or a workspace that still has no one to take over is told again with
- * the highest priority (the workspace will lose its owner: change the owner or use the emergency account the plan names). It never holds
- * a record, a lock or a revocation back: nothing here changes a role, a step or an account, and no password or key is read or written.
+ * the highest priority (the workspace will lose its owner: change the owner or use the emergency account the plan names). By its rules it
+ * never holds a record, a lock or a revocation back: nothing here changes a role, a step or an account, and no password or key is read or
+ * written. (A failure of the hook itself, a bug or a statement the database refuses, is not a rule: it rolls the record back like any
+ * failure inside the transaction.)
  * The event is the point the notification channel takes the alert from (`g4-notification-delivery`), and the Super Admin is told in the
- * inbox in the same transaction, once for each role the person holds that nobody takes over (F17): a department head who has a
+ * inbox in the same transaction, once for each role the person holds that nobody takes over: a department head who has a
  * successor is replaced and is not told.
  */
 @Injectable()
 export class RoleDutiesHook implements OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [PersonnelFileHookContributions] as const;
+
   constructor(
     private readonly hooks: PersonnelFileHookContributions,
     private readonly repo: RoleDutiesRepo,

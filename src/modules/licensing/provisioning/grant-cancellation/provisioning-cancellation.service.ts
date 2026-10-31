@@ -5,7 +5,7 @@ import { AuditApi } from '../../../audit/public/audit.api';
 import { AssignmentService } from '../../assignment/assignment.service';
 import type { GrantCancellation } from '../../public/licensing.types';
 import type { GrantCancelCause } from '../../public/licensing-open-grants.types';
-import { licensingAuditEvent } from '../../mappers/licensing-audit-event.mapper';
+import { licensingAuditEvent } from '../../licensing-audit-event.mapper';
 import { cancelReasonOf, grantCancelAction } from './grant-cancellation.policy';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
@@ -24,7 +24,7 @@ export interface GrantCancelInput {
 
 /**
  * What becomes of the grant of a request that ends before it is done: its requester withdrew it (`US-05-08` AC-3, AC-5, AC-9), the
- * person it was for left (`US-03-04` AC-25) or was transferred to another department (F29: the part not yet granted is closed; a
+ * person it was for left (`US-03-04` AC-25) or was transferred to another department (the part not yet granted is closed; a
  * grant that is done is never undone by closing the request). A task nobody has worked (queued, or waiting for its retry) is cancelled with its
  * assignment at once: the seat is free again and the task ends as cancelled, never as failed (`FR-2.5`). A task being worked is not
  * cancelled by a withdrawal: the withdrawal waits for its result; for a beneficiary who left or was transferred it is cancelled, only with

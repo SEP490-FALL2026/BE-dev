@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { normalizeAccountIdentifier } from '../../../core/account-identifier';
+import { normalizeAccountIdentifier } from '../public/account-identifier.policy';
 import type { BusinessDate } from '../../../core/business-date';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -11,7 +11,7 @@ import { AssignmentNotFoundError } from '../public/licensing.errors';
 import { ResponsibleDeadlineHook } from '../public/licensing.extension-points';
 import type { ResponsibleHolder } from '../public/licensing-service-account.types';
 import type { AssignmentRecord, AssignmentView } from '../public/licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { toAssignmentFailure } from './assignment-conflicts.repo';
 import { assertResponsibleChange, assignmentCreatedSnapshot, toAssignmentView } from './assignment.policy';
 import { AssignmentRepo, type NewAssignment } from './assignment.repo';

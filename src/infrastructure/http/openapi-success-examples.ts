@@ -10,7 +10,7 @@ type Media = { schema?: unknown } & Record<string, unknown>;
 type Response = { content?: Record<string, Media> } & Record<string, unknown>;
 
 /**
- * Shows the declared success `message` of every response that carries it (OPENAPI-EXAMPLE.1): the JSON schema becomes
+ * Shows the declared success `message` of every response that carries it: the JSON schema becomes
  * `allOf: [<the DTO reference>, { properties: { message: { example } } }]` — the DTO stays the one source of `success` and
  * `data`, and only the example of `message` is added. Returns a new document; the input is unchanged.
  */

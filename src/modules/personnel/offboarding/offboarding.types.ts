@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { Grounds, GroundsInput } from '../policies/grounds.policy';
+import type { Grounds, GroundsInput } from '../personnel-grounds.policy';
 import type { RoleFlag } from '../public/personnel.types';
 
 export type OffboardingState = 'HANDING_OVER' | 'LEFT' | 'CANCELLED';
@@ -53,7 +53,7 @@ export interface OffboardingRecord {
   accountLockNote: string | null;
   closedAt: Date | null;
   closedByAppUserId: string | null;
-  /** Who recorded it: an account, or the ticket of the controlled procedure (spec L.2): exactly one of the two is set. */
+  /** Who recorded it: an account, or the ticket of the controlled procedure: exactly one of the two is set. */
   recordedByAppUserId: string | null;
   recordedByTicketId: string | null;
   recordedAt: Date;
@@ -80,7 +80,7 @@ export interface OffboardingChangeRecord {
   newLastWorkingDay: BusinessDate | null;
   reason: string | null;
   detail: Record<string, unknown> | null;
-  /** The account, or the ticket of the controlled procedure (spec L.2). */
+  /** The account, or the ticket of the controlled procedure. */
   changedByAppUserId: string | null;
   changedByTicketId: string | null;
   changedAt: Date;

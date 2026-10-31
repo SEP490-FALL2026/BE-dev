@@ -1,9 +1,7 @@
 import { BusinessDate } from '../../../core/business-date';
-import { CostCenterStatus } from '../cost-center/cost-center.types';
-import { EmployeeStatus, EmployeeWorkState } from '../employee/employee.types';
+import { EmployeeStatus, EmployeeWorkState } from '../organization-employee.types';
 import { ProjectRecord } from '../project/project.types';
-
-export type DepartmentStatus = 'ACTIVE' | 'INACTIVE';
+import type { CostCenterStatus, DepartmentStatus, HeadPeriodRecord } from '../organization-structure.types';
 
 /**
  * Why a department needs attention (US-03-06 AC-9, AC-15): it has no head, no usable IT Admin in charge, or no Cost Center in use yet
@@ -26,14 +24,6 @@ export interface DepartmentRecord {
   createdAt: Date;
   updatedAt: Date;
   deactivatedAt: Date | null;
-}
-
-export interface HeadPeriodRecord {
-  employeeId: string;
-  employeeCode: string;
-  fullName: string;
-  validFrom: BusinessDate;
-  validTo: BusinessDate | null;
 }
 
 /** Who heads a department on a day, and since when. */
@@ -62,7 +52,7 @@ export interface DepartmentView extends DepartmentRecord {
 }
 
 export interface DepartmentProfileView extends DepartmentView {
-  /** The person named to take over from a day after today, with that day in `since`; null when nobody is (`QĐ-87` `D-5`). */
+  /** The person named to take over from a day after today, with that day in `since`; null when nobody is (`QĐ-87`). */
   successor: DepartmentHeadRecord | null;
   headHistory: HeadPeriodRecord[];
   /** The department had more head periods than the {@link DEPARTMENT_HEAD_HISTORY_LIMIT} shown. */

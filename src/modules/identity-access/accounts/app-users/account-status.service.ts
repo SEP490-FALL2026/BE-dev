@@ -23,12 +23,12 @@ import {
   SelfChangeForbiddenError,
   SuperAdminHolderNotLockableError,
 } from '../account.errors';
-import { ACCOUNT_SESSIONS, AccountSessions } from '../../account-sessions.extension-points';
+import { ACCOUNT_SESSIONS, AccountSessions } from '../account-sessions.types';
 import { ActionLinkRevocation } from '../action-link-revocation.service';
 import { RoleGrantService } from '../role-grant.service';
 
 /**
- * Lock, unlock and role grants of an account (slice 1b). Every method takes the AppUser row lock
+ * Lock, unlock and role grants of an account. Every method takes the AppUser row lock
  * first and re-reads what it decides on (lock protocol rules 1 and 2).
  */
 @Injectable()

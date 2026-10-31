@@ -15,7 +15,7 @@ src/
   worker/     worker: hai vòng thăm dò PostgreSQL (gửi email, bước mở của Request) — *.job.ts
   cli/        lệnh vận hành: commands.ts (bảng lệnh), run-command.ts (khung chung), <lệnh>/ (phần riêng)
   core/       TypeScript thuần: ngày nghiệp vụ, tiền, CSV, extension point (Hook, Listeners, Contributions)
-  infrastructure/  adapter kỹ thuật: config, database, HTTP, bảo mật, mail, object storage, queue
+  infrastructure/  adapter kỹ thuật: config, database, HTTP, bảo mật, mail, object storage, queue (dự phòng, chưa có consumer)
   modules/    14 module nghiệp vụ, xếp theo tầng (docs/generated/module-graph.md)
   generated/  Prisma client (sinh bởi `pnpm prisma:generate`, không sửa tay)
 ```

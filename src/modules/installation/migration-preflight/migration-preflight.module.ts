@@ -6,7 +6,7 @@ import { MigrationPreflightRepo } from './migration-preflight.repo';
 import { MigrationPreflightApi } from '../public/migration-preflight.api';
 
 /**
- * The graph of `pnpm ops:preflight` (P28-01): database settings only, every session read-only, no business module.
+ * The graph of `pnpm ops:preflight`: database settings only, every session read-only, no business module.
  * Never imported by the API, the worker or a command that writes.
  */
 @Module({

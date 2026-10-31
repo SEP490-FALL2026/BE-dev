@@ -8,7 +8,7 @@ import { toAccessRequestApiException } from '../access-request/access-request.ht
 import { toAssessmentApiException } from './assessment.http-errors';
 
 /**
- * F01 (`QĐ-87d(1)`, spec L.11): a department may have no Cost Center yet, and whatever charges a cost to it answers 409
+ * The Cost Center link (`QĐ-87d(1)`): a department may have no Cost Center yet, and whatever charges a cost to it answers 409
  * `FINANCE.SETUP_INCOMPLETE` with nothing written. Every request mapper falls back to `toAccessRequestApiException`, so
  * one mapping answers on every route that can throw it.
  */

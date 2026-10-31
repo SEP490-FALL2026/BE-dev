@@ -1,7 +1,7 @@
 import type { DbTx, TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../src/modules/audit/public/audit.api';
-import type { LicensingApi } from '../../src/modules/licensing/public/licensing.api';
+import type { LicensingSeatBaselineApi } from '../../src/modules/licensing/public/licensing-seat-baseline.api';
 import type { NotificationsApi } from '../../src/modules/notifications/public/notifications.api';
 import type { InAppNotificationInput } from '../../src/modules/notifications/public/notifications.types';
 import type { OrganizationApi } from '../../src/modules/organization/public/organization.api';
@@ -320,7 +320,7 @@ export function harness(start: Directory = directory()) {
     org as unknown as OrganizationApi,
     audit as unknown as AuditApi,
     runner as unknown as TransactionRunner,
-    { openSeatHolders: () => Promise.resolve([]) } as unknown as LicensingApi,
+    { openSeatHolders: () => Promise.resolve([]) } as unknown as LicensingSeatBaselineApi,
     rowValidation,
   );
   const confirmation = new EmployeeImportConfirmationService(

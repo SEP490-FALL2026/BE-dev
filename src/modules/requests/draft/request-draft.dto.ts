@@ -9,7 +9,7 @@ import { requestIdParamSchema, requestSchema, submitBodySchema } from '../access
 export const DRAFT_KINDS = ['INDIVIDUAL', 'GROUP', 'SERVICE_ACCOUNT'] as const;
 
 /**
- * What is saved as a draft (spec L.1): exactly the body of the operation that sends it, with the kind that says which operation that
+ * What is saved as a draft: exactly the body of the operation that sends it, with the kind that says which operation that
  * is, validated by the same schema (`accessRequestSubmit`, `groupRequestSubmit`, `accessRequestServiceAccountSubmit`). Saving runs no
  * gate; sending the draft runs all of them again, on this content, with the department of the sender on the day.
  */
@@ -62,7 +62,7 @@ export class AccessRequestDraftPageResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ items: z.array(draftSchema), pagination })),
 ) {}
 /**
- * What reading a request answers (`accessRequestGet`, spec L.1, F92): the request, as always, or — to the person who saved it — the draft,
+ * What reading a request answers (`accessRequestGet`): the request, as always, or — to the person who saved it — the draft,
  * which is not a request yet and so has no price, step or Cost Center to show: only what the list of drafts shows of it.
  */
 export class AccessRequestOrDraftResponseDto extends createZodDto(

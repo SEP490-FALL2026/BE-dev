@@ -35,7 +35,7 @@ export const MUTANTS = [
     probes: [
       {
         config: 'test/config/jest.integration.cjs',
-        file: 'test/integration/identity-access/account-management-http.integration-spec.ts',
+        file: 'test/integration/identity-access/account-creation-http.integration-spec.ts',
         name: 'resending keeps exactly one usable token',
       },
     ],

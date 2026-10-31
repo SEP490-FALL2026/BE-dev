@@ -29,6 +29,7 @@ import {
   toProvisioningApiException,
 } from '../provisioning.http-errors';
 import { ProvisioningDecisionService } from './provisioning-decision.service';
+import { ProvisioningGrantService } from './provisioning-grant.service';
 import { ProvisioningService } from './provisioning.service';
 import { toSummaryWire, toWire } from '../provisioning-task.mapper';
 
@@ -60,6 +61,7 @@ const NOT_FOUND = {
 export class ProvisioningTasksController {
   constructor(
     private readonly provisioning: ProvisioningService,
+    private readonly grants: ProvisioningGrantService,
     private readonly decisions: ProvisioningDecisionService,
   ) {}
 
@@ -102,7 +104,7 @@ export class ProvisioningTasksController {
   )
   async grant(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: GrantBodyDto) {
     try {
-      const { task, warnings } = await this.provisioning.grant(actor, body);
+      const { task, warnings } = await this.grants.grant(actor, body);
 
       return { task: toWire(task), warnings };
     } catch (error) {
@@ -314,7 +316,7 @@ export class ProvisioningTasksController {
     },
   )
   async handOff(
-    // Validated only: the body is a strict empty object, so a client that still sends `evidence` is refused (F08).
+    // Validated only: the body is a strict empty object, so a client that still sends `evidence` is refused.
     @Body() _body: HandOffBodyDto,
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: TaskIdParamDto,

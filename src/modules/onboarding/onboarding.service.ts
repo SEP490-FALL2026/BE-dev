@@ -3,7 +3,7 @@ import type { AuthenticatedPrincipal } from '../../infrastructure/security/token
 import { CatalogApi } from '../catalog/public/catalog.api';
 import { DataImportApi } from '../data-import/public/data-import.api';
 import { IdentityAccessApi } from '../identity-access/public/identity-access.api';
-import { LicensingApi } from '../licensing/public/licensing.api';
+import { LicensingSeatBaselineApi } from '../licensing/public/licensing-seat-baseline.api';
 import { OrganizationApi } from '../organization/public/organization.api';
 import { assertMayReadChecklist } from './onboarding.policy';
 
@@ -71,7 +71,7 @@ export class OnboardingService {
     private readonly identity: IdentityAccessApi,
     private readonly imports: DataImportApi,
     private readonly catalog: CatalogApi,
-    private readonly licensing: LicensingApi,
+    private readonly licensingBaseline: LicensingSeatBaselineApi,
   ) {}
 
   /** The Super Admin and the IT Admin read it, and nobody else: OnboardingForbiddenError. */
@@ -81,7 +81,7 @@ export class OnboardingService {
       this.organization.getOnboardingFacts(),
       this.imports.latestEmployeeImport(),
       this.catalog.getOnboardingFacts(),
-      this.licensing.getBaselineProgress(),
+      this.licensingBaseline.getBaselineProgress(),
     ]);
     const usableItAdmins = await this.identity.findUsableItAdminEmployeeIds(
       facts.departmentsByItAdmin.flatMap((department) =>

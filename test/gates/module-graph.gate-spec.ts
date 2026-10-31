@@ -1,10 +1,10 @@
-import { Type } from '@nestjs/common';
+import { Inject, Injectable, Module, Type } from '@nestjs/common';
 import { SELF_DECLARED_DEPS_METADATA } from '@nestjs/common/constants';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { AppModule } from '../../src/app/app.module';
-import { ACCOUNT_SESSIONS } from '../../src/modules/identity-access/account-sessions.extension-points';
+import { ACCOUNT_SESSIONS } from '../../src/modules/identity-access/accounts/account-sessions.types';
 import { AccountStatusService } from '../../src/modules/identity-access/accounts/app-users/account-status.service';
 import { SessionDirectoryService } from '../../src/modules/identity-access/auth/session-directory.service';
 import { HolderCredentialReset } from '../../src/modules/identity-access/recovery/holder-credential-reset.service';
@@ -13,12 +13,12 @@ import { AuditController } from '../../src/modules/audit/audit.controller';
 import { AuditQueryRepo } from '../../src/modules/audit/audit-query.repo';
 import { ActionTokenRepo } from '../../src/modules/identity-access/accounts/action-token.repo';
 import { AppUserRepo } from '../../src/modules/identity-access/accounts/app-user.repo';
-import { CredentialRepo } from '../../src/modules/identity-access/accounts/credential.repo';
+import { CredentialRepo } from '../../src/modules/identity-access/credentials/credential.repo';
 import { RoleGrantRepo } from '../../src/modules/identity-access/accounts/role-grant.repo';
 import { AppUsersController } from '../../src/modules/identity-access/accounts/app-users/app-users.controller';
 import { MeController } from '../../src/modules/identity-access/access/me.controller';
 import { AuthController } from '../../src/modules/identity-access/auth/auth.controller';
-import { PasswordHasher } from '../../src/modules/identity-access/accounts/password-hasher.service';
+import { PasswordHasher } from '../../src/modules/identity-access/credentials/password-hasher.service';
 import { SessionRepo } from '../../src/modules/identity-access/auth/session.repo';
 import { IdentityAccessApi } from '../../src/modules/identity-access/public/identity-access.api';
 import { IdentityAccessModule } from '../../src/modules/identity-access/identity-access.module';
@@ -37,18 +37,23 @@ import { IdentityAccessLocalSeedFacadeModule } from '../../src/modules/identity-
 import { IdentityAccessInspectionFacadeModule } from '../../src/modules/identity-access/identity-access-inspection-facade.module';
 import { DATABASE_SESSION_OPTIONS } from '../../src/infrastructure/database/read-only-session.module';
 import { NotificationsModule } from '../../src/modules/notifications/notifications.module';
-import { PayloadCipher } from '../../src/modules/notifications/payload-cipher.service';
+import { PayloadCipher } from '../../src/modules/notifications/email/payload-cipher.service';
 import { ObjectStorageModule } from '../../src/infrastructure/object-storage/object-storage.module';
 import { QueueInfrastructureModule } from '../../src/infrastructure/queue/queue-infrastructure.module';
 import { EmailDispatchLoop } from '../../src/worker/email-dispatch.job';
 import { RequestWorkLoop } from '../../src/worker/request-work.job';
 import { RecoveryCliModule } from '../../src/cli/recover/recover-cli.module';
 import { WorkerModule } from '../../src/worker/worker.module';
+import { consumersOfExports, moduleFolders, outsideConsumers } from '../support/module-export-consumers';
+import { collectGraph, metadata, tokenName, tokenOf, type ModuleNode, type Token } from '../support/nest-module-graph';
+import { PROCESS_GRAPHS } from '../support/process-graphs';
 
 /**
- * What a business module may export (docs/rules/module-structure.md): its facade, a port it implements for
- * infrastructure, or the service of a CLI entry module. Every other exported token of a business module is private,
- * whatever its name (A4-03). Exact `Module: token` pairs; a module that is not mounted is not listed.
+ * What a business module may export for any module to use (docs/rules/module-structure.md): its facade, a port it implements for
+ * infrastructure, or the service of a CLI entry module. Every other exported token of a business module is private, whatever its
+ * name (A4-03), and R10 lets it be exported only when every class that injects it is in the exporting module's own folder (the
+ * capability services an HTTP module of the same module calls instead of the facade). Exact `Module: token` pairs; a module that
+ * is not mounted is not listed.
  */
 const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'AuditModule: AuditApi',
@@ -68,8 +73,14 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // The audited exchange-rate use case the finance HTTP module serves; the raw ledger is not exported.
   'FinanceModule: ExchangeRateService',
   'IdentityAccessFacadeModule: IdentityAccessApi',
-  // G4 (ADR-0013): the licensing facade the seat baseline import (data-import) reads and writes the assignments through.
+  // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the handover
+  // duties of a departure, the open grant tasks of a person, the service account duties, and (G4, ADR-0013) the seat baseline the import reads and writes through.
   'LicensingModule: LicensingApi',
+  'LicensingModule: LicensingRenewalApi',
+  'LicensingModule: LicensingHandoverApi',
+  'LicensingModule: LicensingOpenGrantsApi',
+  'LicensingModule: LicensingServiceAccountApi',
+  'LicensingModule: LicensingSeatBaselineApi',
   // The extension points requests and personnel bind or add to (public/licensing.extension-points.ts).
   'LicensingModule: GrantRequestGateHook',
   'LicensingModule: RevocationListeners',
@@ -156,25 +167,6 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'RecoveryModule: RoleTransferRecoveryApi',
 ]);
 
-/**
- * Exports outside that contract. The 18/10/2026 entries are removed by the named slice of
- * docs/workspace/items/foundation-remediation-handoff-2026-10-18; the GATE.1 entries (19/10/2026) by the slice of
- * docs/reviews/be-full-src-architecture-audit-2026-10-19. Entries are only removed, never added to pass a build; a
- * stale entry fails like a new export.
- */
-const LEGACY_PRIVATE_EXPORTS: ReadonlySet<string> = new Set([
-  // E4 = A (Owner, scoped legacy exception kept at H4.7, reviewed at G3): OrganizationHttpModule shares CostCenterRepo
-  // (CostCenterService) and DepartmentRepo (the three department use-case services); OrganizationRepo has no HTTP
-  // consumer since Wave 2 and stays exported only under E4. No other repo is exported.
-  'OrganizationModule: CostCenterRepo',
-  'OrganizationModule: DepartmentRepo',
-  'OrganizationModule: OrganizationRepo',
-  // Owner 19/10/2026 (GATE.1, extends E9): non-facade exports the contract allowlist found. H8.3 removed the
-  // data-import entry (facade DataImportApi); ROOT.1 removed NotificationsModule: EmailDispatcher (the worker loop
-  // reads EmailDeliveryApi).
-  'OperatingParametersModule: NonWorkingDatesService', // G3: same-context HTTP module sharing, reviewed like E4
-]);
-
 // The real configuration modules load and validate an env file the moment they are imported. The
 // graph only needs their shape, so they are replaced by an empty module.
 jest.mock('@nestjs/config', () => ({
@@ -182,87 +174,8 @@ jest.mock('@nestjs/config', () => ({
   ConfigModule: { forRoot: () => ({ module: class ConfigStubModule {} }) },
 }));
 
-interface ModuleNode {
-  /** The module class; for a dynamic module, the class its `module` property names. */
-  module: Type<unknown>;
-  controllers: unknown[];
-  providers: unknown[];
-  imports: unknown[];
-}
-
-type Token = unknown;
-
 /** Nest lets many providers share these on purpose (one per guard, pipe, filter or interceptor). */
 const MULTI_PROVIDER_TOKENS: ReadonlySet<Token> = new Set([APP_GUARD, APP_PIPE, APP_FILTER, APP_INTERCEPTOR]);
-
-function metadata(module: Type<unknown>, key: 'imports' | 'providers' | 'controllers' | 'exports'): unknown[] {
-  return (Reflect.getMetadata(key, module) as unknown[] | undefined) ?? [];
-}
-
-function isDynamicModule(entry: object): entry is {
-  module: Type<unknown>;
-  imports?: unknown[];
-  providers?: unknown[];
-  controllers?: unknown[];
-} {
-  return 'module' in entry;
-}
-
-/** Reads the metadata Nest itself would read. Promises (async modules) and forwardRef are not followed. */
-function describeModule(entry: unknown): ModuleNode | null {
-  if (typeof entry === 'function') {
-    const module = entry as Type<unknown>;
-
-    return {
-      module,
-      controllers: metadata(module, 'controllers'),
-      providers: metadata(module, 'providers'),
-      imports: metadata(module, 'imports'),
-    };
-  }
-  if (typeof entry !== 'object' || entry === null || 'then' in entry || 'forwardRef' in entry) return null;
-  if (!isDynamicModule(entry)) return null;
-
-  return {
-    module: entry.module,
-    controllers: [...metadata(entry.module, 'controllers'), ...(entry.controllers ?? [])],
-    providers: [...metadata(entry.module, 'providers'), ...(entry.providers ?? [])],
-    imports: [...metadata(entry.module, 'imports'), ...(entry.imports ?? [])],
-  };
-}
-
-/** Every module reachable from `root` through `imports`, the root included. A static module appears once. */
-function collectGraph(root: Type<unknown>): ModuleNode[] {
-  const nodes: ModuleNode[] = [];
-  const seen = new Set<unknown>();
-  const pending: unknown[] = [root];
-
-  while (pending.length > 0) {
-    const entry = pending.pop();
-    if (seen.has(entry)) continue;
-    seen.add(entry);
-
-    const node = describeModule(entry);
-    if (!node) continue;
-
-    nodes.push(node);
-    pending.push(...node.imports);
-  }
-
-  return nodes;
-}
-
-function tokenOf(provider: unknown): Token {
-  if (typeof provider === 'object' && provider !== null && 'provide' in provider) return provider.provide;
-
-  return provider;
-}
-
-function tokenName(token: Token): string {
-  if (typeof token === 'function') return token.name;
-
-  return String(token);
-}
 
 /** The modules that declare `token` as a provider, one entry per declaration. */
 function declarationsOf(graph: ModuleNode[], token: Token): ModuleNode[] {
@@ -316,7 +229,7 @@ const DECLARED_FOR_API_AND_RECOVERY = [
 ];
 
 /** GATE.2: the one file that declares the session port shared by accounts and recovery (implemented by auth). */
-const ACCOUNT_SESSIONS_OWNER = 'src/modules/identity-access/account-sessions.extension-points.ts';
+const ACCOUNT_SESSIONS_OWNER = 'src/modules/identity-access/accounts/account-sessions.types.ts';
 
 /** Source files (tests and generated code excluded) whose text contains `needle`, as repository-relative paths. */
 function sourceFilesDeclaring(needle: string): string[] {
@@ -386,7 +299,8 @@ describe('module graph', () => {
     }
   });
 
-  it('E6: declares exactly the providers shared with the recovery command once in the API and once in the command', () => {
+  // E6
+  it('declares exactly the providers shared with the recovery command once in the API and once in the command', () => {
     const declaredIn = (graph: ModuleNode[], name: string) =>
       graph.flatMap((node) =>
         node.providers.filter((provider) => tokenName(tokenOf(provider)) === name).map(() => node.module.name),
@@ -407,7 +321,8 @@ describe('module graph', () => {
     expect(inBoth.sort()).toEqual([...DECLARED_FOR_API_AND_RECOVERY].sort());
   });
 
-  it('GATE.2: binds the one ACCOUNT_SESSIONS token to SessionDirectoryService in the API and the recovery command, and injects that token into both consumers', () => {
+  // GATE.2
+  it('binds the one ACCOUNT_SESSIONS token to SessionDirectoryService in the API and the recovery command, and injects that token into both consumers', () => {
     const declaringFiles = sourceFilesDeclaring("Symbol('ACCOUNT_SESSIONS')");
     expect(declaringFiles).toEqual([ACCOUNT_SESSIONS_OWNER]);
 
@@ -492,26 +407,24 @@ describe('module graph', () => {
     }
   });
 
-  it('exports only the public contract of a business module, except the legacy entries being removed', () => {
+  // R10
+  it('lets a business module export outside its public contract only what a class of its own folder injects', () => {
     const businessModules = businessModuleNames();
-    const exported = new Set<string>();
-    for (const [, root] of graphs) {
-      for (const node of collectGraph(root)) {
-        if (!businessModules.has(node.module.name)) continue;
-        for (const token of metadata(node.module, 'exports')) {
-          const name = tokenName(token);
-          if (isPrivateExport(node.module.name, name)) exported.add(`${node.module.name}: ${name}`);
-        }
+    const folders = moduleFolders(join(process.cwd(), 'src'));
+    const folderOf = (name: string): string => folders.get(name) ?? `library:${name}`;
+    const reached: string[] = [];
+    for (const [graphName, root] of PROCESS_GRAPHS) {
+      for (const use of outsideConsumers(consumersOfExports(collectGraph(root)), folderOf)) {
+        if (!businessModules.has(use.exporter) || !isPrivateExport(use.exporter, use.token)) continue;
+        reached.push(`${graphName}: ${use.consumerModule}.${use.consumer} injects ${use.exporter}: ${use.token}`);
       }
     }
 
-    expect({
-      newPrivateExports: [...exported].filter((entry) => !LEGACY_PRIVATE_EXPORTS.has(entry)).sort(),
-      staleLedgerEntries: [...LEGACY_PRIVATE_EXPORTS].filter((entry) => !exported.has(entry)).sort(),
-    }).toEqual({ newPrivateExports: [], staleLedgerEntries: [] });
+    expect(reached.sort()).toEqual([]);
   });
 
-  it('A4-03: judges every exported token against the public contract list, not a name suffix', () => {
+  // A4-03
+  it('judges every exported token against the public contract list, not a name suffix', () => {
     expect(isPrivateExport('IdentityAccessFacadeModule', 'SuccessorEligibility')).toBe(true);
     expect(isPrivateExport('NotificationsModule', 'EmailDispatcher')).toBe(true);
     expect(isPrivateExport('OrganizationModule', 'IdentityAccessApi')).toBe(true);
@@ -533,7 +446,8 @@ describe('module graph', () => {
     }
   });
 
-  it('H6.4 (E2 = A, ADR-0014): mounts no queue anywhere, and object storage only in the API, for the files of contracts', () => {
+  // H6.4 (E2 = A, OD-R5, ADR-0014)
+  it('keeps the standby queue module (no consumer yet) out of every process graph today, and object storage only in the API, for the files of contracts', () => {
     for (const [name, root] of graphs) {
       const modules = collectGraph(root).map((node) => node.module);
 
@@ -545,7 +459,10 @@ describe('module graph', () => {
     }
   });
 
-  it('H6.4: delivers mail by polling PostgreSQL in the worker, with no BullMQ queue or processor registered', () => {
+  // Describes today: the queue has no producer and no processor. The slice that adds the first consumer mounts
+  // QueueInfrastructureModule on purpose and changes this expectation (and the one above) with it.
+  // H6.4
+  it('delivers mail by polling PostgreSQL in the worker, with no BullMQ queue, producer or processor registered yet', () => {
     const worker = collectGraph(WorkerModule);
     const tokens = worker.flatMap((node) => node.providers.map((provider) => tokenName(tokenOf(provider))));
 
@@ -555,7 +472,8 @@ describe('module graph', () => {
     expect(sourceFilesDeclaring('@Processor(')).toEqual([]);
   });
 
-  it('G5: runs the reminders of late steps in the worker through the narrow requests graph, with no catalog and no controller, and declares what the API shares once', () => {
+  // G5
+  it('runs the reminders of late steps in the worker through the narrow requests graph, with no catalog and no controller, and declares what the API shares once', () => {
     const worker = collectGraph(WorkerModule);
     const api = collectGraph(AppModule);
 
@@ -594,13 +512,15 @@ describe('module graph', () => {
   });
 });
 
-describe('operational command graphs (H6.1, docs/rules/operational-commands.md)', () => {
+// H6.1
+describe('operational command graphs (docs/rules/operational-commands.md)', () => {
   const apiAndWorker: [string, Type<unknown>][] = [
     ['AppModule', AppModule],
     ['WorkerModule', WorkerModule],
   ];
 
-  it('rule 3: keeps the command graphs and their contracts out of the API and the worker', () => {
+  // rule 3
+  it('keeps the command graphs and their contracts out of the API and the worker', () => {
     for (const [name, root] of apiAndWorker) {
       const modules = collectGraph(root).map((node) => node.module);
 
@@ -625,7 +545,8 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
     }
   });
 
-  it('rule 1: opens the sessions of the inspection and preflight graphs read-only, and of no other graph', () => {
+  // rule 1
+  it('opens the sessions of the inspection and preflight graphs read-only, and of no other graph', () => {
     const graphs: [string, Type<unknown>, number][] = [
       ['AppModule', AppModule, 0],
       ['WorkerModule', WorkerModule, 0],
@@ -647,7 +568,8 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
     }
   });
 
-  it('rule 1: loads only what the inspection reads: no controller, mail, queue, storage, JWT or API module', () => {
+  // rule 1
+  it('loads only what the inspection reads: no controller, mail, queue, storage, JWT or API module', () => {
     const graph = collectGraph(InspectionModule);
     const modules = graph.map((node) => node.module);
 
@@ -664,7 +586,8 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
     expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
   });
 
-  it('rule 1: the Cost Center link graph (F01) loads the database settings and the audit facade only: no controller, no mail, no queue', () => {
+  // rule 1, F01
+  it('the Cost Center link graph loads the database settings and the audit facade only: no controller, no mail, no queue', () => {
     const graph = collectGraph(CostCenterDirectionCliModule);
 
     expect(controllersOf(graph)).toEqual([]);
@@ -679,7 +602,8 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
     expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
   });
 
-  it('rule 1: the owner-assignment graph (F02) loads the database settings, the organization and the audit facades only', () => {
+  // rule 1, F02
+  it('the owner-assignment graph loads the database settings, the organization and the audit facades only', () => {
     const graph = collectGraph(SubscriptionOwnerAssignmentCliModule);
 
     expect(controllersOf(graph)).toEqual([]);
@@ -695,7 +619,8 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
     expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
   });
 
-  it('rule 1: the preflight graph (P28-01) loads the database settings and the database only: no business module', () => {
+  // rule 1, P28-01
+  it('the preflight graph loads the database settings and the database only: no business module', () => {
     const graph = collectGraph(MigrationPreflightModule);
 
     expect(controllersOf(graph)).toEqual([]);
@@ -711,8 +636,10 @@ describe('operational command graphs (H6.1, docs/rules/operational-commands.md)'
   });
 });
 
-describe('the local seed graph (H6.2)', () => {
-  it('rule 3: declares the demo account contract in the seed graph only', () => {
+// H6.2
+describe('the local seed graph', () => {
+  // rule 3
+  it('declares the demo account contract in the seed graph only', () => {
     const graphs: [string, Type<unknown>, number][] = [
       ['AppModule', AppModule, 0],
       ['WorkerModule', WorkerModule, 0],
@@ -767,4 +694,139 @@ describe('the local seed graph (H6.2)', () => {
       expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
     },
   );
+});
+
+// R10
+describe('an export outside the public contract is used only inside its own module folder (docs/rules/module-structure.md)', () => {
+  @Injectable()
+  class Secret {}
+  @Injectable()
+  class Neighbour {
+    constructor(readonly secret: Secret) {}
+  }
+  @Injectable()
+  class Stranger {
+    constructor(readonly secret: Secret) {}
+  }
+  const SESSION = Symbol('SESSION');
+  @Injectable()
+  class ByToken {
+    constructor(@Inject(SESSION) readonly session: unknown) {}
+  }
+  @Module({ providers: [Secret, { provide: SESSION, useValue: 1 }], exports: [Secret, SESSION] })
+  class ExporterModule {}
+  @Module({ imports: [ExporterModule], providers: [Neighbour] })
+  class NeighbourModule {}
+  @Module({ imports: [ExporterModule], providers: [Stranger, ByToken] })
+  class StrangerModule {}
+  @Module({ imports: [ExporterModule], providers: [{ provide: 'MADE', useFactory: () => 1, inject: [Secret] }] })
+  class FactoryModule {}
+  @Module({ imports: [ExporterModule] })
+  class ReExportModule {}
+  @Module({ imports: [ReExportModule], providers: [Stranger] })
+  class BehindModule {}
+  // an alias of an export is a use of it: `{ provide: ALIAS, useExisting: Secret }` hands the private class to whoever injects ALIAS
+  const ALIAS = Symbol('ALIAS');
+  @Module({
+    imports: [ExporterModule],
+    providers: [
+      { provide: ALIAS, useExisting: Secret },
+      { provide: 'OF_TOKEN', useExisting: SESSION },
+    ],
+  })
+  class AliasModule {}
+  @Module({ imports: [ExporterModule], providers: [{ provide: 'BUILT', useClass: Stranger }] })
+  class ClassModule {}
+  @Module({ imports: [ExporterModule], providers: [{ provide: ALIAS, useExisting: Secret }] })
+  class AliasNeighbourModule {}
+
+  const folders: Record<string, string> = {
+    ExporterModule: 'src/modules/a',
+    NeighbourModule: 'src/modules/a',
+    StrangerModule: 'src/modules/b',
+    FactoryModule: 'src/worker',
+    BehindModule: 'src/modules/b',
+    AliasModule: 'src/modules/c',
+    ClassModule: 'src/modules/d',
+    AliasNeighbourModule: 'src/modules/a',
+  };
+  const folderOf = (name: string): string => folders[name] ?? 'unknown';
+  const outside = (root: Type<unknown>) =>
+    outsideConsumers(consumersOfExports(collectGraph(root)), folderOf)
+      .map((use) => `${use.consumerModule}.${use.consumer} -> ${use.exporter}: ${use.token}`)
+      .sort();
+
+  it('reads a consumer from the constructor of a provider of an importing module: by type, by @Inject token, and from a factory', () => {
+    @Module({ imports: [NeighbourModule, StrangerModule, FactoryModule] })
+    class Root {}
+
+    expect(
+      consumersOfExports(collectGraph(Root))
+        .map((use) => `${use.consumerModule}.${use.consumer} -> ${use.token}`)
+        .sort(),
+    ).toEqual([
+      'FactoryModule.MADE -> Secret',
+      'NeighbourModule.Neighbour -> Secret',
+      'StrangerModule.ByToken -> Symbol(SESSION)',
+      'StrangerModule.Stranger -> Secret',
+    ]);
+  });
+
+  it('accepts a consumer in the exporting module folder and names one outside it', () => {
+    @Module({ imports: [NeighbourModule] })
+    class Inside {}
+    @Module({ imports: [NeighbourModule, StrangerModule, FactoryModule] })
+    class Outside {}
+
+    expect(outside(Inside)).toEqual([]);
+    expect(outside(Outside)).toEqual([
+      'FactoryModule.MADE -> ExporterModule: Secret',
+      'StrangerModule.ByToken -> ExporterModule: Symbol(SESSION)',
+      'StrangerModule.Stranger -> ExporterModule: Secret',
+    ]);
+  });
+
+  it('counts the target of a `useExisting` alias, and the class of a `useClass` provider, as used by the module that declares them', () => {
+    @Module({ imports: [AliasModule, ClassModule, AliasNeighbourModule] })
+    class Root {}
+
+    expect(outside(Root)).toEqual(
+      [
+        'AliasModule.Symbol(ALIAS) -> ExporterModule: Secret',
+        'AliasModule.OF_TOKEN -> ExporterModule: Symbol(SESSION)',
+        'ClassModule.BUILT -> ExporterModule: Secret',
+      ].sort(),
+    );
+    // the same alias in the folder of the exporter stays inside the folder
+    @Module({ imports: [AliasNeighbourModule] })
+    class Inside {}
+
+    expect(outside(Inside)).toEqual([]);
+    expect(consumersOfExports(collectGraph(Inside)).map((use) => `${use.consumer} -> ${use.token}`)).toEqual([
+      'Symbol(ALIAS) -> Secret',
+    ]);
+  });
+
+  it('is not hidden by a module in between that re-exports the exporting module', () => {
+    @Module({ imports: [ExporterModule], exports: [ExporterModule] })
+    class Through {}
+    @Module({ imports: [Through], providers: [Stranger] })
+    class Behind {}
+    @Module({ imports: [Behind] })
+    class Root {}
+    const folderThrough = (name: string): string => (name === 'Behind' ? 'src/modules/b' : folderOf(name));
+
+    expect(
+      outsideConsumers(consumersOfExports(collectGraph(Root)), folderThrough).map(
+        (use) => `${use.consumerModule}.${use.consumer} -> ${use.token}`,
+      ),
+    ).toEqual(['Behind.Stranger -> Secret']);
+  });
+
+  it('does not count the import of a module whose providers never inject the token', () => {
+    @Module({ imports: [ReExportModule, BehindModule] })
+    class Root {}
+
+    expect(consumersOfExports(collectGraph(Root)).filter((use) => use.consumerModule === 'ReExportModule')).toEqual([]);
+  });
 });

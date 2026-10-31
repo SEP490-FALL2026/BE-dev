@@ -1,5 +1,11 @@
-import { checkLineClosure, checkLineTransferClosure, soleLiveLine } from './group-line-closure.policy';
-import { LINE_STATES, type LineState } from '../group-request/group-request.types';
+import {
+  checkLineClosure,
+  checkLineTransferClosure,
+  lineCancelledDetail,
+  needsEvidenceAtOnce,
+  soleLiveLine,
+} from './group-line-closure.policy';
+import { LINE_STATES, type LineState } from '../access-request/group-request.types';
 
 describe('removing a person who left from a request for a group (US-03-04 AC-25, US-05-17)', () => {
   it.each(['AWAITING_NEED', 'NEED_CONFIRMED', 'APPROVED', 'EXECUTING'] as const)(
@@ -75,5 +81,52 @@ describe('removing a person who was transferred from a request for a group (F29,
     expect(checkLineTransferClosure({ lineState: 'APPROVED', beneficiaryTransferred: false })).toBe(
       'BENEFICIARY_NOT_TRANSFERRED',
     );
+  });
+});
+
+describe('what closing the line of a person asks for at once, and what it records (US-03-04 AC-25, QĐ-77f)', () => {
+  it('asks for the confirmation of the check with the vendor when a transfer closes a line that is being carried out', () => {
+    expect(needsEvidenceAtOnce('BENEFICIARY_TRANSFERRED', 'EXECUTING', undefined)).toBe(true);
+  });
+
+  it.each([
+    ['the evidence is given', 'BENEFICIARY_TRANSFERRED', 'EXECUTING', 'Đã kiểm tra với nhà cung cấp'],
+    ['the line is not being carried out', 'BENEFICIARY_TRANSFERRED', 'APPROVED', undefined],
+    ['the person left', 'BENEFICIARY_LEFT', 'EXECUTING', undefined],
+  ] as const)('asks for nothing at once when %s', (_label, cause, lineState, evidence) => {
+    expect(needsEvidenceAtOnce(cause, lineState, evidence)).toBe(false);
+  });
+
+  it('records the line as cancelled, from the state it was in, with the cause, the hand, the task cancelled with it and what went back', () => {
+    expect(
+      lineCancelledDetail(
+        { id: 'req-1', requesterEmployeeId: 'sender' },
+        { employeeId: 'emp-2', from: 'EXECUTING', cause: 'BENEFICIARY_LEFT', actorEmployeeId: 'it-1' },
+        { taskId: 'task-1', taskStatus: 'QUEUED' },
+        true,
+      ),
+    ).toEqual({
+      requestId: 'req-1',
+      beneficiaryEmployeeId: 'emp-2',
+      from: 'EXECUTING',
+      to: 'CANCELLED',
+      reasonKind: 'BENEFICIARY_LEFT',
+      cancelledByEmployeeId: 'it-1',
+      requesterEmployeeId: 'sender',
+      taskId: 'task-1',
+      taskStatusBefore: 'QUEUED',
+      released: true,
+    });
+  });
+
+  it('records no task when the line had none', () => {
+    expect(
+      lineCancelledDetail(
+        { id: 'req-1', requesterEmployeeId: 'sender' },
+        { employeeId: 'emp-2', from: 'AWAITING_NEED', cause: 'BENEFICIARY_TRANSFERRED', actorEmployeeId: 'it-1' },
+        null,
+        false,
+      ),
+    ).toMatchObject({ taskId: null, taskStatusBefore: null, released: false });
   });
 });

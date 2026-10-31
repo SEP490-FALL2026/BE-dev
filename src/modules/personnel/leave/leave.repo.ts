@@ -4,7 +4,7 @@ import { type BusinessDate, fromDateColumn, toDateColumn } from '../../../core/b
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { Grounds } from '../policies/grounds.policy';
+import type { Grounds } from '../personnel-grounds.policy';
 import type { LeaveInterval } from '../public/personnel.types';
 import type {
   LeaveChangeKind,

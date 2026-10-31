@@ -6,14 +6,14 @@ import { AssignmentNotOpenError, RevocationRefusedError } from '../../licensing/
 import type { OpenedRevocation } from '../../licensing/public/licensing.types';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import { userActor } from '../public/personnel.types';
 import { TransferReviewError } from './transfer-review.errors';
 import { isChangeOfMind, mayDecide, mayRecordDecision, statusAfterDecision } from './transfer-review.policy';
 import { TransferReviewRepo } from './transfer-review.repo';
 import type { DecisionInput, ReviewItemRecord, ReviewRecord } from './transfer-review.types';
 
-/** What a revocation this review opens is asked for as: the review after a transfer, or the review after the setup (F21). */
+/** What a revocation this review opens is asked for as: the review after a transfer, or the review after the setup. */
 const sourceOf = (review: ReviewRecord): 'TRANSFER_REVIEW' | 'POST_SETUP_REVIEW' =>
   review.transferId === null ? 'POST_SETUP_REVIEW' : 'TRANSFER_REVIEW';
 
@@ -29,14 +29,14 @@ export interface DecisionOutcome {
  * "no longer needed" opens the revocation through the licensing gate in the same transaction, so there is never a revocation
  * before the head decided and never a decision without the revocation it asks for. A review that is late is decided like any other.
  * One decision may be changed, once, through this same route: a tool the head said is still needed (`STILL_NEEDED`, which waits for a
- * new Request of the department, T-6) may become "no longer needed", and then the revocation opens now exactly as for a first
+ * new Request of the department) may become "no longer needed", and then the revocation opens now exactly as for a first
  * "no longer needed", and the Audit Trail event keeps the earlier decision in `before`. It is refused (`DECISION_ALREADY_RECORDED`)
  * for any other change, and once the old seat is on its way back (the revocation of this review exists: the new Request ended and
  * `TransferReviewReplacementService` asked for it), so the seat is taken back once, whoever comes first. The revocation is asked
  * for with the review as its reference, so licensing answers a second ask with the task that exists and no new reason. The lock
  * order is the one of every decision: the review, then the organization reads, then the seat in licensing. The source of the
  * revocation is the review after the transfer, or the review after the setup for a person who holds a seat of another department
- * (`POST_SETUP_REVIEW`, F21).
+ * (`POST_SETUP_REVIEW`).
  */
 @Injectable()
 export class TransferReviewDecisionService {

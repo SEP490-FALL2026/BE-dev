@@ -37,7 +37,7 @@ export interface PlanLineMovedEvent {
 export interface BudgetChangeListener {
   /**
    * Takes, before the budget year lock, the locks of the rows this listener will change for the Cost Center and the year when a
-   * version is decided or the year is closed. The order of the whole system is the row of the request first, then the year (F31): a
+   * version is decided or the year is closed. The order of the whole system is the row of the request first, then the year: a
    * listener that locked its rows only after the year lock would wait for a writer that holds its row and waits for the year.
    */
   lockWaiting(tx: DbTx, scope: { costCenterId: string; year: number }): Promise<void>;
@@ -48,7 +48,7 @@ export interface BudgetChangeListener {
    */
   versionRefused(tx: DbTx, actor: AuthenticatedPrincipal, event: BudgetRefusalEvent): Promise<void>;
   /**
-   * The year-end closure closed a version that never became current (`QĐ-91e`, F62): the system does it, so there is no actor.
+   * The year-end closure closed a version that never became current (`QĐ-91e`): the system does it, so there is no actor.
    * A version that was current stays as the reference budget of the year and is not told here.
    */
   versionExpired(tx: DbTx, event: BudgetVersionEvent): Promise<void>;
@@ -57,7 +57,7 @@ export interface BudgetChangeListener {
 
 /**
  * One change of a budget, as `BudgetChangeListeners` tells it: the kind names the method of `BudgetChangeListener` that hears it.
- * `LOCK_WAITING` is emitted before the budget year lock is taken (F31), the others once the change is written.
+ * `LOCK_WAITING` is emitted before the budget year lock is taken, the others once the change is written.
  */
 export type BudgetChange =
   | { kind: 'LOCK_WAITING'; scope: { costCenterId: string; year: number } }

@@ -1,10 +1,9 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { LINE_DESCRIPTION_MAX, REASON_MAX } from './budget.policy';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
-const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 const text = (max: number) => z.string().trim().min(1).max(max);
 const money = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
 const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
@@ -57,6 +56,10 @@ export const decisionBodySchema = z
     if (body.decision === 'APPROVE' && body.reason !== undefined) {
       ctx.addIssue({ code: 'custom', path: ['reason'], message: 'An approval gives no reason.' });
     }
+  })
+  .meta({
+    description:
+      'A refusal (REJECT) or a request to look again (REQUEST_CHANGES) gives its reason; an approval (APPROVE) gives none.',
   });
 
 const quarters = z.strictObject({ q1: money, q2: money, q3: money, q4: money });
@@ -100,7 +103,8 @@ export const versionPatchSchema = z
     reason: text(REASON_MAX).nullable(),
   })
   .partial()
-  .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' });
+  .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
+  .meta({ minProperties: 1, description: 'Give at least one field.' });
 export const linePatchSchema = z
   .strictObject({
     description: text(LINE_DESCRIPTION_MAX),
@@ -116,7 +120,8 @@ export const linePatchSchema = z
     adjustmentReason: text(REASON_MAX).nullable(),
   })
   .partial()
-  .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' });
+  .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
+  .meta({ minProperties: 1, description: 'Give at least one field.' });
 export const addLinesBodySchema = z.strictObject({ lines: z.array(lineBody).min(1).max(LINES_MAX) });
 /** A move of the purchase window of a line of the current budget, with its reason; an amount is given only to be refused. */
 export const windowBodySchema = z
@@ -128,7 +133,8 @@ export const windowBodySchema = z
   })
   .refine((body) => body.windowFrom !== undefined || body.windowTo !== undefined || body.amount !== undefined, {
     message: 'Give the new window.',
-  });
+  })
+  .meta({ description: 'Give at least one of windowFrom, windowTo and amount.' });
 
 const pageQuery = {
   page: z.coerce.number().int().positive().default(1),

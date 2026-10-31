@@ -1,8 +1,8 @@
 import { BusinessDate } from '../../../core/business-date';
-import { CostCenterKind, CostCenterStatus } from '../cost-center/cost-center.types';
-import { DepartmentStatus, HeadPeriodRecord } from '../department/department.types';
+import { CostCenterKind, CostCenterStatus } from '../organization-structure.types';
+import { DepartmentStatus, HeadPeriodRecord } from '../organization-structure.types';
 
-import type { EmployeeStatus, EmployeeWorkState, EmploymentType } from '../employee/employee.types';
+import type { EmployeeStatus, EmployeeWorkState, EmploymentType } from '../organization-employee.types';
 
 export type { EmployeeStatus, EmployeeWorkState, EmploymentType };
 
@@ -35,13 +35,13 @@ export interface CreateEmployeeWithPlacementInput {
   employmentType: EmploymentType;
   hireDate: BusinessDate;
   /**
-   * The day the person becomes a member of the department (`QĐ-66ak`, R-11). Left out, it is the hire date: only
+   * The day the person becomes a member of the department (`QĐ-66ak`). Left out, it is the hire date: only
    * the installation command does that (`QĐ-67a`). Every path inside the application passes the day the person is
    * recorded, so no placement is ever made up for days before the person was in the system.
    */
   memberSince?: BusinessDate;
   departmentId: string;
-  /** Free text (`QĐ-87e`); the catalogue entry is the database's business, not this call's (spec L.10). */
+  /** Free text (`QĐ-87e`); the catalogue entry is the database's business, not this call's. */
   jobTitle: string | null;
 }
 
@@ -71,7 +71,7 @@ export interface EmployeeRecord {
 
 /**
  * What an IT Admin may read of a person: the least a technical task needs (grant, revoke, hand over), never the record, the
- * basis of an event or a verification (`F12`, spec K). `effectiveOn` is the first day of the person's current period in the
+ * basis of an event or a verification. `effectiveOn` is the first day of the person's current period in the
  * department. Read only for the departments the IT Admin is in charge of or stands in for.
  */
 export interface EmployeeTechnicalView {
@@ -182,7 +182,7 @@ export interface ClearedHeadSuccessor {
 
 /**
  * A notice an employee record owes, in the shape the inbox takes (`InAppNotificationInput`). It is declared here and not imported
- * so that the facade, which the installation command loads, does not reach the notifications module (R-13); the code that writes it
+ * so that the facade, which the installation command loads, does not reach the notifications module; the code that writes it
  * (`NotificationsApi.notifyInApp`) takes it as it is, and the compiler holds the two shapes together. Ids only.
  */
 export interface ProfileNotice {
@@ -194,7 +194,7 @@ export interface ProfileNotice {
   eventKey: string;
 }
 
-/** The notices an employee record owes when it is created or corrected, as the inbox takes them (`F17`, `QĐ-87b(3)`). */
+/** The notices an employee record owes when it is created or corrected, as the inbox takes them (`QĐ-87b(3)`). */
 export interface ProfileNoticeRequest {
   kind: 'CREATED' | 'UPDATED';
   organizationId: string;
@@ -218,7 +218,7 @@ export interface CostedOwningUnit extends OwningUnit {
 }
 
 /**
- * The local seed fixture items as `pnpm dev:seed` compares them (P23-RV-01): every field the fixture fixes, the link
+ * The local seed fixture items as `pnpm dev:seed` compares them: every field the fixture fixes, the link
  * between the cost center and its department, and the ids it writes against. Null when absent.
  */
 export interface LocalSeedFixtureFacts {

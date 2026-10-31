@@ -6,7 +6,7 @@ import {
   type AuthenticatedPrincipal,
 } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { AccountDirectoryService } from '../../../src/modules/identity-access/accounts/account-directory.service';
-import { CredentialService } from '../../../src/modules/identity-access/accounts/credential.service';
+import { CredentialService } from '../../../src/modules/identity-access/credentials/credential.service';
 import { RoleGrantService } from '../../../src/modules/identity-access/accounts/role-grant.service';
 import { LoginService } from '../../../src/modules/identity-access/auth/login.service';
 import { IdentityAccessApi } from '../../../src/modules/identity-access/public/identity-access.api';

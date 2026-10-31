@@ -22,8 +22,8 @@ import { ProvisioningTaskRepo } from '../provisioning-task.repo';
  * assignment as a failed one and the seat free; a revocation that is closed leaves its assignment as it was. When the
  * requester withdrew the request while the grant had failed, none of those three is left: the task is closed as cancelled
  * (`cancel`), never as failed (`US-05-08` AC-9). Every decision is one transaction with its audit event, by an IT Admin (the
- * frame judges the role, F13). Locks: the task, then the request (its outcome), then the subscription and the assignment of the
- * seat; the grant takes the request before the subscription, so no path takes the subscription before the request (F25).
+ * frame judges the role). Locks: the task, then the request (its outcome), then the subscription and the assignment of the
+ * seat; the grant takes the request before the subscription, so no path takes the subscription before the request.
  */
 @Injectable()
 export class ProvisioningDecisionService {
@@ -56,8 +56,7 @@ export class ProvisioningDecisionService {
 
   /**
    * Hands a failed connector task to a person: only the channel changes, with who handed it and when; the last error, the failure
-   * kind and reason and the tries made stay with the task. The evidence is asked when the manual work completes, not here (F08,
-   * `QĐ-90a`). Throws
+   * kind and reason and the tries made stay with the task. The evidence is asked when the manual work completes, not here (`QĐ-90a`). Throws
    * ProvisioningTaskAlreadyManualError and the errors of `retry`.
    */
   async handOff(actor: AuthenticatedPrincipal, id: string): Promise<TaskView> {
@@ -93,7 +92,7 @@ export class ProvisioningDecisionService {
         await this.refuseWhileWithdrawing(tx, locked);
         if (locked.kind === 'GRANT' && locked.requestId !== null) {
           // The request is locked (by its outcome) before the subscription and the assignment: the grant of another person of a
-          // request for a group takes the request and then the same subscription, so the other order is a cycle (F25).
+          // request for a group takes the request and then the same subscription, so the other order is a cycle.
           await this.gate.get().reportOutcome(tx, locked.requestId, 'FAILED', locked.assignment.employeeId);
           await this.assignments.closeFailed(tx, actor, {
             organizationId,

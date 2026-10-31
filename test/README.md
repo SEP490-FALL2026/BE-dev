@@ -68,6 +68,10 @@ suite CLI biên dịch mã nguồn bằng ts-node mỗi lần gọi (luôn đún
   module với đuôi `*.timing-spec.ts` và chạy tuần tự sau lượt song song: bên cạnh worker khác, phép đo đo tải của máy
   chứ không đo code. Gate `parallel-safety` chặn `expect(elapsed).toBeLessThan(...)` ở file khác.
 - `afterAll` đóng app/pool rồi mới xóa database của file; một lượt sạch không để lại `slm_<random>_test` nào.
+- Một file trong `test/integration`, `test/http`, `test/e2e` tối đa **800 dòng** (gate `test-size`, không có danh sách ngoại lệ). Dài hơn
+  thì tách theo use case: phần dựng chung (kiểu wire, lịch, app, tài khoản, các lời gọi) thành lớp harness ở `test/support/`
+  (`department-harness.ts`, `account-management-http-harness.ts`...), mỗi file mới có `beforeAll` riêng và tự dựng harness; kiểm
+  tra số `it`/`test` trước và sau để không mất ca nào.
 - Không trỏ tới database dùng chung hay dữ liệu thật. Cơ chế và chẩn đoán khi dọn lỗi:
   [support guide](support/README.md).
 
@@ -133,3 +137,20 @@ it('refuses an employee with 403', async () => {
 
 Chọn module bị ảnh hưởng: `scripts/ci/affected-modules.mjs` (đổi `src/core`, `src/infrastructure`, `prisma/`,
 `test/support` hay dependency ⇒ chạy tất cả). Chạy local không thay kết quả GitHub Actions.
+
+**Thời gian và `timeout-minutes`.** Quy tắc: `timeout-minutes` của một job = p95 đo được + 50 %, làm tròn lên phút; không đặt
+theo mục tiêu. Mục tiêu cũ "integration đầy đủ ≤ 15 phút" **không đạt** và đã bỏ. Số đo trên `dev`, integration `ALL`, một
+runner 2 vCPU (run `40923299529`, `40945441332`):
+
+| Job / bước                                      | Đo được                                         |
+| ----------------------------------------------- | ----------------------------------------------- |
+| `integration` (cả job)                          | 30 phút 25 s – 31 phút 26 s                     |
+| song song `--maxWorkers=2` / timing / `_serial` | 27 phút 04 s – 27 phút 56 s / 54–56 s / 59–61 s |
+| `http-contract`; `quality`                      | 136–170 s; 416–473 s                            |
+
+Chỉ có hai mẫu, nên p95 tạm là mẫu lớn nhất: quy tắc cho job `integration` khoảng 47–48 phút, trong khi `ci.yml` đặt 40 (Owner,
+30/10/2026); Owner quyết giữ hay đổi, tài liệu này không đổi workflow. Chưa có số đo của lượt module bị ảnh hưởng, của
+`e2e-smoke` và của `nightly.yml`. Sau khi tách spec integration (nhiều database hơn) phải đo lại bằng run mới; số gốc ở
+[nghiệm thu mục 11](../docs/reviews/be-architecture-test-acceptance-2026-10-29/README.md#11-bằng-chứng-github-đọc-được-prompt-09-30102026)
+và quy tắc ở [spec](../docs/workspace/items/be-test-architecture-redesign/spec.md#ngân-sách-thời-gian-ci-31102026-od-r8--b).
+CI vẫn `remote-verification-pending` cho tới khi Owner đẩy và đọc run mới.

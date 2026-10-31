@@ -23,6 +23,9 @@ const RETURN_REVOCATION_LISTENER = 'requests.return-request';
  */
 @Injectable()
 export class ReturnRevocationHook implements OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [RevocationListeners] as const;
+
   constructor(
     private readonly returns: ReturnRequestRepo,
     private readonly organization: OrganizationApi,

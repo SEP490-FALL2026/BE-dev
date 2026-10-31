@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { Grounds, GroundsInput } from '../policies/grounds.policy';
+import type { Grounds, GroundsInput } from '../personnel-grounds.policy';
 
 export type TransferStatus = 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
 
@@ -27,7 +27,7 @@ export interface TransferRecord {
   opensPlacementId: string;
   headHandover: HeadHandoverFacts | null;
   grounds: Grounds;
-  /** Who recorded it: an account, or the ticket of the controlled procedure (spec L.2): exactly one of the two is set. */
+  /** Who recorded it: an account, or the ticket of the controlled procedure: exactly one of the two is set. */
   recordedByAppUserId: string | null;
   recordedByTicketId: string | null;
   recordedAt: Date;
@@ -57,7 +57,7 @@ export interface TransferChangeRecord {
   newEffectiveOn: BusinessDate | null;
   reason: string;
   grounds: Grounds;
-  /** The account, or the ticket of the controlled procedure (spec L.2). */
+  /** The account, or the ticket of the controlled procedure. */
   changedByAppUserId: string | null;
   changedByTicketId: string | null;
   changedAt: Date;

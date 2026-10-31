@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { LicensingApi } from '../../licensing/public/licensing.api';
+import { LicensingServiceAccountApi } from '../../licensing/public/licensing-service-account.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
-import { technicalStepRefusal } from '../policies/personnel-self-action.policy';
+import { technicalStepRefusal } from '../personnel-self-action.policy';
 import { SERVICE_ACCOUNT_UNASSIGNED, TRANSFER_REVIEW_OPEN, userActor } from '../public/personnel.types';
 import { TransferGuardService } from './transfer-guard.service';
 import { TransferRefusedError } from './transfer.errors';
@@ -26,14 +26,14 @@ export class TransferClosureService {
     private readonly transfers: TransferRepo,
     private readonly settlement: TransferSettlementService,
     private readonly organization: OrganizationApi,
-    private readonly licensing: LicensingApi,
+    private readonly licensingServiceAccounts: LicensingServiceAccountApi,
     private readonly audit: AuditApi,
     private readonly guard: TransferGuardService,
   ) {}
 
   /**
    * Closing is a technical step that follows the event (the people who answer for the service accounts are named): the IT Admin's,
-   * judged here and not only by the guard of the route (F13).
+   * judged here and not only by the guard of the route.
    */
   close(actor: AuthenticatedPrincipal, id: string): Promise<TransferRecord> {
     const refused = technicalStepRefusal(actor);
@@ -57,7 +57,7 @@ export class TransferClosureService {
 
       // The parts of the record that are still open keep it open: a service account with nobody to answer for it, and the review of
       // the tools the new head has not finished (`US-03-08` AC-5, `US-03-07`). Each is told by its code with how many there are.
-      const open = await this.licensing.listServiceAccountDuties([held.employeeId], tx);
+      const open = await this.licensingServiceAccounts.listServiceAccountDuties([held.employeeId], tx);
       const reviews = await this.transfers.countOpenReviews(tx, held.id);
       if (open.length > 0 || reviews > 0) {
         throw new TransferRefusedError('NOT_CLOSEABLE', {

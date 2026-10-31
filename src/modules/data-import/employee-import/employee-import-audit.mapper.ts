@@ -1,5 +1,5 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { HrBasis } from '../../../core/hr-basis';
+import type { HrBasis } from '../../organization/public/hr-basis.types';
 import type { AuditEventInput } from '../../audit/public/audit.types';
 import type { ImportResult, ImportSummary } from './employee-import.types';
 

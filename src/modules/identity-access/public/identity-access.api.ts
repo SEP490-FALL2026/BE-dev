@@ -5,7 +5,7 @@ import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { ActionLinkService } from '../accounts/action-link.service';
-import { CredentialService } from '../accounts/credential.service';
+import { CredentialService } from '../credentials/credential.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
 import { ApprovalRoleHoldersService } from '../approval-roles/approval-role-holders.service';
 import {
@@ -15,7 +15,7 @@ import {
   LeaverGrantRole,
   SuperAdminHolder,
 } from './identity-access.types';
-import { employeeHasNotLeft, isActionLinkRedeemable } from '../policies/account.policy';
+import { employeeHasNotLeft, isActionLinkRedeemable } from '../accounts/account.policy';
 
 /** Public facade of the identity-access module. */
 @Injectable()
@@ -65,7 +65,7 @@ export class IdentityAccessApi {
 
   /**
    * Whether the link behind this token hash would still work, for an invitation or a password reset;
-   * the dispatcher asks this before sending (T-10).
+   * the dispatcher asks this before sending.
    */
   async isActionLinkUsable(tokenHash: string): Promise<boolean> {
     const link = await this.links.findActionLink(tokenHash);
@@ -81,19 +81,8 @@ export class IdentityAccessApi {
    * in a statement of its own, so a grant or a lock that commits after this cannot change what was judged before
    * commit.
    */
-  async inspectEmployeeAccount(tx: DbTx, employeeId: string): Promise<EmployeeAccountInspection> {
-    const appUserId = await this.accounts.findAccountIdByEmployee(tx, employeeId);
-    if (appUserId === null) return { hasAccount: false, usable: false, roles: [] };
-
-    await this.accounts.lockAppUser(tx, appUserId, 'SHARE');
-    const account = await this.accounts.readAccount(tx, appUserId);
-    const roles = await this.grants.effectiveRoles(appUserId, tx);
-
-    return {
-      hasAccount: account !== null,
-      usable: account !== null && account.status === 'ACTIVE' && account.activationState === 'ACTIVATED',
-      roles,
-    };
+  inspectEmployeeAccount(tx: DbTx, employeeId: string): Promise<EmployeeAccountInspection> {
+    return this.accounts.inspectEmployeeAccount(tx, employeeId);
   }
 
   /**
@@ -145,7 +134,7 @@ export class IdentityAccessApi {
     return this.accounts.employeeIdsOfAccounts(appUserIds, tx);
   }
 
-  /** How many IT Admins other than this employee can act (an unlocked read, `QĐ-77m`); with `tx`, in the transaction of the act (F24). */
+  /** How many IT Admins other than this employee can act (an unlocked read, `QĐ-77m`); with `tx`, in the transaction of the act. */
   countUsableItAdminsExcept(employeeId: string, tx?: DbTx): Promise<number> {
     return this.accounts.countUsableItAdminsExcept(employeeId, tx);
   }

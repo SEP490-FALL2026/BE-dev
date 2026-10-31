@@ -1,0 +1,472 @@
+{
+  "src/modules/budgets/budget-view/budget-view.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/budgets/budget/version-line.repo.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/budgets/budget/version-view.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/budgets/proposal/proposal-view.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/budgets/proposal/proposal.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/budgets/version/line-import.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/budgets/year-end/year-end.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/modules/catalog/plan/plan.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/catalog/subscription/subscription-view.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/catalog/subscription/subscription.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/catalog/subscription/subscription.repo.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/data-import/employee-import/row-validation/employee-import-row-validation.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/data-import/seat-baseline-import/seat-baseline-imports.controller.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/identity-access/access/jwt-access-token-verifier.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/identity-access/accounts/app-users/account-invitation.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/identity-access/accounts/invitation-redemption.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/identity-access/approval-roles/approval-role.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/modules/identity-access/auth/session.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/identity-access/public/holder-recovery.api.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/modules/identity-access/public/role-transfer-recovery.api.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/identity-access/recovery/role-handover.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/installation/dev-seed/dev-seed-plan.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/installation/migration-preflight/migration-preflight-judgement.policy.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/modules/installation/public/dev-seed.api.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/installation/public/installation-inspection.api.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/installation/public/installation.api.ts": {
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/modules/installation/public/migration-preflight-report.mapper.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/licensing/assignment/assignment.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/licensing/assignment/renewal/assignment-renewal.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/licensing/department-tools/department-tools.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/licensing/expiry/expiry-queue.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/licensing/handover/handover-issue.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/licensing/handover/handover-view.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/licensing/license-key/license-key.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/licensing/provisioning/grant-cancellation/grant-cancellation.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/licensing/provisioning/provisioning-task-view.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/licensing/provisioning/revocation.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/licensing/saas-issue/saas-issue-handling.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/modules/licensing/saas-issue/saas-issue-view.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/licensing/saas-issue/saas-issue.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/notifications/email/email-dispatcher.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/notifications/inbox/inbox.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/onboarding/onboarding.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/operating-parameters/parameter-definitions.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/organization/department-management/department.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/organization/employee/employee-manual.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/modules/organization/employee/import-lookup.repo.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/organization/public/cost-center-direction.api.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/personnel/leave/leave.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/personnel/notice/notice.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/personnel/notice/notice.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/personnel/offboarding/offboarding-frame.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/personnel/offboarding/offboarding.mapper.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/personnel/role-duties/role-duties.listener.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/personnel/super-admin-event/profile-correction.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/personnel/super-admin-event/super-admin-event.repo.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/personnel/transfer-review/transfer-review-decision.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/modules/personnel/transfer/transfer.mapper.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/access-request/access-request-record.mapper.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/assessment/assessment-view.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/assessment/proposal.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/modules/requests/assessment/quote-pricing.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/cancellation/departure-cancellation.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/grant/grant.policy.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/group-line-decisions/group-line-query.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/group-line-decisions/group-lines.controller.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/group-line-decisions/group-spend-decision.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/modules/requests/group-request-submission/group-request-trail.mapper.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/group-request-submission/group-submission-facts.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/reassignment/controlled-wait.repo.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/reassignment/step-reassignment.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/request-view/access-request-query.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/request-view/access-request.mapper.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/request-view/pricing-view.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/service-account-request/service-account-request.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  },
+  "src/modules/requests/sla/backlog-alert.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/sla/reminder-writer.service.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/spend-submission/spend-queue.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/spend/budget-check.service.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/status/request-status-facts.service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/status/rules/request-status-rules.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/modules/requests/timing/request-timing.policy.ts": {
+    "complexity": {
+      "count": 1
+    }
+  }
+}

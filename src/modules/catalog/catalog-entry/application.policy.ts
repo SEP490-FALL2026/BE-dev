@@ -27,7 +27,7 @@ export function isCommunicationService(answers: CommunicationAnswers): boolean {
   return answers.personToPersonMessaging || answers.callsOrMeetings || answers.mailbox;
 }
 
-/** The most similar applications a detail names; the total says how many there are (`LD-06`). */
+/** The most similar applications a detail names; the total says how many there are. */
 export const SIMILAR_APPLICATION_LIMIT = 20;
 
 /** A communication service is not collected for usage by default (BR-06.2); otherwise nothing is decided here. */

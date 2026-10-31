@@ -11,7 +11,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { PERSONNEL_ACCESS_ERROR_EXAMPLES } from '../mappers/personnel-access.http-errors';
+import { PERSONNEL_ACCESS_ERROR_EXAMPLES } from '../personnel-access.http-errors';
 import { userActor } from '../public/personnel.types';
 import {
   ChangeReturnDateBodyDto,
@@ -34,7 +34,7 @@ const FORBIDDEN = {
     'Only the Super Admin starts, moves or ends a long leave, and reads it in full; the IT Admin reads a minimal projection (AUTHORIZATION.FORBIDDEN).',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
-/** A write by the Super Admin is also refused about themselves (F19): the controlled procedure records that event. */
+/** A write by the Super Admin is also refused about themselves: the controlled procedure records that event. */
 const FORBIDDEN_WRITE = {
   ...FORBIDDEN,
   description: `${FORBIDDEN.description} The Super Admin does not record or change a long leave about themselves in the application (PERSONNEL.SELF_CHANGE_FORBIDDEN): the controlled procedure does.`,

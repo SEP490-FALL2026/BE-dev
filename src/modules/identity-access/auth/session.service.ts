@@ -4,7 +4,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { IssuedSession } from '../public/identity-access.types';
-import { employeeHasNotLeft } from '../policies/account.policy';
+import { employeeHasNotLeft } from '../accounts/account.policy';
 import { SessionInvalidError } from './auth.errors';
 import { SessionTokenService } from './session-token.service';
 import { SessionRepo } from './session.repo';

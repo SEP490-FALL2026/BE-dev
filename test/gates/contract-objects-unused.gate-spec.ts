@@ -135,7 +135,8 @@ export function objectsReached(source: string): string[] {
   );
 }
 
-describe('the compatibility release does not use what the release after it deletes (spec L.10, F01, F03, F04, F05, F06)', () => {
+// spec L.10, F01, F03, F04, F05, F06
+describe('the compatibility release does not use what the release after it deletes', () => {
   const files = sourceFiles(SOURCE_ROOT).map((path) => ({
     path: relative(SOURCE_ROOT, path).split(sep).join('/'),
     source: readFileSync(path, 'utf8'),

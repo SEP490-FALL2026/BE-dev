@@ -6,7 +6,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
-import { employeeHasNotLeft } from '../policies/account.policy';
+import { employeeHasNotLeft } from '../accounts/account.policy';
 import { ApprovalRoleHolderInvalidError, ApprovalRolePairingError } from './approval-role.errors';
 import { cutHistory } from '../../../core/application/pagination';
 import { APPROVAL_ROLES, ApprovalRoleName, ApprovalRoleRepo } from './approval-role.repo';

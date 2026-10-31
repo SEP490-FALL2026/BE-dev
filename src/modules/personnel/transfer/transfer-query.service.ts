@@ -3,7 +3,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
-import { readAccessOf, type ReadAccess } from '../policies/personnel-self-action.policy';
+import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
 import { TransferRefusedError } from './transfer.errors';
 import type { TransferChangeWire, TransferDetailWire, TransferRecordedWire, TransferSummaryWire } from './transfer.dto';
 import { toChange, toDetail, toRecorded, toSummary, type TransferNames } from './transfer.mapper';
@@ -26,7 +26,7 @@ const paged = <T>(items: T[], total: number, page: { page: number; pageSize: num
 });
 
 /**
- * Reads transfers (F12): the Super Admin reads all of them in full; the IT Admin only the minimal projection of the transfers that
+ * Reads transfers: the Super Admin reads all of them in full; the IT Admin only the minimal projection of the transfers that
  * leave or enter a department they are in charge of or stand in for (one with no usable IT Admin named is every IT Admin's), and the
  * rest do not exist for them (404); nobody else reads them. The log of
  * moves and cancellations carries the reasons and the basis, so it is the Super Admin's alone.
@@ -39,7 +39,7 @@ export class TransferQueryService {
     private readonly identity: IdentityAccessApi,
   ) {}
 
-  /** One page of summaries; the names of the page are read in one statement each, whatever the page size (`LD-07`). */
+  /** One page of summaries; the names of the page are read in one statement each, whatever the page size. */
   async list(actor: AuthenticatedPrincipal, filter: TransferListFilter): Promise<Paged<TransferSummaryWire>> {
     const { departmentIds } = await this.scopeOf(actor);
     const { items, total } = await this.transfers.list({ ...filter, ...(departmentIds ? { departmentIds } : {}) });

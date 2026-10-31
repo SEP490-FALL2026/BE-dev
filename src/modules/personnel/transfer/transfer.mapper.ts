@@ -1,5 +1,5 @@
 import type { DepartmentBrief, EmployeeRecord } from '../../organization/public/organization.types';
-import type { ReadAccess } from '../policies/personnel-self-action.policy';
+import type { ReadAccess } from '../personnel-self-action.policy';
 import type { TransferChangeWire, TransferDetailWire, TransferRecordedWire, TransferSummaryWire } from './transfer.dto';
 import type { TransferChangeRecord, TransferRecord, TransferSummaryRecord, TransferWarning } from './transfer.types';
 
@@ -35,7 +35,7 @@ export function toSummary(record: TransferSummaryRecord, names: TransferNames): 
 }
 
 /**
- * The transfer in full for the Super Admin; for the IT Admin only the minimal projection (F12): the people, the departments, the day
+ * The transfer in full for the Super Admin; for the IT Admin only the minimal projection: the people, the departments, the day
  * and the state the technical work needs, without the basis, the handover of the head or the reason of a cancellation.
  */
 export function toDetail(

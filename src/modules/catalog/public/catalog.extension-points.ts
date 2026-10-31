@@ -18,7 +18,7 @@ export interface SeatOccupancyReader {
   openHolderCount(planIds: readonly string[], day: BusinessDate): Promise<number>;
   /**
    * The first `limit` assignments on these plans that have not ended and have not failed, how many there are in all and
-   * how many per plan (`LD-06`: never every seat); with `tx`, read in the caller's transaction.
+   * how many per plan (never every seat); with `tx`, read in the caller's transaction.
    */
   openAssignmentsOfPlans(
     planIds: readonly string[],

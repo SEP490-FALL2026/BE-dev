@@ -38,33 +38,48 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
 - Đăng ký vào: `organization.department-use-readers` (`DepartmentUseContributions`, tên `catalog.subscriptions`) —
   `subscription/subscription-department-use.listener.ts`.
 
+## Hướng phụ thuộc giữa capability (R6)
+
+Không vòng (`pnpm arch:capabilities --module catalog`, gate `capability-graph`). Từ thấp lên cao: `vendor-dictionary` →
+`vendor`, `functional-group` → `catalog-entry` → `plan` → `subscription` → `plan-terms`; `application-retirement` và
+`internal-software-registration` đứng trên `catalog-entry`, `plan` (và `subscription`). Một cạnh ngược mới là vòng: chuyển
+file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên capability mới theo tên use case.
+
 ## Capability → file chính
 
 - `vendor-dictionary/` — từ điển vendor dùng chung, gợi ý/chuẩn hóa, đề xuất (US-04-07);
   `vendor-dictionary.controller.ts`; `VendorDictionaryService`, `VendorRecognitionService`, `VendorProposalService`.
 - `vendor/` — danh sách vendor, hồ sơ thuế và ước tính thuế (US-12-09, dữ liệu qua `FinanceApi`);
   `vendors.controller.ts`; `VendorQueryService`, `VendorTaxService`.
-- `catalog-entry/` — ứng dụng (US-04-01), Business Owner (US-04-06), retire, phần mềm nội bộ;
-  `applications.controller.ts`, `application-owners.controller.ts`; use case `retirement/` (controller, dto, policy,
-  repo, service); `ApplicationService`, `ApplicationRetirementService`.
+- `catalog-entry/` — ứng dụng (US-04-01), Business Owner (US-04-06), gợi ý K2 (`k2-recommendation.policy.ts`);
+  `applications.controller.ts`, `application-owners.controller.ts`; `ApplicationService` (phần kiểm trước khi ghi ở
+  `ApplicationWriteGuards`, phần đổi trạng thái là hàm thuần trong `application-state.policy.ts`). Gốc của module: `plan/` và
+  `subscription/` đọc ứng dụng qua `ApplicationLookupService`; ứng dụng muốn biết plan của mình để gợi ý K2 thì khai
+  `application-plans.types.ts` (`ApplicationPlans`) và `plan/plan-lookup.service.ts` trả lời, `catalog.module.ts` nối hai bên.
+- `application-retirement/` — retire ứng dụng (xác nhận của Business Owner, chặn bởi assignment/subscription); đọc ứng dụng,
+  plan và subscription nên đứng trên cả ba; controller, dto, policy, repo, `ApplicationRetirementService`.
+- `internal-software-registration/` — đăng ký phần mềm nội bộ: tạo ứng dụng và plan trong một transaction; đứng trên
+  `catalog-entry/` và `plan/`; `InternalSoftwareRegistrationService` (facade `CatalogApi` gọi).
 - `functional-group/` — nhóm chức năng (BR-06.9); `functional-groups.controller.ts`; `FunctionalGroupService`.
 - `plan/` — plan của ứng dụng, workspace profile K2 (US-04-02); `plans.controller.ts`; `PlanService`,
   `PlanWorkspaceService`.
 - `plan-terms/` — điều khoản, ý kiến Business Owner, cảnh báo review (US-04-11); `plan-terms.controller.ts`;
   `PlanTermsService`.
 - `subscription/` — subscription và mua đứt (US-04-03, US-04-05), đích ghế, giá; `subscriptions.controller.ts`;
-  `SubscriptionService`, `SeatTargetService`, `seat-guard.policy.ts`.
+  `SubscriptionService`, `SubscriptionChangeService` (đổi subscription; kiểm trước khi ghi ở `SubscriptionChangeGuard`),
+  `SeatTargetService`, `seat-guard.policy.ts` (số lượng không dưới ghế đang chiếm); `nextStateOf`, `subscriptionStatusOf`,
+  `sameUnitPrice` là hàm thuần trong `subscription.policy.ts`.
 - `contract/` — hợp đồng và file riêng tư trong object storage (US-04-04); `contracts.controller.ts`,
   `documents.controller.ts`; `ContractService`, `DocumentService`; `document-expiry.job.ts` chạy mỗi giờ (DB-13).
 - `subscription-owner-assignment/` — repo và Nest module riêng của lệnh CLI; service nằm ở `public/`.
-- `mappers/` — `catalog-audit-event.mapper.ts` (sự kiện Audit Trail của module).
+- Gốc module: `catalog-audit-event.mapper.ts` (sự kiện Audit Trail, mọi capability dùng).
 
 ## Bất biến quan trọng
 
 - Không route nào xóa vendor, nhóm chức năng, plan, subscription hay hợp đồng (JSDoc các controller).
 - Số lượng subscription không thấp hơn số ghế đang chiếm (`assertQuantityNotBelowOccupied`, `seat-guard.policy.ts`);
   retire ứng dụng chỉ khi Business Owner đã xác nhận và không còn assignment/subscription chặn
-  (`catalog-entry/retirement/application-retirement.service.ts`). Cả hai đọc ghế qua `SeatOccupancyHook`.
+  (`application-retirement/application-retirement.service.ts`). Cả hai đọc ghế qua `SeatOccupancyHook`.
 - `lockSeatTarget`: subscription `FOR UPDATE`, plan nội bộ `FOR SHARE` tới hết transaction (`seat-target.service.ts`).
 - Thay đổi tạo/tăng/kéo dài khoản phải trả cần phòng ban sở hữu có Cost Center đang dùng (F26,
   `FINANCE.SETUP_INCOMPLETE`, `subscription.service.ts`).

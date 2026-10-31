@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { Client } from 'pg';
-import { PayloadCipher } from '../../../src/modules/notifications/payload-cipher.service';
+import { PayloadCipher } from '../../../src/modules/notifications/email/payload-cipher.service';
 import { bodyOf } from '../../support/api-body';
 import {
   HttpTestApp,

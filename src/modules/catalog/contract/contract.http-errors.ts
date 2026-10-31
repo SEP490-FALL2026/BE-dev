@@ -68,7 +68,7 @@ const example = (error: Error) => errorExampleOf(toContractApiException(error));
 /** The default of the operating parameter DOCUMENT_MAX_SIZE_MB (10 MB), the largest file the example refuses. */
 const EXAMPLE_MAX_BYTES = 10 * 1024 * 1024;
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const CONTRACT_ERROR_EXAMPLES = {
   CONTRACT_NOT_FOUND: example(new ContractNotFoundError()),
   NAME_REQUIRED: example(new ContractNameRequiredError()),

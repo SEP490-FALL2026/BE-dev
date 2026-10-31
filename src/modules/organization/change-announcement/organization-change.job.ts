@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
-import { OrganizationHistoryApi } from '../public/organization-history.api';
+import { OrganizationContextService } from '../organization-context.service';
+import { OrganizationChangeService } from './organization-change.service';
 
 /** The first sweep waits, so a short-lived process (a test, a command) never starts one. */
 const FIRST_SWEEP_AFTER_MS = 5 * 60 * 1000;
@@ -18,7 +19,10 @@ export class OrganizationChangeSweeper implements OnApplicationBootstrap, OnModu
   private running: Promise<void> | undefined;
   private stopped = false;
 
-  constructor(private readonly history: OrganizationHistoryApi) {}
+  constructor(
+    private readonly changes: OrganizationChangeService,
+    private readonly context: OrganizationContextService,
+  ) {}
 
   onApplicationBootstrap(): void {
     this.stopped = false;
@@ -41,7 +45,7 @@ export class OrganizationChangeSweeper implements OnApplicationBootstrap, OnModu
 
   private async sweep(): Promise<void> {
     try {
-      const { told, failed } = await this.history.announceDueChanges();
+      const { told, failed } = await this.changes.announceDue(await this.context.businessToday());
       if (told > 0 || failed > 0) this.logger.log(`Told ${told} change(s) of the organization, ${failed} failed`);
     } catch (error) {
       this.logger.error(`Organization change sweep failed: ${(error as Error).name}`);

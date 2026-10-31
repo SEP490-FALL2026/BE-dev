@@ -3,12 +3,12 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import request from 'supertest';
 import { Client } from 'pg';
-import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
   provisionDisposableDatabase,
 } from '../../support/disposable-database';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { AssignmentWire, SeatHarness } from '../../support/seat-baseline-harness';
 import { HR_BASIS } from '../../support/hr-basis';
 
@@ -166,12 +166,11 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
 
   describe('over HTTP', () => {
     const h = new SeatHarness();
-    let organization: OrganizationApi;
-    const today = (day: string) => jest.spyOn(organization, 'businessToday').mockResolvedValue(day);
+    // The business day the module's own capabilities read is the context service's, which the facade delegates to: one stub for both.
+    const today = (day: string) => pretendBusinessToday(h.ctx.app, day);
 
     beforeAll(async () => {
       await h.start();
-      organization = h.ctx.app.get(OrganizationApi, { strict: false });
     }, 180000);
 
     afterEach(() => {

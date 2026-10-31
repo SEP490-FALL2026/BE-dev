@@ -20,6 +20,7 @@ import {
   UpdateSubscriptionBodyDto,
 } from './subscription.dto';
 import { SUBSCRIPTION_ERROR_EXAMPLES, toSubscriptionApiException } from './subscription.http-errors';
+import { SubscriptionChangeService } from './subscription-change.service';
 import { SubscriptionService } from './subscription.service';
 import type { SubscriptionView } from './subscription.types';
 
@@ -82,7 +83,7 @@ const REPORTING_CURRENCY_CONFLICT = {
   examples: [SUBSCRIPTION_ERROR_EXAMPLES.REPORTING_CURRENCY_NOT_SUPPORTED],
 } as const;
 
-/** The update is the one route whose conflict is not only the configuration: a change that owes more needs a Cost Center (F26). */
+/** The update is the one route whose conflict is not only the configuration: a change that owes more needs a Cost Center. */
 const UPDATE_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
@@ -108,7 +109,10 @@ const toWire = (view: SubscriptionView) => ({
 @ApiTags('subscriptions')
 @Controller({ path: 'subscriptions', version: '1' })
 export class SubscriptionsController {
-  constructor(private readonly subscriptions: SubscriptionService) {}
+  constructor(
+    private readonly subscriptions: SubscriptionService,
+    private readonly changes: SubscriptionChangeService,
+  ) {}
 
   @Get()
   @RequireRoles('IT_ADMIN', 'FINANCE')
@@ -188,7 +192,7 @@ export class SubscriptionsController {
     @Body() body: UpdateSubscriptionBodyDto,
   ) {
     try {
-      return toWire(await this.subscriptions.update(actor, params.id, body));
+      return toWire(await this.changes.update(actor, params.id, body));
     } catch (error) {
       throw toSubscriptionApiException(error);
     }

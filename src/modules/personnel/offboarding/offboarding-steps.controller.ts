@@ -21,7 +21,7 @@ import {
 import { OFFBOARDING_ERROR_EXAMPLES, toOffboardingApiException } from './offboarding.http-errors';
 import { OffboardingLeftService } from './offboarding-left.service';
 import { OffboardingRevocationService } from './offboarding-revocation.service';
-import { OffboardingViewService } from './offboarding-view.service';
+import { OffboardingDetailService } from './detail/offboarding-detail.service';
 
 const E = OFFBOARDING_ERROR_EXAMPLES;
 const FORBIDDEN = {
@@ -57,7 +57,7 @@ export class OffboardingStepsController {
   constructor(
     private readonly left: OffboardingLeftService,
     private readonly revocations: OffboardingRevocationService,
-    private readonly view: OffboardingViewService,
+    private readonly detail: OffboardingDetailService,
   ) {}
 
   @Post(':id/account-lock')
@@ -89,7 +89,7 @@ export class OffboardingStepsController {
     @Body() body: RecordAccountLockBodyDto,
   ) {
     try {
-      return await this.view.detailOf(await this.left.recordAccountLock(actor, params.id, body), 'MINIMAL');
+      return await this.detail.detailOf(await this.left.recordAccountLock(actor, params.id, body), 'MINIMAL');
     } catch (error) {
       throw toOffboardingApiException(error);
     }
@@ -125,7 +125,7 @@ export class OffboardingStepsController {
   ) {
     try {
       const opened = await this.revocations.openRevocations(actor, params.id, { ...body, reason: body.reason ?? '' });
-      const detail = await this.view.detailOf(opened.record, 'MINIMAL');
+      const detail = await this.detail.detailOf(opened.record, 'MINIMAL');
 
       return { ...detail, revocations: { created: opened.created, reasonAdded: opened.reasonAdded } };
     } catch (error) {
@@ -154,7 +154,7 @@ export class OffboardingStepsController {
   )
   async close(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: OffboardingIdParamDto) {
     try {
-      return await this.view.detailOf(await this.revocations.close(actor, params.id), 'MINIMAL');
+      return await this.detail.detailOf(await this.revocations.close(actor, params.id), 'MINIMAL');
     } catch (error) {
       throw toOffboardingApiException(error);
     }

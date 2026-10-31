@@ -5,7 +5,8 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { EmployeeNotFoundError } from '../public/organization.errors';
-import { OrganizationApi } from '../public/organization.api';
+import { OrganizationContextService } from '../organization-context.service';
+import { EmployeeDirectoryService } from './employee-directory.service';
 import type { EmployeeRecord } from '../public/organization.types';
 import {
   EmployeeForbiddenError,
@@ -16,7 +17,7 @@ import {
 import { EmployeeMaintenanceService } from './employee-maintenance.service';
 
 /**
- * What correcting the official fields of a record does around the facade (`US-02-02` AC-19, `QĐ-87a`, `QĐ-87c`, F11, F13, F17): who
+ * What correcting the official fields of a record does around the facade (`US-02-02` AC-19, `QĐ-87a`, `QĐ-87c`): who
  * is refused before anything is read, what is written, audited and told in one transaction, and the cases that write nothing.
  */
 describe('EmployeeMaintenanceService', () => {
@@ -70,7 +71,20 @@ describe('EmployeeMaintenanceService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         EmployeeMaintenanceService,
-        { provide: OrganizationApi, useValue: organization },
+        {
+          provide: OrganizationContextService,
+          useValue: { businessToday: organization.businessToday, findOrganization: organization.getOrganization },
+        },
+        {
+          provide: EmployeeDirectoryService,
+          useValue: {
+            lock: (tx: unknown, id: string) => organization.lockEmployeeForUpdate(tx, id) as Promise<void>,
+            find: organization.getEmployee,
+            isWorkEmailTaken: organization.isWorkEmailTaken,
+            updateOfficialFields: organization.updateEmployeeOfficialFields,
+            profileNotices: organization.getProfileNotices,
+          },
+        },
         { provide: AuditApi, useValue: audit },
         { provide: NotificationsApi, useValue: notifications },
         { provide: TransactionRunner, useValue: runner },

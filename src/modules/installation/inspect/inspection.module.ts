@@ -5,11 +5,11 @@ import { ReadOnlyDatabaseSessionModule } from '../../../infrastructure/database/
 import { AuditModule } from '../../audit/audit.module';
 import { IdentityAccessInspectionFacadeModule } from '../../identity-access/identity-access-inspection-facade.module';
 import { OrganizationModule } from '../../organization/organization.module';
-import { InstallationInspectionApi } from '../public/inspection.api';
+import { InstallationInspectionApi } from '../public/installation-inspection.api';
 import { MigrationStateRepo } from './migration-state.repo';
 
 /**
- * The graph of `pnpm ops:inspect` (H6.1). Database settings only (no secret, mail, Redis or storage), every session
+ * The graph of `pnpm ops:inspect`. Database settings only (no secret, mail, Redis or storage), every session
  * read-only, and only the read contracts it inspects. Never imported by the API, the worker or a command that writes.
  */
 @Module({

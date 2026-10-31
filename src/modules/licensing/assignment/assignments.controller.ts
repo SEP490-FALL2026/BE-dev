@@ -12,7 +12,7 @@ import { RequireRoles } from '../../../infrastructure/security/decorators/access
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AssignmentView } from '../public/licensing.types';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { toLicensingApiException } from '../licensing.http-errors';
 import {
   AssignmentIdParamDto,
   AssignmentPageResponseDto,

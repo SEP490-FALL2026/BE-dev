@@ -15,6 +15,9 @@ import { TransferReviewService } from './transfer-review.service';
  */
 @Injectable()
 export class TransferReviewListener implements OrganizationChangeListener, OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [OrganizationChangeListeners] as const;
+
   constructor(
     private readonly changes: OrganizationChangeListeners,
     private readonly reviews: TransferReviewService,

@@ -1,38 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../../core/application/pagination';
-import type { BusinessDate } from '../../../../core/business-date';
-import { DbTx, TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditApi } from '../../../audit/public/audit.api';
-import { CatalogApi } from '../../../catalog/public/catalog.api';
-import type { SeatTarget } from '../../../catalog/public/catalog.types';
 import { OrganizationApi } from '../../../organization/public/organization.api';
-import { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
-import { AssignmentService } from '../../assignment/assignment.service';
-import {
-  GrantRequestRefusedError,
-  ProvisioningBeneficiaryDepartedError,
-  ProvisioningResponsibleInvalidError,
-  ProvisioningSubscriptionError,
-  ProvisioningTaskNotFoundError,
-  SeatQuantityUnknownError,
-  SeatTargetNotFoundError,
-} from '../../public/licensing.errors';
+import { ProvisioningBeneficiaryDepartedError, ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
 import { GrantRequestGateHook, RevocationListeners } from '../../public/licensing.extension-points';
 import type { ProvisioningChannel, ProvisioningTaskStatus } from '../../public/licensing.types';
-import { licensingAuditEvent } from '../../mappers/licensing-audit-event.mapper';
-import {
-  assertGrantableType,
-  assertItAdmin,
-  assertSubscriptionChoice,
-  chooseServiceIdentifier,
-  cleanEvidence,
-  cleanFailureReason,
-  nextStatus,
-} from '../provisioning.policy';
-import { maxAttempts as maxAttemptsFor } from '../failure.policy';
+import { cleanEvidence, cleanFailureReason, nextStatus } from '../provisioning.policy';
 import { assertNotRevocationTask } from '../revocation.policy';
-import { ProvisioningHolderService } from './provisioning-holder.service';
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
@@ -41,142 +15,20 @@ import { ProvisioningTaskViewService, type TaskSummaryView, type TaskView } from
 export type TaskScope = 'ALL' | 'MINE' | 'GENERAL';
 
 /**
- * The queue of the work that makes a seat real (`US-07-01`, `US-07-02`). A grant writes the assignment, which holds the
- * seat from that day, and a task for a person to do; the task is completed only with a note of evidence by a person, and
- * is never completed, failed or changed by time. Every write is one transaction with its audit event, under the lock of
- * the seat target or of the task. The state of the request itself is the answer of the gate, not judged here.
+ * The queue of the work that makes a seat real (`US-07-01`, `US-07-02`): the list, one task, and the claim, the completion and the failure
+ * of a task. The task is completed only with a note of evidence by a person, and is never completed, failed or changed by time. Every write
+ * is one transaction with its audit event, under the lock of the task. The state of the request itself is the answer of the gate, not judged here.
  */
 @Injectable()
 export class ProvisioningService {
   constructor(
     private readonly repo: ProvisioningTaskRepo,
     private readonly frame: ProvisioningTaskFrame,
-    private readonly holders: ProvisioningHolderService,
     private readonly views: ProvisioningTaskViewService,
-    private readonly assignments: AssignmentService,
-    private readonly catalog: CatalogApi,
     private readonly organization: OrganizationApi,
-    private readonly parameters: OperatingParametersApi,
-    private readonly audit: AuditApi,
-    private readonly runner: TransactionRunner,
     private readonly gate: GrantRequestGateHook,
     private readonly revocation: RevocationListeners,
   ) {}
-
-  /**
-   * Grants the seat of a request: the assignment (source REQUEST, from today) and a manual task in the queue of the IT
-   * Admin in charge of the department of whoever holds it. A personal seat is the beneficiary's, under a company account; a
-   * service account (`US-05-21`) is answered for by a person of the department that owns it, under the identifier the IT
-   * Admin enters. The seat goes only on a subscription of the department of the request, which owns it and is charged for it
-   * (`QĐ-89a`, F20). Throws ProvisioningItAdminRequiredError, GrantRequestRefusedError, SeatTargetNotFoundError, ProvisioningTypeNotSupportedError,
-   * ProvisioningSubscriptionError, SeatQuantityUnknownError, EmployeeNotFoundError, ProvisioningBeneficiaryDepartedError,
-   * ProvisioningBeneficiaryNotStartedError, ProvisioningPersonalAccountError, ProvisioningAccountIdentifierRequiredError,
-   * ProvisioningResponsibleNotInDepartmentError, ProvisioningResponsibleInvalidError, ProvisioningAnotherItAdminNeededError
-   * and AssignmentConflictError.
-   */
-  async grant(
-    actor: AuthenticatedPrincipal,
-    input: {
-      requestId: string;
-      subscriptionId?: string;
-      accountIdentifier?: string;
-      expectedEndDate?: BusinessDate;
-      responsibleEmployeeId?: string;
-      /** The person of a request for a group this grant is for; a request for one person has none to name. */
-      beneficiaryEmployeeId?: string;
-    },
-  ): Promise<{ task: TaskView; warnings: 'DEPARTMENT_WITHOUT_IT_ADMIN'[] }> {
-    assertItAdmin(actor);
-    const answer = await this.gate.get().check(input.requestId, input.beneficiaryEmployeeId);
-    if (answer.status !== 'GRANTABLE') throw new GrantRequestRefusedError(answer.status);
-    // Only a service account has a person to name, and its identifier is the IT Admin's to give: nothing is locked or written yet.
-    if (answer.seat === 'PERSONAL' && input.responsibleEmployeeId !== undefined) {
-      throw new ProvisioningResponsibleInvalidError('NOT_SERVICE_ACCOUNT');
-    }
-    const serviceIdentifier = answer.seat === 'SERVICE' ? chooseServiceIdentifier(input.accountIdentifier) : null;
-
-    const plan = await this.catalog.findSeatTarget({ planId: answer.planId });
-    if (!plan) throw new SeatTargetNotFoundError('PLAN');
-    assertGrantableType(plan.provisioningType);
-    assertSubscriptionChoice(plan.provisioningType, input.subscriptionId);
-
-    const organization = await this.requireOrganization();
-    const today = await this.organization.businessToday();
-    const inCharge = await this.organization.getItAdminInCharge(
-      input.responsibleEmployeeId ?? answer.employeeId,
-      today,
-    );
-    // The most tries are fixed here: a parameter changed later reaches only the tasks made after it (US-01-04 AC-13).
-    const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT')));
-
-    const record = await this.runner.run(async (tx) => {
-      // The request is locked and moved to "being carried out" here, in the transaction of the grant: a second grant of
-      // the same request finds it no longer grantable, and a request that changed since the read above is refused.
-      const claimed = await this.gate.get().claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);
-      if (claimed.status !== 'GRANTABLE') throw new GrantRequestRefusedError(claimed.status);
-      if (
-        claimed.employeeId !== answer.employeeId ||
-        claimed.planId !== answer.planId ||
-        claimed.seat !== answer.seat
-      ) {
-        throw new GrantRequestRefusedError('NOT_APPROVED');
-      }
-      const target = await this.lockTarget(tx, plan, input.subscriptionId);
-      const holder =
-        claimed.seat === 'SERVICE' && serviceIdentifier !== null
-          ? await this.holders.service(tx, actor, {
-              requested: { employeeId: claimed.employeeId, account: claimed.serviceAccount },
-              named: input.responsibleEmployeeId,
-              accountIdentifier: serviceIdentifier,
-              today,
-            })
-          : await this.holders.personal(tx, {
-              requestId: input.requestId,
-              employeeId: answer.employeeId,
-              accountIdentifier: input.accountIdentifier,
-              today,
-            });
-
-      const assignment = await this.assignments.createFromRequest(tx, actor, {
-        organizationId: organization.id,
-        requestId: input.requestId,
-        departmentId: answer.seat === 'SERVICE' ? answer.serviceAccount.departmentId : answer.departmentId,
-        target,
-        holder,
-        effectiveFrom: today,
-        // The day the head gave for a person who is not staff is the end of the seat unless the IT Admin names another.
-        expectedEndDate: input.expectedEndDate ?? claimed.expectedEndDate,
-      });
-      const task = await this.repo.insert(tx, {
-        organizationId: organization.id,
-        assignmentId: assignment.id,
-        channel: 'MANUAL',
-        requestId: input.requestId,
-        defaultResponsibleEmployeeId: inCharge?.itAdminEmployeeId ?? null,
-        createdByAppUserId: actor.appUserId,
-        maxAttempts,
-      });
-      await this.audit.record(
-        tx,
-        licensingAuditEvent(actor, organization.id, 'PROVISIONING_TASK.CREATED', 'ProvisioningTask', task.id, null, {
-          requestId: input.requestId,
-          assignmentId: assignment.id,
-          channel: task.channel,
-          defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
-          ...(holder.selfExecuted === null ? {} : { selfExecuted: holder.selfExecuted }),
-        }),
-      );
-      // An IT Admin who answers for the account themselves because no other can is told to the Super Admin (`SoD-5`, F24).
-      if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
-
-      return task;
-    });
-
-    return {
-      task: (await this.views.views([record]))[0],
-      warnings: inCharge && inCharge.itAdminEmployeeId === null ? ['DEPARTMENT_WITHOUT_IT_ADMIN'] : [],
-    };
-  }
 
   /** The queue, the oldest first: `MINE` the tasks this IT Admin is in charge of, `GENERAL` those nobody works by default. */
   async list(
@@ -285,29 +137,11 @@ export class ProvisioningService {
     return (await this.views.views([task]))[0];
   }
 
-  /** K5: the plan itself (no seat); K1 and K2: the subscription, which must be of the plan and have a quantity. */
-  private async lockTarget(tx: DbTx, plan: SeatTarget, subscriptionId: string | undefined): Promise<SeatTarget> {
-    const target = await this.catalog.lockSeatTarget(tx, subscriptionId ? { subscriptionId } : { planId: plan.planId });
-    if (!target) throw new SeatTargetNotFoundError(subscriptionId ? 'SUBSCRIPTION' : 'PLAN');
-    if (target.planId !== plan.planId) throw new ProvisioningSubscriptionError('PLAN_MISMATCH');
-    this.assignments.assertSeatTargetUsable(target);
-    if (target.kind === 'SUBSCRIPTION' && target.purchasedQuantity === null) throw new SeatQuantityUnknownError();
-
-    return target;
-  }
-
   /** The persons in charge by default who no longer work: the tasks of those join the general queue. */
   private async responsibleWhoLeft(): Promise<string[]> {
     const ids = await this.repo.responsibleEmployeeIds();
     const known = await this.organization.getEmployees(ids);
 
     return known.filter((employee) => employee.status !== 'ACTIVE').map((employee) => employee.id);
-  }
-
-  private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
-    if (!organization) throw new Error('A provisioning task was made before installation');
-
-    return organization;
   }
 }

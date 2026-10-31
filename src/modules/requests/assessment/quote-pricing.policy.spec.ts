@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
-import { priceFromQuote, type Quote, type QuotePricingInput } from './quote-pricing.policy';
+import type { Quote } from '../access-request/assessment-record.types';
+import { priceFromQuote, type QuotePricingInput } from './quote-pricing.policy';
 
 const day = (value: string): BusinessDate => value;
 const usd = (units: number) => ({ amountMinor: BigInt(units) * 100n, currency: 'USD' });

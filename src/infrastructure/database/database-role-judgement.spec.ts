@@ -129,6 +129,73 @@ describe('judgeSeparation', () => {
     ]);
   });
 
+  describe('sequence privileges (H7-SEQ: the two legacy-sync sequences of BM-09 and BM-11)', () => {
+    const LEGACY_SYNC = ['personnel_notice_seq', 'saas_issue_seq'];
+    const finding = (name: string, expected: string, has: string) => ({
+      code: 'RUNTIME_SEQUENCE_PRIVILEGES',
+      subject: `${name}: expected ${expected}, has ${has}`,
+    });
+    const withSequences = (...entries: [string, string[]][]): SeparationFacts => ({
+      ...healthy(),
+      sequences: entries.map(([name, privileges]) => ({ name, privileges })),
+    });
+
+    it.each(LEGACY_SYNC)('accepts SELECT and UPDATE on %s (what its nextCode statements execute)', (name) => {
+      expect(judgeSeparation(withSequences([name, ['SELECT', 'UPDATE']], ['probe_seq', ['USAGE']]))).toEqual([]);
+    });
+
+    it.each(LEGACY_SYNC)('refuses %s when the runtime role only has USAGE, as it had before H7-SEQ', (name) => {
+      expect(judgeSeparation(withSequences([name, ['USAGE']]))).toEqual([finding(name, 'SELECT, UPDATE', 'USAGE')]);
+    });
+
+    it.each(LEGACY_SYNC)('refuses %s when SELECT (the read of its state) is missing', (name) => {
+      expect(judgeSeparation(withSequences([name, ['UPDATE']]))).toEqual([finding(name, 'SELECT, UPDATE', 'UPDATE')]);
+    });
+
+    it.each(LEGACY_SYNC)('refuses %s when UPDATE (the setval that lifts it) is missing', (name) => {
+      expect(judgeSeparation(withSequences([name, ['SELECT']]))).toEqual([finding(name, 'SELECT, UPDATE', 'SELECT')]);
+    });
+
+    it.each(LEGACY_SYNC)('refuses %s when it holds nothing at all', (name) => {
+      expect(judgeSeparation(withSequences([name, []]))).toEqual([finding(name, 'SELECT, UPDATE', 'none')]);
+    });
+
+    it.each(LEGACY_SYNC)('refuses %s when it holds more than the policy (the old blanket USAGE stays)', (name) => {
+      expect(judgeSeparation(withSequences([name, ['SELECT', 'UPDATE', 'USAGE']]))).toEqual([
+        finding(name, 'SELECT, UPDATE', 'SELECT, UPDATE, USAGE'),
+      ]);
+    });
+
+    it.each([['SELECT'], ['UPDATE'], ['SELECT', 'USAGE'], ['UPDATE', 'USAGE'], ['SELECT', 'UPDATE', 'USAGE']])(
+      'keeps every other sequence USAGE only: refuses %s on an ordinary one',
+      (...privileges) => {
+        expect(judgeSeparation(withSequences(['billing_seq', privileges]))).toEqual([
+          finding('billing_seq', 'USAGE', privileges.join(', ')),
+        ]);
+      },
+    );
+
+    it('judges each sequence on its own name: a policy of one does not leak to a sequence that merely looks like it', () => {
+      expect(
+        judgeSeparation(withSequences(['saas_issue_seq_2', ['SELECT', 'UPDATE']], ['my_saas_issue_seq', ['UPDATE']])),
+      ).toEqual([
+        finding('saas_issue_seq_2', 'USAGE', 'SELECT, UPDATE'),
+        finding('my_saas_issue_seq', 'USAGE', 'UPDATE'),
+      ]);
+    });
+
+    it('does not require a sequence that the schema has not created yet (an older baseline the provisioner supports)', () => {
+      expect(judgeSeparation(withSequences(['probe_seq', ['USAGE']]))).toEqual([]);
+      expect(judgeSeparation(withSequences(['saas_issue_seq', ['SELECT', 'UPDATE']]))).toEqual([]);
+    });
+
+    it('still takes USAGE only as the default privilege of a future sequence, never SELECT or UPDATE', () => {
+      expect(
+        codes({ ...healthy(), defaultPrivileges: { tables: DML, sequences: ['SELECT', 'UPDATE', 'USAGE'] } }),
+      ).toEqual(['DEFAULT_PRIVILEGES_SEQUENCES']);
+    });
+  });
+
   it('refuses a SECURITY DEFINER routine, which would run as the owner for the runtime role', () => {
     expect(judgeSeparation({ ...healthy(), securityDefinerRoutines: ['escalate()'] })).toEqual([
       { code: 'SECURITY_DEFINER_ROUTINE', subject: 'escalate()' },

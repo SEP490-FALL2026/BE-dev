@@ -4,7 +4,8 @@ import type { BusinessDate } from '../../../core/business-date';
 import { FinanceApi } from '../../finance/public/finance.api';
 import type { PricingRecord } from '../access-request/access-request.types';
 import { AssessmentIncompleteError, AssessmentQuoteRefusedError } from './assessment.errors';
-import { priceFromQuote, type Quote } from './quote-pricing.policy';
+import type { Quote } from '../access-request/assessment-record.types';
+import { priceFromQuote } from './quote-pricing.policy';
 import type { AssessmentPatchDto } from './assessment.dto';
 
 /**

@@ -29,7 +29,9 @@ const submitBodySchema = z.strictObject({
   assignmentId: z.uuid(),
   category,
   impact,
-  description: text.refine((value) => value.trim() !== '', { message: 'The description is required.' }),
+  description: text
+    .refine((value) => value.trim() !== '', { message: 'The description is required.' })
+    .meta({ description: 'Required: a value that is only whitespace is refused.' }),
   occurredAt: z.iso.datetime({ offset: true }),
 });
 const messageBodySchema = z.strictObject({ body: text });

@@ -2,7 +2,8 @@
 
 `docker compose up -d --wait` starts local PostgreSQL only; that is all the API and the worker need. Redis and MinIO are
 optional and start only under their named profiles (`--profile queue`, `--profile storage`), for trying the queue and
-object storage the API mounts for contract files (the queue is not mounted, Owner decision E2 = A, H6.4). Ports bind to loopback.
+object storage the API mounts for contract files. The queue is standby infrastructure with no consumer yet (kept by the Owner,
+OD-R5; not mounted, E2 = A, H6.4). Ports bind to loopback.
 Check for port conflicts before starting; do not stop unrelated services.
 Create the configured MinIO bucket before using storage. The API refuses the public default credentials of MinIO
 (`minioadmin`) in every environment but `NODE_ENV=test` (SEC-04): set your own `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`
@@ -24,13 +25,31 @@ Dockerfile builds the generated Prisma client in Linux, installs dependencies fr
 the lockfile and runs the final image as the node user. Secrets, local node_modules
 and generated output are excluded from the build context.
 
+**What the runtime image carries (OD-R9, Task 2.7 of the readability hardening).** The `runtime` stage copies `node_modules`
+from the `production-dependencies` stage (`pnpm install --prod --frozen-lockfile`), not from the `build` stage, so the image
+holds the production dependencies only: no `jest`, `eslint`, `ts-jest`, `@nestjs/cli`, `prettier` or `@types/*`. What the image
+runs stays in `dependencies`: `prisma` (the CLI behind `node node_modules/prisma/build/index.js migrate deploy`, which the
+`migrate` service of `docker-compose.prod.yml` runs in this same image; its `prisma.config.ts` needs `dotenv` and
+`prisma/config`), `@prisma/client`, `@prisma/adapter-pg`, `@node-rs/argon2`, and `bullmq` with `@nestjs/bullmq` (standby
+queue infrastructure kept by the Owner, OD-R5). Install scripts are not disabled in that stage: pnpm 11 runs only the build
+scripts `allowBuilds` in `pnpm-workspace.yaml` allows (`@prisma/engines`, which downloads the schema engine that
+`migrate deploy` needs, and `prisma`). `typescript` stays under `node_modules/.pnpm` only as a peer of `prisma` (not
+resolvable from the application). Measured on 30/10/2026 (`docker build --target runtime`): `node_modules` 909 MB to 427 MB
+(928 to 352 packages in `.pnpm`) and the image 1.58 GB to 939 MB (compressed 331 MB to 195 MB).
+`test/gates/deployment-roles.gate-spec.ts` keeps this shape. To prove a change to it with the real image, build the
+`runtime` stage and check: `node dist/cli.js --help` and every `dist/*-cli.js --help`; `require('bullmq')`,
+`require('@nestjs/bullmq')`, `@node-rs/argon2` (hash and verify) and the generated client in `dist/generated/prisma` load;
+`jest`, `eslint`, `typescript`, `ts-jest` do not resolve; `migrate deploy` and `ops:db-roles reconcile` pass against a
+provisioned throwaway database; `node dist/main.js` (and `node dist/worker.js`) starts and `/api/v1/health/ready` answers 200.
+
 ```sh
 docker build -t slm-api:foundation .
 docker build --target migrate -t slm-migrate:foundation .
 ```
 
 The runtime defaults to production. Supply DATABASE_URL and HTTPS CORS_ORIGINS.
-Redis is not required: the queue is not mounted. Object storage is mounted by the API (ADR-0014) and so needs an HTTPS
+Redis is not required today: the queue is standby infrastructure with no consumer yet, and it validates Redis only when a future
+module mounts it. Object storage is mounted by the API (ADR-0014) and so needs an HTTPS
 OBJECT_STORAGE_ENDPOINT with OBJECT_STORAGE_BUCKET and the access key (the variables marked
 `@production-required-when-mounted` in `.env.example`); the worker and the commands do not read them. The endpoint is
 the one the browser uploads to and the one signed links open: its host is written into every link, so it must be
@@ -118,11 +137,11 @@ depth of 5; malformed, unsupported (charset or `Content-Encoding`) or corrupt co
 [h7-postgresql-runtime-role-separation](../workspace/items/h7-postgresql-runtime-role-separation/spec.md). Production uses
 three PostgreSQL identities; each process gets exactly one:
 
-| Identity                             | Variables (`.env` beside the Compose file)           | Used by                                                                                                                                              | Attributes and privileges                                                                                                                                                                                                 |
-| ------------------------------------ | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cluster superuser (bootstrap)        | `POSTGRES_USER`, `POSTGRES_PASSWORD`                 | the `postgres` container; `ops:db-roles provision` (service `db-admin`, profile `admin`); a restore                                                  | superuser created by the image; never the URL of the API, the worker or a deploy step                                                                                                                                     |
-| Deploy role (default `slm_deploy`)   | `DATABASE_DEPLOY_USER`, `DATABASE_DEPLOY_PASSWORD`   | services `backup` (`pg_dump`) and `migrate` (preflight, `prisma migrate deploy`, `ops:db-roles reconcile`/`verify`, `ops:inspect`), profile `deploy` | `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, no membership; owns the database and every object of schema `public`                                                                               |
-| Runtime role (default `slm_runtime`) | `DATABASE_RUNTIME_USER`, `DATABASE_RUNTIME_PASSWORD` | `api`, `worker`; `ops:bootstrap`, `ops:recover` through `run api`                                                                                    | same attributes; `CONNECT`, `USAGE` on `public`, `SELECT, INSERT, UPDATE, DELETE` on every application table except `_prisma_migrations` (none) and `audit_events` (`SELECT, INSERT`), `USAGE` on sequences; owns nothing |
+| Identity                             | Variables (`.env` beside the Compose file)           | Used by                                                                                                                                              | Attributes and privileges                                                                                                                                                                                                                    |
+| ------------------------------------ | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cluster superuser (bootstrap)        | `POSTGRES_USER`, `POSTGRES_PASSWORD`                 | the `postgres` container; `ops:db-roles provision` (service `db-admin`, profile `admin`); a restore                                                  | superuser created by the image; never the URL of the API, the worker or a deploy step                                                                                                                                                        |
+| Deploy role (default `slm_deploy`)   | `DATABASE_DEPLOY_USER`, `DATABASE_DEPLOY_PASSWORD`   | services `backup` (`pg_dump`) and `migrate` (preflight, `prisma migrate deploy`, `ops:db-roles reconcile`/`verify`, `ops:inspect`), profile `deploy` | `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, no membership; owns the database and every object of schema `public`                                                                                                  |
+| Runtime role (default `slm_runtime`) | `DATABASE_RUNTIME_USER`, `DATABASE_RUNTIME_PASSWORD` | `api`, `worker`; `ops:bootstrap`, `ops:recover` through `run api`                                                                                    | same attributes; `CONNECT`, `USAGE` on `public`, `SELECT, INSERT, UPDATE, DELETE` on every application table except `_prisma_migrations` (none) and `audit_events` (`SELECT, INSERT`), `USAGE` on sequences except two (below); owns nothing |
 
 - **Two files.** `.env` feeds Compose interpolation only (the three identities, `DOMAIN`, `PORT`); a missing password stops
   every Compose command before it starts anything. `.env.app` holds the application settings (`.env.example` above the
@@ -145,6 +164,15 @@ three PostgreSQL identities; each process gets exactly one:
   none. A new table that needs other runtime privileges than plain DML (append-only like `audit_events`) is added to
   `RUNTIME_TABLE_EXCEPTIONS` in `src/infrastructure/database/database-role-judgement.ts` in the same change. A
   `SECURITY DEFINER` routine in `public` is reported by `reconcile`: it would run as the owner for the runtime role.
+- **Two sequences hold more than `USAGE` (H7-SEQ).** The runtime role holds exactly `SELECT, UPDATE` on `personnel_notice_seq`
+  (BM-09) and `saas_issue_seq` (BM-11), and `USAGE` on every other sequence and on future ones. Numbering a notice or a report
+  reads the old sequence (`SELECT … FROM <sequence>`: `SELECT`) and lifts it with `setval` (`UPDATE`) so that the compatibility
+  image never draws a number already issued; `UPDATE` also allows `nextval`, so `USAGE` is not granted there. Both `reconcile`
+  and `verify` read the one policy `RUNTIME_SEQUENCE_EXCEPTIONS` (`database-role-judgement.ts`): a missing or an extra privilege is
+  the finding `RUNTIME_SEQUENCE_PRIVILEGES`, and a manual `GRANT` is neither needed nor kept — the next `reconcile` takes back
+  anything outside the policy. Between `migrate deploy` (which creates a sequence with the default `USAGE`) and `reconcile` the
+  runtime role fails closed (`42501` on `POST /saas-issues` or `POST /personnel-notices`); the deploy script runs `reconcile` before it
+  starts the new containers.
 
 ### Deploys after H7 (H7-OPS-02, H7-OPS-RV-01..07)
 

@@ -423,7 +423,8 @@ function listReachableSourceFiles(entry: string): Map<string, string> {
   return reachable;
 }
 
-describe('installation command dependency boundary (R-13)', () => {
+// R-13
+describe('installation command dependency boundary', () => {
   const sourceRoot = join(process.cwd(), 'src');
   const toRelative = (files: Iterable<string>) =>
     [...files].map((file) => relative(sourceRoot, file).split(sep).join('/'));
@@ -511,7 +512,8 @@ function reExports(file: string, source: string): string[] {
     );
 }
 
-describe('ROOT-HARDEN.1: public injectable contracts', () => {
+// ROOT-HARDEN.1
+describe('public injectable contracts', () => {
   const sourceRoot = join(process.cwd(), 'src');
   const modulesRoot = join(sourceRoot, 'modules');
   const toModulePath = (file: string) => relative(modulesRoot, file).split(sep).join('/');

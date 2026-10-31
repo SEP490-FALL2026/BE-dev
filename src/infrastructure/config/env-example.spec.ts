@@ -18,7 +18,7 @@ const COMPOSE_ONLY = new Set([
   'POSTGRES_PASSWORD',
   'POSTGRES_DB',
   'POSTGRES_PORT',
-  // H7: the two roles of docker-compose.prod.yml; the API and the worker receive only the runtime role's DATABASE_URL.
+  // The two roles of docker-compose.prod.yml; the API and the worker receive only the runtime role's DATABASE_URL.
   'DATABASE_DEPLOY_USER',
   'DATABASE_DEPLOY_PASSWORD',
   'DATABASE_RUNTIME_USER',
@@ -30,7 +30,7 @@ const COMPOSE_ONLY = new Set([
   'DOMAIN',
 ]);
 
-/** Owned by modules the API and the worker do not mount today (E2 = A); validated when a G7/G9 slice mounts them. */
+/** Owned by modules the API and the worker do not mount today (the Owner keeps them on standby); validated when a later slice mounts them. */
 const NOT_MOUNTED: ReadonlySet<string> = new Set([...OBJECT_STORAGE_ENVIRONMENT_KEYS, ...QUEUE_ENVIRONMENT_KEYS]);
 
 /** Names that must never reappear: removed from the schema, a value would be silently ignored. */

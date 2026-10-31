@@ -176,7 +176,9 @@ describe('OpenAPI dialect and runtime contract (e2e)', () => {
     expect(Object.keys(schemas).filter((name) => !compared.has(name))).toEqual([]);
   });
 
-  it('documents the four request fields Zod 4.6 had turned into arrays as nullable strings again', () => {
+  // These four are dates: they are a nullable string (never an array, which Zod 4.6 had made of them) and say that they are a calendar
+  // date, which is the only addition to the exact schema this test pinned before the date carried `format` and a description.
+  it('documents the four request fields Zod 4.6 had turned into arrays as nullable dates again', () => {
     const field = (component: string, property: string) =>
       ((schemas[component] as { properties: Json }).properties[property] as Json) ?? {};
 
@@ -186,11 +188,14 @@ describe('OpenAPI dialect and runtime contract (e2e)', () => {
       ['UpdateSubscriptionBodyDto', 'noticeDeadline'],
       ['PlanTermsBodyDto', 'lastReviewedOn'],
     ]) {
-      expect({ component, property, schema: field(component, property) }).toEqual({
+      const { description, ...shape } = field(component, property);
+
+      expect({ component, property, schema: shape }).toEqual({
         component,
         property,
-        schema: { type: 'string', nullable: true },
+        schema: { type: 'string', nullable: true, format: 'date' },
       });
+      expect(description).toMatch(/calendar date/);
     }
   });
 

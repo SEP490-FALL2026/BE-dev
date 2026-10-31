@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { SaasIssueSweepService } from '../../src/modules/licensing/saas-issue/saas-issue-sweep.service';
-import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import { pretendBusinessToday } from './pretend-today';
 import type { ApiAccount } from './api-accounts';
 import { ExpiryHarness } from './expiry-harness';
 import type { Department, Person } from './request-harness';
@@ -183,8 +183,7 @@ export class SaasIssueHarness extends ExpiryHarness {
 
   /** The organization says today is `day` until the returned function is called. */
   pretendToday(day: string): () => void {
-    const spy = jest.spyOn(this.ctx.app.get(OrganizationApi, { strict: false }), 'businessToday');
-    spy.mockResolvedValue(day);
+    const spy = pretendBusinessToday(this.ctx.app, day);
 
     return () => spy.mockRestore();
   }

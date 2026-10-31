@@ -96,7 +96,7 @@ export class TransferReviewViewService {
     };
   }
 
-  /** The open Requests of the person who moved (F29), for the head to read beside the tools; none for the review after the setup. */
+  /** The open Requests of the person who moved, for the head to read beside the tools; none for the review after the setup. */
   private async unfinishedRequestsOf(
     record: ReviewSummaryRecord,
   ): Promise<TransferReviewDetailWire['unfinishedRequests']> {
@@ -199,7 +199,7 @@ export class TransferReviewViewService {
 
   /**
    * The seats of the "still needed" lines whose old seat is already being taken back for their review: the Request that was to
-   * replace the tool ended, and the revocation opened with the review as its reference (T-6). The line itself cannot carry the
+   * replace the tool ended, and the revocation opened with the review as its reference. The line itself cannot carry the
    * task (it stays "still needed"), so licensing is asked, one statement for each review on the page (a page of lines is the
    * lines of one review).
    */

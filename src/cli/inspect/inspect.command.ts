@@ -1,4 +1,4 @@
-import { InstallationInspectionApi } from '../../modules/installation/public/inspection.api';
+import { InstallationInspectionApi } from '../../modules/installation/public/installation-inspection.api';
 import { defineCommand, errorName, runInNestContext, writeCliFailure as fail } from '../run-command';
 import { INSPECTION_USAGE, InspectionArgumentError, parseInspectionArguments } from './inspect.arguments';
 import { formatInspection, inspectionJson } from './inspect-report';

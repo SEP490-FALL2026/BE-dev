@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import request from 'supertest';
-import { budgetYearLockKey } from '../../../src/core/budget-year-lock-key';
+import { budgetYearLockKey } from '../../../src/modules/budgets/public/budget-year-lock-key.policy';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { BudgetNotFinanceError } from '../../../src/modules/budgets/budget/budget.errors';
-import { ProposalService } from '../../../src/modules/budgets/budget/proposal/proposal.service';
+import { ProposalService } from '../../../src/modules/budgets/proposal/proposal.service';
 import { VersionRepo } from '../../../src/modules/budgets/budget/version.repo';
-import { VersionService } from '../../../src/modules/budgets/budget/version/version.service';
+import { VersionService } from '../../../src/modules/budgets/version/version.service';
 import { BudgetsApi } from '../../../src/modules/budgets/public/budgets.api';
 import { BudgetHarness, type ProposalWire, type VersionWire } from '../../support/budget-harness';
 import { waitForLockWaiters } from '../../support/lock-wait';

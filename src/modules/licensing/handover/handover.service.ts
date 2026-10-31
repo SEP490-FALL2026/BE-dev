@@ -13,7 +13,7 @@ import type {
   ReconcileHandoverInput,
 } from '../public/licensing-handover.types';
 import type { RevocationContext, RevocationReasonFacts, RevocationTaskFacts } from '../public/licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { RevocationReadService } from '../provisioning/revocation-read.service';
 import { isOverdue, requirementOf } from './handover-confirmer.policy';
 import { HandoverConfirmerResolver } from './handover-confirmer.service';

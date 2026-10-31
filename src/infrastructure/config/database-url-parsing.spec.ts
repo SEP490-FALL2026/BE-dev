@@ -1,5 +1,5 @@
 /**
- * Characterization (Prompt 23, Phase 0): what the WHATWG URL parser of Node, which every host check here builds on,
+ * Characterization (Phase 0): what the WHATWG URL parser of Node, which every host check here builds on,
  * makes of DATABASE_URL shapes. A check that reads the raw string instead (`includes('localhost')`) is fooled by
  * several of these; one that reads `hostname` is not.
  */

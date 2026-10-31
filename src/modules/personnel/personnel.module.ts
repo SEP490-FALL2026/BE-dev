@@ -27,13 +27,19 @@ import { NoticeQueryService } from './notice/notice-query.service';
 import { NoticeRepo } from './notice/notice.repo';
 import { NoticeService } from './notice/notice.service';
 import { OffboardingAuditService } from './offboarding/offboarding-audit.service';
-import { OffboardingChangeService } from './offboarding/offboarding-change.service';
+import { OffboardingCaseWriter } from './offboarding/offboarding-case-writer.service';
+import { OffboardingChangeJudge } from './offboarding/change/offboarding-change-judge.service';
+import { OffboardingChangeWriter } from './offboarding/change/offboarding-change-writer.service';
+import { OffboardingChangeService } from './offboarding/change/offboarding-change.service';
+import { OffboardingEndings } from './offboarding/offboarding-endings.service';
 import { OffboardingFrame } from './offboarding/offboarding-frame.service';
 import { OffboardingHandoverService } from './offboarding/offboarding-handover.service';
 import { OffboardingLeftService } from './offboarding/offboarding-left.service';
 import { OffboardingListRepo } from './offboarding/offboarding-list.repo';
 import { OffboardingPeriodsService } from './offboarding/offboarding-periods.service';
+import { OffboardingPreconditions } from './offboarding/offboarding-preconditions.service';
 import { OffboardingRevocationService } from './offboarding/offboarding-revocation.service';
+import { OffboardingDetailService } from './offboarding/detail/offboarding-detail.service';
 import { OffboardingViewService } from './offboarding/offboarding-view.service';
 import { OffboardingController } from './offboarding/offboarding.controller';
 import { OffboardingStepsController } from './offboarding/offboarding-steps.controller';
@@ -64,14 +70,17 @@ import { PersonnelFileDeadlines } from './service-account/personnel-file-deadlin
 import { PersonnelApi } from './public/personnel.api';
 import { ServiceAccountBlockerSource } from './service-account/service-account-blocker.listener';
 import { ServiceAccountDutyHook } from './service-account/service-account-duty.listener';
+import { TransferChangeWriter } from './transfer/transfer-change-writer.service';
 import { TransferChangeService } from './transfer/transfer-change.service';
 import { TransferClosureService } from './transfer/transfer-closure.service';
 import { TransferEffectiveListener } from './transfer/transfer-effective.listener';
 import { TransferGuardService } from './transfer/transfer-guard.service';
-import { TransferNoticeRecorder } from './transfer/transfer-notice.listener';
+import { TransferNoticeRecorder } from './notice/transfer-notice.listener';
 import { TransferQueryService } from './transfer/transfer-query.service';
 import { TransferSettlementService } from './transfer/transfer-settlement.service';
 import { TransferRepo } from './transfer/transfer.repo';
+import { TransferPreconditions } from './transfer/transfer-preconditions.service';
+import { TransferRecorder } from './transfer/transfer-recorder.service';
 import { TransferService } from './transfer/transfer.service';
 import { TransfersController } from './transfer/transfers.controller';
 import { TransferReviewDecisionService } from './transfer-review/transfer-review-decision.service';
@@ -106,9 +115,9 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
  * to `NoticeRecorderContributions`), told as late by an hourly sweep and never acted on.
  *
  * Who writes an event is the Super Admin (`QĐ-87a`), judged by the policy of each service; about the Super Admin themselves only the
- * controlled procedure `pnpm ops:record-super-admin-event` writes it, with a ticket (spec L.2). The command lives in `super-admin-event/`
+ * controlled procedure `pnpm ops:record-super-admin-event` writes it, with a ticket. The command lives in `super-admin-event/`
  * with a module of its own that the API and the worker never load; it reaches the writes below through the services this module
- * exports for it. Everyone concerned by an event is told in the inbox in the same transaction (`PersonnelNotifier`, F17).
+ * exports for it. Everyone concerned by an event is told in the inbox in the same transaction (`PersonnelNotifier`).
  */
 @Module({
   imports: [
@@ -143,7 +152,10 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     TransferGuardService,
     TransferSettlementService,
     TransferEffectiveListener,
+    TransferPreconditions,
+    TransferRecorder,
     TransferService,
+    TransferChangeWriter,
     TransferChangeService,
     TransferClosureService,
     TransferQueryService,
@@ -175,9 +187,15 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     OffboardingPeriodsService,
     OffboardingHandoverService,
     OffboardingLeftService,
+    OffboardingPreconditions,
+    OffboardingEndings,
+    OffboardingCaseWriter,
     OffboardingService,
+    OffboardingChangeJudge,
+    OffboardingChangeWriter,
     OffboardingChangeService,
     OffboardingRevocationService,
+    OffboardingDetailService,
     OffboardingViewService,
     OpenRequestsService,
     OpenRequestsSource,
@@ -204,7 +222,7 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     PersonnelApi,
   ],
   // The facade and the extension point of the file hooks, and the services of the writes the controlled procedure runs with an operator
-  // actor (spec L.2).
+  // actor.
   exports: [
     PersonnelFileHookContributions,
     PersonnelApi,

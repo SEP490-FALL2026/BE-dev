@@ -2,7 +2,7 @@ import { CostCenterForbiddenError } from './cost-center.errors';
 
 /**
  * Who may do what with the Cost Center catalogue, decided in the service so no route is the only thing between a caller and the
- * data (`F13`). Finance creates, renames and retires; the Super Admin, who owns the departments the Cost Centers belong to, may
+ * data. Finance creates, renames and retires; the Super Admin, who owns the departments the Cost Centers belong to, may
  * read the catalogue to see which department is still without one; the IT Admin has no operation on it (`QĐ-87a`, `US-04-09`).
  * Pure: no store, no clock.
  */

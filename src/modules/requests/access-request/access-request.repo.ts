@@ -30,7 +30,7 @@ export class AccessRequestRepo {
    * one statement (the checks of the table accept a row only with all of them), and then its people and its need step.
    */
   async insert(tx: DbTx, input: NewAccessRequest): Promise<{ id: string; needStepId: string }> {
-    // Only a free internal request is charged to nothing (`QĐ-87g(2)`, F91): the table says so too, but a request that costs money and
+    // Only a free internal request is charged to nothing (`QĐ-87g(2)`): the table says so too, but a request that costs money and
     // has no Cost Center is a defect of the caller, and it is told here, as one, before the table answers with an unmapped 23514.
     if (input.costCenterId === null && (input.branch !== 'INTERNAL_FREE' || input.type === 'SERVICE_ACCOUNT')) {
       throw new Error(

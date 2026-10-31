@@ -4,7 +4,7 @@ import type { ActionLinkService } from '../accounts/action-link.service';
 import { RecoveryLinks } from './recovery-links.service';
 
 /**
- * Where a recovery mail goes (`F18`, `P28-05`): to the recipient the caller names, which is the login email of the account, and
+ * Where a recovery mail goes: to the recipient the caller names, which is the login email of the account, and
  * never nowhere or somewhere else. An empty recipient stops the transaction before a link is issued or a mail is queued.
  */
 describe('RecoveryLinks recipients', () => {

@@ -2,7 +2,7 @@ import type { LocalSeedFixtureFacts } from '../../organization/public/organizati
 import { buildSeedPlan } from './dev-seed-plan.policy';
 
 /**
- * P23-RV-01: the plan compares each fixture item by its stable key on every field the fixture fixes. Literal states:
+ * The plan compares each fixture item by its stable key on every field the fixture fixes. Literal states:
  * absent, exact, and each kind of difference. Since `QĐ-87d(1)` the department comes first and its Cost Center is created
  * for it; a Cost Center that belongs to no department is never repaired here.
  */

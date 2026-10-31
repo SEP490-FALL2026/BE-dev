@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { SpendEntryService } from '../spend/spend-entry.service';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestNoDepartmentError,
   AccessRequestNotDraftError,
@@ -13,10 +11,10 @@ import {
 } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
-import { RequestDraftRepo } from '../access-request/request-draft.repo';
+import { RequestDraftRepo } from '../request-draft/request-draft.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
-import { LONG_TERM_MONTHS, nextRequestState } from '../access-request/need-decision.policy';
-import { RequestAssessmentService, type RequestSettings } from '../access-request/request-assessment.service';
+import { LONG_TERM_MONTHS } from '../access-request/need-decision.policy';
+import { RequestFactsService, type RequestSettings } from '../access-request/request-facts.service';
 import {
   GroupRequestDuplicateLineError,
   GroupRequestLinesRefusedError,
@@ -24,16 +22,14 @@ import {
   GroupRequestTermConfirmationRequiredError,
   GroupRequestTooManyLinesError,
 } from '../group-request/group-request.errors';
-import { submissionEvents } from './group-request-trail.mapper';
-import { planNeedSteps, type PlannedNeedStep } from './group-need-routing.policy';
+import { planNeedSteps } from './group-need-routing.policy';
+import { GroupRequestWriter } from './group-request-writer.service';
 import { needsTermConfirmation, type LineReason, type PlanRefusal } from '../group-request/group-request.policy';
 import {
   GroupSubmissionFactsService,
   type GroupJudgement,
   type GroupLineInput,
 } from './group-submission-facts.service';
-import { LineDecisionRepo } from '../group-request/line-decision.repo';
-import { RequestLineRepo } from '../group-request/request-line.repo';
 
 export interface GroupBody {
   planId: string;
@@ -66,14 +62,12 @@ export class GroupRequestService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly facts: GroupSubmissionFactsService,
-    private readonly assessment: RequestAssessmentService,
+    private readonly assessment: RequestFactsService,
     private readonly organization: OrganizationApi,
     private readonly requests: AccessRequestRepo,
-    private readonly lines: RequestLineRepo,
-    private readonly decisions: LineDecisionRepo,
     private readonly entry: SpendEntryService,
-    private readonly audit: AuditApi,
     private readonly drafts: RequestDraftRepo,
+    private readonly writer: GroupRequestWriter,
   ) {}
 
   /** Every reason the request cannot be sent, and what it would cost, without writing anything. */
@@ -104,7 +98,7 @@ export class GroupRequestService {
    * Throws AccessRequestSuperAdminCannotRequestError, GroupRequestPlanNotEligibleError, GroupRequestTooManyLinesError,
    * GroupRequestDuplicateLineError, GroupRequestLinesRefusedError, GroupRequestTermConfirmationRequiredError,
    * AccessRequestNoDepartmentError and the errors of assessing a plan. A draft (draftId) is the request being sent: it is locked first,
-   * judged again under the lock, and its row becomes the request (spec L.1); AccessRequestNotFoundError and AccessRequestNotDraftError.
+   * judged again under the lock, and its row becomes the request; AccessRequestNotFoundError and AccessRequestNotDraftError.
    */
   async submit(
     actor: AuthenticatedPrincipal,
@@ -132,7 +126,13 @@ export class GroupRequestService {
         facts: judged.assessed.routing.facts,
         slaWorkingDays: settings.slaWorkingDays,
       });
-      const request = await this.write(tx, actor, organizationId, judged, planned, body, options.draftId ?? null);
+      const request = await this.writer.write(tx, actor, {
+        organizationId,
+        judged,
+        planned,
+        body,
+        draftId: options.draftId ?? null,
+      });
       if (request.state === 'AWAITING_SPEND_SUBMISSION') await this.entry.enter(tx, actor, request);
 
       const final = await this.requests.findById(request.id, tx);
@@ -180,160 +180,5 @@ export class GroupRequestService {
     ) {
       throw new GroupRequestTermConfirmationRequiredError();
     }
-  }
-
-  private async write(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    organizationId: string,
-    judged: GroupJudgement,
-    planned: readonly PlannedNeedStep<GroupLineInput>[],
-    body: GroupBody,
-    draftId: string | null,
-  ): Promise<AccessRequestRecord> {
-    const { assessed } = judged;
-    const { policy, unit } = assessed;
-    const now = new Date();
-    const open = planned.filter((entry) => !entry.confirmedBySending);
-    const waiting = open.length > 0 && open.every((entry) => entry.step.state === 'WAITING');
-    const state = open.length === 0 ? nextRequestState(policy.branch) : waiting ? 'WAITING_CONTROLLED' : 'PENDING';
-
-    const [first, ...rest] = planned;
-    const created = await this.requests.insert(tx, {
-      type: 'GROUP_GRANT',
-      organizationId,
-      branch: policy.branch,
-      state: 'PENDING',
-      planId: body.planId,
-      requesterEmployeeId: actor.employeeId,
-      beneficiaryEmployeeIds: judged.lines.map((line) => line.employeeId),
-      departmentId: unit.departmentId,
-      costCenterId: unit.costCenter?.id ?? null,
-      businessReason: body.businessReason,
-      termMonths: body.termMonths,
-      projectLabel: body.projectLabel ?? null,
-      pricing: judged.pricing,
-      policy,
-      createdByAppUserId: actor.appUserId,
-      now,
-      needStep: first.step,
-      draftId,
-    });
-    const stepIds = [created.needStepId];
-    for (const entry of rest) {
-      stepIds.push(await this.requests.addNeedStep(tx, { requestId: created.id, step: entry.step, now }));
-    }
-
-    await this.lines.insertMany(
-      tx,
-      planned.flatMap((entry, index) =>
-        entry.lines.map((line) => ({
-          requestId: created.id,
-          employeeId: line.employeeId,
-          state: entry.confirmedBySending ? ('NEED_CONFIRMED' as const) : ('AWAITING_NEED' as const),
-          needStepId: stepIds[index],
-          expectedEndDate: line.expectedEndDate ?? null,
-        })),
-      ),
-    );
-
-    const confirmed = planned.findIndex((entry) => entry.confirmedBySending);
-    if (confirmed >= 0) {
-      await this.confirmByHead(tx, actor, {
-        organizationId,
-        requestId: created.id,
-        stepId: stepIds[confirmed],
-        state,
-        judged,
-        body,
-        now,
-        lines: planned[confirmed].lines,
-      });
-    }
-    for (const event of submissionEvents(actor, {
-      organizationId,
-      requestId: created.id,
-      planId: body.planId,
-      termMonths: body.termMonths,
-      state,
-      judged,
-      planned,
-      stepIds,
-    })) {
-      await this.audit.record(tx, event);
-    }
-
-    const request = await this.requests.findById(created.id, tx);
-    if (!request) throw new Error(`The request ${created.id} was not found after it was written.`);
-
-    return request;
-  }
-
-  /** The need step of the people is approved by the head in the moment of sending, one decision for each person (`US-05-17` AC-1, AC-3). */
-  private async confirmByHead(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    input: {
-      organizationId: string;
-      requestId: string;
-      stepId: string;
-      state: AccessRequestRecord['state'];
-      judged: GroupJudgement;
-      body: GroupBody;
-      now: Date;
-      lines: readonly GroupLineInput[];
-    },
-  ): Promise<void> {
-    await this.requests.recordNeedDecision(tx, {
-      organizationId: input.organizationId,
-      requestId: input.requestId,
-      stepId: input.stepId,
-      requestState: input.state,
-      departmentId: input.judged.assessed.unit.departmentId,
-      record: {
-        decision: 'APPROVED',
-        decidedByEmployeeId: actor.employeeId,
-        deciderRole: 'MANAGER',
-        reason: null,
-        termConfirmationReason: input.body.termConfirmation?.reason.trim() ?? null,
-        decidedAt: input.now,
-      },
-    });
-    await this.decisions.insertMany(
-      tx,
-      input.lines.map((line) => ({
-        requestId: input.requestId,
-        employeeId: line.employeeId,
-        stage: 'NEED' as const,
-        stepId: input.stepId,
-        decision: 'APPROVED' as const,
-        reason: null,
-        decidedByEmployeeId: actor.employeeId,
-        deciderRole: 'MANAGER' as const,
-        decidedAt: input.now,
-      })),
-    );
-    await this.audit.record(
-      tx,
-      accessRequestAuditEvent(
-        actor,
-        input.organizationId,
-        'ACCESS_REQUEST.NEED_APPROVED',
-        'ACCESS_REQUEST_STEP',
-        input.stepId,
-        {
-          requestId: input.requestId,
-          decision: 'APPROVED',
-          assigneeEmployeeId: actor.employeeId,
-          decidedByEmployeeId: actor.employeeId,
-          deciderRole: 'MANAGER',
-          departmentId: input.judged.assessed.unit.departmentId,
-          requestState: input.state,
-          termConfirmed: input.body.termConfirmation !== undefined,
-          delegated: true,
-          lineCount: input.lines.length,
-        },
-      ),
-    );
   }
 }

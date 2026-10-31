@@ -11,7 +11,7 @@ import { PreflightHistory, PreflightReport } from './migration-preflight.types';
 import { judgeRecoveryTarget, RecoveryTargetReport } from './recovery-target.policy';
 
 /**
- * `ops:preflight` (P28-01, `P29-MIGRATION=B-FORWARD`): judges, before `prisma migrate deploy`, whether the migration
+ * `ops:preflight` : judges, before `prisma migrate deploy`, whether the migration
  * history can carry this database to Units-only Cost Centers. It writes nothing, and cannot: its graph opens every
  * PostgreSQL session read-only (ReadOnlyDatabaseSessionModule). Every read runs in the one transaction of the command.
  */
@@ -44,7 +44,7 @@ export class MigrationPreflightApi {
     return this.runner.run(async (tx) => {
       const history = historyOf(await this.repo.migrationRecords(tx));
       const conversion = await this.conversion(tx, history);
-      // The gates read the schema as it is, whatever the history: they probe before they name an object (spec L.10).
+      // The gates read the schema as it is, whatever the history: they probe before they name an object.
       const gates = judgeContractGates(await this.repo.contractGateFacts(tx));
 
       return withContractGates(conversion, gates);
@@ -52,7 +52,7 @@ export class MigrationPreflightApi {
   }
 
   /**
-   * `--recovery-target` (P04-CPE-04, spec L.12): whether an image that declares `reads` (the label of its image) can serve
+   * `--recovery-target`: whether an image that declares `reads` (the label of its image) can serve
    * this database as it is now. Read only, like the judgement above.
    */
   async recoveryTarget(reads: readonly string[]): Promise<RecoveryTargetReport> {

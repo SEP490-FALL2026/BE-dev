@@ -40,6 +40,16 @@ const AUTH_ERRORS = [
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
+/** The three reads (the list, the history of a parameter, the non-working dates) are the Super Admin's, like the writes. */
+const READ_ERRORS = [
+  UNAUTHENTICATED_RESPONSE,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the Super Admin reads the operating parameters, their history and the non-working dates.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+] as const;
 const VALIDATION_ERROR_DESCRIPTION = 'The request is invalid (VALIDATION_ERROR).';
 const VALIDATION_ERROR = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -90,7 +100,7 @@ export class OperatingParametersController {
     message: 'PARAMETER.LISTED',
     description: 'Every parameter with the value in force, its default, its unit and the domain a value must stay in.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS)
+  @ApiErrorResponses(...READ_ERRORS)
   async list() {
     try {
       return { items: (await this.parameters.list()).map(toWire) };
@@ -135,7 +145,7 @@ export class OperatingParametersController {
     message: 'PARAMETER.HISTORY_LISTED',
     description: 'The values the parameter has had, newest first.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, PARAMETER_NOT_FOUND)
+  @ApiErrorResponses(...READ_ERRORS, VALIDATION_ERROR, PARAMETER_NOT_FOUND)
   async history(@Param() params: ParameterKeyParamDto) {
     try {
       const history = await this.parameters.history(params.key);
@@ -161,7 +171,7 @@ export class OperatingParametersController {
     description:
       'One page of the days nobody works, in date order, optionally between two dates. The list is paged: without page and pageSize the answer holds the first 20 only. pagination.totalItems counts every matching day and pagination.totalPages the pages; ask for page 2 up to totalPages (pageSize up to 100) to read the rest.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR)
+  @ApiErrorResponses(...READ_ERRORS, VALIDATION_ERROR)
   async listNonWorkingDates(@Query() query: ListNonWorkingDatesQueryDto) {
     try {
       const page = await this.nonWorkingDates.list(query);

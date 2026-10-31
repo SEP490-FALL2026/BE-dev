@@ -7,46 +7,54 @@ import { IdentityAccessFacadeModule } from '../identity-access/identity-access-f
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
-import { BudgetCostCenterUseReader } from './budget/commitment/budget-cost-center-use.listener';
-import { BudgetHeadChangeListener } from './budget/proposal/budget-head-change.listener';
+import { BudgetCostCenterUseReader } from './commitment/budget-cost-center-use.listener';
+import { BudgetHeadChangeListener } from './proposal/budget-head-change.listener';
 import { BudgetFactsRepo } from './budget/budget-facts.repo';
 import { BudgetNotifierService } from './budget/budget-notifier.service';
-import { BudgetProposalsController } from './budget/proposal/budget-proposals.controller';
+import { BudgetProposalsController } from './proposal/budget-proposals.controller';
 import { BudgetSupportService } from './budget/budget-support.service';
 import { BudgetYearLockRepo } from './budget/budget-year-lock.repo';
-import { BudgetVersionLinesController } from './budget/version/budget-version-lines.controller';
-import { BudgetVersionsController } from './budget/version/budget-versions.controller';
-import { BudgetViewService } from './budget/budget-view/budget-view.service';
-import { BudgetsController } from './budget/budget-view/budgets.controller';
+import { BudgetVersionLinesController } from './version/budget-version-lines.controller';
+import { BudgetVersionsController } from './version/budget-versions.controller';
+import { BudgetViewService } from './budget-view/budget-view.service';
+import { BudgetsController } from './budget-view/budgets.controller';
 import { BudgetsApi } from './public/budgets.api';
 import { BudgetChangeListeners, CommitmentReleaseGuardHook } from './public/budgets.extension-points';
-import { BudgetCommitmentsController } from './budget/commitment/budget-commitments.controller';
+import { BudgetCommitmentsController } from './commitment/budget-commitments.controller';
 import { CommitmentRepo } from './budget/commitment.repo';
-import { CommitmentService } from './budget/commitment/commitment.service';
+import { CommitmentService } from './commitment/commitment.service';
 import { DecisionRepo } from './budget/decision.repo';
-import { LineImportService } from './budget/version/line-import.service';
+import { LineImportService } from './version/line-import.service';
 import { ProposalRepo } from './budget/proposal.repo';
-import { ProposalService } from './budget/proposal/proposal.service';
-import { ProposalViewService } from './budget/proposal/proposal-view.service';
-import { VersionAccessService } from './budget/version/version-access.service';
-import { VersionHistoryRepo } from './budget/version/version-history.repo';
-import { VersionHistoryService } from './budget/version/version-history.service';
-import { VersionHistoryViewService } from './budget/version/version-history-view.service';
+import { ProposalService } from './proposal/proposal.service';
+import { ProposalViewService } from './proposal/proposal-view.service';
+import { VersionAccessService } from './version/version-access.service';
+import { VersionHistoryRepo } from './version/version-history.repo';
+import { VersionHistoryService } from './version/version-history.service';
+import { VersionHistoryViewService } from './version/version-history-view.service';
 import { VersionLineRepo } from './budget/version-line.repo';
-import { VersionDecisionService } from './budget/version/version-decision.service';
-import { VersionLineService } from './budget/version/version-line.service';
+import { VersionDecisionJudge } from './version/version-decision-judge.service';
+import { VersionDecisionWriter } from './version/version-decision-writer.service';
+import { VersionDecisionService } from './version/version-decision.service';
+import { VersionLineMovedNotifier } from './version/version-line-moved.service';
+import { VersionLineService } from './version/version-line.service';
+import { VersionWindowService } from './version/version-window.service';
 import { VersionRepo } from './budget/version.repo';
-import { VersionService } from './budget/version/version.service';
+import { VersionCreationService } from './version/version-creation.service';
+import { VersionFigures } from './version/version-figures.service';
+import { VersionRevisionService } from './version/version-revision.service';
+import { VersionTrail } from './version/version-trail.service';
+import { VersionService } from './version/version.service';
 import { VersionViewService } from './budget/version-view.service';
-import { BudgetYearEndService } from './budget/year-end/year-end.service';
-import { BudgetYearEndSweeper } from './budget/year-end/year-end.job';
+import { BudgetYearEndService } from './year-end/year-end.service';
+import { BudgetYearEndSweeper } from './year-end/year-end.job';
 
 /**
  * The budgets context (C5, ADR-0016): the proposals the heads of department send for a Cost Center and a fiscal year, and
  * the versions of the budget Finance builds from them. It reads the organization (Cost Centers, heads, the day), the
  * finance context (currencies, money), the catalog (that a plan a line names exists), the operating parameters and the notices
  * of the inbox through their facades, and writes nothing of theirs. The controllers live in the module because no other graph needs
- * them yet. The closure of the fiscal year (`BudgetYearEndSweeper`) runs in the API process like the other sweepers (P03-D12). It
+ * them yet. The closure of the fiscal year (`BudgetYearEndSweeper`) runs in the API process like the other sweepers. It
  * exports one facade (`BudgetsApi`), what the check of a request reads, and the extension points the requests context binds
  * (`public/budgets.extension-points.ts`: who hears when a budget changes, who says a remainder may go); it never imports them back.
  */
@@ -84,8 +92,16 @@ import { BudgetYearEndSweeper } from './budget/year-end/year-end.job';
     VersionAccessService,
     VersionHistoryService,
     VersionHistoryViewService,
+    VersionFigures,
+    VersionTrail,
+    VersionCreationService,
+    VersionRevisionService,
     VersionService,
+    VersionLineMovedNotifier,
     VersionLineService,
+    VersionWindowService,
+    VersionDecisionJudge,
+    VersionDecisionWriter,
     VersionDecisionService,
     LineImportService,
     BudgetYearEndService,

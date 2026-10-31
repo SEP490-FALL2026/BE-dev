@@ -22,7 +22,7 @@ const itAdmin = (employeeId: string): AuthenticatedPrincipal => ({
 });
 
 /**
- * `SoD-5` (F24, `QĐ-77m`): an IT Admin who is the beneficiary of a task works it only when no other usable IT Admin can; the others are
+ * `SoD-5` (`QĐ-77m`): an IT Admin who is the beneficiary of a task works it only when no other usable IT Admin can; the others are
  * counted in the transaction of the act, the act is audited as self-executed and the Super Admin is told in that same transaction.
  *
  * This unit spec establishes what the frame does with the transaction it is given, and nothing about two transactions at once: whether

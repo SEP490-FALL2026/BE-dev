@@ -3,14 +3,14 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { StepTargetService } from '../reassignment/step-target.service';
+import { StepTargetService } from '../step-routing/step-target.service';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, AccessRequestState } from '../access-request/access-request.types';
 import { codesOf, type CheckRoute } from './budget-check.policy';
 import { BudgetCheckService, type NotCheckable } from './budget-check.service';
 import type { CheckRecord, CheckTrigger } from './budget-check.repo';
-import { routeFinanceReview, routeSpendStep } from './spend-routing.policy';
+import { routeFinanceReview, routeSpendStep } from '../step-routing/spend-routing.policy';
 import { SpendStepRepo } from './spend-step.repo';
 
 export type RoutingOutcome =
@@ -111,7 +111,7 @@ export class SpendRoutingService {
   /**
    * Who holds, or would hold, the spend step of the request: the spending approver, or the substitute when the approver is a party to it,
    * and nobody when nobody who still works can (the step then waits). Finance does not complete the review of a request they will decide
-   * (`SoD-8`, F32); the same table gave the spend step in the first place.
+   * (`SoD-8`); the same table gave the spend step in the first place.
    */
   async spendDeciderOf(tx: DbTx, request: AccessRequestRecord): Promise<string | null> {
     const holders = await this.targets.usableApprovalRoleHolders(tx);
@@ -124,7 +124,7 @@ export class SpendRoutingService {
   }
 
   /**
-   * Finance gave an opinion to a request that waited for a version of the budget (J.3, F65): it is checked again, as a check of its own
+   * Finance gave an opinion to a request that waited for a version of the budget (J.3): it is checked again, as a check of its own
    * (`FINANCE_OUTCOME_WHILE_WAITING`). A request whose data is at fault (the year closed, a quote that is no longer in force) or that
    * cannot be checked goes back to the queue of its head, where the check runs when they send it again, and no spend step is made
    * (`QĐ-92a`). Otherwise the spend step is opened with the opinion in front of the approver: the review of Finance is not opened again,

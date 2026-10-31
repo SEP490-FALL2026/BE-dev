@@ -7,7 +7,7 @@ import { InboxService } from './inbox.service';
 import { isKnownCode, refuseInAppNotification } from './inbox.policy';
 
 /**
- * Notices for a department that has no head yet (F67, T-11). A notice that would reach the head of a department with none is
+ * Notices for a department that has no head yet. A notice that would reach the head of a department with none is
  * kept instead of dropped, judged by the same closed table as any inbox notice; when the Super Admin names the first head,
  * every held notice of the department is handed to that head, once, in the same transaction, and to nobody else.
  */

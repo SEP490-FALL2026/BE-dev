@@ -9,7 +9,7 @@ import { AccessRequestNotFoundError } from '../access-request/access-request.err
 import { chargedCostCenterId, hasSpendStep } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { PlanLineService } from './plan-line.service';
+import { PlanLineService } from '../plan-line/plan-line.service';
 import { SpendHeadService } from './spend-head.service';
 import { SpendReadSupport } from '../spend/spend-read.service';
 import type { PlanLineBody, PlanLineStateWire, SuggestionWire } from '../spend/spend-submission.dto';

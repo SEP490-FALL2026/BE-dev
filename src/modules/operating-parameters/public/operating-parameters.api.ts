@@ -120,7 +120,7 @@ export class OperatingParametersApi {
     });
   }
 
-  /** The newest {@link HISTORY_LIMIT} values of a parameter, and whether there are older ones (`LD-14`). */
+  /** The newest {@link HISTORY_LIMIT} values of a parameter, and whether there are older ones. */
   async history(
     key: string,
   ): Promise<{ items: { value: ParameterValue; from: Date; until: Date | null }[]; hasMore: boolean }> {

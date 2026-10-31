@@ -112,13 +112,13 @@ export interface EmployeeRowResult {
   parsed?: ParsedEmployeeRow;
 }
 
-/** Where the preview shows a placement reason (the manual form names a field instead: H8 D-1). */
+/** Where the preview shows a placement reason (the manual form names a field instead). */
 const FILE_COLUMN: Record<PlacementSubject, EmployeeColumn> = {
   DEPARTMENT: 'department_code',
   JOB_TITLE: 'job_title',
 };
 
-/** A cell as it is read: its display form (T-12) — NFC, ends trimmed, inner whitespace runs collapsed. */
+/** A cell as it is read: its display form — NFC, ends trimmed, inner whitespace runs collapsed. */
 export const clean = (value: string | undefined): string => normalizeDisplayName(value ?? '');
 
 /**
@@ -172,7 +172,7 @@ function typeAndDateIssues(row: RowText): RowIssue[] {
   return issues;
 }
 
-/** Only a person to create is placed (H8 D-2); the placement reasons come after this file's own (D-3, D-4). */
+/** Only a person to create is placed; the placement reasons come after this file's own. */
 function placementIssues(row: RowText, department: { id: string; active: boolean } | undefined): RowIssue[] {
   return placementReasons({
     department: { named: row.departmentCode !== '', found: department ?? null },

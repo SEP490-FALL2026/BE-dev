@@ -6,7 +6,7 @@ import type { GrantOutcome } from '../../licensing/public/licensing.types';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { RequestOutcomeService } from '../outcome/request-outcome.service';
 import { GroupResolutionService } from './group-resolution.service';
-import { shareToRelease } from './line-allocation.policy';
+import { shareToRelease } from '../spend/line-allocation.policy';
 import { LineAmountRepo } from './line-amount.repo';
 import { RequestLineRepo } from './request-line.repo';
 
@@ -57,7 +57,7 @@ export class GroupGrantService {
     );
     // A grant the IT Admin closed as failed spends nothing: the share of that person goes back, and nobody else's does (`AC-6`).
     if (outcome === 'FAILED') await this.release(tx, request.id, employeeId, 'GRANT_FAILED', now);
-    // The line of this person reached its own end: a seat that is real, or the request ended for them without one (F43).
+    // The line of this person reached its own end: a seat that is real, or the request ended for them without one.
     if (outcome === 'COMPLETED') await this.outcomes.granted(tx, request, [employeeId], now);
     else await this.outcomes.ended(tx, request, [employeeId], now);
     await this.resolution.resolve(tx, null, request.id, now);

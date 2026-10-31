@@ -13,7 +13,7 @@ interface Delivery {
 }
 
 /**
- * SEC-UPGRADE-RV-01-F3: the transport with the installed nodemailer, against an in-process SMTP server — addressing,
+ * The transport with the installed nodemailer, against an in-process SMTP server — addressing,
  * headers, the error mapping and what an error carries. The three nodemailer advisories fixed in 10.1.4 are addressparser
  * bugs that turned text of a recipient field into another recipient; the cases below are their shapes.
  */

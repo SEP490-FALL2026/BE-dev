@@ -2,7 +2,8 @@ name: software-license-management
 
 # Local development. "docker compose up -d --wait" starts PostgreSQL only: the API and the worker need nothing else
 # today, except the contract files, which the API keeps in object storage (ADR-0014): MinIO (profile "storage") serves
-# them locally. Redis (profile "queue") is optional, for a G7/G9 slice that mounts the queue (Owner decision E2 = A):
+# them locally. Redis (profile "queue") is optional standby infrastructure with no consumer yet, kept for a future slice
+# that mounts the queue (Owner decisions E2 = A and OD-R5):
 # "docker compose --profile queue --profile storage up -d --wait".
 services:
   postgres:

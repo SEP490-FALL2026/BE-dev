@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import request from 'supertest';
-import { PasswordHasher } from '../../../src/modules/identity-access/accounts/password-hasher.service';
+import { PasswordHasher } from '../../../src/modules/identity-access/credentials/password-hasher.service';
 import { bodyOf } from '../../support/api-body';
 import {
   HttpTestApp,

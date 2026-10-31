@@ -80,3 +80,56 @@ export function judgeApproval(
 
   return same ? { kind: 'OK', overriddenYears: needed } : { kind: 'OVERRIDE_MISMATCH', years: needed };
 }
+
+/** The role the person decides in: the substitute when the approver is a party, as the roles stood when the decision was made. */
+export const spendDeciderRoleOf = (
+  holders: { conflictSubstituteEmployeeId: string | null },
+  actorEmployeeId: string,
+): 'CONFLICT_SUBSTITUTE' | 'SPENDING_APPROVER' =>
+  holders.conflictSubstituteEmployeeId === actorEmployeeId ? 'CONFLICT_SUBSTITUTE' : 'SPENDING_APPROVER';
+
+/**
+ * What the decision of the spend step is written as (`US-06-01` AC-2, AC-4, AC-5): the role the person decided in (the substitute when the
+ * approver is a party, as the roles stood), the state the request goes to, and the audit entry. An approval goes to be carried out, a
+ * refusal ends the request.
+ */
+export function spendDecisionRecordOf(
+  holders: { conflictSubstituteEmployeeId: string | null },
+  actorEmployeeId: string,
+  of: {
+    request: { id: string };
+    step: { id: string; samePersonAsSpend: boolean; noIndependentReview: boolean };
+  },
+  decided: {
+    decision: 'APPROVED' | 'REJECTED';
+    checkId: string | null;
+    reason: string | null;
+    override: { reason: string; years: readonly number[] } | null;
+  },
+): {
+  deciderRole: 'CONFLICT_SUBSTITUTE' | 'SPENDING_APPROVER';
+  requestState: 'AWAITING_EXECUTION' | 'REJECTED';
+  action: string;
+  detail: { [key: string]: string | boolean | null };
+} {
+  const deciderRole = spendDeciderRoleOf(holders, actorEmployeeId);
+  const approved = decided.decision === 'APPROVED';
+  const requestState = approved ? 'AWAITING_EXECUTION' : 'REJECTED';
+
+  return {
+    deciderRole,
+    requestState,
+    action: approved ? 'ACCESS_REQUEST.SPEND_APPROVED' : 'ACCESS_REQUEST.SPEND_REJECTED',
+    detail: {
+      requestId: of.request.id,
+      checkId: decided.checkId,
+      decision: decided.decision,
+      deciderRole,
+      override: decided.override !== null,
+      overrideYears: (decided.override?.years ?? []).join(','),
+      samePersonAsSpend: of.step.samePersonAsSpend,
+      noIndependentReview: of.step.noIndependentReview,
+      requestState,
+    },
+  };
+}

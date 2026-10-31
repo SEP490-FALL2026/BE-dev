@@ -3,9 +3,9 @@ import {
   isCompanyAccount,
   looksLikeSecret,
   normalizeAccountIdentifier,
-} from '../../../core/account-identifier';
+} from '../../licensing/public/account-identifier.policy';
 import { isBusinessDate, type BusinessDate } from '../../../core/business-date';
-import { occupies, peakOccupancy, type SeatPeriod } from '../../../core/seat-occupancy';
+import { occupies, peakOccupancy, type SeatPeriod } from './seat-occupancy.policy';
 import type { ExistingAssignment } from '../../licensing/public/licensing.types';
 import {
   REQUIRED_SEAT_COLUMNS,
@@ -219,7 +219,7 @@ function owningUnitErrors(unit: OwningUnit, facts: SeatFacts): SeatRowErrorCode[
   // A department that has no Cost Center in use yet (`QĐ-87d(1)`) has nothing to charge the account to: the same refusal
   // as a Unit that was retired.
   if (!unit.costCenter || unit.costCenter.status !== 'ACTIVE') errors.push('COST_CENTER_INACTIVE');
-  // A service account of one department does not sit on the subscription of another (`QĐ-89a`, F20).
+  // A service account of one department does not sit on the subscription of another (`QĐ-89a`).
   const owner = facts.target.ownerDepartmentId ?? null;
   if (owner !== null && owner !== unit.departmentId) errors.push('SUBSCRIPTION_DEPARTMENT_MISMATCH');
 
@@ -249,7 +249,7 @@ function judgeServiceCharge(
 
 /**
  * A personal seat names no Cost Center. It is written on the subscription of its owner department whatever department
- * the person is in; when they are in another one, closing the baseline opens the review of their own head (F21, `QĐ-89e`).
+ * the person is in; when they are in another one, closing the baseline opens the review of their own head (`QĐ-89e`).
  */
 function judgePersonalCharge(costCenterCode: string, facts: SeatFacts): SeatCharge {
   return {

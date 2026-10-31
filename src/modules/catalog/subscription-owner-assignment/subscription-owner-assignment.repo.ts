@@ -14,7 +14,7 @@ export interface OwnerAssignmentRow {
 }
 
 /**
- * The persistence of `pnpm ops:assign-subscription-owner` (F02, spec L.3): the one writer of
+ * The persistence of `pnpm ops:assign-subscription-owner`: the one writer of
  * `subscription_owner_assignments`. The command may run against a database that has not yet got the expansion migration,
  * so it asks the catalog first and names the column and the table only after it has seen both.
  */

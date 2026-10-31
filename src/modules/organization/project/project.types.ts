@@ -1,6 +1,6 @@
 export type ProjectStatus = 'RUNNING' | 'FINISHED';
 
-/** What a list of projects shows of each: no description, which only the detail and the department profile carry (`LD-12`). */
+/** What a list of projects shows of each: no description, which only the detail and the department profile carry. */
 export interface ProjectSummaryRecord {
   id: string;
   name: string;

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { LicensingApi } from '../../licensing/public/licensing.api';
+import { LicensingSeatBaselineApi } from '../../licensing/public/licensing-seat-baseline.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
@@ -13,9 +13,9 @@ import {
 } from '../access-request/access-request.errors';
 import { hasSpendStep, mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
-import { RequestDraftRepo } from '../access-request/request-draft.repo';
+import { RequestDraftRepo } from '../request-draft/request-draft.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { RequestAssessmentService } from '../access-request/request-assessment.service';
+import { RequestFactsService } from '../access-request/request-facts.service';
 import type { ServiceAccountSubmitBodyDto } from './service-account-request.dto';
 import { ServiceAccountSubmitRefusedError } from './service-account-request.errors';
 import { submitRefusal } from './service-account-request.policy';
@@ -24,7 +24,7 @@ import { ServiceAccountRequestRepo } from './service-account-request.repo';
 /**
  * Sending a request for a service account (`US-05-21` AC-1, AC-2): the person asks for the account of a non-human subject
  * for themselves, and answers for it. It is the same request as any other, so the facts it is judged by are read by the same
- * `RequestAssessmentService`, and every step after it (the need, the spend, the commitment) is the one of the plan: the
+ * `RequestFactsService`, and every step after it (the need, the spend, the commitment) is the one of the plan: the
  * department and Unit Cost Center are those of the sender on the day, the branch and the chain come from the kind of the
  * application, and a paid plan always has its spend step whatever seats the subscription has left (`QĐ-82m` C). What is
  * particular is the detail (purpose, expected identifier, who answers) and the two rules of `submitRefusal`. The request,
@@ -38,8 +38,8 @@ export class ServiceAccountRequestService {
     private readonly requests: AccessRequestRepo,
     private readonly details: ServiceAccountRequestRepo,
     private readonly organization: OrganizationApi,
-    private readonly assessment: RequestAssessmentService,
-    private readonly licensing: LicensingApi,
+    private readonly assessment: RequestFactsService,
+    private readonly licensingBaseline: LicensingSeatBaselineApi,
     private readonly audit: AuditApi,
     private readonly drafts: RequestDraftRepo,
   ) {}
@@ -47,7 +47,7 @@ export class ServiceAccountRequestService {
   /**
    * Throws AccessRequestSuperAdminCannotRequestError, AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError,
    * AccessRequestApplicationRetiredError, AccessRequestSpendDateNotAllowedError and ServiceAccountSubmitRefusedError. A draft (draftId)
-   * is the request being sent: it is locked first, judged again under the lock, and its row becomes the request (spec L.1);
+   * is the request being sent: it is locked first, judged again under the lock, and its row becomes the request;
    * AccessRequestNotFoundError and AccessRequestNotDraftError.
    */
   async submit(
@@ -57,7 +57,7 @@ export class ServiceAccountRequestService {
   ): Promise<AccessRequestRecord> {
     if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const settings = await this.assessment.settings();
-    const baseline = await this.licensing.getBaselineProgress();
+    const baseline = await this.licensingBaseline.getBaselineProgress();
 
     return this.runner.run(async (tx) => {
       if (options.draftId) {
@@ -79,7 +79,7 @@ export class ServiceAccountRequestService {
         now,
         settings,
         lockDepartment: true,
-        // The seat it ends in is charged to the Unit of the department, free or not (`QĐ-86a`, F91).
+        // The seat it ends in is charged to the Unit of the department, free or not (`QĐ-86a`).
         chargedToUnit: true,
       });
       const refusal = submitRefusal({

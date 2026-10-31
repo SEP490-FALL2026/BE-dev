@@ -31,23 +31,23 @@ flowchart BT
     onboarding["onboarding"]
     installation["installation"]
   end
-  budgets -->|9| audit
+  budgets -->|10| audit
   budgets -->|2| catalog
   budgets -->|3| finance
   budgets -->|2| identity_access
   budgets -->|3| notifications
   budgets -->|2| operating_parameters
   budgets -->|9| organization
-  catalog -->|16| audit
+  catalog -->|17| audit
   catalog -->|11| finance
   catalog -->|2| identity_access
   catalog -->|4| operating_parameters
-  catalog -->|25| organization
+  catalog -->|26| organization
   data_import -->|6| audit
   data_import -->|1| catalog
-  data_import -->|8| licensing
+  data_import -->|9| licensing
   data_import -->|2| notifications
-  data_import -->|9| organization
+  data_import -->|11| organization
   finance -->|4| audit
   finance -->|4| organization
   identity_access -->|18| audit
@@ -58,11 +58,11 @@ flowchart BT
   installation -->|18| identity_access
   installation -->|9| organization
   licensing -->|24| audit
-  licensing -->|29| catalog
+  licensing -->|31| catalog
   licensing -->|3| identity_access
   licensing -->|2| notifications
   licensing -->|5| operating_parameters
-  licensing -->|40| organization
+  licensing -->|42| organization
   onboarding -->|2| catalog
   onboarding -->|2| data_import
   onboarding -->|2| identity_access
@@ -76,20 +76,20 @@ flowchart BT
   personnel -->|24| audit
   personnel -->|7| catalog
   personnel -->|13| identity_access
-  personnel -->|26| licensing
+  personnel -->|29| licensing
   personnel -->|5| notifications
   personnel -->|4| operating_parameters
-  personnel -->|63| organization
+  personnel -->|75| organization
   personnel -->|5| requests
-  requests -->|51| audit
-  requests -->|15| budgets
-  requests -->|18| catalog
+  requests -->|60| audit
+  requests -->|16| budgets
+  requests -->|21| catalog
   requests -->|7| finance
   requests -->|16| identity_access
-  requests -->|32| licensing
+  requests -->|37| licensing
   requests -->|7| notifications
   requests -->|9| operating_parameters
-  requests -->|69| organization
+  requests -->|74| organization
 ```
 
 59 module edges.

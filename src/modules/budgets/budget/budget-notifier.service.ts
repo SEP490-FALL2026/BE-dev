@@ -17,7 +17,7 @@ interface Notice {
 }
 
 /**
- * The notices of the budget loops of a Cost Center and a year that this context gives (F67, `QĐ-92b`, `US-12-15` rows 18, 40, 52 →
+ * The notices of the budget loops of a Cost Center and a year that this context gives (`QĐ-92b`, `US-12-15` rows 18, 40, 52 →
  * 55): the version that waits for the spending approver, a proposal sent or given back, a version decided, a version that never
  * became current and a proposal that is closed when the year ends, and the work of a proposal that falls to the head of today
  * or waits because nobody heads the department. Each is written in the transaction of the change that makes it, for the people

@@ -18,7 +18,7 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
     `searchActiveEmployees`, `lockEmployeeForShare`/`ForUpdate`, `lookupForEmployeeImport` (cho import).
   - Cost Center: `createUnitCostCenter`, `costCentersByIds`, `lockCostCentersShared`, `getOwningUnits`,
     `requireUnitCostCenter`.
-  - Đang dùng: `getDepartmentUse`, `getCostCenterUse`, `getOwnedServiceAccounts` (hỏi các extension point bên dưới).
+  - Đang dùng: `getDepartmentUse`, `getCostCenterUse` (hỏi các extension point bên dưới).
   - `emitChange` (báo thay đổi), `getProfileNotices`, `getOnboardingFacts`.
 - `OrganizationHistoryApi` ([public/organization-history.api.ts](public/organization-history.api.ts)): ghi lịch sử cho
   personnel và licensing (ADR-0017) — `lockDepartments`, `scheduleStructureChange`, `scheduleHeadHandover`, …
@@ -26,7 +26,10 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
   `pnpm ops:cost-center-direction`, qua `cost-center-direction/cost-center-direction.module.ts`.
 - `public/employee-placement.policy.ts` — phòng ban có nhận người không; dùng chung cho form tay, import, chuyển phòng.
 - Type/lỗi: `organization.types.ts`, `organization-use.types.ts`, `organization.errors.ts`, `cost-center-direction.*`.
-- Ngoại lệ cũ (quyết định E4): `OrganizationModule` còn export `OrganizationRepo`, `CostCenterRepo`, `DepartmentRepo`.
+- Export cho `OrganizationHttpModule` cùng thư mục (R10: chỉ consumer cùng thư mục được inject, không qua facade): các service của
+  capability `OrganizationContextService`, `DepartmentDirectoryService`, `DepartmentUseService`, `EmployeeDirectoryService`,
+  `OrganizationChangeService`, và ba repo theo ngoại lệ Owner E4 (`CostCenterRepo`, `DepartmentRepo`; `OrganizationRepo` hiện không
+  còn consumer nào, chỉ giữ export theo E4).
 
 ## Bảng sở hữu
 
@@ -38,29 +41,56 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
 
 - Mở ([public/organization.extension-points.ts](public/organization.extension-points.ts)), bên đăng ký `*.listener.ts`:
   - `OrganizationChangeListeners` (`organization.change-listeners`) — organization `department/held-notice-handover`;
-    budgets `budget/proposal/budget-head-change`; personnel `transfer/transfer-effective`,
+    budgets `proposal/budget-head-change`; personnel `transfer/transfer-effective`,
     `transfer-review/transfer-review`; requests `reassignment/organization-change`.
   - `DepartmentUseContributions` (`organization.department-use-readers`) — catalog
     `subscription/subscription-department-use`; licensing `provisioning/department-use/department-open-work`; personnel
     `event-notice/department-open-work`; requests `access-request/open-request/department-open-requests`.
   - `CostCenterUseContributions` (`organization.cost-center-use-readers`) — budgets
-    `budget/commitment/budget-cost-center-use`; requests `access-request/open-request/cost-center-open-requests`.
+    `commitment/budget-cost-center-use`; requests `access-request/open-request/cost-center-open-requests`.
   - `DepartmentServiceAccountReaderHook` (`organization.department-service-account-reader`) — licensing
-    `assignment/assignment-service-account`.
+    `assignment/assignment-service-account`; chỉ `department-management/department.service.ts` đọc (ngừng phòng ban, API), không qua facade.
   - `EmployeeAccountsHook` (`organization.employee-accounts`) — identity-access `accounts/employee-accounts`.
 - Đăng ký vào: chỉ point của chính module (`department/held-notice-handover.listener.ts`).
+
+## Hướng phụ thuộc giữa capability (R6)
+
+Không vòng (`pnpm arch:capabilities --module organization`, gate `capability-graph`, kể cả đường đi qua facade và file gốc). Từ thấp lên cao:
+`change-announcement`, `cost-center-direction`, `project` → `department` → `cost-center`, `employee` → `department-management`.
+Các capability gọi service của nhau, **không** gọi facade của chính module (`public/organization.api.ts` là cửa cho module khác;
+gate `module-layout`): `department-management/` và `employee/` đọc ngày và bản ghi tổ chức qua `organization-context.service.ts` (gốc), đọc
+phòng ban qua `DepartmentDirectoryService`, nhân viên qua `EmployeeDirectoryService`, báo thay đổi qua `OrganizationChangeService`. Các
+service đó được `OrganizationModule` xuất cho `OrganizationHttpModule` cùng thư mục (mục hợp đồng trong gate `module-graph`).
+
+Tại sao có `department-management/`: một trưởng phòng là một nhân viên (`department-head.service`, `department.service` kiểm tra nhân
+viên qua `EmployeeDirectoryService`), còn một nhân viên được xếp vào phòng ban (`employee-manual.service` khóa phòng ban để nhập,
+`employee-directory.service` tìm trưởng để báo). Hai chiều ấy nằm trong một capability thì thành vòng, nên phần nền của phòng ban (thư
+mục, repo, use reader, kiểu, lỗi, policy) ở `department/` ở dưới `employee/`, còn use case ghi và đọc phòng ban và trưởng phòng ở trên.
+
+Từ vựng trạng thái nhân viên (`EmployeeStatus`, `EmployeeWorkState`, `EmploymentType`) và của cấu trúc (`CostCenterKind`,
+`CostCenterStatus`, `DepartmentStatus`, `HeadPeriodRecord`) là của cả module nên nằm ở gốc, `organization-employee.types.ts` và
+`organization-structure.types.ts` (`public/organization.types.ts` dùng lại cho module khác), không ở capability.
 
 ## Capability → file chính
 
 - `employee/` — `POST /employees` (`employees.controller.ts` → `employee-manual.service.ts`), `PATCH /employees/{id}`
-  (`employee-maintenance.controller.ts` → `employee-maintenance.service.ts`); `employee.policy.ts`, `employee.repo.ts`.
-- `department/` — `departments.controller.ts` (`/departments*`, `/department-warnings`) → `department.service.ts`,
-  `department-query.service.ts`; `department-heads.controller.ts` (trưởng, khuyết, kế nhiệm) →
-  `department-head.service.ts`; `department-use.service.ts`, `department.policy.ts`.
-- `cost-center/` — `cost-centers.controller.ts` (`/cost-centers*`) → `cost-center.service.ts`, `cost-center.policy.ts`.
-- `project/` — `projects.controller.ts` (`/projects*`) → `project.service.ts`.
+  (`employee-maintenance.controller.ts` → `employee-maintenance.service.ts`); `employee.policy.ts`, `employee-correction.policy.ts`
+  (hàm thuần: đổi gì, từ chối gì khi sửa trường chính thức), `employee.repo.ts`, `employee.http-errors.ts`.
+- `department/` — phần nền: `department-directory.service.ts` (thư mục, kỳ trưởng phòng), `department-use.service.ts`,
+  `department.repo.ts`, `department-head.repo.ts`, `department.policy.ts`, `department.errors.ts`, `held-notice-handover.listener.ts`.
+- `department-management/` — use case của phòng ban và trưởng phòng: `departments.controller.ts` (`/departments*`,
+  `/department-warnings`) → `department.service.ts`, `department-query.service.ts`; `department-heads.controller.ts` (trưởng, khuyết,
+  kế nhiệm) → `department-head.service.ts`; `department.dto.ts`, `department.mapper.ts`, `department.http-errors.ts`.
+- `cost-center/` — `cost-centers.controller.ts` (`/cost-centers*`) → `cost-center.service.ts`, `cost-center.policy.ts`,
+  `cost-center.http-errors.ts`.
+- `project/` — `projects.controller.ts` (`/projects*`) → `project.service.ts`; `project.mapper.ts` và `project.dto.ts`
+  (schema wire của project, cũng nhúng trong hồ sơ phòng ban); `project.http-errors.ts`.
 - `change-announcement/` — `organization-change.service.ts` (phát thay đổi), `organization-change.job.ts` (sweeper mỗi
-  giờ, chỉ trong graph API). `cost-center-direction/` — repo, policy của lệnh. `mappers/` — HTTP errors, audit event.
+  giờ, chỉ trong graph API). `cost-center-direction/` — repo, policy của lệnh.
+- Gốc module (dùng chung nhiều capability): `organization-audit-event.mapper.ts`, `organization-context.service.ts`,
+  `organization.http-errors.ts` (phần mọi route gặp: ApiException, nhân viên không có, database không trả lời; mỗi capability có
+  `<capability>.http-errors.ts` trả lời lỗi của mình rồi gọi lại file này), `organization-local-seed-fixture.mapper.ts` (cho `public/`),
+  `organization-employee.types.ts`, `organization-structure.types.ts`, `organization.repo.ts`.
 - Nest: `organization.module.ts` (facade, mọi graph), `organization-http.module.ts` (controller + sweeper, chỉ API).
 
 ## Bất biến quan trọng

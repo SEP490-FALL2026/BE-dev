@@ -85,7 +85,7 @@ describe('toOpenApi30Presentation', () => {
   });
 });
 
-/** CP0-10: `const` is a schema keyword; it is converted only on schema objects, never on names or values. */
+/** `const` is a schema keyword; it is converted only on schema objects, never on names or values. */
 describe('toOpenApi30Presentation: `const` only where it is a schema keyword', () => {
   const ENUM_FALSE = { type: 'boolean', enum: [false] };
   const document = () => ({
@@ -242,7 +242,7 @@ const presentedField = (schema: unknown): unknown =>
   toOpenApi30Presentation(inComponent(schema)).components.schemas.Thing.properties.field;
 
 /**
- * OPENAPI-EXAMPLE.1-F3: since Zod 4.6, a bare `z.string().nullable()` is emitted as `type: ["string", "null"]` and a
+ * Since Zod 4.6, a bare `z.string().nullable()` is emitted as `type: ["string", "null"]` and a
  * record as `propertyNames: { type: "string" }` — JSON Schema the OpenAPI 3.0 document must not contain.
  */
 describe('toOpenApi30Presentation: JSON Schema type unions and null (OPENAPI-EXAMPLE.1-F3)', () => {

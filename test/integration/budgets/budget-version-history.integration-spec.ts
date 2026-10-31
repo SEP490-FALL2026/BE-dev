@@ -1,4 +1,4 @@
-import { VersionHistoryViewService } from '../../../src/modules/budgets/budget/version/version-history-view.service';
+import { VersionHistoryViewService } from '../../../src/modules/budgets/version/version-history-view.service';
 import { BudgetNotAHistoryReaderError } from '../../../src/modules/budgets/budget/budget.errors';
 import { BudgetHarness, type HistoryEntryWire, type Pageable } from '../../support/budget-harness';
 import type { Person } from '../../support/request-harness';

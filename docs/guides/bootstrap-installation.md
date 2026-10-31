@@ -134,9 +134,9 @@ Wrapper chỉ vận chuyển mật khẩu gốc qua stdin, không tự hash và 
 
 Nguồn đối chiếu: [installation service](../../src/modules/installation/public/installation.api.ts),
 [identity facade](../../src/modules/identity-access/public/identity-access.api.ts),
-[credential service](../../src/modules/identity-access/accounts/credential.service.ts),
-[password hasher](../../src/modules/identity-access/accounts/password-hasher.service.ts),
-[credential repository](../../src/modules/identity-access/accounts/credential.repo.ts),
+[credential service](../../src/modules/identity-access/credentials/credential.service.ts),
+[password hasher](../../src/modules/identity-access/credentials/password-hasher.service.ts),
+[credential repository](../../src/modules/identity-access/credentials/credential.repo.ts),
 [Prisma model](../../prisma/models/identity-access.prisma) và
 [kiểm mật khẩu khi đăng nhập](../../src/modules/identity-access/auth/login.service.ts).
 

@@ -36,7 +36,7 @@ describe('MeController — failures after the guard (R-15)', () => {
   });
 });
 
-// --- error answers of the password change (H5.0 characterization) -------------------------------------------------
+// --- error answers of the password change (characterization) -------------------------------------------------
 
 const CURRENT = 'current-password-secret-1';
 const NEXT = 'next-password-secret-12';

@@ -1,38 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client';
-import { fromDateColumn, toDateColumn } from '../../../core/business-date';
+import { toDateColumn } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import type { AssessmentFields } from './assessment.policy';
-import type { Quote } from './quote-pricing.policy';
-
-/** What the Employee declares when the software is not in the catalog (`US-05-06` AC-1). */
-export interface ProposalRecord {
-  softwareName: string;
-  homepageUrl: string;
-  purpose: string;
-  dataDescription: string;
-  expectedUsers: number;
-}
-
-/** The assessment as kept: the fields the rules judge and the ones that are only recorded. */
-export interface AssessmentRecord extends AssessmentFields {
-  status: 'DRAFT' | 'COMPLETED' | 'REJECTED';
-  vendorId: string | null;
-  equivalentPlanId: string | null;
-  proposedBusinessOwnerEmployeeId: string | null;
-  controlRiskNote: string | null;
-  rejectionKind: 'UNCONTROLLABLE' | 'NOT_ELIGIBLE' | null;
-  rejectionReason: string | null;
-  alternativePlanId: string | null;
-  alternativeNote: string | null;
-  rejectedAt: Date | null;
-  rejectedByEmployeeId: string | null;
-  savedByEmployeeId: string | null;
-  completedByEmployeeId: string | null;
-  completedAt: Date | null;
-  updatedAt: Date;
-}
+import type { AssessmentRecord, ProposalRecord, Quote } from '../access-request/assessment-record.types';
 
 /** The fields the IT Admin gives or clears in one save: a key that is present is written, `null` clears it. */
 export type AssessmentPatch = Partial<
@@ -51,65 +22,6 @@ export type AssessmentPatch = Partial<
     | 'rejectedByEmployeeId'
   >
 >;
-
-type Row = Prisma.AccessRequestAssessmentGetPayload<object>;
-
-function toQuote(row: Row): Quote | null {
-  if (
-    row.quoteUnitPriceMinor === null ||
-    row.quoteCurrency === null ||
-    row.quoteBillingCycle === null ||
-    row.quoteValidFrom === null ||
-    row.quoteBillingCycle === 'OTHER'
-  ) {
-    return null;
-  }
-
-  return {
-    unitPrice: { amountMinor: row.quoteUnitPriceMinor, currency: row.quoteCurrency },
-    billingCycle: row.quoteBillingCycle,
-    validFrom: fromDateColumn(row.quoteValidFrom),
-    validUntil: row.quoteValidUntil ? fromDateColumn(row.quoteValidUntil) : null,
-    commitmentMonths: row.commitmentMonths,
-    paymentFrequency: row.paymentFrequency,
-    firstPaymentOn: row.firstPaymentOn ? fromDateColumn(row.firstPaymentOn) : null,
-  };
-}
-
-function toRecord(row: Row): AssessmentRecord {
-  return {
-    status: row.status,
-    classification: row.classification,
-    vendorId: row.vendorId,
-    vendorName: row.vendorName,
-    plannedPlanName: row.plannedPlanName,
-    provisioningType: row.provisioningType,
-    adminConsole: row.adminConsole,
-    memberExport: row.memberExport,
-    sso: row.sso,
-    termsSummary: row.termsSummary,
-    memberUsageMethod: row.memberUsageMethod,
-    grantRevokeMethod: row.grantRevokeMethod,
-    dataSensitivity: row.dataSensitivity,
-    opinionStatus: row.opinionStatus,
-    opinionNote: row.opinionNote,
-    equivalentPlanId: row.equivalentPlanId,
-    proposedBusinessOwnerEmployeeId: row.proposedBusinessOwnerEmployeeId,
-    controlLevel: row.controlLevel,
-    controlRiskNote: row.controlRiskNote,
-    rejectionKind: row.rejectionKind,
-    rejectionReason: row.rejectionReason,
-    alternativePlanId: row.alternativePlanId,
-    alternativeNote: row.alternativeNote,
-    rejectedAt: row.rejectedAt,
-    rejectedByEmployeeId: row.rejectedByEmployeeId,
-    quote: toQuote(row),
-    savedByEmployeeId: row.savedByEmployeeId,
-    completedByEmployeeId: row.completedByEmployeeId,
-    completedAt: row.completedAt,
-    updatedAt: row.updatedAt,
-  };
-}
 
 const QUOTE_CLEARED = {
   quoteUnitPriceMinor: null,
@@ -137,7 +49,7 @@ function quoteColumns(quote: Quote | null): Prisma.AccessRequestAssessmentUnchec
   };
 }
 
-/** The one writer of `access_request_proposals` and `access_request_assessments`, and their reads. */
+/** The one writer of `access_request_proposals` and `access_request_assessments`; their reads are `AssessmentReadRepo`'s. */
 @Injectable()
 export class AssessmentRepo {
   constructor(private readonly prisma: PrismaService) {}
@@ -146,21 +58,6 @@ export class AssessmentRepo {
   async open(tx: DbTx, requestId: string, proposal: ProposalRecord): Promise<void> {
     await tx.accessRequestProposal.create({ data: { requestId, ...proposal } });
     await tx.accessRequestAssessment.create({ data: { requestId } });
-  }
-
-  async findProposal(requestId: string, tx?: DbTx): Promise<ProposalRecord | null> {
-    const row = await (tx ?? this.prisma).accessRequestProposal.findUnique({
-      where: { requestId },
-      select: { softwareName: true, homepageUrl: true, purpose: true, dataDescription: true, expectedUsers: true },
-    });
-
-    return row;
-  }
-
-  async findAssessment(requestId: string, tx?: DbTx): Promise<AssessmentRecord | null> {
-    const row = await (tx ?? this.prisma).accessRequestAssessment.findUnique({ where: { requestId } });
-
-    return row ? toRecord(row) : null;
   }
 
   /** Writes the fields given and who saved them; the others stay as they were. */

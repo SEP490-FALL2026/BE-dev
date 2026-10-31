@@ -18,7 +18,7 @@ export function toCongestionApiException(error: unknown): unknown {
 
 const example = (error: Error) => errorExampleOf(toCongestionApiException(error));
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const CONGESTION_ERROR_EXAMPLES = {
   HOLDER_NOT_FOUND: example(new CongestionHolderNotFoundError()),
 } as const;

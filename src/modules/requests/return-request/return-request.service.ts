@@ -4,23 +4,18 @@ import { TransactionRunner, type DbTx } from '../../../infrastructure/database/t
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import {
-  AssignmentNotFoundError,
-  AssignmentNotOpenError,
-  RevocationRefusedError,
-  SeatTargetNotFoundError,
-} from '../../licensing/public/licensing.errors';
-import { LicensingApi } from '../../licensing/public/licensing.api';
+import { SeatTargetNotFoundError } from '../../licensing/public/licensing.errors';
 import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.types';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
+import { handoverFor } from './handover.policy';
 import type { ReturnBodyDto } from './return-request.dto';
 import { ReturnRequestRefusedError } from './return-request.errors';
-import { checkReturnable, checkSender, mayReadReturn, originMatches } from './return-request.policy';
+import { checkReturnable, checkSender, originMatches, returnSubmittedDetail } from './return-request.policy';
 import { ReturnRequestRepo, type ReturnRequestRecord } from './return-request.repo';
-import { handoverFor } from './handover.policy';
+import { ReturnSeatGate } from './return-seat-gate.service';
 
 const SHORT_DEADLINE_PARAMETER = 'HANDOVER_SHORT_DEADLINE_WORKING_DAYS';
 
@@ -39,7 +34,7 @@ export class ReturnRequestService {
     private readonly returns: ReturnRequestRepo,
     private readonly requests: AccessRequestRepo,
     private readonly organization: OrganizationApi,
-    private readonly licensing: LicensingApi,
+    private readonly seat: ReturnSeatGate,
     private readonly catalog: CatalogApi,
     private readonly parameters: OperatingParametersApi,
     private readonly audit: AuditApi,
@@ -55,43 +50,21 @@ export class ReturnRequestService {
     return this.runner.run(async (tx) => {
       const now = new Date();
       const today = await this.organization.businessToday(now, tx);
-      const facts = await this.factsOf(tx, body.assignmentId);
-      const holderUnit = (await this.organization.getOwningUnits([facts.employeeId], today, tx)).get(facts.employeeId);
-      const headed = await this.organization.getHeadedDepartment(actor.employeeId, today);
-      const sender = checkSender({
-        actorEmployeeId: actor.employeeId,
-        holderEmployeeId: facts.employeeId,
-        holderDepartmentId: holderUnit?.departmentId ?? null,
-        actorHeadedDepartmentId: headed?.departmentId ?? null,
-      });
-      if (!sender.ok) throw new ReturnRequestRefusedError(sender.refusal);
-      if (!holderUnit) throw new ReturnRequestRefusedError('NO_DEPARTMENT');
-
-      const [plan] = await this.catalog.getPlanRevocationInfo([facts.planId], tx);
-      if (!plan) throw new SeatTargetNotFoundError('PLAN');
-      const problem = checkReturnable({
-        open: facts.open,
-        kind: facts.kind,
-        provisioningType: plan.provisioningType,
-        grant: facts.grant,
-      });
-      if (problem) throw new ReturnRequestRefusedError('ASSIGNMENT_NOT_RETURNABLE', problem);
-      if (body.fromRequestId !== undefined) await this.assertOrigin(tx, actor, facts, body.fromRequestId);
+      const { facts, holderUnit, sender, plan } = await this.requireReturnable(tx, actor, body, today);
 
       // The revocation is opened first: it holds the lock of the seat, so what is judged after it is judged on a seat nobody else
       // is changing, and a rollback takes the task and its reason with it.
       const id = randomUUID();
-      const head = sender.source === 'HEAD_CONFIRMATION';
-      const opened = await this.openRevocation(tx, actor, {
+      const opened = await this.seat.openRevocation(tx, actor, {
         assignmentId: facts.assignmentId,
         returnRequestId: id,
-        head,
+        head: sender.source === 'HEAD_CONFIRMATION',
         reason,
         now,
       });
       if (await this.returns.findAwaitingOf(facts.assignmentId, tx))
         throw new ReturnRequestRefusedError('ALREADY_REQUESTED');
-      if (await this.licensing.hasPendingRenewal(facts.assignmentId, tx)) {
+      if (await this.seat.hasPendingRenewal(facts.assignmentId, tx)) {
         throw new ReturnRequestRefusedError('RENEWAL_PENDING');
       }
 
@@ -124,89 +97,46 @@ export class ReturnRequestService {
       // The audit event says who, which seat and which task; the warning that the revocation is coming is for the notices.
       await this.audit.record(
         tx,
-        accessRequestAuditEvent(actor, organization.id, 'RETURN_REQUEST.SUBMITTED', 'RETURN_REQUEST', created.id, {
-          returnRequestId: created.id,
-          assignmentId: facts.assignmentId,
-          planId: facts.planId,
-          holderEmployeeId: facts.employeeId,
-          requestedByEmployeeId: actor.employeeId,
-          source: sender.source,
-          departmentId: holderUnit.departmentId,
-          revocationTaskId: opened.taskId,
-          revocationTaskCreated: opened.created,
-          handoverRequired: handover.required,
-          handoverDueOn: handover.dueOn,
-          originRequestId: body.fromRequestId ?? null,
-        }),
+        accessRequestAuditEvent(
+          actor,
+          organization.id,
+          'RETURN_REQUEST.SUBMITTED',
+          'RETURN_REQUEST',
+          created.id,
+          returnSubmittedDetail({ ...created, revocationTaskCreated: opened.created }),
+        ),
       );
 
       return created;
     });
   }
 
-  /**
-   * The person who triggered the return says that the handover of the data is done (`US-05-13` AC-6, `QĐ-62f`). Throws
-   * ReturnRequestRefusedError.
-   */
-  async confirmHandover(actor: AuthenticatedPrincipal, id: string): Promise<ReturnRequestRecord> {
-    return this.runner.run(async (tx) => {
-      const now = new Date();
-      const found = await this.returns.lockById(tx, id);
-      const headed = await this.organization.getHeadedDepartment(
-        actor.employeeId,
-        await this.organization.businessToday(now, tx),
-      );
-      if (
-        !found ||
-        !mayReadReturn({
-          actorEmployeeId: actor.employeeId,
-          roles: actor.roles,
-          holderEmployeeId: found.holderEmployeeId,
-          requestedByEmployeeId: found.requestedByEmployeeId,
-          returnDepartmentId: found.departmentId,
-          actorHeadedDepartmentId: headed?.departmentId ?? null,
-        })
-      ) {
-        throw new ReturnRequestRefusedError('NOT_FOUND');
-      }
-      if (actor.employeeId !== found.requestedByEmployeeId) throw new ReturnRequestRefusedError('NOT_REQUESTER');
-      if (found.state !== 'AWAITING_REVOCATION') throw new ReturnRequestRefusedError('NOT_AWAITING');
-      if (!found.handoverRequired) throw new ReturnRequestRefusedError('HANDOVER_NOT_REQUIRED');
-      if (found.handoverConfirmedAt !== null) throw new ReturnRequestRefusedError('HANDOVER_ALREADY_CONFIRMED');
-
-      await this.returns.confirmHandover(tx, found.id, actor.employeeId, now);
-      const today = await this.organization.businessToday(now, tx);
-      await this.audit.record(
-        tx,
-        accessRequestAuditEvent(
-          actor,
-          found.organizationId,
-          'RETURN_REQUEST.HANDOVER_CONFIRMED',
-          'RETURN_REQUEST',
-          found.id,
-          {
-            returnRequestId: found.id,
-            assignmentId: found.assignmentId,
-            confirmedByEmployeeId: actor.employeeId,
-            onTime: found.handoverDueOn === null || today <= found.handoverDueOn,
-          },
-        ),
-      );
-
-      const confirmed = await this.returns.findById(found.id, tx);
-      if (!confirmed) throw new Error(`The return ${found.id} was not found after its handover was confirmed.`);
-
-      return confirmed;
+  /** The seat, who may return it, and the plan and the origin it is judged against. Throws ReturnRequestRefusedError. */
+  private async requireReturnable(tx: DbTx, actor: AuthenticatedPrincipal, body: ReturnBodyDto, today: string) {
+    const facts = await this.seat.factsOf(tx, body.assignmentId);
+    const holderUnit = (await this.organization.getOwningUnits([facts.employeeId], today, tx)).get(facts.employeeId);
+    const headed = await this.organization.getHeadedDepartment(actor.employeeId, today);
+    const sender = checkSender({
+      actorEmployeeId: actor.employeeId,
+      holderEmployeeId: facts.employeeId,
+      holderDepartmentId: holderUnit?.departmentId ?? null,
+      actorHeadedDepartmentId: headed?.departmentId ?? null,
     });
-  }
+    if (!sender.ok) throw new ReturnRequestRefusedError(sender.refusal);
+    if (!holderUnit) throw new ReturnRequestRefusedError('NO_DEPARTMENT');
 
-  private async factsOf(tx: DbTx, assignmentId: string): Promise<AssignmentFacts> {
-    try {
-      return await this.licensing.getAssignmentFacts(tx, assignmentId);
-    } catch (error) {
-      if (error instanceof AssignmentNotFoundError) throw new ReturnRequestRefusedError('ASSIGNMENT_NOT_FOUND');
-      throw error;
-    }
+    const [plan] = await this.catalog.getPlanRevocationInfo([facts.planId], tx);
+    if (!plan) throw new SeatTargetNotFoundError('PLAN');
+    const problem = checkReturnable({
+      open: facts.open,
+      kind: facts.kind,
+      provisioningType: plan.provisioningType,
+      grant: facts.grant,
+    });
+    if (problem) throw new ReturnRequestRefusedError('ASSIGNMENT_NOT_RETURNABLE', problem);
+    if (body.fromRequestId !== undefined) await this.assertOrigin(tx, actor, facts, body.fromRequestId);
+
+    return { facts, holderUnit, sender, plan };
   }
 
   /** The request the return says it follows: the one whose grant made this seat, which the person has a part in and which is done. */
@@ -224,43 +154,5 @@ export class ReturnRequestService {
       fromRequestId,
     });
     if (!matches) throw new ReturnRequestRefusedError('ORIGIN_MISMATCH');
-  }
-
-  /**
-   * Opens the revocation as the source it is. The person who sends the return is not the IT Admin who will work it, even when they
-   * hold that role: the rule of an IT Admin who revokes their own seat is applied when the task is taken, so the role is not
-   * handed to the gate here. A refusal of the gate that is a fact about the seat is answered as the return it is.
-   */
-  private async openRevocation(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    input: { assignmentId: string; returnRequestId: string; head: boolean; reason: string; now: Date },
-  ) {
-    const asSender = { ...actor, roles: actor.roles.filter((role) => role !== 'IT_ADMIN') };
-    try {
-      return await this.licensing.openRevocation(tx, asSender, {
-        assignmentId: input.assignmentId,
-        source: input.head ? 'MANAGER_NOT_NEEDED' : 'RETURN',
-        decision: {
-          decidedByEmployeeId: actor.employeeId,
-          decidedRole: input.head ? 'MANAGER' : 'EMPLOYEE',
-          referenceKind: 'RETURN_REQUEST',
-          referenceId: input.returnRequestId,
-          note: input.reason,
-        },
-        now: input.now,
-      });
-    } catch (error) {
-      if (error instanceof AssignmentNotOpenError) {
-        throw new ReturnRequestRefusedError('ASSIGNMENT_NOT_RETURNABLE', 'NOT_OPEN');
-      }
-      if (error instanceof RevocationRefusedError && error.problem === 'ASSIGNMENT_IS_SERVICE_ACCOUNT') {
-        throw new ReturnRequestRefusedError('ASSIGNMENT_NOT_RETURNABLE', 'SERVICE_ACCOUNT');
-      }
-      if (error instanceof RevocationRefusedError && error.problem === 'TYPE_NOT_SUPPORTED') {
-        throw new ReturnRequestRefusedError('ASSIGNMENT_NOT_RETURNABLE', 'PLAN_NOT_SUPPORTED');
-      }
-      throw error;
-    }
   }
 }

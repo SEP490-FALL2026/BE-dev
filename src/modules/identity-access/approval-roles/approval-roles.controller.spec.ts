@@ -11,7 +11,7 @@ import {
 import { ApprovalRoleService } from './approval-role.service';
 import { ApprovalRolesController } from './approval-roles.controller';
 
-// H5.0 characterization: the error answers of the approval-role routes.
+// Characterization: the error answers of the approval-role routes.
 
 const actor = { appUserId: '00000000-0000-4000-8000-000000000001' } as AuthenticatedPrincipal;
 const employeeId = '00000000-0000-4000-8000-000000000002';

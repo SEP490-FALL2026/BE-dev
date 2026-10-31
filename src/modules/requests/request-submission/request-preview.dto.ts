@@ -1,7 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { employeeRef, moneySchema, pricingSchema, submitBodySchema } from '../access-request/access-request.dto';
+import { costEstimateSchema, employeeRef, pricingSchema, submitBodySchema } from '../access-request/access-request.dto';
 
 /**
  * What is asked before a request is sent: the plan and the term, and the day the money is expected to go out when the
@@ -13,18 +13,6 @@ export const previewBodySchema = submitBodySchema.pick({
   termMonths: true,
   projectLabel: true,
   expectedSpendOn: true,
-});
-
-export const costEstimateSchema = z.strictObject({
-  label: z.enum(['ESTIMATE', 'ESTIMATE_NO_PROFILE']),
-  basis: z.enum(['PROFILE', 'DEFAULT_NO_PROFILE']),
-  taxGroup: z.string(),
-  preTax: moneySchema,
-  tax: moneySchema,
-  deductibleTax: moneySchema,
-  nonDeductibleTax: moneySchema,
-  estimatedCost: moneySchema,
-  totalPayable: moneySchema,
 });
 
 const chainStepSchema = z.strictObject({

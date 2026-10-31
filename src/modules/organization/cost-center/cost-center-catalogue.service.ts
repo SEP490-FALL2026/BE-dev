@@ -7,7 +7,7 @@ import { CostCenterRecord } from './cost-center.types';
 /**
  * The Cost Center catalogue as the organization facade needs it outside the catalogue's own HTTP use cases: the
  * installation's first UNIT, created for its department. The catalogue use cases
- * themselves (`CostCenterService`) keep using `CostCenterRepo` directly (Owner decision E4).
+ * themselves (`CostCenterService`) keep using `CostCenterRepo` directly (a scoped Owner exception).
  */
 @Injectable()
 export class CostCenterCatalogueService {

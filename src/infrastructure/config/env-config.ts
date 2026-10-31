@@ -2,7 +2,7 @@ import type { ConfigModuleOptions } from '@nestjs/config';
 import { validateEnvironment, validateInstallationEnvironment } from './env-schema';
 
 /**
- * H7-VRF-01: a test run is configured by its own process environment only. `ConfigModule` would otherwise read the
+ * A test run is configured by its own process environment only. `ConfigModule` would otherwise read the
  * developer's ignored `.env` from the working directory and copy every key it lacks into `process.env`, where the next
  * suite and the test harness read it. Development and production keep the default (production images carry no `.env`).
  */
@@ -15,7 +15,7 @@ export const environmentConfigOptions = {
   validate: validateEnvironment,
 } satisfies ConfigModuleOptions;
 
-/** The installation command validates only the database settings and NODE_ENV (R-13). */
+/** The installation command validates only the database settings and NODE_ENV. */
 export const installationEnvironmentConfigOptions = {
   cache: true,
   isGlobal: true,

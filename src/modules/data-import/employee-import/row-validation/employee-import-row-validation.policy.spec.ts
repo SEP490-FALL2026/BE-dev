@@ -32,7 +32,7 @@ const lookup = (overrides: Partial<EmployeeImportLookup> = {}): EmployeeImportLo
   departments: new Map([
     ['P-DES', { id: 'd-des', active: true }],
     ['P-OLD', { id: 'd-old', active: false }],
-    // A department with no Cost Center in use is a department like any other for a people file (`QĐ-87d(3)`, F44).
+    // A department with no Cost Center in use is a department like any other for a people file (`QĐ-87d(3)`).
     ['P-NOCC', { id: 'd-nocc', active: true }],
   ]),
   existing: new Map<string, ExistingEmployee>(),

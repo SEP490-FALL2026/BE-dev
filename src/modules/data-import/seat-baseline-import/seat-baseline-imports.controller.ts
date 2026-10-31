@@ -75,6 +75,16 @@ const COMMON_ERRORS = [
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
+/** Reading an import and its rows is the IT Admin's, as uploading and confirming it are. */
+const READ_ERRORS = [
+  UNAUTHENTICATED_RESPONSE,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only an IT Admin reads a seat baseline import and its rows.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+] as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The import does not exist (SEAT_BASELINE_IMPORT.NOT_FOUND).',
@@ -83,6 +93,12 @@ const NOT_FOUND = {
 const INVALID_ID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The identifier is not a UUID (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
+} as const;
+/** The rows are read with a filter and paging as well, so the query can be what is wrong. */
+const INVALID_ID_OR_QUERY = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The identifier is not a UUID, or the filter or paging query is invalid (VALIDATION_ERROR).',
   examples: [VALIDATION_EXAMPLE],
 } as const;
 
@@ -199,7 +215,7 @@ export class SeatBaselineImportsController {
     message: 'SEAT_BASELINE_IMPORT.FETCHED',
     description: 'The import with its preview or its result.',
   })
-  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, INVALID_ID)
+  @ApiErrorResponses(...READ_ERRORS, NOT_FOUND, INVALID_ID)
   async get(@Param() params: SeatImportIdParamDto) {
     try {
       return toWire(await this.imports.view(params.id));
@@ -216,7 +232,7 @@ export class SeatBaselineImportsController {
     description:
       'A page of the rows in the order of the file, each with what it said, its outcome and the reasons it is wrong; outcome=ERROR lists the rows to fix. An identifier that looks like a secret is shown masked.',
   })
-  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, INVALID_ID)
+  @ApiErrorResponses(...READ_ERRORS, NOT_FOUND, INVALID_ID_OR_QUERY)
   async rows(@Param() params: SeatImportIdParamDto, @Query() query: ListSeatImportRowsQueryDto) {
     try {
       const page = await this.imports.rows(params.id, query);

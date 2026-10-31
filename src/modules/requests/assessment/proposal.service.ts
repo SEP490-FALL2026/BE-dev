@@ -12,7 +12,7 @@ import { hasSpendStep, mayRequest } from '../access-request/access-request.polic
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { AssessmentRepo } from './assessment.repo';
-import { RequestAssessmentService } from '../access-request/request-assessment.service';
+import { RequestFactsService } from '../access-request/request-facts.service';
 import type { ProposalBodyDto } from './assessment.dto';
 
 /**
@@ -29,11 +29,11 @@ export class ProposalService {
     private readonly repo: AccessRequestRepo,
     private readonly assessments: AssessmentRepo,
     private readonly organization: OrganizationApi,
-    private readonly assessment: RequestAssessmentService,
+    private readonly assessment: RequestFactsService,
     private readonly audit: AuditApi,
   ) {}
 
-  /** Throws AccessRequestSuperAdminCannotRequestError (F30), AccessRequestNoDepartmentError and FinanceSetupIncompleteError. */
+  /** Throws AccessRequestSuperAdminCannotRequestError, AccessRequestNoDepartmentError and FinanceSetupIncompleteError. */
   async submit(actor: AuthenticatedPrincipal, body: ProposalBodyDto): Promise<AccessRequestRecord> {
     if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const settings = await this.assessment.settings();

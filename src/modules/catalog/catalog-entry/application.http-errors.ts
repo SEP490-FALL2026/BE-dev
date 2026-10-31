@@ -104,7 +104,7 @@ export function toApplicationApiException(error: unknown): unknown {
     return refuse(UNPROCESSABLE, 'APPLICATION.DICTIONARY_LINE_MISMATCH', error.message);
   }
   if (error instanceof ApplicationVendorGroupChangedError) {
-    // The race loser of DB-03 (P29-N3): its own code, never the 422 code of a mismatch under a second status.
+    // The race loser of DB-03: its own code, never the 422 code of a mismatch under a second status.
     return refuse(HttpStatus.CONFLICT, 'APPLICATION.DICTIONARY_GROUP_CHANGED', error.message);
   }
   if (error instanceof ApplicationUpdateEmptyError) {
@@ -134,7 +134,7 @@ const blockingSubscription: RetirementBlockingSubscription & { planName: string 
   planName: '<plan-name>',
 };
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const APPLICATION_ERROR_EXAMPLES = {
   NOT_FOUND: example(new ApplicationNotFoundError()),
   ALREADY_RETIRED: example(new ApplicationAlreadyRetiredError()),

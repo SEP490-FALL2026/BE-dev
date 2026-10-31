@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { groundsSnapshot, normalizedGrounds } from '../policies/grounds.policy';
-import { personnelAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { groundsSnapshot, normalizedGrounds } from '../personnel-grounds.policy';
+import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
@@ -25,20 +25,20 @@ import type {
   NoticeRecord,
   RecordNoticeInput,
   VerificationInput,
-} from './notice.types';
+} from '../personnel-notice.types';
 
 function refuse(refusal: NoticeRefusal | null): void {
   if (refusal) throw new NoticeRefusedError(refusal.code, refusal.details);
 }
 
 /**
- * What the Super Admin does with a notice that waits (`US-03-11`, F40): rejects it with a reason, or checks it against an
+ * What the Super Admin does with a notice that waits (`US-03-11`): rejects it with a reason, or checks it against an
  * authoritative basis outside the notice and records the official event through the capability that owns it, or links it to an event
  * that already exists. One transaction for each, the notice locked first: whatever the event refuses leaves the notice waiting and
  * writes nothing. The notice never changes a person by itself; the event it leads to does, by its own rules. Only the Super Admin
  * handles a notice, and never one about themselves (`PERSONNEL.SELF_CHANGE_FORBIDDEN`); the controlled procedure records the event of
  * such a notice with its ticket (`--from-notice`), which is the one thing it does with a notice. The record of how it was checked
- * exists only on this path (T-7).
+ * exists only on this path.
  */
 @Injectable()
 export class NoticeHandlingService {

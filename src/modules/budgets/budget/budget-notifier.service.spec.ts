@@ -22,7 +22,7 @@ const proposal = {
 } as unknown as ProposalRecord;
 
 /**
- * `T-11` (review, race of a kept notice and the assignment of a first head): a writer that may KEEP a notice for a department takes the
+ * The race of a kept notice and the assignment of a first head: a writer that may KEEP a notice for a department takes the
  * department `FOR SHARE` before it reads the head, so the assignment (which holds it `FOR UPDATE` and hands the kept notices over
  * before it commits) and the writer cannot interleave and leave a notice kept for a department that has a head.
  */

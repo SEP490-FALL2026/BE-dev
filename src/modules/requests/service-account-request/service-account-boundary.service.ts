@@ -85,7 +85,7 @@ export class ServiceAccountBoundaryService {
           },
         ),
       );
-      // The refusal of the IT Admin ends the request for the person who answers for the account, without a grant (F43).
+      // The refusal of the IT Admin ends the request for the person who answers for the account, without a grant.
       if (verdict.state === 'REJECTED') await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
 
       const record = await this.requests.findById(request.id, tx);

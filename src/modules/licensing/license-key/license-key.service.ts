@@ -13,7 +13,7 @@ import {
   LicenseKeyRevealLimitError,
   SeatTargetNotFoundError,
 } from '../public/licensing.errors';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { LicenseKeyCipher } from './license-key-cipher.service';
 import { LicenseKeyApplicationRetiredError } from './license-key.errors';
 import {
@@ -86,7 +86,7 @@ export class LicenseKeyService {
       .sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
 
     const stored = await this.runner.run(async (tx) => {
-      // The purchase is held for the transaction that keeps its keys (P28-10): the subscription FOR UPDATE and its plan
+      // The purchase is held for the transaction that keeps its keys: the subscription FOR UPDATE and its plan
       // FOR SHARE, so a change of the plan's kind waits for the keys or the keys wait for it, and the kind is read again
       // under the lock. The check before the transaction only answers early.
       const held = await this.catalog.lockSeatTarget(tx, { subscriptionId: input.subscriptionId });
@@ -94,7 +94,7 @@ export class LicenseKeyService {
       if (held.provisioningType !== 'K4') throw new LicenseKeyPlanNotK4Error(held.provisioningType);
       if (held.applicationStatus === 'RETIRED') throw new LicenseKeyApplicationRetiredError();
 
-      // One statement for the whole batch (P28-13: a thousand round trips outlasted the transaction on a busy server).
+      // One statement for the whole batch (a thousand round trips outlasted the transaction on a busy server).
       const keptIds = await this.repo.insertManyIfNew(
         tx,
         sealed.map((row) => {
@@ -199,7 +199,7 @@ export class LicenseKeyService {
    * last slot cannot both pass.
    */
   private async takeSlot(tx: DbTx, actor: AuthenticatedPrincipal): Promise<void> {
-    // `Date.now()`, the one clock the windows are named by, so a test can set the instant of an opening (P28-13).
+    // `Date.now()`, the one clock the windows are named by, so a test can set the instant of an opening.
     const now = new Date(Date.now());
     for (const window of ['MINUTE', 'DAY'] as const) {
       if (!(await this.quota.take(tx, actor.appUserId, window, now))) {

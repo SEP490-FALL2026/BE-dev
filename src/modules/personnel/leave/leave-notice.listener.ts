@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { NoticeRefusedError } from '../notice/notice.errors';
-import type { NoticeEventRef, NoticeRecord } from '../notice/notice.types';
+import type { NoticeEventRef, NoticeRecord } from '../personnel-notice.types';
 import {
   NoticeRecorderContributions,
   type NoticeEventRecorder,
@@ -19,6 +19,9 @@ import { LeaveService } from './leave.service';
  */
 @Injectable()
 export class LeaveNoticeRecorder implements OnModuleInit, NoticeEventRecorder {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [NoticeRecorderContributions] as const;
+
   readonly eventKind = 'LONG_LEAVE' as const;
 
   constructor(

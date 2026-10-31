@@ -59,7 +59,7 @@ export class SpendBatchService {
         }
         locked.set(id, request);
       }
-      // A department with no Cost Center in use is stopped before anything is checked against a budget (F27): not the answer of a year
+      // A department with no Cost Center in use is stopped before anything is checked against a budget: not the answer of a year
       // with no budget, and nothing is written.
       const today = await this.organization.businessToday(new Date(), tx);
       const unit = (await this.organization.getOwningUnits([actor.employeeId], today, tx)).get(actor.employeeId);

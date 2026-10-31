@@ -5,7 +5,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event.mapper';
+import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   PlanNotFoundError,
   PlanWorkspacePersonInvalidError,

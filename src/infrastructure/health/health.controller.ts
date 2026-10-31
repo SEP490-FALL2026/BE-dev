@@ -83,7 +83,7 @@ export class HealthController {
         () => this.prismaHealth.pingCheck('database', this.prisma, { timeout: READINESS_TIMEOUT_MS }),
       ]);
     } catch (error) {
-      // Which dependency failed and the kind of error, and nothing the error says: a log is not the place for a host, a role or a secret (F93).
+      // Which dependency failed and the kind of error, and nothing the error says: a log is not the place for a host, a role or a secret.
       logger.error(`Readiness check failed: ${JSON.stringify(readinessDiagnostic(error))}`);
       // Terminus reports a failed check as a bare 503; give it the availability code of the contract (R-12).
       if (!(error instanceof ServiceUnavailableException)) throw error;

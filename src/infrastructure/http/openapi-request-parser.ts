@@ -5,7 +5,7 @@ import { REQUEST_BODY_LIMIT_TEXT } from './request-body-limit';
 
 /**
  * What the JSON parser answers before any route runs (`applyRequestBodyLimit`, the filter's parser recognition), so every
- * operation that takes a JSON body can answer it (P29-N1, P29-N4). These are the one wording for each answer.
+ * operation that takes a JSON body can answer it. These are the one wording for each answer.
  */
 export const MALFORMED_BODY_DESCRIPTION =
   'The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).';

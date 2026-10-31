@@ -4,14 +4,14 @@ import { TransactionRunner, toTransientError } from '../../../infrastructure/dat
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
-import { CredentialService } from '../accounts/credential.service';
+import { CredentialService } from '../credentials/credential.service';
 import { PasswordPolicyError } from '../public/identity-access.errors';
 import { AccountNoLongerUsableError, CurrentPasswordInvalidError } from './auth.errors';
 import { CredentialChangeService } from './credential-change.service';
 import { LoginThrottle } from './login-throttle.service';
 import { canReceiveResetMail } from './password-reset.policy';
 
-/** Changing one's own password while signed in (slice 1c, `US-01-10` AC-5). */
+/** Changing one's own password while signed in (`US-01-10` AC-5). */
 @Injectable()
 export class PasswordChangeService {
   constructor(
@@ -51,7 +51,7 @@ export class PasswordChangeService {
     // Everything CPU-heavy happens before the transaction (lock protocol rule 3).
     const verifiedHash = await this.verifyCurrent(account.credentialHash, currentPassword);
     if (verifiedHash === null) {
-      // Only a wrong attempt is a failure; it joins the sign-in counter, in one atomic statement (T-6).
+      // Only a wrong attempt is a failure; it joins the sign-in counter, in one atomic statement.
       await this.throttle.recordFailure(account.organizationId, keyHash);
       throw new CurrentPasswordInvalidError();
     }

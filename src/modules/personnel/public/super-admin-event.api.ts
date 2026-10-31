@@ -3,27 +3,18 @@ import { TransactionRunner, type DbTx } from '../../../infrastructure/database/t
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { LeaveService } from '../leave/leave.service';
-import { NoticeHandlingService } from '../notice/notice-handling.service';
-import type { NoticeEventInput } from '../notice/notice.types';
-import { OffboardingChangeService } from '../offboarding/offboarding-change.service';
-import { OffboardingService } from '../offboarding/offboarding.service';
 import type { PersonnelActor } from './personnel.types';
-import { TransferChangeService } from '../transfer/transfer-change.service';
-import { TransferService } from '../transfer/transfer.service';
 import { ProfileCorrectionService } from '../super-admin-event/profile-correction.service';
+import { SuperAdminDepartureEvents } from '../super-admin-event/super-admin-departure-events.service';
+import { SuperAdminLeaveEvents } from '../super-admin-event/super-admin-leave-events.service';
+import { SuperAdminTransferEvents } from '../super-admin-event/super-admin-transfer-events.service';
+import type { Subject } from '../super-admin-event/super-admin-event-anchor.service';
 import { SuperAdminEventRefusedError } from './super-admin-event.errors';
-import {
-  assertContext,
-  assertSplit,
-  noticeKindFitsMode,
-  parametersDigest,
-} from '../super-admin-event/super-admin-event.policy';
+import { assertContext, assertSplit, parametersDigest } from '../super-admin-event/super-admin-event.policy';
 import { refusalOf } from '../super-admin-event/super-admin-event-refusal.mapper';
-import { SuperAdminEventRepo, type RecordKind } from '../super-admin-event/super-admin-event.repo';
+import { SuperAdminEventRepo } from '../super-admin-event/super-admin-event.repo';
 import type {
   EventBasis,
-  NoticeSource,
   SuperAdminEventCommand,
   SuperAdminEventContext,
   SuperAdminEventModeName,
@@ -31,13 +22,8 @@ import type {
   SuperAdminEventResult,
 } from './super-admin-event.types';
 
-interface Subject {
-  id: string;
-  organizationId: string;
-}
-
 /**
- * The controlled procedure for an event whose subject is the Super Admin (`pnpm ops:record-super-admin-event`, spec L.2, F19, `QĐ-87c`,
+ * The controlled procedure for an event whose subject is the Super Admin (`pnpm ops:record-super-admin-event`, `QĐ-87c`,
  * `QĐ-88b`). There is no principal: the command is the operator's, and the permission is judged here, closed on any doubt. It checks the
  * ticket, the split of persons and that the person the event is about HOLDS the `SUPER_ADMIN` role, and only then calls the service that
  * writes the event of the capability that owns it, with the actor `OPERATOR` (whose policy accepts it for that person alone). One
@@ -53,12 +39,9 @@ export class SuperAdminEventApi {
     private readonly organization: OrganizationApi,
     private readonly identity: IdentityAccessApi,
     private readonly tickets: SuperAdminEventRepo,
-    private readonly transfers: TransferService,
-    private readonly transferChanges: TransferChangeService,
-    private readonly leaves: LeaveService,
-    private readonly offboarding: OffboardingService,
-    private readonly offboardingChanges: OffboardingChangeService,
-    private readonly notices: NoticeHandlingService,
+    private readonly transferEvents: SuperAdminTransferEvents,
+    private readonly leaveEvents: SuperAdminLeaveEvents,
+    private readonly departureEvents: SuperAdminDepartureEvents,
     private readonly profile: ProfileCorrectionService,
   ) {}
 
@@ -104,7 +87,7 @@ export class SuperAdminEventApi {
         return { ticketRef: context.ticketRef, mode: parameters.mode, outcome: 'ALREADY_RECORDED', recordId };
       }
 
-      // Lock order (T-11): the departments by id, then the employee, then the account. The services that write the events take the
+      // Lock order: the departments by id, then the employee, then the account. The services that write the events take the
       // departments an event needs first, so nothing is locked here: each of them judges, under its own locks, that the subject
       // holds the `SUPER_ADMIN` role (`requireOperatorSubject`), and `profile-correct`, which locks no department, does it below.
       // The split of persons reads without a lock.
@@ -146,119 +129,18 @@ export class SuperAdminEventApi {
     basis: EventBasis,
   ): Promise<string> {
     switch (parameters.mode) {
-      case 'transfer-record': {
-        if (parameters.fromNotice) {
-          return this.fromNotice(tx, actor, subject, parameters.mode, parameters.fromNotice, basis, {
-            effectiveOn: parameters.effectiveOn,
-            toDepartmentId: parameters.toDepartmentId,
-            successor: parameters.successor,
-          });
-        }
-
-        return (
-          await this.transfers.recordInTx(tx, actor, {
-            employeeId: subject.id,
-            toDepartmentId: parameters.toDepartmentId,
-            effectiveOn: parameters.effectiveOn,
-            grounds: basis,
-            successor: parameters.successor,
-          })
-        ).id;
-      }
+      case 'transfer-record':
       case 'transfer-reschedule':
-        await this.assertAbout(tx, 'TRANSFER', parameters.transferId, subject);
-
-        return (
-          await this.transferChanges.reschedule(
-            actor,
-            parameters.transferId,
-            {
-              newEffectiveOn: parameters.newEffectiveOn,
-              reason: parameters.reason,
-              grounds: basis,
-              successor: parameters.successor,
-            },
-            tx,
-          )
-        ).id;
       case 'transfer-cancel':
-        await this.assertAbout(tx, 'TRANSFER', parameters.transferId, subject);
-
-        return (
-          await this.transferChanges.cancel(
-            actor,
-            parameters.transferId,
-            { reason: parameters.reason, grounds: basis },
-            tx,
-          )
-        ).id;
-      case 'leave-start': {
-        if (parameters.fromNotice) {
-          return this.fromNotice(tx, actor, subject, parameters.mode, parameters.fromNotice, basis, {
-            startedOn: parameters.startedOn,
-            approvedReturnOn: parameters.approvedReturnOn,
-          });
-        }
-
-        return (
-          await this.leaves.startInTx(tx, actor, {
-            employeeId: subject.id,
-            startedOn: parameters.startedOn,
-            approvedReturnOn: parameters.approvedReturnOn,
-            grounds: basis,
-          })
-        ).id;
-      }
+        return this.transferEvents.write(tx, actor, subject, parameters, basis);
+      case 'leave-start':
       case 'leave-return':
-        await this.assertAbout(tx, 'LEAVE', parameters.leaveId, subject);
-
-        return (
-          await this.leaves.confirmReturn(
-            actor,
-            parameters.leaveId,
-            { returnedOn: parameters.returnedOn, grounds: basis },
-            tx,
-          )
-        ).id;
+        return this.leaveEvents.write(tx, actor, subject, parameters, basis);
       case 'departure-record':
-      case 'abrupt-departure-record': {
-        const transferCancellation = parameters.cancelTransferReason
-          ? { reason: parameters.cancelTransferReason }
-          : undefined;
-        if (parameters.fromNotice) {
-          return this.fromNotice(tx, actor, subject, parameters.mode, parameters.fromNotice, basis, {
-            lastWorkingDay: parameters.lastWorkingDay,
-            successor: parameters.successor,
-            pendingTransferCancellation: transferCancellation,
-          });
-        }
-
-        return (
-          await this.offboarding.recordInTx(tx, actor, {
-            employeeId: subject.id,
-            lastWorkingDay: parameters.lastWorkingDay,
-            abrupt: parameters.mode === 'abrupt-departure-record',
-            grounds: basis,
-            successor: parameters.successor,
-            pendingTransferCancellation: transferCancellation,
-          })
-        ).id;
-      }
+      case 'abrupt-departure-record':
       case 'departure-change':
-        await this.assertAbout(tx, 'CASE', parameters.caseId, subject);
-
-        return (
-          await this.offboardingChanges.changeLastDay(
-            actor,
-            parameters.caseId,
-            { lastWorkingDay: parameters.lastWorkingDay, reason: parameters.reason, successor: parameters.successor },
-            tx,
-          )
-        ).id;
       case 'departure-cancel':
-        await this.assertAbout(tx, 'CASE', parameters.caseId, subject);
-
-        return (await this.offboardingChanges.cancel(actor, parameters.caseId, { reason: parameters.reason }, tx)).id;
+        return this.departureEvents.write(tx, actor, subject, parameters, basis);
       case 'profile-correct':
         // No department is locked by this mode, so the protocol is the employee and then the account, here.
         await this.organization.lockEmployeeForUpdate(tx, subject.id);
@@ -268,45 +150,6 @@ export class SuperAdminEventApi {
 
         return subject.id;
     }
-  }
-
-  /** The record to change must exist and be about the person the ticket is about. */
-  private async assertAbout(tx: DbTx, kind: RecordKind, id: string, subject: Subject): Promise<void> {
-    const employeeId = await this.tickets.employeeOf(tx, kind, id);
-    if (employeeId === null) throw new SuperAdminEventRefusedError('RECORD_NOT_FOUND');
-    if (employeeId !== subject.id) throw new SuperAdminEventRefusedError('RECORD_NOT_ABOUT_SUBJECT');
-  }
-
-  /**
-   * The event is recorded from a notice of a head about the person (`BM-09`): the notice becomes `RECORDED` with the record of how it
-   * was checked, exactly as the application does when the Super Admin records it. A notice about another person, or of a kind the mode
-   * does not record, is refused before anything is written.
-   */
-  private async fromNotice(
-    tx: DbTx,
-    actor: PersonnelActor,
-    subject: Subject,
-    mode: SuperAdminEventModeName,
-    source: NoticeSource,
-    basis: EventBasis,
-    event: NoticeEventInput,
-  ): Promise<string> {
-    const notice = await this.tickets.noticeOf(tx, source.noticeId);
-    if (!notice || notice.employeeId !== subject.id) throw new SuperAdminEventRefusedError('NOTICE_NOT_ABOUT_SUBJECT');
-    if (!noticeKindFitsMode(mode, notice.kind)) throw new SuperAdminEventRefusedError('NOTICE_KIND_MISMATCH');
-    const recorded = await this.notices.record(
-      actor,
-      source.noticeId,
-      {
-        verification: { method: source.verificationMethod, reference: source.verificationReference ?? basis.reference },
-        grounds: basis,
-        event,
-      },
-      tx,
-    );
-    if (!recorded.recordedEventId) throw new SuperAdminEventRefusedError('RECORD_NOT_FOUND');
-
-    return recorded.recordedEventId;
   }
 }
 

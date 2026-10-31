@@ -7,11 +7,11 @@ import type { RowIssue } from '../employee-import-row.types';
 import { EmployeeImportLookup, EmployeeRowClassifier } from './employee-import-row-validation.policy';
 
 /*
- * BEH.1 / A4-11 characterization (H8 Phase 0). The import preview (`EmployeeRowClassifier`) and manual entry
+ * Characterization. The import preview (`EmployeeRowClassifier`) and manual entry
  * (`validateEmployeeRow`) each judge a row; this spec runs one fixture through both and records where they agree and
- * where they differ. Prompt 25 (`beh1-employee-row-validation-ownership`) made both paths adapters of one semantic
+ * where they differ. The work item `beh1-employee-row-validation-ownership` made both paths adapters of one semantic
  * placement policy (`organization/public/employee-placement.policy.ts`) — the agreeing department and job title reasons, codes
- * and order — and deliberately kept H8 D-1 through D-4 (field against column, an existing person, the place of a taken
+ * and order — and deliberately kept four differences (field against column, an existing person, the place of a taken
  * email, import-only reasons). Making those equal would change codes, fields, order and stored previews; a change to
  * either path updates this table on purpose.
  *
@@ -26,7 +26,7 @@ interface Fixture {
   emailTaken?: boolean;
 }
 
-/** A department the lookup found: whether it has a Cost Center in use is not asked (`QĐ-87d(3)`, F44). */
+/** A department the lookup found: whether it has a Cost Center in use is not asked (`QĐ-87d(3)`). */
 const DEPARTMENT = { id: 'd-ops', active: true };
 
 /** The job title cell the fixture stands for: free text, so it is only given or not, and fits or not (QĐ-87e). */

@@ -14,6 +14,9 @@ import { PersonnelFileDeadlinesRepo } from './personnel-file-deadlines.repo';
  */
 @Injectable()
 export class PersonnelFileDeadlines implements ResponsibleDeadlineProvider, OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [ResponsibleDeadlineHook] as const;
+
   constructor(
     private readonly repo: PersonnelFileDeadlinesRepo,
     private readonly hook: ResponsibleDeadlineHook,

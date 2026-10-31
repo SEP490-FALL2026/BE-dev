@@ -5,7 +5,7 @@ import { isUniqueViolation } from '../../../infrastructure/database/unique-viola
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event.mapper';
+import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   VendorGroupNameTakenError,
   VendorGroupNotFoundError,

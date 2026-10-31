@@ -184,6 +184,7 @@
             "name": "resourceId",
             "required": false,
             "in": "query",
+            "description": "Needs resourceType: an id is only meaningful for one type of resource.",
             "schema": { "minLength": 1, "maxLength": 200, "type": "string" }
           },
           {
@@ -202,6 +203,7 @@
             "name": "occurredFrom",
             "required": false,
             "in": "query",
+            "description": "Must be earlier than occurredTo when both are given: the window includes occurredFrom and excludes occurredTo.",
             "schema": { "format": "date-time", "type": "string" }
           },
           {
@@ -1876,7 +1878,7 @@
             }
           },
           "403": {
-            "description": "Only Finance maintains the Cost Center catalogue (the IT Admin and the Super Admin do not).",
+            "description": "Only Finance reads the people in a cost center (the IT Admin and the Super Admin do not).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -1918,7 +1920,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED), or the department does not exist or is no longer in use (COST_CENTER.DEPARTMENT_NOT_ACTIVE).",
+            "description": "The id or the query is invalid (VALIDATION_ERROR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -2075,7 +2077,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin changes department data, on an HR basis. The IT Admin does not.",
+            "description": "Only the Super Admin and the IT Admin list departments; the IT Admin sees only the departments they are in charge of or stand in for.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -2096,7 +2098,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.",
+            "description": "The query is invalid (VALIDATION_ERROR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -2542,7 +2544,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.",
+            "description": "The id is not a UUID (VALIDATION_ERROR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -3294,7 +3296,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.",
+            "description": "The id or the query is invalid (VALIDATION_ERROR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -3487,7 +3489,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.",
+            "description": "The id or the query is invalid (VALIDATION_ERROR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -4968,7 +4970,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin keeps the projects described on department profiles.",
+            "description": "Only the Super Admin lists and reads the projects described on department profiles; the IT Admin does not.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -4989,7 +4991,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).",
+            "description": "The query is invalid (VALIDATION_ERROR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -5372,7 +5374,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin keeps the projects described on department profiles.",
+            "description": "Only the Super Admin lists and reads the projects described on department profiles; the IT Admin does not.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -5414,7 +5416,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).",
+            "description": "The id is not a UUID (VALIDATION_ERROR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -6199,8 +6201,20 @@
             "in": "query",
             "schema": { "type": "string", "enum": ["PENDING", "EFFECTIVE", "CANCELLED"] }
           },
-          { "name": "effectiveFrom", "required": false, "in": "query", "schema": { "type": "string" } },
-          { "name": "effectiveTo", "required": false, "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "effectiveFrom",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          },
+          {
+            "name": "effectiveTo",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          },
           {
             "name": "page",
             "required": false,
@@ -53081,7 +53095,7 @@
             }
           },
           "403": {
-            "description": "Only Finance builds the versions of a budget.",
+            "description": "Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -53792,7 +53806,7 @@
             }
           },
           "403": {
-            "description": "Only Finance builds the versions of a budget.",
+            "description": "Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -54857,7 +54871,7 @@
             }
           },
           "403": {
-            "description": "Only Finance builds the versions of a budget.",
+            "description": "Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -56161,7 +56175,7 @@
             }
           },
           "403": {
-            "description": "Only Finance builds the versions of a budget.",
+            "description": "Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -57813,7 +57827,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters.",
+            "description": "Only the Super Admin reads the operating parameters, their history and the non-working dates.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -58209,7 +58223,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters.",
+            "description": "Only the Super Admin reads the operating parameters, their history and the non-working dates.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -58335,8 +58349,20 @@
       "get": {
         "operationId": "nonWorkingDateList",
         "parameters": [
-          { "name": "from", "required": false, "in": "query", "schema": { "type": "string" } },
-          { "name": "to", "required": false, "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          },
           {
             "name": "page",
             "required": false,
@@ -58403,7 +58429,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters.",
+            "description": "Only the Super Admin reads the operating parameters, their history and the non-working dates.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -58769,7 +58795,15 @@
     "/api/v1/non-working-dates/{date}": {
       "patch": {
         "operationId": "nonWorkingDateRename",
-        "parameters": [{ "name": "date", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "path",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -59033,7 +59067,15 @@
       },
       "delete": {
         "operationId": "nonWorkingDateRemove",
-        "parameters": [{ "name": "date", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "path",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "The day is a working day again. A day before today is refused (NON_WORKING_DATE.IN_PAST).",
@@ -59918,7 +59960,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin imports people.",
+            "description": "Only the Super Admin reads an employee import and its rows.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -60117,7 +60159,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin imports people.",
+            "description": "Only the Super Admin reads an employee import and its rows.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -61425,7 +61467,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin imports the seat baseline.",
+            "description": "Only an IT Admin reads a seat baseline import and its rows.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -61624,7 +61666,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin imports the seat baseline.",
+            "description": "Only an IT Admin reads a seat baseline import and its rows.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -61666,7 +61708,7 @@
             }
           },
           "422": {
-            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
+            "description": "The identifier is not a UUID, or the filter or paging query is invalid (VALIDATION_ERROR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -62320,8 +62362,20 @@
             "in": "query",
             "schema": { "pattern": "^[A-Z]{3}$", "type": "string" }
           },
-          { "name": "from", "required": false, "in": "query", "schema": { "type": "string" } },
-          { "name": "to", "required": false, "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          },
           {
             "name": "page",
             "required": false,
@@ -67172,7 +67226,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin configures the approval roles.",
+            "description": "Only the Super Admin reads the approval roles and their holders.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -67873,7 +67927,7 @@
   },
   "info": {
     "title": "Software License Management API",
-    "description": "Internal software license and technology cost API",
+    "description": "Internal software license and technology cost API. A text field whose description says it is trimmed has its leading and trailing whitespace removed before it is checked; for the other text fields the description makes no such promise.",
     "version": "1.0",
     "contact": {}
   },
@@ -68017,9 +68071,19 @@
         "properties": {
           "employeeCode": { "type": "string", "minLength": 1, "maxLength": 50 },
           "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "workEmail": { "type": "string", "maxLength": 254, "nullable": true },
+          "workEmail": {
+            "format": "email",
+            "description": "An email address; surrounding whitespace is trimmed before it is checked. The part before any +tag must not be empty: an address that cannot be normalized for matching is refused.",
+            "type": "string",
+            "maxLength": 254,
+            "nullable": true
+          },
           "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
-          "hireDate": { "type": "string" },
+          "hireDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "departmentCode": { "type": "string", "maxLength": 50, "nullable": true },
           "jobTitle": { "type": "string", "maxLength": 1000, "nullable": true },
           "hrBasis": {
@@ -68028,7 +68092,11 @@
               "type": { "type": "string", "minLength": 1, "maxLength": 100 },
               "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
               "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": { "type": "string" }
+              "issuedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["type", "reference", "issuer", "issuedOn"],
             "additionalProperties": false
@@ -68090,9 +68158,19 @@
         "type": "object",
         "properties": {
           "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "workEmail": { "type": "string", "maxLength": 254, "nullable": true },
+          "workEmail": {
+            "format": "email",
+            "description": "An email address; surrounding whitespace is trimmed before it is checked. The part before any +tag must not be empty: an address that cannot be normalized for matching is refused.",
+            "type": "string",
+            "maxLength": 254,
+            "nullable": true
+          },
           "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
-          "hireDate": { "type": "string" },
+          "hireDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "jobTitle": { "type": "string", "maxLength": 1000, "nullable": true },
           "hrBasis": {
             "type": "object",
@@ -68100,7 +68178,11 @@
               "type": { "type": "string", "minLength": 1, "maxLength": 100 },
               "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
               "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": { "type": "string" }
+              "issuedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["type", "reference", "issuer", "issuedOn"],
             "additionalProperties": false
@@ -68455,7 +68537,11 @@
               "type": { "type": "string", "minLength": 1, "maxLength": 100 },
               "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
               "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": { "type": "string" }
+              "issuedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["type", "reference", "issuer", "issuedOn"],
             "additionalProperties": false
@@ -68619,7 +68705,11 @@
               "type": { "type": "string", "minLength": 1, "maxLength": 100 },
               "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
               "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": { "type": "string" }
+              "issuedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["type", "reference", "issuer", "issuedOn"],
             "additionalProperties": false
@@ -68637,7 +68727,11 @@
               "type": { "type": "string", "minLength": 1, "maxLength": 100 },
               "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
               "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": { "type": "string" }
+              "issuedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["type", "reference", "issuer", "issuedOn"],
             "additionalProperties": false
@@ -68798,14 +68892,22 @@
         "type": "object",
         "properties": {
           "employeeId": { "type": "string", "format": "uuid" },
-          "effectiveFrom": { "type": "string" },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "hrBasis": {
             "type": "object",
             "properties": {
               "type": { "type": "string", "minLength": 1, "maxLength": 100 },
               "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
               "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": { "type": "string" }
+              "issuedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["type", "reference", "issuer", "issuedOn"],
             "additionalProperties": false
@@ -68817,14 +68919,22 @@
       "VacateHeadBodyDto": {
         "type": "object",
         "properties": {
-          "effectiveFrom": { "type": "string" },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "hrBasis": {
             "type": "object",
             "properties": {
               "type": { "type": "string", "minLength": 1, "maxLength": 100 },
               "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
               "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": { "type": "string" }
+              "issuedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["type", "reference", "issuer", "issuedOn"],
             "additionalProperties": false
@@ -68837,14 +68947,22 @@
         "type": "object",
         "properties": {
           "employeeId": { "type": "string", "format": "uuid" },
-          "effectiveFrom": { "type": "string" },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "hrBasis": {
             "type": "object",
             "properties": {
               "type": { "type": "string", "minLength": 1, "maxLength": 100 },
               "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
               "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": { "type": "string" }
+              "issuedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["type", "reference", "issuer", "issuedOn"],
             "additionalProperties": false
@@ -68862,7 +68980,11 @@
               "type": { "type": "string", "minLength": 1, "maxLength": 100 },
               "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
               "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": { "type": "string" }
+              "issuedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["type", "reference", "issuer", "issuedOn"],
             "additionalProperties": false
@@ -68980,7 +69102,11 @@
               "type": { "type": "string", "minLength": 1, "maxLength": 100 },
               "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
               "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": { "type": "string" }
+              "issuedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["type", "reference", "issuer", "issuedOn"],
             "additionalProperties": false
@@ -69002,7 +69128,11 @@
               "type": { "type": "string", "minLength": 1, "maxLength": 100 },
               "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
               "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": { "type": "string" }
+              "issuedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["type", "reference", "issuer", "issuedOn"],
             "additionalProperties": false
@@ -69016,7 +69146,11 @@
         "properties": {
           "employeeId": { "type": "string", "format": "uuid" },
           "toDepartmentId": { "type": "string", "format": "uuid" },
-          "effectiveOn": { "type": "string" },
+          "effectiveOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "grounds": {
             "type": "object",
             "properties": {
@@ -69518,7 +69652,11 @@
       "RescheduleTransferBodyDto": {
         "type": "object",
         "properties": {
-          "newEffectiveOn": { "type": "string" },
+          "newEffectiveOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "reason": { "type": "string", "maxLength": 1000 },
           "grounds": {
             "type": "object",
@@ -69866,6 +70004,7 @@
           "newToolNote": { "type": "string", "maxLength": 500 }
         },
         "required": ["assignmentId", "decision"],
+        "description": "A note (newToolNote) goes only with the decision NEEDS_NEW_TOOL, and it is not blank.",
         "additionalProperties": false
       },
       "TransferReviewDecisionResponseDto": {
@@ -69998,8 +70137,16 @@
         "type": "object",
         "properties": {
           "employeeId": { "type": "string", "format": "uuid" },
-          "startedOn": { "type": "string" },
-          "approvedReturnOn": { "type": "string" },
+          "startedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "approvedReturnOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "grounds": {
             "type": "object",
             "properties": {
@@ -70218,7 +70365,11 @@
       "ChangeReturnDateBodyDto": {
         "type": "object",
         "properties": {
-          "newApprovedReturnOn": { "type": "string" },
+          "newApprovedReturnOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "grounds": {
             "type": "object",
             "properties": {
@@ -70236,7 +70387,11 @@
       "ConfirmReturnBodyDto": {
         "type": "object",
         "properties": {
-          "returnedOn": { "type": "string" },
+          "returnedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "grounds": {
             "type": "object",
             "properties": {
@@ -70255,7 +70410,11 @@
         "type": "object",
         "properties": {
           "employeeId": { "type": "string", "format": "uuid" },
-          "lastWorkingDay": { "type": "string" },
+          "lastWorkingDay": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "abrupt": { "default": false, "type": "boolean" },
           "grounds": {
             "type": "object",
@@ -70857,7 +71016,11 @@
       "ChangeLastDayBodyDto": {
         "type": "object",
         "properties": {
-          "lastWorkingDay": { "type": "string" },
+          "lastWorkingDay": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "reason": { "type": "string", "maxLength": 1000 },
           "successor": {
             "oneOf": [
@@ -70890,7 +71053,11 @@
       "MarkLeftBodyDto": {
         "type": "object",
         "properties": {
-          "departedOn": { "type": "string" },
+          "departedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "accountLock": {
             "type": "object",
             "properties": { "note": { "type": "string", "minLength": 1, "maxLength": 1000 } },
@@ -71403,7 +71570,11 @@
             "type": "string",
             "enum": ["DEPARTMENT_TRANSFER_OUT", "DEPARTMENT_TRANSFER_IN", "DEPARTURE", "ABRUPT_DEPARTURE", "LONG_LEAVE"]
           },
-          "proposedOn": { "type": "string" },
+          "proposedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "targetDepartmentId": { "type": "string", "format": "uuid" },
           "note": { "type": "string", "maxLength": 500 }
         },
@@ -71641,8 +71812,16 @@
             "type": "object",
             "properties": {
               "toDepartmentId": { "type": "string", "format": "uuid" },
-              "effectiveOn": { "type": "string" },
-              "lastWorkingDay": { "type": "string" },
+              "effectiveOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
+              "lastWorkingDay": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
               "successor": {
                 "oneOf": [
                   {
@@ -71668,8 +71847,16 @@
                 "required": ["reason"],
                 "additionalProperties": false
               },
-              "startedOn": { "type": "string" },
-              "approvedReturnOn": { "type": "string" }
+              "startedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
+              "approvedReturnOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "additionalProperties": false
           }
@@ -72849,7 +73036,11 @@
               "identity": { "type": "string", "maxLength": 1000 },
               "occupiesSeat": { "type": "boolean" },
               "holderEmployeeId": { "type": "string", "format": "uuid" },
-              "lastReviewedOn": { "type": "string" }
+              "lastReviewedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["identity", "occupiesSeat", "holderEmployeeId", "lastReviewedOn"],
             "additionalProperties": false,
@@ -73478,10 +73669,26 @@
             "additionalProperties": false
           },
           "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER"] },
-          "startDate": { "type": "string" },
-          "endDate": { "type": "string" },
-          "renewalDate": { "type": "string" },
-          "noticeDeadline": { "type": "string" },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "renewalDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "noticeDeadline": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "noticePeriodDays": { "type": "integer", "minimum": 0, "maximum": 3650 },
           "autoRenew": { "type": "boolean" },
           "allowsMidTermReduction": { "type": "boolean" }
@@ -73679,10 +73886,29 @@
             "additionalProperties": false
           },
           "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER"] },
-          "startDate": { "type": "string" },
-          "endDate": { "type": "string", "nullable": true },
-          "renewalDate": { "type": "string", "nullable": true },
-          "noticeDeadline": { "type": "string", "nullable": true },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "nullable": true
+          },
+          "renewalDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "nullable": true
+          },
+          "noticeDeadline": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "nullable": true
+          },
           "noticePeriodDays": { "type": "integer", "minimum": 0, "maximum": 3650, "nullable": true },
           "autoRenew": { "type": "boolean" },
           "allowsMidTermReduction": { "type": "boolean" }
@@ -73827,7 +74053,12 @@
         "type": "object",
         "properties": {
           "termsUrl": { "type": "string", "maxLength": 10000, "nullable": true },
-          "lastReviewedOn": { "type": "string", "nullable": true },
+          "lastReviewedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "nullable": true
+          },
           "aiTraining": { "type": "string", "maxLength": 10000, "nullable": true },
           "dataLocation": { "type": "string", "maxLength": 10000, "nullable": true },
           "installLimit": {
@@ -74709,8 +74940,16 @@
         "type": "object",
         "properties": {
           "employeeId": { "type": "string", "format": "uuid" },
-          "effectiveFrom": { "type": "string" },
-          "expectedEndDate": { "type": "string" }
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "expectedEndDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          }
         },
         "required": ["employeeId", "effectiveFrom"],
         "additionalProperties": false
@@ -75080,7 +75319,11 @@
           "requestId": { "type": "string", "format": "uuid" },
           "subscriptionId": { "type": "string", "format": "uuid" },
           "accountIdentifier": { "type": "string", "maxLength": 254 },
-          "expectedEndDate": { "type": "string" },
+          "expectedEndDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "responsibleEmployeeId": { "type": "string", "format": "uuid" },
           "beneficiaryEmployeeId": { "type": "string", "format": "uuid" }
         },
@@ -75194,11 +75437,26 @@
                         "nullable": true
                       },
                       "accessState": { "type": "string", "enum": ["CUT", "UNTIL_PAID_END", null], "nullable": true },
-                      "paidThroughOn": { "type": "string", "nullable": true },
+                      "paidThroughOn": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "A calendar date as YYYY-MM-DD.",
+                        "nullable": true
+                      },
                       "terminating": { "type": "boolean" },
-                      "terminatingUntil": { "type": "string", "nullable": true },
+                      "terminatingUntil": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "A calendar date as YYYY-MM-DD.",
+                        "nullable": true
+                      },
                       "completionNote": { "type": "string", "nullable": true },
-                      "accessCutOn": { "type": "string", "nullable": true },
+                      "accessCutOn": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "A calendar date as YYYY-MM-DD.",
+                        "nullable": true
+                      },
                       "accessEvidence": { "type": "string", "nullable": true },
                       "firstReason": {
                         "type": "object",
@@ -75451,9 +75709,19 @@
                           "nullable": true
                         },
                         "accessState": { "type": "string", "enum": ["CUT", "UNTIL_PAID_END", null], "nullable": true },
-                        "paidThroughOn": { "type": "string", "nullable": true },
+                        "paidThroughOn": {
+                          "type": "string",
+                          "format": "date",
+                          "description": "A calendar date as YYYY-MM-DD.",
+                          "nullable": true
+                        },
                         "terminating": { "type": "boolean" },
-                        "terminatingUntil": { "type": "string", "nullable": true }
+                        "terminatingUntil": {
+                          "type": "string",
+                          "format": "date",
+                          "description": "A calendar date as YYYY-MM-DD.",
+                          "nullable": true
+                        }
                       },
                       "required": [
                         "source",
@@ -75631,11 +75899,26 @@
                         "nullable": true
                       },
                       "accessState": { "type": "string", "enum": ["CUT", "UNTIL_PAID_END", null], "nullable": true },
-                      "paidThroughOn": { "type": "string", "nullable": true },
+                      "paidThroughOn": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "A calendar date as YYYY-MM-DD.",
+                        "nullable": true
+                      },
                       "terminating": { "type": "boolean" },
-                      "terminatingUntil": { "type": "string", "nullable": true },
+                      "terminatingUntil": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "A calendar date as YYYY-MM-DD.",
+                        "nullable": true
+                      },
                       "completionNote": { "type": "string", "nullable": true },
-                      "accessCutOn": { "type": "string", "nullable": true },
+                      "accessCutOn": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "A calendar date as YYYY-MM-DD.",
+                        "nullable": true
+                      },
                       "accessEvidence": { "type": "string", "nullable": true },
                       "firstReason": {
                         "type": "object",
@@ -75803,9 +76086,17 @@
           },
           "evidence": { "default": "", "type": "string", "maxLength": 2000 },
           "note": { "type": "string", "maxLength": 1000 },
-          "paidThroughOn": { "type": "string" },
+          "paidThroughOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "accessState": { "type": "string", "enum": ["CUT", "UNTIL_PAID_END"] },
-          "accessCutOn": { "type": "string" },
+          "accessCutOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "accessEvidence": { "type": "string", "maxLength": 2000 }
         },
         "required": ["completion"],
@@ -75814,7 +76105,11 @@
       "AccessCutBodyDto": {
         "type": "object",
         "properties": {
-          "accessCutOn": { "type": "string" },
+          "accessCutOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "evidence": { "default": "", "type": "string", "maxLength": 2000 }
         },
         "required": ["accessCutOn"],
@@ -76540,7 +76835,11 @@
             "enum": ["NO_ACCESS", "INVITATION_OR_ACTIVATION", "MISSING_PLAN_FEATURE", "PROVIDER_OUTAGE", "OTHER"]
           },
           "impact": { "type": "string", "enum": ["UNUSABLE", "PARTIAL", "QUESTION_OR_OTHER"] },
-          "description": { "type": "string", "maxLength": 2000 },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Required: a value that is only whitespace is refused."
+          },
           "occurredAt": { "type": "string", "format": "date-time" }
         },
         "required": ["assignmentId", "category", "impact", "description", "occurredAt"],
@@ -76952,7 +77251,11 @@
               "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
               "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
               "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "expectedSpendOn": { "type": "string" },
+              "expectedSpendOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
               "kind": { "type": "string", "enum": ["INDIVIDUAL"] }
             },
             "required": ["planId", "businessReason", "termMonths", "kind"],
@@ -76970,7 +77273,11 @@
                   "type": "object",
                   "properties": {
                     "employeeId": { "type": "string", "format": "uuid" },
-                    "expectedEndDate": { "type": "string" }
+                    "expectedEndDate": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                    }
                   },
                   "required": ["employeeId"],
                   "additionalProperties": false
@@ -76979,7 +77286,11 @@
               "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
               "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
               "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "expectedSpendOn": { "type": "string" },
+              "expectedSpendOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
               "termConfirmation": {
                 "type": "object",
                 "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 1000 } },
@@ -77000,7 +77311,11 @@
               "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
               "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
               "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "expectedSpendOn": { "type": "string" },
+              "expectedSpendOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
               "kind": { "type": "string", "enum": ["SERVICE_ACCOUNT"] }
             },
             "required": ["planId", "purpose", "expectedIdentifier", "businessReason", "termMonths", "kind"],
@@ -77579,7 +77894,11 @@
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
           "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "expectedSpendOn": { "type": "string" }
+          "expectedSpendOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          }
         },
         "required": ["planId", "businessReason", "termMonths"],
         "additionalProperties": false
@@ -78064,7 +78383,11 @@
           "planId": { "type": "string", "format": "uuid" },
           "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
           "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "expectedSpendOn": { "type": "string" }
+          "expectedSpendOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          }
         },
         "required": ["planId", "termMonths"],
         "additionalProperties": false
@@ -78911,12 +79234,18 @@
                 "additionalProperties": false
               },
               "offPlan": { "type": "boolean", "enum": [true] },
-              "expectedSpendOn": { "type": "string" }
+              "expectedSpendOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "Choose exactly one: a line of the plan of the budget (planLine), or that the spend is outside it (offPlan: true)."
           }
         },
         "required": ["decision"],
+        "description": "A refusal (REJECT) gives its reason, and neither confirms a term nor chooses a line of the plan. An approval (APPROVE) may confirm a term over twelve months with a reason of its own, and for a request that costs money chooses a line of the plan or that it is outside it.",
         "additionalProperties": false
       },
       "WithdrawBodyDto": {
@@ -78989,19 +79318,28 @@
           "evidence": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["cause"],
+        "description": "A closing for a transfer (cause BENEFICIARY_TRANSFERRED) gives its reason in note.",
         "additionalProperties": false
       },
       "ProposalBodyDto": {
         "type": "object",
         "properties": {
           "softwareName": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "homepageUrl": { "type": "string", "maxLength": 500 },
+          "homepageUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "An absolute web address, http or https, with a host; surrounding whitespace is trimmed first."
+          },
           "purpose": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "dataDescription": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "expectedUsers": { "type": "integer", "minimum": 1, "maximum": 1000000 },
           "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
           "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "expectedSpendOn": { "type": "string" }
+          "expectedSpendOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          }
         },
         "required": ["softwareName", "homepageUrl", "purpose", "dataDescription", "expectedUsers", "termMonths"],
         "additionalProperties": false
@@ -79414,21 +79752,37 @@
                 "additionalProperties": false
               },
               "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL"] },
-              "validFrom": { "type": "string" },
-              "validUntil": { "type": "string", "nullable": true },
+              "validFrom": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
+              "validUntil": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+                "nullable": true
+              },
               "commitmentMonths": { "type": "integer", "minimum": 1, "maximum": 120, "nullable": true },
               "paymentFrequency": {
                 "type": "string",
                 "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "UPFRONT_ONCE", null],
                 "nullable": true
               },
-              "firstPaymentOn": { "type": "string", "nullable": true }
+              "firstPaymentOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+                "nullable": true
+              }
             },
             "required": ["unitPrice", "billingCycle", "validFrom"],
             "additionalProperties": false,
             "nullable": true
           }
         },
+        "minProperties": 1,
+        "description": "Give at least one field; a field that is present is written, and the ones that can be cleared take null.",
         "additionalProperties": false
       },
       "AssessmentRejectionBodyDto": {
@@ -79464,15 +79818,29 @@
                     "additionalProperties": false
                   },
                   "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL"] },
-                  "validFrom": { "type": "string" },
-                  "validUntil": { "type": "string", "nullable": true },
+                  "validFrom": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                  },
+                  "validUntil": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+                    "nullable": true
+                  },
                   "commitmentMonths": { "type": "integer", "minimum": 1, "maximum": 120, "nullable": true },
                   "paymentFrequency": {
                     "type": "string",
                     "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "UPFRONT_ONCE", null],
                     "nullable": true
                   },
-                  "firstPaymentOn": { "type": "string", "nullable": true }
+                  "firstPaymentOn": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+                    "nullable": true
+                  }
                 },
                 "required": ["unitPrice", "billingCycle", "validFrom"],
                 "additionalProperties": false
@@ -79761,6 +80129,7 @@
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["outcome"],
+        "description": "An assessment (outcome ASSESSED) gives its opinion and the direction it advises, and no reason. Every other outcome gives its reason, and no opinion and no direction.",
         "additionalProperties": false
       },
       "BudgetCheckResponseDto": {
@@ -80094,7 +80463,8 @@
             "minItems": 1,
             "maxItems": 50,
             "type": "array",
-            "items": { "type": "string", "format": "uuid" }
+            "items": { "type": "string", "format": "uuid" },
+            "uniqueItems": true
           }
         },
         "required": ["requestIds"],
@@ -80266,6 +80636,7 @@
           },
           "offPlan": { "type": "boolean", "enum": [true] }
         },
+        "description": "Choose exactly one: a line of the plan of the budget (planLine), or that the spend is outside it (offPlan: true).",
         "additionalProperties": false
       },
       "PlanLineResponseDto": {
@@ -80378,16 +80749,22 @@
       "SupplementBodyDto": {
         "type": "object",
         "properties": {
-          "expectedSpendOn": { "type": "string" },
+          "expectedSpendOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "dropEmployeeIds": {
             "minItems": 1,
             "maxItems": 100,
             "type": "array",
-            "items": { "type": "string", "format": "uuid" }
+            "items": { "type": "string", "format": "uuid" },
+            "uniqueItems": true
           },
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["reason"],
+        "description": "Give at least one of expectedSpendOn and dropEmployeeIds.",
         "additionalProperties": false
       },
       "SupplementResponseDto": {
@@ -81089,7 +81466,8 @@
                 "minItems": 1,
                 "maxItems": 20,
                 "type": "array",
-                "items": { "type": "integer", "minimum": 2000, "maximum": 2200 }
+                "items": { "type": "integer", "minimum": 2000, "maximum": 2200 },
+                "uniqueItems": true
               }
             },
             "required": ["reason", "years"],
@@ -81097,6 +81475,7 @@
           }
         },
         "required": ["decision"],
+        "description": "A refusal (REJECT) gives its reason and no exception. An approval (APPROVE) gives no reason, and may accept an exception (override) with its own reason and the years it names.",
         "additionalProperties": false
       },
       "BatchDecisionBodyDto": {
@@ -81107,11 +81486,13 @@
             "minItems": 1,
             "maxItems": 50,
             "type": "array",
-            "items": { "type": "string", "format": "uuid" }
+            "items": { "type": "string", "format": "uuid" },
+            "uniqueItems": true
           },
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["decision", "requestIds"],
+        "description": "A refusal (REJECT) gives its reason; an approval (APPROVE) gives none. A request is decided once.",
         "additionalProperties": false
       },
       "BatchDecisionResponseDto": {
@@ -81360,7 +81741,8 @@
             "minItems": 1,
             "maxItems": 50,
             "type": "array",
-            "items": { "type": "string", "format": "uuid" }
+            "items": { "type": "string", "format": "uuid" },
+            "uniqueItems": true
           },
           "items": {
             "minItems": 1,
@@ -81370,16 +81752,25 @@
               "type": "object",
               "properties": {
                 "planId": { "type": "string", "format": "uuid" },
-                "expectedSpendOn": { "type": "string" }
+                "expectedSpendOn": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                }
               },
               "required": ["planId"],
               "additionalProperties": false
-            }
+            },
+            "description": "Each tool is named once: no two items carry the same planId."
           },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
           "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "expectedEndDate": { "type": "string" },
+          "expectedEndDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "termConfirmation": {
             "type": "object",
             "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 1000 } },
@@ -81388,6 +81779,7 @@
           }
         },
         "required": ["beneficiaryEmployeeIds", "items", "businessReason", "termMonths"],
+        "description": "One request is made for every person and every tool, so the people times the tools is at most 50.",
         "additionalProperties": false
       },
       "DelegatedResponseDto": {
@@ -81983,7 +82375,11 @@
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
           "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "expectedSpendOn": { "type": "string" }
+          "expectedSpendOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          }
         },
         "required": ["planId", "purpose", "expectedIdentifier", "businessReason", "termMonths"],
         "additionalProperties": false
@@ -81995,6 +82391,7 @@
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["decision"],
+        "description": "A refusal (REJECT) gives its reason; an acceptance (ACCEPT) gives none.",
         "additionalProperties": false
       },
       "ReturnBodyDto": {
@@ -82248,10 +82645,18 @@
         "type": "object",
         "properties": {
           "assignmentId": { "type": "string", "format": "uuid" },
-          "newExpectedEndDate": { "type": "string" },
+          "newExpectedEndDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "expectedSpendOn": { "type": "string" },
+          "expectedSpendOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "termConfirmation": {
             "type": "object",
             "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 1000 } },
@@ -83210,7 +83615,11 @@
               "type": "object",
               "properties": {
                 "employeeId": { "type": "string", "format": "uuid" },
-                "expectedEndDate": { "type": "string" }
+                "expectedEndDate": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                }
               },
               "required": ["employeeId"],
               "additionalProperties": false
@@ -83219,7 +83628,11 @@
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
           "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "expectedSpendOn": { "type": "string" },
+          "expectedSpendOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "termConfirmation": {
             "type": "object",
             "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 1000 } },
@@ -84090,7 +84503,8 @@
                 "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
               },
               "required": ["employeeId", "decision"],
-              "additionalProperties": false
+              "additionalProperties": false,
+              "description": "A refusal (REJECT) gives its reason; an approval (APPROVE) gives none."
             }
           },
           "termConfirmation": {
@@ -84112,12 +84526,18 @@
                 "additionalProperties": false
               },
               "offPlan": { "type": "boolean", "enum": [true] },
-              "expectedSpendOn": { "type": "string" }
+              "expectedSpendOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "Choose exactly one: a line of the plan of the budget (planLine), or that the spend is outside it (offPlan: true)."
           }
         },
         "required": ["lines"],
+        "description": "Each person of the step is decided once. A term confirmation and a choice of line of the plan (spend) are accepted only when at least one person is approved.",
         "additionalProperties": false
       },
       "LineSpendDecisionBodyDto": {
@@ -84135,7 +84555,8 @@
                 "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
               },
               "required": ["employeeId", "decision"],
-              "additionalProperties": false
+              "additionalProperties": false,
+              "description": "A refusal (REJECT) gives its reason; an approval (APPROVE) gives none."
             }
           },
           "override": {
@@ -84146,7 +84567,8 @@
                 "minItems": 1,
                 "maxItems": 20,
                 "type": "array",
-                "items": { "type": "integer", "minimum": 2000, "maximum": 2200 }
+                "items": { "type": "integer", "minimum": 2000, "maximum": 2200 },
+                "uniqueItems": true
               }
             },
             "required": ["reason", "years"],
@@ -84154,6 +84576,7 @@
           }
         },
         "required": ["lines"],
+        "description": "Each person is decided once. An exception (override) is accepted only when at least one person is approved.",
         "additionalProperties": false
       },
       "LineWithdrawBodyDto": {
@@ -84169,6 +84592,7 @@
           "evidence": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["cause"],
+        "description": "A closing for a transfer (cause BENEFICIARY_TRANSFERRED) gives its reason in note.",
         "additionalProperties": false
       },
       "BudgetProposalBodyDto": {
@@ -84195,11 +84619,23 @@
                   "required": ["amount", "currency"],
                   "additionalProperties": false
                 },
-                "windowFrom": { "type": "string" },
-                "windowTo": { "type": "string" },
+                "windowFrom": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                },
+                "windowTo": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                },
                 "servicePeriodMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
                 "repeatCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "ONE_TIME"] },
-                "quoteValidUntil": { "type": "string" },
+                "quoteValidUntil": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                },
                 "note": { "type": "string", "minLength": 1, "maxLength": 1000 }
               },
               "required": ["description", "amount"],
@@ -84490,11 +84926,23 @@
                   "required": ["amount", "currency"],
                   "additionalProperties": false
                 },
-                "windowFrom": { "type": "string" },
-                "windowTo": { "type": "string" },
+                "windowFrom": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                },
+                "windowTo": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                },
                 "servicePeriodMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
                 "repeatCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "ONE_TIME"] },
-                "quoteValidUntil": { "type": "string" },
+                "quoteValidUntil": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                },
                 "note": { "type": "string", "minLength": 1, "maxLength": 1000 }
               },
               "required": ["description", "amount"],
@@ -85102,6 +85550,8 @@
           },
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000, "nullable": true }
         },
+        "minProperties": 1,
+        "description": "Give at least one field.",
         "additionalProperties": false
       },
       "DecisionBodyDto": {
@@ -85111,6 +85561,7 @@
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["decision"],
+        "description": "A refusal (REJECT) or a request to look again (REQUEST_CHANGES) gives its reason; an approval (APPROVE) gives none.",
         "additionalProperties": false
       },
       "VersionLinePageResponseDto": {
@@ -85225,14 +85676,29 @@
             "required": ["amount", "currency"],
             "additionalProperties": false
           },
-          "windowFrom": { "type": "string" },
-          "windowTo": { "type": "string" },
+          "windowFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "windowTo": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "servicePeriodMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
           "repeatCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "ONE_TIME"] },
-          "quoteValidUntil": { "type": "string", "nullable": true },
+          "quoteValidUntil": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "nullable": true
+          },
           "financeComment": { "type": "string", "minLength": 1, "maxLength": 1000, "nullable": true },
           "adjustmentReason": { "type": "string", "minLength": 1, "maxLength": 1000, "nullable": true }
         },
+        "minProperties": 1,
+        "description": "Give at least one field.",
         "additionalProperties": false
       },
       "LineResponseDto": {
@@ -85335,11 +85801,23 @@
                   "required": ["amount", "currency"],
                   "additionalProperties": false
                 },
-                "windowFrom": { "type": "string" },
-                "windowTo": { "type": "string" },
+                "windowFrom": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                },
+                "windowTo": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                },
                 "servicePeriodMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
                 "repeatCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "ONE_TIME"] },
-                "quoteValidUntil": { "type": "string" },
+                "quoteValidUntil": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+                },
                 "note": { "type": "string", "minLength": 1, "maxLength": 1000 }
               },
               "required": ["description", "amount"],
@@ -85353,8 +85831,16 @@
       "WindowBodyDto": {
         "type": "object",
         "properties": {
-          "windowFrom": { "type": "string" },
-          "windowTo": { "type": "string" },
+          "windowFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "windowTo": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "amount": {
             "type": "object",
             "properties": {
@@ -85366,6 +85852,7 @@
           },
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
+        "description": "Give at least one of windowFrom, windowTo and amount.",
         "additionalProperties": false
       },
       "LineChangePageResponseDto": {
@@ -86177,7 +86664,14 @@
       },
       "AddNonWorkingDateBodyDto": {
         "type": "object",
-        "properties": { "date": { "type": "string" }, "reason": { "type": "string", "maxLength": 1000 } },
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "reason": { "type": "string", "maxLength": 1000 }
+        },
         "required": ["date", "reason"],
         "additionalProperties": false
       },
@@ -86485,7 +86979,11 @@
               "type": { "type": "string", "minLength": 1, "maxLength": 100 },
               "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
               "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": { "type": "string" }
+              "issuedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              }
             },
             "required": ["type", "reference", "issuer", "issuedOn"],
             "additionalProperties": false
@@ -87024,7 +87522,11 @@
         "type": "object",
         "properties": {
           "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
-          "rateDate": { "type": "string" },
+          "rateDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "rate": { "type": "string", "maxLength": 40 }
         },
         "required": ["currency", "rateDate", "rate"],
@@ -87386,7 +87888,15 @@
       },
       "PasswordResetRequestBodyDto": {
         "type": "object",
-        "properties": { "email": { "type": "string", "minLength": 1, "maxLength": 320 } },
+        "properties": {
+          "email": {
+            "format": "email",
+            "description": "An email address; surrounding whitespace is trimmed before it is checked.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 320
+          }
+        },
         "required": ["email"],
         "additionalProperties": false
       },

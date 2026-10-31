@@ -2,10 +2,15 @@ import {
   checkLineNeedDecider,
   compareLines,
   needLineState,
+  needRecordOf,
+  needStepOf,
+  lineSpendDecidedDetail,
+  groupSpendDecidedDetail,
   refusalsWithoutReason,
   spendLineState,
   stepOutcomeOf,
   stepRefusalReason,
+  verdictsOf,
   type LineDeciderFacts,
 } from './group-line-decision.policy';
 
@@ -94,5 +99,138 @@ describe('what a decision leads to', () => {
         { employeeId: 'b', decision: 'REJECT', reason: 'Not needed' },
       ]),
     ).toBe('Too costly; Not needed');
+  });
+});
+
+describe('the step a person decides, and what they decided, in a request for a group (US-05-17)', () => {
+  const step = (id: string, assigneeEmployeeId: string | null, state: string) => ({ id, assigneeEmployeeId, state });
+  const steps = [step('s1', 'a', 'APPROVED'), step('s2', 'a', 'PENDING'), step('s3', 'b', 'PENDING')];
+
+  it.each([
+    ['the pending step they hold, before a decided one', 'a', 's2'],
+    ['the step of their own line, when they hold none', 'c', 's3'],
+    ['the first step, when they hold none and are in no line', 'd', 's1'],
+  ])('is %s (needStepOf)', (_label, employeeId, expected) => {
+    const lines = [{ employeeId: 'c', needStepId: 's3' }];
+
+    expect(needStepOf(steps, lines, employeeId).id).toBe(expected);
+  });
+
+  it('is the first step they hold when none of theirs is pending (needStepOf)', () => {
+    expect(needStepOf([step('s1', 'a', 'APPROVED'), step('s2', 'a', 'REJECTED')], [], 'a').id).toBe('s1');
+  });
+
+  it('answers the lines still waiting, in their order, with the verdict given for each (verdictsOf)', () => {
+    const given = [
+      { employeeId: 'p2', decision: 'REJECT' as const, reason: 'Không cần' },
+      { employeeId: 'p1', decision: 'APPROVE' as const },
+    ];
+
+    expect(verdictsOf([{ employeeId: 'p1' }, { employeeId: 'p2' }], given)).toEqual([given[1], given[0]]);
+  });
+
+  it('records an approval with the confirmation of a long term, trimmed, and no reason (needRecordOf)', () => {
+    const verdicts = [
+      { employeeId: 'p1', decision: 'APPROVE' as const },
+      { employeeId: 'p2', decision: 'REJECT' as const, reason: ' Không cần ' },
+    ];
+
+    expect(needRecordOf(verdicts, ' Cần 18 tháng ')).toEqual({
+      decision: 'APPROVED',
+      reason: null,
+      termConfirmationReason: 'Cần 18 tháng',
+    });
+    expect(needRecordOf(verdicts, '  ').termConfirmationReason).toBeNull();
+    expect(needRecordOf(verdicts, undefined).termConfirmationReason).toBeNull();
+  });
+
+  it('records a refusal of everybody with what was said of each, and no confirmation (needRecordOf)', () => {
+    const verdicts = [
+      { employeeId: 'p1', decision: 'REJECT' as const, reason: 'A' },
+      { employeeId: 'p2', decision: 'REJECT' as const, reason: 'B' },
+    ];
+
+    expect(needRecordOf(verdicts, 'Cần 18 tháng')).toEqual({
+      decision: 'REJECTED',
+      reason: 'A; B',
+      termConfirmationReason: null,
+    });
+  });
+});
+
+describe('what the audit says of a spend decision taken on the people of a group (US-05-17 AC-9, US-06-01 AC-15)', () => {
+  const request = { id: 'req-1', requesterEmployeeId: 'sender' };
+  const verdicts = [
+    { employeeId: 'p1', decision: 'APPROVE' as const },
+    { employeeId: 'p2', decision: 'REJECT' as const, reason: ' Hết ngân sách ' },
+  ];
+
+  it('says of each person whether they were approved, the reason of a refusal trimmed, and by whom', () => {
+    expect(
+      lineSpendDecidedDetail(request, 'step-1', verdicts[1], {
+        actorEmployeeId: 'approver',
+        deciderRole: 'SPENDING_APPROVER',
+      }),
+    ).toEqual({
+      requestId: 'req-1',
+      stepId: 'step-1',
+      beneficiaryEmployeeId: 'p2',
+      decision: 'REJECTED',
+      decidedByEmployeeId: 'approver',
+      deciderRole: 'SPENDING_APPROVER',
+      reason: 'Hết ngân sách',
+      requesterEmployeeId: 'sender',
+    });
+    expect(
+      lineSpendDecidedDetail(request, 'step-1', verdicts[0], {
+        actorEmployeeId: 'approver',
+        deciderRole: 'SPENDING_APPROVER',
+      }),
+    ).toMatchObject({ decision: 'APPROVED', reason: null });
+  });
+
+  it('says of the whole decision what was checked, whether it was overridden and for which years, who was approved and who refused', () => {
+    expect(
+      groupSpendDecidedDetail(
+        request,
+        { id: 'step-1', samePersonAsSpend: false, noIndependentReview: true },
+        {
+          verdicts,
+          checkId: 'check-1',
+          override: { reason: 'Cần gấp', years: [2026, 2027] },
+          decision: 'APPROVED',
+          deciderRole: 'CONFLICT_SUBSTITUTE',
+        },
+      ),
+    ).toEqual({
+      requestId: 'req-1',
+      checkId: 'check-1',
+      decision: 'APPROVED',
+      deciderRole: 'CONFLICT_SUBSTITUTE',
+      override: true,
+      overrideYears: '2026,2027',
+      samePersonAsSpend: false,
+      noIndependentReview: true,
+      requestState: 'AWAITING_EXECUTION',
+      lineCount: 2,
+      approvedEmployeeIds: ['p1'],
+      rejectedEmployeeIds: ['p2'],
+    });
+  });
+
+  it('goes to REJECTED when nobody is approved, with no override', () => {
+    expect(
+      groupSpendDecidedDetail(
+        request,
+        { id: 'step-1', samePersonAsSpend: true, noIndependentReview: false },
+        {
+          verdicts: [verdicts[1]],
+          checkId: null,
+          override: null,
+          decision: 'REJECTED',
+          deciderRole: 'SPENDING_APPROVER',
+        },
+      ),
+    ).toMatchObject({ requestState: 'REJECTED', override: false, overrideYears: '', checkId: null });
   });
 });

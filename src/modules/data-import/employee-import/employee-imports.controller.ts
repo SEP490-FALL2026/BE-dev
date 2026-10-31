@@ -60,6 +60,16 @@ const COMMON_ERRORS = [
   { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin imports people.', examples: [FORBIDDEN_EXAMPLE] },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
+/** Reading an import and its rows is the Super Admin's, as uploading and confirming it are. */
+const READ_ERRORS = [
+  UNAUTHENTICATED_RESPONSE,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only the Super Admin reads an employee import and its rows.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+] as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description: 'The import does not exist (IMPORT.NOT_FOUND).',
@@ -146,7 +156,7 @@ export class EmployeeImportsController {
     message: 'EMPLOYEE_IMPORT.FETCHED',
     description: 'The import with its preview or its result.',
   })
-  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, INVALID_ID)
+  @ApiErrorResponses(...READ_ERRORS, NOT_FOUND, INVALID_ID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ImportIdParamDto) {
     try {
       return toWire(await this.previews.view(actor, params.id));
@@ -163,7 +173,7 @@ export class EmployeeImportsController {
     description:
       'The rows of the file with what the preview made of each: the line, the cells, the errors with their column and code, the differences of a person already there. Filter by outcome to download the errors.',
   })
-  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, {
+  @ApiErrorResponses(...READ_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The identifier is not a UUID, or the filter or paging query is invalid (VALIDATION_ERROR).',
     examples: [VALIDATION_EXAMPLE],

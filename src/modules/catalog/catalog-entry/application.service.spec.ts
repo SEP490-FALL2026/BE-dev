@@ -2,7 +2,6 @@ import type { DbTx, TransactionRunner } from '../../../infrastructure/database/t
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { OrganizationApi } from '../../organization/public/organization.api';
-import type { PlanLookupService } from '../plan/plan-lookup.service';
 import { SeatOccupancyHook, type SeatOccupancyReader } from '../public/catalog.extension-points';
 import type { FunctionalGroupLookupService } from '../functional-group/functional-group-lookup.service';
 import type { VendorDictionaryLookupService } from '../vendor-dictionary/vendor-dictionary-lookup.service';
@@ -10,6 +9,7 @@ import type { VendorDirectoryService } from '../vendor/vendor-directory.service'
 import { ApplicationNotFoundError } from './application.errors';
 import type { ApplicationRepo } from './application.repo';
 import { ApplicationService } from './application.service';
+import { ApplicationWriteGuards } from './application-write-guards.service';
 import type { ApplicationVendorLinkService } from './application-vendor-link.service';
 import { ApplicationViewService } from './application-view.service';
 import type { ApplicationRecord } from './application.types';
@@ -99,17 +99,15 @@ function serviceWith(input: {
   const service = new ApplicationService(
     applications as unknown as ApplicationRepo,
     {} as VendorDirectoryService,
-    { findActive: jest.fn() } as unknown as FunctionalGroupLookupService,
     {} as VendorDictionaryLookupService,
     {} as ApplicationVendorLinkService,
-    organization as unknown as OrganizationApi,
-    new ApplicationViewService(
-      organization as unknown as OrganizationApi,
-      plans as unknown as PlanLookupService,
-      occupancy,
-    ),
+    new ApplicationViewService(organization as unknown as OrganizationApi, plans, occupancy),
     audit as unknown as AuditApi,
     runner as unknown as TransactionRunner,
+    new ApplicationWriteGuards(
+      organization as unknown as OrganizationApi,
+      { findActive: jest.fn() } as unknown as FunctionalGroupLookupService,
+    ),
   );
 
   return { service, applications, organization, openHolderCount, audit };

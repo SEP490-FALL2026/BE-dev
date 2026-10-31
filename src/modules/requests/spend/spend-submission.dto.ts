@@ -1,25 +1,33 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { oneChoice, planLineChoiceFields, requestStateSchema } from '../access-request/access-request.dto';
+import {
+  PLAN_LINE_CHOICE_DESCRIPTION,
+  oneChoice,
+  planLineChoiceFields,
+  requestStateSchema,
+} from '../access-request/access-request.dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
-const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 const money = z.strictObject({ amount: z.string(), currency: z.string() });
 const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 
 /** The most requests a head sends on at once: a bound against a typo, not a business rule. */
 export const BATCH_MAX = 50;
 
-export const planLineBodySchema = z.strictObject(planLineChoiceFields).superRefine(oneChoice);
+export const planLineBodySchema = z
+  .strictObject(planLineChoiceFields)
+  .superRefine(oneChoice)
+  .meta({ description: PLAN_LINE_CHOICE_DESCRIPTION });
 
 export const submitBatchBodySchema = z.strictObject({
   requestIds: z
     .array(z.uuid())
     .min(1)
     .max(BATCH_MAX)
-    .refine((ids) => new Set(ids).size === ids.length, { message: 'A request is sent once in a batch.' }),
+    .refine((ids) => new Set(ids).size === ids.length, { message: 'A request is sent once in a batch.' })
+    .meta({ uniqueItems: true }),
 });
 
 export const supplementBodySchema = z
@@ -32,6 +40,7 @@ export const supplementBodySchema = z
       .min(1)
       .max(100)
       .refine((ids) => new Set(ids).size === ids.length, { message: 'A person is named once.' })
+      .meta({ uniqueItems: true })
       .optional(),
     reason: text(1000),
   })
@@ -39,7 +48,8 @@ export const supplementBodySchema = z
     if (body.expectedSpendOn === undefined && body.dropEmployeeIds === undefined) {
       ctx.addIssue({ code: 'custom', path: ['expectedSpendOn'], message: 'Change the day or leave people out.' });
     }
-  });
+  })
+  .meta({ description: 'Give at least one of expectedSpendOn and dropEmployeeIds.' });
 
 const pageQuery = {
   page: z.coerce.number().int().positive().default(1),

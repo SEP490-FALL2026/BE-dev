@@ -5,7 +5,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { AssignmentEndService } from '../assignment/assignment-end.service';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import type { OperatorAuditActor } from '../public/licensing-handover.types';
 import { confirmationCovers, requirementOf, takesOver, type SourceFact } from './handover-confirmer.policy';
 import { HandoverRepo, type DutyRecord } from './handover.repo';

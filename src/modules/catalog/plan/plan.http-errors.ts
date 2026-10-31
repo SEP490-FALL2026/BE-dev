@@ -89,7 +89,7 @@ export function toPlanApiException(error: unknown): unknown {
 
 const example = (error: Error) => errorExampleOf(toPlanApiException(error));
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const PLAN_ERROR_EXAMPLES = {
   NOT_FOUND: example(new PlanNotFoundError()),
   NAME_TAKEN: example(new PlanNameTakenError()),

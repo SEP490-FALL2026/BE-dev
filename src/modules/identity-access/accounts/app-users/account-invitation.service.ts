@@ -6,7 +6,7 @@ import { AuditApi } from '../../../audit/public/audit.api';
 import { EmployeeNotFoundError } from '../../../organization/public/organization.errors';
 import { OrganizationApi } from '../../../organization/public/organization.api';
 import { AppRole } from '../../public/identity-access.types';
-import { employeeHasNotLeft } from '../../policies/account.policy';
+import { employeeHasNotLeft } from '../account.policy';
 import { translateAccountWriteError } from './account-constraints.errors';
 import { AccountDirectoryService } from '../account-directory.service';
 import { accountAuditEvent, isSelfChange, RequestedRole, validateRoleSet } from './account-administration.policy';
@@ -32,7 +32,7 @@ export interface CreateAccountInput {
 }
 
 /**
- * Creating an account and inviting its owner, or inviting again (slice 1b). Every method that changes an account takes
+ * Creating an account and inviting its owner, or inviting again. Every method that changes an account takes
  * the AppUser row lock first and re-reads what it decides on (lock protocol rules 1 and 2). Redeeming the invitation is
  * `InvitationRedemptionService`.
  */

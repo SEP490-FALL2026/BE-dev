@@ -5,7 +5,7 @@ import {
   type ApprovalRoleChangeListener,
 } from '../../identity-access/public/identity-access.extension-points';
 import type { ApprovalRoleChange } from '../../identity-access/public/identity-access.types';
-import { StepReassignmentRepo } from './step-reassignment.repo';
+import { StepReassignmentRepo } from '../step-routing/step-reassignment.repo';
 import { StepReassignmentService } from './step-reassignment.service';
 
 /**
@@ -18,6 +18,9 @@ import { StepReassignmentService } from './step-reassignment.service';
  */
 @Injectable()
 export class RequestsApprovalRoleListener implements ApprovalRoleChangeListener, OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [ApprovalRoleChangeListeners] as const;
+
   constructor(
     private readonly repo: StepReassignmentRepo,
     private readonly reassignment: StepReassignmentService,

@@ -31,7 +31,7 @@ export class SubscriptionNoticeService {
   ) {}
 
   /**
-   * The notices whose base date is on or after `today` and within the earliest alert days (`LD-02`): the subscriptions
+   * The notices whose base date is on or after `today` and within the earliest alert days: the subscriptions
    * outside that window cannot be due for a review, so they are not read.
    */
   async activeNotices(today: BusinessDate, planId?: string): Promise<ActiveNotice[]> {

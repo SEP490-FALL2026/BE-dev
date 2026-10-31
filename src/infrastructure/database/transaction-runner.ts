@@ -31,7 +31,7 @@ const TRANSIENT_SQL_STATES = new Set(['40P01', '55P03', '57014', '40001', '57P01
 const TRANSIENT_PRISMA_CODES = new Set(['P2028', 'P2024', 'P1001', 'P1002', 'P1008', 'P1017', 'P2034']);
 
 /**
- * Prisma 7 + adapter-pg only gives SQLSTATE 23505 (P2002) and 40001 (P2034) their own code.
+ * Prisma 7 + adapter-pg only gives SQLSTATE 23505 (02) and 40001 (34) their own code.
  * Deadlock, lock timeout and statement timeout arrive as P2010 (raw) or P2039 (model) with
  * the original SQLSTATE nested in meta.driverAdapterError.cause.
  */

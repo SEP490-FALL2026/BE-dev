@@ -1,5 +1,5 @@
 import { Contributions } from './contributions';
-import { assertHooksBound, Hook } from './hook';
+import { Hook } from './hook';
 import { Listeners } from './listeners';
 
 describe('Hook', () => {
@@ -21,23 +21,14 @@ describe('Hook', () => {
     expect(() => new Hook<number>('test.unbound').get()).toThrow('Hook test.unbound is not bound');
   });
 
-  it('answers its declared whenUnbound value until it is bound, and the binding afterwards', () => {
-    const hook = new Hook<{ allow(): boolean }>('test.fallback', { allow: () => false });
+  it('reports whether it is bound, and answers nothing else before the binding', () => {
+    const hook = new Hook<{ allow(): boolean }>('test.bound-state');
 
-    expect(hook.get().allow()).toBe(false);
-    expect(() => assertHooksBound([hook])).not.toThrow();
+    expect(hook.isBound()).toBe(false);
+    expect(() => hook.get()).toThrow('Hook test.bound-state is not bound');
     hook.bind({ allow: () => true });
+    expect(hook.isBound()).toBe(true);
     expect(hook.get().allow()).toBe(true);
-  });
-
-  it('names every unbound hook at once', () => {
-    const bound = new Hook<number>('test.bound');
-    bound.bind(1);
-
-    expect(() => assertHooksBound([bound, new Hook('test.a'), new Hook('test.b')])).toThrow(
-      'Hooks not bound: test.a, test.b',
-    );
-    expect(() => assertHooksBound([bound])).not.toThrow();
   });
 });
 

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { normalizeEmail } from '../../../core/email';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
-import { CredentialService } from '../accounts/credential.service';
+import { CredentialService } from '../credentials/credential.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
 import { DemoAccountRoleError } from './identity-access.errors';
 import { CreateDemoAccountInput, DemoAccountRole, DemoAccountState } from './identity-access.types';
@@ -10,7 +10,7 @@ import { CreateDemoAccountInput, DemoAccountRole, DemoAccountState } from './ide
 const DEMO_ACCOUNT_ROLES: ReadonlySet<string> = new Set<DemoAccountRole>(['IT_ADMIN', 'FINANCE', 'EMPLOYEE']);
 
 /**
- * Demo accounts for `pnpm dev:seed` (H6.2, after its local guards) and `pnpm ops:demo-dataset` (the shared demo dataset,
+ * Demo accounts for `pnpm dev:seed` (after its local guards) and `pnpm ops:demo-dataset` (the shared demo dataset,
  * after it proved its target installation). Declared only in IdentityAccessLocalSeedFacadeModule, which nothing but those
  * two command graphs loads. One activated account per demo employee with exactly one direct role, never SUPER_ADMIN and
  * never a derived role (operational-commands rule 6). The login email counts as asserted by the person who ran the

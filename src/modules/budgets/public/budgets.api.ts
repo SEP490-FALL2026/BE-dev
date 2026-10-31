@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
-import { CommitmentService } from '../budget/commitment/commitment.service';
+import { CommitmentService } from '../commitment/commitment.service';
 import type {
   CommitmentHoldInput,
   CommitmentReleaseInput,

@@ -7,7 +7,7 @@ import type {
   OffboardingRightWire,
   OffboardingSummaryWire,
 } from './offboarding.dto';
-import type { ReadAccess } from '../policies/personnel-self-action.policy';
+import type { ReadAccess } from '../personnel-self-action.policy';
 import { ROLE_FLAGS, type RoleFlagMap } from '../public/personnel.types';
 import type { Checklist } from './offboarding.policy';
 import type { OffboardingChangeRecord, OffboardingRecord, OffboardingSummaryRecord } from './offboarding.types';

@@ -48,15 +48,15 @@ export function toAccessRequestApiException(error: unknown): unknown {
     return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
   }
 
-  // The Super Admin does no business work: no request is sent in their name, whatever the route (F30).
+  // The Super Admin does no business work: no request is sent in their name, whatever the route.
   if (error instanceof AccessRequestSuperAdminCannotRequestError) {
     return refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST', error.message);
   }
-  // A draft that was already sent (or is not a draft) is not sent or deleted again (spec L.1).
+  // A draft that was already sent (or is not a draft) is not sent or deleted again.
   if (error instanceof AccessRequestNotDraftError) {
     return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_DRAFT', error.message);
   }
-  // A service judged the role itself, as the guard of the route does (F13): the same answer.
+  // A service judged the role itself, as the guard of the route does: the same answer.
   if (error instanceof AccessRequestRoleRequiredError) {
     return refuse(
       HttpStatus.FORBIDDEN,

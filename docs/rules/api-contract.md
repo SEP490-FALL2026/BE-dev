@@ -240,6 +240,20 @@ openapi:export` từ chối ghi, e2e kiểm document trong tiến trình và `op
   ([openapi-dialect.e2e-spec.ts](../../test/http/platform/openapi-dialect.http-spec.ts)) so mọi DTO body/query/path/response với bản 3.0 do
   chính Zod dựng từ schema runtime — nâng Zod/nestjs-zod/Swagger làm đổi nghĩa document thì đỏ. Không sửa bằng cách đổi chuỗi
   `openapi`, tắt validator hay bỏ ràng buộc.
+- **Luật của request mà document nói được (`F01`).** Ngày nghiệp vụ trong body, query, path dùng đúng một định nghĩa
+  ([business-date.dto.ts](../../src/infrastructure/http/dto/business-date.dto.ts): `businessDate`, `businessDay`,
+  `businessDateSchema(message)`) — không viết lại `refine(isBusinessDate)` trong DTO; document nhận `format: date` và mô tả,
+  không `pattern`. Mảng phần tử vô hướng không trùng gắn `.meta({ uniqueItems: true })`, body "ít nhất một field" gắn
+  `.meta({ minProperties: 1 })`; luật không có từ khóa OpenAPI 3.0 (trim, điều kiện chéo field, địa chỉ web, email chuẩn hóa) ghi
+  bằng `description` của field hoặc của object (query DTO ghi trên field, vì nestjs-zod bỏ metadata cấp object của query); câu về
+  trim nằm một lần ở `info.description`. Không `anyOf`, không `pattern` thêm. Test
+  [openapi-request-rules](../../test/http/platform/openapi-request-rules.http-spec.ts) đọc cây Zod của từng route và đòi mọi ngày,
+  mảng, patch có keyword; dialect gate vẫn so document với bản Zod tự dựng.
+- **Lời của 403/422 ở route đọc (`F03`).** Route GET mô tả đúng ai đọc được và cái gì có thể sai ở một lần đọc (id, query), không
+  mượn câu của route ghi cùng controller (HR basis, luật của phòng ban, "maintains", "configures", "imports"). Khai hằng riêng cho
+  route đọc; `status`, `examples`, guard không đổi. Test
+  [openapi-read-wording](../../test/http/platform/openapi-read-wording.http-spec.ts) cấm cụm từ của route ghi trên GET và ghim câu
+  của các route đọc đã sửa.
 - Cập nhật [API inventory](../../test/support/api-coverage-manifest.ts) khi thêm/bỏ operation.
 - Chạy `pnpm test:e2e`, `pnpm openapi:export`; review diff `openapi.json`.
 - Contract sinh từ controller/DTO. Không sửa JSON hoặc generated FE client bằng tay.
@@ -248,4 +262,4 @@ openapi:export` từ chối ghi, e2e kiểm document trong tiến trình và `op
 Ví dụ hiện có, đã mount và khai báo quyền đúng: [audit controller](../../src/modules/audit/audit.controller.ts)
 (`GET /api/v1/audit-events`, `@RequireRoles('SUPER_ADMIN')` ở class, `operationId`, success/error response) cùng test
 [e2e](../../test/http/audit/audit-events.http-spec.ts) và [integration](../../test/integration/audit/audit-query-http.integration-spec.ts).
-Cách thêm endpoint: [development guide](../guides/kien-truc-backend-va-cach-viet-code.md).
+Cách thêm endpoint: [hướng dẫn dev mới](../guides/huong-dan-dev-moi.md).

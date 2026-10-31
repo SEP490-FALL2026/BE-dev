@@ -27,10 +27,6 @@ export class FinanceApi {
     private readonly taxProfiles: TaxProfileService,
   ) {}
 
-  listCurrencies(): Promise<CurrencyRecord[]> {
-    return this.currencies.list();
-  }
-
   findCurrency(code: string, tx?: DbTx): Promise<CurrencyRecord | null> {
     return this.currencies.find(code, tx);
   }
@@ -102,7 +98,7 @@ export class FinanceApi {
     return this.taxProfiles.estimate(vendorId, netMinor, tx);
   }
 
-  /** `estimateTax` for many prices in one read of the profiles of their vendors, in the order given (`LD-01`). */
+  /** `estimateTax` for many prices in one read of the profiles of their vendors, in the order given. */
   estimateTaxMany(items: readonly { vendorId: string; netMinor: bigint }[], tx?: DbTx): Promise<TaxEstimateResult[]> {
     return this.taxProfiles.estimateMany(items, tx);
   }

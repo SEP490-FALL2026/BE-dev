@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { LicensingApi } from '../../../src/modules/licensing/public/licensing.api';
+import { LicensingRenewalApi } from '../../../src/modules/licensing/public/licensing-renewal.api';
 import { ReturnHarness, type RenewalWire } from '../../support/return-harness';
 import type { Unit } from '../../support/spend-harness';
 
@@ -73,7 +74,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
         [requestId],
       )
     ).rows;
-  const holds = (assignmentId: string) => h.ctx.app.get(LicensingApi).hasPendingRenewal(assignmentId);
+  const holds = (assignmentId: string) => h.ctx.app.get(LicensingRenewalApi).hasPendingRenewal(assignmentId);
 
   describe('a request of its own, which approval turns into the record that follows (AC-1)', () => {
     it('renews a right of internal software: the old record keeps its end, a new one begins there and nobody is waited for', async () => {
@@ -160,7 +161,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
     });
 
     it('ends the old record today when the decision comes after the day the right was to end, and never leaves a period empty', async () => {
-      const licensing = h.ctx.app.get(LicensingApi);
+      const licensing = h.ctx.app.get(LicensingRenewalApi);
       const { TransactionRunner } = await import('../../../src/infrastructure/database/transaction-runner');
       const runner = h.ctx.app.get(TransactionRunner);
       const late = await holder({ planId: internalPlan }, 2);

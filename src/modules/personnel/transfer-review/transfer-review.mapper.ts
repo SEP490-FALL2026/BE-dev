@@ -12,7 +12,7 @@ export interface ReviewNames {
   plans: ReadonlyMap<string, PlanRevocationInfo>;
   /** The head of each department today, by department id; absent while it has none. */
   heads: ReadonlyMap<string, string>;
-  /** The seats of the lines of the page whose old seat is already being taken back for this review (T-6, F43). */
+  /** The seats of the lines of the page whose old seat is already being taken back for this review. */
   revoking: ReadonlySet<string>;
 }
 

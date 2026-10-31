@@ -15,8 +15,8 @@ import {
   ACCESS_REQUEST_ERROR_EXAMPLES as EXAMPLES,
   toAccessRequestApiException,
 } from '../access-request/access-request.http-errors';
-import { AccessRequestQueryService } from '../access-request/access-request-query.service';
-import { toWire } from '../access-request/access-request.mapper';
+import { AccessRequestQueryService } from '../request-view/access-request-query.service';
+import { toWire } from '../request-view/access-request.mapper';
 import {
   DelegatedBodyDto,
   DelegatedResponseDto,

@@ -56,7 +56,10 @@ export function configureApplication(app: INestApplication, options: ConfigureAp
 export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Software License Management API')
-    .setDescription('Internal software license and technology cost API')
+    .setDescription(
+      'Internal software license and technology cost API. A text field whose description says it is trimmed has its leading and ' +
+        'trailing whitespace removed before it is checked; for the other text fields the description makes no such promise.',
+    )
     .setVersion('1.0')
     .setOpenAPIVersion('3.0.0')
     .addBearerAuth()

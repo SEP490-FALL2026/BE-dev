@@ -1,7 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { WAITING_REASON_CODES } from './reassignment.policy';
+import { WAITING_REASON_CODES } from '../step-routing/reassignment.policy';
 
 export const controlledWaitListQuerySchema = z.strictObject({
   page: z.coerce.number().int().positive().default(1),

@@ -129,6 +129,16 @@ không. `EmailDispatcher`, repo, cipher và transport vẫn private (ROOT.1). M�
 log Nest và nhận `EnvironmentValidationError` bằng `instanceof`; gate cấu trúc quét cả root và infrastructure để chặn so
 khớp lỗi theo `error.name`.
 
+**Đồng hồ của `audit_events.occurred_at`.** Với đường ghi của ứng dụng, `occurred_at` là đồng hồ của **tiến trình ghi** lúc gửi
+câu `INSERT` (Prisma sinh `@default(now())` ở phía client, câu lệnh mang cột này như một tham số), không phải `DEFAULT` của cột và
+không phải giờ bắt đầu transaction; SQL viết thẳng không nêu cột (migration, harness) vẫn dùng `DEFAULT CURRENT_TIMESTAMP` của
+PostgreSQL. Bộ chiếu thông báo (`RequestStatusProjectorService`) và `AuditApi.readSince` đọc theo dấu thời gian này, với độ
+trễ đọc là `DB_TRANSACTION_TIMEOUT_MS` + 5 giây. Ràng buộc vận hành: khi API, worker và PostgreSQL chạy trên các máy khác nhau,
+độ lệch đồng hồ giữa chúng phải nhỏ hơn 5 giây (margin của độ trễ đọc), nếu không một event ghi muộn có thể bị bộ chiếu bỏ qua.
+Hiện API, worker và PostgreSQL trên VPS cùng một máy nên ràng buộc này tự đúng; gate: **review** khi đổi cách triển khai
+([nghiệm thu §5](../reviews/be-architecture-test-acceptance-2026-10-29/README.md#5-tiêu-chí-ổn-định-khi-chạy-song-song) ghi phép
+kiểm gốc).
+
 Lệnh vận hành theo [operational commands](../rules/operational-commands.md). `InspectionModule` (H6.1) chỉ xác thực biến
 DB, import `ReadOnlyDatabaseSessionModule` nên mọi phiên PostgreSQL mở `default_transaction_read_only=on`, và đọc qua
 `OrganizationService`, `AuditService.countByAction` và `IdentityAccessInspectionService`

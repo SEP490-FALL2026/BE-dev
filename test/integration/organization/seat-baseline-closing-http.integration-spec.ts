@@ -1,21 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import request from 'supertest';
-import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
 import { waitForLockWaiters } from '../../support/lock-wait';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { AssignmentWire, SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
 
 describe('a closed seat baseline over HTTP (integration, real PostgreSQL)', () => {
-  let organization: OrganizationApi;
   let subscriptionId: string;
   let botId: string;
 
   beforeAll(async () => {
     await h.start();
-    organization = h.ctx.app.get(OrganizationApi, { strict: false });
-    jest.spyOn(organization, 'businessToday').mockResolvedValue('2026-10-01');
+    pretendBusinessToday(h.ctx.app, '2026-10-01');
   }, 180000);
 
   afterAll(async () => {

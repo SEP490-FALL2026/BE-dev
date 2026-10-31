@@ -6,7 +6,7 @@ import { ActionLinkService } from './action-link.service';
 
 /**
  * Ends the links an account could still use, and cancels their mails not yet sent so a dead link is never delivered
- * (T-4, T-5). One step, because every caller (a new invitation or reset link, a lock, a password change, the recovery
+ *. One step, because every caller (a new invitation or reset link, a lock, a password change, the recovery
  * of a credential) needs both halves together.
  */
 @Injectable()

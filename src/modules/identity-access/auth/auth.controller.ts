@@ -11,7 +11,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RawResponse } from '../../../infrastructure/http/decorators/raw-response.decorator';
 import { Public } from '../../../infrastructure/security/decorators/public.decorator';
 import { InvitationRedemptionService } from '../accounts/invitation-redemption.service';
-import { AccountActivatedResponseDto, RedeemInvitationBodyDto } from '../dto/account-management.dto';
+import { AccountActivatedResponseDto, RedeemInvitationBodyDto } from '../accounts/account-management.dto';
 import {
   LoginBodyDto,
   PasswordResetBodyDto,
@@ -20,15 +20,15 @@ import {
   PasswordResetResponseDto,
   RefreshTokenBodyDto,
   SessionTokenResponseDto,
-} from '../dto/auth.dto';
+} from './auth.dto';
 import { IssuedSession } from '../public/identity-access.types';
-import { ACCOUNT_ERROR_EXAMPLES, toAccountApiException } from '../mappers/account.http-errors';
+import { ACCOUNT_ERROR_EXAMPLES, toAccountApiException } from '../accounts/account.http-errors';
 import {
   AUTH_ERROR_EXAMPLES,
   toAuthApiException,
   toPasswordApiException,
   toPasswordResetApiException,
-} from '../mappers/auth.http-errors';
+} from './auth.http-errors';
 import { LoginService } from './login.service';
 import { PasswordResetRequestService } from './password-reset-request.service';
 import { PasswordResetService } from './password-reset.service';

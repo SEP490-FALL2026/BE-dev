@@ -4,7 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { ControlledWaitRepo } from './controlled-wait.repo';
-import { alertRecipientsOf, configurationHintOf, type ReassignableStepKind } from './reassignment.policy';
+import { alertRecipientsOf, configurationHintOf, type ReassignableStepKind } from '../step-routing/reassignment.policy';
 import { reassignmentAuditEvent } from './reassignment-audit.mapper';
 
 /** A step that waits, as the alert is raised for it. */

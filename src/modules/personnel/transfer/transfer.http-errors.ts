@@ -2,7 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
-import { toPersonnelAccessApiException } from '../mappers/personnel-access.http-errors';
+import { toPersonnelAccessApiException } from '../personnel-access.http-errors';
 import { TransferRefusedError } from './transfer.errors';
 import { newTransferRefusal, type NewTransferFacts } from './transfer.policy';
 

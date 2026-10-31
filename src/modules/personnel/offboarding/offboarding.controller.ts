@@ -11,7 +11,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { PERSONNEL_ACCESS_ERROR_EXAMPLES } from '../mappers/personnel-access.http-errors';
+import { PERSONNEL_ACCESS_ERROR_EXAMPLES } from '../personnel-access.http-errors';
 import { userActor } from '../public/personnel.types';
 import {
   CancelOffboardingBodyDto,
@@ -27,8 +27,9 @@ import {
   RecordOffboardingBodyDto,
 } from './offboarding.dto';
 import { OFFBOARDING_ERROR_EXAMPLES, toOffboardingApiException } from './offboarding.http-errors';
-import { OffboardingChangeService } from './offboarding-change.service';
+import { OffboardingChangeService } from './change/offboarding-change.service';
 import { OffboardingLeftService } from './offboarding-left.service';
+import { OffboardingDetailService } from './detail/offboarding-detail.service';
 import { OffboardingViewService } from './offboarding-view.service';
 import { OffboardingService } from './offboarding.service';
 
@@ -39,7 +40,7 @@ const FORBIDDEN = {
     'Only the Super Admin records, changes, cancels or marks the departure of a person, and reads it in full; the IT Admin reads the technical case and takes the steps that follow (AUTHORIZATION.FORBIDDEN).',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
-/** A write by the Super Admin is also refused about themselves (F19): the controlled procedure records that event. */
+/** A write by the Super Admin is also refused about themselves: the controlled procedure records that event. */
 const FORBIDDEN_WRITE = {
   ...FORBIDDEN,
   description: `${FORBIDDEN.description} The Super Admin does not record or change a departure about themselves in the application (PERSONNEL.SELF_CHANGE_FORBIDDEN): the controlled procedure does.`,
@@ -87,6 +88,7 @@ export class OffboardingController {
     private readonly changes: OffboardingChangeService,
     private readonly left: OffboardingLeftService,
     private readonly view: OffboardingViewService,
+    private readonly detail: OffboardingDetailService,
   ) {}
 
   @Post()
@@ -124,7 +126,7 @@ export class OffboardingController {
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordOffboardingBodyDto) {
     try {
-      return await this.view.detailOf(await this.offboarding.record(userActor(actor), body));
+      return await this.detail.detailOf(await this.offboarding.record(userActor(actor), body));
     } catch (error) {
       throw toOffboardingApiException(error);
     }
@@ -244,7 +246,7 @@ export class OffboardingController {
         reason: body.reason ?? '',
       });
 
-      return await this.view.detailOf(record);
+      return await this.detail.detailOf(record);
     } catch (error) {
       throw toOffboardingApiException(error);
     }
@@ -280,7 +282,7 @@ export class OffboardingController {
     try {
       const record = await this.changes.cancel(userActor(actor), params.id, { reason: body.reason ?? '' });
 
-      return await this.view.detailOf(record);
+      return await this.detail.detailOf(record);
     } catch (error) {
       throw toOffboardingApiException(error);
     }
@@ -315,7 +317,7 @@ export class OffboardingController {
     @Body() body: MarkLeftBodyDto,
   ) {
     try {
-      return await this.view.detailOf(await this.left.markLeft(userActor(actor), params.id, body));
+      return await this.detail.detailOf(await this.left.markLeft(userActor(actor), params.id, body));
     } catch (error) {
       throw toOffboardingApiException(error);
     }

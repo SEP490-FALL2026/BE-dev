@@ -26,7 +26,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const status = handled instanceof HttpException ? handled.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const body = this.createEnvelope(handled, status, requestId);
 
-    // A client that left (request.aborted) has no socket to answer on: classify, but never write to it (P29-N4).
+    // A client that left (request.aborted) has no socket to answer on: classify, but never write to it.
     if (this.clientIsGone(response)) return;
     response.setHeader('x-request-id', requestId).status(status).json(body);
   }

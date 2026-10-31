@@ -11,7 +11,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { PERSONNEL_ACCESS_ERROR_EXAMPLES } from '../mappers/personnel-access.http-errors';
+import { PERSONNEL_ACCESS_ERROR_EXAMPLES } from '../personnel-access.http-errors';
 import { userActor } from '../public/personnel.types';
 import {
   LinkNoticeBodyDto,

@@ -10,7 +10,7 @@ import {
   verificationRefusal,
   type SendFacts,
 } from './notice.policy';
-import type { NoticeKind } from './notice.types';
+import type { NoticeKind } from '../personnel-notice.types';
 
 const HEAD = 'head-1';
 const PERSON = 'person-1';

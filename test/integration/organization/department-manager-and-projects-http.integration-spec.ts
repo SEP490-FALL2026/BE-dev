@@ -1,0 +1,355 @@
+import { DepartmentHarness, today, addDays } from '../../support/department-harness';
+
+describe('department profiles, heads and the derived MANAGER role over HTTP (integration, real PostgreSQL): the head as MANAGER, what the IT Admin reads and the projects of a profile', () => {
+  const h = new DepartmentHarness();
+  const {
+    asFinance,
+    asIt,
+    asAdmin,
+    as,
+    api,
+    unique,
+    errorOf,
+    dataOf,
+    newDepartment,
+    getDepartment,
+    enter,
+    accountIn,
+    assignHead,
+    rolesOf,
+    auditOf,
+    rowCount,
+  } = h;
+
+  beforeAll(async () => {
+    await h.start();
+  }, 120000);
+
+  afterEach(() => h.afterEach());
+
+  afterAll(async () => {
+    await h.stop();
+  });
+
+  describe('the head is the department MANAGER, and only for as long as they head it (US-01-02)', () => {
+    it('gives the role from the day the period begins and takes it back when the period ends (AC-2, AC-3)', async () => {
+      const department = await newDepartment();
+      const first = await accountIn(department.code);
+      const second = await accountIn(department.code);
+      expect((await rolesOf(first)).derived).toEqual([]);
+      await assignHead(department.id, first.employeeId).expect(200);
+      expect((await rolesOf(first)).derived).toEqual(['MANAGER']);
+
+      // The next head is named for three days ahead: until then nothing changes for either.
+      await assignHead(department.id, second.employeeId, addDays(today(), 3)).expect(200);
+      expect((await rolesOf(first)).derived).toEqual(['MANAGER']);
+      expect((await rolesOf(second)).derived).toEqual([]);
+
+      // Three days pass: the periods slide back by four days, so the first ended yesterday and the second began yesterday.
+      // The members have been in the department that long too, or the database would refuse the earlier periods.
+      await h.ctx.sql.query('UPDATE employee_placements SET valid_from = valid_from - 10 WHERE department_id = $1', [
+        department.id,
+      ]);
+      await h.ctx.sql.query(
+        `UPDATE department_head_periods SET valid_from = valid_from - 4, valid_to = valid_to - 4
+          WHERE department_id = $1 AND valid_to IS NOT NULL`,
+        [department.id],
+      );
+      await h.ctx.sql.query(
+        `UPDATE department_head_periods SET valid_from = valid_from - 4 WHERE department_id = $1 AND valid_to IS NULL`,
+        [department.id],
+      );
+      expect((await rolesOf(first)).derived).toEqual([]);
+      expect((await rolesOf(second)).derived).toEqual(['MANAGER']);
+      // The members did not change when the head did.
+      expect((await getDepartment(department.id)).memberCount).toBe(2);
+      // The one who lost the role cannot use a Manager route (AC-3).
+      await api().get(`/api/v1/departments/${department.id}`).set(as(first)).expect(403);
+      await api().get(`/api/v1/departments/${department.id}`).set(as(second)).expect(200);
+      // Put the members back as they were recorded, so the coverage check at the end still holds.
+      await h.ctx.sql.query('DELETE FROM department_head_periods WHERE department_id = $1', [department.id]);
+      await h.ctx.sql.query('UPDATE employee_placements SET valid_from = valid_from + 10 WHERE department_id = $1', [
+        department.id,
+      ]);
+    });
+
+    it('is no longer selfServiceOnly once the person heads a department', async () => {
+      const department = await newDepartment();
+      const member = await accountIn(department.code);
+      const before = (await api().get('/api/v1/me').set(as(member)).expect(200)).body as {
+        data: { selfServiceOnly: boolean };
+      };
+      await assignHead(department.id, member.employeeId).expect(200);
+
+      const after = (await api().get('/api/v1/me').set(as(member)).expect(200)).body as {
+        data: { selfServiceOnly: boolean; roles: { effective: string[] } };
+      };
+
+      expect(before.data.selfServiceOnly).toBe(true);
+      expect(after.data).toMatchObject({ selfServiceOnly: false, roles: { effective: ['MANAGER'] } });
+    });
+
+    it('never gives the role to the Super Admin, even if the data says they head a department (FR-8.7)', async () => {
+      const department = await newDepartment();
+      // Written by SQL on purpose: the application refuses it, so only a defect or a hand edit can produce it.
+      await h.ctx.sql.query(
+        `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2026-02-01')`,
+        [h.seed.organizationId, h.seed.departmentId, h.seed.superAdmin.employeeId],
+      );
+
+      const me = await api().get('/api/v1/me').set(asAdmin()).expect(200);
+
+      expect((me.body as { data: { roles: { derived: string[]; effective: string[] } } }).data.roles).toEqual({
+        direct: ['SUPER_ADMIN'],
+        derived: [],
+        effective: ['SUPER_ADMIN'],
+      });
+      await h.ctx.sql.query('DELETE FROM department_head_periods WHERE employee_id = $1', [
+        h.seed.superAdmin.employeeId,
+      ]);
+      expect(department.status).toBe('ACTIVE');
+    });
+
+    it('shows the head their own department and its people, and nobody else’s (AC-17, AC-7 of US-01-02)', async () => {
+      const department = await newDepartment();
+      const other = await newDepartment();
+      const head = await accountIn(department.code);
+      const colleague = await enter(department.code, { workEmail: null });
+      await enter(other.code);
+      await assignHead(department.id, head.employeeId).expect(200);
+
+      const own = await api().get(`/api/v1/departments/${department.id}`).set(as(head)).expect(200);
+      const foreign = await api().get(`/api/v1/departments/${other.id}`).set(as(head)).expect(403);
+      const list = await api()
+        .get(`/api/v1/departments/${department.id}/employees?pageSize=100`)
+        .set(as(head))
+        .expect(200);
+      const foreignList = await api().get(`/api/v1/departments/${other.id}/employees`).set(as(head)).expect(403);
+
+      expect(dataOf(own).memberCount).toBe(2);
+      expect(errorOf(foreign).code).toBe('DEPARTMENT.OUT_OF_SCOPE');
+      expect(errorOf(foreignList).code).toBe('DEPARTMENT.OUT_OF_SCOPE');
+      const items = (list.body as { data: { items: Record<string, unknown>[] } }).data.items;
+      expect(items.map((item) => item.employeeCode)).toEqual([head.code, colleague.code].sort());
+      for (const item of items) {
+        expect(Object.keys(item).sort()).toEqual([
+          'employeeCode',
+          'fullName',
+          'hasWorkEmail',
+          'memberSince',
+          'status',
+          'workState',
+        ]);
+      }
+      expect(items.find((item) => item.employeeCode === colleague.code)).toMatchObject({
+        hasWorkEmail: false,
+        memberSince: today(),
+        status: 'ACTIVE',
+      });
+      // The head is one of the people in the department (AC-9).
+      expect(items.some((item) => item.employeeCode === head.code)).toBe(true);
+    });
+
+    it('does not let Finance or an employee read a department or its people, nor the IT Admin read its people in full (AC-7, F12)', async () => {
+      const department = await newDepartment();
+      const employee = await accountIn('P-OPS');
+
+      for (const headers of [asFinance(), as(employee)]) {
+        await api().get(`/api/v1/departments/${department.id}/employees`).set(headers).expect(403);
+        await api().get(`/api/v1/departments/${department.id}`).set(headers).expect(403);
+        await api().get(`/api/v1/departments/${department.id}/technical-members`).set(headers).expect(403);
+      }
+      await api().get(`/api/v1/departments/${department.id}/employees`).set(asIt()).expect(403);
+    });
+
+    it('lets the Super Admin read any department and its people in full (QĐ-87b(4), F12)', async () => {
+      const department = await newDepartment({ itAdminEmployeeId: h.it2.employeeId });
+      const member = await enter(department.code);
+
+      const profile = await api().get(`/api/v1/departments/${department.id}`).set(asAdmin()).expect(200);
+      const people = await api().get(`/api/v1/departments/${department.id}/employees`).set(asAdmin()).expect(200);
+
+      expect(dataOf(profile).id).toBe(department.id);
+      const items = (people.body as { data: { items: { employeeCode: string }[] } }).data.items;
+      expect(items.map((item) => item.employeeCode)).toEqual([member.code]);
+    });
+
+    describe('the IT Admin reads only the departments they are in charge of or stand in for, and only the minimum (F12)', () => {
+      it('reads the technical view of the people of a department they are in charge of: no grounds, email or hire date', async () => {
+        const department = await newDepartment({ itAdminEmployeeId: h.it1.employeeId });
+        const member = await enter(department.code);
+
+        const response = await api()
+          .get(`/api/v1/departments/${department.id}/technical-members`)
+          .set(asIt())
+          .expect(200);
+
+        const page = (
+          response.body as { message: string; data: { items: Record<string, unknown>[]; pagination: unknown } }
+        ).data;
+        expect((response.body as { message: string }).message).toBe('DEPARTMENT.TECHNICAL_MEMBERS_LISTED');
+        expect(page.items).toEqual([
+          {
+            id: member.employeeId,
+            code: member.code,
+            fullName: `Person ${member.code}`,
+            departmentId: department.id,
+            employmentStatus: 'WORKING',
+            effectiveOn: today(),
+          },
+        ]);
+        expect(page.pagination).toEqual({ page: 1, pageSize: 20, totalItems: 1, totalPages: 1 });
+        expect(response.text).not.toMatch(/workEmail|hasWorkEmail|hireDate|employmentType|grounds/);
+      });
+
+      it('answers 404 for a department another IT Admin is in charge of, as if it did not exist, in every read', async () => {
+        const theirs = await newDepartment({ itAdminEmployeeId: h.it2.employeeId });
+        await enter(theirs.code);
+
+        for (const path of [`/departments/${theirs.id}`, `/departments/${theirs.id}/technical-members`]) {
+          const response = await api().get(`/api/v1${path}`).set(asIt()).expect(404);
+          expect(errorOf(response).code).toBe('DEPARTMENT.NOT_FOUND');
+        }
+        // The list and the warnings do not name it either.
+        const list = await api().get(`/api/v1/departments?search=${theirs.code}`).set(asIt()).expect(200);
+        expect((list.body as { data: { items: unknown[] } }).data.items).toEqual([]);
+        // ...while the Super Admin and the IT Admin in charge read it.
+        await api().get(`/api/v1/departments/${theirs.id}`).set(asAdmin()).expect(200);
+        await api().get(`/api/v1/departments/${theirs.id}`).set(as(h.it2)).expect(200);
+      });
+
+      it('stands in for a department nobody usable is in charge of, so the shared queue can be worked', async () => {
+        const unattended = await newDepartment();
+        await enter(unattended.code);
+
+        await api().get(`/api/v1/departments/${unattended.id}`).set(asIt()).expect(200);
+        const people = await api()
+          .get(`/api/v1/departments/${unattended.id}/technical-members`)
+          .set(asIt())
+          .expect(200);
+
+        expect((people.body as { data: { items: unknown[] } }).data.items).toHaveLength(1);
+      });
+
+      it('is told by the service, not only by the route: a caller with no reading role gets the same 403 as the guard', async () => {
+        const department = await newDepartment();
+        const employee = await accountIn('P-OPS');
+
+        const response = await api()
+          .get(`/api/v1/departments/${department.id}/technical-members`)
+          .set(as(employee))
+          .expect(403);
+
+        expect(errorOf(response).code).toBe('AUTHORIZATION.FORBIDDEN');
+      });
+    });
+  });
+
+  describe('projects described on a profile (AC-14)', () => {
+    it('describes a project with the departments that take part, and shows it on each of their profiles', async () => {
+      const design = await newDepartment();
+      const finance2 = await newDepartment();
+
+      const created = await api()
+        .post('/api/v1/projects')
+        .set(asAdmin())
+        .send({
+          name: ' Alpha ',
+          description: 'Rebuild the portal',
+          departmentIds: [design.id, finance2.id, design.id],
+        })
+        .expect(201);
+      const project = (created.body as { data: { id: string; name: string; status: string; departments: unknown[] } })
+        .data;
+
+      expect(project).toMatchObject({ name: 'Alpha', status: 'RUNNING' });
+      expect(project.departments).toHaveLength(2);
+      for (const department of [design, finance2]) {
+        expect((await getDepartment(department.id)).projects).toEqual([
+          expect.objectContaining({ id: project.id, name: 'Alpha', description: 'Rebuild the portal' }),
+        ]);
+      }
+      expect((await auditOf(project.id))[0]).toMatchObject({ action: 'PROJECT.CREATED' });
+    });
+
+    it('is not a cost center, has no members and adds nothing to any department', async () => {
+      const costCenters = await rowCount('cost_centers');
+      const placements = await rowCount('employee_placements');
+      const department = await newDepartment();
+      const centersAfterDepartment = await rowCount('cost_centers');
+
+      await api()
+        .post('/api/v1/projects')
+        .set(asAdmin())
+        .send({ name: 'Beta', departmentIds: [department.id] })
+        .expect(201);
+
+      expect(await rowCount('cost_centers')).toBe(centersAfterDepartment);
+      expect(centersAfterDepartment).toBe(costCenters + 1);
+      expect(await rowCount('employee_placements')).toBe(placements);
+      expect((await getDepartment(department.id)).memberCount).toBe(0);
+    });
+
+    it('changes the status and the departments, records before and after, and filters the list by department', async () => {
+      const first = await newDepartment();
+      const second = await newDepartment();
+      const created = await api()
+        .post('/api/v1/projects')
+        .set(asAdmin())
+        .send({ name: unique('Gamma'), departmentIds: [first.id] })
+        .expect(201);
+      const id = (created.body as { data: { id: string } }).data.id;
+
+      const updated = await api()
+        .patch(`/api/v1/projects/${id}`)
+        .set(asAdmin())
+        .send({ status: 'FINISHED', departmentIds: [second.id] })
+        .expect(200);
+
+      expect((updated.body as { data: { status: string; departments: { id: string }[] } }).data).toMatchObject({
+        status: 'FINISHED',
+        departments: [{ id: second.id }],
+      });
+      const forSecond = await api().get(`/api/v1/projects?departmentId=${second.id}`).set(asAdmin()).expect(200);
+      const forFirst = await api().get(`/api/v1/projects?departmentId=${first.id}`).set(asAdmin()).expect(200);
+      expect((forSecond.body as { data: { items: unknown[] } }).data.items).toHaveLength(1);
+      expect((forFirst.body as { data: { items: unknown[] } }).data.items).toHaveLength(0);
+      expect((await auditOf(id)).at(-1)).toMatchObject({
+        action: 'PROJECT.UPDATED',
+        before: { status: 'RUNNING', departmentIds: [first.id] },
+        after: { status: 'FINISHED', departmentIds: [second.id] },
+      });
+    });
+
+    it('refuses a name that is empty, a department that does not exist, and everyone but the Super Admin (F10)', async () => {
+      const department = await newDepartment();
+      const post = (body: object, headers = asAdmin()) => api().post('/api/v1/projects').set(headers).send(body);
+
+      expect(errorOf(await post({ name: ' ', departmentIds: [department.id] }).expect(422)).code).toBe(
+        'PROJECT.INVALID_NAME',
+      );
+      expect(
+        errorOf(await post({ name: 'Delta', departmentIds: ['3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11'] }).expect(422))
+          .code,
+      ).toBe('PROJECT.INVALID_DEPARTMENT_NOT_FOUND');
+      await post({ name: 'Epsilon', departmentIds: [department.id] }, asFinance()).expect(403);
+      await post({ name: 'Epsilon', departmentIds: [department.id] }, asIt()).expect(403);
+      await api().get('/api/v1/projects').set(asIt()).expect(403);
+      await api()
+        .post('/api/v1/projects')
+        .set(asAdmin())
+        .send({ name: 'No basis', departmentIds: [], hrBasis: undefined })
+        .expect(422);
+      await api()
+        .patch('/api/v1/projects/3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11')
+        .set(asAdmin())
+        .send({ name: 'x' })
+        .expect(404);
+    });
+  });
+
+  it('leaves every employee with exactly the placements the invariant I-2 asks for', async () => {
+    expect(await h.placementViolations()).toEqual([]);
+  });
+});

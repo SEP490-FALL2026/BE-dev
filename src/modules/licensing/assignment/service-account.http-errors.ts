@@ -9,7 +9,7 @@ import {
   AssignmentNotServiceAccountError,
   AssignmentResponsibleInvalidError,
 } from '../public/licensing.errors';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { toLicensingApiException } from '../licensing.http-errors';
 import { AssignmentResponsibleAfterDeadlineError, ServiceAccountDutyTooManyError } from './service-account.errors';
 
 /**
@@ -36,7 +36,7 @@ export function toServiceAccountApiException(error: unknown): unknown {
 
 const example = (error: Error) => errorExampleOf(toServiceAccountApiException(error));
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const SERVICE_ACCOUNT_ERROR_EXAMPLES = {
   ASSIGNMENT_NOT_FOUND: example(new AssignmentNotFoundError()),
   ASSIGNMENT_NOT_OPEN: example(new AssignmentNotOpenError()),

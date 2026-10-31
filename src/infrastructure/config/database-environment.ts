@@ -41,7 +41,7 @@ export const databaseKeys = {
     .default(''),
   // Per-transaction limits for the organization/identity area. The ordering lock < statement <
   // transaction makes PostgreSQL stop a slow statement (55P03/57014) before Prisma closes the
-  // transaction itself (P2028); assertDatabaseLimits enforces it.
+  // transaction itself (28); assertDatabaseLimits enforces it.
   DB_LOCK_TIMEOUT_MS: Joi.number().integer().min(100).max(60_000).default(3_000),
   DB_STATEMENT_TIMEOUT_MS: Joi.number().integer().min(100).max(120_000).default(5_000),
   DB_TRANSACTION_TIMEOUT_MS: Joi.number().integer().min(100).max(180_000).default(10_000),
@@ -107,7 +107,7 @@ export function assertDatabaseLimits(result: DatabaseEnvironmentVariables): void
 }
 
 /**
- * Credentials that administer the database (H7: F-15, DB-04, Q9): the cluster superuser and the deploy role. Compose
+ * Credentials that administer the database (DB-04, Q9): the cluster superuser and the deploy role. Compose
  * reads them from `.env` for interpolation only; the API, the worker and the recovery command get `.env.app` and the
  * runtime `DATABASE_URL`, so in production any of these in their environment is a wiring mistake.
  */

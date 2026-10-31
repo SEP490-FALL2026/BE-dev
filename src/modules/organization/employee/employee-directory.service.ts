@@ -39,7 +39,7 @@ export class EmployeeDirectoryService {
   ) {}
 
   /**
-   * The notices a created or corrected record owes (`F17`): who they go to follows from the department the person is in on the day
+   * The notices a created or corrected record owes: who they go to follows from the department the person is in on the day
    * and who heads it and is IT Admin in charge of it then. Read in the caller's transaction, so they are right for what it writes.
    */
   async profileNotices(tx: DbTx, request: ProfileNoticeRequest): Promise<ProfileNotice[]> {

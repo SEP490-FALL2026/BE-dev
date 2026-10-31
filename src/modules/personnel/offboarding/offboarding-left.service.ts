@@ -34,7 +34,7 @@ export class OffboardingLeftService {
 
   /**
    * Turns a handover under way into the departure: an event of the person, which only the Super Admin records and never about
-   * themselves (F40, F19). Throws OffboardingRefusedError and PersonnelAccessRefusedError.
+   * themselves. Throws OffboardingRefusedError and PersonnelAccessRefusedError.
    */
   markLeft(actor: PersonnelActor, id: string, input: MarkLeftInput, outer?: DbTx): Promise<OffboardingRecord> {
     return this.frame.runEvent(actor, id, { outer }, async (tx, { held, today, recordedOn }) => {

@@ -1,6 +1,6 @@
 import { EnvironmentValidationError, validateEnvironment } from './env-schema';
 
-/** H7: the API, the worker and the recovery command receive the runtime role only (docker-compose.prod.yml). */
+/** The API, the worker and the recovery command receive the runtime role only (docker-compose.prod.yml). */
 const production = {
   NODE_ENV: 'production',
   CORS_ORIGINS: 'https://licenses.example.com',

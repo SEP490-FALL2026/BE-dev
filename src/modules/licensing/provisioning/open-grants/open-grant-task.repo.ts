@@ -32,23 +32,21 @@ export class OpenGrantTaskRepo {
       status: { in: [...OPEN_GRANT_TASK_STATUSES] },
       assignment: { employeeId },
     };
-    const [rows, total] = await Promise.all([
-      db.provisioningTask.findMany({
-        where,
-        select: {
-          id: true,
-          status: true,
-          requestId: true,
-          assignmentId: true,
-          createdAt: true,
-          assignment: { select: { planId: true } },
-        },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-        skip: page.skip,
-        take: page.take,
-      }),
-      db.provisioningTask.count({ where }),
-    ]);
+    const rows = await db.provisioningTask.findMany({
+      where,
+      select: {
+        id: true,
+        status: true,
+        requestId: true,
+        assignmentId: true,
+        createdAt: true,
+        assignment: { select: { planId: true } },
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      skip: page.skip,
+      take: page.take,
+    });
+    const total = await db.provisioningTask.count({ where });
 
     return {
       items: rows.map((row) => ({

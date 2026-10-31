@@ -12,8 +12,8 @@ import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/securit
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AccessRequestResponseDto, RequestIdParamDto } from '../access-request/access-request.dto';
-import { AccessRequestQueryService } from '../access-request/access-request-query.service';
-import { toWire } from '../access-request/access-request.mapper';
+import { AccessRequestQueryService } from '../request-view/access-request-query.service';
+import { toWire } from '../request-view/access-request.mapper';
 import { ServiceAccountBoundaryService } from './service-account-boundary.service';
 import { ServiceAccountRequestService } from './service-account-request.service';
 import { ServiceAccountReviewBodyDto, ServiceAccountSubmitBodyDto } from './service-account-request.dto';

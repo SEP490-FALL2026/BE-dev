@@ -2,7 +2,7 @@ import type { ClientBase } from 'pg';
 import { RoleFacts, SeparationFacts } from '../database-role-judgement';
 
 /**
- * Catalog reads of `ops:db-roles` (H7). Every statement is constant SQL with bind parameters; identifiers that end up in
+ * Catalog reads of `ops:db-roles`. Every statement is constant SQL with bind parameters; identifiers that end up in
  * DDL are quoted by the server (`format('%I')`), never assembled from catalog strings here.
  */
 

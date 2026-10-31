@@ -1,7 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
-import { isBusinessDate } from '../../../core/business-date';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** The longest note of a reason or a label a request keeps; the DTO bounds the request with them. */
 export const REASON_MAX_LENGTH = 1000;
@@ -20,7 +20,7 @@ export const submitBodySchema = z.strictObject({
   termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
   projectLabel: z.string().trim().min(1).max(PROJECT_LABEL_MAX_LENGTH).optional(),
   /** The day the money is expected to go out (paid software only); it fixes the budget year. Today when left out. */
-  expectedSpendOn: z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' }).optional(),
+  expectedSpendOn: businessDate.optional(),
 });
 /**
  * What the head chooses for a request that costs money: a line of the plan of the budget, or that it is outside it
@@ -36,6 +36,10 @@ export const planLineChoiceFields = {
     .optional(),
   offPlan: z.literal(true).optional(),
 };
+
+/** What a client reads of the choice that `oneChoice` enforces. */
+export const PLAN_LINE_CHOICE_DESCRIPTION =
+  'Choose exactly one: a line of the plan of the budget (planLine), or that the spend is outside it (offPlan: true).';
 
 /** Exactly one of a line and "outside the plan". */
 export const oneChoice = (body: { planLine?: unknown; offPlan?: unknown }, ctx: z.RefinementCtx) => {
@@ -65,12 +69,10 @@ export const needDecisionBodySchema = z
     spend: z
       .strictObject({
         ...planLineChoiceFields,
-        expectedSpendOn: z
-          .string()
-          .refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' })
-          .optional(),
+        expectedSpendOn: businessDate.optional(),
       })
       .superRefine(oneChoice)
+      .meta({ description: PLAN_LINE_CHOICE_DESCRIPTION })
       .optional(),
   })
   .superRefine((body, ctx) => {
@@ -83,6 +85,12 @@ export const needDecisionBodySchema = z
     if (body.decision === 'REJECT' && body.spend !== undefined) {
       ctx.addIssue({ code: 'custom', path: ['spend'], message: 'Only an approval chooses a line of the plan.' });
     }
+  })
+  .meta({
+    description:
+      'A refusal (REJECT) gives its reason, and neither confirms a term nor chooses a line of the plan. An approval (APPROVE) may ' +
+      'confirm a term over twelve months with a reason of its own, and for a request that costs money chooses a line of the plan or ' +
+      'that it is outside it.',
   });
 const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -123,6 +131,19 @@ const needDecisionSchema = z.strictObject({
 
 export const moneySchema = z.strictObject({ amount: z.string(), currency: z.string() });
 /** What the request costs: no amount for internal software, a priced amount, or a missing price with its reason. */
+
+/** What a request costs, estimated before tax and after, as the preview and the approver's card show it. */
+export const costEstimateSchema = z.strictObject({
+  label: z.enum(['ESTIMATE', 'ESTIMATE_NO_PROFILE']),
+  basis: z.enum(['PROFILE', 'DEFAULT_NO_PROFILE']),
+  taxGroup: z.string(),
+  preTax: moneySchema,
+  tax: moneySchema,
+  deductibleTax: moneySchema,
+  nonDeductibleTax: moneySchema,
+  estimatedCost: moneySchema,
+  totalPayable: moneySchema,
+});
 export const pricingSchema = z.strictObject({
   status: z.enum(['NOT_APPLICABLE', 'PRICED', 'MISSING']),
   missingReason: z.enum(['NO_PRICED_SUBSCRIPTION', 'CYCLE_UNKNOWN', 'AMOUNT_TOO_LARGE', 'AWAITING_QUOTE']).nullable(),
@@ -289,7 +310,7 @@ export const requestSchema = z.strictObject({
 export const withdrawBodySchema = z.strictObject({ reason: z.string().trim().min(1).max(1000).optional() });
 
 export class SubmitBodyDto extends createZodDto(submitBodySchema) {}
-/** A seat the person already holds in a tool that does the same work: a row of the list (`LD-08`). */
+/** A seat the person already holds in a tool that does the same work: a row of the list. */
 const similarSeatSchema = z.strictObject({
   assignmentId: z.uuid(),
   plan: z.strictObject({

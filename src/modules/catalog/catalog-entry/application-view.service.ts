@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { PlanLookupService } from '../plan/plan-lookup.service';
-import { recommendK2, type K2Recommendation } from '../subscription/seat-guard.policy';
 import { SeatOccupancyHook } from '../public/catalog.extension-points';
+import { ApplicationPlans } from './application-plans.types';
 import { replacementRequired } from './application.policy';
+import { recommendK2, type K2Recommendation } from './k2-recommendation.policy';
 import type { ApplicationRecord, ApplicationView, BusinessOwnerView } from './application.types';
 
 /**
@@ -15,7 +15,7 @@ import type { ApplicationRecord, ApplicationView, BusinessOwnerView } from './ap
 export class ApplicationViewService {
   constructor(
     private readonly organization: OrganizationApi,
-    private readonly plans: PlanLookupService,
+    private readonly plans: ApplicationPlans,
     private readonly occupancy: SeatOccupancyHook,
   ) {}
 

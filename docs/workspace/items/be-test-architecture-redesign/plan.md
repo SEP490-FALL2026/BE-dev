@@ -102,7 +102,8 @@ HTTP contract nhanh và ổn định; bật job `http-contract` trên CI (Task T
 
 ### Checkpoint
 
-Integration đầy đủ ≤ 15 phút trên một runner 2 vCPU (`workflow_dispatch`).
+Integration đầy đủ ≤ 15 phút trên một runner 2 vCPU (`workflow_dispatch`): mục tiêu của thiết kế đầu, **không đạt**. Đo trên
+GitHub 30–31 phút (run `40923299529`, `40945441332`); mục tiêu thay bằng số đo theo `OD-R8` = B ([spec](spec.md#ngân-sách-thời-gian-ci-31102026-od-r8--b)).
 
 ### Phase T3 — CI phân tầng
 
@@ -110,7 +111,7 @@ Integration đầy đủ ≤ 15 phút trên một runner 2 vCPU (`workflow_dispa
 
 - Files: `.github/workflows/ci.yml`, `scripts/ci/affected-modules.mjs`.
 - Depends on: Phase T1, Phase T2, `OD-T2`, `OD-T5`.
-- Acceptance: theo sơ đồ pipeline trong spec; `deploy` needs các job test; timeout theo từng job; gỡ hai bước `if: ${{ false }}`.
+- Acceptance: theo sơ đồ pipeline trong spec; `deploy` needs các job test; timeout theo từng job (quy tắc p95 đo được + 50 %, spec _Ngân sách thời gian CI_); gỡ hai bước `if: ${{ false }}`.
 - Verify: một push thử lên nhánh tạm: các job chạy đúng điều kiện; cố ý làm đỏ một integration → `deploy` không chạy.
 
 ### Task T3.2: workflow nightly
@@ -173,6 +174,22 @@ Ba lượt liên tiếp (P4, [nghiệm thu §5](../../../reviews/be-architecture
 transaction 15 s, truy vấn 30 s (giới hạn production chỉ ở suite chứng minh nó); file đo thời gian chạy tuần tự;
 `project()` của harness dùng đồng hồ muộn hơn giữa Node và PostgreSQL; `maxWorkers: '50%'` mặc định cho máy dev.
 
+### Ngân sách thời gian CI (31/10/2026)
+
+Task 7.6 của `be-architecture-readability-hardening`, `OD-R8` = B. Chỉ tài liệu; không đổi workflow.
+
+| Đại lượng                 | Giá trị                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| P5, mục tiêu thiết kế đầu | ≤ 15 phút: **không đạt**, không còn là mục tiêu                                                               |
+| Job `integration` đo được | 1 886 s (`25d5244`, run `40923299529`) và 1 825 s (`f498c74`, run `40945441332`); song song 1 676 s / 1 624 s |
+| Quy tắc `timeout-minutes` | p95 đo được + 50 %, làm tròn lên phút (thay "gấp đôi mục tiêu")                                               |
+| Quy tắc cho kết quả trên  | ≈ 47–48 phút; `ci.yml` đặt 40 (Owner 30/10/2026): Owner quyết; chỉ hai mẫu                                    |
+| Phải đo lại               | sau Task 7.4 (6 file integration → 20, nhiều database hơn)                                                    |
+| P7, P8                    | `owner-waived / not-required-for-this-checkpoint`                                                             |
+| Trạng thái CI             | `remote-verification-pending`                                                                                 |
+
+Số đo gốc và cách đọc: [nghiệm thu mục 11](../../../reviews/be-architecture-test-acceptance-2026-10-29/README.md#11-bằng-chứng-github-đọc-được-prompt-09-30102026); quy tắc đầy đủ ở spec.
+
 ## Verification and handoff
 
 | Lệnh / kiểm tra AC                         | Revision / môi trường                                                                | Kết quả thực chạy                                                                                                                                                                                                                                                                                                                                                                                                                                        | Giới hạn / việc còn lại                                                                                                                |
@@ -189,6 +206,6 @@ transaction 15 s, truy vấn 30 s (giới hạn production chỉ ở suite chứ
 
 - [ ] Mọi điều trong `## Definition of Done` của spec có bằng chứng; số liệu trước/sau ghi ở bảng trên.
       Trung vị ≤ 4 s/file và `beforeAll` ≤ 60 s: `owner-waived / not-required-for-this-checkpoint` (Owner 29/10/2026),
-      không phải đã đạt — hiện trạng 9,3–11,9 s/file, 242 hook khai timeout 90–300 s. Chưa: các mục CI (chờ lượt chạy của
-      Owner).
+      không phải đã đạt — hiện trạng 9,3–11,9 s/file, 242 hook khai timeout 90–300 s. P5: mục tiêu 15 phút không đạt, thay bằng số
+      đo 30–31 phút (`OD-R8` = B, mục _Ngân sách thời gian CI_). Chưa: các mục CI còn lại (chờ lượt chạy của Owner).
 - [ ] Spec/plan cập nhật theo implementation cuối.

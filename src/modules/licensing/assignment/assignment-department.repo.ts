@@ -6,7 +6,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AssignmentRecord } from '../public/licensing.types';
 import { toRecord } from './assignment.repo';
 
-/** A seat of the baseline that is held on a subscription, as the review after the installation needs to see it (F21). */
+/** A seat of the baseline that is held on a subscription, as the review after the installation needs to see it. */
 export interface BaselineSeatRow {
   assignmentId: string;
   employeeId: string;
@@ -25,8 +25,7 @@ export class AssignmentDepartmentRepo {
 
   /**
    * One page of what a department uses on `day`, by start date then id, the total, and how many seats each plan holds, from
-   * one snapshot (`LD-09`), grouped by the department that owns the seat, not by the department of whoever holds it now (F22,
-   * `QĐ-89a`): the seats on the subscriptions the department owns (a personal seat made before it carried its department is
+   * one snapshot, grouped by the department that owns the seat, not by the department of whoever holds it now (`QĐ-89a`): the seats on the subscriptions the department owns (a personal seat made before it carried its department is
    * found through its subscription), the service accounts it owns (`QĐ-86c`), and the seats of its members on internal software,
    * which has no subscription and so no owner. Only the page is read in full.
    */
@@ -58,11 +57,19 @@ export class AssignmentDepartmentRepo {
 
     return this.prisma.$transaction(
       async (tx) => {
-        const [rows, total, groups] = await Promise.all([
-          tx.licenseAssignment.findMany({ where, orderBy: [{ validFrom: 'asc' }, { id: 'asc' }], skip, take }),
-          tx.licenseAssignment.count({ where }),
-          tx.licenseAssignment.groupBy({ by: ['planId'], where, _count: { _all: true }, orderBy: { planId: 'asc' } }),
-        ]);
+        const rows = await tx.licenseAssignment.findMany({
+          where,
+          orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
+          skip,
+          take,
+        });
+        const total = await tx.licenseAssignment.count({ where });
+        const groups = await tx.licenseAssignment.groupBy({
+          by: ['planId'],
+          where,
+          _count: { _all: true },
+          orderBy: { planId: 'asc' },
+        });
 
         return {
           items: rows.map(toRecord),
@@ -76,7 +83,7 @@ export class AssignmentDepartmentRepo {
 
   /**
    * The personal seats the baseline wrote on a subscription that are open on `day`, by person then id: what closing the baseline
-   * looks at to find the people who hold a seat of another department's subscription (F21, `QĐ-89e`).
+   * looks at to find the people who hold a seat of another department's subscription (`QĐ-89e`).
    */
   async openBaselineSeats(day: BusinessDate, tx: DbTx): Promise<BaselineSeatRow[]> {
     const date = toDateColumn(day);

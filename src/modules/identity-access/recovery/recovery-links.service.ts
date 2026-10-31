@@ -5,7 +5,7 @@ import { ActionLinkService } from '../accounts/action-link.service';
 import { TicketRecord } from './recovery.repo';
 
 /**
- * A mail with nobody to go to is a programming error, never a silent skip or a send to somebody else (`P28-05`, `F18`): the caller
+ * A mail with nobody to go to is a programming error, never a silent skip or a send to somebody else: the caller
  * names the login email of the account, and an empty one stops the transaction before a link or a mail is written.
  */
 function requireRecipient(recipient: string): string {

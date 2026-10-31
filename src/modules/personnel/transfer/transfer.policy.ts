@@ -1,6 +1,6 @@
 import { type BusinessDate } from '../../../core/business-date';
 import { placementReasons } from '../../organization/public/employee-placement.policy';
-import { groundsRefusal, type GroundsInput } from '../policies/grounds.policy';
+import { groundsRefusal, type GroundsInput } from '../personnel-grounds.policy';
 
 /**
  * What the policy of a transfer refuses, as a semantic code (`DEPARTMENT_TRANSFER.<code>` on the wire) and the facts a person
@@ -35,7 +35,7 @@ export interface NewTransferFacts {
   current: { departmentId: string; validFrom: BusinessDate };
   /** Where the person is to be; what the caller did not name stays as it is. */
   target: { departmentId: string };
-  /** The department the person is to join: whether it exists and takes people. Its Cost Center is not asked (`QĐ-87d`(3), F44). */
+  /** The department the person is to join: whether it exists and takes people. Its Cost Center is not asked (`QĐ-87d`(3)). */
   destinationDepartment: { active: boolean } | null;
   grounds: GroundsInput | undefined;
   pending: { effectiveOn: BusinessDate } | null;
@@ -102,7 +102,7 @@ export function newTransferRefusal(facts: NewTransferFacts): TransferRefusal | n
   if (late) return late;
 
   const reasons = placementReasons({
-    // A transfer is a change of place, not a charge: a department with no Cost Center takes people like any other (`QĐ-87d`(3), F44).
+    // A transfer is a change of place, not a charge: a department with no Cost Center takes people like any other (`QĐ-87d`(3)).
     department: { named: true, found: facts.destinationDepartment },
   });
   const reason = reasons[0];
@@ -158,4 +158,38 @@ export function cancelRefusal(facts: PendingTransferFacts): TransferRefusal | nu
   const settled = notPendingRefusal(facts);
   if (settled) return settled;
   return reasonAndGrounds(facts.reason, facts.grounds);
+}
+
+/** Whether a change of department may start at all, judged on what the person is before the locks: unknown, or gone. */
+export function subjectRefusal(seen: { status: string } | null): 'EMPLOYEE_NOT_FOUND' | 'EMPLOYEE_LEFT' | null {
+  if (!seen) return 'EMPLOYEE_NOT_FOUND';
+
+  return seen.status === 'TERMINATED' ? 'EMPLOYEE_LEFT' : null;
+}
+
+/** Whether, once the locks are taken, the placement in force is still the one seen before them (none, or another, is a change by someone else). */
+export function placementHeld<P extends { placementId: string }>(
+  current: P | null,
+  seenPlacementId: string,
+): current is P {
+  return current !== null && current.placementId === seenPlacementId;
+}
+
+/** The successor a head hands over to as the record and its audit name it: `NONE` when nobody takes over, null when the person did not head. */
+export function headSuccessorLabel(handover: { successorEmployeeId: string | null } | null): string | null {
+  return handover ? (handover.successorEmployeeId ?? 'NONE') : null;
+}
+
+/**
+ * Who followed the head before the move, so a move that names nobody keeps the choice (`US-03-01` AC-19, `US-03-04` AC-22): the person
+ * chosen, or nobody; nothing to keep when the person did not head the department.
+ */
+export function previousSuccessorChoice(
+  handover: { successorEmployeeId: string | null } | null,
+): { kind: 'EMPLOYEE'; employeeId: string } | { kind: 'NONE' } | undefined {
+  if (!handover) return undefined;
+
+  return handover.successorEmployeeId
+    ? { kind: 'EMPLOYEE', employeeId: handover.successorEmployeeId }
+    : { kind: 'NONE' };
 }

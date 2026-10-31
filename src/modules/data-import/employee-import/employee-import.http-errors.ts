@@ -24,7 +24,7 @@ function refuse(status: HttpStatus, code: string, message: string, details?: Rec
 /** The HTTP answer of the people import routes for an error: the business errors by code, 503 for a database outage. */
 export function toImportApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
-  // The policy of the service refuses a role the way the guard of the route does, with the same body (`F13`).
+  // The policy of the service refuses a role the way the guard of the route does, with the same body.
   if (error instanceof ImportForbiddenError) return new ApiException(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR);
   if (error instanceof ImportFileInvalidError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `IMPORT.${error.problem}`, error.message, error.details);

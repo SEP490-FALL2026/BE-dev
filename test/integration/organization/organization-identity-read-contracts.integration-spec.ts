@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
 import { PgRelay } from '../../support/pg-relay';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { QueryCounter, tablesOf } from '../../support/query-count';
 import { HR_BASIS } from '../../support/hr-basis';
 import { SeatHarness } from '../../support/seat-baseline-harness';
@@ -23,7 +23,7 @@ describe('organization and identity read contracts (integration, real PostgreSQL
       },
     });
     counter = QueryCounter.on(relay);
-    jest.spyOn(h.ctx.app.get(OrganizationApi, { strict: false }), 'businessToday').mockResolvedValue('2026-12-01');
+    pretendBusinessToday(h.ctx.app, '2026-12-01');
   }, 120000);
 
   afterAll(async () => {

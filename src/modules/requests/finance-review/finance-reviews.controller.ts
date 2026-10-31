@@ -13,6 +13,7 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { FinanceReviewService } from './finance-review.service';
 import { SpendViewService } from './spend-view.service';
+import { SpendYearsViewService } from './spend-years-view.service';
 import { SPEND_ERROR_EXAMPLES, toSpendApiException } from '../spend/spend.http-errors';
 import {
   BudgetCheckResponseDto,
@@ -63,6 +64,7 @@ export class FinanceReviewsController {
   constructor(
     private readonly reviews: FinanceReviewService,
     private readonly views: SpendViewService,
+    private readonly yearViews: SpendYearsViewService,
   ) {}
 
   @Get('finance-reviews')
@@ -175,7 +177,7 @@ export class FinanceReviewsController {
     @Query() query: YearsQueryDto,
   ) {
     try {
-      return await this.views.years(actor, params.id, query);
+      return await this.yearViews.years(actor, params.id, query);
     } catch (error) {
       throw toSpendApiException(error);
     }

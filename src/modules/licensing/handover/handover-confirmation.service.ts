@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { confirmedRoleOf, isOverdue, isValueAllowed } from './handover-confirmer.policy';
 import { HandoverCaseFacts } from './handover-case-facts.service';
 import { HandoverConfirmerResolver } from './handover-confirmer.service';

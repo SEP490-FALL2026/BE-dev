@@ -1,22 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
-import { normalizeDisplayName } from '../../../core/display-name';
-import { InvalidEmailError, normalizeEmail } from '../../../core/email';
-import type { HrBasis } from '../../../core/hr-basis';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { HrBasis } from '../public/hr-basis.types';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
-import { organizationAuditEvent } from '../mappers/audit-event.mapper';
+import { organizationAuditEvent } from '../organization-audit-event.mapper';
 import {
   EmployeeEmailTakenError,
   EmployeeNotFoundError,
   EmployeeOpenSeatNeedsEndError,
 } from '../public/organization.errors';
-import { isJobTitleTooLong, placementReasons } from '../public/employee-placement.policy';
-import { OrganizationApi } from '../public/organization.api';
+import { OrganizationContextService } from '../organization-context.service';
+import { EmployeeDirectoryService } from '../employee/employee-directory.service';
+import type { EmployeeRecord } from '../public/organization.types';
 import { EmployeeWorkState, EmploymentType } from '../public/organization.types';
 import { EmployeeRowInvalidError, EmployeeUpdateEmptyError } from './employee.errors';
+import { correctionOf, OFFICIAL_FIELDS, workEmailToCheck, type Correction } from './employee-correction.policy';
 import { assertMayCorrectEmployee } from './employee.policy';
 
 /** The official fields of a record that the Super Admin may correct on an HR basis (`QĐ-82m`, `QĐ-87a`); nothing else is here. */
@@ -42,21 +42,19 @@ export interface MaintainedEmployeeView {
   workState: EmployeeWorkState;
 }
 
-const OFFICIAL = ['fullName', 'workEmail', 'employmentType', 'hireDate', 'jobTitle'] as const;
-type Official = (typeof OFFICIAL)[number];
-
 /**
  * Correcting the official fields of a record that exists (`US-02-02` AC-19, `QĐ-82m` `INF-20`, `QĐ-87a`): name, work email, kind
  * of staff, free-text job title and a hire date that has not come yet, always on an HR basis, by the Super Admin alone and never on
- * the Super Admin's own record (`QĐ-87c`, `F19`: that goes through the controlled procedure, so this refuses with 403 and writes
+ * the Super Admin's own record (`QĐ-87c`: that goes through the controlled procedure, so this refuses with 403 and writes
  * nothing). The department and the status are events with a day they take effect (`US-03-01`) and are never changed here; neither
  * are the account, its roles or the login email (`FR-8.6`). The person, and the head of their department, are told in the same
- * transaction (`QĐ-87b(3)`, `F17`). Who may is `employee.policy.ts`, run first.
+ * transaction (`QĐ-87b(3)`). Who may is `employee.policy.ts`, run first.
  */
 @Injectable()
 export class EmployeeMaintenanceService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly context: OrganizationContextService,
+    private readonly employees: EmployeeDirectoryService,
     private readonly audit: AuditApi,
     private readonly notifications: NotificationsApi,
     private readonly runner: TransactionRunner,
@@ -73,104 +71,21 @@ export class EmployeeMaintenanceService {
     input: OfficialFieldsInput,
   ): Promise<MaintainedEmployeeView> {
     assertMayCorrectEmployee(actor, employeeId);
-    if (OFFICIAL.every((field) => input[field] === undefined)) throw new EmployeeUpdateEmptyError();
-    const organization = await this.organization.getOrganization();
+    if (OFFICIAL_FIELDS.every((field) => input[field] === undefined)) throw new EmployeeUpdateEmptyError();
+    const organization = await this.context.findOrganization();
     if (!organization) throw new Error('An employee was changed before installation');
-    const today = await this.organization.businessToday();
+    const today = await this.context.businessToday();
 
     try {
-      return await this.runner.run(async (tx) => {
-        await this.organization.lockEmployeeForUpdate(tx, employeeId);
-        const current = await this.organization.getEmployee(employeeId, tx);
-        if (!current) throw new EmployeeNotFoundError(employeeId);
-
-        const workEmail = input.workEmail === undefined ? undefined : input.workEmail?.trim() || null;
-        const jobTitle = input.jobTitle === undefined ? undefined : normalizeDisplayName(input.jobTitle ?? '') || null;
-        const reasons: { field: string; code: string }[] = [];
-        const changes: Partial<Record<Official, unknown>> = {};
-        const before: Partial<Record<Official, unknown>> = {};
-        const note = (field: Official, was: unknown, now: unknown) => {
-          before[field] = was;
-          changes[field] = now;
-        };
-
-        if (input.fullName !== undefined && input.fullName !== current.fullName)
-          note('fullName', current.fullName, input.fullName);
-        if (input.employmentType !== undefined && input.employmentType !== current.employmentType) {
-          note('employmentType', current.employmentType, input.employmentType);
-        }
-        if (workEmail !== undefined && this.differs(workEmail, current.workEmail)) {
-          // The normalized email differs from the person's own, so whoever has it is somebody else.
-          const normalized = workEmail === null ? null : this.normalize(workEmail);
-          if (normalized !== null && (await this.organization.isWorkEmailTaken(tx, organization.id, normalized))) {
-            reasons.push({ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' });
-          }
-          note('workEmail', current.workEmail, workEmail);
-        }
-        if (input.hireDate !== undefined && input.hireDate !== current.hireDate) {
-          if (current.hireDate <= today) reasons.push({ field: 'hireDate', code: 'HIRE_DATE_LOCKED' });
-          else if (input.hireDate < today) reasons.push({ field: 'hireDate', code: 'HIRE_DATE_IN_PAST' });
-          else note('hireDate', current.hireDate, input.hireDate);
-        }
-        if (jobTitle !== undefined && jobTitle !== (current.jobTitle ?? null)) {
-          // The same bound the form and the people file keep (BEH.1): the title is optional free text, only bounded.
-          const [refused] = placementReasons({
-            jobTitle: { tooLong: jobTitle !== null && isJobTitleTooLong(jobTitle) },
-          });
-          if (refused) reasons.push({ field: 'jobTitle', code: refused.code });
-          else note('jobTitle', current.jobTitle ?? null, jobTitle);
-        }
-        if (reasons.length > 0) throw new EmployeeRowInvalidError(reasons);
-
-        if (Object.keys(changes).length > 0) {
-          await this.organization.updateEmployeeOfficialFields(tx, employeeId, {
-            ...(changes.fullName !== undefined ? { fullName: changes.fullName as string } : {}),
-            ...('workEmail' in changes ? { workEmail: changes.workEmail as string | null } : {}),
-            ...(changes.employmentType !== undefined
-              ? { employmentType: changes.employmentType as EmploymentType }
-              : {}),
-            ...(changes.hireDate !== undefined ? { hireDate: changes.hireDate as BusinessDate } : {}),
-            ...('jobTitle' in changes ? { jobTitle: changes.jobTitle as string | null } : {}),
-          });
-          await this.audit.record(
-            tx,
-            organizationAuditEvent(
-              actor,
-              organization.id,
-              'EMPLOYEE.OFFICIAL_FIELDS_CHANGED',
-              'Employee',
-              employeeId,
-              { employeeCode: current.employeeCode, ...(before as Record<string, string | null>) },
-              { ...(changes as Record<string, string | null>), hrBasis: { ...input.hrBasis } },
-            ),
-          );
-          const notices = await this.organization.getProfileNotices(tx, {
-            kind: 'UPDATED',
-            organizationId: organization.id,
-            employeeId,
-            onDate: today,
-          });
-          for (const notice of notices) await this.notifications.notifyInApp(tx, notice);
-        }
-
-        return {
-          id: employeeId,
-          employeeCode: current.employeeCode,
-          fullName: input.fullName ?? current.fullName,
-          workEmail: workEmail === undefined ? current.workEmail : workEmail,
-          employmentType: input.employmentType ?? current.employmentType,
-          hireDate: 'hireDate' in changes ? (changes.hireDate as BusinessDate) : current.hireDate,
-          jobTitle: 'jobTitle' in changes ? (changes.jobTitle as string | null) : (current.jobTitle ?? null),
-          status: current.status,
-          workState: current.workState,
-        };
-      });
+      return await this.runner.run((tx) =>
+        this.correct(tx, { actor, organizationId: organization.id, employeeId, today }, input),
+      );
     } catch (error) {
       // A concurrent change won the unique email after the check: the same answer the check gives.
       if (error instanceof EmployeeEmailTakenError) {
         throw new EmployeeRowInvalidError([{ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' }]);
       }
-      // A contractor, freelancer or intern holds every open seat with an expected end (INV-07, P28-04): PostgreSQL
+      // A contractor, freelancer or intern holds every open seat with an expected end (INV-07): PostgreSQL
       // refuses the change of kind, the transaction rolls back and no audit is written.
       if (error instanceof EmployeeOpenSeatNeedsEndError) {
         throw new EmployeeRowInvalidError([{ field: 'employmentType', code: 'OPEN_ASSIGNMENT_NEEDS_EXPECTED_END' }]);
@@ -179,19 +94,69 @@ export class EmployeeMaintenanceService {
     }
   }
 
-  /** Two emails are the same record when they normalize alike; the typed text is kept as it was written. */
-  private differs(next: string | null, current: string | null): boolean {
-    if (next === null || current === null) return next !== current;
+  private async correct(
+    tx: DbTx,
+    who: { actor: AuthenticatedPrincipal; organizationId: string; employeeId: string; today: BusinessDate },
+    input: OfficialFieldsInput,
+  ): Promise<MaintainedEmployeeView> {
+    await this.employees.lock(tx, who.employeeId, 'UPDATE');
+    const current = await this.employees.find(who.employeeId, tx);
+    if (!current) throw new EmployeeNotFoundError(who.employeeId);
 
-    return next !== current && this.normalize(next) !== this.normalize(current);
+    // The normalized email differs from the person's own, so whoever has it is somebody else.
+    const toCheck = workEmailToCheck(input.workEmail, current.workEmail);
+    const workEmailTaken = toCheck !== null && (await this.employees.isWorkEmailTaken(tx, who.organizationId, toCheck));
+    const correction = correctionOf(current, input, { today: who.today, workEmailTaken });
+    if (correction.reasons.length > 0) throw new EmployeeRowInvalidError(correction.reasons);
+    if (Object.keys(correction.changes).length > 0) await this.writeChanges(tx, who, current, correction, input);
+
+    return viewOf(current, correction, input);
   }
 
-  private normalize(workEmail: string): string | null {
-    try {
-      return normalizeEmail(workEmail);
-    } catch (error) {
-      if (error instanceof InvalidEmailError) return null;
-      throw error;
-    }
+  /** The columns, the audit entry and the notices of a correction that changes something, in one transaction. */
+  private async writeChanges(
+    tx: DbTx,
+    who: { actor: AuthenticatedPrincipal; organizationId: string; employeeId: string; today: BusinessDate },
+    current: EmployeeRecord,
+    correction: Correction,
+    input: OfficialFieldsInput,
+  ): Promise<void> {
+    await this.employees.updateOfficialFields(tx, who.employeeId, correction.changes);
+    await this.audit.record(
+      tx,
+      organizationAuditEvent(
+        who.actor,
+        who.organizationId,
+        'EMPLOYEE.OFFICIAL_FIELDS_CHANGED',
+        'Employee',
+        who.employeeId,
+        { employeeCode: current.employeeCode, ...(correction.before as Record<string, string | null>) },
+        { ...(correction.changes as Record<string, string | null>), hrBasis: { ...input.hrBasis } },
+      ),
+    );
+    const notices = await this.employees.profileNotices(tx, {
+      kind: 'UPDATED',
+      organizationId: who.organizationId,
+      employeeId: who.employeeId,
+      onDate: who.today,
+    });
+    for (const notice of notices) await this.notifications.notifyInApp(tx, notice);
   }
+}
+
+/** The record as the caller sees it after the correction: what changed, what was typed for the email, the rest as it was. */
+function viewOf(current: EmployeeRecord, correction: Correction, input: OfficialFieldsInput): MaintainedEmployeeView {
+  const { changes, typedWorkEmail } = correction;
+
+  return {
+    id: current.id,
+    employeeCode: current.employeeCode,
+    fullName: input.fullName ?? current.fullName,
+    workEmail: typedWorkEmail === undefined ? current.workEmail : typedWorkEmail,
+    employmentType: input.employmentType ?? current.employmentType,
+    hireDate: changes.hireDate ?? current.hireDate,
+    jobTitle: 'jobTitle' in changes ? (changes.jobTitle ?? null) : (current.jobTitle ?? null),
+    status: current.status,
+    workState: current.workState,
+  };
 }

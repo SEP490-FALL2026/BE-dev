@@ -5,8 +5,9 @@ import { queueEnvironmentFrom } from './queue.config';
 
 /**
  * The queue's Redis connection, validated when the module is mounted (production requires REDIS_HOST and
- * REDIS_PASSWORD). Not mounted by the API or the worker while no Story uses a queue (E2 = A, H6.4); a G7/G9 slice that
- * needs one mounts it and gets the strict validation back with it.
+ * REDIS_PASSWORD). Standby infrastructure with no consumer yet (the Owner keeps it for future use): no
+ * process mounts it today, so the API, the worker and the commands neither need Redis nor validate it. The first module that
+ * needs a queue mounts it and gets the strict validation back with it.
  */
 export function createQueueConfiguration(config: ConfigService): BullRootModuleOptions {
   const queue = queueEnvironmentFrom(config);

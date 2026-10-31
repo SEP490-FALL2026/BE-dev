@@ -25,7 +25,7 @@ describe('JwtAccessTokenVerifier — database failures', () => {
   });
 
   // An unexpected failure is a defect, not an outage: it must keep its own identity so it is
-  // reported as an internal error instead of being disguised as a retryable 503 (R-04).
+  // reported as an internal error instead of being disguised as a retryable 503.
   it('does not disguise an unexpected error as an outage', async () => {
     const defect = new TypeError('Cannot read properties of undefined');
     const outcome = await verifierFailingWith(defect)

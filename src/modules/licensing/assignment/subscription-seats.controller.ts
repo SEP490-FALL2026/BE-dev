@@ -9,7 +9,7 @@ import {
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
-import { LICENSING_ERROR_EXAMPLES, toLicensingApiException } from '../mappers/licensing.http-errors';
+import { LICENSING_ERROR_EXAMPLES, toLicensingApiException } from '../licensing.http-errors';
 import { SeatUsageResponseDto, SubscriptionSeatsParamDto } from './assignment.dto';
 import { AssignmentService } from './assignment.service';
 

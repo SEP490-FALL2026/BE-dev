@@ -6,7 +6,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
-import { operatorSubjectRefusal, userWriterRefusal } from '../policies/personnel-self-action.policy';
+import { operatorSubjectRefusal, userWriterRefusal } from '../personnel-self-action.policy';
 import type { PersonnelActor } from '../public/personnel.types';
 import { TransferRefusedError } from './transfer.errors';
 import { TransferRepo } from './transfer.repo';
@@ -31,7 +31,7 @@ export class TransferGuardService {
   }
 
   /**
-   * The first rule of every write of an event (F13, F19, F40): only the Super Admin writes, and never about themselves. It needs no
+   * The first rule of every write of an event: only the Super Admin writes, and never about themselves. It needs no
    * database, so it is judged before any lock; a person who signed in is judged here in full. Throws PersonnelAccessRefusedError.
    */
   requireWriter(actor: PersonnelActor, subjectEmployeeId: string): void {
@@ -41,7 +41,7 @@ export class TransferGuardService {
   }
 
   /**
-   * The second rule, for the controlled procedure only: it serves a person who holds the `SUPER_ADMIN` role (spec L.2). The account is
+   * The second rule, for the controlled procedure only: it serves a person who holds the `SUPER_ADMIN` role. The account is
    * read `FOR SHARE`, so call it after the employee is locked (the lock protocol: the employee, then the account). Nothing for a
    * person who signed in. Throws PersonnelAccessRefusedError.
    */
@@ -113,7 +113,7 @@ export class TransferGuardService {
    * The controlled procedure has no account, yet `offboarding_cases.left_by_app_user_id` (a person who is `LEFT` says who marked it)
    * and the handover confirmations `licensing` opens (`created_by_app_user_id`) are still NOT NULL: for the procedure the stand-in is
    * the account of the Super Admin it serves, with the ticket as its session. It fills those columns and nothing else: who did the
-   * event is the ticket in its own column and in the Audit Trail (spec L.2), and the facade of the handover is told the ticket
+   * event is the ticket in its own column and in the Audit Trail, and the facade of the handover is told the ticket
    * (`OperatorAuditActor`) so that what it audits is `OPERATOR` with no account, never this stand-in.
    */
   async standIn(tx: DbTx, actor: PersonnelActor): Promise<AuthenticatedPrincipal> {
@@ -135,7 +135,7 @@ export class TransferGuardService {
   /**
    * The database has the last word on the periods a write puts back or the ones it opens: if someone changed the head of the
    * department or the placements of the person meanwhile, they no longer fit and nothing is saved. A race the database refuses is a
-   * conflict the caller can read and retry (F37, F46), never a 500.
+   * conflict the caller can read and retry, never a 500.
    */
   async guarded<T>(work: () => Promise<T>): Promise<T> {
     try {

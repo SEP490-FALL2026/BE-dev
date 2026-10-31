@@ -24,7 +24,7 @@ export interface RoleView {
 
 /**
  * Which roles the people who leave hold (`US-03-04` AC-11, AC-27, AC-28): read from the facades of the identity, the organization and
- * the catalog, a fixed number of statements for any number of people (`LD-07`), in the caller's transaction when it has one. Reads only:
+ * the catalog, a fixed number of statements for any number of people, in the caller's transaction when it has one. Reads only:
  * the alert and the snapshot are written by the hook, and nothing here changes a role, a step or an account.
  */
 @Injectable()

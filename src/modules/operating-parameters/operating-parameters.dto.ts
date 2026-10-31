@@ -1,9 +1,8 @@
 import { z } from 'zod';
-import { isBusinessDate } from '../../core/business-date';
 import { successEnvelopeSchema } from '../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../infrastructure/http/dto/zod-dto';
+import { businessDate } from '../../infrastructure/http/dto/business-date.dto';
 
-const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 const parameterValue = z.union([z.number(), z.string(), z.array(z.number())]);
 
 export const parameterKeyParamSchema = z.strictObject({ key: z.string().regex(/^[A-Z][A-Z0-9_]{0,99}$/) });

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { normalizeAccountIdentifier } from '../../../core/account-identifier';
+import { normalizeAccountIdentifier } from '../public/account-identifier.policy';
 import type { BusinessDate } from '../../../core/business-date';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -17,7 +17,7 @@ import type {
   SeatHolder,
   SeatUsage,
 } from '../public/licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { toAssignmentFailure } from './assignment-conflicts.repo';
 import { AssignmentDepartmentRepo } from './assignment-department.repo';
 import {
@@ -108,7 +108,7 @@ export class AssignmentService {
 
   /**
    * The people who hold, on `day`, a seat the baseline wrote on a subscription owned by another department than the one they are in
-   * (F21, `QĐ-89e`), read in the transaction that closes the baseline. A seat written before a personal seat carried its department
+   * (`QĐ-89e`), read in the transaction that closes the baseline. A seat written before a personal seat carried its department
    * is judged against the owner of its subscription.
    */
   async baselineHoldersOfOtherDepartments(tx: DbTx, day: BusinessDate): Promise<SeatBaselineClosedHolder[]> {
@@ -198,7 +198,7 @@ export class AssignmentService {
    * Writes the seat a request is granted, in the caller transaction (which holds the lock of the seat target), with its
    * audit event: a personal seat, or a service account with its reason, owning department and Cost Center (`US-05-21`). A seat
    * on a subscription belongs to the department that owns it, and the request may be granted only on a subscription of its own
-   * department (`departmentId`): there is no pool of seats between departments (`QĐ-89a`, F20). Throws AssignmentConflictError
+   * department (`departmentId`): there is no pool of seats between departments (`QĐ-89a`). Throws AssignmentConflictError
    * when the subscription is another department's (before anything is written), or when the database refuses the seat: an
    * overlap, the seats all taken, the identifier in use, no expected end date for time-limited staff, or a rule of the baseline or
    * of the owning department.

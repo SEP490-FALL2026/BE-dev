@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { REVOCATION_SOURCES } from '../public/licensing.types';
 import { EVIDENCE_MAX_LENGTH, FAILURE_REASON_MAX_LENGTH } from './provisioning.policy';
 import { REVOCATION_NOTE_MAX_LENGTH } from './revocation.policy';
+import { businessDate, responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /**
  * Only the shape and a generous bound are checked here, and no field can carry a secret: a grant names the request, the
@@ -12,7 +12,6 @@ import { REVOCATION_NOTE_MAX_LENGTH } from './revocation.policy';
  * the account is the company's and a note of evidence or a reason is given (a missing one is taken as blank) is judged by
  * the policy and the service and answers with its own code.
  */
-const businessDate = z.string().refine(isBusinessDate, { message: 'Must be a real date as YYYY-MM-DD.' });
 
 export const grantBodySchema = z.strictObject({
   requestId: z.uuid(),
@@ -26,7 +25,7 @@ export const grantBodySchema = z.strictObject({
 });
 export const completeBodySchema = z.strictObject({ evidence: z.string().max(EVIDENCE_MAX_LENGTH).default('') });
 export const failureBodySchema = z.strictObject({ reason: z.string().max(FAILURE_REASON_MAX_LENGTH).default('') });
-/** A hand-off carries nothing: it changes only the channel, and the evidence is asked when the manual work completes (F08, `QĐ-90a`). */
+/** A hand-off carries nothing: it changes only the channel, and the evidence is asked when the manual work completes (`QĐ-90a`). */
 export const handOffBodySchema = z.strictObject({});
 export const closeFailedBodySchema = failureBodySchema;
 /**
@@ -92,13 +91,13 @@ const revocationSummarySchema = z.strictObject({
   reasonCount: z.number().int().nonnegative(),
   completion: z.enum(['ACCOUNT_REMOVED', 'ALREADY_GONE', 'RENEWAL_CANCELLED', 'OFF_SYSTEM_REVOKED']).nullable(),
   accessState: z.enum(['CUT', 'UNTIL_PAID_END']).nullable(),
-  paidThroughOn: businessDate.nullable(),
+  paidThroughOn: responseBusinessDate.nullable(),
   terminating: z.boolean(),
-  terminatingUntil: businessDate.nullable(),
+  terminatingUntil: responseBusinessDate.nullable(),
 });
 const revocationDetailSchema = revocationSummarySchema.extend({
   completionNote: z.string().nullable(),
-  accessCutOn: businessDate.nullable(),
+  accessCutOn: responseBusinessDate.nullable(),
   accessEvidence: z.string().nullable(),
   firstReason: z
     .strictObject({
@@ -111,7 +110,7 @@ const revocationDetailSchema = revocationSummarySchema.extend({
     })
     .nullable(),
 });
-/** A row of the list (`LD-08`): the task without its steps, evidence and errors; the detail is this and those. */
+/** A row of the list: the task without its steps, evidence and errors; the detail is this and those. */
 const taskSummarySchema = z.strictObject({
   id: z.uuid(),
   kind: z.enum(['GRANT', 'REVOKE']),

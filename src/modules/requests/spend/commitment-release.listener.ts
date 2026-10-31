@@ -20,6 +20,9 @@ const ENDED: readonly AccessRequestState[] = [
  */
 @Injectable()
 export class RequestCommitmentReleaseGuard implements CommitmentReleaseGuard, OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [CommitmentReleaseGuardHook] as const;
+
   constructor(
     private readonly requests: AccessRequestRepo,
     private readonly hook: CommitmentReleaseGuardHook,

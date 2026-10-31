@@ -7,7 +7,7 @@ import {
   LicenseKeyRevealLimitError,
   SeatTargetNotFoundError,
 } from '../public/licensing.errors';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { toLicensingApiException } from '../licensing.http-errors';
 import { LicenseKeyApplicationRetiredError } from './license-key.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
@@ -42,7 +42,7 @@ export function toLicenseKeyApiException(error: unknown): unknown {
 
 const example = (error: Error) => errorExampleOf(toLicenseKeyApiException(error));
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const LICENSE_KEY_ERROR_EXAMPLES = {
   NOT_FOUND: example(new LicenseKeyNotFoundError()),
   PLAN_NOT_K4: example(new LicenseKeyPlanNotK4Error('K1')),

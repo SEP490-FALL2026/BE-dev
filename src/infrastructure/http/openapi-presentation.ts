@@ -25,7 +25,7 @@ export function isRedundantFormatPattern(format: unknown, pattern: unknown): boo
  *
  * - `const` becomes a single-value `enum`;
  * - a `type` array (Zod ≥ 4.6 writes a bare nullable as `type: [T, "null"]`) becomes one `type` plus `nullable`, or an
- *   `anyOf` of single types when several remain (OPENAPI-EXAMPLE.1-F3);
+ *   `anyOf` of single types when several remain;
  * - a `{ type: "null" }` branch of `anyOf`/`oneOf` becomes `nullable` on the rest;
  * - a nullable `enum` lists `null` among its values, and an `enum` listing `null` is nullable;
  * - a numeric `exclusiveMinimum`/`exclusiveMaximum` becomes the 3.0 bound plus its boolean flag;
@@ -68,7 +68,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
- * The OpenAPI document outside schemas (CP0-10). It is walked to find the schemas: `components.schemas.*` and every
+ * The OpenAPI document outside schemas. It is walked to find the schemas: `components.schemas.*` and every
  * `schema` (parameters, headers, media types). Examples and `x-*` extensions are copied as they are.
  */
 function walkDocument(node: unknown, key?: string): unknown {

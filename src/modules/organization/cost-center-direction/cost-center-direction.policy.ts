@@ -8,7 +8,7 @@ const REFERENCE_MAX = 200;
 const lengthOk = (value: string): boolean => value.length >= REFERENCE_MIN && value.length <= REFERENCE_MAX;
 
 /**
- * The rules of the command that need no database, judged before the transaction (spec L.11): the evidence and the basis
+ * The rules of the command that need no database, judged before the transaction: the evidence and the basis
  * are 2 to 200 characters, and in `SHARED` the person who runs the command is not the person who approved it.
  * `LOCAL_TEST` lets one person do both; the Audit Trail records the environment.
  */

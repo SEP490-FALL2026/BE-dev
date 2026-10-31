@@ -3,12 +3,12 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
-import { readAccessOf, type ReadAccess } from '../policies/personnel-self-action.policy';
+import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
 import { NoticeRefusedError } from './notice.errors';
 import type { NoticeDetailWire, NoticeSummaryWire } from './notice.dto';
 import { toDetail, toSummary } from './notice.mapper';
 import { NoticeRepo } from './notice.repo';
-import type { NoticeRecord } from './notice.types';
+import type { NoticeRecord } from '../personnel-notice.types';
 
 export interface NoticePage {
   items: NoticeSummaryWire[];
@@ -16,7 +16,7 @@ export interface NoticePage {
 }
 
 /**
- * Reads notices (`SoD-2`, F12): the Super Admin reads the queue of every notice with how it was verified; the IT Admin reads only the
+ * Reads notices (`SoD-2`): the Super Admin reads the queue of every notice with how it was verified; the IT Admin reads only the
  * minimal projection (no record of the check) of the notices about people in the departments they are in charge of or stand in for
  * (one with no usable IT Admin named is every IT Admin's); a department head
  * reads only the notices they sent; one outside that does not exist for the reader. The names of a page are read in one statement

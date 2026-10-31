@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { RevocationListeners, type RevocationEvent } from '../public/licensing.extension-points';
 import type { RevocationTaskFacts } from '../public/licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
+import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { gateOf } from './handover-confirmer.policy';
 import { HandoverCaseFacts } from './handover-case-facts.service';
 import { HandoverConfirmerResolver } from './handover-confirmer.service';
@@ -24,6 +24,9 @@ const HANDOVER_REVOCATION_LISTENER = 'licensing.handover-confirmation';
  */
 @Injectable()
 export class HandoverRevocationHook implements OnModuleInit {
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [RevocationListeners] as const;
+
   constructor(
     private readonly revocation: RevocationListeners,
     private readonly handovers: HandoverService,

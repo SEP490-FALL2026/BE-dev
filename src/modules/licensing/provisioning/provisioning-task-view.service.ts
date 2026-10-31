@@ -50,7 +50,7 @@ export interface RevocationDetailView extends RevocationSummaryView {
   } | null;
 }
 
-/** The card of a task as the IT Admin reads it: the row of the list and the rest a detail adds (`LD-08`). */
+/** The card of a task as the IT Admin reads it: the row of the list and the rest a detail adds. */
 export interface TaskSummaryView {
   id: string;
   kind: ProvisioningTaskKind;
@@ -89,7 +89,7 @@ export interface TaskSummaryView {
   elapsedSeconds: number;
 }
 
-/** What only a detail carries: the steps, the evidence, the errors and who did what (`LD-08`). */
+/** What only a detail carries: the steps, the evidence, the errors and who did what. */
 export interface TaskDetailFields {
   steps: TaskStep[];
   doneWhen: TaskDoneWhen | null;
@@ -122,7 +122,7 @@ interface ViewContext {
 /**
  * Builds the cards of tasks: the people, the plan and its kind of provisioning, the steps that kind asks for, what the
  * IT Admin may decide, and how long the task has taken. Everything is read through the facades of the modules that own it,
- * the people and the plans of a whole page in one read each (`LD-08`).
+ * the people and the plans of a whole page in one read each.
  */
 @Injectable()
 export class ProvisioningTaskViewService {

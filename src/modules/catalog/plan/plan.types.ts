@@ -22,7 +22,7 @@ export interface PlanRecord {
   updatedAt: Date;
 }
 
-/** A row of the plan list (`LD-05`): the plan without its revocation note, which only the detail carries. */
+/** A row of the plan list: the plan without its revocation note, which only the detail carries. */
 export type PlanSummaryRecord = Omit<PlanRecord, 'revocationNote'>;
 
 export interface WorkspaceMemberRecord {

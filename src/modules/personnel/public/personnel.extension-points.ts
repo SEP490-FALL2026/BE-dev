@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { Contributions } from '../../../core/extension/contributions';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { NoticeEventInput, NoticeEventKind, NoticeEventRef, NoticeRecord } from '../notice/notice.types';
-import type { Grounds } from '../policies/grounds.policy';
+import type { NoticeEventInput, NoticeEventKind, NoticeEventRef, NoticeRecord } from '../personnel-notice.types';
+import type { Grounds } from '../personnel-grounds.policy';
 import type { PersonnelActor } from './personnel.types';
 
 /** A file of the personnel context (a transfer now, the leaving of a person later) and the day its effect is due. */
@@ -18,7 +18,10 @@ export interface PersonnelFileEvent {
 /**
  * What a flow that hangs on a personnel file does when the file is recorded, when its day moves and when it is cancelled
  * (`g6-service-account-handover` asks for a person to answer for the service accounts of the one who goes). Called in the
- * transaction of the write, after it; a hook that throws is logged and never changes the result of the write.
+ * transaction of the write, after it, as a part of it: a hook that throws — a bug, a failing statement, a refusal it
+ * raises — rolls the whole write back and its error is the error of the write, as a refusing entry of `Listeners` does. A hook that
+ * is allowed to fail without the write failing catches the error inside itself. What a hook writes belongs to the transaction too, so
+ * a statement of a hook that fails in the database leaves the transaction aborted for whatever comes after it.
  */
 export interface PersonnelFileHook {
   onRecorded?(tx: DbTx, event: PersonnelFileEvent): Promise<void>;
@@ -30,8 +33,9 @@ export interface PersonnelFileHook {
 
 /**
  * The hooks of the flows that follow a personnel file, added when their module starts; none at the start. The transfer and the
- * departure call each in the order it was added (`event-notice/personnel-file-hooks.service.ts`), each in its own try: a hook that
- * throws is logged and the next one is still called, which is why this is not a `Listeners` (whose first throw stops the rest).
+ * departure call each in the order it was added (`event-notice/personnel-file-hooks.service.ts`), in the transaction of the write. A
+ * hook that throws stops the ones after it and rolls the write back, as an entry of `Listeners` would; it is a `Contributions`
+ * because a hook is an object with up to four optional steps, not one handler of one event.
  */
 @Injectable()
 export class PersonnelFileHookContributions extends Contributions<PersonnelFileHook> {

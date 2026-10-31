@@ -49,7 +49,7 @@ export function toVendorApiException(error: unknown): unknown {
 
 const example = (error: Error) => errorExampleOf(toVendorApiException(error));
 
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
+/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const VENDOR_ERROR_EXAMPLES = {
   NOT_FOUND: example(new VendorNotFoundError()),
   TAX_TYPE_INVALID: example(new TaxProfileTaxTypeInvalidError()),

@@ -15,14 +15,15 @@ import { HeadAssignmentError } from './department.errors';
 import { itAdminScope } from './department.policy';
 import { DepartmentHeadRepo } from './department-head.repo';
 import { DepartmentRepo } from './department.repo';
-import { DepartmentHeadRecord, DepartmentRecord, HeadPeriodChanges, HeadPeriodRecord } from './department.types';
+import { DepartmentHeadRecord, DepartmentRecord, HeadPeriodChanges } from './department.types';
+import { HeadPeriodRecord } from '../organization-structure.types';
 
 /**
  * The departments and their heads as `OrganizationModule` holds them: the owner of `DepartmentHeadRepo`, which no other
  * provider injects. The organization facade reaches departments through it, for other modules (installation, accounts,
  * the per-request role check, import, onboarding), for the manual entry and for the department use cases' head periods.
  * Every call runs in the caller's transaction, in the order the caller makes it; the rules stay with the use cases. The
- * department use cases keep using `DepartmentRepo` directly (Owner decision E4).
+ * department use cases keep using `DepartmentRepo` directly (a scoped Owner exception).
  */
 @Injectable()
 export class DepartmentDirectoryService {
@@ -152,7 +153,7 @@ export class DepartmentDirectoryService {
   }
 
   /**
-   * The departments an IT Admin reads and handles (`US-01-11`, F12): those that name them in charge (retired ones too) and the active
+   * The departments an IT Admin reads and handles (`US-01-11`): those that name them in charge (retired ones too) and the active
    * ones nobody usable is in charge of, whose technical work falls to every IT Admin (`itAdminScope`). An unlocked read; `usableAmong`
    * tells which of the IT Admins named can act.
    */

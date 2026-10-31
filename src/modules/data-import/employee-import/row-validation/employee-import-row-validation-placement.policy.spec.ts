@@ -2,9 +2,9 @@ import type { EmployeeCells } from '../employee-import-row.types';
 import { EmployeeImportLookup, EmployeeRowClassifier } from './employee-import-row-validation.policy';
 
 /*
- * BEH.1: the import adapter of the shared placement policy. The decision is organization's; this file owns where a
- * reason is shown (a file column, H8 D-1), that a person already there is compared and not placed (D-2), that the
- * placement reasons come after the file's own (D-3) and the reasons only an import has (D-4). Literal expectations.
+ * The import adapter of the shared placement policy. The decision is organization's; this file owns where a
+ * reason is shown (a file column), that a person already there is compared and not placed, that the
+ * placement reasons come after the file's own and the reasons only an import has. Literal expectations.
  */
 
 const lookup: EmployeeImportLookup = {

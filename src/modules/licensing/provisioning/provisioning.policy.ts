@@ -1,4 +1,4 @@
-import { isCompanyAccount } from '../../../core/account-identifier';
+import { isCompanyAccount } from '../public/account-identifier.policy';
 import {
   ProvisioningAccountIdentifierRequiredError,
   ProvisioningAnotherItAdminNeededError,
@@ -21,7 +21,7 @@ import type {
   TaskStep,
 } from '../public/licensing.types';
 
-/** Only an IT Admin works the provisioning queue (`QĐ-87a`, `SoD-1`, F13): the route guard is not the only place this is judged. */
+/** Only an IT Admin works the provisioning queue (`QĐ-87a`, `SoD-1`): the route guard is not the only place this is judged. */
 export function assertItAdmin(actor: { roles: readonly string[] }): void {
   if (!actor.roles.includes('IT_ADMIN')) throw new ProvisioningItAdminRequiredError();
 }

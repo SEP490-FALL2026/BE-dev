@@ -7,9 +7,9 @@ import { readSqlState, TransactionRunner } from '../../../infrastructure/databas
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { FinanceApi } from '../public/finance.api';
+import { CurrencyService } from '../currency/currency.service';
 import type { ExchangeRateRecord } from '../public/finance.types';
-import { financeAuditEvent } from '../mappers/finance-audit-event.mapper';
+import { financeAuditEvent } from '../finance-audit-event.mapper';
 import {
   ExchangeRateAlreadyRecordedError,
   ExchangeRateDateInFutureError,
@@ -30,7 +30,7 @@ export interface ExchangeRateView extends ExchangeRateRecord {
 @Injectable()
 export class ExchangeRateService {
   constructor(
-    private readonly finance: FinanceApi,
+    private readonly currencies: CurrencyService,
     private readonly ledger: ExchangeRateLedgerService,
     private readonly organization: OrganizationApi,
     private readonly audit: AuditApi,
@@ -71,7 +71,7 @@ export class ExchangeRateService {
     input: { currency: string; rateDate: BusinessDate; rate: string },
   ): Promise<ExchangeRateView> {
     const rate = parseRate(input.rate);
-    if (!(await this.finance.findCurrency(input.currency))) throw new CurrencyNotSupportedError(input.currency);
+    if (!(await this.currencies.find(input.currency))) throw new CurrencyNotSupportedError(input.currency);
     const problem = rateDateProblem(input.rateDate, await this.organization.businessToday());
     if (problem === 'DATE_IN_FUTURE') throw new ExchangeRateDateInFutureError();
     if (problem === 'DATE_TOO_OLD') throw new ExchangeRateDateTooOldError();
@@ -79,7 +79,7 @@ export class ExchangeRateService {
     try {
       return await this.runner.run(async (tx) => {
         // The reporting currency that governs the rate, read with the organization row held FOR SHARE until the rate
-        // commits (P28-03, DB-01): a change in flight is waited for and then read, and a change after this one waits
+        // commits (DB-01): a change in flight is waited for and then read, and a change after this one waits
         // for the rate and is refused by the lock. The check, the audit and the answer all speak this currency.
         const organization = await this.organization.getOrganizationShared(tx);
         if (!organization) throw new Error('Exchange rates were used before installation');

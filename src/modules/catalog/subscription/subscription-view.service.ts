@@ -24,7 +24,7 @@ export class SubscriptionViewService {
     if (records.length === 0) return [];
     const daysBefore = await this.alertDays();
     // A priced subscription answers its tax profile from the read its estimate came from, so the two are one version
-    // (LD-01, P28-06); only the vendors of the subscriptions without a price are read for their profile alone.
+    //; only the vendors of the subscriptions without a price are read for their profile alone.
     const unpricedVendors = records.filter((record) => record.unitPrice === null).map((record) => record.vendor.id);
     const groups =
       unpricedVendors.length === 0

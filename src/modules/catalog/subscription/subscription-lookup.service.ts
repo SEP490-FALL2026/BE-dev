@@ -12,7 +12,7 @@ export class SubscriptionLookupService {
 
   /**
    * What a plan is bought at for a department, from the newest priced active subscription that department owns; null when it
-   * has none, and never the price of another department's subscription (`FR-3.2`, F38).
+   * has none, and never the price of another department's subscription (`FR-3.2`).
    */
   async priceOfPlan(
     planId: string,

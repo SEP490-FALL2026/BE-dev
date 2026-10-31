@@ -58,7 +58,7 @@ export type Pricing =
 
 export function priceRequest(input: PricingInput): Pricing {
   const budgetYear = fiscalYearOf(input.expectedSpendOn, input.fiscalYearStartMonth);
-  // A price of nothing is no price: a paid request never costs 0 (`FR-3.2`, F34), so the price data is incomplete and the request is not
+  // A price of nothing is no price: a paid request never costs 0 (`FR-3.2`), so the price data is incomplete and the request is not
   // checked, instead of reaching an approval that cannot hold a commitment of 0.
   if (input.unitPrice === null || input.unitPrice.amountMinor <= 0n || input.billingCycle === null) {
     return { status: 'MISSING', reason: 'NO_PRICED_SUBSCRIPTION', budgetYear };

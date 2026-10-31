@@ -90,3 +90,35 @@ export function deciderRoleOf(routingRow: number): DeciderRole {
       throw new Error(`The routing row ${routingRow} gives the step to nobody, so nobody decides in it.`);
   }
 }
+
+export interface NeedDecisionOutcome {
+  approved: boolean;
+  /** Where the request goes: the next state of its branch for an approval, `REJECTED` for a refusal. */
+  requestState: ApprovedRequestState | 'REJECTED';
+  deciderRole: DeciderRole;
+  /** The reason a person gave for confirming a long term; only an approval carries it. */
+  termConfirmationReason: string | null;
+  /** The head approving a request that costs money chooses its line first; a refusal there undoes the whole decision. */
+  headChoosesLine: boolean;
+}
+
+/**
+ * What a decision leads to, once it is allowed (`US-05-04` AC-12, AC-16): the state the request goes to, the role the person decided
+ * in (the row of the routing table as it stood), and whether the head has the line of the plan to choose. Throws for a row that gives
+ * the step to nobody.
+ */
+export function needDecisionOutcome(
+  asked: { branch: AccessRequestBranchCode; routingRow: number; hasSpendStep: boolean },
+  input: DecisionInput,
+): NeedDecisionOutcome {
+  const approved = input.decision === 'APPROVE';
+  const deciderRole = deciderRoleOf(asked.routingRow);
+
+  return {
+    approved,
+    requestState: approved ? nextRequestState(asked.branch) : 'REJECTED',
+    deciderRole,
+    termConfirmationReason: (approved ? input.termConfirmationReason?.trim() : null) || null,
+    headChoosesLine: approved && asked.hasSpendStep && deciderRole === 'MANAGER',
+  };
+}

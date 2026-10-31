@@ -32,7 +32,7 @@ export interface SubscriptionRecord {
   planId: string;
   planName: string;
   planPricingModel: PlanPricingModel | null;
-  /** The department that owns the purchase: always set, and never changed (`QĐ-89a`, F02). */
+  /** The department that owns the purchase: always set, and never changed (`QĐ-89a`). */
   ownerDepartmentId: string;
   applicationId: string;
   applicationName: string;
@@ -58,7 +58,7 @@ export interface SubscriptionRecord {
 export interface NewSubscription {
   organizationId: string;
   planId: string;
-  /** Required in the type: the one writer of `subscriptions` never stores a subscription without its owner (F02). */
+  /** Required in the type: the one writer of `subscriptions` never stores a subscription without its owner. */
   ownerDepartmentId: string;
   kind: SubscriptionKind;
   status: SubscriptionStatus;

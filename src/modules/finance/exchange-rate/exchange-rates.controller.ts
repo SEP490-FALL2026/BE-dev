@@ -12,7 +12,8 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { FINANCE_ERROR_EXAMPLES, toFinanceApiException } from '../mappers/finance.http-errors';
+import { FINANCE_ERROR_EXAMPLES } from '../finance.http-errors';
+import { EXCHANGE_RATE_ERROR_EXAMPLES, toExchangeRateApiException } from './exchange-rate.http-errors';
 import {
   ExchangeRatePageResponseDto,
   ExchangeRateResponseDto,
@@ -71,7 +72,7 @@ export class ExchangeRatesController {
 
       return { items: page.items.map(toWire), pagination: page.pagination };
     } catch (error) {
-      throw toFinanceApiException(error);
+      throw toExchangeRateApiException(error);
     }
   }
 
@@ -98,9 +99,9 @@ export class ExchangeRatesController {
       examples: [
         VALIDATION_EXAMPLE,
         FINANCE_ERROR_EXAMPLES.CURRENCY_NOT_SUPPORTED,
-        FINANCE_ERROR_EXAMPLES.EXCHANGE_RATE_DATE_IN_FUTURE,
-        FINANCE_ERROR_EXAMPLES.EXCHANGE_RATE_DATE_TOO_OLD,
-        FINANCE_ERROR_EXAMPLES.EXCHANGE_RATE_SAME_AS_REPORTING_CURRENCY,
+        EXCHANGE_RATE_ERROR_EXAMPLES.EXCHANGE_RATE_DATE_IN_FUTURE,
+        EXCHANGE_RATE_ERROR_EXAMPLES.EXCHANGE_RATE_DATE_TOO_OLD,
+        EXCHANGE_RATE_ERROR_EXAMPLES.EXCHANGE_RATE_SAME_AS_REPORTING_CURRENCY,
         FINANCE_ERROR_EXAMPLES.RATE_OUT_OF_RANGE,
         FINANCE_ERROR_EXAMPLES.RATE_SCALE_EXCEEDED,
       ],
@@ -108,14 +109,14 @@ export class ExchangeRatesController {
     {
       status: HttpStatus.CONFLICT,
       description: 'A rate for that currency and day is already recorded (EXCHANGE_RATE.ALREADY_RECORDED).',
-      examples: [FINANCE_ERROR_EXAMPLES.EXCHANGE_RATE_ALREADY_RECORDED],
+      examples: [EXCHANGE_RATE_ERROR_EXAMPLES.EXCHANGE_RATE_ALREADY_RECORDED],
     },
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordExchangeRateBodyDto) {
     try {
       return toWire(await this.rates.record(actor, body));
     } catch (error) {
-      throw toFinanceApiException(error);
+      throw toExchangeRateApiException(error);
     }
   }
 }

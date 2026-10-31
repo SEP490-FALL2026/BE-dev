@@ -11,7 +11,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toProjectSummaryWire, toProjectWire } from '../mappers/project.mapper';
+import { toProjectSummaryWire, toProjectWire } from './project.mapper';
 import {
   CreateProjectBodyDto,
   ListProjectsQueryDto,
@@ -20,7 +20,7 @@ import {
   ProjectResponseDto,
   UpdateProjectBodyDto,
 } from './project.dto';
-import { ORGANIZATION_ERROR_EXAMPLES, toOrganizationApiException } from '../mappers/organization.http-errors';
+import { PROJECT_ERROR_EXAMPLES, toProjectApiException } from './project.http-errors';
 import { ProjectService } from './project.service';
 
 const AUTH_ERRORS = [
@@ -32,12 +32,28 @@ const AUTH_ERRORS = [
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
+/** The reads (the list and one project): the same role, said for a read; the writes above keep their own wording. */
+const READ_ERRORS = [
+  UNAUTHENTICATED_RESPONSE,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'Only the Super Admin lists and reads the projects described on department profiles; the IT Admin does not.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+] as const;
 const VALIDATION_ERROR_DESCRIPTION =
   'The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).';
-/** The reads: only the request itself can be invalid. */
-const VALIDATION_ERROR = {
+/** The reads: only the request itself can be invalid, the query of the list or the id of one project. */
+const QUERY_INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: VALIDATION_ERROR_DESCRIPTION,
+  description: 'The query is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
+} as const;
+const ID_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The id is not a UUID (VALIDATION_ERROR).',
   examples: [VALIDATION_EXAMPLE],
 } as const;
 /** The writes: the request, or the project it describes. */
@@ -46,16 +62,16 @@ const PROJECT_INVALID = {
   description: VALIDATION_ERROR_DESCRIPTION,
   examples: [
     VALIDATION_EXAMPLE,
-    ORGANIZATION_ERROR_EXAMPLES.PROJECT_INVALID_DEPARTMENT_NOT_FOUND,
-    ORGANIZATION_ERROR_EXAMPLES.PROJECT_INVALID_DESCRIPTION,
-    ORGANIZATION_ERROR_EXAMPLES.PROJECT_INVALID_NAME,
+    PROJECT_ERROR_EXAMPLES.PROJECT_INVALID_DEPARTMENT_NOT_FOUND,
+    PROJECT_ERROR_EXAMPLES.PROJECT_INVALID_DESCRIPTION,
+    PROJECT_ERROR_EXAMPLES.PROJECT_INVALID_NAME,
   ],
 } as const;
 
 /**
  * Projects described on department profiles (`US-03-06` AC-14). A project is text: not a Cost Center, no members
  * of its own and no step of any approval. The Super Admin lists, reads, adds and changes them, on an HR basis; the IT Admin does
- * not (`QĐ-87a`). Who may is decided by the policy of the service as well as by the role of the route (`F13`).
+ * not (`QĐ-87a`). Who may is decided by the policy of the service as well as by the role of the route.
  */
 @ApiTags('projects')
 @Controller({ path: 'projects', version: '1' })
@@ -70,14 +86,14 @@ export class ProjectsController {
     description:
       'A page of projects by name, optionally those a department takes part in. The description is read with GET /projects/{id}.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR)
+  @ApiErrorResponses(...READ_ERRORS, QUERY_INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListProjectsQueryDto) {
     try {
       const page = await this.projects.list(actor, query);
 
       return { items: page.items.map(toProjectSummaryWire), pagination: page.pagination };
     } catch (error) {
-      throw toOrganizationApiException(error);
+      throw toProjectApiException(error);
     }
   }
 
@@ -88,16 +104,16 @@ export class ProjectsController {
     message: 'PROJECT.FETCHED',
     description: 'The project in full, with its description and the departments that take part.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_ERROR, {
+  @ApiErrorResponses(...READ_ERRORS, ID_INVALID, {
     status: HttpStatus.NOT_FOUND,
     description: 'The project does not exist (PROJECT.NOT_FOUND).',
-    examples: [ORGANIZATION_ERROR_EXAMPLES.PROJECT_NOT_FOUND],
+    examples: [PROJECT_ERROR_EXAMPLES.PROJECT_NOT_FOUND],
   })
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ProjectIdParamDto) {
     try {
       return toProjectWire(await this.projects.get(actor, params.id));
     } catch (error) {
-      throw toOrganizationApiException(error);
+      throw toProjectApiException(error);
     }
   }
 
@@ -114,7 +130,7 @@ export class ProjectsController {
     try {
       return toProjectWire(await this.projects.create(actor, body));
     } catch (error) {
-      throw toOrganizationApiException(error);
+      throw toProjectApiException(error);
     }
   }
 
@@ -128,7 +144,7 @@ export class ProjectsController {
   @ApiErrorResponses(...AUTH_ERRORS, PROJECT_INVALID, {
     status: HttpStatus.NOT_FOUND,
     description: 'The project does not exist (PROJECT.NOT_FOUND).',
-    examples: [ORGANIZATION_ERROR_EXAMPLES.PROJECT_NOT_FOUND],
+    examples: [PROJECT_ERROR_EXAMPLES.PROJECT_NOT_FOUND],
   })
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -138,7 +154,7 @@ export class ProjectsController {
     try {
       return toProjectWire(await this.projects.update(actor, params.id, body));
     } catch (error) {
-      throw toOrganizationApiException(error);
+      throw toProjectApiException(error);
     }
   }
 }

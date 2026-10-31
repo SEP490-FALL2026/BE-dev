@@ -1,4 +1,12 @@
-import { checkSupplement, entryFor, judgePlanLineChoice, submissionStop } from './spend-submission.policy';
+import {
+  checkSupplement,
+  entryFor,
+  judgePlanLineChoice,
+  submissionStop,
+  supplementAuditDetail,
+  supplementChangeOf,
+  supplementDropsPlanLine,
+} from './spend-submission.policy';
 
 describe('the line a request is attached to (US-05-04 AC-12, AC-13)', () => {
   const today = '2026-05-15';
@@ -97,5 +105,79 @@ describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16)', () =>
   it('is not for a request with no price, nor to the same day', () => {
     expect(checkSupplement({ ...facts, priced: false })).toBe('NOT_PRICED');
     expect(checkSupplement({ ...facts, newExpectedSpendOn: '2025-12-20' })).toBe('NO_CHANGE');
+  });
+});
+
+describe('what a supplementary file changes, and what it says (QĐ-82n, US-06-14 AC-13, AC-15)', () => {
+  const before = {
+    status: 'PRICED' as const,
+    expectedSpendOn: '2026-11-01',
+    budgetYear: 2026,
+    amount: { amountMinor: 1000n, currency: 'VND' },
+  };
+  const after = {
+    status: 'PRICED' as const,
+    expectedSpendOn: '2027-01-15',
+    budgetYear: 2027,
+    amount: { amountMinor: 1200n, currency: 'VND' },
+  };
+
+  it('puts what the request was beside what it became: the day, the year, the amount and the currency it keeps', () => {
+    expect(supplementChangeOf(before, after)).toEqual({
+      beforeExpectedSpendOn: '2026-11-01',
+      afterExpectedSpendOn: '2027-01-15',
+      beforeBudgetYear: 2026,
+      afterBudgetYear: 2027,
+      beforeAmountMinor: 1000n,
+      afterAmountMinor: 1200n,
+      currency: 'VND',
+    });
+  });
+
+  it.each([
+    ['is not priced again', { ...after, status: 'MISSING' as const }, before],
+    ['has no amount again', { ...after, amount: null }, before],
+    ['has no day again', { ...after, expectedSpendOn: null }, before],
+    ['has no year again', { ...after, budgetYear: null }, before],
+    ['had no amount', after, { ...before, amount: null }],
+    ['had no day', after, { ...before, expectedSpendOn: null }],
+    ['had no year', after, { ...before, budgetYear: null }],
+  ])('is not a change that can be recorded when the request %s', (_label, repriced, original) => {
+    expect(supplementChangeOf(original, repriced)).toBeNull();
+  });
+
+  it('detaches the line of the plan only when the year changed and the request was attached to a line or off the plan', () => {
+    expect(supplementDropsPlanLine(2027, 2026, { planLine: { position: 1 }, offPlan: false })).toBe(true);
+    expect(supplementDropsPlanLine(2027, 2026, { planLine: null, offPlan: true })).toBe(true);
+    expect(supplementDropsPlanLine(2027, 2026, { planLine: null, offPlan: false })).toBe(false);
+    expect(supplementDropsPlanLine(2026, 2026, { planLine: { position: 1 }, offPlan: true })).toBe(false);
+  });
+
+  it('says in the audit entry what the file was before and after, with the amounts as text, and who was left out', () => {
+    expect(
+      supplementAuditDetail(
+        'req-1',
+        {
+          number: 2,
+          beforeExpectedSpendOn: '2026-11-01',
+          afterExpectedSpendOn: '2027-01-15',
+          beforeBudgetYear: 2026,
+          afterBudgetYear: 2027,
+          beforeAmountMinor: 1000n,
+          afterAmountMinor: 1200n,
+        },
+        ['emp-3'],
+      ),
+    ).toEqual({
+      requestId: 'req-1',
+      number: 2,
+      before: '2026-11-01',
+      after: '2027-01-15',
+      beforeBudgetYear: 2026,
+      afterBudgetYear: 2027,
+      beforeAmountMinor: '1000',
+      afterAmountMinor: '1200',
+      droppedEmployeeIds: ['emp-3'],
+    });
   });
 });

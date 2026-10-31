@@ -2,7 +2,7 @@ import { EmployeeForbiddenError, EmployeeSelfChangeForbiddenError } from './empl
 
 /**
  * Who may enter and correct employee records, decided in the service so no route is the only thing between a caller and the data
- * (`F13`). The Super Admin enters and corrects them, on an HR basis, and never their own (`QĐ-87a`, `QĐ-87c`); the IT Admin, Finance,
+ *. The Super Admin enters and corrects them, on an HR basis, and never their own (`QĐ-87a`, `QĐ-87c`); the IT Admin, Finance,
  * a head and an employee do not (`US-02-02`). Pure: no store, no clock.
  */
 

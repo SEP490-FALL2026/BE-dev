@@ -1,4 +1,11 @@
-import { checkLineWithdrawal, hasGrantTask, holdsMoney, type LineWithdrawalFacts } from './group-withdrawal.policy';
+import {
+  checkLineWithdrawal,
+  hasGrantTask,
+  holdsMoney,
+  releasedByYear,
+  withdrawalAuditOf,
+  type LineWithdrawalFacts,
+} from './group-withdrawal.policy';
 
 const facts: LineWithdrawalFacts = {
   actorEmployeeId: 'sender',
@@ -66,5 +73,68 @@ describe('withdrawing one person of a request for a group (US-05-08, US-05-17 AC
       ['AWAITING_NEED', 'NEED_CONFIRMED', 'APPROVED', 'EXECUTING'].map((state) => holdsMoney(state as never)),
     ).toEqual([false, false, true, true]);
     expect(['APPROVED', 'EXECUTING'].map((state) => hasGrantTask(state as never))).toEqual([false, true]);
+  });
+});
+
+describe('what is given back and what is recorded when people of a group are withdrawn (US-05-08, US-06-14 AC-14)', () => {
+  it('adds up the shares of every person by year, in the order the years first appear, and nothing for nobody', () => {
+    expect(
+      releasedByYear([
+        [
+          { year: 2026, amountMinor: 100n },
+          { year: 2027, amountMinor: 50n },
+        ],
+        [{ year: 2026, amountMinor: 25n }],
+        [],
+      ]),
+    ).toEqual([
+      { year: 2026, amountMinor: 125n },
+      { year: 2027, amountMinor: 50n },
+    ]);
+    expect(releasedByYear([])).toEqual([]);
+  });
+
+  const request = { id: 'req-1', requesterEmployeeId: 'sender' };
+  const line = { employeeId: 'emp-2', state: 'APPROVED' as const };
+
+  it('records a line that ended as withdrawn, with whether its money went back and whether the sender did it', () => {
+    expect(
+      withdrawalAuditOf(
+        request,
+        line,
+        { kind: 'ENDED', released: true },
+        { actorEmployeeId: 'sender', reason: 'Không cần' },
+      ),
+    ).toEqual({
+      action: 'ACCESS_REQUEST.LINE_WITHDRAWN',
+      detail: {
+        requestId: 'req-1',
+        beneficiaryEmployeeId: 'emp-2',
+        from: 'APPROVED',
+        to: 'WITHDRAWN',
+        withdrawnByEmployeeId: 'sender',
+        reason: 'Không cần',
+        requesterEmployeeId: 'sender',
+        byRequester: true,
+        released: true,
+      },
+    });
+  });
+
+  it('records a line that waits for the IT Admin as requested, with the task, and no money given back', () => {
+    const recorded = withdrawalAuditOf(
+      request,
+      { employeeId: 'emp-2', state: 'EXECUTING' },
+      { kind: 'WAITING_FOR_IT', taskId: 'task-1' },
+      { actorEmployeeId: 'head', reason: null },
+    );
+
+    expect(recorded.action).toBe('ACCESS_REQUEST.LINE_WITHDRAWAL_REQUESTED');
+    expect(recorded.detail).toMatchObject({
+      to: 'AWAITING_IT_CLOSE',
+      byRequester: false,
+      released: false,
+      taskId: 'task-1',
+    });
   });
 });

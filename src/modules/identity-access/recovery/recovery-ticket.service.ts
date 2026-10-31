@@ -8,7 +8,7 @@ import { RecoveryRepo } from './recovery.repo';
 /**
  * What the forgotten-password flow needs from the recovery of the Super Admin role (US-01-09, US-01-10 AC-10): whether
  * an operator's credential reset is waiting for the account, and the completion of a ticket when its link is used. The
- * tickets stay private to recovery (A4-20); everything runs in the caller's transaction, under its AppUser lock.
+ * tickets stay private to recovery; everything runs in the caller's transaction, under its AppUser lock.
  */
 @Injectable()
 export class RecoveryTicketService {

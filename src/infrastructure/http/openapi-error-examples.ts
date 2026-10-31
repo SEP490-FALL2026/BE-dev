@@ -3,7 +3,7 @@ import { ApiException } from './errors/api.exception';
 
 /**
  * One error answer as the OpenAPI document shows it: the `code`, `message` and optional `details` of the error envelope.
- * Presentation only — the runtime never reads it (OPENAPI-EXAMPLE.1).
+ * Presentation only — the runtime never reads it.
  */
 export interface ErrorExample {
   readonly code: string;

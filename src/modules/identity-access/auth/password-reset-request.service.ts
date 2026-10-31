@@ -10,7 +10,7 @@ import { PasswordResetMailService } from './password-reset-mail.service';
 import { canReceiveResetMail } from './password-reset.policy';
 
 /**
- * Forgot a password (slice 1c): a reset link for an account that may use one, and the same answer for every email. It
+ * Forgot a password: a reset link for an account that may use one, and the same answer for every email. It
  * takes the AppUser row lock first and re-reads what it decides on (lock protocol rules 1 and 2).
  */
 @Injectable()

@@ -3,7 +3,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { personnelSystemAuditEvent } from '../mappers/personnel-audit-event.mapper';
+import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { NoticeRepo } from './notice.repo';
 
 /** How many notices one pass tells about; the next pass takes the rest. */
@@ -11,7 +11,7 @@ const BATCH = 200;
 
 /**
  * Tells, once for each notice, that its day has passed without the Super Admin handling it (`US-03-10` AC-2, `US-03-11` AC-5): the Super
- * Admin is told in the inbox in the same transaction (F17) and the audit event keeps the fact. It only tells. The notice is never recorded or rejected by the
+ * Admin is told in the inbox in the same transaction and the audit event keeps the fact. It only tells. The notice is never recorded or rejected by the
  * calendar and the person it is about is never changed. The mark and the event are written together, so a notice is told once however
  * many instances run the sweep.
  */

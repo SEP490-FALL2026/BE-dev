@@ -1,35 +1,12 @@
+import { CURRENT_POLICY_VERSION, type RequestPolicy } from '../access-request/access-request.policy';
 import type { AccessRequestState } from '../access-request/access-request.types';
-import type { Quote } from './quote-pricing.policy';
+import type { AssessmentFields } from '../access-request/assessment-record.types';
 
 /**
  * The rules of the assessment the IT Admin completes for software that is not in the catalog (`US-05-06`, `BM-02`), as
  * pure decisions: who may fill it and when, and when it is complete. Nothing here puts the software into the catalog or
  * decides the spend: the IT Admin gives the assessment and only the spending approver decides (`QĐ-22`, `SoD-5`).
  */
-
-export type Classification = 'INTERNAL' | 'PAID_LICENSED';
-export type ControlLevelCode = 'FULL' | 'PARTIAL' | 'UNCONTROLLABLE';
-export type SensitivityCode = 'LOW' | 'MEDIUM' | 'HIGH';
-export type OpinionStatusCode = 'OBTAINED' | 'NOT_AVAILABLE';
-
-/** The fields of the assessment as the IT Admin has filled them so far; anything not given is null. */
-export interface AssessmentFields {
-  classification: Classification | null;
-  vendorName: string | null;
-  plannedPlanName: string | null;
-  provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5' | null;
-  adminConsole: boolean | null;
-  memberExport: boolean | null;
-  sso: boolean | null;
-  termsSummary: string | null;
-  memberUsageMethod: string | null;
-  grantRevokeMethod: string | null;
-  dataSensitivity: SensitivityCode | null;
-  opinionStatus: OpinionStatusCode | null;
-  opinionNote: string | null;
-  controlLevel: ControlLevelCode | null;
-  quote: Quote | null;
-}
 
 /** The first thing that stops the assessment from being completed, or `OK`. */
 export type CompletionVerdict =
@@ -115,3 +92,52 @@ export const canLinkCatalogPlan = (facts: {
   state: AccessRequestState;
   planId: string | null;
 }): boolean => facts.branch === 'NEW_SOFTWARE' && facts.state === 'AWAITING_EXECUTION' && facts.planId === null;
+
+/** Whether the person works the assessment in the place of the one the step was given to: any step that is not their own. */
+export function actsForAssignee(step: { assigneeEmployeeId: string | null } | null, actorEmployeeId: string): boolean {
+  return step !== null && step.assigneeEmployeeId !== actorEmployeeId;
+}
+
+/**
+ * What registering internal software for a proposal rests on (`US-05-20` AC-3 -> AC-5, AC-8): only software the company built itself
+ * goes this way, whatever else it is stays in the third branch (`AC-8`), and how sensitive its data is must be said, by the body or by
+ * the assessment. Classification is judged first.
+ */
+export function internalRegistrationBasis(
+  assessment: Pick<AssessmentFields, 'classification' | 'dataSensitivity'>,
+  given: AssessmentFields['dataSensitivity'] | undefined,
+):
+  | { kind: 'NOT_INTERNAL' }
+  | { kind: 'DATA_SENSITIVITY_MISSING' }
+  | { kind: 'OK'; dataSensitivity: NonNullable<AssessmentFields['dataSensitivity']> } {
+  if (assessment.classification !== 'INTERNAL') return { kind: 'NOT_INTERNAL' };
+  const dataSensitivity = given ?? assessment.dataSensitivity;
+
+  return dataSensitivity === null ? { kind: 'DATA_SENSITIVITY_MISSING' } : { kind: 'OK', dataSensitivity };
+}
+
+/**
+ * The branch, the chain and the state the request takes once its software is registered: with a payment the chain stays as it was sent
+ * and the request waits to be submitted for spend; with none the spend step is dropped and the IT Admin grants it by hand (`AC-1`, `AC-10`).
+ */
+export function registeredShapeOf(
+  withSpend: boolean,
+  sent: RequestPolicy,
+): {
+  branch: 'NEW_SOFTWARE' | 'INTERNAL_FREE';
+  policy: RequestPolicy;
+  state: 'AWAITING_SPEND_SUBMISSION' | 'AWAITING_EXECUTION';
+} {
+  if (withSpend) return { branch: 'NEW_SOFTWARE', policy: sent, state: 'AWAITING_SPEND_SUBMISSION' };
+
+  return {
+    branch: 'INTERNAL_FREE',
+    policy: {
+      version: CURRENT_POLICY_VERSION,
+      branch: 'INTERNAL_FREE',
+      chain: ['NEED', 'IT_ASSESSMENT', 'IT_EXECUTION'],
+      slaWorkingDays: sent.slaWorkingDays,
+    },
+    state: 'AWAITING_EXECUTION',
+  };
+}

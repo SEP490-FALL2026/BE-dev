@@ -11,7 +11,7 @@ import { REFERENCE_VERSION } from './version.repo';
  * held and spent against it, and the purchase window of a plan line. It writes nothing and takes the transaction of the
  * caller so that a check and the decision it follows see the same data; the facade `budgets.service.ts` is how another
  * context reaches it. The budget of a year that has ended is the reference budget, the version that was current when the year
- * closed; a version that never became current is never read as a budget (F62, `QĐ-91c`).
+ * closed; a version that never became current is never read as a budget (`QĐ-91c`).
  */
 @Injectable()
 export class BudgetFactsRepo {
@@ -116,10 +116,13 @@ export class BudgetFactsRepo {
       select: { id: true, currency: true },
     });
     if (!current) return null;
-    const [rows, total] = await Promise.all([
-      db.budgetVersionLine.findMany({ where: { versionId: current.id }, orderBy: { position: 'asc' }, skip, take }),
-      db.budgetVersionLine.count({ where: { versionId: current.id } }),
-    ]);
+    const rows = await db.budgetVersionLine.findMany({
+      where: { versionId: current.id },
+      orderBy: { position: 'asc' },
+      skip,
+      take,
+    });
+    const total = await db.budgetVersionLine.count({ where: { versionId: current.id } });
 
     return {
       currency: current.currency,

@@ -10,6 +10,7 @@ import { EmployeeDirectoryService } from '../../../src/modules/organization/empl
 import { EmployeeDepartureRepo } from '../../../src/modules/organization/employee/employee-departure.repo';
 import { EmployeeRepo } from '../../../src/modules/organization/employee/employee.repo';
 import { ImportLookupRepo } from '../../../src/modules/organization/employee/import-lookup.repo';
+import { OrganizationContextService } from '../../../src/modules/organization/organization-context.service';
 import { OrganizationRepo } from '../../../src/modules/organization/organization.repo';
 import {
   EmployeeCodeTakenError,
@@ -23,7 +24,6 @@ import { OrganizationChangeService } from '../../../src/modules/organization/cha
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
 import {
   CostCenterUseContributions,
-  DepartmentServiceAccountReaderHook,
   DepartmentUseContributions,
   OrganizationChangeListeners,
 } from '../../../src/modules/organization/public/organization.extension-points';
@@ -53,8 +53,9 @@ describe('organization foundation (integration)', () => {
     prisma = new PrismaService(config);
     runner = new TransactionRunner(prisma, config);
     const departments = new DepartmentDirectoryService(new DepartmentRepo(prisma), new DepartmentHeadRepo(prisma));
+    const organizationRepo = new OrganizationRepo(prisma);
     organization = new OrganizationApi(
-      new OrganizationRepo(prisma),
+      organizationRepo,
       departments,
       new EmployeeDirectoryService(
         new EmployeeRepo(prisma),
@@ -63,9 +64,9 @@ describe('organization foundation (integration)', () => {
         departments,
       ),
       new CostCenterCatalogueService(new CostCenterRepo(prisma)),
-      new DepartmentServiceAccountReaderHook(),
       new DepartmentUseService(new DepartmentUseContributions(), new CostCenterUseContributions()),
       new OrganizationChangeService(new OrganizationChangeListeners(), new AnnouncementRepo(prisma), runner),
+      new OrganizationContextService(organizationRepo),
     );
     sql = new Client({ connectionString: database.url });
     await sql.connect();

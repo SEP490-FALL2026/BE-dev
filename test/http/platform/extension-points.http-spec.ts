@@ -8,8 +8,9 @@ import { createHttpContractApp } from '../../support/http-contract-app';
 
 /**
  * ADR-0019: every extension point of the API graph is a Nest provider, and a Hook that no module bound fails only when
- * it is first called. This file starts the real API graph once and proves, before any request, that every Hook can
- * answer — a missing `*.listener.ts` registration shows here instead of in production.
+ * it is first called. This file starts the real API graph once and proves, before any request, that every Hook is
+ * bound — a missing `*.listener.ts` registration shows here instead of in production. (The gate `extension-wiring` proves
+ * the same for every process graph without starting one.)
  */
 describe('extension points of the API graph (ADR-0019)', () => {
   let app: INestApplication<App>;
@@ -33,7 +34,7 @@ describe('extension points of the API graph (ADR-0019)', () => {
     const hooks = providers().filter((provider): provider is Hook<unknown> => provider instanceof Hook);
 
     expect(hooks.length).toBeGreaterThan(0);
-    expect(hooks.filter((hook) => !hook.canAnswer()).map((hook) => hook.name)).toEqual([]);
+    expect(hooks.filter((hook) => !hook.isBound()).map((hook) => hook.name)).toEqual([]);
   });
 
   it('gives every point a unique name', () => {

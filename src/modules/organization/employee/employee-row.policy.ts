@@ -6,7 +6,7 @@ import {
   placementReasons,
 } from '../public/employee-placement.policy';
 
-/** The shared placement reasons (BEH.1), then the two keys the form checks against the people already there. */
+/** The shared placement reasons, then the two keys the form checks against the people already there. */
 export type EmployeeRowReasonCode =
   | PlacementReasonCode
   | 'EMPLOYEE_CODE_TAKEN'
@@ -14,7 +14,7 @@ export type EmployeeRowReasonCode =
   /** The code or the email is the record of the person entering: nobody enters their own (`US-02-02` AC-18). */
   | 'OWN_RECORD';
 
-/** The form field a reason is about (the import names a file column instead: H8 D-1). */
+/** The form field a reason is about (the import names a file column instead). */
 export type EmployeeRowField = 'departmentCode' | 'jobTitle' | 'employeeCode' | 'workEmail';
 
 /** Where the form shows a placement reason. */
@@ -43,10 +43,10 @@ const isBlank = (value: string | null | undefined): boolean =>
   value === undefined || value === null || value.trim() === '';
 
 /**
- * Why a row of the manual form cannot become an employee (T-16). Whether the department can take someone in and the job title
- * is bounded (it is optional free text, `QĐ-87e`) is the placement policy the import preview shares (BEH.1); this adapter reads
+ * Why a row of the manual form cannot become an employee. Whether the department can take someone in and the job title
+ * is bounded (it is optional free text, `QĐ-87e`) is the placement policy the import preview shares; this adapter reads
  * blank fields the form's way, shows each reason on its form field, then adds the taken code and email — after the placement
- * reasons, and a taken code is a reason here, not an existing person to compare (H8 D-2, D-3). It lists every reason at once, in a
+ * reasons, and a taken code is a reason here, not an existing person to compare. It lists every reason at once, in a
  * fixed order, so one attempt shows everything to fix. It decides from what the caller looked up and nothing else.
  */
 export function validateEmployeeRow(

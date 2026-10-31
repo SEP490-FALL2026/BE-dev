@@ -29,7 +29,7 @@ import {
   SeatSubscriptionDraftError,
   SeatTargetNotFoundError,
 } from '../public/licensing.errors';
-import { toLicensingApiException } from '../mappers/licensing.http-errors';
+import { toLicensingApiException } from '../licensing.http-errors';
 import { ProvisioningItAdminRequiredError } from './provisioning.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>

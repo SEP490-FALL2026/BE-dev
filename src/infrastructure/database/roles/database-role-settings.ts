@@ -1,5 +1,5 @@
 /**
- * The settings of `ops:db-roles` (H7), read from the environment as one set. Every message names a variable and a rule,
+ * The settings of `ops:db-roles`, read from the environment as one set. Every message names a variable and a rule,
  * never a value: no password and no URL is ever echoed.
  */
 

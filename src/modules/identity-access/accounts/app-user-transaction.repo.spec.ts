@@ -2,7 +2,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AppUserRepo } from './app-user.repo';
 
-/** P23-RV-02: the usable IT Admin read runs on the transaction it is given, never on the repository's own client. */
+/** The usable IT Admin read runs on the transaction it is given, never on the repository's own client. */
 describe('AppUserRepo.findUsableItAdminEmployeeIds on the caller transaction', () => {
   it('queries through the transaction', async () => {
     const prisma = { appUser: { findMany: jest.fn() } };

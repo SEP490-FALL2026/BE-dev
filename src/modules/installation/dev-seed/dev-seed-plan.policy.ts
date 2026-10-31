@@ -5,7 +5,7 @@ import type { EmployeeImportLookupData, LocalSeedFixtureFacts } from '../../orga
 import { DEMO_COST_CENTER, DEMO_DEPARTMENT, DEMO_HIRE_DATE, DEMO_PEOPLE } from './dev-seed-fixture.types';
 import { PlannedItem, SeedConflict, SeedPlan } from '../public/dev-seed.types';
 
-/** The display name each fixture item is stored and compared with (T-12): accents composed, whitespace collapsed. */
+/** The display name each fixture item is stored and compared with: accents composed, whitespace collapsed. */
 const COST_CENTER_NAME = normalizeDisplayName(DEMO_COST_CENTER.name);
 const DEPARTMENT_NAME = normalizeDisplayName(DEMO_DEPARTMENT.name);
 
@@ -52,7 +52,7 @@ function departmentConflict(department: NonNullable<LocalSeedFixtureFacts['depar
 }
 
 /**
- * The plan of a seed run, from what exists (P23-RV-01). Each fixture item is compared by its stable key on every field
+ * The plan of a seed run, from what exists. Each fixture item is compared by its stable key on every field
  * the fixture fixes: matching exactly is present, missing is created (the Cost Center for the department that exists
  * already), and any difference is a specific conflict, never repaired. Items are in write order: the department, then
  * its Cost Center (`QĐ-87d(1)`).

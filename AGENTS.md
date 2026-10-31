@@ -17,17 +17,17 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 
 ## Read only what the task needs
 
-| Task                                         | Reference                                                                                                        |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Add an endpoint                              | [Development guide](docs/guides/kien-truc-backend-va-cach-viet-code.md), [API rules](docs/rules/api-contract.md) |
-| Add/move a file, capability folder or error  | [Module structure rules](docs/rules/module-structure.md)                                                         |
-| Model, query, transaction, business behavior | [Database rules](docs/rules/database-business.md)                                                                |
-| Authentication, files, jobs                  | [Security rules](docs/rules/security-jobs.md)                                                                    |
-| Add or change a script                       | [Script guide](scripts/README.md)                                                                                |
-| Add or update tests                          | [Test guide](test/README.md)                                                                                     |
-| Documentation or ADR                         | [Documentation rules](docs/rules/documentation.md)                                                               |
-| Split assigned work into items (spec/plan)   | [Work-item sizing](docs/rules/work-item-sizing.md)                                                               |
-| Add or change an out-of-HTTP command or seed | [Operational commands](docs/rules/operational-commands.md)                                                       |
+| Task                                         | Reference                                                                                      |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Add an endpoint                              | [Hướng dẫn dev mới](docs/guides/huong-dan-dev-moi.md), [API rules](docs/rules/api-contract.md) |
+| Add/move a file, capability folder or error  | [Module structure rules](docs/rules/module-structure.md)                                       |
+| Model, query, transaction, business behavior | [Database rules](docs/rules/database-business.md)                                              |
+| Authentication, files, jobs                  | [Security rules](docs/rules/security-jobs.md)                                                  |
+| Add or change a script                       | [Script guide](scripts/README.md)                                                              |
+| Add or update tests                          | [Test guide](test/README.md)                                                                   |
+| Documentation or ADR                         | [Documentation rules](docs/rules/documentation.md)                                             |
+| Split assigned work into items (spec/plan)   | [Work-item sizing](docs/rules/work-item-sizing.md)                                             |
+| Add or change an out-of-HTTP command or seed | [Operational commands](docs/rules/operational-commands.md)                                     |
 
 ## Repository constraints
 

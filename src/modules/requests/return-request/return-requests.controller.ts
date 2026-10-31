@@ -19,6 +19,7 @@ import {
 } from './return-request.dto';
 import { RETURN_ERROR_EXAMPLES, toReturnApiException } from './return-request.http-errors';
 import { ReturnRequestQueryService } from './return-request-query.service';
+import { ReturnHandoverService } from './return-handover.service';
 import { ReturnRequestService } from './return-request.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -43,6 +44,7 @@ const INVALID_ID = {
 export class ReturnRequestsController {
   constructor(
     private readonly returns: ReturnRequestService,
+    private readonly handovers: ReturnHandoverService,
     private readonly queries: ReturnRequestQueryService,
   ) {}
 
@@ -168,7 +170,7 @@ export class ReturnRequestsController {
   )
   async confirmHandover(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ReturnIdParamDto) {
     try {
-      const record = await this.returns.confirmHandover(actor, params.id);
+      const record = await this.handovers.confirmHandover(actor, params.id);
 
       return { returnRequest: await this.queries.detail(record) };
     } catch (error) {

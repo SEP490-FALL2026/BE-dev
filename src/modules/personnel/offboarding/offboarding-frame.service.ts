@@ -7,7 +7,7 @@ import { OrganizationHistoryApi } from '../../organization/public/organization-h
 import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
-import { technicalStepRefusal } from '../policies/personnel-self-action.policy';
+import { technicalStepRefusal } from '../personnel-self-action.policy';
 import type { PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { OffboardingRefusedError } from './offboarding.errors';
@@ -33,7 +33,7 @@ interface FrameOptions {
  * works in the one transaction. The database has the last word on the periods put back: a change someone made between the record and
  * now answers `CONCURRENT_CHANGE`, and nothing is saved. Two kinds of command: an event of the person (moving the last day,
  * cancelling, becoming `LEFT`), which only the Super Admin writes and never about themselves, and a technical step that follows it (the
- * lock of the account, the revocations, the closing), which is the IT Admin's (F13, F40).
+ * lock of the account, the revocations, the closing), which is the IT Admin's.
  */
 @Injectable()
 export class OffboardingFrame {

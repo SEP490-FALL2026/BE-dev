@@ -79,11 +79,11 @@ khởi động. Kiểm được bằng truy vấn catalog và thao tác bị t�
 
 ## Ma trận vai
 
-| Vai                              | Biến                                                | Thuộc tính                                                                              | Sở hữu / quyền                                                                                                                                                                                             |
-| -------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bootstrap (cluster admin)        | `POSTGRES_USER`/`POSTGRES_PASSWORD` (đã có)         | superuser do image tạo                                                                  | chỉ dùng cho `ops:db-roles provision`, khôi phục bản sao lưu, sửa vai                                                                                                                                      |
-| Deploy (`slm_deploy` mặc định)   | `DATABASE_DEPLOY_USER`/`DATABASE_DEPLOY_PASSWORD`   | `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, không membership | owner database ứng dụng (⟹ owner schema `public` qua `pg_database_owner`) và mọi bảng/hàm/kiểu trong `public`; tạo extension trusted (`btree_gist`)                                                        |
-| Runtime (`slm_runtime` mặc định) | `DATABASE_RUNTIME_USER`/`DATABASE_RUNTIME_PASSWORD` | như deploy, không membership, không role setting                                        | `CONNECT` database; `USAGE` schema `public`; `SELECT, INSERT, UPDATE, DELETE` mọi bảng `public` trừ: `_prisma_migrations` (không gì), `audit_events` (`SELECT, INSERT`); `USAGE` sequence; không sở hữu gì |
+| Vai                              | Biến                                                | Thuộc tính                                                                              | Sở hữu / quyền                                                                                                                                                                                                                                                                        |
+| -------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bootstrap (cluster admin)        | `POSTGRES_USER`/`POSTGRES_PASSWORD` (đã có)         | superuser do image tạo                                                                  | chỉ dùng cho `ops:db-roles provision`, khôi phục bản sao lưu, sửa vai                                                                                                                                                                                                                 |
+| Deploy (`slm_deploy` mặc định)   | `DATABASE_DEPLOY_USER`/`DATABASE_DEPLOY_PASSWORD`   | `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, không membership | owner database ứng dụng (⟹ owner schema `public` qua `pg_database_owner`) và mọi bảng/hàm/kiểu trong `public`; tạo extension trusted (`btree_gist`)                                                                                                                                   |
+| Runtime (`slm_runtime` mặc định) | `DATABASE_RUNTIME_USER`/`DATABASE_RUNTIME_PASSWORD` | như deploy, không membership, không role setting                                        | `CONNECT` database; `USAGE` schema `public`; `SELECT, INSERT, UPDATE, DELETE` mọi bảng `public` trừ: `_prisma_migrations` (không gì), `audit_events` (`SELECT, INSERT`); `USAGE` sequence, trừ `personnel_notice_seq` và `saas_issue_seq` (`SELECT, UPDATE`, H7-SEQ); không sở hữu gì |
 
 PUBLIC mất `CONNECT`/`TEMPORARY` trên database ứng dụng và `USAGE` trên schema `public`; quyền `EXECUTE` mặc định của hàm giữ
 nguyên (trigger và `pg_advisory_xact_lock`, `set_config` cần nó). Default privileges `FOR ROLE <deploy> IN SCHEMA public` cấp DML
@@ -143,7 +143,8 @@ migration) và từ wiring hiện tại (`docker-compose.prod.yml`, `deploy.yml`
 
 Kiểm tra (dùng chung cho cả ba lệnh, hàm thuần trên facts đọc từ catalog): thuộc tính và membership của hai vai; deploy là owner
 database; không đối tượng `public` nào thuộc vai khác; quyền **hiệu lực** của runtime trên từng bảng đúng bằng tập mong đợi
-(`has_table_privilege`, gồm cả PUBLIC); sequence chỉ `USAGE`; schema `USAGE` không `CREATE`; database `CONNECT` không
+(`has_table_privilege`, gồm cả PUBLIC); sequence chỉ `USAGE`, trừ hai sequence của H7-SEQ giữ đúng `SELECT, UPDATE`
+(`RUNTIME_SEQUENCE_EXCEPTIONS`); schema `USAGE` không `CREATE`; database `CONNECT` không
 `CREATE`/`TEMPORARY`; default privileges của deploy role đủ; không hàm `SECURITY DEFINER` trong `public`.
 
 ### Kiểm tra danh tính khi API/worker khởi động
@@ -359,6 +360,13 @@ ONLY`; chỉ đọc danh tính (che bằng hash), phiên bản, trạng thái re
 - [ ] Không đổi route/OpenAPI/nghiệp vụ (bằng chứng hash).
 
 ## Changes and acceptance
+
+Prompt 09 (30/10/2026, readability + H7 closure, Task 8.1): `H7-SEQ` — sự cố trên VPS `POST /saas-issues` → SQLSTATE `42501`
+"permission denied for sequence saas_issue_seq". Nguyên nhân: `reconcile` thu mọi quyền sequence rồi chỉ cấp `USAGE`, `verify`
+đòi đúng `USAGE`, còn `NoticeRepo.nextCode` (BM-09) và `SaasIssueRepo.nextCode` (BM-11) đọc trạng thái sequence cũ (`SELECT`) và
+`setval` (`UPDATE`). Sửa: một chính sách `RUNTIME_SEQUENCE_EXCEPTIONS` (`personnel_notice_seq`, `saas_issue_seq` = `SELECT, UPDATE`)
+cho cả cấp quyền lẫn `verify`; sequence khác và default privileges vẫn chỉ `USAGE`; không `SECURITY DEFINER`, không bỏ `setval`.
+Ma trận vai và verifier ở trên đã cập nhật; mô hình vai còn lại, harness và migration giữ nguyên.
 
 Prompt 02 (26/10/2026, sau Owner commit H7 `471de5e` và merge G5/G6 `0da8f56`): `H7-TEST-RV-08` — harness đợi hết tiến trình
 của lượt bằng pipe fd 3 trước khi xóa thư mục tạm (xem _Prompt 02_ ở trên và plan). Chỉ

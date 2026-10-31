@@ -13,7 +13,7 @@ import {
   AppUserStatus,
   RoleGrantRecord,
 } from '../../public/identity-access.types';
-import { employeeHasNotLeft } from '../../policies/account.policy';
+import { employeeHasNotLeft } from '../account.policy';
 import { AccountDirectoryService } from '../account-directory.service';
 import { AccountNotFoundError } from '../account.errors';
 import { ActionLinkService } from '../action-link.service';
@@ -52,7 +52,7 @@ export interface AccountPage {
 /** The candidate list shows at most this many people (spec 1b). */
 const CANDIDATE_LIMIT = 20;
 
-/** Reads for account administration (slice 1b): candidates, the account list and one account. */
+/** Reads for account administration: candidates, the account list and one account. */
 /** How many grants of one account the detail shows, the newest; older ones are reported by `roleHistoryHasMore`. */
 export const ROLE_HISTORY_LIMIT = 50;
 
@@ -71,7 +71,7 @@ export class AccountQueryService {
     const organization = await this.organization.getOrganization();
     const today = toDateColumn(businessDateAt(new Date(), organization?.timeZone ?? 'UTC'));
     // Every employee who already has an account, handed to the organization module so it can leave
-    // them out in the same query that searches, sorts and limits: no window, no page cap (R-03).
+    // them out in the same query that searches, sorts and limits: no window, no page cap.
     const withAccount = await this.accounts.findEmployeeIdsWithAccount();
 
     return this.organization.searchActiveEmployees(search, today, CANDIDATE_LIMIT, withAccount);

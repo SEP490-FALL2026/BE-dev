@@ -7,11 +7,11 @@ import { AuditApi } from '../../../src/modules/audit/public/audit.api';
 import {
   PASSWORD_HASH_POLICY_VERSION,
   PasswordHasher,
-} from '../../../src/modules/identity-access/accounts/password-hasher.service';
+} from '../../../src/modules/identity-access/credentials/password-hasher.service';
 import { AlreadyInstalledError } from '../../../src/modules/installation/public/installation.errors';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import { MailTransport } from '../../../src/infrastructure/mail/mail-transport';
-import { PayloadCipher } from '../../../src/modules/notifications/payload-cipher.service';
+import { PayloadCipher } from '../../../src/modules/notifications/email/payload-cipher.service';
 import {
   DisposableDatabase,
   dropDisposableDatabase,

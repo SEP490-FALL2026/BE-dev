@@ -14,7 +14,7 @@ import { RecoveryContext, RecoveryResult } from '../public/recovery.types';
 /**
  * The successor's side of a role transfer (AC-12): first an account with no role and an invitation, then the wait until
  * they have activated it. Activating never grants the role; only the next run of the same ticket moves it. Every invitation goes to
- * the login email of the successor's account, never to the work email on the record as it is now (`P28-05`, `F18`): the work email
+ * the login email of the successor's account, never to the work email on the record as it is now: the work email
  * can change while an invitation is on its way, the account's login email does not, so a link is never sent to an address the
  * account does not have.
  */
@@ -110,7 +110,7 @@ export class SuccessorEnrolment {
         return { ticketRef: context.ticketRef, mode: 'TRANSFER_ROLE', outcome: 'INVITATION_ALREADY_SENT' };
       }
       await this.revocation.revokeUsable(tx, successorAccountId, 'SUPERSEDED', now);
-      // The login email of the account, whatever the work email on the record says now (`P28-05`): never the other, never empty.
+      // The login email of the account, whatever the work email on the record says now: never the other, never empty.
       const account = await this.accounts.findAccountById(successorAccountId);
       await this.links.sendInvitation(
         tx,

@@ -28,7 +28,7 @@ export class NonWorkingDatesService {
     private readonly runner: TransactionRunner,
   ) {}
 
-  /** One page of the days nobody works by date, optionally between two dates (`LD-15`). */
+  /** One page of the days nobody works by date, optionally between two dates. */
   async list(query: {
     from?: BusinessDate;
     to?: BusinessDate;

@@ -7,7 +7,7 @@ import { SubscriptionOwnerAssignmentRepo } from '../subscription-owner-assignmen
 import type { AssignmentCommand, AssignmentResult } from './subscription-owner-assignment.types';
 
 /**
- * Gives ONE existing subscription its owner department on a stated basis (F02, `P03-D03`, spec L.3), in one transaction:
+ * Gives ONE existing subscription its owner department on a stated basis, in one transaction:
  * the subscription is locked, the department is the active one the operator named by its code, the row of the basis is
  * written and the Audit Trail event commits with it. Nothing is inferred and nothing is written when anything is refused.
  * There is no principal: the command is the operator's, and the Audit Trail says so (`OPERATOR`).

@@ -3,6 +3,7 @@ import {
   checkReviewOutcome,
   checkReviewer,
   checkWaitingOutcome,
+  reviewCompletedDetail,
   type ReviewFacts,
 } from './finance-review.policy';
 
@@ -94,5 +95,61 @@ describe('who may end the review of a request (QĐ-82l(8), SoD-8, F32)', () => {
     expect(checkReviewer({ ...base, requesterEmployeeId: 'finance', spendDeciderEmployeeId: 'finance' })).toBe(
       'OWN_REQUEST',
     );
+  });
+});
+
+describe('what the audit says when Finance ends a review (US-06-13, J.3)', () => {
+  const request = { id: 'req-1', costCenterId: 'cc-1' };
+  const check = {
+    id: 'check-1',
+    years: [year(null, 2026), year('INSUFFICIENT_BUDGET', 2028), year('NO_ACTIVE_BUDGET', 2027)],
+  };
+
+  it('says what the check was and how the review ended, and nothing of the opinion', () => {
+    expect(reviewCompletedDetail(request, check, { outcome: 'ASSESSED', opinion: 'Đủ ngân sách' }, false)).toEqual({
+      requestId: 'req-1',
+      checkId: 'check-1',
+      outcome: 'ASSESSED',
+    });
+  });
+
+  it('gives the head the reason in Finance own words when the request comes back, and the direction when there is one', () => {
+    expect(
+      reviewCompletedDetail(
+        request,
+        check,
+        { outcome: 'RETURN_TO_HEAD', reason: 'Thiếu báo giá', direction: 'REPRICE' },
+        false,
+      ),
+    ).toEqual({
+      requestId: 'req-1',
+      checkId: 'check-1',
+      outcome: 'RETURNED_TO_HEAD',
+      direction: 'REPRICE',
+      reason: 'Thiếu báo giá',
+    });
+    expect(reviewCompletedDetail(request, check, { outcome: 'RETURN_TO_HEAD' }, false)).not.toHaveProperty('reason');
+  });
+
+  it('names the Cost Center and the first year that lacks a budget when one is asked for, never a figure', () => {
+    expect(reviewCompletedDetail(request, check, { outcome: 'NEEDS_BUDGET' }, false)).toEqual({
+      requestId: 'req-1',
+      checkId: 'check-1',
+      outcome: 'BUDGET_REVISION_NEEDED',
+      costCenterId: 'cc-1',
+      year: 2027,
+    });
+    expect(
+      reviewCompletedDetail(request, { id: 'check-1', years: [year(null)] }, { outcome: 'NEEDS_BUDGET' }, false),
+    ).toMatchObject({
+      costCenterId: 'cc-1',
+    });
+    expect(
+      reviewCompletedDetail(request, { id: 'check-1', years: [year(null)] }, { outcome: 'NEEDS_BUDGET' }, false),
+    ).not.toHaveProperty('year');
+  });
+
+  it('says it was made while the request waited for a version of the budget', () => {
+    expect(reviewCompletedDetail(request, check, { outcome: 'ASSESSED' }, true)).toMatchObject({ whileWaiting: true });
   });
 });

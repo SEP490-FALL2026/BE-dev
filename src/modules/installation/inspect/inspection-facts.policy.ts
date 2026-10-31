@@ -71,7 +71,7 @@ export const NO_ANNOUNCEMENT_GAPS: ChangeAnnouncementGaps = {
   HEAD_PERIOD_END: 0,
 };
 
-/** The changes that took effect and are marked by no announcement, all kinds together (F47). */
+/** The changes that took effect and are marked by no announcement, all kinds together. */
 export function announcementGapTotal(gaps: ChangeAnnouncementGaps): number {
   return gaps.PLACEMENT_START + gaps.HEAD_PERIOD_START + gaps.HEAD_PERIOD_END;
 }

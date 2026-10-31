@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
 import { hrBasisSchema } from '../../../infrastructure/http/dto/hr-basis.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { businessDateSchema } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** An address the one email rule cannot reduce (for example a name that is only a "+tag") can never be matched, so it is refused here. */
 function canBeNormalized(email: string): boolean {
@@ -18,6 +18,10 @@ function canBeNormalized(email: string): boolean {
 }
 
 const employmentType = z.enum(['STAFF', 'CONTRACTOR', 'FREELANCER', 'INTERN']);
+
+const WORK_EMAIL_DESCRIPTION =
+  'An email address; surrounding whitespace is trimmed before it is checked. The part before any +tag must not be empty: ' +
+  'an address that cannot be normalized for matching is refused.';
 
 /**
  * The department and the job title are only bounded here, and may be missing: a missing or unknown department, a too long title
@@ -34,9 +38,10 @@ export const createEmployeeBodySchema = z.strictObject({
     .max(254)
     .pipe(z.email())
     .refine(canBeNormalized, { message: 'workEmail cannot be normalized.' })
+    .meta({ format: 'email', description: WORK_EMAIL_DESCRIPTION })
     .nullish(),
   employmentType,
-  hireDate: z.string().refine(isBusinessDate, { message: 'hireDate must be a real date as YYYY-MM-DD.' }),
+  hireDate: businessDateSchema('hireDate must be a real date as YYYY-MM-DD.'),
   departmentCode: z.string().max(50).nullish(),
   jobTitle: z.string().max(1000).nullish(),
   /** The HR document the record is entered on (`US-02-02` AC-16): required. */
@@ -55,10 +60,11 @@ export const updateEmployeeBodySchema = z.strictObject({
     .max(254)
     .pipe(z.email())
     .refine(canBeNormalized, { message: 'workEmail cannot be normalized.' })
+    .meta({ format: 'email', description: WORK_EMAIL_DESCRIPTION })
     .nullable()
     .optional(),
   employmentType: employmentType.optional(),
-  hireDate: z.string().refine(isBusinessDate, { message: 'hireDate must be a real date as YYYY-MM-DD.' }).optional(),
+  hireDate: businessDateSchema('hireDate must be a real date as YYYY-MM-DD.').optional(),
   jobTitle: z.string().max(1000).nullable().optional(),
   hrBasis: hrBasisSchema,
 });

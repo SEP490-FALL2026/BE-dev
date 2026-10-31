@@ -4,7 +4,7 @@ import { BusinessDate, fromDateColumn, toDateColumn } from '../../../core/busine
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { Grounds } from '../policies/grounds.policy';
+import type { Grounds } from '../personnel-grounds.policy';
 import type {
   HeadHandoverFacts,
   TransferChangeRecord,
@@ -93,7 +93,7 @@ export class TransferRepo {
         employeeId: input.employeeId,
         fromDepartmentId: input.fromDepartmentId,
         toDepartmentId: input.toDepartmentId,
-        // The titles are not named: the database gives the row the catalogue entry the person has (spec L.10).
+        // The titles are not named: the database gives the row the catalogue entry the person has.
         effectiveOn: toDateColumn(input.effectiveOn),
         closesPlacementId: input.closesPlacementId,
         opensPlacementId: input.opensPlacementId,

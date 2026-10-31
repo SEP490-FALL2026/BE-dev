@@ -3,9 +3,9 @@ import { InvalidEmailError, normalizeEmail } from '../../../core/email';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { AccountDirectoryService } from '../accounts/account-directory.service';
-import { CredentialService } from '../accounts/credential.service';
+import { CredentialService } from '../credentials/credential.service';
 import { AccountSnapshot, IssuedSession } from '../public/identity-access.types';
-import { employeeHasNotLeft } from '../policies/account.policy';
+import { employeeHasNotLeft } from '../accounts/account.policy';
 import { InvalidCredentialsError } from './auth.errors';
 import { LoginThrottle } from './login-throttle.service';
 import { SessionTokenService } from './session-token.service';
@@ -58,7 +58,7 @@ export class LoginService {
 
     if (!usable) {
       // Only a wrong attempt is a failure. An attempt still being checked, or one that succeeds, is
-      // not counted (R-06): the counter is raised here, after the check, in one atomic statement so
+      // not counted: the counter is raised here, after the check, in one atomic statement so
       // simultaneous wrong guesses are all counted.
       await this.throttle.recordFailure(organization.id, keyHash);
       throw new InvalidCredentialsError();

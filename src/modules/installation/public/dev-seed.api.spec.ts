@@ -16,7 +16,7 @@ type Fixture = Awaited<ReturnType<OrganizationApi['readLocalSeedFixture']>>;
 /** The fixture facts as the seed reads them: the two items. The activation of the compatibility release is not read any more. */
 const fixtureOf = (parts: Pick<Fixture, 'costCenter' | 'department'>): Fixture => parts as Fixture;
 const noFixture = fixtureOf({ costCenter: null, department: null });
-/** The organization fixture items exactly as the seed writes them (P23-RV-01): the department and its Cost Center. */
+/** The organization fixture items exactly as the seed writes them: the department and its Cost Center. */
 const exactFixture = fixtureOf({
   costCenter: {
     id: 'cc-1',

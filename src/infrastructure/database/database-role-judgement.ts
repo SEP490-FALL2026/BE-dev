@@ -1,5 +1,5 @@
 /**
- * The role matrix of H7 as pure rules over facts read from the PostgreSQL catalog (spec
+ * The role matrix of the separated runtime and deploy roles as pure rules over facts read from the PostgreSQL catalog (spec
  * `docs/workspace/items/h7-postgresql-runtime-role-separation`). `ops:db-roles` judges the deploy/runtime pair; the API
  * and the worker judge their own login at start-up. No I/O here, so every rule has a unit test of its own.
  */
@@ -19,11 +19,44 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   // The same for the two records of QĐ-87d(1): the basis of a link made by procedure, and the one activation row.
   cost_center_department_links: ['INSERT', 'SELECT'],
   cost_center_direction_activations: ['INSERT', 'SELECT'],
-  // The approval ticket of an event about the Super Admin (spec L.2) and the history of the edits of a budget version (F66) are
+  // The approval ticket of an event about the Super Admin and the history of the edits of a budget version are
   // added to and never changed or deleted (their triggers refuse it first).
   super_admin_event_tickets: ['INSERT', 'SELECT'],
   budget_version_history: ['INSERT', 'SELECT'],
 };
+
+/** Sequence privileges the runtime role holds on every sequence of `public`: drawing numbers (`nextval`) and `currval`. */
+export const RUNTIME_SEQUENCE_DEFAULT: readonly string[] = ['USAGE'];
+
+/**
+ * The two sequences the runtime role holds more on than {@link RUNTIME_SEQUENCE_DEFAULT} — the one policy that the
+ * grant (`ops:db-roles` provision/reconcile) and this judgement both read, so they cannot drift apart again.
+ *
+ * `NoticeRepo.nextCode` (BM-09, `personnel_notice_seq`) and `SaasIssueRepo.nextCode` (BM-11, `saas_issue_seq`) number a code from a
+ * per-year counter and keep the legacy sequence at or above the number issued, so that the compatibility image that still draws
+ * from it never repeats one. Each statement of that sync needs one privilege, no more:
+ *
+ * - SELECT: `… WHERE (SELECT CASE WHEN is_called THEN last_value ELSE last_value - 1 END FROM <sequence>) < n` reads the sequence
+ *   as a relation, on every numbering. The manual says only that SELECT "for sequences … also allows use of the currval
+ *   function" (ddl-priv); that a plain read needs it is what PostgreSQL 17 does (42501 without it), pinned by
+ *   `database-runtime-sequences.integration-spec.ts`.
+ * - UPDATE: `SELECT setval('<sequence>', n, true)` when the sequence is behind the counter ("setval requires UPDATE privilege on
+ *   the sequence", functions-sequence); UPDATE also allows `nextval`.
+ *
+ * USAGE is not listed: UPDATE already allows `nextval` and SELECT allows `currval`, so the image that draws from the sequence
+ * works without it. Nothing else is granted: not on the other sequences, not in the default privileges of future ones.
+ */
+export const RUNTIME_SEQUENCE_EXCEPTIONS: Readonly<Record<string, readonly string[]>> = {
+  personnel_notice_seq: ['SELECT', 'UPDATE'],
+  saas_issue_seq: ['SELECT', 'UPDATE'],
+};
+
+/** The exact privileges the runtime role must hold on the sequence `name` of `public`. */
+export function runtimeSequencePrivileges(name: string): readonly string[] {
+  return Object.hasOwn(RUNTIME_SEQUENCE_EXCEPTIONS, name)
+    ? RUNTIME_SEQUENCE_EXCEPTIONS[name]
+    : RUNTIME_SEQUENCE_DEFAULT;
+}
 
 export interface RoleFacts {
   name: string;
@@ -51,6 +84,7 @@ export interface SeparationFacts {
   foreignOwnedObjects: string[];
   /** Effective privileges of the runtime role (PUBLIC included) on every table, view and foreign table of `public`. */
   tables: { name: string; privileges: string[] }[];
+  /** Effective privileges of the runtime role (PUBLIC included) on every sequence of `public` that exists in this database. */
   sequences: { name: string; privileges: string[] }[];
   schemaPrivileges: string[];
   databasePrivileges: string[];
@@ -114,13 +148,25 @@ export function judgeSeparation(facts: SeparationFacts): RoleFinding[] {
     );
   }
   for (const sequence of facts.sequences) {
-    findings.push(...exact('RUNTIME_SEQUENCE_PRIVILEGES', sequence.name, sequence.privileges, ['USAGE']));
+    findings.push(
+      ...exact(
+        'RUNTIME_SEQUENCE_PRIVILEGES',
+        sequence.name,
+        sequence.privileges,
+        runtimeSequencePrivileges(sequence.name),
+      ),
+    );
   }
   findings.push(...exact('RUNTIME_SCHEMA_PRIVILEGES', 'public', facts.schemaPrivileges, ['USAGE']));
   findings.push(...exact('RUNTIME_DATABASE_PRIVILEGES', 'database', facts.databasePrivileges, ['CONNECT']));
   findings.push(...exact('DEFAULT_PRIVILEGES_TABLES', 'future tables', facts.defaultPrivileges.tables, RUNTIME_DML));
   findings.push(
-    ...exact('DEFAULT_PRIVILEGES_SEQUENCES', 'future sequences', facts.defaultPrivileges.sequences, ['USAGE']),
+    ...exact(
+      'DEFAULT_PRIVILEGES_SEQUENCES',
+      'future sequences',
+      facts.defaultPrivileges.sequences,
+      RUNTIME_SEQUENCE_DEFAULT,
+    ),
   );
   findings.push(...facts.securityDefinerRoutines.map((subject) => ({ code: 'SECURITY_DEFINER_ROUTINE', subject })));
 

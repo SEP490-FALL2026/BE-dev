@@ -1,34 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { AssignmentEndService } from '../assignment/assignment-end.service';
 import { SeatTargetNotFoundError } from '../public/licensing.errors';
-import type {
-  OpenedRevocation,
-  OpenRevocationInput,
-  RevocationReasonFacts,
-  RevocationSource,
-} from '../public/licensing.types';
-import { licensingAuditEvent } from '../mappers/licensing-audit-event.mapper';
-import { maxAttempts as maxAttemptsFor } from './failure.policy';
-import { RevocationListeners } from '../public/licensing.extension-points';
+import type { OpenedRevocation, OpenRevocationInput } from '../public/licensing.types';
 import { assertRevocable, assertRevocationSource, isOpenAssignment } from './revocation.policy';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
-import { toRevocationFacts, type ProvisioningTaskRecord } from './provisioning-task.types';
-import { ProvisioningTaskReasonRepo, type ReasonRecord } from './provisioning-task-reason.repo';
+import { ProvisioningTaskReasonRepo } from './provisioning-task-reason.repo';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
-
-const factsOf = (reason: ReasonRecord): RevocationReasonFacts => ({
-  source: reason.source,
-  decidedByEmployeeId: reason.decidedByEmployeeId,
-  decidedRole: reason.decidedRole,
-  referenceKind: reason.referenceKind,
-  referenceId: reason.referenceId,
-});
+import { RevocationRecorder } from './revocation-recorder.service';
+import { RevocationTaskFactory } from './revocation-task-factory.service';
 
 /**
  * The one gate that opens the revocation of a seat (`US-07-05` AC-3, AC-11, AC-12): every source (a return, a departure, a
@@ -46,10 +29,9 @@ export class RevocationService {
     private readonly ending: AssignmentEndService,
     private readonly catalog: CatalogApi,
     private readonly organization: OrganizationApi,
-    private readonly parameters: OperatingParametersApi,
-    private readonly audit: AuditApi,
     private readonly frame: ProvisioningTaskFrame,
-    private readonly revocation: RevocationListeners,
+    private readonly factory: RevocationTaskFactory,
+    private readonly recorder: RevocationRecorder,
   ) {}
 
   /**
@@ -80,71 +62,20 @@ export class RevocationService {
     const organization = await this.organization.getOrganization(tx);
     if (!organization) throw new Error('A revocation was opened before installation');
 
-    const task = live ?? (await this.create(tx, actor, { organizationId: organization.id, assignment, source, now }));
-    const reason = await this.reasons.insert(tx, {
-      taskId: task.id,
+    const task =
+      live ?? (await this.factory.create(tx, actor, { organizationId: organization.id, assignment, source, now }));
+    await this.recorder.record(tx, actor, {
+      organizationId: organization.id,
+      task,
+      reused: live !== null,
+      assignmentId: assignment.id,
       source,
-      decidedByEmployeeId: input.decision.decidedByEmployeeId ?? null,
-      decidedRole: input.decision.decidedRole.trim(),
-      referenceKind: input.decision.referenceKind ?? null,
-      referenceId,
-      note: input.decision.note?.trim() || null,
+      input,
+      selfExecuted,
+      now,
     });
-    // The audit event carries who decided and on what, never the note or the account.
-    await this.audit.record(
-      tx,
-      licensingAuditEvent(
-        actor,
-        organization.id,
-        live ? 'PROVISIONING_TASK.REVOCATION_REASON_ADDED' : 'PROVISIONING_TASK.REVOCATION_OPENED',
-        'ProvisioningTask',
-        task.id,
-        live ? { status: task.status } : null,
-        {
-          assignmentId: assignment.id,
-          source,
-          decidedByEmployeeId: reason.decidedByEmployeeId,
-          decidedRole: reason.decidedRole,
-          referenceKind: reason.referenceKind,
-          referenceId: reason.referenceId,
-          defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
-          selfExecuted,
-        },
-      ),
-    );
-    // An IT Admin who asks for their own seat to go because no other IT Admin can is told to the Super Admin (`SoD-5`, F24).
-    if (selfExecuted) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
-    const reasons = (await this.reasons.listOf([task.id], tx)).map(factsOf);
-    const context = input.context ?? {};
-    await this.revocation.emit(tx, { moment: 'OPENED', task: toRevocationFacts(task), reasons, context, actor, now });
 
     return { taskId: task.id, created: live === null, reasonAdded: live !== null, status: task.status };
-  }
-
-  /** The task a seat did not have yet: manual, queued for the IT Admin in charge of the holder's department today. */
-  private async create(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    input: {
-      organizationId: string;
-      assignment: { id: string; employeeId: string };
-      source: RevocationSource;
-      now: Date;
-    },
-  ): Promise<ProvisioningTaskRecord> {
-    const today = await this.organization.businessToday(input.now, tx);
-    const inCharge = await this.organization.getItAdminInCharge(input.assignment.employeeId, today);
-    // The most tries are fixed here, as for a grant: a parameter changed later reaches only the tasks made after it.
-    const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT')));
-
-    return this.tasks.insertRevocation(tx, {
-      organizationId: input.organizationId,
-      assignmentId: input.assignment.id,
-      source: input.source,
-      defaultResponsibleEmployeeId: inCharge?.itAdminEmployeeId ?? null,
-      createdByAppUserId: actor.appUserId,
-      maxAttempts,
-    });
   }
 
   /** The rule of the IT Admin who is the one revoked (`QĐ-77m`); a person who is not an IT Admin is never restricted by it. */

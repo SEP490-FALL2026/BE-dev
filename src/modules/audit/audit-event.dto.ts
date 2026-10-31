@@ -13,10 +13,20 @@ export const listAuditEventsQuerySchema = z
     page: z.coerce.number().int().positive().default(1),
     pageSize: z.coerce.number().int().positive().max(100).default(20),
     resourceType: z.string().min(1).max(100).optional(),
-    resourceId: z.string().min(1).max(200).optional(),
+    resourceId: z
+      .string()
+      .min(1)
+      .max(200)
+      .meta({ description: 'Needs resourceType: an id is only meaningful for one type of resource.' })
+      .optional(),
     actorAppUserId: z.uuid().optional(),
     action: z.string().min(1).max(100).optional(),
-    occurredFrom: instant.optional(),
+    occurredFrom: instant
+      .meta({
+        description:
+          'Must be earlier than occurredTo when both are given: the window includes occurredFrom and excludes occurredTo.',
+      })
+      .optional(),
     occurredTo: instant.optional(),
   })
   .superRefine((query, context) => {

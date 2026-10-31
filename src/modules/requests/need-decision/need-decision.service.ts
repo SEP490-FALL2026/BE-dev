@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { RenewalApplyService } from '../renewal-request/renewal-apply.service';
-import { SpendEntryService } from '../spend/spend-entry.service';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestDecisionRefusedError,
@@ -14,16 +11,15 @@ import {
 import { canViewRequest, viewFactsOf, hasSpendStep } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { AssessmentStepRepo } from '../access-request/assessment-step.repo';
 import {
   checkNeedDecision,
-  deciderRoleOf,
-  nextRequestState,
+  needDecisionOutcome,
   type DecisionInput,
+  type NeedDecisionOutcome,
 } from '../access-request/need-decision.policy';
-import { NeedSpendService } from './need-spend.service';
-import { RequestAssessmentService } from '../access-request/request-assessment.service';
-import { RequestOutcomeService } from '../outcome/request-outcome.service';
+import { RequestFactsService } from '../access-request/request-facts.service';
+import { NeedSpendService } from '../assessment/need-spend.service';
+import { NeedDecisionEffects } from './need-decision-effects.service';
 
 /**
  * Deciding the need step (`US-05-04`, `US-01-12` AC-6): the person the routing table gave the step approves or refuses
@@ -41,133 +37,109 @@ export class NeedDecisionService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly repo: AccessRequestRepo,
-    private readonly steps: AssessmentStepRepo,
-    private readonly organization: OrganizationApi,
     private readonly audit: AuditApi,
-    private readonly settings: RequestAssessmentService,
+    private readonly settings: RequestFactsService,
     private readonly spendChoice: NeedSpendService,
-    private readonly entry: SpendEntryService,
-    private readonly renewals: RenewalApplyService,
-    private readonly outcomes: RequestOutcomeService,
+    private readonly effects: NeedDecisionEffects,
   ) {}
 
   async decide(actor: AuthenticatedPrincipal, requestId: string, input: DecisionInput): Promise<AccessRequestRecord> {
     const { fiscalYearStartMonth } = await this.settings.settings();
 
     return this.runner.run(async (tx) => {
-      const request = await this.repo.lockById(tx, requestId);
-      if (!request || !canViewRequest(actor, viewFactsOf(request))) {
-        throw new AccessRequestNotFoundError();
-      }
-      // The people of a request for a group are decided one by one, in the routes of its lines (`US-05-17`).
-      if (request.type === 'GROUP_GRANT') throw new AccessRequestGroupUsesLinesError();
-      const { needStep } = request;
-
-      const refusal = checkNeedDecision(
-        {
-          actorEmployeeId: actor.employeeId,
-          requesterEmployeeId: request.requesterEmployeeId,
-          beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
-          assigneeEmployeeId: needStep.assigneeEmployeeId,
-          stepState: needStep.state,
-          // A renewal is long when the right would run on over twelve months in all, not when its own term is.
-          termMonths: request.renewal?.consecutiveMonths ?? request.termMonths,
-        },
+      const request = await this.lockDecidable(tx, actor, requestId, input);
+      const outcome = needDecisionOutcome(
+        { branch: request.branch, routingRow: request.needStep.routingRow, hasSpendStep: hasSpendStep(request.policy) },
         input,
       );
-      if (refusal) throw new AccessRequestDecisionRefusedError(refusal);
-
-      const approved = input.decision === 'APPROVE';
-      const requestState = approved ? nextRequestState(request.branch) : 'REJECTED';
-      const decidedAt = new Date();
-      const deciderRole = deciderRoleOf(needStep.routingRow);
-      const termConfirmationReason = approved ? (input.termConfirmationReason?.trim() ?? null) : null;
-
       // The head approving a request that costs money chooses its line first; a refusal here undoes the whole decision.
-      const headChoosesLine = approved && hasSpendStep(request.policy) && deciderRole === 'MANAGER';
-      if (input.spend !== undefined && !headChoosesLine)
+      if (input.spend !== undefined && !outcome.headChoosesLine) {
         throw new AccessRequestDecisionRefusedError('SPEND_NOT_APPLICABLE');
-      if (headChoosesLine) {
+      }
+      const decidedAt = new Date();
+      if (outcome.headChoosesLine) {
         await this.spendChoice.apply(tx, actor, request, input.spend, { decidedAt, fiscalYearStartMonth });
       }
+      await this.writeDecision(tx, actor, request, { input, outcome, decidedAt });
 
-      await this.repo.recordNeedDecision(tx, {
-        organizationId: request.organizationId,
-        requestId: request.id,
-        stepId: needStep.id,
-        requestState,
-        departmentId: request.departmentId,
-        record: {
-          decision: approved ? 'APPROVED' : 'REJECTED',
-          decidedByEmployeeId: actor.employeeId,
-          deciderRole,
-          reason: input.reason?.trim() || null,
-          termConfirmationReason: termConfirmationReason || null,
-          decidedAt,
-        },
-      });
-      await this.audit.record(
-        tx,
-        accessRequestAuditEvent(
-          actor,
-          request.organizationId,
-          approved ? 'ACCESS_REQUEST.NEED_APPROVED' : 'ACCESS_REQUEST.NEED_REJECTED',
-          'ACCESS_REQUEST_STEP',
-          needStep.id,
-          {
-            requestId: request.id,
-            decision: approved ? 'APPROVED' : 'REJECTED',
-            assigneeEmployeeId: needStep.assigneeEmployeeId,
-            decidedByEmployeeId: actor.employeeId,
-            deciderRole,
-            departmentId: request.departmentId,
-            requestState,
-            termConfirmed: Boolean(termConfirmationReason),
-          },
-        ),
-      );
-      // A refusal ends the request for the person it was for, without a grant (F43).
-      if (!approved) await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, decidedAt);
-
-      // A renewal needs nobody to carry it out: approved in full, it is applied here, in the transaction of the decision.
-      if (approved && request.type === 'RENEWAL' && requestState === 'AWAITING_EXECUTION') {
-        await this.renewals.apply(tx, actor, request, decidedAt);
-      }
-
-      if (approved && request.branch === 'NEW_SOFTWARE') {
-        // The software is not in the catalog: the IT Admin in charge of the department of the sender assesses it next
-        // (`US-05-06` AC-2); with none who still works the step waits and any IT Admin may take it.
-        const inCharge = await this.organization.getItAdminInCharge(
-          request.requesterEmployeeId,
-          await this.organization.businessToday(decidedAt, tx),
-        );
-        await this.steps.add(tx, {
-          requestId: request.id,
-          assigneeEmployeeId: inCharge?.itAdminEmployeeId ?? null,
-          slaWorkingDays: request.policy.slaWorkingDays,
-          now: decidedAt,
-        });
-        await this.audit.record(
-          tx,
-          accessRequestAuditEvent(
-            actor,
-            request.organizationId,
-            'ACCESS_REQUEST.ASSESSMENT_REQUESTED',
-            'ACCESS_REQUEST',
-            request.id,
-            { requestId: request.id, itAdminEmployeeId: inCharge?.itAdminEmployeeId ?? null },
-          ),
-        );
-      }
-
-      const decided = await this.repo.findById(request.id, tx);
-      if (!decided) throw new Error(`The request ${request.id} was not found after it was decided.`);
-      if (approved && decided.state === 'AWAITING_SPEND_SUBMISSION') await this.entry.enter(tx, actor, decided);
-
-      const final = await this.repo.findById(request.id, tx);
-      if (!final) throw new Error(`The request ${request.id} was not found after it was decided.`);
-
-      return final;
+      return this.effects.follow(tx, actor, request, outcome, decidedAt);
     });
+  }
+
+  /** The request, locked, when the person may see it, it is not a group and the policy lets them decide its need step. */
+  private async lockDecidable(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    requestId: string,
+    input: DecisionInput,
+  ): Promise<AccessRequestRecord> {
+    const request = await this.repo.lockById(tx, requestId);
+    if (!request || !canViewRequest(actor, viewFactsOf(request))) throw new AccessRequestNotFoundError();
+    // The people of a request for a group are decided one by one, in the routes of its lines (`US-05-17`).
+    if (request.type === 'GROUP_GRANT') throw new AccessRequestGroupUsesLinesError();
+    const { needStep } = request;
+    const refusal = checkNeedDecision(
+      {
+        actorEmployeeId: actor.employeeId,
+        requesterEmployeeId: request.requesterEmployeeId,
+        beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
+        assigneeEmployeeId: needStep.assigneeEmployeeId,
+        stepState: needStep.state,
+        // A renewal is long when the right would run on over twelve months in all, not when its own term is.
+        termMonths: request.renewal?.consecutiveMonths ?? request.termMonths,
+      },
+      input,
+    );
+    if (refusal) throw new AccessRequestDecisionRefusedError(refusal);
+
+    return request;
+  }
+
+  /** The decision of the step and the request state, and the audit event of it, written together. */
+  private async writeDecision(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+    decided: { input: DecisionInput; outcome: NeedDecisionOutcome; decidedAt: Date },
+  ): Promise<void> {
+    const { input, outcome, decidedAt } = decided;
+    const { needStep } = request;
+    const decision = outcome.approved ? 'APPROVED' : 'REJECTED';
+
+    await this.repo.recordNeedDecision(tx, {
+      organizationId: request.organizationId,
+      requestId: request.id,
+      stepId: needStep.id,
+      requestState: outcome.requestState,
+      departmentId: request.departmentId,
+      record: {
+        decision,
+        decidedByEmployeeId: actor.employeeId,
+        deciderRole: outcome.deciderRole,
+        reason: input.reason?.trim() || null,
+        termConfirmationReason: outcome.termConfirmationReason,
+        decidedAt,
+      },
+    });
+    await this.audit.record(
+      tx,
+      accessRequestAuditEvent(
+        actor,
+        request.organizationId,
+        outcome.approved ? 'ACCESS_REQUEST.NEED_APPROVED' : 'ACCESS_REQUEST.NEED_REJECTED',
+        'ACCESS_REQUEST_STEP',
+        needStep.id,
+        {
+          requestId: request.id,
+          decision,
+          assigneeEmployeeId: needStep.assigneeEmployeeId,
+          decidedByEmployeeId: actor.employeeId,
+          deciderRole: outcome.deciderRole,
+          departmentId: request.departmentId,
+          requestState: outcome.requestState,
+          termConfirmed: Boolean(outcome.termConfirmationReason),
+        },
+      ),
+    );
   }
 }

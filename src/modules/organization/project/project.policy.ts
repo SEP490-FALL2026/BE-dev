@@ -2,7 +2,7 @@ import { ProjectForbiddenError } from './project.errors';
 
 /**
  * Who may keep and read the projects described on department profiles, decided in the service so no route is the only thing
- * between a caller and the data (`F13`). Projects are organization data: the Super Admin keeps them on an HR basis and reads them;
+ * between a caller and the data. Projects are organization data: the Super Admin keeps them on an HR basis and reads them;
  * the IT Admin and everyone else do neither (`QĐ-87a`). Pure: no store, no clock.
  */
 

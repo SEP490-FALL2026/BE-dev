@@ -67,7 +67,7 @@ const ASSIGNMENT_SELECT = {
   validUntil: true,
 } as const;
 
-/** The columns of a task that a list row shows: everything but the long text a detail carries (`LD-08`). */
+/** The columns of a task that a list row shows: everything but the long text a detail carries. */
 export const SUMMARY_SELECT = {
   id: true,
   organizationId: true,

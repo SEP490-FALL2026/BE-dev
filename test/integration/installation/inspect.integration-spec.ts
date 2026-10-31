@@ -5,7 +5,7 @@ import { PrismaService } from '../../../src/infrastructure/database/prisma.servi
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import { INSPECTION_USAGE } from '../../../src/cli/inspect/inspect.arguments';
-import { InstallationInspectionApi } from '../../../src/modules/installation/public/inspection.api';
+import { InstallationInspectionApi } from '../../../src/modules/installation/public/installation-inspection.api';
 import { CLI_COLD_START_MS, cliWorkingDirectory, runCli, stopCliProcesses } from '../../support/cli-process';
 import {
   DisposableDatabase,

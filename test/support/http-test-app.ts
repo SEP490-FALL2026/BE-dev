@@ -6,7 +6,7 @@ import { configureApplication } from '../../src/app/configure-application';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../src/modules/identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
-import { PasswordHasher } from '../../src/modules/identity-access/accounts/password-hasher.service';
+import { PasswordHasher } from '../../src/modules/identity-access/credentials/password-hasher.service';
 import {
   DisposableDatabase,
   dropDisposableDatabase,

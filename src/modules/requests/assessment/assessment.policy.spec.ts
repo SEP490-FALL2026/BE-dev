@@ -1,11 +1,13 @@
+import type { AssessmentFields, Quote } from '../access-request/assessment-record.types';
 import {
+  actsForAssignee,
   canLinkCatalogPlan,
   checkAssessor,
+  internalRegistrationBasis,
   judgeCompletion,
   missingFields,
-  type AssessmentFields,
+  registeredShapeOf,
 } from './assessment.policy';
-import type { Quote } from './quote-pricing.policy';
 
 const quote: Quote = {
   unitPrice: { amountMinor: 800n, currency: 'USD' },
@@ -171,5 +173,72 @@ describe('linking a request to the plan registered in the catalog (US-05-06 AC-4
     ],
   ] as const)('not %s', (_name, facts) => {
     expect(canLinkCatalogPlan(facts)).toBe(false);
+  });
+});
+
+describe('who the IT Admin works for when they save, complete or refuse an assessment (US-05-06)', () => {
+  it.each([
+    ['a step held by somebody else', { assigneeEmployeeId: 'it-2' }, true],
+    ['a step that nobody holds, as the audit has always said', { assigneeEmployeeId: null }, true],
+    ['their own step', { assigneeEmployeeId: 'it-1' }, false],
+    ['no step at all', null, false],
+  ])('says whether they stand in for the assignee on %s (actsForAssignee)', (_label, step, acts) => {
+    expect(actsForAssignee(step, 'it-1')).toBe(acts);
+  });
+});
+
+describe('registering internal software for a proposal (US-05-20 AC-3 -> AC-5, AC-8 -> AC-10)', () => {
+  it('takes only software the company built itself, then the sensitivity given or the one the assessment has', () => {
+    expect(internalRegistrationBasis({ classification: 'PAID_LICENSED', dataSensitivity: 'LOW' }, 'HIGH')).toEqual({
+      kind: 'NOT_INTERNAL',
+    });
+    expect(internalRegistrationBasis({ classification: 'INTERNAL', dataSensitivity: 'LOW' }, 'HIGH')).toEqual({
+      kind: 'OK',
+      dataSensitivity: 'HIGH',
+    });
+    expect(internalRegistrationBasis({ classification: 'INTERNAL', dataSensitivity: 'LOW' }, undefined)).toEqual({
+      kind: 'OK',
+      dataSensitivity: 'LOW',
+    });
+  });
+
+  it('is incomplete when neither the body nor the assessment says how sensitive the data is', () => {
+    expect(internalRegistrationBasis({ classification: 'INTERNAL', dataSensitivity: null }, undefined)).toEqual({
+      kind: 'DATA_SENSITIVITY_MISSING',
+    });
+  });
+
+  it('judges classification before sensitivity: software that is not internal is refused whatever else is missing', () => {
+    expect(internalRegistrationBasis({ classification: null, dataSensitivity: null }, undefined)).toEqual({
+      kind: 'NOT_INTERNAL',
+    });
+  });
+
+  const sent = {
+    version: 3,
+    branch: 'NEW_SOFTWARE' as const,
+    chain: ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'] as const,
+    slaWorkingDays: 2,
+  };
+
+  it('keeps the chain as it was sent and waits for the spend when the grant needs a payment (AC-10)', () => {
+    expect(registeredShapeOf(true, { ...sent, chain: [...sent.chain] })).toEqual({
+      branch: 'NEW_SOFTWARE',
+      policy: { ...sent, chain: [...sent.chain] },
+      state: 'AWAITING_SPEND_SUBMISSION',
+    });
+  });
+
+  it('drops the spend step and goes to the IT Admin to be granted by hand when nothing is paid (AC-1)', () => {
+    expect(registeredShapeOf(false, { ...sent, chain: [...sent.chain] })).toEqual({
+      branch: 'INTERNAL_FREE',
+      policy: {
+        version: 1,
+        branch: 'INTERNAL_FREE',
+        chain: ['NEED', 'IT_ASSESSMENT', 'IT_EXECUTION'],
+        slaWorkingDays: 2,
+      },
+      state: 'AWAITING_EXECUTION',
+    });
   });
 });

@@ -7,7 +7,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
-import { catalogAuditEvent } from '../mappers/catalog-audit-event.mapper';
+import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   ContractNotFoundError,
   DocumentAccessForbiddenError,
@@ -138,12 +138,12 @@ export class DocumentService {
     const current = await this.ownedBy(actor, id);
     if (current.status !== 'AWAITING_UPLOAD') throw new DocumentNotAwaitingUploadError();
     if (Date.now() - current.createdAt.getTime() > UPLOAD_ABANDONED_AFTER_MS) {
-      // Given up by this call, or changed first by a simultaneous one: then the row as it is now answers (P29-N7).
+      // Given up by this call, or changed first by a simultaneous one: then the row as it is now answers.
       if (await this.expire(current.id, current.objectKey, actor)) throw new DocumentUploadExpiredError();
       throw await this.answerFromRow(actor, id);
     }
     const stored = await this.stored(current.objectKey);
-    // Never came, or kept (or given up) by a simultaneous call that deletes it only after its commit (P29-N5).
+    // Never came, or kept (or given up) by a simultaneous call that deletes it only after its commit.
     if (stored.etag === undefined) throw await this.answerFromRow(actor, id);
     let finalKey: string | null = null;
     try {
@@ -159,7 +159,7 @@ export class DocumentService {
       if (!(error instanceof DocumentUploadMismatchError)) throw error;
       finalKey = null;
     }
-    // The database first, the upload last (P28-11): a commit that fails takes its own copy back and keeps the upload, so
+    // The database first, the upload last: a commit that fails takes its own copy back and keeps the upload, so
     // the same call works again — no lost upload, no orphan copy, no false 409.
     const result = await this.runner
       .run(async (tx) => {
@@ -196,7 +196,7 @@ export class DocumentService {
 
   /**
    * The answer for a file a simultaneous call may have changed, from its row read again with the same owner check
-   * (P29-N5, P29-N7): still awaiting its upload ⟹ pending, given up ⟹ expired, otherwise done ⟹ not awaiting.
+   *: still awaiting its upload ⟹ pending, given up ⟹ expired, otherwise done ⟹ not awaiting.
    */
   private async answerFromRow(actor: AuthenticatedPrincipal, id: string): Promise<Error> {
     const { status } = await this.ownedBy(actor, id);

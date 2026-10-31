@@ -36,7 +36,7 @@ export interface AssignmentView extends AssignmentRecord {
   effectiveFromLabel: string | null;
 }
 
-/** An assignment of a list, with who holds it, which plan it is of and which Cost Center it is charged to (`LD-10`). */
+/** An assignment of a list, with who holds it, which plan it is of and which Cost Center it is charged to. */
 export interface AssignmentSummaryView extends AssignmentView {
   employee: { employeeId: string; employeeCode: string; fullName: string };
   plan: { planId: string; planName: string; applicationName: string };
@@ -121,7 +121,7 @@ export type ProvisioningChannel = 'MANUAL' | 'CONNECTOR';
 export type ProvisioningTaskStatus =
   'QUEUED' | 'RETRY_SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CLOSED_FAILED' | 'CANCELLED';
 
-/** How a task failed (`F-12`): only a temporary failure is tried again by itself. */
+/** How a task failed: only a temporary failure is tried again by itself. */
 export type ProvisioningFailureKind = 'TRANSIENT' | 'PERMANENT' | 'AUTHENTICATION' | 'QUOTA_EXCEEDED' | 'NOT_DONE';
 
 /** What the IT Admin may decide about a failed task. */
@@ -168,7 +168,7 @@ export type GrantRequestAnswer =
       seat: 'PERSONAL';
       employeeId: string;
       planId: string;
-      /** The department of the request: its seat is granted only on a subscription this department owns (`QĐ-89a`, F20). */
+      /** The department of the request: its seat is granted only on a subscription this department owns (`QĐ-89a`). */
       departmentId: string;
       expectedEndDate: string | null;
     }
@@ -240,7 +240,7 @@ export const REVOCATION_SOURCES = [
   'SUBSCRIPTION_EXPIRED',
   'NOT_LEGALIZED',
   'RE_EXECUTION',
-  // The head of the holder's department decided, after the installation, that a seat on another department's subscription goes (F21).
+  // The head of the holder's department decided, after the installation, that a seat on another department's subscription goes.
   'POST_SETUP_REVIEW',
 ] as const;
 export type RevocationSource = (typeof REVOCATION_SOURCES)[number];

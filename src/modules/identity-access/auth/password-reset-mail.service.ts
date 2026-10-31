@@ -11,7 +11,7 @@ import { AccountSnapshot } from '../public/identity-access.types';
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 /**
- * The link a forgotten-password request mails (T-1, T-2, T-4): at most a configured number an hour, one working at a
+ * The link a forgotten-password request mails: at most a configured number an hour, one working at a
  * time, always to the email stored on the account. Runs in the caller's transaction, under its AppUser lock.
  */
 @Injectable()
@@ -33,7 +33,7 @@ export class PasswordResetMailService {
     );
     if (issuedLastHour >= this.config.get('AUTH_PASSWORD_RESET_MAX_PER_HOUR', { infer: true })) return false;
 
-    // At most one link works at a time: the older one is revoked and its mail, if not yet sent, cancelled (T-4).
+    // At most one link works at a time: the older one is revoked and its mail, if not yet sent, cancelled.
     await this.revocation.revokeUsable(tx, account.id, 'SUPERSEDED', now, 'RESET_PASSWORD');
 
     const issued = await this.links.issue(

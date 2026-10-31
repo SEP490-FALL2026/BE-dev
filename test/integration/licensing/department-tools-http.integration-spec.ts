@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { LicensingApi } from '../../../src/modules/licensing/public/licensing.api';
+import { LicensingRenewalApi } from '../../../src/modules/licensing/public/licensing-renewal.api';
 import { ApiAccount, createActivatedAccount } from '../../support/api-accounts';
 import { RevocationHarness } from '../../support/revocation-harness';
 import { HR_BASIS } from '../../support/hr-basis';
@@ -258,7 +258,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
       const renewing = await seatOf('TR-RNW', { expected_end_date: h.inDays(5) });
 
       await h.ctx.app.get(TransactionRunner).run((tx) =>
-        h.ctx.app.get(LicensingApi).renewAssignment(tx, h.actorOf(h.it1), {
+        h.ctx.app.get(LicensingRenewalApi).renewAssignment(tx, h.actorOf(h.it1), {
           assignmentId: renewing,
           requestId: randomUUID(),
           previousExpectedEndDate: h.inDays(5),

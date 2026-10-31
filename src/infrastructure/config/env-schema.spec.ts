@@ -6,7 +6,7 @@ import {
 } from './env-schema';
 import { installationEnvironmentConfigOptions } from './env-config';
 
-/** Development has no secret fallback since E3 = C: a developer supplies these from `.env`. Made up for this spec. */
+/** Development has no secret fallback since the Owner removed it: a developer supplies these from `.env`. Made up for this spec. */
 const OWN_SECRETS = {
   AUTH_ACCESS_TOKEN_SECRET: 'env-schema-spec-access-token-secret-0123456789',
   AUTH_THROTTLE_PEPPER: 'env-schema-spec-pepper-0123',

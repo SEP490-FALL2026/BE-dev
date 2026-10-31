@@ -40,6 +40,11 @@ export const reviewBodySchema = z
     if (body.reason === undefined) issue('reason', 'This outcome needs its reason.');
     if (body.opinion !== undefined) issue('opinion', 'This outcome gives no opinion.');
     if (body.direction !== undefined) issue('direction', 'This outcome gives no direction.');
+  })
+  .meta({
+    description:
+      'An assessment (outcome ASSESSED) gives its opinion and the direction it advises, and no reason. Every other outcome gives ' +
+      'its reason, and no opinion and no direction.',
   });
 
 const pageQuery = {

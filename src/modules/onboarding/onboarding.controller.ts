@@ -68,7 +68,7 @@ class OnboardingChecklistResponseDto extends createZodDto(successEnvelopeSchema(
 
 /**
  * The onboarding checklist (`US-02-04`): for the Super Admin, who does step 1 (the organization and its people, on an HR basis), and
- * the IT Admin, who does steps 2 to 5. Nobody else sees it, whatever the route lets through (`F13`).
+ * the IT Admin, who does steps 2 to 5. Nobody else sees it, whatever the route lets through.
  */
 @ApiTags('onboarding')
 @Controller({ path: 'onboarding-checklist', version: '1' })

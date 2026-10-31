@@ -1,21 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditApi } from '../../audit/public/audit.api';
-import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { RequestOutcomeService } from '../outcome/request-outcome.service';
-import { RenewalApplyService } from '../renewal-request/renewal-apply.service';
-import { BudgetCheckService } from '../spend/budget-check.service';
-import { SpendDecisionRepo } from '../spend/spend-decision.repo';
-import { checkSpendDecider, judgeApproval, type BlockedReason } from '../spend/spend-decision.policy';
+import { SpendEffectsService } from '../budget-information/spend-effects.service';
+import { BudgetCheckService, type CheckOutcome } from '../spend/budget-check.service';
+import { checkSpendDecider, judgeApproval } from '../spend/spend-decision.policy';
 import { SpendDecisionRefusedError } from '../spend/spend.errors';
 import { SpendRoutingService } from '../spend/spend-routing.service';
-import { SpendEffectsService } from '../spend/spend-effects.service';
 import { SpendStepRepo, type SpendStepRecord } from '../spend/spend-step.repo';
+import { SpendDecisionRecorder, type SpendDecisionResult } from './spend-decision-recorder.service';
 
 export interface SpendDecisionInput {
   decision: 'APPROVE' | 'REJECT';
@@ -24,12 +19,6 @@ export interface SpendDecisionInput {
   /** The exception an approval accepts: why, and the years it names. */
   override?: { reason: string; years: readonly number[] };
 }
-
-export type SpendDecisionResult =
-  | { status: 'DECIDED'; decision: 'APPROVED' | 'REJECTED'; requestState: string }
-  /** The request was checked again as the approver decided and it is not for them yet: nothing was decided (`US-06-01` AC-18). */
-  | { status: 'BOUNCED'; to: 'FINANCE_REVIEW' }
-  | { status: 'BOUNCED'; to: 'HEAD'; reason: BlockedReason };
 
 /**
  * The spending approver decides the spend step (`US-06-01`). The request is locked, the check is made again, and the decision
@@ -48,12 +37,8 @@ export class SpendDecisionService {
     private readonly steps: SpendStepRepo,
     private readonly checks: BudgetCheckService,
     private readonly effects: SpendEffectsService,
-    private readonly decisions: SpendDecisionRepo,
     private readonly routing: SpendRoutingService,
-    private readonly identity: IdentityAccessApi,
-    private readonly audit: AuditApi,
-    private readonly renewals: RenewalApplyService,
-    private readonly outcomes: RequestOutcomeService,
+    private readonly recorder: SpendDecisionRecorder,
   ) {}
 
   /** Throws AccessRequestNotFoundError and SpendDecisionRefusedError. */
@@ -63,135 +48,83 @@ export class SpendDecisionService {
     input: SpendDecisionInput,
   ): Promise<SpendDecisionResult> {
     return this.runner.run(async (tx) => {
-      const request = await this.requests.lockById(tx, requestId);
-      if (!request) throw new AccessRequestNotFoundError();
-      // The people of a request for a group are decided one by one, in the route of its lines (`US-05-17`).
-      if (request.type === 'GROUP_GRANT') throw new AccessRequestGroupUsesLinesError();
-      const step = await this.steps.findOpen(requestId, 'SPEND_APPROVAL', tx);
-      if (!step) throw new SpendDecisionRefusedError('NO_SPEND_STEP');
-      const refusal = checkSpendDecider({
-        actorEmployeeId: actor.employeeId,
-        requesterEmployeeId: request.requesterEmployeeId,
-        beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
-        assigneeEmployeeId: step.assigneeEmployeeId,
-        stepState: step.state,
-      });
-      if (refusal) throw new SpendDecisionRefusedError(refusal);
-      // The person who completed the review of Finance of this request does not decide its spend step (`SoD-8`).
-      await this.effects.refuseReviewer(tx, request, actor.employeeId);
-
+      const { request, step } = await this.lockDecidable(tx, actor, requestId);
       const now = new Date();
       const outcome = await this.checks.run(tx, request, 'SPEND_DECISION', actor, now);
+      const of = { request, step, now };
       if (input.decision === 'REJECT') {
-        return this.record(tx, actor, request, step, now, {
+        return this.recorder.record(tx, actor, of, {
           decision: 'REJECTED',
           checkId: outcome.status === 'CHECKED' ? outcome.check.id : null,
           reason: input.reason ?? null,
           override: null,
         });
       }
-      if (outcome.status === 'NOT_CHECKABLE') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
 
-      const reviewed = await this.effects.reviewed(tx, request, step);
-      const verdict = judgeApproval(outcome.check, reviewed, input.override ? { years: input.override.years } : null);
-      switch (verdict.kind) {
-        case 'BLOCKED':
-          await this.effects.sendBack(tx, actor, request, step, now, verdict.reason);
-
-          return { status: 'BOUNCED', to: 'HEAD', reason: verdict.reason };
-        case 'NEEDS_REVIEW':
-          await this.effects.sendBack(tx, actor, request, step, now, 'NEEDS_FINANCE_REVIEW');
-          await this.routing.reopenReview(tx, actor, request, now);
-
-          return { status: 'BOUNCED', to: 'FINANCE_REVIEW' };
-        case 'OVERRIDE_REQUIRED':
-        case 'OVERRIDE_MISMATCH':
-          throw new SpendDecisionRefusedError(verdict.kind, verdict.years);
-        case 'OVERRIDE_NOT_NEEDED':
-          throw new SpendDecisionRefusedError('OVERRIDE_NOT_NEEDED');
-        case 'OK':
-          return this.record(tx, actor, request, step, now, {
-            decision: 'APPROVED',
-            checkId: outcome.check.id,
-            reason: null,
-            override: input.override ? { reason: input.override.reason, years: verdict.overriddenYears } : null,
-          });
-      }
+      return this.approve(tx, actor, of, { input, outcome });
     });
   }
 
-  private async record(
+  /** The request locked, with the spend step the person holds; the person who reviewed it for Finance does not decide it (`SoD-8`). */
+  private async lockDecidable(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    request: AccessRequestRecord,
-    step: SpendStepRecord,
-    now: Date,
-    decided: {
-      decision: 'APPROVED' | 'REJECTED';
-      checkId: string | null;
-      reason: string | null;
-      override: { reason: string; years: readonly number[] } | null;
-    },
-  ): Promise<SpendDecisionResult> {
-    const holders = await this.identity.getApprovalRoleHolders(tx);
-    const deciderRole =
-      holders.conflictSubstituteEmployeeId === actor.employeeId ? 'CONFLICT_SUBSTITUTE' : 'SPENDING_APPROVER';
-    const requestState = decided.decision === 'APPROVED' ? 'AWAITING_EXECUTION' : 'REJECTED';
-    await this.decisions.record(tx, {
-      organizationId: request.organizationId,
-      requestId: request.id,
-      stepId: step.id,
-      departmentId: request.departmentId,
-      decision: decided.decision,
-      deciderRole,
-      reason: decided.reason,
-      checkId: decided.checkId,
-      overrideReason: decided.override?.reason ?? null,
-      overrideYears: decided.override?.years ?? [],
-      decidedByEmployeeId: actor.employeeId,
-      decidedAt: now,
-      requestState,
+    requestId: string,
+  ): Promise<{ request: AccessRequestRecord; step: SpendStepRecord }> {
+    const request = await this.requests.lockById(tx, requestId);
+    if (!request) throw new AccessRequestNotFoundError();
+    // The people of a request for a group are decided one by one, in the route of its lines (`US-05-17`).
+    if (request.type === 'GROUP_GRANT') throw new AccessRequestGroupUsesLinesError();
+    const step = await this.steps.findOpen(requestId, 'SPEND_APPROVAL', tx);
+    if (!step) throw new SpendDecisionRefusedError('NO_SPEND_STEP');
+    const refusal = checkSpendDecider({
+      actorEmployeeId: actor.employeeId,
+      requesterEmployeeId: request.requesterEmployeeId,
+      beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
+      assigneeEmployeeId: step.assigneeEmployeeId,
+      stepState: step.state,
     });
-    if (decided.decision === 'APPROVED') await this.effects.hold(tx, actor, request, decided.checkId, now);
-    await this.audit.record(
-      tx,
-      accessRequestAuditEvent(
-        actor,
-        request.organizationId,
-        decided.decision === 'APPROVED' ? 'ACCESS_REQUEST.SPEND_APPROVED' : 'ACCESS_REQUEST.SPEND_REJECTED',
-        'ACCESS_REQUEST_STEP',
-        step.id,
-        {
-          requestId: request.id,
-          checkId: decided.checkId,
-          decision: decided.decision,
-          deciderRole,
-          override: decided.override !== null,
-          overrideYears: (decided.override?.years ?? []).join(','),
-          samePersonAsSpend: step.samePersonAsSpend,
-          noIndependentReview: step.noIndependentReview,
-          requestState,
-        },
-      ),
-    );
+    if (refusal) throw new SpendDecisionRefusedError(refusal);
+    await this.effects.refuseReviewer(tx, request, actor.employeeId);
 
-    // A refusal ends the request for the person it was for, without a grant (F43).
-    if (decided.decision === 'REJECTED') await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
-
-    // A renewal needs nobody to carry it out: approved in full, it is applied here, in the transaction of the decision.
-    if (decided.decision === 'APPROVED' && request.type === 'RENEWAL') {
-      await this.renewals.apply(tx, actor, request, now);
-
-      return { status: 'DECIDED', decision: decided.decision, requestState: await this.stateOf(tx, request.id) };
-    }
-
-    return { status: 'DECIDED', decision: decided.decision, requestState };
+    return { request, step };
   }
 
-  private async stateOf(tx: DbTx, requestId: string): Promise<string> {
-    const found = await this.requests.findById(requestId, tx);
-    if (!found) throw new Error(`The request ${requestId} was not found after it was decided.`);
+  /** An approval is made on what the check says: it is recorded, goes back to the head or to Finance, or is refused for its override. */
+  private async approve(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    of: { request: AccessRequestRecord; step: SpendStepRecord; now: Date },
+    decided: { input: SpendDecisionInput; outcome: CheckOutcome },
+  ): Promise<SpendDecisionResult> {
+    const { request, step, now } = of;
+    const { input, outcome } = decided;
+    if (outcome.status === 'NOT_CHECKABLE') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
 
-    return found.state;
+    const reviewed = await this.effects.reviewed(tx, request, step);
+    const verdict = judgeApproval(outcome.check, reviewed, input.override ? { years: input.override.years } : null);
+    switch (verdict.kind) {
+      case 'BLOCKED':
+        await this.effects.sendBack(tx, actor, request, step, now, verdict.reason);
+
+        return { status: 'BOUNCED', to: 'HEAD', reason: verdict.reason };
+      case 'NEEDS_REVIEW':
+        await this.effects.sendBack(tx, actor, request, step, now, 'NEEDS_FINANCE_REVIEW');
+        await this.routing.reopenReview(tx, actor, request, now);
+
+        return { status: 'BOUNCED', to: 'FINANCE_REVIEW' };
+      case 'OVERRIDE_REQUIRED':
+      case 'OVERRIDE_MISMATCH':
+        throw new SpendDecisionRefusedError(verdict.kind, verdict.years);
+      case 'OVERRIDE_NOT_NEEDED':
+        throw new SpendDecisionRefusedError('OVERRIDE_NOT_NEEDED');
+      case 'OK':
+        return this.recorder.record(tx, actor, of, {
+          decision: 'APPROVED',
+          checkId: outcome.check.id,
+          reason: null,
+          override: input.override ? { reason: input.override.reason, years: verdict.overriddenYears } : null,
+        });
+    }
   }
 }

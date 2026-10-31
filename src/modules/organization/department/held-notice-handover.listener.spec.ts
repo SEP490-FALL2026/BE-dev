@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
-import { OrganizationApi } from '../public/organization.api';
+import { OrganizationContextService } from '../organization-context.service';
 import { OrganizationChangeListeners } from '../public/organization.extension-points';
 import type { OrganizationChange } from '../public/organization.types';
 import { HeldNoticeHandoverListener } from './held-notice-handover.listener';
@@ -21,7 +21,7 @@ const started = (
 });
 
 /**
- * `T-11` (spec amendment of the review): the notices kept for a department that nobody headed are handed to the head when
+ * The notices kept for a department that nobody headed are handed to the head when
  * their period STARTS, by hearing `HEAD_PERIOD_START` on the registry of the organization, and by nothing else.
  */
 describe('HeldNoticeHandoverListener', () => {
@@ -35,7 +35,7 @@ describe('HeldNoticeHandoverListener', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         HeldNoticeHandoverListener,
-        { provide: OrganizationApi, useValue: organization },
+        { provide: OrganizationContextService, useValue: { findOrganization: organization.getOrganization } },
         { provide: NotificationsApi, useValue: notifications },
         { provide: OrganizationChangeListeners, useValue: changes },
       ],

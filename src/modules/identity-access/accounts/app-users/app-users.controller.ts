@@ -25,8 +25,8 @@ import {
   CreateAppUserBodyDto,
   GrantRoleBodyDto,
   ListAppUsersQueryDto,
-} from '../../dto/account-management.dto';
-import { ACCOUNT_ERROR_EXAMPLES, toAccountApiException } from '../../mappers/account.http-errors';
+} from '../account-management.dto';
+import { ACCOUNT_ERROR_EXAMPLES, toAccountApiException } from '../account.http-errors';
 
 const iso = (value: Date): string => value.toISOString();
 

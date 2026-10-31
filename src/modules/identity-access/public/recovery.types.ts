@@ -29,6 +29,6 @@ export interface RecoveryResult {
   ticketRef: string;
   mode: RecoveryModeName;
   outcome: RecoveryOutcome;
-  /** For a link: where it went, always to an address of the account (`P28-05`). Never the link. */
+  /** For a link: where it went, always to an address of the account. Never the link. */
   sentTo?: 'LOGIN_EMAIL' | 'NEW_EMAIL';
 }

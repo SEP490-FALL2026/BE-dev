@@ -1,18 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { BusinessDate, businessDateAt } from '../../../core/business-date';
+import { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CostCenterCatalogueService } from '../cost-center/cost-center-catalogue.service';
 import { DepartmentDirectoryService } from '../department/department-directory.service';
 import { DepartmentUseService } from '../department/department-use.service';
 import { OrganizationChangeService } from '../change-announcement/organization-change.service';
-import { DepartmentHeadRecord, HeadPeriodChanges, HeadPeriodRecord } from '../department/department.types';
+import { DepartmentHeadRecord } from '../department/department.types';
 import { EmployeeDirectoryService } from '../employee/employee-directory.service';
-import { toBrief, toLocalSeedFixtureFacts } from '../mappers/local-seed-fixture.mapper';
+import { toBrief, toLocalSeedFixtureFacts } from '../organization-local-seed-fixture.mapper';
+import { OrganizationContextService } from '../organization-context.service';
 import { OrganizationRepo } from '../organization.repo';
-import { DepartmentServiceAccountReaderHook } from './organization.extension-points';
 import type { CostCenterUse, DepartmentUse } from './organization-use.types';
 import {
-  ClearedHeadSuccessor,
   CostCenterBrief,
   CostedOwningUnit,
   CreateCostCenterInput,
@@ -42,28 +41,19 @@ import {
 /** Public facade of the organization module: other modules call it in their own transaction, never the tables. */
 @Injectable()
 export class OrganizationApi {
-  /** The organization's time zone never changes after installation (I-8), so it is read once. */
-  private timeZone: string | null = null;
-
   constructor(
     private readonly repo: OrganizationRepo,
     private readonly departments: DepartmentDirectoryService,
     private readonly employees: EmployeeDirectoryService,
     private readonly costCenters: CostCenterCatalogueService,
-    private readonly serviceAccounts: DepartmentServiceAccountReaderHook,
     private readonly use: DepartmentUseService,
     private readonly changes: OrganizationChangeService,
+    private readonly context: OrganizationContextService,
   ) {}
 
   /** Today in the organization's own calendar (`now` is a parameter for tests; `tx` reads the zone in the caller's transaction). */
-  async businessToday(now: Date = new Date(), tx?: DbTx): Promise<BusinessDate> {
-    if (this.timeZone === null) {
-      const organization = await this.repo.findOrganization(tx);
-      if (!organization) return businessDateAt(now, 'UTC');
-      this.timeZone = organization.timeZone;
-    }
-
-    return businessDateAt(now, this.timeZone);
+  businessToday(now: Date = new Date(), tx?: DbTx): Promise<BusinessDate> {
+    return this.context.businessToday(now, tx);
   }
 
   /** True when the employee heads a department or has a head period not yet ended: never a Super Admin (FR-8.7, AC-3). */
@@ -81,7 +71,7 @@ export class OrganizationApi {
     return toBrief(await this.departments.find(departmentId, tx));
   }
 
-  /** The departments with these ids in one read, by id (`LD-07`). */
+  /** The departments with these ids in one read, by id. */
   async getDepartmentBriefs(departmentIds: readonly string[], tx?: DbTx): Promise<DepartmentBrief[]> {
     return (await this.departments.findMany(departmentIds, tx)).flatMap((record) => toBrief(record) ?? []);
   }
@@ -117,7 +107,7 @@ export class OrganizationApi {
     return this.departments.idsInChargeOf(employeeId, tx);
   }
 
-  /** What an IT Admin reads and handles: the departments that name them and, while nobody usable is named, every active one (F12). */
+  /** What an IT Admin reads and handles: the departments that name them and, while nobody usable is named, every active one. */
   getItAdminScope(employeeId: string, usableAmong: UsableItAdmins, tx?: DbTx): Promise<string[]> {
     return this.departments.itAdminScopeOf(employeeId, usableAmong, tx);
   }
@@ -132,25 +122,7 @@ export class OrganizationApi {
     return this.departments.headsOn(ids, onDate, tx);
   }
 
-  /** Who headed the department, newest period first, at most `limit` periods. Pass `tx` to read in a transaction. */
-  getDepartmentHeadHistory(departmentId: string, limit: number, tx?: DbTx): Promise<HeadPeriodRecord[]> {
-    return this.departments.headHistory(tx, departmentId, limit);
-  }
-
-  /** Cancels the head periods from `from` on and ends the one in force the day before; the caller holds the department lock. */
-  endDepartmentHeadPeriodsFrom(tx: DbTx, departmentId: string, from: BusinessDate): Promise<HeadPeriodChanges> {
-    return this.departments.endHeadPeriodsFrom(tx, departmentId, from);
-  }
-
-  /** Opens a head period; throws HeadAssignmentError when the database refuses the person on those days (INV-19). */
-  startDepartmentHeadPeriod(
-    tx: DbTx,
-    input: { organizationId: string; departmentId: string; employeeId: string; validFrom: BusinessDate },
-  ): Promise<{ periodId: string }> {
-    return this.departments.startHeadPeriod(tx, input);
-  }
-
-  /** F47 (`ops:inspect`, read only): how many changes of each kind had taken effect at `asOf` in their organization's calendar and were never marked as told. */
+  /** For `ops:inspect` (read only): how many changes of each kind had taken effect at `asOf` in their organization's calendar and were never marked as told. */
   countUnmarkedChangesAsOf(
     tx: DbTx,
     asOf: Date,
@@ -268,23 +240,14 @@ export class OrganizationApi {
     return this.employees.lookupForImport(tx, names, await this.businessToday(new Date(), tx));
   }
 
-  /** The row locks a write of imported people needs: the departments (T-11). */
+  /** The row locks a write of imported people needs: the departments. */
   lockForEmployeeImport(tx: DbTx, departmentIds: string[]): Promise<void> {
     return this.employees.lockForImport(tx, departmentIds);
-  }
-
-  /** The database clock at the start of the transaction: the instant the new employee's `created_at` gets. */
-  employeeRecordingInstant(tx: DbTx): Promise<Date> {
-    return this.employees.recordingInstant(tx);
   }
 
   /** `FOR SHARE` on the department a person is entered into (it must stay until commit), then its state; null if none. */
   lockDepartmentForEntry(tx: DbTx, organizationId: string, code: string): Promise<DepartmentEntryLock | null> {
     return this.departments.lockForEntry(tx, organizationId, code);
-  }
-
-  isEmployeeCodeTaken(tx: DbTx, organizationId: string, employeeCode: string): Promise<boolean> {
-    return this.employees.isCodeTaken(tx, organizationId, employeeCode);
   }
 
   isWorkEmailTaken(tx: DbTx, organizationId: string, normalizedWorkEmail: string): Promise<boolean> {
@@ -323,11 +286,6 @@ export class OrganizationApi {
     return this.departments.requireUnitCostCenter(unit);
   }
 
-  /** The first `limit` open or future service accounts the department owns and how many there are (`QĐ-86c`), asked of `licensing`. */
-  getOwnedServiceAccounts(departmentId: string, onDate: BusinessDate, limit: number, tx?: DbTx) {
-    return this.serviceAccounts.get().ownedBy(departmentId, onDate, limit, tx);
-  }
-
   /** The first `limit` of each thing that keeps the department in use on `day` and how many there are: retiring waits for them. */
   getDepartmentUse(departmentId: string, day: BusinessDate, limit: number, tx?: DbTx): Promise<DepartmentUse> {
     return this.use.readDepartment(departmentId, day, limit, tx);
@@ -338,18 +296,9 @@ export class OrganizationApi {
     return this.use.readCostCenter(costCenterId, limit, tx);
   }
 
-  /** The notices a created or corrected employee record owes, to write with `NotificationsApi.notifyInApp` in the same transaction (`F17`). */
+  /** The notices a created or corrected employee record owes, to write with `NotificationsApi.notifyInApp` in the same transaction. */
   getProfileNotices(tx: DbTx, request: ProfileNoticeRequest): Promise<ProfileNotice[]> {
     return this.employees.profileNotices(tx, request);
-  }
-
-  /** Takes back the successor named to take over the department from a day after `today`; the caller holds the department lock. */
-  clearDepartmentHeadSuccessor(
-    tx: DbTx,
-    departmentId: string,
-    today: BusinessDate,
-  ): Promise<ClearedHeadSuccessor | null> {
-    return this.departments.clearHeadSuccessor(tx, departmentId, today);
   }
 
   /** The numbers and gaps of the onboarding checklist (US-02-04 AC-1, AC-6); with `tx`, in order in that transaction. */
