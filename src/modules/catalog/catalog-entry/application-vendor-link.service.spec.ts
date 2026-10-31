@@ -2,9 +2,9 @@ import { HttpStatus } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import type { AuditApi } from '../../audit/public/audit.api';
-import type { VendorDictionaryLookupService } from '../vendor-dictionary/vendor-dictionary-lookup.service';
+import type { VendorDictionaryFactsService } from '../vendor-dictionary/vendor-dictionary-facts.service';
 import type { VendorProposalIntakeService } from '../vendor-dictionary/vendor-proposal-intake.service';
-import type { VendorDirectoryService, VendorRecord } from '../vendor/vendor-directory.service';
+import type { VendorRecordService, VendorRecord } from '../vendor/vendor-record.service';
 import { ApplicationVendorLinkService } from './application-vendor-link.service';
 import { ApplicationDictionaryLineMismatchError, ApplicationVendorGroupChangedError } from './application.errors';
 import { toApplicationApiException } from './application.http-errors';
@@ -32,8 +32,8 @@ function linkWith(holder: VendorRecord | null, adopted: { vendor: VendorRecord; 
     adoptDictionaryGroup: jest.fn().mockResolvedValue(adopted),
   };
   const service = new ApplicationVendorLinkService(
-    dictionary as unknown as VendorDictionaryLookupService,
-    vendors as unknown as VendorDirectoryService,
+    dictionary as unknown as VendorDictionaryFactsService,
+    vendors as unknown as VendorRecordService,
     {} as VendorProposalIntakeService,
     {} as AuditApi,
   );

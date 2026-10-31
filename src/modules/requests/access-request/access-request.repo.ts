@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { toDateColumn } from '../../../core/business-date';
 import { pricingColumns } from './access-request-pricing.mapper';
 import { SELECT_REQUEST, toRecord } from './access-request-record.mapper';
 import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
+import { requestPolicyJson } from './access-request.json';
 import type {
   AccessRequestState,
   PricingRecord,
@@ -53,7 +53,7 @@ export class AccessRequestRepo {
       delegatedBatchId: input.delegatedBatchId ?? null,
       expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
       ...pricingColumns(input.pricing),
-      policy: input.policy as unknown as Prisma.InputJsonObject,
+      policy: requestPolicyJson.encode(input.policy),
       createdByAppUserId: input.createdByAppUserId,
       submittedAt: input.now,
     };
@@ -232,7 +232,7 @@ export class AccessRequestRepo {
       data: {
         planId: registration.planId,
         branch: registration.branch,
-        policy: registration.policy as unknown as Prisma.InputJsonObject,
+        policy: requestPolicyJson.encode(registration.policy),
         state: registration.state,
         ...pricingColumns(registration.pricing),
       },

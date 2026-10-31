@@ -1,6 +1,6 @@
 import type { EmployeeRowOutcome } from './employee-import-row.types';
 import type { ImportRecord } from './employee-import.repo';
-import type { ImportResult, ImportSummary, ImportView } from './employee-import.types';
+import type { ImportView } from './employee-import.types';
 
 /** How many rows came out each way: what the preview summary and the confirmation result both report. */
 export function outcomeCounts(rows: readonly { outcome: EmployeeRowOutcome }[]) {
@@ -22,12 +22,8 @@ export function toImportView(record: ImportRecord): ImportView {
     status: record.status,
     previewVersion: record.previewVersion,
     ignoredColumns: record.ignoredColumns,
-    // A preview kept before the review queue existed has none.
-    summary: {
-      ...(record.summary as ImportSummary),
-      reviewQueue: (record.summary as Partial<ImportSummary>).reviewQueue ?? { total: 0, items: [] },
-    },
-    result: (record.result ?? null) as ImportResult | null,
+    summary: record.summary,
+    result: record.result,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
     confirmedAt: record.confirmedAt,

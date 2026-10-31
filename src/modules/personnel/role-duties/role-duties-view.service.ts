@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { DepartureNoticeWire, SuperAdminWatchWire } from './role-duties.dto';
 import { assessSuperAdmin, departureLevel, flagMap } from './role-duties.policy';
 import { RoleDutiesRepo } from './role-duties.repo';
@@ -17,14 +17,14 @@ export class RoleDutiesViewService {
     private readonly repo: RoleDutiesRepo,
     private readonly roles: RoleDutiesService,
     private readonly identity: IdentityAccessApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** The open departure of the person who asks, or null when there is none: never the departure of anyone else. */
   async noticeOf(principal: AuthenticatedPrincipal): Promise<DepartureNoticeWire | null> {
     const found = await this.repo.findOpenOf(principal.employeeId);
     if (!found || found.state === 'CANCELLED') return null;
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const view = (
       await this.roles.rolesOf([{ employeeId: found.employeeId, headsDepartment: found.headSuccessor !== null }])
     ).get(found.employeeId);
@@ -40,7 +40,7 @@ export class RoleDutiesViewService {
   /** The four states of the Super Admin role, from the one person who holds it. */
   async superAdminWatch(): Promise<SuperAdminWatchWire> {
     const holder = await this.identity.getSuperAdminHolder();
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const handover = holder?.workState === 'HANDING_OVER' ? await this.repo.findOpenOf(holder.employeeId) : null;
     const assessed = assessSuperAdmin(
       holder && {
@@ -53,7 +53,7 @@ export class RoleDutiesViewService {
       handover && { lastWorkingDay: handover.lastWorkingDay },
       today,
     );
-    const person = holder ? (await this.organization.getEmployees([holder.employeeId]))[0] : undefined;
+    const person = holder ? (await this.organizationReads.getEmployees([holder.employeeId]))[0] : undefined;
 
     return {
       ...assessed,

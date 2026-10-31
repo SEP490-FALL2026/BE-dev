@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../catalog/public/catalog.types';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type {
   AccessState,
   ProvisioningChannel,
@@ -128,7 +128,7 @@ interface ViewContext {
 export class ProvisioningTaskViewService {
   constructor(
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly reasons: ProvisioningTaskReasonRepo,
   ) {}
 
@@ -201,7 +201,7 @@ export class ProvisioningTaskViewService {
       ),
     ];
     const employees = new Map(
-      (await this.organization.getEmployees(employeeIds)).map((employee) => [employee.id, employee]),
+      (await this.organizationReads.getEmployees(employeeIds)).map((employee) => [employee.id, employee]),
     );
     const planIds = [...new Set(records.map((task) => task.assignment.planId))];
     const plans = new Map((await this.catalog.findPlanSeatTargets(planIds)).map((plan) => [plan.planId, plan]));
@@ -215,7 +215,7 @@ export class ProvisioningTaskViewService {
     const reasonCounts = withReasons
       ? new Map([...reasons].map(([taskId, list]) => [taskId, list.length]))
       : await this.reasons.countOf(revocationIds);
-    const today = revocationIds.length > 0 ? await this.organization.businessToday() : '';
+    const today = revocationIds.length > 0 ? await this.organizationReads.businessToday() : '';
 
     return { employees, plans, reasons, reasonCounts, today, now: Date.now() };
   }

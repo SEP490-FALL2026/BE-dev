@@ -12,7 +12,7 @@ import { BudgetHeadChangeListener } from './proposal/budget-head-change.listener
 import { BudgetFactsRepo } from './budget/budget-facts.repo';
 import { BudgetNotifierService } from './budget/budget-notifier.service';
 import { BudgetProposalsController } from './proposal/budget-proposals.controller';
-import { BudgetSupportService } from './budget/budget-support.service';
+import { BudgetFactsService } from './budget/budget-facts.service';
 import { BudgetYearLockRepo } from './budget/budget-year-lock.repo';
 import { BudgetVersionLinesController } from './version/budget-version-lines.controller';
 import { BudgetVersionsController } from './version/budget-versions.controller';
@@ -84,7 +84,7 @@ import { BudgetYearEndSweeper } from './year-end/year-end.job';
     DecisionRepo,
     CommitmentRepo,
     BudgetYearLockRepo,
-    BudgetSupportService,
+    BudgetFactsService,
     BudgetNotifierService,
     ProposalViewService,
     ProposalService,

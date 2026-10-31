@@ -20,7 +20,7 @@ import { SuccessorEligibility } from './accounts/successor-eligibility.service';
 import { JwtAccessTokenVerifier } from './access/jwt-access-token-verifier.service';
 import { MeController } from './access/me.controller';
 import { MeService } from './access/me.service';
-import { ApprovalRoleDirectoryService } from './approval-roles/approval-role-directory.service';
+import { ApprovalRoleFactsService } from './approval-roles/approval-role-facts.service';
 import { ApprovalRoleRepo } from './approval-roles/approval-role.repo';
 import { ApprovalRolesController } from './approval-roles/approval-roles.controller';
 import { ApprovalRoleService } from './approval-roles/approval-role.service';
@@ -35,7 +35,7 @@ import { PasswordResetMailService } from './auth/password-reset-mail.service';
 import { PasswordResetRedemptionService } from './auth/password-reset-redemption.service';
 import { PasswordResetRequestService } from './auth/password-reset-request.service';
 import { PasswordResetService } from './auth/password-reset.service';
-import { SessionDirectoryService } from './auth/session-directory.service';
+import { SessionRecordService } from './auth/session-record.service';
 import { SessionTokenService } from './auth/session-token.service';
 import { SessionRepo } from './auth/session.repo';
 import { SessionService } from './auth/session.service';
@@ -79,8 +79,8 @@ import { RecoveryRepo } from './recovery/recovery.repo';
   ],
   providers: [
     ApprovalRoleRepo,
-    ApprovalRoleDirectoryService,
-    { provide: APPROVAL_ROLE_HOLDINGS, useExisting: ApprovalRoleDirectoryService },
+    ApprovalRoleFactsService,
+    { provide: APPROVAL_ROLE_HOLDINGS, useExisting: ApprovalRoleFactsService },
     ApprovalRoleService,
     SuccessorEligibility,
     SuperAdminTransferService,
@@ -102,8 +102,8 @@ import { RecoveryRepo } from './recovery/recovery.repo';
     RecoveryTicketService,
     SessionService,
     SessionTokenService,
-    SessionDirectoryService,
-    { provide: ACCOUNT_SESSIONS, useExisting: SessionDirectoryService },
+    SessionRecordService,
+    { provide: ACCOUNT_SESSIONS, useExisting: SessionRecordService },
     SessionRepo,
     MeService,
     TokenService,

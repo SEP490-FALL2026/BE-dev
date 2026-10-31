@@ -16,14 +16,14 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
   - `createBootstrapSuperAdmin` — chỉ cho lệnh cài đặt (FR-9.8).
   - `isActionLinkUsable` — worker hỏi trước khi gửi mail có link.
   - `inspectEmployeeAccount` — tài khoản của nhân viên: có không, dùng được không, vai trò gì (khóa `FOR SHARE`); thân hàm ở
-    `accounts/account-directory.service.ts`, facade và `employee-accounts.listener.ts` cùng gọi nó.
+    `accounts/account-record.service.ts`, facade và `employee-accounts.listener.ts` cùng gọi nó.
   - `markEmployeeLeft` — ghi ngày người rời đi lên tài khoản của họ.
   - `findUsableItAdminEmployeeIds`, `findUsableFinanceEmployeeId`, `countUsableItAdminsExcept`, `getSuperAdminHolder`,
     `listRoleHoldersAmong` — ai đang giữ vai trò nào.
   - `getApprovalRoleHolders` — ai giữ ba vai trò phê duyệt (định tuyến bước của Request).
   - `findAccountIdOfEmployee`, `findLoginEmailOfEmployee`, `employeeIdsOfAccounts` — ánh xạ tài khoản ↔ nhân viên.
 - `HolderRecoveryApi`, `RoleTransferRecoveryApi` (`public/holder-recovery.api.ts`, `role-transfer-recovery.api.ts`) —
-  khôi phục Super Admin, chỉ lệnh `pnpm ops:recover` (qua `recovery.module.ts`).
+  khôi phục Super Admin, chỉ lệnh `pnpm ops:recover` (qua `identity-access-recovery-cli.module.ts`).
 - `IdentityAccessInspectionApi` — chỉ `pnpm ops:inspect`; `LocalDemoAccountApi` — chỉ `pnpm dev:seed` và
   `pnpm ops:demo-dataset` (qua `DemoAccountsApi` của installation).
 - Type/lỗi: `identity-access.types.ts`, `identity-access.errors.ts`, `recovery.types.ts`, `recovery.errors.ts`.
@@ -68,7 +68,7 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
 - `approval-roles/` — `approval-roles.controller.ts` (`GET /approval-roles`, `PUT /approval-roles/{role}`) →
   `approval-role.service.ts`. `recovery/` — các bước của `pnpm ops:recover` (không có controller).
 - Nest: `identity-access.module.ts` (API: controller, JWT), `identity-access-facade.module.ts` (facade, mọi graph),
-  `recovery.module.ts`, `identity-access-inspection-facade.module.ts`, `identity-access-local-seed-facade.module.ts`.
+  `identity-access-recovery-cli.module.ts`, `identity-access-inspection-facade.module.ts`, `identity-access-local-seed-facade.module.ts`.
 
 ## Bất biến quan trọng
 

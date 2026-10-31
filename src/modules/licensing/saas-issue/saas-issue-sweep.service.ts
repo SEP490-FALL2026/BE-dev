@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { isReopenLapsed } from './saas-issue.policy';
 import { SaasIssueRepo, type SaasIssueRecord } from './saas-issue.repo';
 
@@ -18,14 +18,14 @@ const BATCH = 200;
 export class SaasIssueSweepService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly issues: SaasIssueRepo,
     private readonly audit: AuditApi,
   ) {}
 
   /** Runs both parts as of `now`; returns how many reports were closed and how many were told about. */
   async run(now: Date = new Date()): Promise<{ closed: number; told: number }> {
-    const today = await this.organization.businessToday(now);
+    const today = await this.organizationReads.businessToday(now);
     const lapsed = await this.issues.listLapsed(today, BATCH);
     let closed = 0;
     for (const issue of lapsed) if (await this.close(issue, now)) closed += 1;
@@ -39,7 +39,7 @@ export class SaasIssueSweepService {
   private close(candidate: SaasIssueRecord, now: Date): Promise<boolean> {
     return this.runner.run(async (tx) => {
       const issue = await this.issues.lock(tx, candidate.id);
-      const today = await this.organization.businessToday(now, tx);
+      const today = await this.organizationReads.businessToday(now, tx);
       if (!issue || !isReopenLapsed({ state: issue.state, reopenUntil: issue.reopenUntil, today })) return false;
       await this.issues.update(tx, issue.id, { state: 'CLOSED', closedAt: now });
       await this.issues.insertEntry(tx, {

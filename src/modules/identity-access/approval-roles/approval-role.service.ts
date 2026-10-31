@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { TransactionRunner, readSqlState } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
 import { employeeHasNotLeft } from '../accounts/account.policy';
 import { ApprovalRoleHolderInvalidError, ApprovalRolePairingError } from './approval-role.errors';
@@ -33,9 +33,9 @@ export interface ApprovalRoleView {
 export class ApprovalRoleService {
   constructor(
     private readonly repo: ApprovalRoleRepo,
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly grants: RoleGrantService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
     private readonly changes: ApprovalRoleChangeListeners,
@@ -52,7 +52,7 @@ export class ApprovalRoleService {
       ]),
     ];
     const people = new Map(
-      (await this.organization.getEmployees(employeeIds)).map((employee) => [employee.id, employee]),
+      (await this.organizationReads.getEmployees(employeeIds)).map((employee) => [employee.id, employee]),
     );
     const named = (employeeId: string) => {
       const employee = people.get(employeeId);
@@ -82,14 +82,14 @@ export class ApprovalRoleService {
    * not be the spending approver (AC-7). Naming the person who already holds it changes nothing.
    */
   async set(actor: AuthenticatedPrincipal, role: ApprovalRoleName, employeeId: string): Promise<ApprovalRoleView[]> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The approval roles were used before installation');
 
     await this.runner.run(async (tx) => {
       // Lock order: the advisory key for these roles, then the employee, then the account (lock protocol).
       await this.repo.lockForChange(tx);
-      await this.organization.lockEmployeeForShare(tx, employeeId);
-      const employee = await this.organization.getEmployee(employeeId, tx);
+      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
+      const employee = await this.organizationReads.getEmployee(employeeId, tx);
       if (!employeeHasNotLeft(employee)) throw new ApprovalRoleHolderInvalidError('EMPLOYEE_NOT_ACTIVE');
 
       const appUserId = await this.accounts.findAccountIdByEmployee(tx, employeeId);
@@ -132,7 +132,7 @@ export class ApprovalRoleService {
         if (readSqlState(error) === '23514') throw new ApprovalRolePairingError();
         throw error;
       }
-      const previous = current ? await this.organization.getEmployee(current.employeeId, tx) : null;
+      const previous = current ? await this.organizationReads.getEmployee(current.employeeId, tx) : null;
       await this.audit.record(tx, {
         organizationId: organization.id,
         actorKind: 'USER',

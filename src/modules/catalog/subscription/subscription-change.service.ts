@@ -3,7 +3,7 @@ import { TransactionRunner, type DbTx } from '../../../infrastructure/database/t
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
-import { PlanLookupService } from '../plan/plan-lookup.service';
+import { PlanFactsService } from '../plan/plan-facts.service';
 import {
   SubscriptionNotFoundError,
   SubscriptionPlanNotFoundError,
@@ -36,7 +36,7 @@ import type { UpdateSubscriptionInput } from './subscription.service';
 export class SubscriptionChangeService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
-    private readonly plans: PlanLookupService,
+    private readonly plans: PlanFactsService,
     private readonly pricing: SubscriptionPricingService,
     private readonly obligation: SubscriptionObligationService,
     private readonly views: SubscriptionViewService,

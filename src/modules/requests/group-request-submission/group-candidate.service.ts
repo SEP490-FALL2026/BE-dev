@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNoDepartmentError } from '../access-request/access-request.errors';
 
 export interface GroupCandidate {
@@ -17,20 +17,20 @@ export interface GroupCandidate {
  */
 @Injectable()
 export class GroupCandidateService {
-  constructor(private readonly organization: OrganizationApi) {}
+  constructor(private readonly organizationReads: OrganizationReadApi) {}
 
   /** Throws AccessRequestNoDepartmentError. */
   async page(
     actor: AuthenticatedPrincipal,
     query: { q?: string; page: number; pageSize: number },
   ): Promise<Page<GroupCandidate>> {
-    const today = await this.organization.businessToday();
-    const unit = (await this.organization.getOwningUnits([actor.employeeId], today)).get(actor.employeeId);
+    const today = await this.organizationReads.businessToday();
+    const unit = (await this.organizationReads.getOwningUnits([actor.employeeId], today)).get(actor.employeeId);
     if (!unit) throw new AccessRequestNoDepartmentError();
 
-    const ids = (await this.organization.getDepartmentMemberIds(unit.departmentId, today)) ?? [];
+    const ids = (await this.organizationReads.getDepartmentMemberIds(unit.departmentId, today)) ?? [];
     const term = query.q?.trim().toLowerCase();
-    const named = (await this.organization.getEmployees(ids))
+    const named = (await this.organizationReads.getEmployees(ids))
       .flatMap((person) =>
         person.status === 'ACTIVE' && person.workEmail !== null && person.workEmail.trim() !== ''
           ? [{ employeeId: person.id, fullName: person.fullName, workEmail: person.workEmail }]

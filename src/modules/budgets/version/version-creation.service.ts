@@ -10,7 +10,7 @@ import {
   BudgetYearEndedError,
 } from '../budget/budget.errors';
 import { copiedLineOf, versionSourceOf, yearHasEnded } from '../budget/budget.policy';
-import { BudgetSupportService } from '../budget/budget-support.service';
+import { BudgetFactsService } from '../budget/budget-facts.service';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
@@ -30,7 +30,7 @@ export class VersionCreationService {
     private readonly versions: VersionRepo,
     private readonly proposals: ProposalRepo,
     private readonly views: VersionViewService,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
     private readonly yearLock: BudgetYearLockRepo,
     private readonly figures: VersionFigures,
     private readonly trail: VersionTrail,
@@ -41,15 +41,15 @@ export class VersionCreationService {
    * BudgetProposalStateError, BudgetCurrentExistsError, BudgetVersionInFlightError, BudgetQuartersMismatchError and the money errors.
    */
   async createFromProposal(actor: AuthenticatedPrincipal, body: VersionBodyDto): Promise<VersionWire> {
-    this.support.requireFinance(actor);
-    const fiscalStart = await this.support.fiscalYearStartMonth();
+    this.facts.requireFinance(actor);
+    const fiscalStart = await this.facts.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
       // The proposal row is locked first, as the head's successor and the sending of a version lock it, so they queue.
       const proposal = await this.proposals.lockById(tx, body.proposalId);
       if (!proposal) throw new BudgetProposalNotFoundError();
-      await this.support.costCenterInUse(proposal.costCenterId, tx);
-      const today = await this.support.today(new Date(), tx);
+      await this.facts.costCenterInUse(proposal.costCenterId, tx);
+      const today = await this.facts.today(new Date(), tx);
       if (yearHasEnded(proposal.year, today, fiscalStart)) throw new BudgetYearEndedError(proposal.year);
       const latest = await this.versions.latestOfProposal(proposal.id, tx);
       const source = versionSourceOf(proposal, latest?.state ?? null);

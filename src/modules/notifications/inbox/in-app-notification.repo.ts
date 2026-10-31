@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { InAppNotificationInput, InAppNotificationRecord, InAppParamValue } from '../public/notifications.types';
+import type { InAppNotificationInput, InAppNotificationRecord } from '../public/notifications.types';
+import { inAppNotificationParamsJson } from './notification-params.json';
 
 const READ_SELECT = {
   id: true,
@@ -17,8 +18,7 @@ const READ_SELECT = {
 type Row = Prisma.InAppNotificationGetPayload<{ select: typeof READ_SELECT }>;
 
 function recordOf(row: Row): InAppNotificationRecord {
-  // Only a flat object is ever written (the policy refuses anything else), and a CHECK keeps it an object.
-  return { ...row, params: row.params as Record<string, InAppParamValue> };
+  return { ...row, params: inAppNotificationParamsJson.decode(row.params) };
 }
 
 /**
@@ -39,7 +39,7 @@ export class InAppNotificationRepo {
           code: input.code,
           subjectType: input.subject?.type ?? null,
           subjectId: input.subject?.id ?? null,
-          params: input.params,
+          params: inAppNotificationParamsJson.encode(input.params),
           eventKey: input.eventKey,
         },
       ],

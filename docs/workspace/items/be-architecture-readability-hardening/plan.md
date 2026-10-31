@@ -1,5 +1,13 @@
 # Plan: hoàn thiện ranh giới bên trong module và luật kiến trúc cho dev mới
 
+> **Owner acceptance — 31/10/2026:** ADR-0019 đã được Owner chấp nhận qua xác nhận trực tiếp và cập nhật Accepted,
+> gồm mục 3 và 5; OD-R7 không còn chờ quyết định ADR này. O7 walkthrough vẫn riêng, chưa có kết quả người thật.
+
+> **Post-deploy update — 31/10/2026:** `main` `c14c06a…` có CI `41191829114` và CD `41194738633` xanh.
+> Owner chốt Task 7.6/OD-R8: giữ integration 40 phút, ngoại lệ có theo dõi (run mới 34:11), không sửa workflow.
+> ADR-0019 vẫn Proposed vì Owner yêu cầu xem tóm tắt trước; O7 chưa có human walkthrough. Source WIP local khác
+> không nằm trong bằng chứng deploy này. Bảng pending cũ bên dưới giữ làm lịch sử, không phải phải chạy lại full suite.
+
 > **Owner override OD-R5 — 30/10/2026: giữ queue/Redis cho tương lai.** Task 2.6 dưới đây đã đổi từ xóa sang
 > kiểm tra/refactor phần dự phòng. Không gỡ BullMQ, module/config/test queue, Redis service/volume hoặc config mẫu;
 > không bật queue hay mở rộng nghiệp vụ khi chưa có use case. Ưu tiên hơn lựa chọn người thực hiện đề xuất trước đó.

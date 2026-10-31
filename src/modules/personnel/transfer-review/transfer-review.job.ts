@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { TransferReviewOverdueService } from './transfer-review-overdue.service';
+import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 
 /** The first sweep waits, so a short-lived process (a test, a command) never starts one. */
 const FIRST_SWEEP_AFTER_MS = 5 * 60 * 1000;
@@ -42,7 +43,7 @@ export class TransferReviewSweeper implements OnApplicationBootstrap, OnModuleDe
       const told = await this.overdue.noticeOverdue();
       if (told > 0) this.logger.log(`Told ${told} transfer review(s) past their deadline`);
     } catch (error) {
-      this.logger.error(`Transfer review overdue sweep failed: ${(error as Error).name}`);
+      this.logger.error(`Transfer review overdue sweep failed: ${describeForOperator(error)}`, traceForOperator(error));
     } finally {
       this.schedule(SWEEP_EVERY_MS);
     }

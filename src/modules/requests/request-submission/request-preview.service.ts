@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNoDepartmentError } from '../access-request/access-request.errors';
 import type { PreviewBodyDto, PreviewWire } from './request-preview.dto';
 import { buildChain, spendSubmissionOf, termNeedsConfirmation } from './request-preview.policy';
@@ -19,7 +19,7 @@ export class RequestPreviewService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly assessment: RequestFactsService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly pricing: PricingViewService,
   ) {}
@@ -46,9 +46,9 @@ export class RequestPreviewService {
     const peopleIds = [...new Set(chain.flatMap((step) => (step.assigneeEmployeeId ? [step.assigneeEmployeeId] : [])))];
 
     const [department, costCenters, people, priceView, costEstimate] = await Promise.all([
-      this.organization.getDepartmentBrief(unit.departmentId),
-      unit.costCenter ? this.organization.costCentersByIds([unit.costCenter.id]) : Promise.resolve([]),
-      this.organization.getEmployees(peopleIds),
+      this.organizationReads.getDepartmentBrief(unit.departmentId),
+      unit.costCenter ? this.organizationReads.costCentersByIds([unit.costCenter.id]) : Promise.resolve([]),
+      this.organizationReads.getEmployees(peopleIds),
       this.pricing.view(pricing),
       this.pricing.costEstimate(pricing, vendorId),
     ]);

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ControlledWaitRepo } from './controlled-wait.repo';
 import { alertRecipientsOf, configurationHintOf, type ReassignableStepKind } from '../step-routing/reassignment.policy';
 import { reassignmentAuditEvent } from './reassignment-audit.mapper';
@@ -31,7 +31,7 @@ export interface WaitingStep {
 export class ControlledWaitAlertService {
   constructor(
     private readonly alerts: ControlledWaitRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -49,7 +49,8 @@ export class ControlledWaitAlertService {
 
     const recipients = alertRecipientsOf(step.stepKind, step.waitingReason);
     const itAdmin = recipients.includes('IT_ADMIN_IN_CHARGE')
-      ? ((await this.organization.getItAdminInCharge(step.requesterEmployeeId, today, tx))?.itAdminEmployeeId ?? null)
+      ? ((await this.organizationReads.getItAdminInCharge(step.requesterEmployeeId, today, tx))?.itAdminEmployeeId ??
+        null)
       : null;
     await this.audit.record(
       tx,

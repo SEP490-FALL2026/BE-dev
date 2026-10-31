@@ -4,7 +4,7 @@ import { addDays, type BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { AssignmentNotFoundError, AssignmentRenewalRefusedError } from '../../public/licensing.errors';
 import type { AssignmentFacts, RenewAssignmentInput, RenewedAssignment } from '../../public/licensing-renewal.types';
 import { licensingAuditEvent } from '../../licensing-audit-event.mapper';
@@ -28,7 +28,7 @@ export class AssignmentRenewalService {
     private readonly repo: AssignmentRepo,
     private readonly facts: AssignmentFactsRepo,
     private readonly ending: AssignmentEndService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -54,9 +54,9 @@ export class AssignmentRenewalService {
       throw new AssignmentRenewalRefusedError('END_CHANGED');
     if (facts.revocationLive) throw new AssignmentRenewalRefusedError('REVOCATION_PENDING');
 
-    const organization = await this.organization.getOrganization(tx);
+    const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A seat was renewed before installation');
-    const today = await this.organization.businessToday(input.now, tx);
+    const today = await this.organizationReads.businessToday(input.now, tx);
     // The period of a record is never empty: a seat that began today and was to end today still runs a day.
     const endsOn = later(later(input.previousExpectedEndDate, today), addDays(current.effectiveFrom, 1));
 

@@ -130,7 +130,11 @@ bash demo-dataset.sh --app-dir /opt/slm/backend --config /opt/slm/backend/.env.d
 Wrapper chạy `docker compose run --rm --no-deps -T api node dist/demo-dataset-cli.js <mode> … --environment=SHARED
 --secrets-stdin` với đúng image của `releases/current-image` (không bao giờ `latest`), bằng **runtime role** của service
 `api` (H7 giữ nguyên), trong mạng Compose để gọi API trực tiếp. Báo cáo (không mật khẩu/token) được lưu tại
-`/opt/slm/backend/demo-dataset/<UTC>-<fixture>-<mode>.txt`. Kiểm tra: [mục 5](#5-kiểm-tra-và-mã-thoát).
+`/opt/slm/backend/demo-dataset/<UTC>-<fixture>-<mode>.txt`; dòng đầu ghi mode, image, **API đích kèm nguồn** (`from
+DEMO_API_URL` hay `default: DEMO_API_URL is not set` — mặc định là `http://slm-api:3000`, nên khi API chạy cổng khác,
+ví dụ `PORT=4000`, phải đặt `DEMO_API_URL`), dòng cuối ghi mã thoát và số giây; báo cáo giữ cả stderr của lệnh (dòng
+`refused:`/`warning:`/lỗi), trước 31/10/2026 chỉ giữ stdout nên báo cáo của lượt lỗi trống. Kiểm tra:
+[mục 5](#5-kiểm-tra-và-mã-thoát).
 
 ## 4. Cách B — chạy từ máy local (Windows) qua SSH tunnel
 
@@ -144,7 +148,11 @@ local — PostgreSQL vẫn không công bố cổng nào trên VPS, tunnel đi t
 - SSH vào VPS **bằng khóa hoặc agent, không hỏi mật khẩu** (wrapper dùng `BatchMode=yes`); user SSH chạy được `docker`
   (như user deploy) và đọc được `<app dir>/releases/current-image`.
 - Checkout BE ở commit có hạng mục này, **và** `prisma/` cùng `openapi.json` giống hệt commit đang deploy. Wrapper tự
-  kiểm (mục 4.3); nếu khác, deploy trước (cách A) hoặc chờ.
+  kiểm (mục 4.3); nếu khác, deploy trước (cách A) hoặc chờ. Commit đang deploy do CD build từ repository
+  `WDP301-FA26-GR8/BE`, có thể không có ở `origin` của checkout (`SEP490-FALL2026/BE-dev`): lấy đúng object đó mà không
+  thêm remote hay đổi nhánh bằng `git fetch git@github.com:WDP301-FA26-GR8/BE.git <sha của releases/current-image>`.
+- Trên VPS `e2-micro` (958 MiB RAM, swap trên cùng đĩa) đây là cách được chọn (Owner, 31/10/2026): container one-off của
+  cách A khởi động Node ngay trên host và đã làm truy vấn đầu quá `DB_QUERY_TIMEOUT_MS` (plan của hạng mục, Task 7).
 - Build: tại gốc repo BE, `pnpm install --frozen-lockfile` rồi `pnpm build`. Wrapper từ chối bản build cũ hơn mã nguồn.
 
 ### 4.2. File riêng (ngoài repository)
@@ -215,6 +223,29 @@ nghi tunnel còn mở: `Test-NetConnection 127.0.0.1 -Port 15432` phải `False`
 | `4`      | Có bước **xung đột** hoặc **bị chặn**; bước khác đã chạy                                         | Đọc dòng `XUNG ĐỘT`: dữ liệu ngoài dataset đang giữ chỗ, hoặc bản ghi của dataset đã bị sửa — quyết định thủ công, lệnh không ghi đè. |
 | `3`      | Từ chối trước khi ghi (cấu hình, image, tương thích, lịch, khóa, sai tổ chức/API/mật khẩu)       | Sửa theo thông báo; chưa có bản ghi nào của dataset thay đổi.                                                                         |
 | `1`      | Lỗi giữa chừng (API không tới được, lỗi 5xx, tunnel đứt, vai PostgreSQL không phải runtime role) | Báo cáo nêu bước đã xong; sửa nguyên nhân rồi chạy lại `apply`, lệnh đi tiếp.                                                         |
+
+**Đọc dòng lỗi.** Lỗi ngoài các bước in một dòng
+`The demo dataset run failed in phase <phase> after <ms> ms (run <ms> ms): <loại> [code=…] [sqlState=…] retryable=… [cause=…] [pg="…"]`
+— không URL, không thông điệp gốc của lỗi, không stack, không mật khẩu. `pg="…"` chỉ là thông điệp cố định của
+node-postgres cho lỗi kết nối (`Query read timeout`, `Connection terminated unexpectedly`, …).
+
+| Phase                | Đang làm gì                                                                                        |
+| -------------------- | -------------------------------------------------------------------------------------------------- |
+| `secrets`            | đọc hai mật khẩu từ stdin                                                                          |
+| `startup`            | mở đồ thị lệnh; ở production chạy truy vấn đầu tiên kiểm runtime role, **ngoài** transaction       |
+| `installation-facts` | đọc tổ chức, ngày, Super Admin trong database                                                      |
+| `apply-lock`         | (`apply`) lấy khóa advisory trên kết nối riêng                                                     |
+| `api-proof`          | đăng nhập Super Admin qua API và đối chiếu `/me`                                                   |
+| `calendar`           | đọc tham số năm tài chính và Audit Trail qua API                                                   |
+| `steps`              | các bước của dataset                                                                               |
+| `lock-release`       | (`apply`) nhả khóa; lỗi ở đây chỉ in `warning:`, **không** thay báo cáo hay mã thoát của lượt chạy |
+
+`warning: A database connection was retired …` rồi `phase startup … Error retryable=true pg="Query read timeout"` nghĩa
+là database (hoặc đường mạng tới nó, hoặc tiến trình bị nghẽn CPU) không trả lời truy vấn kiểm vai trong
+`DB_QUERY_TIMEOUT_MS`: chưa có gì được ghi; kiểm tình trạng PostgreSQL/host rồi chạy lại, **không** tăng timeout để
+che. API không tới được in `(<METHOD> <path> kind=NETWORK|TIMEOUT [code=ECONNREFUSED|ENOTFOUND|…] elapsedMs=…)`:
+`NETWORK` + `ECONNREFUSED` = sai cổng hoặc API chưa nghe; `ENOTFOUND`/`EAI_AGAIN` = tên máy; `TIMEOUT` = API nhận
+kết nối nhưng không trả lời trong 30 giây.
 
 ## 6. Bàn giao cho FE
 

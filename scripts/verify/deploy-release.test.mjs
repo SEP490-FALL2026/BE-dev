@@ -148,6 +148,7 @@ count() {
   echo "$counted" > "$state/$1"
 }
 case "$*" in
+  "logs "*) echo "private application log $FAKE_ENV_VALUE" ;;
   *" caddy caddy validate "*)
     echo "caddy: DOMAIN=$FAKE_ENV_VALUE"
     echo "caddy: DOMAIN=$FAKE_ENV_VALUE" >&2
@@ -809,6 +810,37 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
     assert.match(result.output, /RECOVERY: the previous release ghcr\.io\/example\/slm-api:a{40} is ready/);
     assert.match(result.output, /No migration was rolled back.*slm-pre-migrate-/s);
     assert.equal(result.output.includes(SECRET), false);
+  });
+
+  it('captures private candidate diagnostics before rollback, without leaking application logs to Actions', () => {
+    const target = host();
+    const result = deploy(target, { badNew: 'api:notready' });
+    assert.equal(result.status, 1, result.output);
+    const diagnostic = join(target.app, `.deploy-diagnostics-${RELEASE}-${ATTEMPT}`);
+    assert.ok(readFileSync(join(diagnostic, 'api.log'), 'utf8').includes(SECRET));
+    assert.equal(result.output.includes(SECRET), false);
+    assert.match(result.output, /probe exit 1; no output/);
+    const logIndex = result.calls.findIndex((call) => call.includes('logs --timestamps --tail 200 fake-api-1'));
+    const stopIndex = result.calls.findIndex((call) => call.includes(' stop api worker'));
+    assert.ok(logIndex >= 0 && stopIndex > logIndex, result.calls.join('\n'));
+    assert.deepEqual(live(target), LIVE);
+    assert.match(result.output, /RECOVERY: the previous release .* is ready/);
+    if (process.platform !== 'win32') {
+      assert.equal(statSync(diagnostic).mode & 0o777, 0o700);
+      assert.equal(statSync(join(diagnostic, 'api.log')).mode & 0o777, 0o600);
+    }
+  });
+
+  it('continues rollback when diagnostic log collection fails', () => {
+    const target = host();
+    const result = deploy(target, { badNew: 'api:notready', fail: 'logs --timestamps' });
+    assert.equal(result.status, 1, result.output);
+    assert.deepEqual(live(target), LIVE);
+    assert.match(result.output, /RECOVERY: the previous release .* is ready/);
+    assert.match(
+      readFileSync(join(target.app, `.deploy-diagnostics-${RELEASE}-${ATTEMPT}`, 'api-state.txt'), 'utf8'),
+      /logs exit=1/,
+    );
   });
 
   it('reports a recovery step that fails, with the previous release state still restored (H7-OPS-RV-02)', () => {

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SpendEntryService } from '../spend/spend-entry.service';
 import {
   AccessRequestNoDepartmentError,
@@ -63,7 +63,7 @@ export class GroupRequestService {
     private readonly runner: TransactionRunner,
     private readonly facts: GroupSubmissionFactsService,
     private readonly assessment: RequestFactsService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly requests: AccessRequestRepo,
     private readonly entry: SpendEntryService,
     private readonly drafts: RequestDraftRepo,
@@ -157,8 +157,8 @@ export class GroupRequestService {
 
   /** The sender is relied on until commit: they cannot be removed from the company between the check and the write. */
   private async requireSender(tx: DbTx, actor: AuthenticatedPrincipal): Promise<string> {
-    await this.organization.lockEmployeeForShare(tx, actor.employeeId);
-    const employee = await this.organization.getEmployee(actor.employeeId, tx);
+    await this.organizationReads.lockEmployeeForShare(tx, actor.employeeId);
+    const employee = await this.organizationReads.getEmployee(actor.employeeId, tx);
     if (!employee) throw new AccessRequestNoDepartmentError();
 
     return employee.organizationId;

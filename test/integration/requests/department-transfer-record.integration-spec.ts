@@ -91,7 +91,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
       expect.objectContaining({ department_id: fin.id, valid_from: effectiveOn, valid_to: null }),
     ]);
     const owning = async (day: string) =>
-      (await h.organizationService().getOwningUnits([e1.employeeId], day)).get(e1.employeeId)?.costCenter?.id;
+      (await h.organizationReads().getOwningUnits([e1.employeeId], day)).get(e1.employeeId)?.costCenter?.id;
     expect(await owning(h.day(29))).toBe(des.unitId);
     expect(await owning(effectiveOn)).toBe(fin.unitId);
     expect(await h.auditEventsOf('DEPARTMENT_TRANSFER.RECORDED', wire.id)).toEqual([
@@ -232,7 +232,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
     expect(wire).toMatchObject({ status: 'PENDING', to: { department: { code: 'P-BARE' } } });
     expect((await h.placements(person.employeeId)).map((row) => row.department_id)).toEqual([des.id, bare.id]);
     const owning = async (day: string) =>
-      (await h.organizationService().getOwningUnits([person.employeeId], day)).get(person.employeeId)?.costCenter?.id;
+      (await h.organizationReads().getOwningUnits([person.employeeId], day)).get(person.employeeId)?.costCenter?.id;
     expect(await owning(h.day(19))).toBe(des.unitId);
   });
 
@@ -341,9 +341,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
     const today = await h.recorded(body(person.employeeId, { effectiveOn: h.today() }));
     expect(today).toMatchObject({ status: 'EFFECTIVE', effectiveOn: h.today() });
     expect(await h.auditEventsOf('DEPARTMENT_TRANSFER.EFFECTIVE', today.id)).toHaveLength(1);
-    expect((await h.organizationService().getEmployeePlacement(person.employeeId, h.today()))?.departmentId).toBe(
-      fin.id,
-    );
+    expect((await h.organizationReads().getEmployeePlacement(person.employeeId, h.today()))?.departmentId).toBe(fin.id);
   });
 
   it('wants a day after the first day of the placement the person has (a person recorded today cannot move today)', async () => {

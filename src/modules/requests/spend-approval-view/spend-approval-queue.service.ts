@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { BudgetCheckRepo } from '../spend/budget-check.repo';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
-import { SpendReadSupport } from '../spend/spend-read.service';
+import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 import type { ApprovalSummaryWire } from './spend-approval.dto';
 import { approvalSummaryOf, type QueueLookups } from './spend-approval.mapper';
@@ -23,8 +23,8 @@ export class SpendApprovalQueueService {
     private readonly checks: BudgetCheckRepo,
     private readonly batches: SpendBatchRepo,
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
-    private readonly support: SpendReadSupport,
+    private readonly organizationReads: OrganizationReadApi,
+    private readonly wireView: SpendWireViewService,
   ) {}
 
   /** The spend steps waiting for the caller, the oldest first. */
@@ -54,15 +54,15 @@ export class SpendApprovalQueueService {
       this.checks.latestOf(requestIds),
       this.batches.latestBatchOf(requestIds),
       planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
-      this.support.people(
+      this.wireView.people(
         rows.flatMap((row) => [
           row.request.requesterEmployeeId,
           row.request.type === 'GROUP_GRANT' ? null : (row.request.beneficiaries[0]?.employeeId ?? null),
         ]),
       ),
-      this.support.units(rows.map((row) => row.request.amountCurrency)),
+      this.wireView.units(rows.map((row) => row.request.amountCurrency)),
       // A step is only ever opened for a request that was sent, so it has its Cost Center; a draft has none and has no step.
-      this.organization.costCentersByIds([
+      this.organizationReads.costCentersByIds([
         ...new Set(rows.flatMap((row) => (row.request.costCenterId === null ? [] : [row.request.costCenterId]))),
       ]),
     ]);

@@ -72,6 +72,14 @@ function isPgConnectivityError(error: unknown): boolean {
   return PG_CONNECTIVITY_MESSAGES.has(error.message) || (typeof code === 'string' && SOCKET_ERROR_CODES.has(code));
 }
 
+/**
+ * The fixed message node-postgres wrote for a connectivity failure (one of the list above), for an operator line;
+ * undefined for any other error, whose message may carry data.
+ */
+export function pgConnectivityMessage(error: unknown): string | undefined {
+  return error instanceof Error && PG_CONNECTIVITY_MESSAGES.has(error.message) ? error.message : undefined;
+}
+
 export function toTransientError(error: unknown): TransientDatabaseError | undefined {
   if (isPgConnectivityError(error)) return new TransientDatabaseError(undefined, error);
 

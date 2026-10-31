@@ -10,7 +10,7 @@ import {
   BudgetWindowBackwardsError,
 } from '../budget/budget.errors';
 import { backwardLines, incompleteLines, patchChangesLine } from '../budget/budget.policy';
-import { budgetAuditEvent, BudgetSupportService } from '../budget/budget-support.service';
+import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionAccessService } from './version-access.service';
 import { VersionHistoryService } from './version-history.service';
 import { VersionLineRepo, type LinePatch, type VersionLineRecord } from '../budget/version-line.repo';
@@ -32,7 +32,7 @@ export class VersionLineService {
     private readonly versions: VersionRepo,
     private readonly lines: VersionLineRepo,
     private readonly views: VersionViewService,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
     private readonly access: VersionAccessService,
     private readonly history: VersionHistoryService,
     private readonly audit: AuditApi,
@@ -48,8 +48,8 @@ export class VersionLineService {
     position: number,
     patch: LinePatchDto,
   ): Promise<VersionLineWire> {
-    this.support.requireFinance(actor);
-    const fiscalStart = await this.support.fiscalYearStartMonth();
+    this.facts.requireFinance(actor);
+    const fiscalStart = await this.facts.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
       const version = await this.access.lockEditable(tx, id, fiscalStart);
@@ -58,12 +58,12 @@ export class VersionLineService {
 
       const { amount, ...rest } = patch;
       const next: LinePatch = { ...rest };
-      if (amount) next.amountMinor = await this.support.money(amount, version.currency, tx);
+      if (amount) next.amountMinor = await this.facts.money(amount, version.currency, tx);
       const merged = { ...line, ...stripUndefined(next) };
       if (merged.windowTo < merged.windowFrom) throw new BudgetWindowBackwardsError([position]);
       const adjusts = line.proposalPosition !== null && patchChangesLine(line, next);
       if (adjusts && !merged.adjustmentReason) throw new BudgetReasonRequiredError('ADJUSTMENT');
-      await this.support.requirePlans([next.planId]);
+      await this.facts.requirePlans([next.planId]);
 
       await this.lines.patchLine(tx, id, position, next);
       const edited = (await this.lines.findLine(id, position, tx)) as VersionLineRecord;
@@ -92,8 +92,8 @@ export class VersionLineService {
 
   /** Finance adds lines of their own to a version being built; they must say what every line says. */
   async addLines(actor: AuthenticatedPrincipal, id: string, body: AddLinesBodyDto): Promise<VersionWire> {
-    this.support.requireFinance(actor);
-    const fiscalStart = await this.support.fiscalYearStartMonth();
+    this.facts.requireFinance(actor);
+    const fiscalStart = await this.facts.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
       const version = await this.access.lockEditable(tx, id, fiscalStart);
@@ -106,7 +106,7 @@ export class VersionLineService {
       if (incomplete.length > 0) throw new BudgetProposalIncompleteError(incomplete);
       const backwards = backwardLines(drafts);
       if (backwards.length > 0) throw new BudgetWindowBackwardsError(backwards);
-      await this.support.requirePlans(body.lines.map((line) => line.planId));
+      await this.facts.requirePlans(body.lines.map((line) => line.planId));
 
       const lines: Omit<VersionLineRecord, 'position'>[] = [];
       for (const line of body.lines) {
@@ -116,7 +116,7 @@ export class VersionLineService {
           description: line.description,
           planId: line.planId ?? null,
           seats: line.seats ?? null,
-          amountMinor: await this.support.money(line.amount, version.currency, tx),
+          amountMinor: await this.facts.money(line.amount, version.currency, tx),
           windowFrom: line.windowFrom as string,
           windowTo: line.windowTo as string,
           servicePeriodMonths: line.servicePeriodMonths as number,

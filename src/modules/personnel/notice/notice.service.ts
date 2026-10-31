@@ -6,7 +6,7 @@ import { isUniqueViolation } from '../../../infrastructure/database/unique-viola
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import { userActor } from '../public/personnel.types';
@@ -29,7 +29,7 @@ const CALENDAR_WINDOW_DAYS = 90;
 export class NoticeService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly parameters: OperatingParametersApi,
     private readonly notices: NoticeRepo,
     private readonly audit: AuditApi,
@@ -78,16 +78,16 @@ export class NoticeService {
   }
 
   private async sendInTx(tx: DbTx, actor: AuthenticatedPrincipal, input: SendNoticeInput): Promise<NoticeRecord> {
-    const organization = await this.organization.getOrganization(tx);
+    const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A notice was sent before installation');
-    const today = await this.organization.businessToday(new Date(), tx);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
 
-    const employee = await this.organization.getEmployee(input.employeeId, tx);
-    const placement = employee ? await this.organization.getEmployeePlacement(employee.id, today, tx) : null;
+    const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
+    const placement = employee ? await this.organizationReads.getEmployeePlacement(employee.id, today, tx) : null;
     const target = input.targetDepartmentId
-      ? await this.organization.getDepartmentBrief(input.targetDepartmentId, tx)
+      ? await this.organizationReads.getDepartmentBrief(input.targetDepartmentId, tx)
       : null;
-    const senderHead = await this.organization.getHeadedDepartment(actor.employeeId, today);
+    const senderHead = await this.organizationReads.getHeadedDepartment(actor.employeeId, today);
     const refusal = sendRefusal({
       kind: input.kind,
       senderEmployeeId: actor.employeeId,
@@ -105,7 +105,7 @@ export class NoticeService {
     if (refusal) throw new NoticeRefusedError(refusal.code, refusal.details);
     if (!employee || !senderHead) throw new Error('A notice passed the rules without a person or a head');
 
-    const inCharge = await this.organization.getItAdminInCharge(employee.id, today, tx);
+    const inCharge = await this.organizationReads.getItAdminInCharge(employee.id, today, tx);
     const notice = await this.notices.insert(tx, await this.notices.nextCode(tx, today.slice(0, 4)), {
       organizationId: organization.id,
       employeeId: employee.id,

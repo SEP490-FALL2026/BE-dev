@@ -7,6 +7,7 @@ import {
   TOKEN_VERIFICATION_UNAVAILABLE_ERROR,
 } from '../../http/errors/access-errors';
 import { ApiException } from '../../http/errors/api.exception';
+import { describeForOperator } from '../../observability/operator-error';
 import { IS_PUBLIC_METADATA } from '../decorators/public.decorator';
 import { AUTHENTICATED_IDENTITY } from '../models/current-principal';
 import {
@@ -20,15 +21,6 @@ import { extractBearerToken } from '../tokens/bearer-token';
 type AuthenticatedRequest = Request & {
   [AUTHENTICATED_IDENTITY]?: Awaited<ReturnType<AccessTokenVerifierPort['verify']>>;
 };
-
-/** `LoggerService.error` takes the trace as a string; the application logger sanitises it as one. */
-function describeForOperator(reason: unknown): string {
-  if (reason instanceof Error) {
-    return reason.stack ?? `${reason.name}: ${reason.message}`;
-  }
-
-  return String(reason);
-}
 
 @Injectable()
 export class AuthenticationGuard implements CanActivate {
@@ -65,7 +57,10 @@ export class AuthenticationGuard implements CanActivate {
         // The trace argument must be a STRING: the application logger runs string
         // sanitisation over it. Passing an object throws inside the logger, which escapes
         // this method and turns the 503 below into a 500 with nothing logged at all.
-        this.logger.error('Access token verification is unavailable', describeForOperator(error.reason));
+        this.logger.error(
+          'Access token verification is unavailable',
+          describeForOperator(error.reason, { stack: true }),
+        );
 
         throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, TOKEN_VERIFICATION_UNAVAILABLE_ERROR);
       }

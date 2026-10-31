@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
@@ -35,7 +35,7 @@ export class FinanceReviewService {
     private readonly steps: SpendStepRepo,
     private readonly checks: BudgetCheckRepo,
     private readonly routing: SpendRoutingService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly views: SpendViewService,
     private readonly writer: FinanceReviewWriter,
   ) {}
@@ -67,8 +67,8 @@ export class FinanceReviewService {
       const check = await this.checks.latest(requestId, tx);
       if (!check) throw new Error(`The review of the request ${requestId} has no check.`);
 
-      const today = await this.organization.businessToday(new Date(), tx);
-      const heads = await this.organization.getDepartmentHeads([request.departmentId], today);
+      const today = await this.organizationReads.businessToday(new Date(), tx);
+      const heads = await this.organizationReads.getDepartmentHeads([request.departmentId], today);
       const refusal = open
         ? checkReviewOutcome(body.outcome, { check, departmentHasHead: heads.has(request.departmentId) })
         : checkWaitingOutcome(body.outcome, check);

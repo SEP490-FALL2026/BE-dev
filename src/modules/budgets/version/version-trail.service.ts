@@ -3,7 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
-import { budgetAuditEvent } from '../budget/budget-support.service';
+import { budgetAuditEvent } from '../budget/budget-facts.service';
 import type { ProposalRecord } from '../budget/proposal.repo';
 import type { VersionRecord } from '../budget/version.repo';
 import { VersionHistoryService } from './version-history.service';

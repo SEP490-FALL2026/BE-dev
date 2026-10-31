@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { normalizeEmail } from '../../../core/email';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { CredentialService } from '../credentials/credential.service';
 import { PasswordPolicyError } from '../public/identity-access.errors';
 import { AccountNoLongerUsableError, CurrentPasswordInvalidError } from './auth.errors';
@@ -15,8 +15,8 @@ import { canReceiveResetMail } from './password-reset.policy';
 @Injectable()
 export class PasswordChangeService {
   constructor(
-    private readonly accounts: AccountDirectoryService,
-    private readonly organization: OrganizationApi,
+    private readonly accounts: AccountRecordService,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly changes: CredentialChangeService,
     private readonly throttle: LoginThrottle,
     private readonly credentials: CredentialService,
@@ -62,7 +62,7 @@ export class PasswordChangeService {
     await this.runner.run(async (tx) => {
       if (!(await this.accounts.lockAppUser(tx, account.id, 'UPDATE'))) throw new AccountNoLongerUsableError();
       const current = await this.accounts.readAccount(tx, account.id);
-      const employee = current ? await this.organization.getEmployee(current.employeeId, tx) : null;
+      const employee = current ? await this.organizationReads.getEmployee(current.employeeId, tx) : null;
       if (!current || !employee || !canReceiveResetMail(current, employee)) throw new AccountNoLongerUsableError();
       // Another change or reset won the lock first: what was verified is no longer the current password.
       if (current.credentialHash !== verifiedHash) throw new CurrentPasswordInvalidError();

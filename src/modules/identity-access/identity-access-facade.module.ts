@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { OrganizationModule } from '../organization/organization.module';
-import { AccountDirectoryService } from './accounts/account-directory.service';
+import { AccountRecordService } from './accounts/account-record.service';
 import { ActionLinkService } from './accounts/action-link.service';
 import { ActionTokenRepo } from './accounts/action-token.repo';
 import { AppUserRepo } from './accounts/app-user.repo';
@@ -36,7 +36,7 @@ import { ApprovalRoleChangeListeners } from './public/identity-access.extension-
     ApprovalRoleHoldersService,
     ApprovalRoleChangeListeners,
     PasswordHasher,
-    AccountDirectoryService,
+    AccountRecordService,
     RoleGrantService,
     ActionLinkService,
     CredentialService,
@@ -45,7 +45,7 @@ import { ApprovalRoleChangeListeners } from './public/identity-access.extension-
   ],
   exports: [
     IdentityAccessApi,
-    AccountDirectoryService,
+    AccountRecordService,
     RoleGrantService,
     ActionLinkService,
     CredentialService,

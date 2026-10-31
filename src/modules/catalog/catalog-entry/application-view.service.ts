@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SeatOccupancyHook } from '../public/catalog.extension-points';
 import { ApplicationPlans } from './application-plans.types';
 import { replacementRequired } from './application.policy';
@@ -14,14 +14,14 @@ import type { ApplicationRecord, ApplicationView, BusinessOwnerView } from './ap
 @Injectable()
 export class ApplicationViewService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly plans: ApplicationPlans,
     private readonly occupancy: SeatOccupancyHook,
   ) {}
 
   /** The records with their Business Owners, read in one call. Throws when an owner is not an employee. */
   async withOwners(records: ApplicationRecord[]): Promise<ApplicationView[]> {
-    const employees = await this.organization.getEmployees([
+    const employees = await this.organizationReads.getEmployees([
       ...new Set(records.map((record) => record.businessOwnerEmployeeId)),
     ]);
     const byId = new Map<string, BusinessOwnerView>(
@@ -50,7 +50,7 @@ export class ApplicationViewService {
       .filter((plan) => plan.provisioningType === 'K1')
       .map((plan) => plan.id);
     if (k1Plans.length === 0) return [];
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const recommendation = recommendK2(await this.occupancy.get().openHolderCount(k1Plans, today));
 
     return recommendation ? [recommendation] : [];

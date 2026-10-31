@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { RepricingService } from '../assessment/repricing.service';
@@ -42,7 +42,7 @@ export class GroupResolutionService {
     private readonly requests: AccessRequestRepo,
     private readonly repricing: RepricingService,
     private readonly assessment: RequestFactsService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly entry: SpendEntryService,
     private readonly steps: SpendStepRepo,
     private readonly ending: GroupResolutionEnding,
@@ -98,7 +98,7 @@ export class GroupResolutionService {
 
     const settings = await this.assessment.settings();
     const repriced = await this.repricing.reprice(tx, request, pricing.expectedSpendOn, {
-      today: await this.organization.businessToday(now, tx),
+      today: await this.organizationReads.businessToday(now, tx),
       fiscalYearStartMonth: settings.fiscalYearStartMonth,
     });
     await this.requests.setPricing(tx, request.id, repriced);

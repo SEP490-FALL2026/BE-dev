@@ -219,7 +219,7 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   constraint cho phép). Chạy ở cuối test ghi dữ liệu tổ chức.
 - `support/test-config.ts`: `ConfigService` có kiểu cho test tự dựng service.
 - `support/pretend-today.ts`: `pretendBusinessToday(app, day)`, cách **duy nhất** để test nói tổ chức đang ở ngày nào: stub
-  `OrganizationContextService.businessToday`, chỗ capability của `organization` đọc ngày trực tiếp và `OrganizationApi.businessToday`
+  `OrganizationContextService.businessToday`, chỗ capability của `organization` đọc ngày trực tiếp và `OrganizationReadApi.businessToday`
   ủy quyền vào. Spy trên facade chỉ điều khiển module khác, capability của `organization` vẫn đọc ngày thật; các harness
   (`pretendToday(day)`, `today(day)`) đều đi qua helper này.
 - `support/pg-relay.ts`: `PgRelay`, relay TCP trước PostgreSQL trên `127.0.0.1` (cổng ngẫu nhiên) để mô phỏng

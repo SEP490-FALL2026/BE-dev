@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PasswordPolicyError } from '../public/identity-access.errors';
 import { employeeHasNotLeft } from './account.policy';
-import { AccountDirectoryService } from './account-directory.service';
+import { AccountRecordService } from './account-record.service';
 import { InvitationInvalidError } from './account.errors';
 import { ActionLinkService } from './action-link.service';
 import { CredentialService } from '../credentials/credential.service';
@@ -16,10 +16,10 @@ import { CredentialService } from '../credentials/credential.service';
 @Injectable()
 export class InvitationRedemptionService {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -51,7 +51,7 @@ export class InvitationRedemptionService {
       if (!stored || !account) return 'invalid';
 
       const now = new Date();
-      const employee = await this.organization.getEmployee(account.employeeId, tx);
+      const employee = await this.organizationReads.getEmployee(account.employeeId, tx);
       const usable =
         stored.appUserId === appUserId &&
         stored.purpose === 'INVITE' &&

@@ -5,7 +5,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { AssignmentNotOpenError, RevocationRefusedError } from '../../licensing/public/licensing.errors';
 import type { OpenedRevocation } from '../../licensing/public/licensing.types';
 import { LicensingApi } from '../../licensing/public/licensing.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import { userActor } from '../public/personnel.types';
 import { TransferReviewError } from './transfer-review.errors';
@@ -44,7 +44,7 @@ export class TransferReviewDecisionService {
     private readonly runner: TransactionRunner,
     private readonly reviews: TransferReviewRepo,
     private readonly licensing: LicensingApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -55,14 +55,14 @@ export class TransferReviewDecisionService {
       const review = await this.reviews.lock(tx, reviewId);
       if (!review) throw new TransferReviewError('NOT_FOUND');
 
-      const today = await this.organization.businessToday(now, tx);
-      const head = (await this.organization.getDepartmentHeads([review.departmentId], today, tx)).get(
+      const today = await this.organizationReads.businessToday(now, tx);
+      const head = (await this.organizationReads.getDepartmentHeads([review.departmentId], today, tx)).get(
         review.departmentId,
       );
       if (!mayDecide(head?.employeeId ?? null, actor.employeeId)) throw new TransferReviewError('NOT_REVIEWER');
       // A review that was replaced is closed to every decision; one that is complete is closed to all but the change of mind below.
       if (review.status === 'SUPERSEDED') throw new TransferReviewError('NOT_OPEN');
-      const employee = await this.organization.getEmployee(review.employeeId, tx);
+      const employee = await this.organizationReads.getEmployee(review.employeeId, tx);
       if (!employee || employee.status !== 'ACTIVE' || employee.workState === 'LEFT') {
         throw new TransferReviewError('EMPLOYEE_LEFT');
       }

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingApi } from '../../licensing/public/licensing.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestCancellationRefusedError } from '../access-request/access-request.errors';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import type { LineCancelCause, LineState } from '../access-request/group-request.types';
@@ -23,7 +23,7 @@ export interface CancelledTask {
 export class GroupLineCloser {
   constructor(
     private readonly licensing: LicensingApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** Locks the task of the grant of the person before the request is locked, as the IT Admin who works the task locks them. */
@@ -38,7 +38,7 @@ export class GroupLineCloser {
     line: { state: LineState; employeeId: string },
     cause: LineCancelCause,
   ): Promise<void> {
-    const [person] = await this.organization.getEmployees([line.employeeId], tx);
+    const [person] = await this.organizationReads.getEmployees([line.employeeId], tx);
     const refusal =
       cause === 'BENEFICIARY_LEFT'
         ? checkLineClosure({ lineState: line.state, beneficiaryLeft: person?.status === 'TERMINATED' })
@@ -82,8 +82,8 @@ export class GroupLineCloser {
     status: string | undefined,
   ): Promise<boolean> {
     if (status !== 'ACTIVE') return false;
-    const today = await this.organization.businessToday(new Date(), tx);
-    const placement = await this.organization.getEmployeePlacement(employeeId, today, tx);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+    const placement = await this.organizationReads.getEmployeePlacement(employeeId, today, tx);
 
     return placement !== null && placement.departmentId !== request.departmentId;
   }

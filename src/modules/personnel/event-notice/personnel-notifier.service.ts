@@ -5,7 +5,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import type { InAppNotificationCode, InAppParamValue } from '../../notifications/public/notifications.types';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 
 /** What happened to a person that the people concerned are told. Codes only: no name, no basis. */
 export type PersonnelEventKind =
@@ -38,7 +38,7 @@ interface Common {
 export class PersonnelNotifier {
   constructor(
     private readonly notifications: NotificationsApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
   ) {}
 
@@ -54,9 +54,9 @@ export class PersonnelNotifier {
       effectiveOn: BusinessDate;
     },
   ): Promise<void> {
-    const today = await this.organization.businessToday(new Date(), tx);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
     const departments = [...new Set([input.departmentId, ...(input.alsoDepartmentIds ?? [])])];
-    const heads = await this.organization.getDepartmentHeads(departments, today, tx);
+    const heads = await this.organizationReads.getDepartmentHeads(departments, today, tx);
     const recipients = new Set<string>([input.employeeId, ...[...heads.values()].map((head) => head.employeeId)]);
     const occurrence = randomUUID();
     for (const recipient of recipients) {
@@ -112,7 +112,7 @@ export class PersonnelNotifier {
     };
     const eventKey = `ABRUPT_DEPARTURE_RECORDED:${input.caseId}`;
     await this.toSuperAdmin(tx, input.organizationId, 'ABRUPT_DEPARTURE_RECORDED', { ...parameters, eventKey });
-    const inCharge = await this.organization.getItAdminInCharge(input.employeeId, input.lastDayInOffice, tx);
+    const inCharge = await this.organizationReads.getItAdminInCharge(input.employeeId, input.lastDayInOffice, tx);
     const itAdmin = inCharge?.itAdminEmployeeId ?? (await this.identity.findFirstUsableItAdminEmployeeId(tx));
     if (itAdmin)
       await this.tell(tx, input.organizationId, itAdmin, 'ABRUPT_DEPARTURE_RECORDED', { ...parameters, eventKey });

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 import { OrganizationChangeListeners } from '../public/organization.extension-points';
 import type { NewOrganizationChange, OrganizationChange } from '../public/organization.types';
 import { AnnouncementRepo } from './announcement.repo';
@@ -55,7 +56,11 @@ export class OrganizationChangeService {
    */
   async announceDue(today: BusinessDate): Promise<AnnounceDueResult> {
     const result: AnnounceDueResult = { told: 0, failed: 0 };
-    const tell = async (read: (tx: DbTx) => Promise<NewOrganizationChange | null>): Promise<void> => {
+    const tell = async (
+      kind: string,
+      id: string,
+      read: (tx: DbTx) => Promise<NewOrganizationChange | null>,
+    ): Promise<void> => {
       try {
         const told = await this.runner.run(async (tx) => {
           const change = await read(tx);
@@ -67,16 +72,23 @@ export class OrganizationChangeService {
         if (told) result.told += 1;
       } catch (error) {
         result.failed += 1;
-        this.logger.error(`A change of the organization could not be told: ${(error as Error).name}`);
+        this.logger.error(
+          `A change of the organization could not be told (${kind} ${id}): ${describeForOperator(error)}`,
+          traceForOperator(error),
+        );
       }
     };
 
     for (const id of await this.announcements.duePlacementIds(today, SWEEP_BATCH)) {
-      await tell((tx) => this.announcements.lockDuePlacement(tx, id, today));
+      await tell('placement', id, (tx) => this.announcements.lockDuePlacement(tx, id, today));
     }
     const heads = await this.announcements.dueHeadPeriodIds(today, SWEEP_BATCH);
-    for (const id of heads.ends) await tell((tx) => this.announcements.lockDueHeadEnd(tx, id, today));
-    for (const id of heads.starts) await tell((tx) => this.announcements.lockDueHeadStart(tx, id, today));
+    for (const id of heads.ends) {
+      await tell('head period end', id, (tx) => this.announcements.lockDueHeadEnd(tx, id, today));
+    }
+    for (const id of heads.starts) {
+      await tell('head period start', id, (tx) => this.announcements.lockDueHeadStart(tx, id, today));
+    }
 
     return result;
   }

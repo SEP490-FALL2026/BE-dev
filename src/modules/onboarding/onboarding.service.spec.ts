@@ -6,7 +6,7 @@ import { IdentityAccessApi } from '../identity-access/public/identity-access.api
 import { LicensingSeatBaselineApi } from '../licensing/public/licensing-seat-baseline.api';
 import type { BaselineProgress } from '../licensing/public/licensing.types';
 import { OnboardingFacts } from '../organization/public/organization.types';
-import { OrganizationApi } from '../organization/public/organization.api';
+import { OrganizationReadApi } from '../organization/public/organization-read.api';
 import { OnboardingForbiddenError } from './onboarding.errors';
 import { OnboardingService } from './onboarding.service';
 
@@ -48,7 +48,7 @@ function serviceWith(
 
         return Promise.resolve(organizationFacts);
       },
-    } as unknown as OrganizationApi,
+    } as unknown as OrganizationReadApi,
     {
       findUsableItAdminEmployeeIds: () => Promise.resolve(new Set(usableItAdmins)),
     } as unknown as IdentityAccessApi,

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeEmail } from '../../../core/email';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { CredentialService } from '../credentials/credential.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
 import { DemoAccountRoleError } from './identity-access.errors';
@@ -19,7 +19,7 @@ const DEMO_ACCOUNT_ROLES: ReadonlySet<string> = new Set<DemoAccountRole>(['IT_AD
 @Injectable()
 export class LocalDemoAccountApi {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly grants: RoleGrantService,
     private readonly credentials: CredentialService,
   ) {}

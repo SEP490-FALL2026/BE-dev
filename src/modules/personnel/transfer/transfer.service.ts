@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { PersonnelActor } from '../public/personnel.types';
 import { TransferPreconditions } from './transfer-preconditions.service';
 import { TransferRecorder } from './transfer-recorder.service';
@@ -24,7 +24,7 @@ import {
 export class TransferService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly guard: TransferGuardService,
     private readonly catalog: CatalogApi,
     private readonly preconditions: TransferPreconditions,
@@ -48,7 +48,7 @@ export class TransferService {
   async recordInTx(tx: DbTx, actor: PersonnelActor, input: RecordTransferInput): Promise<TransferRecord> {
     this.guard.requireWriter(actor, input.employeeId);
     const organization = await this.guard.requireOrganization();
-    const today = await this.organization.businessToday(new Date(), tx);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
 
     const { seen, held } = await this.preconditions.require(tx, actor, input, today);
 

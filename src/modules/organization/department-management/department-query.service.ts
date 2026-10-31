@@ -5,7 +5,7 @@ import { normalizeDisplayName } from '../../../core/display-name';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { EmployeeTechnicalView } from '../public/organization.types';
 import { OrganizationContextService } from '../organization-context.service';
-import { DepartmentDirectoryService } from '../department/department-directory.service';
+import { DepartmentRecordService } from '../department/department-record.service';
 import { EmployeeAccountsHook } from '../public/organization.extension-points';
 import { ProjectService } from '../project/project.service';
 import {
@@ -62,7 +62,7 @@ export class DepartmentQueryService {
     private readonly repo: DepartmentRepo,
     private readonly technical: DepartmentTechnicalMembersRepo,
     private readonly context: OrganizationContextService,
-    private readonly departments: DepartmentDirectoryService,
+    private readonly departments: DepartmentRecordService,
     private readonly projects: ProjectService,
     private readonly employeeAccounts: EmployeeAccountsHook,
   ) {}

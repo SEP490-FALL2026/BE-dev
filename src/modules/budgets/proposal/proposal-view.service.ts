@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCostCenterNotFoundError, BudgetProposalNotFoundError } from '../budget/budget.errors';
-import { BudgetSupportService } from '../budget/budget-support.service';
+import { BudgetFactsService } from '../budget/budget-facts.service';
 import { ProposalRepo, type ProposalLineRecord, type ProposalRecord } from '../budget/proposal.repo';
 import type { ProposalLineWire, ProposalSummaryWire, ProposalWire } from '../budget/budget.dto';
 
@@ -15,7 +15,7 @@ import type { ProposalLineWire, ProposalSummaryWire, ProposalWire } from '../bud
 export class ProposalViewService {
   constructor(
     private readonly proposals: ProposalRepo,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
   ) {}
 
   async list(
@@ -48,7 +48,7 @@ export class ProposalViewService {
   ): Promise<Page<ProposalLineWire>> {
     const proposal = await this.readable(actor, id);
     const { items, total } = await this.proposals.pageLines(id, (query.page - 1) * query.pageSize, query.pageSize);
-    const money = await this.support.formatter(proposal.currency);
+    const money = await this.facts.formatter(proposal.currency);
 
     return pageOf(
       items.map((line) => toLineWire(line, money)),
@@ -69,8 +69,8 @@ export class ProposalViewService {
   }
 
   private async scope(actor: AuthenticatedPrincipal): Promise<'ALL' | string[]> {
-    if (actor.roles.includes('FINANCE') || (await this.support.isDecider(actor.employeeId))) return 'ALL';
-    const own = await this.support.headedCostCenter(actor.employeeId, await this.support.today(new Date()));
+    if (actor.roles.includes('FINANCE') || (await this.facts.isDecider(actor.employeeId))) return 'ALL';
+    const own = await this.facts.headedCostCenter(actor.employeeId, await this.facts.today(new Date()));
 
     return own === null ? [] : [own];
   }
@@ -83,13 +83,13 @@ export class ProposalViewService {
 
   private async wires(proposals: readonly ProposalRecord[]): Promise<ProposalWire[]> {
     const [people, centers] = await Promise.all([
-      this.support.people(proposals.flatMap((p) => [p.submittedByEmployeeId, p.returnedByEmployeeId])),
-      this.support.costCenters(proposals.map((p) => p.costCenterId)),
+      this.facts.people(proposals.flatMap((p) => [p.submittedByEmployeeId, p.returnedByEmployeeId])),
+      this.facts.costCenters(proposals.map((p) => p.costCenterId)),
     ]);
 
     return Promise.all(
       proposals.map(async (proposal) => {
-        const money = await this.support.formatter(proposal.currency);
+        const money = await this.facts.formatter(proposal.currency);
         const costCenter = centers.get(proposal.costCenterId);
         if (!costCenter) throw new BudgetCostCenterNotFoundError();
 

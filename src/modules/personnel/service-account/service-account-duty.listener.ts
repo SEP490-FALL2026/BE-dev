@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { LicensingServiceAccountApi } from '../../licensing/public/licensing-service-account.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { PersonnelFileHookContributions, type PersonnelFileEvent } from '../public/personnel.extension-points';
 
@@ -25,7 +25,7 @@ export class ServiceAccountDutyHook implements OnModuleInit {
   constructor(
     private readonly hooks: PersonnelFileHookContributions,
     private readonly licensingServiceAccounts: LicensingServiceAccountApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -38,7 +38,7 @@ export class ServiceAccountDutyHook implements OnModuleInit {
 
   private async remind(tx: DbTx, event: PersonnelFileEvent): Promise<void> {
     const duties = await this.licensingServiceAccounts.listServiceAccountDuties([event.employeeId], tx);
-    const organization = await this.organization.getOrganization(tx);
+    const organization = await this.organizationReads.getOrganization(tx);
     if (duties.length === 0 || !organization) return;
 
     await this.audit.record(

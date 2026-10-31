@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { EmployeeRecord, OrganizationRecord } from '../../organization/public/organization.types';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
 import { AccountSnapshot } from '../public/identity-access.types';
 import { tryNormalize } from './recovery-procedure.policy';
@@ -15,13 +15,13 @@ import { RecoveryRefusedError } from '../public/recovery.errors';
 @Injectable()
 export class RecoveryTargets {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly grants: RoleGrantService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   async requireOrganization(): Promise<OrganizationRecord> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A recovery was run before installation');
 
     return organization;
@@ -43,7 +43,7 @@ export class RecoveryTargets {
     tx: DbTx,
     located: AccountSnapshot,
   ): Promise<{ account: AccountSnapshot; employee: EmployeeRecord | null }> {
-    await this.organization.lockEmployeeForShare(tx, located.employeeId);
+    await this.organizationReads.lockEmployeeForShare(tx, located.employeeId);
     await this.accounts.lockAppUser(tx, located.id, 'UPDATE');
     const account = await this.accounts.readAccount(tx, located.id);
     if (!account) throw new RecoveryRefusedError('TARGET_NOT_FOUND');
@@ -51,7 +51,7 @@ export class RecoveryTargets {
       throw new RecoveryRefusedError('TARGET_NOT_HOLDER');
     }
 
-    return { account, employee: await this.organization.getEmployee(account.employeeId, tx) };
+    return { account, employee: await this.organizationReads.getEmployee(account.employeeId, tx) };
   }
 
   /** Whether another account already signs in with this address. An unlocked read, like the one before AC-10. */
@@ -72,7 +72,7 @@ export class RecoveryTargets {
    */
   async lockForTransfer(tx: DbTx, successorEmployeeId: string, holder: AccountSnapshot | null): Promise<string | null> {
     const employeeIds = [...new Set([successorEmployeeId, ...(holder ? [holder.employeeId] : [])])].sort();
-    for (const employeeId of employeeIds) await this.organization.lockEmployeeForShare(tx, employeeId);
+    for (const employeeId of employeeIds) await this.organizationReads.lockEmployeeForShare(tx, employeeId);
     const successorAccountId = await this.accounts.findAccountIdByEmployee(tx, successorEmployeeId);
     const accountIds = [
       ...new Set([...(holder ? [holder.id] : []), ...(successorAccountId ? [successorAccountId] : [])]),
@@ -93,7 +93,7 @@ export class RecoveryTargets {
     const holderId = await this.grants.findSuperAdminHolderId(tx);
     if (holderId !== expectedHolderId) throw new RecoveryRefusedError('TARGET_NOT_HOLDER');
     const account = holderId ? await this.accounts.readAccount(tx, holderId) : null;
-    const employee = account ? await this.organization.getEmployee(account.employeeId, tx) : null;
+    const employee = account ? await this.organizationReads.getEmployee(account.employeeId, tx) : null;
 
     return { holderId, account, employee };
   }

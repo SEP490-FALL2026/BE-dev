@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AnnounceDueResult, OrganizationChangeService } from '../change-announcement/organization-change.service';
-import { DepartmentDirectoryService } from '../department/department-directory.service';
+import { DepartmentRecordService } from '../department/department-record.service';
 import { HeadAssignmentError } from '../department/department.errors';
-import { EmployeeDirectoryService } from '../employee/employee-directory.service';
+import { EmployeeRecordService } from '../employee/employee-record.service';
 import { toBrief } from '../organization-local-seed-fixture.mapper';
 import { HeadHandoverRefusedError } from './organization.errors';
-import { OrganizationApi } from './organization.api';
+import { OrganizationReadApi } from './organization-read.api';
 import type {
   DepartmentBrief,
   EmployeeWorkState,
@@ -31,9 +31,9 @@ import type {
 @Injectable()
 export class OrganizationHistoryApi {
   constructor(
-    private readonly organization: OrganizationApi,
-    private readonly employees: EmployeeDirectoryService,
-    private readonly departments: DepartmentDirectoryService,
+    private readonly organizationReads: OrganizationReadApi,
+    private readonly employees: EmployeeRecordService,
+    private readonly departments: DepartmentRecordService,
     private readonly changes: OrganizationChangeService,
   ) {}
 
@@ -62,7 +62,7 @@ export class OrganizationHistoryApi {
   /** Ends the placement in force on the day and begins the new one from it; told at once when the day is today or past. */
   async scheduleStructureChange(tx: DbTx, input: StructureChangeInput): Promise<ScheduledStructureChange> {
     const scheduled = await this.employees.scheduleStructureChange(tx, input);
-    if (input.effectiveOn <= (await this.organization.businessToday(new Date(), tx))) {
+    if (input.effectiveOn <= (await this.organizationReads.businessToday(new Date(), tx))) {
       await this.changes.emit(tx, {
         kind: 'PLACEMENT_START',
         placementId: scheduled.openedPlacementId,
@@ -115,7 +115,7 @@ export class OrganizationHistoryApi {
     const created = input.successorEmployeeId
       ? await this.openSuccessor(tx, { ...input, successorEmployeeId: input.successorEmployeeId }, ended.endedBefore)
       : null;
-    if (input.effectiveOn <= (await this.organization.businessToday(new Date(), tx))) {
+    if (input.effectiveOn <= (await this.organizationReads.businessToday(new Date(), tx))) {
       await this.changes.emit(tx, {
         kind: 'HEAD_PERIOD_END',
         periodId: ended.periodId,
@@ -249,6 +249,6 @@ export class OrganizationHistoryApi {
 
   /** One pass of the sweep for today (or `today`): tells the listeners of the changes that took effect and were not told. */
   async announceDueChanges(today?: BusinessDate): Promise<AnnounceDueResult> {
-    return this.changes.announceDue(today ?? (await this.organization.businessToday()));
+    return this.changes.announceDue(today ?? (await this.organizationReads.businessToday()));
   }
 }

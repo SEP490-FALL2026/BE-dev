@@ -8,6 +8,14 @@
 
 ## Tài nguyên tạm (đăng ký trước khi tạo — operational-commands rule 8)
 
+**H7-SEQ verified trên VPS — 31/10/2026:** production image `c14c06a36c6cfa6158bddd0a09b11e210df2605d`,
+CD `41194738633` ghi `reconcile: DONE`, `findings: none`, release live/ready. SSH kiểm API đúng image,
+restart 0/OOM false; container tạm `slm-p10-h7-verify-20261031` chạy CLI `db-roles verify --json` bằng service migrate
+trả `CONSISTENT`, `findings: []`, không tạo role/đổi owner/chuyển object. Source đúng SHA giữ SELECT/UPDATE chỉ cho
+`personnel_notice_seq`, `saas_issue_seq`; sequence khác/future USAGE. Bằng chứng và giới hạn ở
+[post-deploy checkpoint](../../../reviews/be-architecture-test-acceptance-2026-10-29/post-deploy-evidence-2026-10-31.md).
+Không tạo BM-09/BM-11 mới để kiểm trong lượt chỉ đọc này; live flow QA thuộc FE. Lỗi kết nối CLI seed vẫn riêng.
+
 Mọi tài nguyên dưới đây do gói này tạo, mang đúng tên này, và bị xóa theo đúng tên khi xong (không prune, không wildcard).
 Tài nguyên có sẵn trên máy trước gói — container `redis-server`, container chết `e408ff45e9df`, volume `slm-demo_*`, image
 `postgres:17-alpine` — **không** thuộc gói và không bị đụng tới.

@@ -54,8 +54,8 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
 - `catalog-entry/` — ứng dụng (US-04-01), Business Owner (US-04-06), gợi ý K2 (`k2-recommendation.policy.ts`);
   `applications.controller.ts`, `application-owners.controller.ts`; `ApplicationService` (phần kiểm trước khi ghi ở
   `ApplicationWriteGuards`, phần đổi trạng thái là hàm thuần trong `application-state.policy.ts`). Gốc của module: `plan/` và
-  `subscription/` đọc ứng dụng qua `ApplicationLookupService`; ứng dụng muốn biết plan của mình để gợi ý K2 thì khai
-  `application-plans.types.ts` (`ApplicationPlans`) và `plan/plan-lookup.service.ts` trả lời, `catalog.module.ts` nối hai bên.
+  `subscription/` đọc ứng dụng qua `ApplicationFactsService`; ứng dụng muốn biết plan của mình để gợi ý K2 thì khai
+  `application-plans.types.ts` (`ApplicationPlans`) và `plan/plan-facts.service.ts` trả lời, `catalog.module.ts` nối hai bên.
 - `application-retirement/` — retire ứng dụng (xác nhận của Business Owner, chặn bởi assignment/subscription); đọc ứng dụng,
   plan và subscription nên đứng trên cả ba; controller, dto, policy, repo, `ApplicationRetirementService`.
 - `internal-software-registration/` — đăng ký phần mềm nội bộ: tạo ứng dụng và plan trong một transaction; đứng trên
@@ -71,7 +71,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `sameUnitPrice` là hàm thuần trong `subscription.policy.ts`.
 - `contract/` — hợp đồng và file riêng tư trong object storage (US-04-04); `contracts.controller.ts`,
   `documents.controller.ts`; `ContractService`, `DocumentService`; `document-expiry.job.ts` chạy mỗi giờ (DB-13).
-- `subscription-owner-assignment/` — repo và Nest module riêng của lệnh CLI; service nằm ở `public/`.
+- `subscription-owner-assignment/` — repo và Nest module riêng của lệnh CLI (`subscription-owner-assignment-cli.module.ts`); service nằm ở `public/`.
 - Gốc module: `catalog-audit-event.mapper.ts` (sự kiện Audit Trail, mọi capability dùng).
 
 ## Bất biến quan trọng

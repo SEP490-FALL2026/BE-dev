@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import { AuditApi } from '../../../audit/public/audit.api';
 import { AppRole } from '../../public/identity-access.types';
 import { translateAccountWriteError } from './account-constraints.errors';
-import { AccountDirectoryService } from '../account-directory.service';
+import { AccountRecordService } from '../account-record.service';
 import {
   accountAuditEvent,
   checkRoleRequest,
@@ -34,7 +34,7 @@ import { RoleGrantService } from '../role-grant.service';
 @Injectable()
 export class AccountStatusService {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly grants: RoleGrantService,
     private readonly revocation: ActionLinkRevocation,
     @Inject(ACCOUNT_SESSIONS) private readonly sessions: AccountSessions,

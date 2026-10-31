@@ -6,13 +6,13 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { organizationAuditEvent } from '../organization-audit-event.mapper';
 import { OrganizationContextService } from '../organization-context.service';
-import { DepartmentDirectoryService } from '../department/department-directory.service';
-import { EmployeeDirectoryService } from '../employee/employee-directory.service';
+import { DepartmentRecordService } from '../department/department-record.service';
+import { EmployeeRecordService } from '../employee/employee-record.service';
 import { OrganizationChangeService } from '../change-announcement/organization-change.service';
 import { EmployeeAccountsHook } from '../public/organization.extension-points';
 import type { EmployeeRecord, NewOrganizationChange } from '../public/organization.types';
 import { DepartmentInactiveError, DepartmentNotFoundError, HeadAssignmentError } from '../department/department.errors';
-import { lockAndReadEmployee, requireOrganization } from './department-lookups.service';
+import { lockAndReadEmployee, requireOrganization } from './department-facts.service';
 import { assertMayChangeOrganization, successorProblem } from '../department/department.policy';
 import { DepartmentRepo } from '../department/department.repo';
 import { DEPARTMENT_HEAD_HISTORY_LIMIT, HeadPeriodChanges } from '../department/department.types';
@@ -55,8 +55,8 @@ export class DepartmentHeadService {
   constructor(
     private readonly repo: DepartmentRepo,
     private readonly context: OrganizationContextService,
-    private readonly departments: DepartmentDirectoryService,
-    private readonly employees: EmployeeDirectoryService,
+    private readonly departments: DepartmentRecordService,
+    private readonly employees: EmployeeRecordService,
     private readonly changes: OrganizationChangeService,
     private readonly employeeAccounts: EmployeeAccountsHook,
     private readonly audit: AuditApi,

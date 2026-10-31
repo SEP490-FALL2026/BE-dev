@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../../audit/public/audit.api';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { personnelSystemAuditEvent } from '../../personnel-audit-event.mapper';
 import {
   OffboardingWarningContributions,
@@ -28,7 +28,7 @@ export class OpenRequestsSource implements OnModuleInit {
     private readonly warnings: OffboardingWarningContributions,
     private readonly hooks: PersonnelFileHookContributions,
     private readonly open: OpenRequestsService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -47,7 +47,7 @@ export class OpenRequestsSource implements OnModuleInit {
   private async remind(tx: DbTx, event: PersonnelFileEvent): Promise<void> {
     if (event.fileKind !== 'OFFBOARDING') return;
     const counted = await this.open.countsOf(event.employeeId, tx);
-    const organization = await this.organization.getOrganization(tx);
+    const organization = await this.organizationReads.getOrganization(tx);
     if (counted.requests + counted.grantTasks === 0 || !organization) return;
 
     await this.audit.record(

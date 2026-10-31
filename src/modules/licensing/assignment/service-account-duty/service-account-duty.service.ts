@@ -5,7 +5,7 @@ import type { DbTx } from '../../../../infrastructure/database/transaction-runne
 import { TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../../audit/public/audit.api';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { ResponsibleDeadlineHook } from '../../public/licensing.extension-points';
 import type { ServiceAccountDuty } from '../../public/licensing-service-account.types';
 import { ServiceAccountDutyTooManyError } from '../service-account.errors';
@@ -30,7 +30,7 @@ export class ServiceAccountDutyService {
   constructor(
     private readonly repo: ServiceAccountDutyRepo,
     private readonly deadlines: ResponsibleDeadlineHook,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly runner: TransactionRunner,
     private readonly audit: AuditApi,
@@ -51,7 +51,7 @@ export class ServiceAccountDutyService {
     page: number;
     pageSize: number;
   }): Promise<Page<ServiceAccountDutyWire>> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const files = await this.filesOfPeopleAnswering({ ...(query.employeeId ? { employeeId: query.employeeId } : {}) });
     const { rows, total } = await this.repo.page(
       files,
@@ -68,9 +68,9 @@ export class ServiceAccountDutyService {
    * event the alert is taken from. Nothing is changed or revoked. Returns how many were written in this pass.
    */
   async noticeOverdue(now: Date = new Date()): Promise<number> {
-    const today = await this.organization.businessToday(now);
+    const today = await this.organizationReads.businessToday(now);
     const files = await this.filesOfPeopleAnswering({ dueBefore: today });
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (files.length === 0 || !organization) return 0;
     let told = 0;
     for (const row of await this.repo.unnoticed(files, NOTICE_BATCH)) {
@@ -123,8 +123,8 @@ export class ServiceAccountDutyService {
   /** The names a page shows, read once for the whole page. */
   private async named(rows: readonly DutyRow[], today: string): Promise<ServiceAccountDutyWire[]> {
     const [people, departments, plans] = await Promise.all([
-      this.organization.getEmployees([...new Set(rows.map((row) => row.employeeId))]),
-      this.organization.getDepartmentBriefs([
+      this.organizationReads.getEmployees([...new Set(rows.map((row) => row.employeeId))]),
+      this.organizationReads.getDepartmentBriefs([
         ...new Set(rows.flatMap((row) => (row.owningDepartmentId ? [row.owningDepartmentId] : []))),
       ]),
       this.catalog.getPlanSummaries([...new Set(rows.map((row) => row.planId))]),

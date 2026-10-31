@@ -4,7 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.types';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
@@ -35,7 +35,7 @@ export class RenewalRequestWriter {
     private readonly requests: AccessRequestRepo,
     private readonly renewals: RenewalRequestRepo,
     private readonly assessment: RequestFactsService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly apply: RenewalApplyService,
     private readonly trail: RenewalRequestTrail,
     private readonly audit: AuditApi,
@@ -125,7 +125,7 @@ export class RenewalRequestWriter {
   }
 
   private async requireOrganization(tx: DbTx) {
-    const organization = await this.organization.getOrganization(tx);
+    const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A renewal was asked for before installation');
 
     return organization;

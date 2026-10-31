@@ -5,7 +5,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { EmployeeNotFoundError } from '../public/organization.errors';
 import { OrganizationContextService } from '../organization-context.service';
-import { EmployeeDirectoryService } from '../employee/employee-directory.service';
+import { EmployeeRecordService } from '../employee/employee-record.service';
 import { DepartmentUseService } from '../department/department-use.service';
 import { DepartmentServiceAccountReaderHook } from '../public/organization.extension-points';
 import { EmployeeAccountsHook, type EmployeeAccounts } from '../public/organization.extension-points';
@@ -71,7 +71,7 @@ describe('DepartmentService', () => {
           useValue: { businessToday: organization.businessToday, findOrganization: organization.getOrganization },
         },
         {
-          provide: EmployeeDirectoryService,
+          provide: EmployeeRecordService,
           useValue: {
             lock: (tx: unknown, id: string) => organization.lockEmployeeForShare(tx, id) as Promise<void>,
             find: organization.getEmployee,

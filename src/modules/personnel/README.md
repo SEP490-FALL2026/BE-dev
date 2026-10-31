@@ -81,7 +81,7 @@ Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-grap
   `me-departure-notice.controller.ts`, `super-admin-watch.controller.ts`; `RoleDutiesService`.
 - `service-account/` — chỉ gồm listener về người phụ trách service account (US-03-08).
 - `event-notice/` — `personnel-file-hooks.service.ts` (chạy file hook), `personnel-notifier.service.ts` (inbox, F17).
-- `super-admin-event/` — Nest module riêng của lệnh, policy, repo ticket, ba service theo họ sự kiện (điều chuyển, nghỉ dài hạn,
+- `super-admin-event/` — Nest module riêng của lệnh (`super-admin-event-cli.module.ts`), policy, repo ticket, ba service theo họ sự kiện (điều chuyển, nghỉ dài hạn,
   thôi việc) và `profile-correction`; tiến trình API và worker không load nó.
 - Gốc module (dùng chung nhiều capability): `personnel-grounds.policy.ts`, `personnel-self-action.policy.ts`,
   `personnel-notice.types.ts` (kiểu thông báo mà `public/personnel.extension-points.ts` và nhiều capability cùng dùng),
@@ -104,3 +104,6 @@ Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-grap
 ## Test
 
 - Unit: `src/modules/personnel/**/*.spec.ts`; HTTP: `test/http/personnel/`; integration: `test/integration/personnel/`.
+- Codec của cột JSON (`.json.ts`): `personnel-head-handover.json.ts` (`head_handover` của `department_transfers` và `offboarding_cases`) và
+  `personnel-change-detail.json.ts` (`detail` của `offboarding_case_changes`) nằm ở gốc module, spec cạnh file (`*.json.spec.ts`); lý do chỗ đặt ở
+  [module structure](../../../docs/rules/module-structure.md).

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { requestPolicyJson } from '../access-request/access-request.json';
 import type { ReassignableStepKind } from './reassignment.policy';
 
 /** An open step as the reassignment reads it, with what the table of its kind needs to run again. */
@@ -69,9 +70,8 @@ const SELECT_REQUEST = {
 
 type RequestRow = Prisma.AccessRequestGetPayload<{ select: typeof SELECT_REQUEST }>;
 
+/** Only a request with an open step is read, and a draft has none (a trigger refuses it), so `policy` is always a `RequestPolicy`. */
 function toRequest(row: RequestRow): ReassignableRequest {
-  const chain = (row.policy as { chain?: unknown } | null)?.chain;
-
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -80,7 +80,7 @@ function toRequest(row: RequestRow): ReassignableRequest {
     state: row.state,
     requesterEmployeeId: row.requesterEmployeeId,
     departmentId: row.departmentId,
-    chainHasSpendStep: Array.isArray(chain) && chain.includes('SPEND_APPROVAL'),
+    chainHasSpendStep: requestPolicyJson.decode(row.policy).chain.includes('SPEND_APPROVAL'),
     beneficiaryEmployeeIds: row.beneficiaries.map((beneficiary) => beneficiary.employeeId),
     lines: row.lines,
     steps: row.steps,

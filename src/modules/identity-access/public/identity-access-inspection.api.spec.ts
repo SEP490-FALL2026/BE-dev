@@ -1,7 +1,7 @@
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
-import { ApprovalRoleDirectoryService } from '../approval-roles/approval-role-directory.service';
+import { ApprovalRoleFactsService } from '../approval-roles/approval-role-facts.service';
 import { IdentityAccessInspectionApi } from './identity-access-inspection.api';
 
 describe('IdentityAccessInspectionApi', () => {
@@ -25,9 +25,9 @@ describe('IdentityAccessInspectionApi', () => {
     };
     const approvalRoles = { heldRoles: jest.fn().mockResolvedValue(state.approval ?? []) };
     const service = new IdentityAccessInspectionApi(
-      accounts as unknown as AccountDirectoryService,
+      accounts as unknown as AccountRecordService,
       grants as unknown as RoleGrantService,
-      approvalRoles as unknown as ApprovalRoleDirectoryService,
+      approvalRoles as unknown as ApprovalRoleFactsService,
     );
 
     return { service, accounts, grants, approvalRoles };

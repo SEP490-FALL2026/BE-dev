@@ -52,6 +52,14 @@ describe('the demo dataset step runner', () => {
     expect(server[0].status).toBe('failed');
   });
 
+  it('describes an unexpected error of a step by kind and code, never by its message', async () => {
+    const reports = await runDemoSteps(ctx('apply'), [
+      step('a', [], () => Promise.reject(new Error('duplicate key value (login_email)=(a@x.example)'))),
+    ]);
+
+    expect(reports[0]).toMatchObject({ status: 'failed', detail: 'Error retryable=false' });
+  });
+
   it('says there is nothing to change when every step was there (apply)', () => {
     expect(exitCodeOf('apply', [{ key: 'a', title: 'a', status: 'present' }])).toBe(2);
     expect(exitCodeOf('plan', [{ key: 'a', title: 'a', status: 'present' }])).toBe(0);

@@ -123,7 +123,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
       );
 
       expect(moved.status).toBe('EFFECTIVE');
-      expect((await h.organizationService().getEmployeePlacement(person.employeeId, h.today()))?.departmentId).toBe(
+      expect((await h.organizationReads().getEmployeePlacement(person.employeeId, h.today()))?.departmentId).toBe(
         fin.id,
       );
     });
@@ -187,7 +187,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
         expect.objectContaining({ department_id: department.id, valid_to: null }),
       ]);
       expect(
-        (await h.organizationService().getDepartmentHeads([department.id], h.day(60))).get(department.id)?.employeeId,
+        (await h.organizationReads().getDepartmentHeads([department.id], h.day(60))).get(department.id)?.employeeId,
       ).toBe(head.employeeId);
       const log = h.dataOf<{ items: Record<string, unknown>[] }>(await h.transferChanges(wire.id).expect(200)).items;
       expect(log).toEqual([expect.objectContaining({ kind: 'CANCELLED', newEffectiveOn: null, reason: why.reason })]);

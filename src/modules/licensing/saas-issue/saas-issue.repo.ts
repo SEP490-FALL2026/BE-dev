@@ -4,6 +4,7 @@ import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/b
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { linkedWorkJson } from './saas-issue-linked-work.json';
 import type { LinkedWork, SaasIssueCategory, SaasIssueImpact, SaasIssueState } from './saas-issue.policy';
 
 export type EntryKind = 'MESSAGE' | 'TRANSITION';
@@ -123,7 +124,7 @@ const toRecord = (row: Row): SaasIssueRecord => ({
   vendorTicketRef: row.vendorTicketRef,
   duplicateOfId: row.duplicateOfId,
   duplicateReason: row.duplicateReason,
-  linkedWork: (row.linkedWork as LinkedWork | null) ?? null,
+  linkedWork: linkedWorkJson.decode(row.linkedWork),
   resolvedAt: row.resolvedAt,
   reopenUntil: row.reopenUntil ? fromDateColumn(row.reopenUntil) : null,
   closedAt: row.closedAt,
@@ -215,7 +216,7 @@ export class SaasIssueRepo {
         state: patch.state,
         ...(patch.resolution !== undefined ? { resolution: patch.resolution } : {}),
         ...(patch.vendorTicketRef !== undefined ? { vendorTicketRef: patch.vendorTicketRef } : {}),
-        ...(patch.linkedWork !== undefined ? { linkedWork: { ...patch.linkedWork } } : {}),
+        ...(patch.linkedWork !== undefined ? { linkedWork: linkedWorkJson.encode(patch.linkedWork) } : {}),
         ...(patch.duplicateOfId !== undefined ? { duplicateOfId: patch.duplicateOfId } : {}),
         ...(patch.duplicateReason !== undefined ? { duplicateReason: patch.duplicateReason } : {}),
         ...(patch.resolvedAt !== undefined ? { resolvedAt: patch.resolvedAt } : {}),

@@ -3,6 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import type { PersonnelActor } from '../public/personnel.types';
 import { planProfileCorrection } from './profile-correction.policy';
@@ -23,9 +24,15 @@ import type { EventBasis, ProfileCorrection } from '../public/super-admin-event.
 export class ProfileCorrectionService {
   constructor(
     private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly notifications: NotificationsApi,
   ) {}
+
+  /** Takes the employee row `FOR UPDATE` before anything else of the correction judges: the lock order of the event is the employee, then the account. */
+  lockSubject(tx: DbTx, employeeId: string): Promise<void> {
+    return this.organization.lockEmployeeForUpdate(tx, employeeId);
+  }
 
   async correct(
     tx: DbTx,
@@ -35,15 +42,15 @@ export class ProfileCorrectionService {
     input: ProfileCorrection,
     basis: EventBasis,
   ): Promise<void> {
-    const current = await this.organization.getEmployee(employeeId, tx);
+    const current = await this.organizationReads.getEmployee(employeeId, tx);
     if (!current) throw new SuperAdminEventRefusedError('SUBJECT_NOT_FOUND');
-    const today = await this.organization.businessToday(new Date(), tx);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
 
     const plan = planProfileCorrection(current, input, today);
     const reasons = [...plan.reasons];
     if (
       plan.workEmailToCheck !== null &&
-      (await this.organization.isWorkEmailTaken(tx, organizationId, plan.workEmailToCheck))
+      (await this.organizationReads.isWorkEmailTaken(tx, organizationId, plan.workEmailToCheck))
     ) {
       reasons.unshift('WORK_EMAIL_TAKEN');
     }
@@ -63,7 +70,7 @@ export class ProfileCorrectionService {
         { ...(plan.changes as Record<string, string | null>), hrBasis: { ...basis } },
       ),
     );
-    const notices = await this.organization.getProfileNotices(tx, {
+    const notices = await this.organizationReads.getProfileNotices(tx, {
       kind: 'UPDATED',
       organizationId,
       employeeId,

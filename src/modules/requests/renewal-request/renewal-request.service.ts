@@ -6,7 +6,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { AssignmentNotFoundError } from '../../licensing/public/licensing.errors';
 import { LicensingRenewalApi } from '../../licensing/public/licensing-renewal.api';
 import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.types';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { TERM_MONTHS_MAX } from '../access-request/access-request.dto';
 import { AccessRequestSuperAdminCannotRequestError } from '../access-request/access-request.errors';
@@ -35,7 +35,7 @@ export class RenewalRequestService {
     private readonly renewals: RenewalRequestRepo,
     private readonly accessRequests: AccessRequestService,
     private readonly assessment: RequestFactsService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly licensingRenewals: LicensingRenewalApi,
     private readonly audit: AuditApi,
     private readonly writer: RenewalRequestWriter,
@@ -52,7 +52,7 @@ export class RenewalRequestService {
 
     return this.runner.run(async (tx) => {
       const now = new Date();
-      const today = await this.organization.businessToday(now, tx);
+      const today = await this.organizationReads.businessToday(now, tx);
       const { facts, byHead, previousEnd } = await this.requireSendable(tx, actor, body, today);
 
       if (routeRenewal({ today, previousEnd }) === 'NEW_REQUEST') {
@@ -70,8 +70,10 @@ export class RenewalRequestService {
   /** The seat, locked, and who may ask: the holder or the head of their department, for a seat that has an end, renewed to a day that may be. */
   private async requireSendable(tx: DbTx, actor: AuthenticatedPrincipal, body: RenewalBodyDto, today: BusinessDate) {
     const facts = await this.lockedFacts(tx, body.assignmentId);
-    const holderUnit = (await this.organization.getOwningUnits([facts.employeeId], today, tx)).get(facts.employeeId);
-    const headed = await this.organization.getHeadedDepartment(actor.employeeId, today);
+    const holderUnit = (await this.organizationReads.getOwningUnits([facts.employeeId], today, tx)).get(
+      facts.employeeId,
+    );
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, today);
     const sender = checkRenewalSender({
       actorEmployeeId: actor.employeeId,
       holderEmployeeId: facts.employeeId,

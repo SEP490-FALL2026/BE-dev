@@ -3,6 +3,7 @@ import type { AuditApi } from '../../audit/public/audit.api';
 import type { FinanceApi } from '../../finance/public/finance.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { OrganizationApi } from '../../organization/public/organization.api';
+import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AlreadyInstalledError, InstallationInputError } from './installation.errors';
 import { InstallationApi } from './installation.api';
 
@@ -102,6 +103,7 @@ function harness(options: { installed?: boolean } = {}) {
   const service = new InstallationApi(
     runner as unknown as TransactionRunner,
     organization as unknown as OrganizationApi,
+    organization as unknown as OrganizationReadApi,
     identity as unknown as IdentityAccessApi,
     audit as unknown as AuditApi,
     repo,

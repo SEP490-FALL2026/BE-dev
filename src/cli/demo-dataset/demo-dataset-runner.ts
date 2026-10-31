@@ -1,4 +1,5 @@
-import { DemoApiError } from './demo-api-client';
+import { DemoApiError, DemoApiUnreachableError } from './demo-api-client';
+import { describeDemoFailure } from './demo-failure';
 import { DemoInventoryIncompleteError, DemoSignInRefusedError } from './demo-step-kit';
 import type { DemoRunContext, DemoStep, StepReport, StepStatus } from './demo-run.types';
 
@@ -45,7 +46,11 @@ async function runOne(ctx: DemoRunContext, step: DemoStep): Promise<StepReport> 
     if (error instanceof DemoApiError && error.status >= 400 && error.status < 500 && error.status !== 401) {
       return { key: step.key, title: step.title, status: 'conflict', detail: `API từ chối: ${error.message}` };
     }
-    const reason = error instanceof Error ? error.message : 'unknown error';
+    // Our own API errors are worded by construction; any other message may carry data, so only its kind and code.
+    const reason =
+      error instanceof DemoApiError || error instanceof DemoApiUnreachableError
+        ? error.message
+        : describeDemoFailure(error);
 
     return { key: step.key, title: step.title, status: 'failed', detail: reason };
   }

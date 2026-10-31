@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
   ProvisioningTaskNotConnectorError,
   ProvisioningTaskNotFoundError,
@@ -29,7 +29,7 @@ export interface FailureRecorded {
 export class ProvisioningFailureService {
   constructor(
     private readonly repo: ProvisioningTaskRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -45,7 +45,7 @@ export class ProvisioningFailureService {
     detail: string;
     now?: Date;
   }): Promise<FailureRecorded> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A failure was recorded before installation');
     const now = input.now ?? new Date();
     const detail = connectorErrorDetail(input.detail, input.kind);

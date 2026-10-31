@@ -3,8 +3,8 @@ import { JwtService } from '@nestjs/jwt';
 import { createHash } from 'node:crypto';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { RefreshTokenSnapshot, SessionSnapshot } from '../public/identity-access.types';
 import { SessionInvalidError } from './auth.errors';
 import { SessionTokenService } from './session-token.service';
@@ -102,9 +102,9 @@ function setUp(world: World) {
     },
   };
   const service = new SessionService(
-    accounts as unknown as AccountDirectoryService,
+    accounts as unknown as AccountRecordService,
     sessions as unknown as SessionRepo,
-    organization as unknown as OrganizationApi,
+    organization as unknown as OrganizationReadApi,
     audit as unknown as AuditApi,
     new SessionTokenService(sessions as unknown as SessionRepo, tokens, config as never),
     runner as unknown as TransactionRunner,

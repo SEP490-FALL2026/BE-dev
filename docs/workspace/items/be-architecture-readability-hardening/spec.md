@@ -1,5 +1,9 @@
 # Spec: hoàn thiện ranh giới bên trong module và luật kiến trúc cho dev mới
 
+> **Owner acceptance ADR — 31/10/2026:** Owner đã xác nhận chấp nhận ADR-0019, gồm quy tắc nhóm chức năng và
+> extension point. [ADR-0019](../../../decisions/0019-module-tiers-and-public-api.md) chuyển Accepted; các đoạn chờ
+> ADR/OD-R7 bên dưới là lịch sử trước xác nhận này. Không tự suy Owner đã làm O7 hoặc nghiệm thu mọi flow nghiệp vụ.
+
 > **Owner quyết định OD-R5 — 30/10/2026: GIỮ queue/Redis cho nhu cầu tương lai.** Không xóa module/config/test queue,
 > `bullmq`, `@nestjs/bullmq`, cấu hình Redis hay service/volume Compose chỉ vì chưa có consumer. Task 2.6 chuyển thành
 > rà soát/refactor hạ tầng dự phòng và tài liệu đúng trạng thái; không tự mount queue, thêm producer/consumer/job hoặc

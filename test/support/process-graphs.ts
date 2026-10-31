@@ -1,14 +1,14 @@
 import type { Type } from '@nestjs/common';
 import { AppModule } from '../../src/app/app.module';
-import { CostCenterDirectionCliModule } from '../../src/cli/cost-center-direction/cost-center-direction-cli.module';
-import { SubscriptionOwnerAssignmentCliModule } from '../../src/cli/assign-subscription-owner/assign-subscription-owner-cli.module';
+import { CostCenterDirectionRootCliModule } from '../../src/cli/cost-center-direction/cost-center-direction-cli.module';
+import { AssignSubscriptionOwnerCliModule } from '../../src/cli/assign-subscription-owner/assign-subscription-owner-cli.module';
 import { RecoveryCliModule } from '../../src/cli/recover/recover-cli.module';
-import { SuperAdminEventCliModule } from '../../src/cli/record-super-admin-event/record-super-admin-event-cli.module';
-import { DemoDatasetModule } from '../../src/modules/installation/demo-dataset/demo-dataset.module';
-import { DevSeedModule } from '../../src/modules/installation/dev-seed/dev-seed.module';
-import { InspectionModule } from '../../src/modules/installation/inspect/inspection.module';
+import { RecordSuperAdminEventCliModule } from '../../src/cli/record-super-admin-event/record-super-admin-event-cli.module';
+import { DemoDatasetCliModule } from '../../src/modules/installation/demo-dataset/demo-dataset-cli.module';
+import { DevSeedCliModule } from '../../src/modules/installation/dev-seed/dev-seed-cli.module';
+import { InspectionCliModule } from '../../src/modules/installation/inspect/inspection-cli.module';
 import { InstallationModule } from '../../src/modules/installation/installation.module';
-import { MigrationPreflightModule } from '../../src/modules/installation/migration-preflight/migration-preflight.module';
+import { MigrationPreflightCliModule } from '../../src/modules/installation/migration-preflight/migration-preflight-cli.module';
 import { WorkerModule } from '../../src/worker/worker.module';
 
 /**
@@ -21,11 +21,11 @@ export const PROCESS_GRAPHS: readonly (readonly [string, Type<unknown>])[] = [
   ['WorkerModule', WorkerModule],
   ['InstallationModule', InstallationModule],
   ['RecoveryCliModule', RecoveryCliModule],
-  ['SuperAdminEventCliModule', SuperAdminEventCliModule],
-  ['InspectionModule', InspectionModule],
-  ['MigrationPreflightModule', MigrationPreflightModule],
-  ['SubscriptionOwnerAssignmentCliModule', SubscriptionOwnerAssignmentCliModule],
-  ['CostCenterDirectionCliModule', CostCenterDirectionCliModule],
-  ['DevSeedModule', DevSeedModule],
-  ['DemoDatasetModule', DemoDatasetModule],
+  ['RecordSuperAdminEventCliModule', RecordSuperAdminEventCliModule],
+  ['InspectionCliModule', InspectionCliModule],
+  ['MigrationPreflightCliModule', MigrationPreflightCliModule],
+  ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule],
+  ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule],
+  ['DevSeedCliModule', DevSeedCliModule],
+  ['DemoDatasetCliModule', DemoDatasetCliModule],
 ];

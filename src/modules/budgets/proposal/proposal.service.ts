@@ -24,7 +24,7 @@ import {
   type LineDraft,
 } from '../budget/budget.policy';
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
-import { budgetAuditEvent, BudgetSupportService } from '../budget/budget-support.service';
+import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { ProposalRepo, type ProposalLineRecord, type ProposalRecord } from '../budget/proposal.repo';
 import { ProposalViewService } from './proposal-view.service';
@@ -46,7 +46,7 @@ export class ProposalService {
     private readonly runner: TransactionRunner,
     private readonly proposals: ProposalRepo,
     private readonly versions: VersionRepo,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
     private readonly notifier: BudgetNotifierService,
     private readonly yearLock: BudgetYearLockRepo,
     private readonly views: ProposalViewService,
@@ -59,7 +59,7 @@ export class ProposalService {
    * BudgetCurrencyError and the money errors.
    */
   async submit(actor: AuthenticatedPrincipal, body: BudgetProposalBodyDto): Promise<ProposalWire> {
-    const fiscalStart = await this.support.fiscalYearStartMonth();
+    const fiscalStart = await this.facts.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
       const id = await this.send(tx, actor, {
@@ -76,11 +76,11 @@ export class ProposalService {
 
   /** Throws BudgetProposalNotFoundError, BudgetProposalStateError and the errors of `submit`. */
   async resubmit(actor: AuthenticatedPrincipal, id: string, lines: LineBody[]): Promise<ProposalWire> {
-    const fiscalStart = await this.support.fiscalYearStartMonth();
+    const fiscalStart = await this.facts.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
       const previous = await this.ownedLocked(tx, actor, id, true);
-      const today = await this.support.today(new Date(), tx);
+      const today = await this.facts.today(new Date(), tx);
       if (yearHasEnded(previous.year, today, fiscalStart)) throw new BudgetYearEndedError(previous.year);
       if (!canResubmit(previous.state)) throw new BudgetProposalStateError('RESUBMIT', previous.state);
       const created = await this.send(tx, actor, {
@@ -97,11 +97,11 @@ export class ProposalService {
 
   /** The head takes the proposal back while Finance has not sent a version made from it (`US-06-10` AC-4). */
   async withdraw(actor: AuthenticatedPrincipal, id: string): Promise<ProposalWire> {
-    const fiscalStart = await this.support.fiscalYearStartMonth();
+    const fiscalStart = await this.facts.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
       const proposal = await this.ownedLocked(tx, actor, id);
-      const today = await this.support.today(new Date(), tx);
+      const today = await this.facts.today(new Date(), tx);
       if (yearHasEnded(proposal.year, today, fiscalStart)) throw new BudgetYearEndedError(proposal.year);
       if (!canWithdraw(proposal.state)) throw new BudgetProposalStateError('WITHDRAW', proposal.state);
 
@@ -122,13 +122,13 @@ export class ProposalService {
 
   /** Finance gives the proposal back with the reason that must go with it (`US-06-09` AC-15). */
   async giveBack(actor: AuthenticatedPrincipal, id: string, reason: string): Promise<ProposalWire> {
-    this.support.requireFinance(actor);
-    const fiscalStart = await this.support.fiscalYearStartMonth();
+    this.facts.requireFinance(actor);
+    const fiscalStart = await this.facts.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
       const proposal = await this.proposals.lockById(tx, id);
       if (!proposal) throw new BudgetProposalNotFoundError();
-      const today = await this.support.today(new Date(), tx);
+      const today = await this.facts.today(new Date(), tx);
       if (yearHasEnded(proposal.year, today, fiscalStart)) throw new BudgetYearEndedError(proposal.year);
       if (!canReturn(proposal.state)) throw new BudgetProposalStateError('RETURN', proposal.state);
 
@@ -156,10 +156,10 @@ export class ProposalService {
     input: { costCenterId: string; year: number; lines: LineBody[]; previous: string | null; fiscalStart: number },
   ): Promise<string> {
     const now = new Date();
-    const today = await this.support.today(now, tx);
+    const today = await this.facts.today(now, tx);
     // The head's own department comes first: without a Cost Center in use there is nothing to propose for.
-    const own = await this.support.requireHeadedCostCenter(actor.employeeId, today, tx);
-    const costCenter = await this.support.costCenter(input.costCenterId, tx);
+    const own = await this.facts.requireHeadedCostCenter(actor.employeeId, today, tx);
+    const costCenter = await this.facts.costCenter(input.costCenterId, tx);
     if (costCenter.id !== own) throw new BudgetNotYourCostCenterError();
     if (!yearIsOpen(input.year, today, input.fiscalStart)) throw new BudgetYearEndedError(input.year);
 
@@ -175,16 +175,16 @@ export class ProposalService {
     if (incomplete.length > 0) throw new BudgetProposalIncompleteError(incomplete);
     const backwards = backwardLines(drafts);
     if (backwards.length > 0) throw new BudgetWindowBackwardsError(backwards);
-    await this.support.requirePlans(input.lines.map((line) => line.planId));
+    await this.facts.requirePlans(input.lines.map((line) => line.planId));
 
-    const reporting = await this.support.reportingCurrency(tx);
+    const reporting = await this.facts.reportingCurrency(tx);
     const lines: Omit<ProposalLineRecord, 'position'>[] = [];
     for (const line of input.lines) {
       lines.push({
         description: line.description,
         planId: line.planId ?? null,
         seats: line.seats ?? null,
-        amountMinor: await this.support.money(line.amount, reporting, tx),
+        amountMinor: await this.facts.money(line.amount, reporting, tx),
         windowFrom: line.windowFrom as ProposalLineRecord['windowFrom'],
         windowTo: line.windowTo as ProposalLineRecord['windowTo'],
         servicePeriodMonths: line.servicePeriodMonths as number,
@@ -205,7 +205,7 @@ export class ProposalService {
     );
     if (open) throw new BudgetProposalOpenError();
 
-    const organizationId = await this.support.organizationId(tx);
+    const organizationId = await this.facts.organizationId(tx);
     const total = totalOf(lines);
     const id = await this.proposals.insert(tx, {
       organizationId,
@@ -262,14 +262,14 @@ export class ProposalService {
     keepWhenNoneInUse = false,
   ): Promise<ProposalRecord> {
     const proposal = await this.proposals.lockById(tx, id);
-    const today = await this.support.today(new Date(), tx);
+    const today = await this.facts.today(new Date(), tx);
     if (!proposal) throw new BudgetProposalNotFoundError();
-    if ((await this.support.headedCostCenter(actor.employeeId, today, tx)) === proposal.costCenterId) return proposal;
+    if ((await this.facts.headedCostCenter(actor.employeeId, today, tx)) === proposal.costCenterId) return proposal;
     // The head of a department whose Cost Center was retired still owns the proposal that was given back: sending it again meets
     // the 409 FINANCE.SETUP_INCOMPLETE of `send`, not a 404.
     if (
       keepWhenNoneInUse &&
-      (await this.support.headsDepartmentWithNoneInUse(actor.employeeId, proposal.costCenterId, today, tx))
+      (await this.facts.headsDepartmentWithNoneInUse(actor.employeeId, proposal.costCenterId, today, tx))
     ) {
       return proposal;
     }

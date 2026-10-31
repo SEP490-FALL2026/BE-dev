@@ -332,6 +332,16 @@ Either fix the cause and run step 7 again with a new `<ATTEMPT>`, or return to t
 `cp -p .env.pre-h7 .env`, then `API_IMAGE=<image noted in step 0> docker compose -f docker-compose.prod.yml up -d api worker`.
 The roles and owners provisioned in step 5 do not stop the old wiring (the superuser bypasses every privilege).
 
+**Failure diagnostics:** after a recreation/readiness failure, before restoring files or stopping containers, the script
+collects best-effort evidence in `<APP_DIR>/.deploy-diagnostics-<RELEASE>-<ATTEMPT>/` (outside `releases/`): host memory/swap, load, disk and
+container stats, selected container state (including OOM, exit and restart counts), and the last 200 timestamped log
+lines per API/worker/Caddy container. Each command has a timeout; each file is capped at 1 MiB. Collection failure does
+not prevent recovery. The directory is `0700`, files `0600`; raw logs can contain sensitive application data, so only
+the location is printed to Actions. Review on the VPS, redact before sharing, and remove the diagnostics after the
+incident is resolved. No environment/configuration dump or automatic upload is performed. The readiness failure now
+includes the probe exit code (`124` normally means the outer 15-second timeout expired). Evidence describes the
+containers present at capture time, which may be mixed old/new after a partial recreation; use their image identifiers.
+
 **If step 7 fails after the promotion began** (`RESULT: … FAILED while <step>`: a rename, the recreation, the readiness or
 the marker): the script has put the old `docker-compose.prod.yml` and `Caddyfile` back and removed the
 `releases/current-image` it wrote; kept the H7 `.env` beside it as `.env.h7-<ATTEMPT>` (`0600`, never under `releases/`);

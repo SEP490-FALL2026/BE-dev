@@ -5,7 +5,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { closesAtYearEnd, yearEndOfVersion, yearHasEnded } from '../budget/budget.policy';
 import { BudgetChangeListeners } from '../public/budgets.extension-points';
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
-import { BudgetSupportService } from '../budget/budget-support.service';
+import { BudgetFactsService } from '../budget/budget-facts.service';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
 import { VersionRepo } from '../budget/version.repo';
@@ -42,7 +42,7 @@ export class BudgetYearEndService {
     private readonly versions: VersionRepo,
     private readonly proposals: ProposalRepo,
     private readonly yearLock: BudgetYearLockRepo,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
     private readonly notifier: BudgetNotifierService,
     private readonly listeners: BudgetChangeListeners,
     private readonly audit: AuditApi,
@@ -50,8 +50,8 @@ export class BudgetYearEndService {
 
   /** Closes every Cost Center and year that has ended by `now` and still holds something to close. `now` is a parameter for tests. */
   async closeEndedYears(now: Date = new Date()): Promise<YearEndResult> {
-    const fiscalStart = await this.support.fiscalYearStartMonth();
-    const fiscalYear = fiscalYearOf(await this.support.today(now), fiscalStart);
+    const fiscalStart = await this.facts.fiscalYearStartMonth();
+    const fiscalYear = fiscalYearOf(await this.facts.today(now), fiscalStart);
     const pairs = new Map<string, { costCenterId: string; year: number }>();
     for (const pair of [
       ...(await this.versions.endedYearsToClose(fiscalYear)),
@@ -76,7 +76,7 @@ export class BudgetYearEndService {
 
   private async closeYear(costCenterId: string, year: number, now: Date, fiscalStart: number): Promise<YearEndResult> {
     return this.runner.run(async (tx) => {
-      const today = await this.support.today(now, tx);
+      const today = await this.facts.today(now, tx);
       if (!yearHasEnded(year, today, fiscalStart)) return NOTHING;
       const proposals = await this.proposals.lockAllOfYear(tx, costCenterId, year);
       const versions = await this.versions.lockAllOfYear(tx, costCenterId, year);

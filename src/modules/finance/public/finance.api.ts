@@ -6,7 +6,7 @@ import { CurrencyNotSupportedError, ReportingCurrencyNotSupportedError } from '.
 import { RATE_DECIMALS, type ScaledRate } from '../../../core/money/rate';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { CurrencyService } from '../currency/currency.service';
 import { ExchangeRateLedgerService } from '../exchange-rate/exchange-rate-ledger.service';
 import type { CurrencyRecord, SnapshotResult, TaxEstimateResult, TaxGroup, TaxLineInput } from './finance.types';
@@ -23,7 +23,7 @@ export class FinanceApi {
   constructor(
     private readonly currencies: CurrencyService,
     private readonly rates: ExchangeRateLedgerService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly taxProfiles: TaxProfileService,
   ) {}
 
@@ -51,7 +51,7 @@ export class FinanceApi {
   async snapshotMoney(tx: DbTx, money: Money, rateDate: BusinessDate): Promise<SnapshotResult> {
     if (!isBusinessDate(rateDate)) throw new RangeError('The rate date is not a business date');
     // Held shared until the caller commits: the reporting currency read here is still the one when the snapshot is stored.
-    const organization = await this.organization.getOrganizationShared(tx);
+    const organization = await this.organizationReads.getOrganizationShared(tx);
     if (!organization) throw new Error('Money was converted before installation');
 
     const from = await this.currencies.find(money.currency, tx);

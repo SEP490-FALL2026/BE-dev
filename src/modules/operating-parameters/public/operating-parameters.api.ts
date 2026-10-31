@@ -4,7 +4,7 @@ import { BusinessDate } from '../../../core/business-date';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ParameterNotFoundError, ParameterValueInvalidError } from '../operating-parameters.errors';
 import { OperatingParametersRepo } from '../operating-parameters.repo';
 import {
@@ -48,7 +48,7 @@ function effective(rows: { key: string; value: ParameterValue }[]): ParameterVal
 export class OperatingParametersApi {
   constructor(
     private readonly repo: OperatingParametersRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -136,7 +136,7 @@ export class OperatingParametersApi {
    */
   async set(actor: AuthenticatedPrincipal, key: string, value: unknown): Promise<ParameterView> {
     if (!definitionOf(key)) throw new ParameterNotFoundError(key);
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The operating parameters were used before installation');
 
     await this.runner.run(async (tx) => {
@@ -178,6 +178,6 @@ export class OperatingParametersApi {
 
   /** The business date the organization is on now, for the non-working-date rules. */
   today(): Promise<BusinessDate> {
-    return this.organization.businessToday();
+    return this.organizationReads.businessToday();
   }
 }

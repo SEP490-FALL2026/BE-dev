@@ -7,10 +7,13 @@
 /** The kinds of application the catalog holds (`QĐ-49a`). */
 export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
 
-export type AccessRequestBranchCode = 'INTERNAL_FREE' | 'PAID_IN_CATALOG' | 'NEW_SOFTWARE';
+/** The lists the types come from, so the codec of the `policy` column (`access-request.json.ts`) reads the same values. */
+export const ACCESS_REQUEST_BRANCHES = ['INTERNAL_FREE', 'PAID_IN_CATALOG', 'NEW_SOFTWARE'] as const;
+export type AccessRequestBranchCode = (typeof ACCESS_REQUEST_BRANCHES)[number];
 
+export const CHAIN_STEPS = ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'] as const;
 /** A link of the chain of a request. `IT_EXECUTION` is the task of the IT Admin, not an approval step. */
-export type ChainStep = 'NEED' | 'IT_ASSESSMENT' | 'SPEND_APPROVAL' | 'IT_EXECUTION';
+export type ChainStep = (typeof CHAIN_STEPS)[number];
 
 /** The version of the rules of this policy; a request keeps the version it was sent under. */
 export const CURRENT_POLICY_VERSION = 1;

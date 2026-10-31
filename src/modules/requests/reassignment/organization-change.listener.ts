@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
   OrganizationChangeListeners,
   type OrganizationChangeListener,
@@ -27,7 +27,7 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
   constructor(
     private readonly repo: StepReassignmentRepo,
     private readonly reassignment: StepReassignmentService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly drafts: RequestDraftDepartureService,
     private readonly changes: OrganizationChangeListeners,
   ) {}
@@ -70,7 +70,7 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
       case 'HEAD_PERIOD_START':
       case 'HEAD_PERIOD_END': {
         const members =
-          (await this.organization.getDepartmentMemberIds(change.departmentId, change.effectiveOn, tx)) ?? [];
+          (await this.organizationReads.getDepartmentMemberIds(change.departmentId, change.effectiveOn, tx)) ?? [];
 
         return {
           requestIds: [

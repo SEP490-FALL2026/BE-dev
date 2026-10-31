@@ -6,7 +6,7 @@ import { DbTx, TransactionRunner } from '../../../infrastructure/database/transa
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
   LicenseKeyNotFoundError,
   LicenseKeyPlanNotK4Error,
@@ -55,7 +55,7 @@ export class LicenseKeyService {
     private readonly quota: LicenseKeyRevealQuotaRepo,
     private readonly cipher: LicenseKeyCipher,
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -70,7 +70,7 @@ export class LicenseKeyService {
     input: { subscriptionId: string; keys: readonly string[] },
   ): Promise<ImportResult> {
     const target = await this.requireK4Purchase(input.subscriptionId);
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A license key was imported before installation');
     const { rows, errors } = judgeBatch(input.keys);
     const lines: ImportResult['errors'] = [...errors];
@@ -171,7 +171,7 @@ export class LicenseKeyService {
    * whose message holds nothing of the key.
    */
   async reveal(actor: AuthenticatedPrincipal, id: string): Promise<{ id: string; value: string }> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A license key was revealed before installation');
 
     return this.runner.run(async (tx) => {

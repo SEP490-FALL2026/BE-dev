@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { ServiceAccountDutyService } from './service-account-duty.service';
+import { describeForOperator, traceForOperator } from '../../../../infrastructure/observability/operator-error';
 
 /** The first sweep waits, so a short-lived process (a test, a command) never starts one. */
 const FIRST_SWEEP_AFTER_MS = 5 * 60 * 1000;
@@ -43,7 +44,7 @@ export class ServiceAccountDutySweeper implements OnApplicationBootstrap, OnModu
       const told = await this.duties.noticeOverdue();
       if (told > 0) this.logger.log(`Reminded about ${told} service account(s) still without a new person`);
     } catch (error) {
-      this.logger.error(`Service account duty sweep failed: ${(error as Error).name}`);
+      this.logger.error(`Service account duty sweep failed: ${describeForOperator(error)}`, traceForOperator(error));
     } finally {
       this.schedule(SWEEP_EVERY_MS);
     }

@@ -3,7 +3,7 @@ import { pageOf, type Page } from '../../../core/application/pagination';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { HandoverService } from '../handover/handover.service';
 import { RenewalHoldHook } from '../public/licensing.extension-points';
 import type { PendingRenewal } from '../public/licensing-renewal.types';
@@ -35,7 +35,7 @@ export class ExpiryQueueService {
     private readonly renewals: RenewalHoldHook,
     private readonly revocations: RevocationService,
     private readonly handovers: HandoverService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -45,11 +45,11 @@ export class ExpiryQueueService {
    * rights, the renewals waiting, the departments, and then the names and the handover of the page.
    */
   async list(query: QueueQuery): Promise<Page<ExpiredRightWire>> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const expired = await this.repo.expired(today);
     const [pending, units] = await Promise.all([
       this.renewals.get().pendingRenewalsOf(expired.map((right) => right.assignmentId)),
-      this.organization.getOwningUnits([...new Set(expired.map((right) => right.employeeId))], today),
+      this.organizationReads.getOwningUnits([...new Set(expired.map((right) => right.employeeId))], today),
     ]);
 
     const rows = expired
@@ -81,7 +81,7 @@ export class ExpiryQueueService {
    */
   async startRevocation(actor: AuthenticatedPrincipal, assignmentId: string): Promise<StartedRevocationWire> {
     const now = new Date();
-    const today = await this.organization.businessToday(now);
+    const today = await this.organizationReads.businessToday(now);
     const facts = await this.repo.factsOf(assignmentId);
     if (!facts) throw new ExpiryError('NOT_FOUND');
     const renewalPending =
@@ -131,8 +131,8 @@ export class ExpiryQueueService {
   ): Promise<ExpiredRightWire[]> {
     if (shown.length === 0) return [];
     const [people, departments, plans, duties] = await Promise.all([
-      this.organization.getEmployees([...new Set(shown.map((row) => row.right.employeeId))]),
-      this.organization.getDepartmentBriefs([
+      this.organizationReads.getEmployees([...new Set(shown.map((row) => row.right.employeeId))]),
+      this.organizationReads.getDepartmentBriefs([
         ...new Set(shown.flatMap((row) => (row.departmentId ? [row.departmentId] : []))),
       ]),
       this.catalog.getPlanRevocationInfo([...new Set(shown.map((row) => row.right.planId))]),

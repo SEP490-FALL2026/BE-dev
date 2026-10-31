@@ -83,26 +83,6 @@ export class CostCenterRepo {
   }
 
   /**
-   * The activation of the Cost Center link of a NEW local database (`pnpm dev:seed`, in the seed's own transaction): it has no
-   * previous release to be recovered, so nothing waits for the host. The only write of this table outside
-   * `pnpm ops:cost-center-direction activate`; the values are the fixed `LOCAL_TEST` ones. False when it was already recorded.
-   */
-  async recordLocalSeedActivation(tx: DbTx, organizationId: string): Promise<boolean> {
-    if ((await tx.costCenterDirectionActivation.count({ where: { organizationId } })) > 0) return false;
-    await tx.costCenterDirectionActivation.create({
-      data: {
-        organizationId,
-        releaseEvidence: 'local development seed',
-        approverRef: 'LOCAL_SEED',
-        operatorRef: 'LOCAL_SEED',
-        environment: 'LOCAL_TEST',
-      },
-    });
-
-    return true;
-  }
-
-  /**
    * A Cost Center for a department, linked in the same statement: the link begins when the Cost Center is created, so
    * `linkedAt` is the same moment as `createdAt` and never before the department's own. Throws
    * CostCenterCodeTakenError, or CostCenterDepartmentAlreadyLinkedError when the department already has one in use.

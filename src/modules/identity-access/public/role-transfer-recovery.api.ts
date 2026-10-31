@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { employeeHasNotLeft } from '../accounts/account.policy';
 import { assertContext, assertSeparation, checkSameTicket } from '../recovery/recovery-procedure.policy';
 import { RecoveryTargets } from '../recovery/recovery-targets.service';
@@ -20,7 +20,7 @@ import { SuccessorEnrolment } from '../recovery/successor-enrolment.service';
 export class RoleTransferRecoveryApi {
   constructor(
     private readonly targets: RecoveryTargets,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly tickets: RecoveryRepo,
     private readonly enrolment: SuccessorEnrolment,
     private readonly handover: RoleHandover,
@@ -33,7 +33,7 @@ export class RoleTransferRecoveryApi {
   ): Promise<RecoveryResult> {
     assertContext(context);
     const organization = await this.targets.requireOrganization();
-    const successorEmployee = await this.organization.getEmployeeByCode(input.successorEmployeeCode);
+    const successorEmployee = await this.organizationReads.getEmployeeByCode(input.successorEmployeeCode);
     if (!successorEmployee) throw new RecoveryRefusedError('SUCCESSOR_NOT_FOUND');
     const holder = input.holderEmail ? await this.targets.locateByEmail(organization.id, input.holderEmail) : null;
     assertSeparation(context, [
@@ -65,7 +65,7 @@ export class RoleTransferRecoveryApi {
       if (current.account && current.account.employeeId === successorEmployee.id) {
         throw new RecoveryRefusedError('SUCCESSOR_IS_HOLDER');
       }
-      const successor = await this.organization.getEmployee(successorEmployee.id, tx);
+      const successor = await this.organizationReads.getEmployee(successorEmployee.id, tx);
       if (!successor || successor.status !== 'ACTIVE') throw new RecoveryRefusedError('EMPLOYEE_NOT_WORKING');
 
       const { ticket, created } = await this.tickets.openAndLock(tx, {

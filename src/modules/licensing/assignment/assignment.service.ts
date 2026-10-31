@@ -6,7 +6,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import type { SeatTarget, SeatTargetRef } from '../../catalog/public/catalog.types';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError } from '../public/licensing.errors';
 import type { SeatBaselineClosedHolder } from '../public/licensing-seat-baseline.types';
 import type {
@@ -47,7 +47,7 @@ export class AssignmentService {
   constructor(
     private readonly repo: AssignmentRepo,
     private readonly byDepartment: AssignmentDepartmentRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -84,7 +84,7 @@ export class AssignmentService {
 
   /** Who holds a seat today in the organization calendar, and how many. */
   async openHolders(): Promise<SeatHolder[]> {
-    return this.repo.openHolders(await this.organization.businessToday());
+    return this.repo.openHolders(await this.organizationReads.businessToday());
   }
 
   /** One page of the personal seats a person holds today in these plans, and the total. */
@@ -96,7 +96,7 @@ export class AssignmentService {
     return this.repo.pageHeldOfPlans(
       employeeId,
       planIds,
-      await this.organization.businessToday(),
+      await this.organizationReads.businessToday(),
       page.skip,
       page.take,
     );
@@ -127,7 +127,11 @@ export class AssignmentService {
         ? []
         : [{ assignmentId: row.assignmentId, employeeId: row.employeeId, owningDepartmentId: owner }];
     });
-    const units = await this.organization.getOwningUnits([...new Set(seats.map((seat) => seat.employeeId))], day, tx);
+    const units = await this.organizationReads.getOwningUnits(
+      [...new Set(seats.map((seat) => seat.employeeId))],
+      day,
+      tx,
+    );
 
     return holdersOfOtherDepartments(
       seats,
@@ -317,7 +321,7 @@ export class AssignmentService {
   async seatUsage(subscriptionId: string): Promise<SeatUsage> {
     const target = await this.catalog.findSeatTarget({ subscriptionId });
     if (!target) throw new SeatTargetNotFoundError('SUBSCRIPTION');
-    const asOf = await this.organization.businessToday();
+    const asOf = await this.organizationReads.businessToday();
     const occupied = await this.repo.countOccupying(subscriptionId, asOf);
     const purchased = target.purchasedQuantity;
 

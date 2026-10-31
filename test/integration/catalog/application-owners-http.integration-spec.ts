@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { ApplicationLookupService } from '../../../src/modules/catalog/catalog-entry/application-lookup.service';
+import { ApplicationFactsService } from '../../../src/modules/catalog/catalog-entry/application-facts.service';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import {
   HttpTestApp,
@@ -41,7 +41,7 @@ describe('Business Owner replacement over HTTP (integration, real PostgreSQL)', 
   let it1: ApiAccount;
   let finance: ApiAccount;
   let employee: ApiAccount;
-  let lookup: ApplicationLookupService;
+  let lookup: ApplicationFactsService;
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
@@ -58,7 +58,7 @@ describe('Business Owner replacement over HTTP (integration, real PostgreSQL)', 
       admin,
     });
     employee = await createActivatedAccount(ctx, seed, { code: 'E-EMP', email: 'emp@acme.vn', roles: [], admin });
-    lookup = ctx.app.get(ApplicationLookupService, { strict: false });
+    lookup = ctx.app.get(ApplicationFactsService, { strict: false });
   }, 120000);
 
   afterAll(async () => {

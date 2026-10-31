@@ -4,7 +4,7 @@ import { estimateTax } from '../../../core/money/tax-estimate';
 import { readSqlState, TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { financeAuditEvent } from '../finance-audit-event.mapper';
 import { TaxProfileVendorNotFoundError } from '../public/finance.errors';
 import {
@@ -53,7 +53,7 @@ function estimateFrom(current: TaxProfileContent | null, netMinor: bigint): TaxE
 export class TaxProfileService {
   constructor(
     private readonly repo: TaxProfileRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -93,7 +93,7 @@ export class TaxProfileService {
     input: { group?: TaxGroup; lines: TaxLineInput[] },
   ): Promise<{ profile: TaxProfileView; changed: boolean }> {
     const content: TaxProfileContent = { group: input.group ?? 'T2', lines: cleanTaxLines(input.lines) };
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A tax profile was declared before installation');
 
     try {

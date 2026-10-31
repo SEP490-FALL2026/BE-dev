@@ -4,7 +4,7 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestPlanNotFoundError } from './access-request.errors';
 import { RequestFactsService, type AssessmentInput } from './request-facts.service';
 import { RoutingFactsService } from './routing-facts.service';
@@ -77,7 +77,7 @@ describe('RequestFactsService.assess', () => {
     const module = await Test.createTestingModule({
       providers: [
         RequestFactsService,
-        { provide: OrganizationApi, useValue: organization },
+        { provide: OrganizationReadApi, useValue: organization },
         { provide: CatalogApi, useValue: catalog },
         { provide: RoutingFactsService, useValue: routing },
         { provide: OperatingParametersApi, useValue: { getValue: jest.fn() } },

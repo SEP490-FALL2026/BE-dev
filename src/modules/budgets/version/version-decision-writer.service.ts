@@ -6,7 +6,7 @@ import type { DecisionBodyDto } from '../budget/budget.dto';
 import { BudgetVersionNotFoundError } from '../budget/budget.errors';
 import { commitmentAttachedAfter, decisionOutcomeOf, versionDecidedDetail } from '../budget/budget.policy';
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
-import { budgetAuditEvent } from '../budget/budget-support.service';
+import { budgetAuditEvent } from '../budget/budget-facts.service';
 import { CommitmentRepo } from '../budget/commitment.repo';
 import { DecisionRepo } from '../budget/decision.repo';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';

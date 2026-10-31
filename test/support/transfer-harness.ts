@@ -3,6 +3,7 @@ import request from 'supertest';
 import { addDays } from '../../src/core/business-date';
 import { OrganizationHistoryApi } from '../../src/modules/organization/public/organization-history.api';
 import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import { OrganizationReadApi } from '../../src/modules/organization/public/organization-read.api';
 import { OrganizationChangeListeners } from '../../src/modules/organization/public/organization.extension-points';
 import type { OrganizationChange } from '../../src/modules/organization/public/organization.types';
 import type { ApiAccount } from './api-accounts';
@@ -170,6 +171,7 @@ export class TransferHarness extends ReassignmentHarness {
 
   history = () => this.ctx.app.get(OrganizationHistoryApi, { strict: false });
   organizationService = () => this.ctx.app.get(OrganizationApi, { strict: false });
+  organizationReads = () => this.ctx.app.get(OrganizationReadApi, { strict: false });
 
   /** The hourly telling of the organization, run by hand as of `day` (default today). */
   sweepAt = (day: string = this.today()) => this.history().announceDueChanges(day);

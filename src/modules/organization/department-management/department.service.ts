@@ -6,7 +6,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { organizationAuditEvent } from '../organization-audit-event.mapper';
 import { OrganizationContextService } from '../organization-context.service';
-import { EmployeeDirectoryService } from '../employee/employee-directory.service';
+import { EmployeeRecordService } from '../employee/employee-record.service';
 import { DepartmentUseService } from '../department/department-use.service';
 import { DepartmentServiceAccountReaderHook } from '../public/organization.extension-points';
 import { EmployeeAccountsHook } from '../public/organization.extension-points';
@@ -18,7 +18,7 @@ import {
   DepartmentNotFoundError,
   DepartmentUpdateEmptyError,
 } from '../department/department.errors';
-import { lockAndReadEmployee, requireOrganization } from './department-lookups.service';
+import { lockAndReadEmployee, requireOrganization } from './department-facts.service';
 import { assertMayChangeOrganization } from '../department/department.policy';
 import { DepartmentRepo } from '../department/department.repo';
 
@@ -45,7 +45,7 @@ export class DepartmentService {
   constructor(
     private readonly repo: DepartmentRepo,
     private readonly context: OrganizationContextService,
-    private readonly employees: EmployeeDirectoryService,
+    private readonly employees: EmployeeRecordService,
     private readonly use: DepartmentUseService,
     private readonly serviceAccounts: DepartmentServiceAccountReaderHook,
     private readonly employeeAccounts: EmployeeAccountsHook,

@@ -3,7 +3,7 @@ import { TransactionRunner, type DbTx } from '../../../infrastructure/database/t
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { SaasIssueError } from './saas-issue.errors';
 import {
@@ -37,7 +37,7 @@ export interface SubmitIssueInput {
 export class SaasIssueService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly calendar: SaasIssueCalendar,
     private readonly issues: SaasIssueRepo,
@@ -46,11 +46,11 @@ export class SaasIssueService {
   ) {}
 
   async submit(actor: AuthenticatedPrincipal, input: SubmitIssueInput): Promise<SaasIssueRecord> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A SaaS issue was sent before installation');
     const problem = occurredProblem(input.occurredAt, new Date());
     if (problem) throw new SaasIssueError(problem);
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const responseDueOn = await this.calendar.responseDueOn(today);
 
     return this.runner.run(async (tx) => {
@@ -157,7 +157,7 @@ export class SaasIssueService {
 
   /** The reporter reopens a resolved report with the reason, no later than the last day fixed when it was resolved. */
   async reopen(actor: AuthenticatedPrincipal, id: string, reason: string): Promise<SaasIssueRecord> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
 
     return this.runner.run(async (tx) => {
       const issue = await this.issues.lock(tx, id);
@@ -203,7 +203,7 @@ export class SaasIssueService {
   /** The IT Admin in charge of the department of the reporter when they can act, else the first IT Admin who can. */
   private async assigneeFor(tx: DbTx, reporterEmployeeId: string, today: string) {
     const inCharge =
-      (await this.organization.getItAdminInCharge(reporterEmployeeId, today, tx))?.itAdminEmployeeId ?? null;
+      (await this.organizationReads.getItAdminInCharge(reporterEmployeeId, today, tx))?.itAdminEmployeeId ?? null;
     const usable = inCharge ? (await this.identity.findUsableItAdminEmployeeIds([inCharge])).has(inCharge) : false;
 
     return assigneeOf({

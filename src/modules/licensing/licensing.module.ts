@@ -81,7 +81,7 @@ import { RevocationCompletionService } from './provisioning/revocation-completio
 import { OpenGrantTaskRepo } from './provisioning/open-grants/open-grant-task.repo';
 import { OpenGrantTaskService } from './provisioning/open-grants/open-grant-task.service';
 import { RevocationReadRepo } from './provisioning/revocation-read.repo';
-import { RevocationReadService } from './provisioning/revocation-read.service';
+import { RevocationViewService } from './provisioning/revocation-view.service';
 import { RevocationRecorder } from './provisioning/revocation-recorder.service';
 import { RevocationTaskFactory } from './provisioning/revocation-task-factory.service';
 import { RevocationService } from './provisioning/revocation.service';
@@ -169,7 +169,7 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
     RevocationService,
     RevocationCompletionService,
     RevocationReadRepo,
-    RevocationReadService,
+    RevocationViewService,
     OpenGrantTaskRepo,
     OpenGrantTaskService,
     HandoverRepo,

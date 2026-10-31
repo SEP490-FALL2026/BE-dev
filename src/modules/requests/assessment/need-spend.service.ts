@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PlanLineService } from '../plan-line/plan-line.service';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestDecisionRefusedError } from '../access-request/access-request.errors';
@@ -20,7 +20,7 @@ import { RepricingService } from './repricing.service';
 export class NeedSpendService {
   constructor(
     private readonly repo: AccessRequestRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly repricing: RepricingService,
     private readonly planLines: PlanLineService,
     private readonly audit: AuditApi,
@@ -38,7 +38,7 @@ export class NeedSpendService {
     context: { decidedAt: Date; fiscalYearStartMonth: number },
   ): Promise<void> {
     if (spend === undefined) throw new AccessRequestDecisionRefusedError('PLAN_LINE_REQUIRED');
-    const today = await this.organization.businessToday(context.decidedAt, tx);
+    const today = await this.organizationReads.businessToday(context.decidedAt, tx);
 
     let current = request;
     if (spend.expectedSpendOn !== undefined && spend.expectedSpendOn !== request.pricing.expectedSpendOn) {

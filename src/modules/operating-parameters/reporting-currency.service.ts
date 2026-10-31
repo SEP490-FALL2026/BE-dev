@@ -6,6 +6,7 @@ import type { AuthenticatedPrincipal } from '../../infrastructure/security/token
 import { AuditApi } from '../audit/public/audit.api';
 import { FinanceApi } from '../finance/public/finance.api';
 import { OrganizationApi } from '../organization/public/organization.api';
+import { OrganizationReadApi } from '../organization/public/organization-read.api';
 import { ReportingCurrencyLockedError } from './operating-parameters.errors';
 
 /**
@@ -18,6 +19,7 @@ import { ReportingCurrencyLockedError } from './operating-parameters.errors';
 export class ReportingCurrencyService {
   constructor(
     private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly finance: FinanceApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -60,7 +62,7 @@ export class ReportingCurrencyService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The reporting currency was read before installation');
 
     return organization;

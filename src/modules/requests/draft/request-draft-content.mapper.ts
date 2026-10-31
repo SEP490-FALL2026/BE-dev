@@ -1,9 +1,9 @@
 import type { z } from 'zod';
-import type { Prisma } from '../../../generated/prisma/client';
 import { groupBodySchema } from '../group-request/group-request.dto';
 import { serviceAccountSubmitSchema } from '../service-account-request/service-account-request.dto';
 import { submitBodySchema } from '../access-request/access-request.dto';
 import type { DraftSaveBody } from './request-draft.dto';
+import { draftPolicyJson, type DraftPolicy } from '../request-draft/request-draft-policy.json';
 import { beneficiaryCountOf } from '../request-draft/request-draft.policy';
 import type { DraftRow } from '../request-draft/request-draft.repo';
 
@@ -19,15 +19,13 @@ export type DraftContent =
   | { kind: 'SERVICE_ACCOUNT'; body: z.infer<typeof serviceAccountSubmitSchema> };
 
 /** The JSON a draft keeps in `policy.draft`: the kind and the body, side by side. */
-export function toContentJson(body: DraftSaveBody): Prisma.InputJsonObject {
+export function toContentJson(body: DraftSaveBody): DraftPolicy['draft'] {
   return { ...body };
 }
 
 /** What the draft was saved with, read again through the schema of the operation that sends it; a draft that does not parse is corrupt. */
 export function contentOf(row: Pick<DraftRow, 'id' | 'policy'>): DraftContent {
-  const stored = (row.policy as { draft?: Record<string, unknown> } | null)?.draft;
-  if (stored === undefined || typeof stored.kind !== 'string') throw new Error(`The draft ${row.id} has no content.`);
-  const { kind, ...body } = stored;
+  const { kind, ...body } = draftPolicyJson.decode(row.policy).draft;
   switch (kind) {
     case 'INDIVIDUAL':
       return { kind, body: submitBodySchema.parse(body) };

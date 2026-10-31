@@ -3,11 +3,11 @@ import type { BusinessDate } from '../../../core/business-date';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
-import { PlanLookupService } from '../plan/plan-lookup.service';
+import { PlanFactsService } from '../plan/plan-facts.service';
 import { SeatOccupancyHook } from '../public/catalog.extension-points';
-import { SubscriptionLookupService } from '../subscription/subscription-lookup.service';
+import { SubscriptionFactsService } from '../subscription/subscription-facts.service';
 import {
   ApplicationAlreadyRetiredError,
   ApplicationNotFoundError,
@@ -61,10 +61,10 @@ export class ApplicationRetirementService {
   constructor(
     private readonly applications: ApplicationRepo,
     private readonly retirements: ApplicationRetirementRepo,
-    private readonly plans: PlanLookupService,
-    private readonly subscriptions: SubscriptionLookupService,
+    private readonly plans: PlanFactsService,
+    private readonly subscriptions: SubscriptionFactsService,
     private readonly occupancy: SeatOccupancyHook,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -88,9 +88,9 @@ export class ApplicationRetirementService {
       // The owner must still be working when the confirmation is kept (INV-06): a departure being recorded is waited for.
       // Only the current owner can confirm, so only that employee (who exists) is locked; anyone else is refused below.
       if (input.businessOwnerEmployeeId === application.businessOwnerEmployeeId) {
-        await this.organization.lockEmployeeForShare(tx, input.businessOwnerEmployeeId);
+        await this.organizationReads.lockEmployeeForShare(tx, input.businessOwnerEmployeeId);
       }
-      const owner = await this.organization.getEmployee(input.businessOwnerEmployeeId, tx);
+      const owner = await this.organizationReads.getEmployee(input.businessOwnerEmployeeId, tx);
       assertConfirmable({
         currentOwnerEmployeeId: application.businessOwnerEmployeeId,
         businessOwnerEmployeeId: input.businessOwnerEmployeeId,
@@ -129,7 +129,7 @@ export class ApplicationRetirementService {
   async get(applicationId: string): Promise<RetirementView> {
     const application = await this.applications.find(applicationId);
     if (!application) throw new ApplicationNotFoundError();
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const confirmations = await this.retirements.confirmations(applicationId, RETIREMENT_LIST_LIMIT);
     const state = await this.retirements.stateOf(applicationId);
     const blockers = await this.blockersOf(applicationId, today);
@@ -162,7 +162,7 @@ export class ApplicationRetirementService {
       const application = await this.applications.lock(tx, applicationId);
       if (!application) throw new ApplicationNotFoundError();
       await this.plans.lockPlansOfApplication(tx, applicationId);
-      const today = await this.organization.businessToday(now, tx);
+      const today = await this.organizationReads.businessToday(now, tx);
       const confirmation = await this.retirements.latestBy(applicationId, application.businessOwnerEmployeeId, tx);
       const blockers = await this.blockersOf(applicationId, today, tx);
 
@@ -207,9 +207,9 @@ export class ApplicationRetirementService {
     const planName = new Map(plans.map((plan) => [plan.id, plan.name]));
     const holdings = await this.occupancy.get().openAssignmentsOfPlans(planIds, today, RETIREMENT_LIST_LIMIT, tx);
     const people = new Map(
-      (await this.organization.getEmployees([...new Set(holdings.items.map((holding) => holding.employeeId))], tx)).map(
-        (employee) => [employee.id, employee],
-      ),
+      (
+        await this.organizationReads.getEmployees([...new Set(holdings.items.map((holding) => holding.employeeId))], tx)
+      ).map((employee) => [employee.id, employee]),
     );
     const running = activeTermSubscriptions(await this.subscriptions.termsOfPlans(planIds, tx), today);
 
@@ -236,7 +236,7 @@ export class ApplicationRetirementService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('An application was retired before installation');
 
     return organization;

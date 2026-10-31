@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RequestsApi } from '../../requests/public/requests.api';
 import type {
   TransferReviewDecisionWire,
@@ -45,14 +45,14 @@ const paged = <T>(items: T[], total: number, page: { page: number; pageSize: num
 export class TransferReviewViewService {
   constructor(
     private readonly lists: TransferReviewListRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly requests: RequestsApi,
     private readonly licensing: LicensingApi,
   ) {}
 
   async list(actor: AuthenticatedPrincipal, query: ReviewListQuery): Promise<Paged<TransferReviewSummaryWire>> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const { items, total } = await this.lists.list({
       scope: await this.scopeOf(actor, today),
       ...(query.status ? { status: query.status } : {}),
@@ -80,7 +80,7 @@ export class TransferReviewViewService {
   }
 
   async detailOf(actor: AuthenticatedPrincipal, record: ReviewSummaryRecord): Promise<TransferReviewDetailWire> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const names = await this.namesOf([record], [], today);
     const reviewerId = names.heads.get(record.departmentId);
     const reviewer = reviewerId ? names.employees.get(reviewerId) : undefined;
@@ -122,7 +122,7 @@ export class TransferReviewViewService {
   ): Promise<Paged<TransferReviewItemWire>> {
     await this.visibleTo(actor, id);
     const { items, total } = await this.lists.listItems(id, page);
-    const names = await this.namesOf([], items, await this.organization.businessToday());
+    const names = await this.namesOf([], items, await this.organizationReads.businessToday());
 
     return paged(
       items.map((item) => toItem(item, names)),
@@ -133,7 +133,7 @@ export class TransferReviewViewService {
 
   /** The answer to a decision: the review as the caller reads it now and the line that was decided. */
   async decisionOf(actor: AuthenticatedPrincipal, outcome: DecisionOutcome): Promise<TransferReviewDecisionWire> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const summary = await this.lists.summaryOf(outcome.review.id);
     if (!summary) throw new TransferReviewError('NOT_FOUND');
     const names = await this.namesOf([summary], [outcome.item], today);
@@ -147,7 +147,7 @@ export class TransferReviewViewService {
   private async visibleTo(actor: AuthenticatedPrincipal, id: string): Promise<ReviewSummaryRecord> {
     const record = await this.lists.summaryOf(id);
     if (!record) throw new TransferReviewError('NOT_FOUND');
-    const scope = await this.scopeOf(actor, await this.organization.businessToday());
+    const scope = await this.scopeOf(actor, await this.organizationReads.businessToday());
     const involved =
       scope.kind === 'ALL' ||
       (scope.kind === 'DEPARTMENT' && scope.departmentId === record.departmentId) ||
@@ -159,7 +159,7 @@ export class TransferReviewViewService {
 
   private async scopeOf(actor: AuthenticatedPrincipal, today: BusinessDate): Promise<ReviewScope> {
     if (actor.roles.includes('IT_ADMIN')) return { kind: 'ALL' };
-    const headed = await this.organization.getHeadedDepartment(actor.employeeId, today);
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, today);
 
     return headed ? { kind: 'DEPARTMENT', departmentId: headed.departmentId } : { kind: 'NONE' };
   }
@@ -174,7 +174,7 @@ export class TransferReviewViewService {
       ...new Set(values.filter((value): value is string => value !== null)),
     ];
     const departmentIds = unique(reviews.map((review) => review.departmentId));
-    const heads = await this.organization.getDepartmentHeads(departmentIds, today);
+    const heads = await this.organizationReads.getDepartmentHeads(departmentIds, today);
     const employeeIds = unique([
       ...reviews.map((review) => review.employeeId),
       ...items.map((item) => item.decidedByEmployeeId),
@@ -182,8 +182,8 @@ export class TransferReviewViewService {
     ]);
     const planIds = unique(items.map((item) => item.planId));
     const [employees, departments, plans, revoking] = await Promise.all([
-      employeeIds.length > 0 ? this.organization.getEmployees(employeeIds) : [],
-      departmentIds.length > 0 ? this.organization.getDepartmentBriefs(departmentIds) : [],
+      employeeIds.length > 0 ? this.organizationReads.getEmployees(employeeIds) : [],
+      departmentIds.length > 0 ? this.organizationReads.getDepartmentBriefs(departmentIds) : [],
       planIds.length > 0 ? this.catalog.getPlanRevocationInfo(planIds) : [],
       this.revokingOf(items),
     ]);

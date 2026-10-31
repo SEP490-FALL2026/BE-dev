@@ -6,7 +6,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { EmployeeNotFoundError } from '../public/organization.errors';
 import { OrganizationContextService } from '../organization-context.service';
-import { EmployeeDirectoryService } from './employee-directory.service';
+import { EmployeeRecordService } from './employee-record.service';
 import type { EmployeeRecord } from '../public/organization.types';
 import {
   EmployeeForbiddenError,
@@ -76,7 +76,7 @@ describe('EmployeeMaintenanceService', () => {
           useValue: { businessToday: organization.businessToday, findOrganization: organization.getOrganization },
         },
         {
-          provide: EmployeeDirectoryService,
+          provide: EmployeeRecordService,
           useValue: {
             lock: (tx: unknown, id: string) => organization.lockEmployeeForUpdate(tx, id) as Promise<void>,
             find: organization.getEmployee,

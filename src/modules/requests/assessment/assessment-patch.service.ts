@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AssessmentRecord } from '../access-request/assessment-record.types';
 import type { AssessmentPatchDto } from './assessment.dto';
 import { AssessmentReferenceNotFoundError } from './assessment.errors';
@@ -15,7 +15,7 @@ import { QuoteService } from './quote.service';
 export class AssessmentPatchService {
   constructor(
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly quotes: QuoteService,
   ) {}
 
@@ -59,7 +59,7 @@ export class AssessmentPatchService {
   }
 
   private async checkedOwner(employeeId: string | null): Promise<string | null> {
-    if (employeeId !== null && (await this.organization.getEmployees([employeeId])).length === 0) {
+    if (employeeId !== null && (await this.organizationReads.getEmployees([employeeId])).length === 0) {
       throw new AssessmentReferenceNotFoundError('proposedBusinessOwnerEmployeeId');
     }
 

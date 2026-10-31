@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingApi } from '../../licensing/public/licensing.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
   AccessRequestNotFoundError,
   AccessRequestWithdrawalRefusedError,
@@ -33,7 +33,7 @@ export class GroupWithdrawalService {
     private readonly requests: AccessRequestRepo,
     private readonly lines: RequestLineRepo,
     private readonly licensing: LicensingApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly spendStatus: SpendStatusService,
     private readonly withdrawer: GroupLineWithdrawer,
     private readonly aftermath: GroupWithdrawalAftermath,
@@ -135,7 +135,7 @@ export class GroupWithdrawalService {
   }
 
   private async heads(actor: AuthenticatedPrincipal, request: AccessRequestRecord): Promise<boolean> {
-    const headed = await this.organization.getHeadedDepartment(actor.employeeId);
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId);
 
     return headed?.departmentId === request.departmentId;
   }

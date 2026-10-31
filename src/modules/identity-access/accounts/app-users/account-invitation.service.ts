@@ -4,11 +4,11 @@ import { TransactionRunner } from '../../../../infrastructure/database/transacti
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
 import { EmployeeNotFoundError } from '../../../organization/public/organization.errors';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { AppRole } from '../../public/identity-access.types';
 import { employeeHasNotLeft } from '../account.policy';
 import { translateAccountWriteError } from './account-constraints.errors';
-import { AccountDirectoryService } from '../account-directory.service';
+import { AccountRecordService } from '../account-record.service';
 import { accountAuditEvent, isSelfChange, RequestedRole, validateRoleSet } from './account-administration.policy';
 import {
   AccountAlreadyActivatedError,
@@ -39,9 +39,9 @@ export interface CreateAccountInput {
 @Injectable()
 export class AccountInvitationService {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly grants: RoleGrantService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly invitations: InvitationMailService,
     private readonly runner: TransactionRunner,
@@ -52,9 +52,9 @@ export class AccountInvitationService {
     const violation = validateRoleSet(input.roles);
     if (violation) throw new RoleRequestRefusedError(violation);
 
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('Account creation before installation');
-    const employee = await this.organization.getEmployee(input.employeeId);
+    const employee = await this.organizationReads.getEmployee(input.employeeId);
     if (!employee) throw new EmployeeNotFoundError(input.employeeId);
 
     const roles = [...new Set(input.roles)] as AppRole[];
@@ -62,8 +62,8 @@ export class AccountInvitationService {
     return this.runner
       .run(async (tx) => {
         // Employee first (lock order 1), so the status checked here cannot change before commit.
-        await this.organization.lockEmployeeForShare(tx, input.employeeId);
-        const current = await this.organization.getEmployee(input.employeeId, tx);
+        await this.organizationReads.lockEmployeeForShare(tx, input.employeeId);
+        const current = await this.organizationReads.getEmployee(input.employeeId, tx);
         if (!current) throw new EmployeeNotFoundError(input.employeeId);
         if (!employeeHasNotLeft(current)) throw new EmployeeTerminatedError();
         // Resolved from the employee as locked, not from the earlier unlocked read (lock protocol rule 2).
@@ -127,7 +127,7 @@ export class AccountInvitationService {
       if (!account) throw new AccountNotFoundError();
       if (account.activationState === 'ACTIVATED') throw new AccountAlreadyActivatedError();
       if (account.status === 'LOCKED') throw new AccountLockedError();
-      const employee = await this.organization.getEmployee(account.employeeId, tx);
+      const employee = await this.organizationReads.getEmployee(account.employeeId, tx);
       if (!employeeHasNotLeft(employee)) throw new EmployeeTerminatedError();
 
       // Every usable token goes, including an expired one that still holds the place (spec base).

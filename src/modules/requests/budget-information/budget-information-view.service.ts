@@ -8,7 +8,7 @@ import {
 } from './budget-information.repo';
 import type { BudgetInformationWire } from './budget-information.dto';
 import { BudgetInformationNotFoundError } from '../spend/spend.errors';
-import { SpendReadSupport } from '../spend/spend-read.service';
+import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 
 /** How the questions to Finance are written for a reader, one read of the people for all of them. */
@@ -16,12 +16,12 @@ import { SpendStepRepo } from '../spend/spend-step.repo';
 export class BudgetInformationViewService {
   constructor(
     private readonly questions: BudgetInformationRepo,
-    private readonly support: SpendReadSupport,
+    private readonly wireView: SpendWireViewService,
     private readonly steps: SpendStepRepo,
   ) {}
 
   async wire(records: readonly BudgetInformationRecord[]): Promise<BudgetInformationWire[]> {
-    const people = await this.support.people(
+    const people = await this.wireView.people(
       records.flatMap((record) => [record.askedByEmployeeId, record.answeredByEmployeeId]),
     );
     const person = (id: string) => people.get(id) as NonNullable<ReturnType<typeof people.get>>;

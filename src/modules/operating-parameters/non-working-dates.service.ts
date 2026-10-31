@@ -4,7 +4,7 @@ import { BusinessDate } from '../../core/business-date';
 import { TransactionRunner } from '../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../audit/public/audit.api';
-import { OrganizationApi } from '../organization/public/organization.api';
+import { OrganizationReadApi } from '../organization/public/organization-read.api';
 import {
   NonWorkingDateInPastError,
   NonWorkingDateNotFoundError,
@@ -23,7 +23,7 @@ const REASON_MAX_LENGTH = 200;
 export class NonWorkingDatesService {
   constructor(
     private readonly repo: OperatingParametersRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -121,7 +121,7 @@ export class NonWorkingDatesService {
 
   private async assertNotPast(date: BusinessDate): Promise<void> {
     // Today itself may still change (AC-10 adds and removes 03/10 on 03/10); only a day before it may not.
-    if (date < (await this.organization.businessToday())) throw new NonWorkingDateInPastError(date);
+    if (date < (await this.organizationReads.businessToday())) throw new NonWorkingDateInPastError(date);
   }
 
   private requireReason(raw: string): string {
@@ -155,7 +155,7 @@ export class NonWorkingDatesService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The non-working dates were used before installation');
 
     return organization;

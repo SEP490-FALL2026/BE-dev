@@ -4,6 +4,7 @@ import { TransactionRunner, type DbTx } from '../../../infrastructure/database/t
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { PersonnelActor } from '../public/personnel.types';
 import { TransferRefusedError } from './transfer.errors';
 import { TransferChangeWriter } from './transfer-change-writer.service';
@@ -22,6 +23,7 @@ export class TransferChangeService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly transfers: TransferRepo,
@@ -112,7 +114,7 @@ export class TransferChangeService {
     this.guard.requireWriter(actor, seen.employeeId);
 
     const work = async (tx: DbTx): Promise<TransferRecord> => {
-      const today = await this.organization.businessToday(new Date(), tx);
+      const today = await this.organizationReads.businessToday(new Date(), tx);
       await this.history.lockDepartments(tx, {
         updateIds: seen.headHandover ? [seen.fromDepartmentId] : [],
         shareIds: [seen.fromDepartmentId, seen.toDepartmentId],
@@ -135,7 +137,7 @@ export class TransferChangeService {
 
   private async lockSuccessor(tx: DbTx, employeeId: string): Promise<void> {
     try {
-      await this.organization.lockEmployeeForShare(tx, employeeId);
+      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
     } catch (error) {
       if (!(error instanceof EmployeeNotFoundError)) throw error;
     }

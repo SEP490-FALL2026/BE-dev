@@ -5,7 +5,7 @@ import { TransactionRunner } from '../../../../infrastructure/database/transacti
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
 import { LicensingSeatBaselineApi } from '../../../licensing/public/licensing-seat-baseline.api';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { importCancelledEvent, importUploadedEvent } from '../employee-import-audit.mapper';
 import type { EmployeeRowOutcome } from '../employee-import-row.types';
 import { outcomeCounts, toImportView } from '../employee-import-view.mapper';
@@ -31,7 +31,7 @@ export const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
 export class EmployeeImportPreviewService {
   constructor(
     private readonly repo: EmployeeImportRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
     private readonly licensing: LicensingSeatBaselineApi,
@@ -177,7 +177,7 @@ export class EmployeeImportPreviewService {
       ...outcomeCounts(rows),
       newPeopleByDepartment: [...byDepartment].map(([departmentCode, count]) => ({ departmentCode, count })),
       departmentsWithoutHead: await this.rowValidation.departmentsWithoutHead(lookup, [...byDepartment.keys()]),
-      reviewQueue: await reviewQueueOf(this.licensing, this.organization, rows),
+      reviewQueue: await reviewQueueOf(this.licensing, this.organizationReads, rows),
       duplicateOf: duplicate
         ? { importId: duplicate.id, fileName: duplicate.fileName, confirmedAt: duplicate.confirmedAt.toISOString() }
         : null,
@@ -185,7 +185,7 @@ export class EmployeeImportPreviewService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A people file was imported before installation');
 
     return organization;

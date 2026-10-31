@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { RecoveryTicketService } from '../recovery/recovery-ticket.service';
 import { PasswordResetMailService } from './password-reset-mail.service';
 import { canReceiveResetMail } from './password-reset.policy';
@@ -16,8 +16,8 @@ import { canReceiveResetMail } from './password-reset.policy';
 @Injectable()
 export class PasswordResetRequestService {
   constructor(
-    private readonly accounts: AccountDirectoryService,
-    private readonly organization: OrganizationApi,
+    private readonly accounts: AccountRecordService,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly recoveryTickets: RecoveryTicketService,
     private readonly mail: PasswordResetMailService,
     private readonly audit: AuditApi,
@@ -40,23 +40,23 @@ export class PasswordResetRequestService {
   private async performRequest(email: string): Promise<void> {
     const normalized = this.tryNormalize(email);
     if (normalized === null) return;
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) return;
     // Unlocked: decides whether there is anyone to issue a link to. Everything that matters is re-read under the lock.
     const found = await this.accounts.findAccountByLoginEmail(organization.id, normalized);
     if (!found) {
       // The same two reads an existing address costs, so "nobody here" is not faster than "here but refused".
-      await this.organization.getEmployee(randomUUID());
+      await this.organizationReads.getEmployee(randomUUID());
       return;
     }
     // An account that cannot use a link (invited, locked, employee left) leaves here without opening a transaction,
     // so only an address that gets a link takes longer than the rest (spec Q-6).
-    if (!canReceiveResetMail(found, await this.organization.getEmployee(found.employeeId))) return;
+    if (!canReceiveResetMail(found, await this.organizationReads.getEmployee(found.employeeId))) return;
 
     await this.runner.run(async (tx) => {
       if (!(await this.accounts.lockAppUser(tx, found.id, 'UPDATE'))) return;
       const account = await this.accounts.readAccount(tx, found.id);
-      const employee = account ? await this.organization.getEmployee(account.employeeId, tx) : null;
+      const employee = account ? await this.organizationReads.getEmployee(account.employeeId, tx) : null;
       if (!account || !canReceiveResetMail(account, employee) || !employee) return;
       // An operator's credential reset is waiting (US-01-10 AC-10): its link stays the only one, and nothing is sent.
       if (await this.recoveryTickets.hasWaitingCredentialReset(tx, account.organizationId, account.id)) return;

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { OpenRequestOfBeneficiary } from '../../public/requests.types';
 import { OpenRequestRepo } from './open-request.repo';
 
@@ -13,7 +13,7 @@ import { OpenRequestRepo } from './open-request.repo';
 export class OpenRequestService {
   constructor(
     private readonly repo: OpenRequestRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
   ) {}
 
@@ -24,12 +24,12 @@ export class OpenRequestService {
   ): Promise<{ items: OpenRequestOfBeneficiary[]; total: number }> {
     const { items, total } = await this.repo.pageOf(employeeId, page, tx);
     const planIds = [...new Set(items.flatMap((item) => (item.planId === null ? [] : [item.planId])))];
-    const people = await this.organization.getEmployees(
+    const people = await this.organizationReads.getEmployees(
       [...new Set(items.map((item) => item.requesterEmployeeId))],
       tx,
     );
     const plans = planIds.length === 0 ? [] : await this.catalog.getPlanSummaries(planIds);
-    const beneficiary = await this.organization.getEmployees([employeeId], tx);
+    const beneficiary = await this.organizationReads.getEmployees([employeeId], tx);
     const left = beneficiary[0]?.status === 'TERMINATED';
 
     return {

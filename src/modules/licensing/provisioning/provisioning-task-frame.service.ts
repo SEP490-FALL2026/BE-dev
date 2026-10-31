@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ProvisioningTaskNotFoundError } from '../public/licensing.errors';
 import type { SelfExecutionMode } from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
@@ -33,7 +33,7 @@ export interface TaskWorkContext {
 export class ProvisioningTaskFrame {
   constructor(
     private readonly repo: ProvisioningTaskRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly notifications: NotificationsApi,
     private readonly audit: AuditApi,
@@ -128,7 +128,7 @@ export class ProvisioningTaskFrame {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A provisioning task was changed before installation');
 
     return organization;

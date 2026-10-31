@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
 import { TransactionRunner, toTransientError } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { CredentialService } from '../credentials/credential.service';
 import { AccountSnapshot, IssuedSession } from '../public/identity-access.types';
 import { employeeHasNotLeft } from '../accounts/account.policy';
@@ -13,8 +13,8 @@ import { SessionTokenService } from './session-token.service';
 @Injectable()
 export class LoginService {
   constructor(
-    private readonly accounts: AccountDirectoryService,
-    private readonly organization: OrganizationApi,
+    private readonly accounts: AccountRecordService,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly credentials: CredentialService,
     private readonly throttle: LoginThrottle,
     private readonly sessionTokens: SessionTokenService,
@@ -34,7 +34,7 @@ export class LoginService {
   }
 
   private async performLogin(email: string, password: string): Promise<IssuedSession> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) {
       await this.credentials.verifyAgainstDummy(password);
       throw new InvalidCredentialsError();
@@ -48,7 +48,7 @@ export class LoginService {
     // Everything CPU-heavy happens before the transaction (lock protocol rule 3).
     const account = await this.accounts.findAccountByLoginEmail(organization.id, normalized);
     const verifiedHash = await this.verifyPassword(account, password);
-    const employee = account ? await this.organization.getEmployee(account.employeeId) : null;
+    const employee = account ? await this.organizationReads.getEmployee(account.employeeId) : null;
     const usable =
       verifiedHash !== null &&
       account !== null &&
@@ -69,7 +69,7 @@ export class LoginService {
       if (!(await this.accounts.lockAppUser(tx, account.id, 'SHARE'))) return null;
 
       const current = await this.accounts.readAccount(tx, account.id);
-      const employeeNow = await this.organization.getEmployee(account.employeeId, tx);
+      const employeeNow = await this.organizationReads.getEmployee(account.employeeId, tx);
       const unchanged =
         current !== null &&
         current.status === 'ACTIVE' &&

@@ -18,15 +18,81 @@ export class DemoApiError extends Error {
   }
 }
 
-/** The API could not be reached (refused connection, DNS, timeout): nothing it would have written is known. */
+/**
+ * `TIMEOUT`: no answer within the client's limit — the request may have reached the API. `NETWORK`: the connection
+ * could not be made or broke (refused, DNS, reset).
+ */
+export type UnreachableKind = 'TIMEOUT' | 'NETWORK';
+
+/**
+ * The socket, DNS and undici codes an unreachable API is reported with. Anything else is shown as no code: a code is
+ * printed only when it is known to carry no data.
+ */
+const NETWORK_CODES: ReadonlySet<string> = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ECONNABORTED',
+  'ETIMEDOUT',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EPIPE',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+  'UND_ERR_SOCKET',
+  'UND_ERR_CLOSED',
+]);
+const TIMEOUT_CODES: ReadonlySet<string> = new Set(['UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT']);
+
+/**
+ * The API could not be reached (refused connection, DNS, timeout): nothing it would have written is known. It names
+ * the request, the kind of failure, the listed code fetch hides in its `cause` and the time the attempt took — never
+ * the address, the message of the cause, a header or a body.
+ */
 export class DemoApiUnreachableError extends Error {
+  /** `METHOD path kind=… [code=…] [elapsedMs=…]`, for a refusal line. */
+  readonly detail: string;
+
   constructor(
     readonly method: string,
     readonly path: string,
+    readonly kind: UnreachableKind = 'NETWORK',
+    readonly code: string | null = null,
+    readonly elapsedMs: number | null = null,
   ) {
-    super(`${method} ${path}: the API could not be reached`);
+    const facts = [`kind=${kind}`];
+    if (code !== null) facts.push(`code=${code}`);
+    if (elapsedMs !== null) facts.push(`elapsedMs=${elapsedMs}`);
+    super(`${method} ${path}: the API could not be reached (${facts.join(' ')})`);
     this.name = 'DemoApiUnreachableError';
+    this.detail = `${method} ${path} ${facts.join(' ')}`;
   }
+}
+
+/** The first listed code in the cause chain of a failed fetch (an AggregateError holds one error per address tried). */
+function networkCodeOf(error: unknown): string | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current !== undefined && current !== null; depth++) {
+    const candidates: unknown[] =
+      current instanceof AggregateError ? [current, ...(current.errors as unknown[])] : [current];
+    for (const candidate of candidates) {
+      const code = (candidate as { code?: unknown }).code;
+      if (typeof code === 'string' && NETWORK_CODES.has(code)) return code;
+    }
+    current = current instanceof Error ? current.cause : undefined;
+  }
+
+  return null;
+}
+
+function unreachableKindOf(error: unknown, code: string | null): UnreachableKind {
+  // AbortSignal.timeout rejects with a DOMException, which is not an `Error` in every realm: matched by name.
+  const name = (error as { name?: unknown } | null)?.name;
+  const timedOut = name === 'TimeoutError' || name === 'AbortError';
+
+  return timedOut || (code !== null && TIMEOUT_CODES.has(code)) ? 'TIMEOUT' : 'NETWORK';
 }
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
@@ -37,6 +103,8 @@ export interface DemoApiOptions {
   /** How many times a 429 or a 503 is retried before it is reported. */
   retries?: number;
   timeoutMs?: number;
+  /** A monotonic clock in ms, for the time an unreachable attempt took. */
+  now?: () => number;
 }
 
 interface Session {
@@ -60,6 +128,7 @@ export class DemoApiClient {
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly retries: number;
   private readonly timeoutMs: number;
+  private readonly now: () => number;
 
   constructor(
     private readonly baseUrl: string,
@@ -69,6 +138,7 @@ export class DemoApiClient {
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.retries = options.retries ?? 5;
     this.timeoutMs = options.timeoutMs ?? 30_000;
+    this.now = options.now ?? (() => performance.now());
   }
 
   /** Signs in once per email; later calls reuse the session. */
@@ -126,6 +196,7 @@ export class DemoApiClient {
     const headers: Record<string, string> = { accept: 'application/json' };
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (token) headers.authorization = `Bearer ${token}`;
+    const startedAt = this.now();
     try {
       return await this.fetchImpl(`${this.baseUrl}${path}`, {
         method,
@@ -133,8 +204,10 @@ export class DemoApiClient {
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
-    } catch {
-      throw new DemoApiUnreachableError(method, path);
+    } catch (error) {
+      const code = networkCodeOf(error);
+      const elapsedMs = Math.round(this.now() - startedAt);
+      throw new DemoApiUnreachableError(method, path, unreachableKindOf(error, code), code, elapsedMs);
     }
   }
 

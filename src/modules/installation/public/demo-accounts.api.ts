@@ -7,7 +7,7 @@ import { DbTx, TransactionRunner } from '../../../infrastructure/database/transa
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LocalDemoAccountApi } from '../../identity-access/public/local-demo-account.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
   DemoAccountPlanItem,
   DemoAccountSpec,
@@ -29,7 +29,7 @@ type Credentials = Map<string, { hash: string; hashPolicyVersion: number }>;
 export class DemoAccountsApi {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly accounts: LocalDemoAccountApi,
     private readonly audit: AuditApi,
@@ -48,9 +48,9 @@ export class DemoAccountsApi {
   /** Null when the database holds no installation. */
   async inspect(): Promise<DemoInstallationFacts | null> {
     return this.runner.run(async (tx) => {
-      const organization = await this.organization.getOrganization(tx);
+      const organization = await this.organizationReads.getOrganization(tx);
       if (organization === null) return null;
-      const today = await this.organization.businessToday(new Date(), tx);
+      const today = await this.organizationReads.businessToday(new Date(), tx);
       const holder = await this.identity.getSuperAdminHolder(tx);
       const loginEmail = holder ? await this.identity.findLoginEmailOfEmployee(tx, holder.employeeId) : null;
 
@@ -68,14 +68,36 @@ export class DemoAccountsApi {
 
   /** The employees of these codes that exist, by code. */
   async findEmployees(codes: readonly string[]): Promise<Map<string, { id: string; status: string }>> {
-    const found = await this.organization.getEmployeesByCodes(codes);
+    const found = await this.organizationReads.getEmployeesByCodes(codes);
 
     return new Map(found.map((employee) => [employee.employeeCode, { id: employee.id, status: employee.status }]));
   }
 
-  /** Whether each wanted account is there as wanted, can be created, or conflicts with existing data. Writes nothing. */
+  /**
+   * Whether each wanted account is there as wanted, can be created, or conflicts with existing data. Writes nothing.
+   * Each account is judged in a short transaction of its own: a read needs no snapshot across accounts (`create`
+   * judges again inside its write transaction), and one transaction for all of them makes ~4 queries × the accounts
+   * sequential round trips, which over the SSH tunnel of the local path (~245 ms each to the VPS) outlived
+   * DB_TRANSACTION_TIMEOUT_MS (P2028).
+   */
   async describe(organizationId: string, specs: readonly DemoAccountSpec[]): Promise<DemoAccountPlanItem[]> {
-    return this.runner.run((tx) => this.plan(tx, organizationId, specs));
+    const employees = await this.runner.run((tx) =>
+      this.organizationReads.getEmployeesByCodes(
+        specs.map((spec) => spec.employeeCode),
+        tx,
+      ),
+    );
+    const items: DemoAccountPlanItem[] = [];
+    for (const spec of specs) {
+      const employee = employees.find((candidate) => candidate.employeeCode === spec.employeeCode);
+      items.push(
+        employee
+          ? await this.runner.run((tx) => this.planOne(tx, organizationId, spec, employee))
+          : absentEmployee(spec),
+      );
+    }
+
+    return items;
   }
 
   /**
@@ -107,34 +129,40 @@ export class DemoAccountsApi {
     organizationId: string,
     specs: readonly DemoAccountSpec[],
   ): Promise<DemoAccountPlanItem[]> {
-    const employees = await this.organization.getEmployeesByCodes(
+    const employees = await this.organizationReads.getEmployeesByCodes(
       specs.map((spec) => spec.employeeCode),
       tx,
     );
     const items: DemoAccountPlanItem[] = [];
     for (const spec of specs) {
       const employee = employees.find((candidate) => candidate.employeeCode === spec.employeeCode);
-      if (!employee) {
-        items.push({ employeeCode: spec.employeeCode, state: 'no-employee', employeeId: null, appUserId: null });
-        continue;
-      }
-      const state = await this.accounts.describeDemoAccount(tx, {
-        organizationId,
-        employeeId: employee.id,
-        loginEmail: spec.loginEmail,
-        role: spec.role,
-      });
-      const appUserId = await this.identity.findAccountIdOfEmployee(tx, employee.id);
-      items.push({
-        employeeCode: spec.employeeCode,
-        state: state.state,
-        ...(state.state === 'conflict' ? { reason: state.reason } : {}),
-        employeeId: employee.id,
-        appUserId,
-      });
+      items.push(employee ? await this.planOne(tx, organizationId, spec, employee) : absentEmployee(spec));
     }
 
     return items;
+  }
+
+  private async planOne(
+    tx: DbTx,
+    organizationId: string,
+    spec: DemoAccountSpec,
+    employee: { id: string },
+  ): Promise<DemoAccountPlanItem> {
+    const state = await this.accounts.describeDemoAccount(tx, {
+      organizationId,
+      employeeId: employee.id,
+      loginEmail: spec.loginEmail,
+      role: spec.role,
+    });
+    const appUserId = await this.identity.findAccountIdOfEmployee(tx, employee.id);
+
+    return {
+      employeeCode: spec.employeeCode,
+      state: state.state,
+      ...(state.state === 'conflict' ? { reason: state.reason } : {}),
+      employeeId: employee.id,
+      appUserId,
+    };
   }
 
   /** Hashing is slow on purpose: it is done before any transaction opens (lock protocol rule 3). */
@@ -193,4 +221,9 @@ export class DemoAccountsApi {
       await record('ROLE.GRANTED', { role: spec.role });
     }
   }
+}
+
+/** The plan item of an account whose employee is not there: nothing to look up. */
+function absentEmployee(spec: DemoAccountSpec): DemoAccountPlanItem {
+  return { employeeCode: spec.employeeCode, state: 'no-employee', employeeId: null, appUserId: null };
 }

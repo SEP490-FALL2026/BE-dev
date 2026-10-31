@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
-import { ApprovalRoleDirectoryService } from '../approval-roles/approval-role-directory.service';
+import { ApprovalRoleFactsService } from '../approval-roles/approval-role-facts.service';
 import { AccountInventory, AccountStateKey, AppRole, ApprovalRoleKind } from './identity-access.types';
 
 const ACCOUNT_STATES: readonly AccountStateKey[] = [
@@ -25,9 +25,9 @@ const zeroes = <K extends string>(keys: readonly K[]): Record<K, number> =>
 @Injectable()
 export class IdentityAccessInspectionApi {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly grants: RoleGrantService,
-    private readonly approvalRoles: ApprovalRoleDirectoryService,
+    private readonly approvalRoles: ApprovalRoleFactsService,
   ) {}
 
   async accountInventory(tx: DbTx): Promise<AccountInventory> {

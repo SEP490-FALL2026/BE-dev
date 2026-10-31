@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type {
   SaasIssueEligibleWire,
   SaasIssueEntryWire,
@@ -41,7 +41,7 @@ export class SaasIssueViewService {
   constructor(
     private readonly issues: SaasIssueRepo,
     private readonly facts: SaasIssueFactsRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
   ) {}
 
@@ -50,7 +50,7 @@ export class SaasIssueViewService {
     actor: AuthenticatedPrincipal,
     query: { page: number; pageSize: number },
   ): Promise<SaasIssueOptionsWire> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const { items, total } = await this.facts.eligiblePage(actor.employeeId, today, {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
@@ -88,7 +88,7 @@ export class SaasIssueViewService {
     if (scope === 'mine' && query.reporterEmployeeId && query.reporterEmployeeId !== actor.employeeId) {
       return pageOf([], 0, query.page, query.pageSize);
     }
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const reporterEmployeeId = scope === 'mine' ? actor.employeeId : query.reporterEmployeeId;
     const { items, total } = await this.issues.page({
       ...(reporterEmployeeId ? { reporterEmployeeId } : {}),
@@ -116,7 +116,7 @@ export class SaasIssueViewService {
 
   /** The reports as they are answered in detail, in the order they were given. */
   async wireOf(records: readonly SaasIssueRecord[]): Promise<SaasIssueWire[]> {
-    const names = await this.namesOf(records, await this.organization.businessToday());
+    const names = await this.namesOf(records, await this.organizationReads.businessToday());
 
     return records.map((record) => toDetail(record, names));
   }
@@ -131,7 +131,7 @@ export class SaasIssueViewService {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     });
-    const people = await this.organization.getEmployees([
+    const people = await this.organizationReads.getEmployees([
       ...new Set(items.flatMap((item) => [item.authorEmployeeId, item.onBehalfOfEmployeeId]).filter(isPresent)),
     ]);
     const byId = new Map(people.map((person) => [person.id, person]));
@@ -159,7 +159,7 @@ export class SaasIssueViewService {
     const planIdOf = await this.facts.planIdsOf([...new Set(records.map((record) => record.assignmentId))]);
     const originalIds = [...new Set(records.map((record) => record.duplicateOfId).filter(isPresent))];
     const [people, plans, originals] = await Promise.all([
-      this.organization.getEmployees([
+      this.organizationReads.getEmployees([
         ...new Set(records.flatMap((record) => [record.reporterEmployeeId, record.assignedItAdminEmployeeId])),
       ]),
       this.catalog.getPlanSummaries([...new Set(planIdOf.values())]),

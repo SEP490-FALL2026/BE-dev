@@ -13,8 +13,8 @@ import { assertMayEnterEmployees } from './employee.policy';
 import { validateEmployeeRow } from './employee-row.policy';
 import { organizationAuditEvent } from '../organization-audit-event.mapper';
 import { OrganizationContextService } from '../organization-context.service';
-import { DepartmentDirectoryService } from '../department/department-directory.service';
-import { EmployeeDirectoryService } from '../employee/employee-directory.service';
+import { DepartmentRecordService } from '../department/department-record.service';
+import { EmployeeRecordService } from '../employee/employee-record.service';
 import { EmploymentType } from '../public/organization.types';
 
 /** What the form sends. The department is named by its code, like the import file column (`FR-9.7`); the job title is optional free text. */
@@ -58,8 +58,8 @@ export interface ManualEmployeeView {
 export class EmployeeManualService {
   constructor(
     private readonly context: OrganizationContextService,
-    private readonly employees: EmployeeDirectoryService,
-    private readonly departments: DepartmentDirectoryService,
+    private readonly employees: EmployeeRecordService,
+    private readonly departments: DepartmentRecordService,
     private readonly audit: AuditApi,
     private readonly notifications: NotificationsApi,
     private readonly runner: TransactionRunner,

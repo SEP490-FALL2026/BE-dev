@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { DecisionBodyDto, VersionWire } from '../budget/budget.dto';
-import { BudgetSupportService } from '../budget/budget-support.service';
+import { BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionViewService } from '../budget/version-view.service';
 import { VersionDecisionJudge } from './version-decision-judge.service';
 import { VersionDecisionWriter } from './version-decision-writer.service';
@@ -23,14 +23,14 @@ export class VersionDecisionService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly views: VersionViewService,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
     private readonly judge: VersionDecisionJudge,
     private readonly writer: VersionDecisionWriter,
   ) {}
 
   /** Throws BudgetVersionNotFoundError, BudgetDecisionRefusedError and BudgetYearEndedError. */
   async decide(actor: AuthenticatedPrincipal, id: string, body: DecisionBodyDto): Promise<VersionWire> {
-    const fiscalStart = await this.support.fiscalYearStartMonth();
+    const fiscalStart = await this.facts.fiscalYearStartMonth();
     const decided = await this.runner.run(async (tx) => {
       const judged = await this.judge.judge(tx, actor, id, fiscalStart);
 

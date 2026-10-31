@@ -25,7 +25,7 @@ import { AssessmentCompletionService } from './assessment/assessment-completion.
 import { AssessmentGate } from './assessment/assessment-gate.service';
 import { AssessmentPatchService } from './assessment/assessment-patch.service';
 import { AssessmentPricingService } from './assessment/assessment-pricing.service';
-import { AssessmentReader } from './assessment/assessment-reader.service';
+import { AssessmentQueryService } from './assessment/assessment-query.service';
 import { AssessmentRejectionService } from './assessment/assessment-rejection.service';
 import { AssessmentService } from './assessment/assessment.service';
 import { AssessmentViewService } from './assessment/assessment-view.service';
@@ -120,11 +120,11 @@ import { SpendEffectsService } from './budget-information/spend-effects.service'
 import { SpendEntryService } from './spend/spend-entry.service';
 import { SpendHeadService } from './spend-submission/spend-head.service';
 import { SpendQueueService } from './spend-submission/spend-queue.service';
-import { SpendReadSupport } from './spend/spend-read.service';
+import { SpendWireViewService } from './spend/spend-wire-view.service';
 import { SpendSubmissionController } from './spend-submission/spend-submission.controller';
 import { SupplementRepo } from './spend-submission/supplement.repo';
 import { SupplementPricing } from './spend-submission/supplement-pricing.service';
-import { SupplementReadService } from './spend-submission/supplement-read.service';
+import { SupplementQueryService } from './spend-submission/supplement-query.service';
 import { SupplementRecorder } from './spend-submission/supplement-recorder.service';
 import { SupplementService } from './spend-submission/supplement.service';
 import { RepricingService } from './assessment/repricing.service';
@@ -221,7 +221,7 @@ import { ServiceAccountRequestsController } from './service-account-request/serv
     QuoteService,
     AssessmentViewService,
     AssessmentGate,
-    AssessmentReader,
+    AssessmentQueryService,
     AssessmentPatchService,
     AssessmentPricingService,
     AssessmentCompletionService,
@@ -261,7 +261,7 @@ import { ServiceAccountRequestsController } from './service-account-request/serv
     FinanceReviewService,
     SpendBudgetListener,
     RepricingService,
-    SpendReadSupport,
+    SpendWireViewService,
     SpendHeadService,
     PlanLineService,
     PlanLineRouteService,
@@ -273,7 +273,7 @@ import { ServiceAccountRequestsController } from './service-account-request/serv
     SupplementRepo,
     SupplementPricing,
     SupplementRecorder,
-    SupplementReadService,
+    SupplementQueryService,
     SupplementService,
     SpendDecisionRepo,
     SpendDecisionRecorder,

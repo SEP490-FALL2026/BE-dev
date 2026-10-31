@@ -34,8 +34,8 @@ export const preflightCommand = defineCommand({
     runInNestContext({
       // The graph validates the database settings only.
       graph: () =>
-        import('../../modules/installation/migration-preflight/migration-preflight.module').then(
-          (m) => m.MigrationPreflightModule,
+        import('../../modules/installation/migration-preflight/migration-preflight-cli.module').then(
+          (m) => m.MigrationPreflightCliModule,
         ),
       work: async (app) => {
         if ('recoveryTarget' in parsed) {

@@ -5,14 +5,16 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LocalDemoAccountApi } from '../../identity-access/public/local-demo-account.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { DevSeedCredentialsService } from '../dev-seed/dev-seed-credentials.service';
 import { DevSeedRepo } from '../dev-seed/dev-seed.repo';
 import { DevSeedApi } from './dev-seed.api';
 
 const LOCAL = 'postgresql://app:app@127.0.0.1:5432/slm';
 const tx = { tx: true } as unknown as DbTx;
 
-type Lookup = Awaited<ReturnType<OrganizationApi['lookupForEmployeeImport']>>;
-type Fixture = Awaited<ReturnType<OrganizationApi['readLocalSeedFixture']>>;
+type Lookup = Awaited<ReturnType<OrganizationReadApi['lookupForEmployeeImport']>>;
+type Fixture = Awaited<ReturnType<OrganizationReadApi['readLocalSeedFixture']>>;
 /** The fixture facts as the seed reads them: the two items. The activation of the compatibility release is not read any more. */
 const fixtureOf = (parts: Pick<Fixture, 'costCenter' | 'department'>): Fixture => parts as Fixture;
 const noFixture = fixtureOf({ costCenter: null, department: null });
@@ -87,7 +89,7 @@ function build(
       return Promise.resolve({ id: 'cc-1' });
     }),
     createDepartment: jest.fn(() => (events.push('department'), Promise.resolve({ id: 'd-1' }))),
-    // No `activateCostCenterDirectionForLocalSeed` here: the seed writes no activation row, and a call to it would throw.
+    // The seed writes no Cost Center activation row: the facade has no such method, so a call to it would not compile.
     createEmployeeWithPlacement: jest.fn((_tx: DbTx, input: { employeeCode: string; jobTitle: string | null }) => {
       events.push(`employee ${input.employeeCode} ${String(input.jobTitle)}`);
       return Promise.resolve({ id: `e-${input.employeeCode}` });
@@ -118,10 +120,10 @@ function build(
     runner as unknown as TransactionRunner,
     repo as unknown as DevSeedRepo,
     organization as unknown as OrganizationApi,
-    identity as unknown as IdentityAccessApi,
+    organization as unknown as OrganizationReadApi,
     accounts as unknown as LocalDemoAccountApi,
     audit as unknown as AuditApi,
-    generate,
+    new DevSeedCredentialsService(identity as unknown as IdentityAccessApi, generate),
   );
   return { service, runner, organization, identity, accounts, audit, generate, events };
 }
@@ -256,13 +258,12 @@ describe('DevSeedApi', () => {
   });
 
   it('writes no activation of the Cost Center link and reports no item for it, however the data stands', async () => {
-    const { service, events, organization } = build();
+    const { service, events } = build();
 
     const result = await service.seed({ confirmLocal: true });
 
     expect(result.items.map((item) => item.kind)).not.toContain('COST_CENTER_DIRECTION');
     expect(events.filter((event) => /activation|DIRECTION/i.test(event))).toEqual([]);
-    expect(organization).not.toHaveProperty('activateCostCenterDirectionForLocalSeed');
   });
 
   it('QĐ-87d(1): refuses a DEMO-CC that belongs to no department and writes nothing — only the link procedure links it', async () => {

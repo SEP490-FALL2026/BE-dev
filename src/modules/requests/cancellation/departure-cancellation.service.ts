@@ -3,7 +3,7 @@ import { TransactionRunner, type DbTx } from '../../../infrastructure/database/t
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { GroupLineClosureService } from '../line-closure/group-line-closure.service';
 import { soleLiveLine } from '../line-closure/group-line-closure.policy';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
@@ -58,7 +58,7 @@ export class DepartureCancellationService {
     private readonly repo: AccessRequestRepo,
     private readonly end: RequestEndService,
     private readonly licensing: LicensingApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly groups: GroupLineClosureService,
     private readonly outcomes: RequestOutcomeService,
@@ -150,7 +150,7 @@ export class DepartureCancellationService {
     request: AccessRequestRecord,
     cause: CancellationCause,
   ): Promise<CancellationRefusal | null> {
-    const people = await this.organization.getEmployees(request.beneficiaryEmployeeIds, tx);
+    const people = await this.organizationReads.getEmployees(request.beneficiaryEmployeeIds, tx);
     if (cause === 'BENEFICIARY_LEFT') {
       return checkCancellation({
         type: request.type,
@@ -159,10 +159,10 @@ export class DepartureCancellationService {
         beneficiaryLeft: new Map(people.map((person) => [person.id, person.status === 'TERMINATED'])),
       });
     }
-    const today = await this.organization.businessToday(new Date(), tx);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
     const transferred = new Map<string, boolean>();
     for (const person of people) {
-      const placement = await this.organization.getEmployeePlacement(person.id, today, tx);
+      const placement = await this.organizationReads.getEmployeePlacement(person.id, today, tx);
       transferred.set(
         person.id,
         wasTransferredFrom({

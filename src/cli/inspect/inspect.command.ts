@@ -15,7 +15,8 @@ export const inspectCommand = defineCommand({
   execute: ({ json }) =>
     runInNestContext({
       // The graph validates the database settings only.
-      graph: () => import('../../modules/installation/inspect/inspection.module').then((m) => m.InspectionModule),
+      graph: () =>
+        import('../../modules/installation/inspect/inspection-cli.module').then((m) => m.InspectionCliModule),
       work: async (app) => {
         const inspection = await app.get(InstallationInspectionApi).inspect();
 

@@ -24,7 +24,7 @@ import {
 } from '../assessment/assessment.dto';
 import { ASSESSMENT_ERROR_EXAMPLES as EXAMPLES, toAssessmentApiException } from '../assessment/assessment.http-errors';
 import { AssessmentCompletionService } from '../assessment/assessment-completion.service';
-import { AssessmentReader } from '../assessment/assessment-reader.service';
+import { AssessmentQueryService } from '../assessment/assessment-query.service';
 import { AssessmentRejectionService } from '../assessment/assessment-rejection.service';
 import { AssessmentService } from '../assessment/assessment.service';
 import { CatalogLinkService } from '../assessment/catalog-link.service';
@@ -68,7 +68,7 @@ export class ProposalsController {
   constructor(
     private readonly proposals: ProposalService,
     private readonly assessments: AssessmentService,
-    private readonly assessmentReads: AssessmentReader,
+    private readonly assessmentReads: AssessmentQueryService,
     private readonly completions: AssessmentCompletionService,
     private readonly rejections: AssessmentRejectionService,
     private readonly links: CatalogLinkService,

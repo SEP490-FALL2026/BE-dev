@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { chargedCostCenterId } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { PricingViewService } from '../request-view/pricing-view.service';
-import { SpendReadSupport } from '../spend/spend-read.service';
+import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { SpendReviewNotFoundError } from '../spend/spend.errors';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 import type { ApprovalDetailWire } from './spend-approval.dto';
@@ -24,9 +24,9 @@ export class SpendApprovalViewService {
     private readonly steps: SpendStepRepo,
     private readonly requests: AccessRequestRepo,
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly pricing: PricingViewService,
-    private readonly support: SpendReadSupport,
+    private readonly wireView: SpendWireViewService,
     private readonly sources: SpendApprovalSourcesService,
   ) {}
 
@@ -46,9 +46,9 @@ export class SpendApprovalViewService {
       : (assessment?.vendorId ?? null);
     const [plans, people, department, centers, cost] = await Promise.all([
       planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
-      this.support.people(detailPeopleIds(step, request, decision)),
-      this.organization.getDepartmentBrief(request.departmentId),
-      this.organization.costCentersByIds([chargedCostCenterId(request)]),
+      this.wireView.people(detailPeopleIds(step, request, decision)),
+      this.organizationReads.getDepartmentBrief(request.departmentId),
+      this.organizationReads.costCentersByIds([chargedCostCenterId(request)]),
       this.pricing.costEstimate(request.pricing, vendorId),
     ]);
     const center = centers[0];

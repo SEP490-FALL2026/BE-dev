@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { businessDateAt, toDateColumn } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccountRecordService } from '../accounts/account-record.service';
 
 export interface MeView {
   appUserId: string;
@@ -21,19 +21,19 @@ export interface MeView {
 @Injectable()
 export class MeService {
   constructor(
-    private readonly accounts: AccountDirectoryService,
-    private readonly organization: OrganizationApi,
+    private readonly accounts: AccountRecordService,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** The caller's own identity and effective roles. Roles come from the principal resolved this request. */
   async get(principal: AuthenticatedPrincipal): Promise<MeView> {
     const [loginEmail, organization] = await Promise.all([
       this.accounts.findLoginEmail(principal.appUserId),
-      this.organization.getOrganization(),
+      this.organizationReads.getOrganization(),
     ]);
     // The placement in force today, in the organization's own calendar.
     const today = toDateColumn(businessDateAt(new Date(), organization?.timeZone ?? 'UTC'));
-    const profile = await this.organization.getEmployeeProfile(principal.employeeId, today);
+    const profile = await this.organizationReads.getEmployeeProfile(principal.employeeId, today);
     if (loginEmail === null || profile === null) {
       throw new Error('An authenticated principal lost its account or employee record');
     }

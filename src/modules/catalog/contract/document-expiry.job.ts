@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { DocumentService } from './document.service';
+import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 
 /** The first sweep waits, so a short-lived process (a test, a command) never starts one. */
 const FIRST_SWEEP_AFTER_MS = 5 * 60 * 1000;
@@ -43,7 +44,7 @@ export class DocumentExpirySweeper implements OnApplicationBootstrap, OnModuleDe
       const expired = await this.documents.expireAbandoned();
       if (expired > 0) this.logger.log(`Gave up ${expired} document(s) whose upload never came`);
     } catch (error) {
-      this.logger.error(`Document expiry sweep failed: ${(error as Error).name}`);
+      this.logger.error(`Document expiry sweep failed: ${describeForOperator(error)}`, traceForOperator(error));
     } finally {
       this.schedule(SWEEP_EVERY_MS);
     }

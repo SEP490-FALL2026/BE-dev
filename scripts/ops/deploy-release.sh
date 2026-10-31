@@ -355,12 +355,13 @@ look() {
     [ "$service" = api ] && api="$ids"
     snapshot="$snapshot $service=$ids#$restarts"
   done
-  local probe_err=''
-  if ! probe_err="$(timeout 15 docker exec "$api" node -e "$READY_PROBE" 2>&1)"; then
+  local probe_err='' probe_status=0
+  probe_err="$(timeout 15 docker exec "$api" node -e "$READY_PROBE" 2>&1)" || probe_status=$?
+  if [ "$probe_status" -ne 0 ]; then
     # One short line: the probe prints a status and codes only, but the exec around it can print its own errors (F93).
     probe_err="${probe_err//$'\n'/ }"
     probe_err="${probe_err:0:200}"
-    echo "api: its readiness endpoint did not answer 2xx (${probe_err:-no output})"
+    echo "api: its readiness endpoint did not answer 2xx (probe exit $probe_status; ${probe_err:-no output})"
     return 1
   fi
   echo "${snapshot# }"
@@ -470,6 +471,36 @@ way_back_open() {
   return 1
 }
 
+# Private, bounded evidence before rollback destroys the candidate containers. Raw application logs may contain
+# sensitive data: never print them to Actions, never dump inspect/config/environment, never upload automatically.
+# A subshell keeps permissions local; bounded tails are also capped at 1 MiB per file.
+capture_diagnostics() (
+  umask 077
+  local dir="$APP_DIR/.deploy-diagnostics-$RELEASE-$ATTEMPT" service ids id status
+  mkdir -m 700 "$dir" || exit 1
+  {
+    date -u
+    timeout 3 uptime
+    timeout 3 free -m
+    timeout 3 df -h "$APP_DIR"
+    timeout 5 docker stats --no-stream
+  } 2>&1 | head -c 1048576 > "$dir/resources.txt"
+  for service in api worker caddy; do
+    ids="$(live_ps "$service" 2> /dev/null)" || ids=''
+    # At most one container per service; record what exists even after a partial recreation.
+    read -r id <<< "$ids"
+    [ -n "$id" ] || continue
+    timeout 5 docker inspect --format \
+      '{{.Id}} image={{.Config.Image}} status={{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} restarts={{.RestartCount}} started={{.State.StartedAt}} finished={{.State.FinishedAt}}' \
+      "$id" 2>&1 | head -c 1048000 > "$dir/$service-state.txt"
+    status=0
+    timeout 5 docker logs --timestamps --tail 200 "$id" 2>&1 | head -c 1048576 > "$dir/$service.log"
+    status=${PIPESTATUS[0]}
+    printf 'logs exit=%s\n' "$status" >> "$dir/$service-state.txt"
+  done
+  return 0
+)
+
 # A rename, the recreation, the readiness or the record of the attempt failed (H7-OPS-RV-02, RV-04, RV-05). Puts the
 # previous release state back whole. Brings the previous containers back when the new ones were created — and on the first
 # H7 rollout in any case (the runbook stopped the old api/worker), after restoring the old `.env` (RV-06). Then checks
@@ -479,6 +510,13 @@ recover() {
   local step="$1" restored=1 recreate="$RECREATED"
   set +e
   echo "❌ RESULT: release $RELEASE (attempt $ATTEMPT) FAILED while $step." >&2
+  if [ "$RECREATED" -eq 1 ]; then
+    if capture_diagnostics > /dev/null 2>&1; then
+      echo "Diagnostics (private, best effort): $APP_DIR/.deploy-diagnostics-$RELEASE-$ATTEMPT; review on the VPS before sharing." >&2
+    else
+      echo 'Diagnostics incomplete or unavailable; continuing recovery.' >&2
+    fi
+  fi
   rm -f "$APP_DIR/.docker-compose.prod.yml.promote" "$APP_DIR/.Caddyfile.promote" "$APP_DIR/releases/.current-image.promote" \
     "$APP_DIR/releases/.current-attempt.promote"
   restore "$REPLACED/docker-compose.prod.yml" "$APP_DIR/docker-compose.prod.yml" || restored=0

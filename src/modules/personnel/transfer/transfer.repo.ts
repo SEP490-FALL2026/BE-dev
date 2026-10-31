@@ -5,6 +5,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { Grounds } from '../personnel-grounds.policy';
+import { transferHeadHandoverJson } from '../personnel-head-handover.json';
 import type {
   HeadHandoverFacts,
   TransferChangeRecord,
@@ -35,7 +36,7 @@ function toRecord(row: TransferRow): TransferRecord {
     status: row.status,
     closesPlacementId: row.closesPlacementId,
     opensPlacementId: row.opensPlacementId,
-    headHandover: (row.headHandover as HeadHandoverFacts | null) ?? null,
+    headHandover: transferHeadHandoverJson.decode(row.headHandover),
     grounds: {
       type: row.groundsType,
       reference: row.groundsReference,
@@ -97,7 +98,7 @@ export class TransferRepo {
         effectiveOn: toDateColumn(input.effectiveOn),
         closesPlacementId: input.closesPlacementId,
         opensPlacementId: input.opensPlacementId,
-        headHandover: input.headHandover ? (input.headHandover as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+        headHandover: transferHeadHandoverJson.encode(input.headHandover),
         ...groundsColumns(input.grounds),
         recordedByAppUserId: input.recordedByAppUserId,
         recordedByTicketId: input.recordedByTicketId,
@@ -203,7 +204,7 @@ export class TransferRepo {
         effectiveOn: toDateColumn(to.effectiveOn),
         closesPlacementId: to.closesPlacementId,
         opensPlacementId: to.opensPlacementId,
-        headHandover: to.headHandover ? (to.headHandover as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+        headHandover: transferHeadHandoverJson.encode(to.headHandover),
       },
     });
 

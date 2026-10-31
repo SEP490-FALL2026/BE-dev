@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { increasesObligation, type ObligationState } from './subscription-obligation.policy';
 
 /**
@@ -11,7 +11,7 @@ import { increasesObligation, type ObligationState } from './subscription-obliga
  */
 @Injectable()
 export class SubscriptionObligationService {
-  constructor(private readonly organization: OrganizationApi) {}
+  constructor(private readonly organizationReads: OrganizationReadApi) {}
 
   /** Throws FinanceSetupIncompleteError (409 `FINANCE.SETUP_INCOMPLETE`) with nothing written. */
   async assertChargeable(
@@ -21,7 +21,7 @@ export class SubscriptionObligationService {
     next: ObligationState,
   ): Promise<void> {
     if (!increasesObligation(current, next)) return;
-    const department = await this.organization.getDepartmentBrief(ownerDepartmentId, tx);
+    const department = await this.organizationReads.getDepartmentBrief(ownerDepartmentId, tx);
     if (!department?.costCenterActive) throw new FinanceSetupIncompleteError(ownerDepartmentId);
   }
 }

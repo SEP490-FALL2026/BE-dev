@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { TransactionRunner, readSqlState } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
-import { OrganizationApi } from '../../../organization/public/organization.api';
-import { AccountDirectoryService } from '../account-directory.service';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import { AccountRecordService } from '../account-record.service';
 import { SuperAdminTransferRefusedError } from '../account.errors';
 import { RoleGrantService } from '../role-grant.service';
 import { SuccessorEligibility } from '../successor-eligibility.service';
@@ -23,16 +23,16 @@ export interface SuperAdminTransferResult {
 @Injectable()
 export class SuperAdminTransferService {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly grants: RoleGrantService,
     private readonly eligibility: SuccessorEligibility,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
   async transfer(actor: AuthenticatedPrincipal, successorAppUserId: string): Promise<SuperAdminTransferResult> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A Super Admin role was transferred before installation');
     if (successorAppUserId === actor.appUserId) throw new SuperAdminTransferRefusedError('SUCCESSOR_IS_HOLDER');
 
@@ -43,7 +43,7 @@ export class SuperAdminTransferService {
     const transferId = randomUUID();
     await this.runner.run(async (tx) => {
       // Lock order (protocol): the employee of the successor, then the two accounts, in id order.
-      await this.organization.lockEmployeeForShare(tx, located.employeeId);
+      await this.organizationReads.lockEmployeeForShare(tx, located.employeeId);
       const [first, second] = [actor.appUserId, successorAppUserId].sort();
       await this.accounts.lockAppUser(tx, first, 'UPDATE');
       await this.accounts.lockAppUser(tx, second, 'UPDATE');

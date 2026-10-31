@@ -4,6 +4,7 @@ import { ApiAccount, adminToken, createActivatedAccount } from '../../support/ap
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { findPlacementCoverageViolations } from '../../support/placement-coverage';
 import { HR_BASIS } from '../../support/hr-basis';
 import { registerUseReaders } from '../../support/organization-use-readers';
@@ -268,6 +269,7 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
 
     it('the import locks departments FOR SHARE (a job title is free text: nothing else to lock); the employee locks keep their two modes', async () => {
       const organization = ctx.app.get(OrganizationApi);
+      const organizationReads = ctx.app.get(OrganizationReadApi);
       const runner = ctx.app.get(TransactionRunner);
       const employeeId = seed.superAdmin.employeeId;
       await holder.query('BEGIN');
@@ -275,11 +277,11 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
       await holder.query('SELECT id FROM employees WHERE id = $1 FOR SHARE', [employeeId]);
 
       await settlesWhileShared(
-        runner.run((tx) => organization.lockForEmployeeImport(tx, [seed.departmentId])),
+        runner.run((tx) => organizationReads.lockForEmployeeImport(tx, [seed.departmentId])),
         'the import locks',
       );
       await settlesWhileShared(
-        runner.run((tx) => organization.lockEmployeeForShare(tx, employeeId)),
+        runner.run((tx) => organizationReads.lockEmployeeForShare(tx, employeeId)),
         'the employee share lock',
       );
       const forUpdate = runner.run((tx) => organization.lockEmployeeForUpdate(tx, employeeId));

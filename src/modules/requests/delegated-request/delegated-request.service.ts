@@ -4,7 +4,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestAlreadyHoldsAccessError,
@@ -39,7 +39,7 @@ export class DelegatedRequestService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly repo: AccessRequestRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly assessment: RequestFactsService,
     private readonly audit: AuditApi,
   ) {}
@@ -56,11 +56,11 @@ export class DelegatedRequestService {
     const settings = await this.assessment.settings();
 
     return this.runner.run(async (tx) => {
-      await this.organization.lockEmployeeForShare(tx, actor.employeeId);
-      const head = await this.organization.getEmployee(actor.employeeId, tx);
+      await this.organizationReads.lockEmployeeForShare(tx, actor.employeeId);
+      const head = await this.organizationReads.getEmployee(actor.employeeId, tx);
       if (!head) throw new AccessRequestNoDepartmentError();
       const now = new Date();
-      const today = await this.organization.businessToday(now, tx);
+      const today = await this.organizationReads.businessToday(now, tx);
       const headedDepartmentId = await this.headedDepartment(tx, actor.employeeId, today);
       const batchId = randomUUID();
 
@@ -79,9 +79,9 @@ export class DelegatedRequestService {
 
   /** The department the caller heads today, or null when they head none. */
   private async headedDepartment(tx: DbTx, employeeId: string, today: BusinessDate): Promise<string | null> {
-    const own = (await this.organization.getOwningUnits([employeeId], today, tx)).get(employeeId);
+    const own = (await this.organizationReads.getOwningUnits([employeeId], today, tx)).get(employeeId);
     if (!own) return null;
-    const heads = await this.organization.getDepartmentHeads([own.departmentId], today);
+    const heads = await this.organizationReads.getDepartmentHeads([own.departmentId], today);
 
     return heads.get(own.departmentId)?.employeeId === employeeId ? own.departmentId : null;
   }
@@ -94,11 +94,11 @@ export class DelegatedRequestService {
     body: DelegatedBodyDto,
   ): Promise<void> {
     const { beneficiaryId, headedDepartmentId, today } = who;
-    const exists = await this.organization.getEmployee(beneficiaryId, tx);
+    const exists = await this.organizationReads.getEmployee(beneficiaryId, tx);
     if (!exists) throw new DelegatedRequestRefusedError('OUTSIDE_DEPARTMENT', beneficiaryId);
-    await this.organization.lockEmployeeForShare(tx, beneficiaryId);
-    const person = await this.organization.getEmployee(beneficiaryId, tx);
-    const unit = (await this.organization.getOwningUnits([beneficiaryId], today, tx)).get(beneficiaryId);
+    await this.organizationReads.lockEmployeeForShare(tx, beneficiaryId);
+    const person = await this.organizationReads.getEmployee(beneficiaryId, tx);
+    const unit = (await this.organizationReads.getOwningUnits([beneficiaryId], today, tx)).get(beneficiaryId);
     const refusal = person
       ? checkDelegation({
           actorEmployeeId: actor.employeeId,

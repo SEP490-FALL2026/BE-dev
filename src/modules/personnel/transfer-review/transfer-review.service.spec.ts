@@ -3,7 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { TransferReviewService } from './transfer-review.service';
 import { TransferReviewRepo } from './transfer-review.repo';
@@ -33,7 +33,7 @@ describe('TransferReviewService.tellHead', () => {
         { provide: TransferReviewRepo, useValue: {} },
         { provide: LicensingApi, useValue: {} },
         { provide: OperatingParametersApi, useValue: {} },
-        { provide: OrganizationApi, useValue: organization },
+        { provide: OrganizationReadApi, useValue: organization },
         { provide: AuditApi, useValue: {} },
         { provide: PersonnelNotifier, useValue: notifier },
       ],

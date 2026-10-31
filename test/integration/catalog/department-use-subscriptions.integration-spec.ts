@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
@@ -86,7 +87,7 @@ describe('what keeps a department in use: its subscriptions and purchases (integ
 
   beforeAll(async () => {
     await h.start();
-    today = await h.ctx.app.get(OrganizationApi, { strict: false }).businessToday();
+    today = await h.ctx.app.get(OrganizationReadApi, { strict: false }).businessToday();
     owner = await h.bareDepartment();
     nothing = await h.bareDepartment();
 
