@@ -80,12 +80,13 @@ export class DepartmentHarness {
   useFacts!: UseFacts;
 
   /**
-   * Every change the Super Admin makes to a department or a project cites its HR basis (`QĐ-87b(1)`): the request carries one unless
-   * the case names `hrBasis` itself (`hrBasis: undefined` leaves it out). Reads and the other routes go as they are.
+   * A department change cites no HR basis since `QĐ-93f`, so a request goes as the case writes it. A project change still cites
+   * one until `qd93-remove-department-projects` removes the routes: its request carries one unless the case names `hrBasis`
+   * itself (`hrBasis: undefined` leaves it out).
    */
   api = () => {
     const writes = (test: request.Test, path: string): request.Test =>
-      /^\/api\/v1\/(departments|projects)/.test(path) ? test.send({ hrBasis: HR_BASIS }) : test;
+      /^\/api\/v1\/projects/.test(path) ? test.send({ hrBasis: HR_BASIS }) : test;
 
     const agent = request(this.server());
 
@@ -121,11 +122,10 @@ export class DepartmentHarness {
     return { id: (response.body as { data: { id: string } }).data.id, code };
   };
 
-  /** What the Super Admin sends to create a department: no Cost Center, and the HR basis it is created from. */
+  /** What the Super Admin sends to create a department: no Cost Center, and no HR basis (`QĐ-93f`). */
   departmentBody = (overrides: Record<string, unknown> = {}) => ({
     code: this.unique('P'),
     name: 'Design',
-    hrBasis: HR_BASIS,
     ...overrides,
   });
 

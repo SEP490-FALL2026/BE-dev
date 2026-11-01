@@ -9,43 +9,40 @@ const OTHER = '7a1c3e55-2d4b-4c8e-9f60-1b2c3d4e5f60';
 
 type Call = (server: App) => request.Test;
 
-/** The HR document a department is created from (`QĐ-87b`): every part is required. */
+/**
+ * The old HR document the department routes used to take (`QĐ-93f` removed it). It is still sent to `/projects` until
+ * `qd93-remove-department-projects`, and to the department routes to prove they now refuse it.
+ */
 const HR_BASIS_BODY = { type: 'DECISION', reference: 'QD-2026-001', issuer: 'HR Office', issuedOn: '2026-10-01' };
 
-/** What the Super Admin alone does, each on an HR basis (`QĐ-87a`, `QĐ-87b(1)`): the IT Admin lost every one of these. */
+/** What the Super Admin alone does (`QĐ-87a`, `QĐ-87b(1)`, no HR basis since `QĐ-93f`): the IT Admin lost every one of these. */
 const SUPER_ADMIN_ONLY: Array<[string, Call]> = [
-  [
-    'PATCH /departments/{id}',
-    (server) => request(server).patch(`/api/v1/departments/${ID}`).send({ name: 'x', hrBasis: HR_BASIS_BODY }),
-  ],
+  ['PATCH /departments/{id}', (server) => request(server).patch(`/api/v1/departments/${ID}`).send({ name: 'x' })],
   [
     'POST /departments/{id}/deactivate',
-    (server) => request(server).post(`/api/v1/departments/${ID}/deactivate`).send({ hrBasis: HR_BASIS_BODY }),
+    (server) => request(server).post(`/api/v1/departments/${ID}/deactivate`).send({}),
   ],
   [
     'POST /departments/{id}/head-assignments',
     (server) =>
       request(server)
         .post(`/api/v1/departments/${ID}/head-assignments`)
-        .send({ employeeId: OTHER, effectiveFrom: '2030-01-01', hrBasis: HR_BASIS_BODY }),
+        .send({ employeeId: OTHER, effectiveFrom: '2030-01-01' }),
   ],
   [
     'POST /departments/{id}/head-vacancies',
-    (server) =>
-      request(server)
-        .post(`/api/v1/departments/${ID}/head-vacancies`)
-        .send({ effectiveFrom: '2030-01-01', hrBasis: HR_BASIS_BODY }),
+    (server) => request(server).post(`/api/v1/departments/${ID}/head-vacancies`).send({ effectiveFrom: '2030-01-01' }),
   ],
   [
     'POST /departments/{id}/successor-designations',
     (server) =>
       request(server)
         .post(`/api/v1/departments/${ID}/successor-designations`)
-        .send({ employeeId: OTHER, effectiveFrom: '2030-01-01', hrBasis: HR_BASIS_BODY }),
+        .send({ employeeId: OTHER, effectiveFrom: '2030-01-01' }),
   ],
   [
     'POST /departments/{id}/successor-clearances',
-    (server) => request(server).post(`/api/v1/departments/${ID}/successor-clearances`).send({ hrBasis: HR_BASIS_BODY }),
+    (server) => request(server).post(`/api/v1/departments/${ID}/successor-clearances`).send({}),
   ],
   ['GET /projects', (server) => request(server).get('/api/v1/projects')],
   ['GET /projects/{id}', (server) => request(server).get(`/api/v1/projects/${ID}`)],
@@ -179,7 +176,7 @@ describe('department routes (e2e, no database)', () => {
   });
 
   describe('creating a department belongs to the Super Admin (QĐ-87b, QĐ-87d(1))', () => {
-    const body = { code: 'P-DES', name: 'Design', hrBasis: HR_BASIS_BODY };
+    const body = { code: 'P-DES', name: 'Design' };
 
     it.each([
       ['the finance officer', ['FINANCE'], []],
@@ -210,20 +207,22 @@ describe('department routes (e2e, no database)', () => {
     const asSuperAdmin = () => ({ Authorization: bearer(principal(['SUPER_ADMIN'])) });
 
     it.each([
-      ['no code', { name: 'Design', hrBasis: HR_BASIS_BODY }],
-      ['a code with a space', { code: 'P DES', name: 'Design', hrBasis: HR_BASIS_BODY }],
-      ['no name', { code: 'P-DES', hrBasis: HR_BASIS_BODY }],
-      ['no HR basis', { code: 'P-DES', name: 'Design' }],
-      ['an HR basis with a missing part', { code: 'P-DES', name: 'Design', hrBasis: { type: 'DECISION' } }],
+      ['no code', { name: 'Design' }],
+      ['a code with a space', { code: 'P DES', name: 'Design' }],
+      ['no name', { code: 'P-DES' }],
+      [
+        'an HR basis, which no department write takes since QĐ-93f',
+        { code: 'P-DES', name: 'Design', hrBasis: HR_BASIS_BODY },
+      ],
       [
         'a cost center, which a department is not created with (QĐ-87d(1))',
-        { code: 'P-DES', name: 'Design', hrBasis: HR_BASIS_BODY, costCenterId: OTHER },
+        { code: 'P-DES', name: 'Design', costCenterId: OTHER },
       ],
-      [
-        'a parent department, which does not exist (AC-3)',
-        { code: 'P-DES', name: 'Design', hrBasis: HR_BASIS_BODY, parentId: ID },
-      ],
-      ['an unknown field', { code: 'P-DES', name: 'Design', hrBasis: HR_BASIS_BODY, status: 'INACTIVE' }],
+      ['a parent department, which does not exist (AC-3)', { code: 'P-DES', name: 'Design', parentId: ID }],
+      ['an unknown field', { code: 'P-DES', name: 'Design', status: 'INACTIVE' }],
+      ['a name of 201 characters (API-DOC-F05)', { code: 'P-DES', name: 'x'.repeat(201) }],
+      ['a function of 1 001 characters (API-DOC-F05)', { code: 'P-DES', name: 'Design', function: 'x'.repeat(1001) }],
+      ['a name of 201 accented letters typed in NFD form', { code: 'P-DES', name: 'á'.repeat(201) }],
     ])('turns away a new department with %s, 422 VALIDATION_ERROR', async (_name, body) => {
       const response = await request(app.getHttpServer())
         .post('/api/v1/departments')
@@ -239,12 +238,14 @@ describe('department routes (e2e, no database)', () => {
       ['a new code', { code: 'P-NEW' }],
       ['a parent', { parentId: ID }],
       ['a status', { status: 'INACTIVE' }],
-      ['no HR basis', { name: 'Design', hrBasis: undefined }],
+      ['an HR basis, which no department write takes since QĐ-93f', { name: 'Design', hrBasis: HR_BASIS_BODY }],
+      ['a name of 201 characters (API-DOC-F05)', { name: 'x'.repeat(201) }],
+      ['a function of 1 001 characters (API-DOC-F05)', { function: 'x'.repeat(1001) }],
     ])('turns away an update that names %s, 422 VALIDATION_ERROR', async (_name, body) => {
       const response = await request(app.getHttpServer())
         .patch(`/api/v1/departments/${ID}`)
         .set(asSuperAdmin())
-        .send({ hrBasis: HR_BASIS_BODY, ...body })
+        .send(body)
         .expect(422);
 
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
@@ -256,11 +257,25 @@ describe('department routes (e2e, no database)', () => {
       ['no date', { employeeId: OTHER }],
       ['a date that is not a date', { employeeId: OTHER, effectiveFrom: '2030-02-31' }],
       ['an unknown field', { employeeId: OTHER, effectiveFrom: '2030-01-01', title: 'Head' }],
+      ['an HR basis (QĐ-93f)', { employeeId: OTHER, effectiveFrom: '2030-01-01', hrBasis: HR_BASIS_BODY }],
     ])('turns away a head assignment with %s, 422 VALIDATION_ERROR', async (_name, body) => {
       const response = await request(app.getHttpServer())
         .post(`/api/v1/departments/${ID}/head-assignments`)
         .set(asSuperAdmin())
-        .send({ hrBasis: HR_BASIS_BODY, ...body })
+        .send(body)
+        .expect(422);
+
+      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it.each([
+      ['no date', {}],
+      ['an HR basis (QĐ-93f)', { effectiveFrom: '2030-01-01', hrBasis: HR_BASIS_BODY }],
+    ])('turns away a head vacancy with %s, 422 VALIDATION_ERROR', async (_name, body) => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/departments/${ID}/head-vacancies`)
+        .set(asSuperAdmin())
+        .send(body)
         .expect(422);
 
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
@@ -270,24 +285,37 @@ describe('department routes (e2e, no database)', () => {
       ['no person', { effectiveFrom: '2030-01-01' }],
       ['a person that is not an id', { employeeId: 'E-1', effectiveFrom: '2030-01-01' }],
       ['no date', { employeeId: OTHER }],
-      ['no HR basis', { employeeId: OTHER, effectiveFrom: '2030-01-01', hrBasis: undefined }],
       ['an unknown field', { employeeId: OTHER, effectiveFrom: '2030-01-01', title: 'Head' }],
+      ['an HR basis (QĐ-93f)', { employeeId: OTHER, effectiveFrom: '2030-01-01', hrBasis: HR_BASIS_BODY }],
     ])('turns away a successor designation with %s, 422 VALIDATION_ERROR', async (_name, body) => {
       const response = await request(app.getHttpServer())
         .post(`/api/v1/departments/${ID}/successor-designations`)
         .set(asSuperAdmin())
-        .send({ hrBasis: HR_BASIS_BODY, ...body })
+        .send(body)
         .expect(422);
 
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
     });
 
     it.each([
-      ['no HR basis', {}],
-      ['an unknown field', { hrBasis: HR_BASIS_BODY, employeeId: OTHER }],
+      ['an HR basis (QĐ-93f)', { hrBasis: HR_BASIS_BODY }],
+      ['an unknown field', { employeeId: OTHER }],
     ])('turns away a successor clearance with %s, 422 VALIDATION_ERROR', async (_name, body) => {
       const response = await request(app.getHttpServer())
         .post(`/api/v1/departments/${ID}/successor-clearances`)
+        .set(asSuperAdmin())
+        .send(body)
+        .expect(422);
+
+      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it.each([
+      ['an HR basis (QĐ-93f)', { hrBasis: HR_BASIS_BODY }],
+      ['an unknown field', { status: 'INACTIVE' }],
+    ])('turns away a deactivation with %s, 422 VALIDATION_ERROR', async (_name, body) => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/departments/${ID}/deactivate`)
         .set(asSuperAdmin())
         .send(body)
         .expect(422);
@@ -309,7 +337,7 @@ describe('department routes (e2e, no database)', () => {
       await request(app.getHttpServer())
         .post('/api/v1/departments/not-a-uuid/deactivate')
         .set(asSuperAdmin())
-        .send({ hrBasis: HR_BASIS_BODY })
+        .send({})
         .expect(422);
     });
   });

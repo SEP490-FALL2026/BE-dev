@@ -332,7 +332,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         {
           action: 'DEPARTMENT.HEAD_ASSIGNED',
           before: { head: null },
-          after: { head: first.code, effectiveFrom: today(), endedPeriods: 0, cancelledPeriods: [], hrBasis: HR_BASIS },
+          after: { head: first.code, effectiveFrom: today(), endedPeriods: 0, cancelledPeriods: [] },
         },
         {
           action: 'DEPARTMENT.HEAD_ASSIGNED',
@@ -342,7 +342,6 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
             effectiveFrom: addDays(today(), 6),
             endedPeriods: 1,
             cancelledPeriods: [],
-            hrBasis: HR_BASIS,
           },
         },
         {
@@ -353,13 +352,12 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
             effectiveFrom: addDays(today(), 3),
             endedPeriods: 1,
             cancelledPeriods: [`${planned.code}@${addDays(today(), 6)}`],
-            hrBasis: HR_BASIS,
           },
         },
         {
           action: 'DEPARTMENT.HEAD_VACATED',
           before: { head: next.code },
-          after: { head: null, effectiveFrom: addDays(today(), 5), cancelledPeriods: [], hrBasis: HR_BASIS },
+          after: { head: null, effectiveFrom: addDays(today(), 5), cancelledPeriods: [] },
         },
       ]);
       expect((await getDepartment(department.id)).headHistory).toEqual([
@@ -380,7 +378,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect((await auditOf(department.id)).at(-1)).toEqual({
         action: 'DEPARTMENT.DEACTIVATED',
         before: { status: 'ACTIVE' },
-        after: { status: 'INACTIVE', hrBasis: HR_BASIS },
+        after: { status: 'INACTIVE' },
       });
     });
 
