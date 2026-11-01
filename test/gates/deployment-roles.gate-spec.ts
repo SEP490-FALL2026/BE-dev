@@ -155,7 +155,7 @@ describe('production PostgreSQL identities', () => {
         position(/candidate run --rm --no-deps migrate node node_modules\/prisma\/build\/index\.js migrate deploy/),
         position(/candidate run --rm --no-deps migrate node dist\/database-roles-cli\.js reconcile/),
         position(/\|\| recover 'replacing docker-compose\.prod\.yml'/),
-        position(/live up -d --force-recreate api worker caddy \|\| recover/),
+        position(/start_release "\$API_IMAGE" "release \$RELEASE" \|\| recover "\$START_STEP"/),
         // H7-OPS-RV-04/05: a success only once the release is ready and stable, then the marker of the attempt.
         position(
           /check_release "\$API_IMAGE" "release \$RELEASE" \|\| recover 'checking that api, worker and caddy are ready'/,
@@ -178,10 +178,16 @@ describe('production PostgreSQL identities', () => {
       expect(hostScript).toMatch(/^READY_TIMEOUT=300$/m);
       expect(hostScript).toMatch(/^STABILITY_WINDOW=20$/m);
       expect(hostScript).toMatch(/^POLL_INTERVAL=2$/m);
-      // The one bounded attempt to return the containers to the previous image (H7-OPS-RV-02) keeps its 300 s.
+      // Both promotion and recovery use bounded staged operations and share one 300 s readiness budget per release.
       expect(hostScript).toMatch(
-        /timeout 300 \\\r?\n\s+docker compose --project-directory "\$APP_DIR" -f "\$APP_DIR\/docker-compose\.prod\.yml" up -d --force-recreate api worker caddy/,
+        /API_IMAGE="\$PREVIOUS_IMAGE" start_release "\$PREVIOUS_IMAGE" "the previous release \$PREVIOUS_IMAGE"/,
       );
+      expect(hostScript).toMatch(/RELEASE_READY_DEADLINE=\$\(\(SECONDS \+ READY_TIMEOUT\)\)/);
+      expect(hostScript.match(/deadline="\$RELEASE_READY_DEADLINE"/g)).toHaveLength(2);
+      for (const name of ['api', 'worker', 'caddy']) {
+        expect(hostScript).toContain(`live up -d --no-deps --force-recreate ${name} || return 1`);
+      }
+      expect(hostScript).not.toMatch(/up -d --force-recreate api worker caddy/);
       // The real readiness endpoint, 2xx only; no fixed sleep stands in for it.
       expect(hostScript).toMatch(/\/v1\/health\/ready/);
       expect(hostScript).toMatch(/r\.ok\?0:1/);
@@ -289,7 +295,7 @@ describe('production PostgreSQL identities', () => {
         /^candidate\(\) \{ CADDYFILE_PATH="\$RELEASE_DIR\/Caddyfile" docker compose --project-directory "\$APP_DIR" -f "\$RELEASE_DIR\/docker-compose\.prod\.yml" "\$@"; \}$/m,
       );
       expect(hostScript).toMatch(
-        /^live\(\) \{ CADDYFILE_PATH="\$APP_DIR\/Caddyfile" docker compose --project-directory "\$APP_DIR" -f "\$APP_DIR\/docker-compose\.prod\.yml" "\$@"; \}$/m,
+        /^live\(\) \{ CADDYFILE_PATH="\$APP_DIR\/Caddyfile" timeout 120 docker compose --project-directory "\$APP_DIR" -f "\$APP_DIR\/docker-compose\.prod\.yml" "\$@"; \}$/m,
       );
       // Caddy's log can carry environment values: the validation prints nothing it read.
       expect(hostScript).toMatch(

@@ -29,6 +29,8 @@ export function requireExpressInstance(instance: unknown): ConfigurableHttpInsta
 export interface ConfigureApplicationOptions {
   /** Mount the interactive docs route. Disable when a caller only needs the document object. */
   mountDocs?: boolean;
+  /** Optional startup measurements; export/test callers need no reporter. */
+  onStartupPhase?: (phase: 'http-configured' | 'swagger-generated') => void;
 }
 
 export function configureApplication(app: INestApplication, options: ConfigureApplicationOptions = {}): void {
@@ -47,9 +49,12 @@ export function configureApplication(app: INestApplication, options: ConfigureAp
   app.setGlobalPrefix(apiPrefix);
   app.enableVersioning({ type: VersioningType.URI });
   app.enableShutdownHooks();
+  options.onStartupPhase?.('http-configured');
 
   if ((options.mountDocs ?? true) && config.get('SWAGGER_ENABLED', { infer: true })) {
-    SwaggerModule.setup(`${apiPrefix}/docs`, app, createOpenApiDocument(app));
+    const document = createOpenApiDocument(app);
+    options.onStartupPhase?.('swagger-generated');
+    SwaggerModule.setup(`${apiPrefix}/docs`, app, document);
   }
 }
 

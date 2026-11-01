@@ -420,7 +420,7 @@ pnpm test:integration && pnpm test:integration:serial && pnpm test:e2e
       `CostCenterRepo.recordLocalSeedActivation` (chỉ nó dùng); spec `dev-seed.api.spec.ts` bỏ khẳng định `not.toHaveProperty`; card `organization` còn 10 phương thức.
 - [ ] Gỡ 3 gitlink `.claude/worktrees/agent-*` (mode 160000, không `.gitmodules`) do nhánh dev A mang vào: commit riêng trên `dev` — `git rm --cached .claude/worktrees/agent-a4ed34b5070192240 .claude/worktrees/agent-acf54cd5caae12394 .claude/worktrees/agent-af2053b0f6b5aaba8` và thêm `.claude/worktrees/` vào `.gitignore`; không làm trong merge này.
 - [ ] Tách commit theo phase để revert độc lập được, nhất là Phase 5 (167 lớp) riêng một commit; không gộp với file WIP `deploy-release` hay `src/cli/demo-dataset/` của Owner.
-- [ ] Bài đi thử của dev mới (O7) và trạng thái ADR-0019: việc của Owner, hạng mục này không làm.
+- [ ] Bài đi thử của dev mới (O7): việc của Owner, hạng mục này không làm. ADR-0019 đã `Accepted` (Owner 31/10/2026), không còn chờ.
 
 - [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
 - [ ] Spec/plan/test design phản ánh đúng implementation cuối; peer review nếu có đã xử lý hoặc ghi disposition.

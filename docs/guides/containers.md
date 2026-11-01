@@ -212,16 +212,26 @@ and the attempt id `<run id>-<run attempt>` of the job. The same script also run
 - **One release state.** The live `docker-compose.prod.yml`, `Caddyfile` and `releases/current-image` (the image of the
   live release) change together. The script keeps the previous ones — and `releases/current-attempt`, when there is one —
   in `releases/<sha>/attempts/<id>/replaced/`, replaces each by one rename and recreates `api`, `worker`, `caddy`.
-- **Ready before success (H7-OPS-RV-04).** `up -d` exiting 0 is not a success. The script then waits at most 300 s
-  (`--ready-timeout`), looking every 2 s (`--poll-interval`), for one look where each of `api`, `worker`, `caddy` has
+- **Sequential startup.** After backup, preflight, migrations, role reconciliation and promotion, the script stops the old
+  worker, recreates only the API and waits for its real readiness endpoint. Only then does it recreate worker, followed
+  by Caddy. Each Compose mutation is bounded at 120 s; `--no-deps` prevents an implicit restart of the ready API.
+  From API creation, the API-only wait and first full ready look share `--ready-timeout` (300 s by default);
+  staging does not silently double the readiness budget. Recovery starts a fresh budget for the previous release.
+  A failure at any stage enters recovery. Recovery uses the same sequence after the data-compatibility check, so the
+  previous API is also started before its worker. This reduces simultaneous startup demand; improvement must be measured
+  on the VPS under comparable conditions. Worker processing pauses until the API is ready; this is a restart deployment,
+  not a zero-downtime rollout.
+- **Ready before success (H7-OPS-RV-04).** `up -d` exiting 0 is not a success. After all three startup steps, the script uses
+  the remaining startup budget (`--ready-timeout`), looking every 2 s (`--poll-interval`), for one look where each of `api`, `worker`, `caddy` has
   exactly one container, running and not restarting; `api` and `worker` run exactly `<IMAGE>:<SHA>`; Caddy mounts the live
   `Caddyfile` (the sha256 of `/etc/caddy/Caddyfile` in the container is the one on disk); and `/api/v1/health/ready`,
   called from inside the API container, answers 2xx. It then watches for 20 s (`--stability-window`): every look must
-  find the same containers with the same restart count, still ready — a crash-looping worker or a container another
+  find the same containers with the same restart count, still ready. The API identity and restart count must also match
+  the API-only startup check — a crash-looping worker or a container another
   deployment replaced fails here. The workflow uses these defaults; the options exist for a slow host and for tests.
 - **Failure after the promotion began** — a rename, the recreation, the readiness or the record below: the script puts
   the previous release state back whole, recreates the previous containers when the new ones had been created (one
-  attempt, at most 300 s, with the image of `releases/current-image`, or of the `api` container on a host deployed before
+  attempt, with the staged startup limits above and the image of `releases/current-image`, or of the `api` container on a host deployed before
   that file existed), and checks the previous release exactly as above. It always exits 1 and prints two separate
   verdicts: `RESULT: release <sha> (attempt <id>) FAILED while <step>` and one of `RECOVERY: the previous release <image>
 is ready`, `RECOVERY: FAILED — …` (the previous release does not answer ready, or its containers or files could not be
@@ -332,14 +342,33 @@ Either fix the cause and run step 7 again with a new `<ATTEMPT>`, or return to t
 `cp -p .env.pre-h7 .env`, then `API_IMAGE=<image noted in step 0> docker compose -f docker-compose.prod.yml up -d api worker`.
 The roles and owners provisioned in step 5 do not stop the old wiring (the superuser bypasses every privilege).
 
+**Host timeline:** before recreating containers and at each readiness look, the script records timestamped Linux
+`/proc` load, memory, CPU, swap/page and pressure counters in the private diagnostic directory's `host-timeline.txt`.
+Compare counter deltas between samples to distinguish CPU/steal, swapping and I/O stalls. This bounded file (1 MiB)
+is also retained on successful deploys for comparison. It uses no Docker call, background sampler or extra Node process.
+On failure, a separate `host-failure.txt` retains the final sample even if the timeline's size cap was reached.
+Missing counters or collection failures do not affect readiness. Remove old diagnostic directories after review.
+
+**Startup phases:** API and worker write immediate JSON entries with `context=StartupTiming`, outside Nest's buffered
+logger. `imports-loaded` measures wall time/CPU since the Node process started (including static imports); subsequent
+entries report deltas for Nest creation, basic HTTP configuration, Swagger generation when enabled, application
+initialization and listening. Worker reports `worker-ready` after its context initializes. Fields `elapsedMs`, `phaseMs`,
+`cpuMs`, `phaseCpuMs` and `rssMiB` contain no environment values or URLs. Wall time much greater than CPU time suggests
+waiting/scheduling and must be compared with host I/O/swap/CPU counters; it does not identify a dependency by itself.
+The API/worker `*-startup.log` files retain these entries privately on success or failure (64 KiB per file, best effort,
+last 2000 container log lines scanned). Swagger behavior is unchanged so the first comparison isolates startup order.
+
 **Failure diagnostics:** after a recreation/readiness failure, before restoring files or stopping containers, the script
 collects best-effort evidence in `<APP_DIR>/.deploy-diagnostics-<RELEASE>-<ATTEMPT>/` (outside `releases/`): host memory/swap, load, disk and
-container stats, selected container state (including OOM, exit and restart counts), and the last 200 timestamped log
+container stats, `vmstat` samples, processes (command names only), selected container state (including OOM, exit and restart counts), and the last 200 timestamped log
 lines per API/worker/Caddy container. Each command has a timeout; each file is capped at 1 MiB. Collection failure does
 not prevent recovery. The directory is `0700`, files `0600`; raw logs can contain sensitive application data, so only
 the location is printed to Actions. Review on the VPS, redact before sharing, and remove the diagnostics after the
 incident is resolved. No environment/configuration dump or automatic upload is performed. The readiness failure now
-includes the probe exit code (`124` normally means the outer 15-second timeout expired). Evidence describes the
+includes the probe exit code (`124` normally means the outer 15-second Docker exec/probe timeout expired, not a proven HTTP failure).
+Container IDs found during readiness are cached so log capture can proceed when subsequent Compose listings fail;
+recovery checks do not overwrite candidate IDs or host samples. The HTTP probe still uses the real endpoint, with unchanged
+readiness and stability criteria. Evidence describes the
 containers present at capture time, which may be mixed old/new after a partial recreation; use their image identifiers.
 
 **If step 7 fails after the promotion began** (`RESULT: … FAILED while <step>`: a rename, the recreation, the readiness or
