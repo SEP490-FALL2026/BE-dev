@@ -1,5 +1,4 @@
 import { Test } from '@nestjs/testing';
-import { HR_BASIS } from '../../../../test/support/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -131,15 +130,14 @@ describe('DepartmentHeadService', () => {
         const heads = await service();
         const actor = principal(role);
         const calls = [
-          () => heads.assign(actor, 'dep-1', { employeeId: 'emp-next', effectiveFrom: TODAY, hrBasis: HR_BASIS }),
-          () => heads.vacate(actor, 'dep-1', { effectiveFrom: TODAY, hrBasis: HR_BASIS }),
+          () => heads.assign(actor, 'dep-1', { employeeId: 'emp-next', effectiveFrom: TODAY }),
+          () => heads.vacate(actor, 'dep-1', { effectiveFrom: TODAY }),
           () =>
             heads.designateSuccessor(actor, 'dep-1', {
               employeeId: 'emp-next',
               effectiveFrom: LATER,
-              hrBasis: HR_BASIS,
             }),
-          () => heads.clearSuccessor(actor, 'dep-1', { hrBasis: HR_BASIS }),
+          () => heads.clearSuccessor(actor, 'dep-1'),
         ];
 
         for (const call of calls) await expect(call()).rejects.toBeInstanceOf(DepartmentForbiddenError);
@@ -156,7 +154,7 @@ describe('DepartmentHeadService', () => {
       const headService = await service();
 
       const refusal: unknown = await headService
-        .assign(superAdmin, 'dep-1', { employeeId: 'emp-missing', effectiveFrom: TODAY, hrBasis: HR_BASIS })
+        .assign(superAdmin, 'dep-1', { employeeId: 'emp-missing', effectiveFrom: TODAY })
         .catch((error: unknown) => error);
 
       expect(refusal).toBeInstanceOf(HeadAssignmentError);
@@ -168,15 +166,13 @@ describe('DepartmentHeadService', () => {
     it('records the HR basis it was named on with the change', async () => {
       organization.headHistory.mockResolvedValue([]);
 
-      await (
-        await service()
-      ).assign(superAdmin, 'dep-1', { employeeId: 'emp-next', effectiveFrom: TODAY, hrBasis: HR_BASIS });
+      await (await service()).assign(superAdmin, 'dep-1', { employeeId: 'emp-next', effectiveFrom: TODAY });
 
       expect(audit.record).toHaveBeenCalledWith(
         tx,
         expect.objectContaining({
           action: 'DEPARTMENT.HEAD_ASSIGNED',
-          after: containing({ head: 'NEXT', hrBasis: HR_BASIS }),
+          after: containing({ head: 'NEXT' }),
         }),
       );
     });
@@ -187,7 +183,6 @@ describe('DepartmentHeadService', () => {
       (await service()).designateSuccessor(superAdmin, 'dep-1', {
         employeeId: 'emp-next',
         effectiveFrom: LATER,
-        hrBasis: HR_BASIS,
         ...overrides,
       });
 
@@ -206,7 +201,7 @@ describe('DepartmentHeadService', () => {
         expect.objectContaining({
           action: 'DEPARTMENT.SUCCESSOR_DESIGNATED',
           before: { head: 'EMP-HEAD', successor: null },
-          after: { head: 'EMP-HEAD', successor: 'NEXT', effectiveFrom: LATER, hrBasis: HR_BASIS },
+          after: { head: 'EMP-HEAD', successor: 'NEXT', effectiveFrom: LATER },
         }),
       );
       // The day has not come: no listener is told.
@@ -256,7 +251,7 @@ describe('DepartmentHeadService', () => {
         restoredHead: period('emp-head', '2026-01-01'),
       });
 
-      await (await service()).clearSuccessor(superAdmin, 'dep-1', { hrBasis: HR_BASIS });
+      await (await service()).clearSuccessor(superAdmin, 'dep-1');
 
       expect(organization.clearHeadSuccessor).toHaveBeenCalledWith(tx, 'dep-1', TODAY);
       expect(audit.record).toHaveBeenCalledWith(
@@ -264,7 +259,7 @@ describe('DepartmentHeadService', () => {
         expect.objectContaining({
           action: 'DEPARTMENT.SUCCESSOR_CLEARED',
           before: { successor: 'EMP-NEXT', effectiveFrom: LATER },
-          after: { successor: null, head: 'EMP-HEAD', hrBasis: HR_BASIS },
+          after: { successor: null, head: 'EMP-HEAD' },
         }),
       );
     });
@@ -272,7 +267,7 @@ describe('DepartmentHeadService', () => {
     it('changes and records nothing when nobody is named', async () => {
       organization.clearHeadSuccessor.mockResolvedValue(null);
 
-      await (await service()).clearSuccessor(superAdmin, 'dep-1', { hrBasis: HR_BASIS });
+      await (await service()).clearSuccessor(superAdmin, 'dep-1');
 
       expect(audit.record).not.toHaveBeenCalled();
     });

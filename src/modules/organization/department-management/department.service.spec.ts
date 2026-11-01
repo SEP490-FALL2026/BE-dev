@@ -1,5 +1,4 @@
 import { Test } from '@nestjs/testing';
-import { HR_BASIS } from '../../../../test/support/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -126,15 +125,13 @@ describe('DepartmentService', () => {
         const departmentService = await service();
         const actor = principal(role);
 
-        await expect(
-          departmentService.create(actor, { code: 'P-NEW', name: 'New', hrBasis: HR_BASIS }),
-        ).rejects.toBeInstanceOf(DepartmentForbiddenError);
-        await expect(
-          departmentService.update(actor, 'dep-1', { name: 'Other', hrBasis: HR_BASIS }),
-        ).rejects.toBeInstanceOf(DepartmentForbiddenError);
-        await expect(departmentService.deactivate(actor, 'dep-1', { hrBasis: HR_BASIS })).rejects.toBeInstanceOf(
+        await expect(departmentService.create(actor, { code: 'P-NEW', name: 'New' })).rejects.toBeInstanceOf(
           DepartmentForbiddenError,
         );
+        await expect(departmentService.update(actor, 'dep-1', { name: 'Other' })).rejects.toBeInstanceOf(
+          DepartmentForbiddenError,
+        );
+        await expect(departmentService.deactivate(actor, 'dep-1')).rejects.toBeInstanceOf(DepartmentForbiddenError);
 
         expect(organization.getOrganization).not.toHaveBeenCalled();
         expect(runner.run).not.toHaveBeenCalled();
@@ -143,7 +140,7 @@ describe('DepartmentService', () => {
     );
 
     it('creates a department with no Cost Center and no activation step, and records the basis', async () => {
-      const id = await (await service()).create(superAdmin, { code: ' P-NEW ', name: 'New', hrBasis: HR_BASIS });
+      const id = await (await service()).create(superAdmin, { code: ' P-NEW ', name: 'New' });
 
       expect(id).toBe('dep-new');
       expect(departments.insert).toHaveBeenCalledWith(tx, expect.objectContaining({ code: 'P-NEW', name: 'New' }));
@@ -151,7 +148,7 @@ describe('DepartmentService', () => {
         tx,
         expect.objectContaining({
           action: 'DEPARTMENT.CREATED',
-          after: containing({ code: 'P-NEW', hrBasis: HR_BASIS }),
+          after: containing({ code: 'P-NEW' }),
         }),
       );
     });
@@ -159,8 +156,8 @@ describe('DepartmentService', () => {
     it('records the basis with a change, and nothing for a change that changes nothing', async () => {
       const departmentService = await service();
 
-      await departmentService.update(superAdmin, 'dep-1', { name: 'Brand', hrBasis: HR_BASIS });
-      await departmentService.update(superAdmin, 'dep-1', { name: 'Design', hrBasis: HR_BASIS });
+      await departmentService.update(superAdmin, 'dep-1', { name: 'Brand' });
+      await departmentService.update(superAdmin, 'dep-1', { name: 'Design' });
 
       expect(departments.update).toHaveBeenCalledTimes(1);
       expect(audit.record).toHaveBeenCalledTimes(1);
@@ -169,7 +166,7 @@ describe('DepartmentService', () => {
         expect.objectContaining({
           action: 'DEPARTMENT.UPDATED',
           before: { name: 'Design' },
-          after: { name: 'Brand', hrBasis: HR_BASIS },
+          after: { name: 'Brand' },
         }),
       );
     });
@@ -181,7 +178,7 @@ describe('DepartmentService', () => {
       const departmentService = await service();
 
       await expect(
-        departmentService.update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-missing', hrBasis: HR_BASIS }),
+        departmentService.update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-missing' }),
       ).rejects.toBeInstanceOf(DepartmentItAdminInvalidError);
       expect(organization.getEmployee).not.toHaveBeenCalled();
       expect(departments.update).not.toHaveBeenCalled();
@@ -192,16 +189,14 @@ describe('DepartmentService', () => {
       organization.lockEmployeeForShare.mockRejectedValue(outage);
       const departmentService = await service();
 
-      await expect(
-        departmentService.update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-it', hrBasis: HR_BASIS }),
-      ).rejects.toBe(outage);
+      await expect(departmentService.update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-it' })).rejects.toBe(outage);
       expect(departments.update).not.toHaveBeenCalled();
     });
 
     it('locks a usable IT Admin for share, then reads it, in the same transaction, before saving the change', async () => {
       const departmentService = await service();
 
-      await departmentService.update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-it', hrBasis: HR_BASIS });
+      await departmentService.update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-it' });
 
       expect(organization.lockEmployeeForShare).toHaveBeenCalledWith(tx, 'emp-it');
       expect(organization.getEmployee).toHaveBeenCalledWith('emp-it', tx);
@@ -217,14 +212,14 @@ describe('DepartmentService', () => {
       Array.from({ length: count }, (_unused, index) => ({ kind, id: `${kind}-${index}`, label: null }));
 
     it('retires one nothing keeps in use, and records the basis', async () => {
-      await (await service()).deactivate(superAdmin, 'dep-1', { hrBasis: HR_BASIS });
+      await (await service()).deactivate(superAdmin, 'dep-1');
 
       expect(departments.deactivate).toHaveBeenCalledWith(tx, 'dep-1', expect.any(Date));
       expect(audit.record).toHaveBeenCalledWith(
         tx,
         expect.objectContaining({
           action: 'DEPARTMENT.DEACTIVATED',
-          after: { status: 'INACTIVE', hrBasis: HR_BASIS },
+          after: { status: 'INACTIVE' },
         }),
       );
     });
@@ -261,9 +256,7 @@ describe('DepartmentService', () => {
     ])('refuses while it still has %s, and retires nothing', async (_name, arrange) => {
       arrange();
 
-      await expect((await service()).deactivate(superAdmin, 'dep-1', { hrBasis: HR_BASIS })).rejects.toBeInstanceOf(
-        DepartmentInUseError,
-      );
+      await expect((await service()).deactivate(superAdmin, 'dep-1')).rejects.toBeInstanceOf(DepartmentInUseError);
       expect(departments.deactivate).not.toHaveBeenCalled();
       expect(audit.record).not.toHaveBeenCalled();
     });
@@ -279,11 +272,7 @@ describe('DepartmentService', () => {
         subscriptions: { items: items('SUBSCRIPTION', 2), total: 2 },
       });
 
-      const refusal: unknown = await (
-        await service()
-      )
-        .deactivate(superAdmin, 'dep-1', { hrBasis: HR_BASIS })
-        .catch((error: unknown) => error);
+      const refusal: unknown = await (await service()).deactivate(superAdmin, 'dep-1').catch((error: unknown) => error);
 
       expect(refusal).toBeInstanceOf(DepartmentInUseError);
       const { groups } = refusal as DepartmentInUseError;
@@ -300,7 +289,7 @@ describe('DepartmentService', () => {
     it('answers the same for a department that is already retired, reading nothing of what keeps it in use', async () => {
       departments.lock.mockResolvedValue({ id: 'dep-1', status: 'INACTIVE' });
 
-      await (await service()).deactivate(superAdmin, 'dep-1', { hrBasis: HR_BASIS });
+      await (await service()).deactivate(superAdmin, 'dep-1');
 
       expect(organization.getDepartmentUse).not.toHaveBeenCalled();
       expect(departments.deactivate).not.toHaveBeenCalled();

@@ -45,7 +45,6 @@ export async function createDepartment(
     name: parsed.name,
     functionDescription: parsed.function,
     itAdminEmployeeId: parsed.itAdminEmployeeId,
-    hrBasis: parsed.hrBasis,
   });
 
   return { id, code: parsed.code };

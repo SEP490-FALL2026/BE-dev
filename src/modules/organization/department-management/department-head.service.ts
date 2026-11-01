@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
-import type { HrBasis } from '../public/hr-basis.types';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -46,8 +45,8 @@ const endedAsChanges = (
 
 /**
  * Who heads a department (`US-03-06` AC-5 → AC-9, AC-18; `US-01-02`): the Super Admin names the head from a day, leaves the
- * department without one from a day, or names who is to follow the head and takes that back (`QĐ-87`), always on an HR
- * basis. Each is an operation of its own, so a later flow (transfer, leaving) can reuse them; the head is the department's
+ * department without one from a day, or names who is to follow the head and takes that back (`QĐ-87`), with no HR basis to
+ * give (`QĐ-93f`): the Audit Trail records who, when, before and after. Each is an operation of its own, so a later flow (transfer, leaving) can reuse them; the head is the department's
  * MANAGER for exactly the days of the period. Who may do it is `department.policy.ts`, run first.
  */
 @Injectable()
@@ -75,7 +74,7 @@ export class DepartmentHeadService {
   async assign(
     actor: AuthenticatedPrincipal,
     departmentId: string,
-    input: { employeeId: string; effectiveFrom: BusinessDate; hrBasis: HrBasis },
+    input: { employeeId: string; effectiveFrom: BusinessDate },
   ): Promise<void> {
     assertMayChangeOrganization(actor.roles);
     const organization = await requireOrganization(this.context);
@@ -114,7 +113,6 @@ export class DepartmentHeadService {
             effectiveFrom: input.effectiveFrom,
             endedPeriods: room.ended.length,
             cancelledPeriods: room.cancelled.map((period) => `${period.employeeCode}@${period.validFrom}`),
-            hrBasis: { ...input.hrBasis },
           },
         ),
       );
@@ -136,7 +134,7 @@ export class DepartmentHeadService {
   async vacate(
     actor: AuthenticatedPrincipal,
     departmentId: string,
-    input: { effectiveFrom: BusinessDate; hrBasis: HrBasis },
+    input: { effectiveFrom: BusinessDate },
   ): Promise<void> {
     assertMayChangeOrganization(actor.roles);
     const organization = await requireOrganization(this.context);
@@ -165,7 +163,6 @@ export class DepartmentHeadService {
             head: null,
             effectiveFrom: input.effectiveFrom,
             cancelledPeriods: room.cancelled.map((period) => `${period.employeeCode}@${period.validFrom}`),
-            hrBasis: { ...input.hrBasis },
           },
         ),
       );
@@ -185,7 +182,7 @@ export class DepartmentHeadService {
   async designateSuccessor(
     actor: AuthenticatedPrincipal,
     departmentId: string,
-    input: { employeeId: string; effectiveFrom: BusinessDate; hrBasis: HrBasis },
+    input: { employeeId: string; effectiveFrom: BusinessDate },
   ): Promise<void> {
     assertMayChangeOrganization(actor.roles);
     const organization = await requireOrganization(this.context);
@@ -225,7 +222,6 @@ export class DepartmentHeadService {
             head: head?.employeeCode ?? null,
             successor: employee.employeeCode,
             effectiveFrom: input.effectiveFrom,
-            hrBasis: { ...input.hrBasis },
           },
         ),
       );
@@ -236,11 +232,7 @@ export class DepartmentHeadService {
    * Takes back the successor named for the head: the head's period is open again and nobody follows them. Nobody named ⟹ nothing
    * changes. Throws DepartmentForbiddenError or DepartmentNotFoundError.
    */
-  async clearSuccessor(
-    actor: AuthenticatedPrincipal,
-    departmentId: string,
-    input: { hrBasis: HrBasis },
-  ): Promise<void> {
+  async clearSuccessor(actor: AuthenticatedPrincipal, departmentId: string): Promise<void> {
     assertMayChangeOrganization(actor.roles);
     const organization = await requireOrganization(this.context);
     const today = await this.context.businessToday();
@@ -264,7 +256,6 @@ export class DepartmentHeadService {
           {
             successor: null,
             head: cleared.restoredHead?.employeeCode ?? null,
-            hrBasis: { ...input.hrBasis },
           },
         ),
       );

@@ -88,6 +88,7 @@ export const DEPARTMENT_ERROR_EXAMPLES = {
   DEPARTMENT_NAME_INVALID: example(new DepartmentNameInvalidError()),
   DEPARTMENT_IT_ADMIN_INVALID: example(new DepartmentItAdminInvalidError()),
   DEPARTMENT_UPDATE_EMPTY: example(new DepartmentUpdateEmptyError()),
+  DEPARTMENT_INACTIVE: example(new DepartmentInactiveError()),
   DEPARTMENT_IN_USE: example(
     new DepartmentInUseError({
       members: { items: [{ employeeCode: 'E001', fullName: '<full-name>' }], total: 1 },
@@ -113,7 +114,7 @@ export const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABL
 
 export const SUPER_ADMIN_ONLY = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Only the Super Admin changes department data, on an HR basis. The IT Admin does not.',
+  description: 'Only the Super Admin changes department data. The IT Admin does not.',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 /** The reads of the departments: the Super Admin reads all, the IT Admin the departments they are in charge of or stand in for. */
@@ -124,7 +125,13 @@ export const READ_ROLES_ONLY = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 export const VALIDATION_ERROR_DESCRIPTION =
-  'The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.';
+  'The request is invalid (VALIDATION_ERROR, among them a name or a function over its limit or a field the route does not take) or a rule of the department refuses it; details name the reason.';
+/** The department is retired: it takes no change to its profile, no head and no successor. */
+export const DEPARTMENT_INACTIVE_RESPONSE = {
+  status: HttpStatus.CONFLICT,
+  description: 'The department is retired (DEPARTMENT.INACTIVE).',
+  examples: [DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_INACTIVE],
+} as const;
 /** The routes where no rule of the department applies: only the request itself can be invalid. */
 export const VALIDATION_ERROR = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,

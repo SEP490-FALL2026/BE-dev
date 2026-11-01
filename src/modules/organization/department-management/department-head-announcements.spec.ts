@@ -1,5 +1,4 @@
 import { Test } from '@nestjs/testing';
-import { HR_BASIS } from '../../../../test/support/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -125,7 +124,7 @@ describe('DepartmentHeadService announces the head periods that take effect toda
       room({ ended: [period('old', '2026-01-01', TODAY)], endedPeriodIds: ['period-old'] }),
     );
 
-    await (await service()).assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TODAY, hrBasis: HR_BASIS });
+    await (await service()).assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TODAY });
 
     expect(emitted()).toEqual([
       {
@@ -155,7 +154,7 @@ describe('DepartmentHeadService announces the head periods that take effect toda
       }),
     );
 
-    await (await service()).vacate(actor, 'dep-1', { effectiveFrom: TODAY, hrBasis: HR_BASIS });
+    await (await service()).vacate(actor, 'dep-1', { effectiveFrom: TODAY });
 
     expect(emitted()).toEqual([
       {
@@ -174,10 +173,10 @@ describe('DepartmentHeadService announces the head periods that take effect toda
     );
     const heads = await service();
 
-    await heads.assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TOMORROW, hrBasis: HR_BASIS });
-    await heads.vacate(actor, 'dep-1', { effectiveFrom: TOMORROW, hrBasis: HR_BASIS });
+    await heads.assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TOMORROW });
+    await heads.vacate(actor, 'dep-1', { effectiveFrom: TOMORROW });
     organization.endHeadPeriodsFrom.mockResolvedValue(room({}));
-    await heads.vacate(actor, 'dep-1', { effectiveFrom: TODAY, hrBasis: HR_BASIS });
+    await heads.vacate(actor, 'dep-1', { effectiveFrom: TODAY });
 
     expect(organization.emitChange).not.toHaveBeenCalled();
   });
@@ -186,9 +185,9 @@ describe('DepartmentHeadService announces the head periods that take effect toda
     organization.endHeadPeriodsFrom.mockResolvedValue(room({}));
     organization.emitChange.mockRejectedValue(new Error('listener refused'));
 
-    await expect(
-      (await service()).assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TODAY, hrBasis: HR_BASIS }),
-    ).rejects.toThrow('listener refused');
+    await expect((await service()).assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TODAY })).rejects.toThrow(
+      'listener refused',
+    );
   });
 
   it('hands no kept notice over itself: that is the work of the listener of HEAD_PERIOD_START, when the period starts (T-11)', async () => {
@@ -196,8 +195,8 @@ describe('DepartmentHeadService announces the head periods that take effect toda
     organization.emitChange.mockResolvedValue(undefined);
     const heads = await service();
 
-    await heads.assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TOMORROW, hrBasis: HR_BASIS });
-    await heads.assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TODAY, hrBasis: HR_BASIS });
+    await heads.assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TOMORROW });
+    await heads.assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TODAY });
 
     // Nothing is told for the day that has not come, and the one of today is the announcement the listener hears.
     expect(emitted().map((change) => (change as { kind: string }).kind)).toEqual(['HEAD_PERIOD_START']);

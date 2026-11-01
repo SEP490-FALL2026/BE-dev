@@ -1,34 +1,37 @@
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { hrBasisSchema } from '../../../infrastructure/http/dto/hr-basis.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { COST_CENTER_CODE_MAX_LENGTH, COST_CENTER_CODE_PATTERN } from '../cost-center/cost-center.types';
+import { DEPARTMENT_FUNCTION_MAX_LENGTH, DEPARTMENT_NAME_MAX_LENGTH } from '../department/department.types';
 import { projectSchema } from '../project/project.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
-/** Only bounded here: whether a name is empty or too long is judged by the service and answers with its own code. */
+/**
+ * The schema is the real limit of the name and the function: accents are composed (NFC) and the ends trimmed before the length is
+ * counted, so a name typed in NFD form is not refused for its length; too long ⟹ VALIDATION_ERROR, and OpenAPI carries the limit
+ * (`API-DOC-F05`). Whether a name is empty is the service's to say (`DEPARTMENT.NAME_INVALID`). No HR basis since `QĐ-93f`: a
+ * body that still carries one is an unknown field.
+ */
 export const createDepartmentBodySchema = z.strictObject({
   code: z.string().trim().min(1).max(COST_CENTER_CODE_MAX_LENGTH).regex(COST_CENTER_CODE_PATTERN),
-  name: z.string().max(1000),
-  function: z.string().max(5000).nullish(),
+  name: z.string().normalize('NFC').trim().max(DEPARTMENT_NAME_MAX_LENGTH),
+  function: z.string().normalize('NFC').trim().max(DEPARTMENT_FUNCTION_MAX_LENGTH).nullish(),
   itAdminEmployeeId: z.uuid().nullish(),
-  /** The HR document the department is created from (`QĐ-87b`): every part is required. */
-  hrBasis: hrBasisSchema,
+});
+
+/** A department has no parent and its Cost Center cannot change: neither is a field (US-03-06 AC-3, AC-4). Same limits as creating. */
+export const updateDepartmentBodySchema = z.strictObject({
+  name: z.string().normalize('NFC').trim().max(DEPARTMENT_NAME_MAX_LENGTH).optional(),
+  function: z.string().normalize('NFC').trim().max(DEPARTMENT_FUNCTION_MAX_LENGTH).nullable().optional(),
+  itAdminEmployeeId: z.uuid().nullable().optional(),
 });
 
 /**
- * A department has no parent and its Cost Center cannot change: neither is a field (US-03-06 AC-3, AC-4). Every change cites the
- * HR document it is made on (`QĐ-87b(1)`): a missing part is a validation error and nothing is written.
+ * Retiring a department and taking back a successor take nothing: the body is empty or absent, and a key is refused like any
+ * unknown field (`QĐ-93f`).
  */
-export const updateDepartmentBodySchema = z.strictObject({
-  name: z.string().max(1000).optional(),
-  function: z.string().max(5000).nullable().optional(),
-  itAdminEmployeeId: z.uuid().nullable().optional(),
-  hrBasis: hrBasisSchema,
-});
-
-/** Retiring a department is made on an HR basis too. */
-export const deactivateDepartmentBodySchema = z.strictObject({ hrBasis: hrBasisSchema });
+const emptyBodySchema = z.preprocess((body) => body ?? {}, z.strictObject({}));
+export const deactivateDepartmentBodySchema = emptyBodySchema;
 
 export const listDepartmentsQuerySchema = z.strictObject({
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
@@ -47,16 +50,14 @@ export const departmentIdParamSchema = z.strictObject({ id: z.uuid() });
 export const assignHeadBodySchema = z.strictObject({
   employeeId: z.uuid(),
   effectiveFrom: businessDate,
-  hrBasis: hrBasisSchema,
 });
-export const vacateHeadBodySchema = z.strictObject({ effectiveFrom: businessDate, hrBasis: hrBasisSchema });
+export const vacateHeadBodySchema = z.strictObject({ effectiveFrom: businessDate });
 /** The person who is to follow the head, from a day after today (`QĐ-87`). */
 export const designateSuccessorBodySchema = z.strictObject({
   employeeId: z.uuid(),
   effectiveFrom: businessDate,
-  hrBasis: hrBasisSchema,
 });
-export const clearSuccessorBodySchema = z.strictObject({ hrBasis: hrBasisSchema });
+export const clearSuccessorBodySchema = emptyBodySchema;
 
 const pagination = z.strictObject({
   page: z.number().int().positive(),

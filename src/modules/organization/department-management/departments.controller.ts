@@ -35,6 +35,7 @@ import {
   QUERY_INVALID,
   READ_ROLES_ONLY,
   SUPER_ADMIN_ONLY,
+  DEPARTMENT_INACTIVE_RESPONSE,
   VALIDATION_ERROR,
   VALIDATION_ERROR_DESCRIPTION,
 } from './department.http-errors';
@@ -59,7 +60,7 @@ const UPDATE_INVALID = {
   ],
 } as const;
 /**
- * Department profiles (`US-03-06`). The Super Admin keeps them, on an HR basis, and reads them in full (`QĐ-87a`); the IT Admin
+ * Department profiles (`US-03-06`). The Super Admin keeps them, with no HR basis to give (`QĐ-93f`), and reads them in full (`QĐ-87a`); the IT Admin
  * changes nothing and reads only the departments they are in charge of or stand in for; a department head reads the one they head
  * and the list of its people (`US-01-02` AC-7); Finance and employees change nothing here (AC-16). Who may do what is decided
  * by the policy of the services, not only by the roles of these routes. There is no route that merges or splits departments
@@ -117,7 +118,6 @@ export class DepartmentsController {
         name: body.name,
         functionDescription: body.function,
         itAdminEmployeeId: body.itAdminEmployeeId,
-        hrBasis: body.hrBasis,
       });
 
       return await this.profileAfter(actor, id);
@@ -154,9 +154,9 @@ export class DepartmentsController {
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.UPDATED',
     description:
-      'The name, the description or the IT Admin in charge changed, on the HR basis given. The Cost Center and the people do not.',
+      'The name, the description or the IT Admin in charge changed. The Cost Center and the people do not. A body that carries an HR basis is refused (VALIDATION_ERROR): the Audit Trail records who, when, before and after.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, UPDATE_INVALID, NOT_FOUND)
+  @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, UPDATE_INVALID, NOT_FOUND, DEPARTMENT_INACTIVE_RESPONSE)
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: DepartmentIdParamDto,
@@ -167,7 +167,6 @@ export class DepartmentsController {
         name: body.name,
         functionDescription: body.function,
         itAdminEmployeeId: body.itAdminEmployeeId,
-        hrBasis: body.hrBasis,
       });
 
       return await this.profileAfter(actor, params.id);
@@ -182,7 +181,7 @@ export class DepartmentsController {
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.DEACTIVATED',
     description:
-      'The department is retired, on the HR basis given: it takes no new member or head. If it is already retired, the answer is the same.',
+      'The department is retired (the body is empty): it takes no new member or head. If it is already retired, the answer is the same.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.CONFLICT,
@@ -192,11 +191,11 @@ export class DepartmentsController {
   })
   async deactivate(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Body() _body: DeactivateDepartmentBodyDto,
     @Param() params: DepartmentIdParamDto,
-    @Body() body: DeactivateDepartmentBodyDto,
   ) {
     try {
-      await this.departments.deactivate(actor, params.id, { hrBasis: body.hrBasis });
+      await this.departments.deactivate(actor, params.id);
 
       return await this.profileAfter(actor, params.id);
     } catch (error) {

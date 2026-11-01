@@ -22,6 +22,7 @@ import {
 import { toDepartmentProfileWire } from './department.mapper';
 import {
   AUTH_ERRORS,
+  DEPARTMENT_INACTIVE_RESPONSE,
   NOT_FOUND,
   SUPER_ADMIN_ONLY,
   VALIDATION_ERROR,
@@ -63,7 +64,7 @@ const SUCCESSOR_INVALID = {
 } as const;
 /**
  * Who heads a department and who is to follow them (`US-03-06` AC-5 → AC-9, AC-18, `QĐ-87`). The Super Admin alone names the
- * head, leaves the department without one, names the successor and takes them back, each on an HR basis; the IT Admin does none
+ * head, leaves the department without one, names the successor and takes them back, each with no HR basis to give (`QĐ-93f`); the IT Admin does none
  * of it. Who may is decided by the policy of the service as well as by the role of the route. Every change answers with the
  * profile of the department as it is after the change.
  */
@@ -85,9 +86,9 @@ export class DepartmentHeadsController {
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.HEAD_ASSIGNED',
     description:
-      'The person heads the department from the date, on the HR basis given; the head before ends the day before. The person must be a member of the department that day. What was kept for the department while nobody headed it is handed to them.',
+      'The person heads the department from the date; the head before ends the day before. The person must be a member of the department that day. What was kept for the department while nobody headed it is handed to them.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, HEAD_ASSIGN_INVALID, NOT_FOUND)
+  @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, HEAD_ASSIGN_INVALID, NOT_FOUND, DEPARTMENT_INACTIVE_RESPONSE)
   async assignHead(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: DepartmentIdParamDto,
@@ -108,7 +109,7 @@ export class DepartmentHeadsController {
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.HEAD_VACATED',
     description:
-      'Nobody heads the department from the date, on the HR basis given; it shows as missing a head. If there is no head to end, nothing changes.',
+      'Nobody heads the department from the date; it shows as missing a head. If there is no head to end, nothing changes.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, HEAD_VACATE_INVALID, NOT_FOUND)
   async vacateHead(
@@ -134,13 +135,16 @@ export class DepartmentHeadsController {
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.SUCCESSOR_DESIGNATED',
     description:
-      'The person is named to head the department from a day after today, on the HR basis given: the head in force now ends the day before, and the profile shows the person as the successor. The person must be a member of the department that day. Somebody has to head the department today.',
+      'The person is named to head the department from a day after today: the head in force now ends the day before, and the profile shows the person as the successor. The person must be a member of the department that day. Somebody has to head the department today.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, SUCCESSOR_INVALID, NOT_FOUND, {
     status: HttpStatus.CONFLICT,
     description:
       'A successor is already named (DEPARTMENT.HEAD_SUCCESSOR_ALREADY_NAMED): take them back first, or the department is retired (DEPARTMENT.INACTIVE).',
-    examples: [DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_HEAD_SUCCESSOR_ALREADY_NAMED],
+    examples: [
+      DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_HEAD_SUCCESSOR_ALREADY_NAMED,
+      DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_INACTIVE,
+    ],
   })
   async designateSuccessor(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -162,16 +166,16 @@ export class DepartmentHeadsController {
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.SUCCESSOR_CLEARED',
     description:
-      'Nobody is named to follow the head any more, on the HR basis given: the head keeps the department. If nobody is named, nothing changes.',
+      'Nobody is named to follow the head any more: the head keeps the department. If nobody is named, nothing changes.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, VALIDATION_ERROR, NOT_FOUND)
   async clearSuccessor(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Body() _body: ClearSuccessorBodyDto,
     @Param() params: DepartmentIdParamDto,
-    @Body() body: ClearSuccessorBodyDto,
   ) {
     try {
-      await this.heads.clearSuccessor(actor, params.id, body);
+      await this.heads.clearSuccessor(actor, params.id);
 
       return await this.profileAfter(actor, params.id);
     } catch (error) {

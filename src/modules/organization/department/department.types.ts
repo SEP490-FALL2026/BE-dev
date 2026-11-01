@@ -9,6 +9,10 @@ import type { CostCenterStatus, DepartmentStatus, HeadPeriodRecord } from '../or
  */
 export type DepartmentWarning = 'MISSING_HEAD' | 'MISSING_IT_ADMIN' | 'MISSING_COST_CENTER';
 
+/** The longest name and function a department takes, in characters after the accents are composed (`API-DOC-F05`). */
+export const DEPARTMENT_NAME_MAX_LENGTH = 200;
+export const DEPARTMENT_FUNCTION_MAX_LENGTH = 1000;
+
 /** How many head periods a profile shows, and how many a head change reads back to find the one in force. */
 export const DEPARTMENT_HEAD_HISTORY_LIMIT = 50;
 
