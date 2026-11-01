@@ -24,11 +24,11 @@ Trưởng phòng giữ hàng đợi các Request có chi phí đã được duy�
 
 ## Primary Story/AC
 
-| Story    | AC                           | Coverage | Phần còn lại thuộc                                                                                                                 |
-| -------- | ---------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| US-06-14 | AC-1→AC-5, AC-7→AC-13, AC-15 | partial  | AC-6 và vế bỏ người thụ hưởng của AC-13: `g5-group-requests`; AC-14: `g5-request-withdrawal`                                       |
-| US-05-04 | AC-11→AC-13, AC-15, AC-16    | partial  | AC-1→AC-10: `g5-manager-need-decision`; AC-14: `g5-group-requests`                                                                 |
-| US-05-03 | AC-9                         | partial  | AC-1→AC-5, AC-10→AC-13: `g5-request-submission-and-routing`; AC-6, AC-7: `g5-delegated-requests`; AC-8, AC-14: `g5-group-requests` |
+| Story    | AC                           | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                  |
+| -------- | ---------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-14 | AC-1→AC-5, AC-9→AC-13, AC-15 | partial  | AC-6 và vế bỏ người thụ hưởng của AC-13: `g5-group-requests`; AC-8, AC-16: `qd93-remove-fallback-substitute-approvers`; AC-14: `g5-request-withdrawal`                                                                                                              |
+| US-05-04 | AC-11→AC-13, AC-15, AC-16    | partial  | AC-1→AC-10: `g5-manager-need-decision`; AC-14: `g5-group-requests`                                                                                                                                                                                                  |
+| US-05-03 | AC-9                         | partial  | AC-1, AC-2, AC-10→AC-13: `g5-request-submission-and-routing`; AC-4, AC-15: `qd93-remove-fallback-substitute-approvers` (AC-15 vế _chưa xếp phòng_: `qd93-unplaced-employee-first-placement`); AC-6, AC-7: `g5-delegated-requests`; AC-8, AC-14: `g5-group-requests` |
 
 ## Supporting references
 
@@ -106,6 +106,8 @@ Trưởng phòng giữ hàng đợi các Request có chi phí đã được duy�
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Scope map chuyển `US-06-14` AC-14 sang `g5-request-withdrawal`, AC-6 sang `g5-group-requests` và vế bỏ người thụ hưởng của AC-13 sang `g5-group-requests`. Quyết định nhu cầu của trưởng phòng có chi phí giờ cần chọn dòng hay _ngoài kế hoạch_ (hợp đồng đổi, báo FE). Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
 
 24/10/2026 (sau `g5-group-requests`): `US-06-14` AC-6 và vế bỏ người thụ hưởng của AC-13 đã làm ở `g5-group-requests`: hàng đợi trình và hồ sơ bổ sung nhận Request nhóm (`beneficiary` null và `lineCount` ở hàng đợi, `dropEmployeeIds` và `droppedCount` ở hồ sơ bổ sung); cờ _cùng người_ đặt theo người được giao của từng bước nhu cầu.
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): `US-06-14` AC-8 (viết lại theo `QĐ-93c`: chờ trưởng phòng mới, không tạo thẳng bước chi) chuyển sang `qd93-remove-fallback-substitute-approvers`; AC-7 bỏ; AC mới `US-06-14` AC-16 thuộc hạng mục `QĐ-93` ở cột cuối.
 
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 

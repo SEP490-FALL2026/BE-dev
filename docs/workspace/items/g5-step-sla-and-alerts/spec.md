@@ -32,12 +32,12 @@ Quá SLA thì người được giao nhận nhắc và người quản lý nhậ
 
 ## Primary Story/AC
 
-| Story    | AC                    | Coverage | Phần còn lại thuộc                                                                                                             |
-| -------- | --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| US-05-09 | AC-1→AC-6, AC-8→AC-11 | partial  | AC-7: `g3-downstream-finance-integration`                                                                                      |
-| US-05-06 | AC-10                 | partial  | AC-1→AC-4, AC-7, AC-8, AC-11→AC-15: `g5-it-assessment-of-new-software`; AC-5 (vế thông báo): `g5-request-status-notifications` |
-| US-05-10 | AC-1→AC-5             | full     | —                                                                                                                              |
-| US-06-02 | AC-3                  | partial  | AC-1, AC-2, AC-4, AC-5, AC-7: `g5-finance-information-request`                                                                 |
+| Story    | AC                            | Coverage | Phần còn lại thuộc                                                                                                             |
+| -------- | ----------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| US-05-09 | AC-1→AC-6, AC-8, AC-10, AC-11 | partial  | AC-7: `g3-downstream-finance-integration`                                                                                      |
+| US-05-06 | AC-10                         | partial  | AC-1→AC-4, AC-7, AC-8, AC-11→AC-15: `g5-it-assessment-of-new-software`; AC-5 (vế thông báo): `g5-request-status-notifications` |
+| US-05-10 | AC-1→AC-5                     | full     | —                                                                                                                              |
+| US-06-02 | AC-3                          | partial  | AC-1, AC-2, AC-4, AC-5, AC-7: `g5-finance-information-request`                                                                 |
 
 ## Supporting references
 
@@ -170,3 +170,5 @@ Múi giờ tổ chức `Asia/Ho_Chi_Minh`; test truyền `now` vào `sweep(now)`
 24/10/2026: thiết kế `ready` (người thiết kế: AI theo giao việc của người dùng); chưa implement, chưa review, chưa nghiệm thu. Các quyết định ở mục _quyết định thiết kế_ chờ Owner xác nhận. Thay `g4-notification-delivery` bằng Phase 1 của `g5-request-status-notifications` trong mục phụ thuộc vì hạng mục cũ đang chờ chính hộp thông báo này.
 
 24/10/2026: implement xong Phase 1 và Phase 2 trên cây làm việc chưa commit (người làm: AI theo giao việc của người dùng); gate xanh theo bảng ở [plan](plan.md#verification-and-handoff); chưa review, chưa nghiệm thu. Khác thiết kế ban đầu, đã ghi lại ở đây: (1) tên migration là `20261024120000` → `20261024120200`; (2) `CongestionRepo` và `SlaQueueAgeService` khai một lần ở `RequestsWorkFacadeModule` rồi xuất ra, thay vì khai ở hai module (cổng một provider một module không cho); (3) nhắc của hàng đợi tới Super Admin dùng mã `SPEND_QUEUE_REMINDER` với `cause NO_HOLDER`, cảnh báo nghẽn mang `holderEmployeeId`, `openCount`, `threshold`, `oldestAgeWorkingDays` (khóa tham số của sáu mã đã sửa ở `inbox.policy.ts`); (4) `spendQueueList.reminders` là số lần nhắc; (5) test dùng ngưỡng nghẽn 3 thay vì 10 để dựng ít Request; (6) bảng nghẽn tính tuổi và cờ `overThreshold` bằng đồng hồ hiện tại, nên test của bảng chỉ kiểm tuổi của bước bắt đầu từ tháng 9; (7) `request-timing.repo.ts` chưa đọc `spend_queued_at` (suy từ dữ liệu có sẵn như trước); (8) không route quyết định nào cần thêm chốt chặn vai cho Super Admin: cả bốn bị từ chối bằng 404 hay 403 (`ACCESS_REQUEST.NOT_FOUND`, `SPEND.NO_SPEND_STEP`, `SPEND.NOT_THE_ASSIGNEE`, `AUTHORIZATION.FORBIDDEN`, `SPEND.BATCH_NOT_FOUND`).
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): `US-05-09` AC-9 bỏ ở nguồn nên rời bảng; AC sở hữu khác không đổi.

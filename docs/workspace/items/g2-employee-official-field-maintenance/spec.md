@@ -30,11 +30,11 @@ thao tác này; đổi phòng/chức vụ/trạng thái không đi qua đây —
 
 ## Primary Story/AC
 
-| Story    | AC    | Coverage | Phần còn lại thuộc                                                                                                                                                                                   |
-| -------- | ----- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-02-02 | AC-19 | partial  | AC-1, AC-9, AC-12→AC-16, AC-18: `g2-employee-intake-by-super-admin`; AC-17: `g4-notification-delivery`; AC-2, AC-4, AC-6→AC-8, AC-10, AC-11: `g2-employee-import-preview-confirm` (giao trước GOV.1) |
+| Story    | AC    | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                                                                 |
+| -------- | ----- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-02-02 | AC-19 | partial  | AC-1, AC-9, AC-12→AC-16, AC-18: `g2-employee-intake-by-super-admin`; AC-17: `g4-notification-delivery`; AC-4, AC-6, AC-8, AC-11: `g2-employee-import-preview-confirm` (giao trước GOV.1); vế bỏ căn cứ HR của AC-19 (`QĐ-93f`): `qd93-remove-hr-basis-org-writes`; AC-2, AC-7, AC-10, AC-20→AC-26: hạng mục `QĐ-93` ở scope map G2 |
 
-AC-19 được sở hữu trọn ở đây; dòng `partial` chỉ vì các AC khác của Story thuộc hạng mục khác.
+AC-19 sở hữu ở đây trừ vế bỏ căn cứ HR (`QĐ-93f`, `qd93-remove-hr-basis-org-writes`); dòng `partial` vì vế đó và các AC khác của Story thuộc hạng mục khác.
 
 ## Supporting references
 
@@ -90,6 +90,8 @@ phục Super Admin; trường tự phục vụ của Employee (mô hình chưa c
 22/10/2026: lập theo Prompt 07. Chưa code, chưa review, chưa nghiệm thu.
 
 23/10/2026 (Prompt 10 — xử lý tồn đọng G0→G4): `BBI-D02` hiện thực: `PATCH /employees/{id}` (IT Admin) sửa họ tên, email công việc, loại nhân sự, ngày vào chưa tới, bắt buộc căn cứ HR; Audit `EMPLOYEE.OFFICIAL_FIELDS_CHANGED` có trước/sau, căn cứ, `byItAdminInCharge`, `selfExecuted`; hồ sơ của chính IT Admin theo `SoD-5`/`QĐ-77m` (IT Admin khác sửa nếu còn người dùng được; hết người thì tự sửa và gắn cờ). Không đổi email đăng nhập, phòng, chức vụ, trạng thái. Mã ngày vào: `HIRE_DATE_LOCKED`, `HIRE_DATE_IN_PAST`. Kiểm chứng: `employee-maintenance-http` (21), e2e `employees` — xanh trên cây làm việc chưa commit, nhánh `Bao_dev_be`, nền `dev` `19be620`, 23/10/2026. Gate toàn cây trên cùng cây: `pnpm lint`, `tsc --noEmit`, `pnpm test` (unit 2.074 (141 suite)), `pnpm test:e2e` (839 (32 suite)), `pnpm test:integration` (112 suite, 1.429 test, gồm 4 test kho S3 thật trên LocalStack), `prisma migrate deploy` trên CSDL mới + `migrate diff --exit-code` (không lệch), `pnpm openapi:export`. Giới hạn: Thông báo "tự thực thi" cho Super Admin chờ hộp thông báo (`g4-notification-delivery`). Chưa commit khi viết dòng này, chưa remote CI, chưa Owner review, chưa nghiệm thu: không có gì là `accepted`; đỏ-trước của từng test không được ghi lại.
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): vế bỏ căn cứ HR của `US-02-02` AC-19 (`QĐ-93f`) thuộc `qd93-remove-hr-basis-org-writes`; scope map G2 ghi AC-19 `partial` (hạng mục này là `Owner`).
 
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 

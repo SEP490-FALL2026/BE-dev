@@ -32,12 +32,11 @@ Trưởng phòng gửi yêu cầu thay cho người trong phòng (kể cả ngư
 
 ## Primary Story/AC
 
-| Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                                                          |
-| -------- | ---------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-03-02 | AC-1, AC-3→AC-14 | full     | —                                                                                                                                                                                                           |
-| US-05-03 | AC-6, AC-7       | partial  | AC-1→AC-5, AC-9→AC-13: `g5-request-submission-and-routing`; AC-8, AC-14: `g5-group-requests`                                                                                                                |
-| US-05-02 | AC-5             | partial  | AC-3, AC-6, AC-7, AC-9, AC-10, AC-12: `g5-request-submission-and-routing`; AC-1, AC-4, AC-11: `g5-request-amount-and-payment-schedule`; AC-2: `g5-group-requests`; AC-8: `g5-it-assessment-of-new-software` |
-| US-06-08 | AC-2, AC-9       | partial  | AC-1, AC-3→AC-8, AC-11: `g5-spend-approval-decision`; AC-10: `g5-group-requests`                                                                                                                            |
+| Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                                               |
+| -------- | ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-03-02 | AC-1, AC-3→AC-14 | partial  | AC-15: vế Người duyệt chi `qd93-remove-fallback-substitute-approvers`, vế _chưa xếp phòng_ `qd93-unplaced-employee-first-placement`                                                                                                                                                                              |
+| US-05-03 | AC-6, AC-7       | partial  | AC-1, AC-2, AC-9→AC-13: `g5-request-submission-and-routing`; AC-4, AC-15: `qd93-remove-fallback-substitute-approvers` (AC-15 vế _chưa xếp phòng_: `qd93-unplaced-employee-first-placement`); AC-8, AC-14: `g5-group-requests`                                                                                    |
+| US-05-02 | AC-5             | partial  | AC-3, AC-6, AC-7, AC-9, AC-10, AC-12: `g5-request-submission-and-routing`; AC-1, AC-4, AC-11: `g5-request-amount-and-payment-schedule`; AC-2: `g5-group-requests`; AC-8: `g5-it-assessment-of-new-software`; AC-13: `qd93-remove-fallback-substitute-approvers`; AC-14: `qd93-unplaced-employee-first-placement` |
 
 ## Supporting references
 
@@ -118,6 +117,8 @@ Trưởng phòng gửi yêu cầu thay cho người trong phòng (kể cả ngư
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Trưởng phòng gửi yêu cầu thay cho người trong phòng; bước nhu cầu xác nhận bằng việc gửi; hàng đợi chờ cấp phát cho IT Admin gộp theo người; ngày kết thúc của người không phải nhân viên chính thức thành ngày kết thúc seat. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
 
 24/10/2026 (sau `g5-group-requests`): quy tắc người thụ hưởng tách ra `beneficiary-eligibility.policy.ts` dùng chung với Request nhóm; `checkDelegation` giữ nguyên kết quả.
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): `US-06-08` `RETIRED` (`QĐ-93d`) — AC-2, AC-9 bỏ khỏi bảng (khóa lịch sử `not affected` ở scope map G5); AC mới `US-03-02` AC-15 thuộc `qd93-remove-fallback-substitute-approvers` và `qd93-unplaced-employee-first-placement`, dòng `US-03-02` đổi sang `partial`; `US-05-03` AC-3, AC-5 bỏ, AC-4 chuyển sang `qd93-remove-fallback-substitute-approvers` (cột cuối).
 
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 

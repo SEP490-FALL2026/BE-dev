@@ -24,11 +24,11 @@ Khi dữ liệu tổ chức hoặc vai Người duyệt chi đổi thật, các 
 
 ## Primary Story/AC
 
-| Story    | AC        | Coverage | Phần còn lại thuộc                                                                                                                |
-| -------- | --------- | -------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| US-05-11 | AC-1→AC-9 | full     | —                                                                                                                                 |
-| US-05-12 | AC-1→AC-9 | full     | —                                                                                                                                 |
-| US-05-03 | AC-13     | partial  | AC-1→AC-5, AC-9→AC-12: `g5-request-submission-and-routing`; AC-6, AC-7: `g5-delegated-requests`; AC-8, AC-14: `g5-group-requests` |
+| Story    | AC                         | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                 |
+| -------- | -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| US-05-11 | AC-1→AC-3, AC-5, AC-7→AC-9 | partial  | AC-6, AC-10: `qd93-remove-fallback-substitute-approvers`                                                                                                                                                                                                           |
+| US-05-12 | AC-1, AC-2, AC-4→AC-9      | partial  | AC-3, AC-10, AC-11: `qd93-remove-fallback-substitute-approvers`                                                                                                                                                                                                    |
+| US-05-03 | AC-13                      | partial  | AC-1, AC-2, AC-9→AC-12: `g5-request-submission-and-routing`; AC-4, AC-15: `qd93-remove-fallback-substitute-approvers` (AC-15 vế _chưa xếp phòng_: `qd93-unplaced-employee-first-placement`); AC-6, AC-7: `g5-delegated-requests`; AC-8, AC-14: `g5-group-requests` |
 
 ## Supporting references
 
@@ -232,6 +232,8 @@ Người: `E1`, `E4` người yêu cầu (`E4` thuộc `P-HR` chưa có trưởn
 24/10/2026: implement xong ở cây làm việc (chưa commit, chưa Owner review, chưa nghiệm thu). Làm đủ cả hai Story và AC-13 của `US-05-03`, trừ việc đưa cảnh báo vào hộp thư (chưa có hộp thư: xem _Explicit out of scope_). Đã dựng phần hợp đồng người nghe tổ chức vì `g6-transfer-record` chưa có, kèm bên phát cho gán và gỡ trưởng phòng hiệu lực hôm nay; ghi một dòng ở spec G6. Sửa `openSpend` không lọc người nghỉ việc. Các quyết định ở mục _quyết định thiết kế_ vẫn chờ Owner xác nhận.
 
 24/10/2026 (sau `g5-group-requests`): `StepTargetService` biết dòng của Request nhóm: bước giữ dòng của trưởng phòng được định tuyến như Request của trưởng phòng, để trưởng phòng không giữ bước quyết dòng của chính mình khi dữ liệu tổ chức đổi (`ReassignableRequest.lines`).
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): `US-05-11` AC-6 và `US-05-12` AC-3 (viết lại theo `QĐ-93c`, thay nhánh approver dự phòng) chuyển sang `qd93-remove-fallback-substitute-approvers`, cùng AC mới `US-05-11` AC-10, `US-05-12` AC-10, AC-11; `US-05-11` AC-4 bỏ; hai dòng đổi sang `partial`.
 
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 

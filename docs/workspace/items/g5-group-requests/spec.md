@@ -32,15 +32,14 @@ Employee (tối đa 10 người cùng phòng) hoặc trưởng phòng gửi mộ
 
 ## Primary Story/AC
 
-| Story    | AC                     | Coverage | Phần còn lại thuộc                                                                                                                                                              |
-| -------- | ---------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-05-02 | AC-2                   | partial  | AC-1, AC-4, AC-11: `g5-request-amount-and-payment-schedule`; AC-3, AC-5→AC-7, AC-9, AC-10, AC-12: `g5-request-submission-and-routing`; AC-8: `g5-it-assessment-of-new-software` |
-| US-05-03 | AC-8, AC-14            | partial  | AC-1→AC-5, AC-9→AC-13: `g5-request-submission-and-routing`; AC-6, AC-7: `g5-delegated-requests`                                                                                 |
-| US-05-04 | AC-14                  | partial  | AC-1→AC-10: `g5-manager-need-decision`; AC-11→AC-13, AC-15, AC-16: `g5-spend-submission-batches`                                                                                |
-| US-05-17 | AC-1→AC-9, AC-11→AC-17 | partial  | AC-10: `g5-commitment-lifecycle`                                                                                                                                                |
-| US-06-14 | AC-6, AC-13            | partial  | AC-1→AC-5, AC-7→AC-13, AC-15 (vế đổi ngày của AC-13): `g5-spend-submission-batches`; AC-14: `g5-request-withdrawal`                                                             |
-| US-06-01 | AC-15                  | partial  | AC-1→AC-10, AC-12→AC-14, AC-16→AC-21: `g5-spend-approval-decision`                                                                                                              |
-| US-06-08 | AC-10                  | partial  | AC-1, AC-3→AC-8, AC-11: `g5-spend-approval-decision`; AC-2, AC-9: `g5-delegated-requests`                                                                                       |
+| Story    | AC                     | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                   |
+| -------- | ---------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| US-05-02 | AC-2                   | partial  | AC-1, AC-4, AC-11: `g5-request-amount-and-payment-schedule`; AC-3, AC-5→AC-7, AC-9, AC-10, AC-12: `g5-request-submission-and-routing`; AC-8: `g5-it-assessment-of-new-software`; AC-13: `qd93-remove-fallback-substitute-approvers`; AC-14: `qd93-unplaced-employee-first-placement` |
+| US-05-03 | AC-8, AC-14            | partial  | AC-1, AC-2, AC-9→AC-13: `g5-request-submission-and-routing`; AC-4, AC-15: `qd93-remove-fallback-substitute-approvers` (AC-15 vế _chưa xếp phòng_: `qd93-unplaced-employee-first-placement`); AC-6, AC-7: `g5-delegated-requests`                                                     |
+| US-05-04 | AC-14                  | partial  | AC-1→AC-10: `g5-manager-need-decision`; AC-11→AC-13, AC-15, AC-16: `g5-spend-submission-batches`                                                                                                                                                                                     |
+| US-05-17 | AC-1→AC-9, AC-11→AC-17 | partial  | AC-10: `g5-commitment-lifecycle`; AC-18: vế Người duyệt chi `qd93-remove-fallback-substitute-approvers`, vế _chưa xếp phòng_ `qd93-unplaced-employee-first-placement`                                                                                                                |
+| US-06-14 | AC-6, AC-13            | partial  | AC-1→AC-5, AC-9→AC-13, AC-15 (vế đổi ngày của AC-13): `g5-spend-submission-batches`; AC-8, AC-16: `qd93-remove-fallback-substitute-approvers`; AC-14: `g5-request-withdrawal`                                                                                                        |
+| US-06-01 | AC-15                  | partial  | AC-1→AC-10, AC-12→AC-14, AC-16→AC-21: `g5-spend-approval-decision`; AC-22: `qd93-remove-fallback-substitute-approvers`                                                                                                                                                               |
 
 ## Supporting references
 
@@ -214,6 +213,8 @@ Làm ngày 25/10/2026 trên cây làm việc chưa commit, trên cơ sở `verif
 25/10/2026 (sau `g6-leaver-request-closure`, `verified` ở local): `removeParticipant` vẫn chưa có. Hạng mục đó liệt kê Request nhóm của người nghỉ việc (dòng của người đó còn `AWAITING_NEED`, `NEED_CONFIRMED`, `APPROVED` hay `EXECUTING`) với `group: true, cancellable: false` và đóng nó bị `409 ACCESS_REQUEST.GROUP_REQUEST_UNSUPPORTED`; một thao tác theo người cho Request nhóm dùng `GroupResolutionService`/`GroupWithdrawalService` (không dùng `RequestEndService`) và phát `ACCESS_REQUEST.CANCELLED` kèm `reasonKind` như Request thường.
 
 25/10/2026 (follow-up): đã thêm `POST /access-requests/{id}/lines/{employeeId}/departure-closure` (IT Admin gỡ dòng của người đã nghỉ, dòng `CANCELLED`, hai migration `20261025010000` và `20261025010100`, kiểm kê e2e 296); xem mục _Follow-up 25/10/2026_ và [plan](plan.md#follow-up-25102026-đóng-dòng-của-người-đã-nghỉ-việc). Vẫn `verified` ở local, chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu; các lựa chọn thiết kế chưa phải quyết định của Owner.
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): `US-06-08` `RETIRED` (`QĐ-93d`) — AC-10 bỏ khỏi bảng (khóa lịch sử `not affected` ở scope map G5); AC sở hữu ở đây không đổi; AC mới/chuyển của các Story chung bảng (`US-05-02` AC-13, AC-14, `US-05-03` AC-4, AC-15, `US-05-17` AC-18, `US-06-14` AC-8, AC-16, `US-06-01` AC-22) thuộc hạng mục `QĐ-93` ở cột cuối; `US-05-03` AC-3, AC-5 và `US-06-14` AC-7 bỏ.
 
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 

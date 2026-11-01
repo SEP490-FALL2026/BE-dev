@@ -24,11 +24,11 @@ Trưởng phòng nộp đề xuất ngân sách phần mềm của phòng cho m�
 
 ## Primary Story/AC
 
-| Story    | AC                                                      | Coverage | Phần còn lại thuộc                                                                                                                                                                                               |
-| -------- | ------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-06-09 | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23 | partial  | AC-17 (vế chạy lại kiểm tra ngân sách): `g5-budget-check-and-finance-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-10, AC-21: `g5-budget-version-decision`; AC-12: `g3-downstream-finance-integration` |
-| US-06-10 | AC-1→AC-13                                              | full     | —                                                                                                                                                                                                                |
-| US-12-15 | AC-24                                                   | partial  | vế danh mục cảnh báo và bảng điều khiển (G8): `g3-downstream-finance-integration`                                                                                                                                |
+| Story    | AC                                                      | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                              |
+| -------- | ------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-09 | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23 | partial  | AC-17 (vế chạy lại kiểm tra ngân sách): `g5-budget-check-and-finance-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-10, AC-21: `g5-budget-version-decision`; AC-12: `g3-downstream-finance-integration`; AC-24→AC-26: `qd93-budget-record-attachments` |
+| US-06-10 | AC-1→AC-13                                              | partial  | AC-14→AC-16: `qd93-budget-record-attachments`                                                                                                                                                                                                                   |
+| US-12-15 | AC-24                                                   | partial  | vế danh mục cảnh báo và bảng điều khiển (G8): `g3-downstream-finance-integration`                                                                                                                                                                               |
 
 ## Supporting references
 
@@ -111,6 +111,8 @@ Trưởng phòng nộp đề xuất ngân sách phần mềm của phòng cho m�
 23/10/2026: lập khung theo scope map G5 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
 
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Mở module `budgets` ([ADR-0016](../../../decisions/0016-budgets-context.md), Proposed). `US-06-09` AC-17 chỉ làm vế dời khoảng mua và lịch sử; vế chạy lại kiểm tra ngân sách thuộc `g5-budget-check-and-finance-review` (`partial` trong bản đồ G5). Các test cần ngân sách hiện hành đặt trạng thái `APPROVED` bằng SQL vì quyết định của Người duyệt chi thuộc `g5-budget-version-decision`. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): AC mới `US-06-10` AC-14→AC-16 và `US-06-09` AC-24→AC-26 (đính kèm tài liệu, `QĐ-93j`) thuộc `qd93-budget-record-attachments`; dòng `US-06-10` đổi sang `partial`, AC sở hữu ở đây không đổi.
 
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 

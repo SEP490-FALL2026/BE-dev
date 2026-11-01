@@ -27,8 +27,8 @@ Employee hoàn trả seat hoặc trưởng phòng xác nhận hết nhu cầu đ
 | Story    | AC         | Coverage | Phần còn lại thuộc                                                                                                                                                                                                              |
 | -------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-01-12 | AC-3       | partial  | AC-1: `g5-request-submission-and-routing`; AC-2: `g5-it-assessment-of-new-software`; AC-4, AC-8, AC-9: `g4-request-and-transfer-integration`; AC-5→AC-7: `g5-manager-need-decision`; AC-10: `g3-downstream-finance-integration` |
-| US-05-13 | AC-1→AC-10 | full     | —                                                                                                                                                                                                                               |
-| US-05-14 | AC-1→AC-5  | full     | —                                                                                                                                                                                                                               |
+| US-05-13 | AC-1→AC-10 | partial  | AC-11: `qd93-remove-fallback-substitute-approvers`                                                                                                                                                                              |
+| US-05-14 | AC-1→AC-5  | partial  | AC-6: `qd93-remove-fallback-substitute-approvers`                                                                                                                                                                               |
 
 ## Supporting references
 
@@ -156,6 +156,8 @@ Suite mới: `return-request` (10 ca), `return-request-handover` (5), `return-re
 24/10/2026: `g6-handover-confirmation` đã đăng ký hook của mình cạnh `RETURN_REQUESTS`. Bản ghi hoàn trả vẫn giữ bàn giao nhẹ của chính nó: hook xác nhận bỏ qua các lý do có `referenceKind = RETURN_REQUEST`, nên một hoàn trả không bị hỏi xác nhận hai lần. Nếu sau này muốn hoàn trả dùng bảng `handover_duties`, đổi ở đó, không ở hook của hoàn trả.
 
 25/10/2026: `g6-time-limited-access` đã xong (`verified` local) và dùng cổng `RenewalHold` của hạng mục này: thêm `pendingRenewalsOf(assignmentIds)` (trả `requestId` và `state` của Request gia hạn chưa kết thúc theo lô, `RenewalRequestRepo.pendingOf`) để hàng đợi quyền hết hạn của IT Admin giữ mục ở trạng thái `WAITING_RENEWAL_DECISION`. Không thêm `getContinuousTermMonths` vì `getAssignmentFacts(...).chainStartsOn` đã đủ. Gia hạn được duyệt vẫn kết thúc Assignment cũ ở ngày kết thúc cũ nên mục rời hàng đợi; không cần đổi gì ở đây.
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): AC mới `US-05-13` AC-11, `US-05-14` AC-6 thuộc `qd93-remove-fallback-substitute-approvers`; hai dòng đổi sang `partial`, AC sở hữu ở đây không đổi.
 
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 

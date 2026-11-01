@@ -113,3 +113,4 @@ không allowlist mới; ledger import/export khác giữ nguyên.
 
 - 19/10/2026: tạo hạng mục, thiết kế `ready`; Owner chốt vị trí HTTP error mapper ở `mappers/` trong phiên; implement và
   `verified` local (bằng chứng ở [plan](plan.md)). Chưa commit, chưa Owner review, chưa nghiệm thu.
+- 01/11/2026 — `QĐ-93` (Docs `69e8a3d`): không AC nào chuyển (bảng Primary chỉ có dòng `n/a` F-23); `US-03-06` AC-14 (Project trên hồ sơ phòng, ở _Supporting references_) bỏ theo `QĐ-93h` — năng lực Project gỡ ở `qd93-remove-department-projects`.

@@ -24,11 +24,11 @@ Người duyệt chi quyết phiên bản ngân sách mà Finance đã gửi: du
 
 ## Primary Story/AC
 
-| Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                               |
-| -------- | ---------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-06-07 | AC-3, AC-4, AC-6 | partial  | AC-1, AC-2, AC-5, AC-7: `g5-commitment-creation`                                                                                                                                 |
-| US-06-09 | AC-10, AC-21     | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-12: `g3-downstream-finance-integration` |
-| US-06-11 | AC-1→AC-10       | full     | —                                                                                                                                                                                |
+| Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                                                                              |
+| -------- | ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-07 | AC-3, AC-4, AC-6 | partial  | AC-1, AC-2, AC-5, AC-7: `g5-commitment-creation`                                                                                                                                                                                |
+| US-06-09 | AC-10, AC-21     | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-12: `g3-downstream-finance-integration`; AC-24→AC-26: `qd93-budget-record-attachments` |
+| US-06-11 | AC-1→AC-10       | partial  | AC-11: `qd93-budget-record-attachments`; AC-12: `qd93-remove-fallback-substitute-approvers`                                                                                                                                     |
 
 ## Supporting references
 
@@ -103,6 +103,8 @@ Người duyệt chi quyết phiên bản ngân sách mà Finance đã gửi: du
 23/10/2026: lập khung theo scope map G5 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
 
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Các test cần khoản cam kết chờ ngân sách đặt chúng bằng SQL vì việc tạo khoản thuộc `g5-commitment-creation`. `makeCurrent` của harness (đặt `APPROVED` bằng SQL) vẫn dùng ở các suite của `g5-budget-proposal-and-review`; suite quyết định dùng đường thật. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): AC mới `US-06-11` AC-11 thuộc `qd93-budget-record-attachments`, AC-12 thuộc `qd93-remove-fallback-substitute-approvers`; dòng `US-06-11` đổi sang `partial`, AC sở hữu ở đây không đổi; `US-06-09` AC-24→AC-26 mới thuộc `qd93-budget-record-attachments`.
 
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 

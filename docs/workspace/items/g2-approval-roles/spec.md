@@ -58,3 +58,5 @@ Không có route ủy quyền, gỡ hay chỉ định người duyệt thay cho 
 ## Thay đổi và nghiệm thu
 
 16/10/2026: thiết kế và triển khai cùng phiên. **Owner xác nhận khi review:** (1) không có thao tác gỡ vai; (2) chỉ Người duyệt chi sinh vai suy ra, hai vai kia là cấu hình G5 đọc; (3) khóa/nghỉ việc sau khi đã giữ vai không tự gỡ — G5/G6 phải xử lý khi định tuyến. Chưa review, chưa nghiệm thu.
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): `US-01-03` AC-1→AC-6, AC-9 (giao trước GOV.1 ở lát này, `not affected` ở scope map G2) chuyển sang `qd93-direct-manager-spending-approver-roles` cùng AC mới AC-10→AC-13 (`SPENDING_APPROVER` gán trực tiếp, `QĐ-93a`/`QĐ-93b`); AC-7, AC-8 bỏ; người thay thế và approver dự phòng (`QĐ-93c`, `QĐ-93d`) gỡ ở `qd93-remove-fallback-substitute-approvers`. Lát này không có bảng Primary nên không sửa bảng.

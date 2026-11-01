@@ -66,6 +66,8 @@ Audit: `SUPER_ADMIN.TRANSFERRED_OUT/IN`, `SUPER_ADMIN.RECOVERY_LINK_ISSUED`, `SU
 
 16/10/2026: thiết kế và triển khai cùng phiên. **Owner xác nhận khi review:** (1) `BOOTSTRAP_ASSERTED` không đủ để **nhận** vai (`QĐ-67b`) — nếu Owner muốn khác, đổi ở `SuccessorEligibility`; (2) liên kết khôi phục dùng cùng hạn lời mời và không có tham số riêng; (3) quy trình vận hành thật (ai giữ phiếu, kênh xác minh danh tính, nơi lưu nhật ký lệnh) là việc tổ chức, không phải của mã — lệnh chỉ ghi tham chiếu. Chưa review, chưa nghiệm thu; chưa chạy thử lệnh trên môi trường dùng chung.
 
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): `US-01-09` AC-1, AC-2, AC-6, AC-7 (viết lại theo `QĐ-93e`: không còn chuyển giao trong ứng dụng) và AC-16 mới chuyển sang `qd93-remove-in-app-super-admin-transfer`, AC-3 sang `qd93-direct-manager-spending-approver-roles` (scope map G1); AC còn lại giữ `not affected` (giao trước GOV.1 ở lát này). Lát này không có bảng Primary nên không sửa bảng.
+
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 
 - Audit G0–G6 trên Docs `769bb64` ↔ BE `7c28e75` mở lại hạng mục này: F18, F19 — lời mời `REASSIGN` tới email đăng nhập; Super Admin là đối tượng.
