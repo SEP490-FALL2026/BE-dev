@@ -29,6 +29,25 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
 
   afterEach(() => h.afterEach());
 
+  /** The people of a department and its head began days ago: a change for today then ends their period instead of cancelling it. */
+  const backdateHeadPeriods = async (departmentId: string) => {
+    await h.ctx.sql.query('UPDATE employee_placements SET valid_from = valid_from - 10 WHERE department_id = $1', [
+      departmentId,
+    ]);
+    await h.ctx.sql.query(
+      'UPDATE department_head_periods SET valid_from = valid_from - 4 WHERE department_id = $1 AND valid_to IS NULL',
+      [departmentId],
+    );
+  };
+
+  /** Puts the members back as they were recorded, so the coverage check at the end of the file still holds. */
+  const putMembersBack = async (departmentId: string) => {
+    await h.ctx.sql.query('DELETE FROM department_head_periods WHERE department_id = $1', [departmentId]);
+    await h.ctx.sql.query('UPDATE employee_placements SET valid_from = valid_from + 10 WHERE department_id = $1', [
+      departmentId,
+    ]);
+  };
+
   /** The head changes of a department the transaction of the route told, by kind (`organization_change_announcements`). */
   const announcedHeadChanges = async (departmentId: string): Promise<Record<string, number>> => {
     const rows = await h.ctx.sql.query<{ kind: string; n: number }>(
@@ -83,9 +102,32 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect(audit[1]).toEqual({
         action: 'DEPARTMENT.HEAD_ASSIGNED',
         before: { head: first.code },
+        after: {
+          head: second.code,
+          effectiveFrom: today(),
+          endedPeriods: 0,
+          cancelledPeriods: [`${first.code}@${today()}`],
+        },
+      });
+      expect(await announcedHeadChanges(department.id)).toEqual({ HEAD_PERIOD_START: 1 });
+    });
+
+    it('announces the end of the head they replace in the same transaction when that head began before today (QĐ-93f, US-03-06 AC-22)', async () => {
+      const department = await newDepartment();
+      const first = await accountIn(department.code);
+      const second = await accountIn(department.code);
+      await assignHead(department.id, first.employeeId).expect(200);
+      await backdateHeadPeriods(department.id);
+
+      await assignHead(department.id, second.employeeId).expect(200);
+
+      expect((await auditOf(department.id)).at(-1)).toEqual({
+        action: 'DEPARTMENT.HEAD_ASSIGNED',
+        before: { head: first.code },
         after: { head: second.code, effectiveFrom: today(), endedPeriods: 1, cancelledPeriods: [] },
       });
       expect(await announcedHeadChanges(department.id)).toEqual({ HEAD_PERIOD_START: 2, HEAD_PERIOD_END: 1 });
+      await putMembersBack(department.id);
     });
 
     it('turns away an HR basis, which no head assignment takes any more: 422 and nobody is named (QĐ-93f)', async () => {
@@ -246,6 +288,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const department = await newDepartment();
       const head = await accountIn(department.code);
       await assignHead(department.id, head.employeeId).expect(200);
+      await backdateHeadPeriods(department.id);
 
       await api()
         .post(`/api/v1/departments/${department.id}/head-vacancies`)
@@ -260,6 +303,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         after: { head: null, effectiveFrom: today(), cancelledPeriods: [] },
       });
       expect(await announcedHeadChanges(department.id)).toEqual({ HEAD_PERIOD_START: 1, HEAD_PERIOD_END: 1 });
+      await putMembersBack(department.id);
     });
 
     it('answers a vacancy that ends nothing with the profile and records nothing', async () => {
@@ -366,11 +410,11 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
 
     it('refuses a successor for a retired department with 409 DEPARTMENT.INACTIVE and records nothing (API-DOC-F05)', async () => {
       const department = await newDepartment();
-      const next = await accountIn(department.code);
+      const outsider = await insertEmployeeFixture(h.ctx.app, h.seed, { code: unique('E-OK'), email: null });
       await api().post(`/api/v1/departments/${department.id}/deactivate`).set(asAdmin()).expect(200);
       const events = (await auditOf(department.id)).length;
 
-      const response = await designate(department.id, next.employeeId, addDays(today(), 10)).expect(409);
+      const response = await designate(department.id, outsider.employeeId, addDays(today(), 10)).expect(409);
 
       expect(errorOf(response).code).toBe('DEPARTMENT.INACTIVE');
       expect(await auditOf(department.id)).toHaveLength(events);
