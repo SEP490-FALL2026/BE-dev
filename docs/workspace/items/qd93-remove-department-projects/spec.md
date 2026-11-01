@@ -94,9 +94,14 @@ khóa `US-05-01` AC-7, `US-05-02` AC-7 thành `partial` cho lát này.
   - `qd93-remove-fallback-substitute-approvers` phase A (W3) chờ phase 1.
   - **Phase 2** ở W5: release riêng (không gộp với fallback phase B hay lần chạy lệnh chuyển đổi), chỉ deploy khi image
     đang chạy là release của phase 1 hoặc mới hơn (xem _Hai release và migration_).
-- `test/http/platform/openapi-presentation.http-spec.ts:254` (306 operation ở `1a77ffe8`) bị ba lát sửa: phase 1 lát này
-  (−4), `qd93-unplaced-employee-first-placement` (+1), `employee-directory-read` (+2). Mỗi lát tính lại từ số trên `dev`
-  lúc rebase, không cộng dồn từ `1a77ffe8`.
+- `test/http/platform/openapi-presentation.http-spec.ts:254` (306 operation ở `1a77ffe8`): phase 1 lát này −4 (301); theo
+  thứ tự merge của gói, từ 306 ở `1a77ffe8`: `qd93-remove-hr-basis-org-writes` 306 →
+  `qd93-remove-in-app-super-admin-transfer` 305 (−1) → `qd93-parameter-labels-dashboard-queues` 305 →
+  `qd93-direct-manager-spending-approver-roles` 305 → `qd93-remove-department-projects` phase 1 301 (−4) →
+  `qd93-remove-fallback-substitute-approvers` phase A 299 (−2) → `qd93-unplaced-employee-first-placement` 300 (+1) →
+  `qd93-code-format-xlsx-employee-import` 300 → `employee-directory-read` 302 (+2) → `qd93-budget-record-attachments` 312
+  (+10) → `dashboard-request-queues-wiring` 312; mỗi lát đổi số này trên nhánh của mình bằng số trên `dev` lúc rebase
+  cộng/trừ phần của mình (thứ tự đổi thì số trung gian đổi theo).
 - FE bỏ màn/field dự án và `projectLabel` cùng đợt deploy phase 1 (contract phá vỡ — response bỏ trường). Phase 2 không đổi
   wire.
 - Mất dữ liệu (OQ-1) và tên finding `QĐ-93h` cho ledger registry (OQ-3) đã được Owner duyệt 01/11/2026; không còn chặn
@@ -207,10 +212,9 @@ quay về tự động hỏng trong khi vẫn được đánh giá `COMPATIBLE`.
 #### Phase 2 — release N+1: xóa cột/bảng (không hoàn tác được — mất dữ liệu đã chấp nhận, OQ-1 Owner duyệt 01/11/2026)
 
 Hai thư mục migration. Luật timestamp (`DB-15`): implementer đặt timestamp thật khi tạo thư mục; trước merge, đổi lại
-timestamp cho đứng sau migration mới nhất trên `dev` và thêm tên thư mục vào `scripts/verify/merged-migrations.txt` (danh
-sách gate `migration-order` đọc; ở `1a77ffe8` danh sách dừng ở `20261028110000_budget_version_detached_at` trong khi
-`prisma/migrations` đã tới `20261101000200_licensing_subscription_renewals` — lát này không sửa danh sách lúc thiết kế).
-`<ts>`/`<ts+1>` dưới đây là chỗ giữ theo đúng luật đó.
+timestamp cho đứng sau migration mới nhất trên `dev` (ở `1a77ffe8`: `20261101000200_licensing_subscription_renewals`). KHÔNG
+sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư mục migration mới xếp sau cùng nên gate `migration-order`
+vẫn xanh); Owner thêm vào danh sách khi phát hành. `<ts>`/`<ts+1>` dưới đây là chỗ giữ theo đúng luật đó.
 
 1. `<ts>_requests_drop_project_label`:
 
@@ -329,6 +333,9 @@ Không áp dụng: xóa đọc/ghi, không thêm khóa; không job nào đọc d
   `accessRequestServiceAccountSubmit`, `accessRequestRenewalSubmit`) và 20 response; L1 `departmentGet` khẳng định không câu
   nào chạm bảng dự án thay cho "giảm một câu"; L2 thứ tự với lát vai (đổi tên file integration) và số operation dùng chung;
   L7 lệnh drift cục bộ; luật timestamp migration, `D-S26`, thứ tự merge W2/W5.
+- 02/11/2026 — sửa theo rà soát pre-flight cuối: quy tắc migration không sửa `scripts/verify/merged-migrations.txt` trên
+  nhánh hạng mục (Owner thêm khi phát hành); số operation ở `openapi-presentation.http-spec.ts:254` (− 4, 301) nêu chuỗi số
+  theo thứ tự merge của cả gói.
 
 Quyết định kỹ thuật (Owner duyệt 01/11/2026):
 

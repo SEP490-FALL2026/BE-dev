@@ -20,8 +20,8 @@
   `qd93-direct-manager-spending-approver-roles` (lát vai sửa `department-manager-and-projects-http.integration-spec.ts`
   theo tên cũ — rebase trước khi `git mv`); phase 2 ở W5, release riêng, chỉ khi image phase 1 đang chạy.
 - Luật timestamp migration (phase 2): đặt timestamp thật khi tạo thư mục (`DB-15`); trước merge đổi lại cho đứng sau
-  migration mới nhất trên `dev` và thêm tên vào `scripts/verify/merged-migrations.txt` (ở `1a77ffe8` danh sách dừng ở
-  `20261028110000` dù `dev` đã có migration mới hơn — không sửa danh sách lúc thiết kế). `<ts>` trong plan chỉ là chỗ giữ
+  migration mới nhất trên `dev`. KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư mục migration mới
+  xếp sau cùng nên gate `migration-order` vẫn xanh); Owner thêm vào danh sách khi phát hành. `<ts>` trong plan chỉ là chỗ giữ
   theo luật này.
 - Kiểm `access_requests.policy` là `jsonb` và cột trạng thái là `"state"` với giá trị nháp `'DRAFT'`
   (`prisma/models/requests.prisma`, `20261029100500_access_request_draft/migration.sql`), không trigger nào chặn `UPDATE`
@@ -125,7 +125,8 @@ gate" vào bảng verification.
   nhận model `@@ignore` vắng khỏi `PRISMA_MODEL_OWNER`; không thì để phase 2), `test/support/api-coverage-manifest.ts:194-197`,
   `test/support/openapi-example-manifest.ts:250-253`, `test/support/openapi-example-route-codes-organization.ts:90-99`,
   `test/http/platform/openapi-read-wording.http-spec.ts` (dòng 15-16, 20, 25, 47-54),
-  `test/http/platform/openapi-presentation.http-spec.ts:254` (số trên `dev` lúc rebase − 4), `test/support/department-harness.ts`
+  `test/http/platform/openapi-presentation.http-spec.ts:254` (số trên `dev` lúc rebase − 4, tức 301 theo thứ tự merge — spec ›
+  Dependencies), `test/support/department-harness.ts`
   (dòng 8, 22, 83-88), `test/integration/requests/request-project-label-retired.integration-spec.ts` (thêm `departmentGet`,
   `departmentUpdate` vào phần `QueryCounter`: không câu nào chạm `projects`, `project_departments`).
 - Depends on: Task 1B.2.

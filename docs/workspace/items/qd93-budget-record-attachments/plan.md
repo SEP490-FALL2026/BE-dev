@@ -19,9 +19,10 @@
   **sau** `qd93-parameter-labels-dashboard-queues`. Lúc nhận và lúc rebase: harness dựng Người duyệt chi và trưởng phòng theo cách
   gán vai trên `dev`; `parameter-definitions.policy.ts` đã có `label` của hạng mục nhãn — chỉ đổi `description` của
   `DOCUMENT_MAX_SIZE_MB`.
-- Quy tắc timestamp migration: mỗi thư mục migration mới mang timestamp thật lúc tạo; trước merge đổi lại timestamp cho lớn hơn
-  migration mới nhất trên `dev` và thêm tên thư mục vào `scripts/verify/merged-migrations.txt` (danh sách gate `migration-order`
-  đọc; đang dừng ở `20261028110000` dù `dev` có migration mới hơn) trong chính lần merge. `<timestamp>` dưới đây theo quy tắc này.
+- Quy tắc timestamp migration: mỗi thư mục migration mới mang timestamp thật lúc tạo; trước merge (sau khi rebase) đổi lại
+  timestamp cho lớn hơn migration mới nhất trên `dev`. KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư
+  mục migration mới xếp sau cùng nên gate `migration-order` vẫn xanh); Owner thêm vào danh sách khi phát hành. `<timestamp>` dưới
+  đây theo quy tắc này.
 - Đọc `AGENTS.md`, `CONTRIBUTING.md`, `test/README.md`, `test/support/README.md`, [module structure](../../../rules/module-structure.md),
   [API contract](../../../rules/api-contract.md) (mục `API-LIST-DETAIL.1`, ví dụ OpenAPI), [database rules](../../../rules/database-business.md),
   [security rules](../../../rules/security-jobs.md), ADR-0014, ADR-0016, ADR-0019 và module card `src/modules/budgets/README.md`.
@@ -113,14 +114,21 @@ accepts, finalScope })` trả `MISSING` (chưa có đối tượng), `MISMATCH` 
 - Files: `src/modules/budgets/attachment/budget-attachment-declaration.service.ts` (khai báo phiên bản; ≤ 7 phụ thuộc),
   `budget-attachment-completion.service.ts` (complete; ≤ 6 phụ thuộc), `budget-attachment-removal.service.ts`,
   `budget-attachment-uploads.controller.ts` (`budgetVersionAttachmentDeclare`, `budgetAttachmentComplete`,
-  `budgetVersionAttachmentRemove`), `src/modules/budgets/version/version-history.service.ts` + `version-history.policy.ts` (+ spec:
-  `attachmentAdded`, `attachmentRemoved` — mọi giá trị là chuỗi, `sizeBytes` dạng text, gỡ có `fileName`),
+  `budgetVersionAttachmentRemove`), `src/modules/budgets/version/version-history.service.ts` + `version-history.policy.ts`
+  (+ spec: `attachmentAdded`, `attachmentRemoved` — mọi giá trị là chuỗi, `sizeBytes` dạng text, gỡ có `fileName`),
   `src/modules/budgets/version/budget-history.dto.ts` (hai `kind` mới), `src/modules/budgets/budgets.module.ts` (import
   `ObjectStorageModule`, provider, controller), `test/support/budget-attachment-harness.ts` (lớp con `BudgetHarness` với
   `FakeObjectStorage`, lời gọi các route), `test/integration/budgets/budget-version-attachments.integration-spec.ts`,
-  `test/http/budgets/budget-attachments.http-spec.ts`, `test/support/api-coverage-manifest.ts`, `test/support/openapi-example-manifest.ts`
-  (tách phần `budgets` nếu vượt 400 dòng — mục _Before coding_), `test/support/openapi-example-route-codes-budgets.ts`, `openapi.json`
-  (sinh).
+  `test/http/budgets/budget-attachments.http-spec.ts`, `test/http/platform/openapi-presentation.http-spec.ts:254` (mỗi task
+  4 → 7 cộng số operation nó thêm; hết Task 7 = số trên `dev` lúc rebase + 10, tức 312 — theo thứ tự merge của gói, từ 306 ở
+  `1a77ffe8`: `qd93-remove-hr-basis-org-writes` 306 → `qd93-remove-in-app-super-admin-transfer` 305 (−1) →
+  `qd93-parameter-labels-dashboard-queues` 305 → `qd93-direct-manager-spending-approver-roles` 305 →
+  `qd93-remove-department-projects` phase 1 301 (−4) → `qd93-remove-fallback-substitute-approvers` phase A 299 (−2) →
+  `qd93-unplaced-employee-first-placement` 300 (+1) → `qd93-code-format-xlsx-employee-import` 300 →
+  `employee-directory-read` 302 (+2) → `qd93-budget-record-attachments` 312 (+10) → `dashboard-request-queues-wiring` 312;
+  mỗi lát đổi số này trên nhánh của mình bằng số trên `dev` lúc rebase cộng/trừ phần của mình (thứ tự đổi thì số trung gian
+  đổi theo)), `test/support/api-coverage-manifest.ts`, `test/support/openapi-example-manifest.ts` (tách phần `budgets` nếu
+  vượt 400 dòng — mục _Before coding_), `test/support/openapi-example-route-codes-budgets.ts`, `openapi.json` (sinh).
 - Depends on: Task 3.
 - Acceptance: các dòng `US-06-09` AC-24, AC-24 từ chối, AC-24 tách import, AC-26, _Gỡ: tệp sai, gỡ lần hai_, _Đua gỡ ↔ gửi/quyết
   phiên bản_, _Kiểm byte / cách ly_, _Đồng thời với gửi phiên bản_, _Giới hạn_ (phiên bản), _Kho không trả lời_ của test matrix
@@ -131,7 +139,7 @@ accepts, finalScope })` trả `MISSING` (chưa có đối tượng), `MISMATCH` 
   `budget-attachments.http-spec.ts` trước →
   `pnpm test:integration -- test/integration/budgets/budget-version-attachments.integration-spec.ts` đỏ (404 route) → implement →
   xanh; `pnpm test -- src/modules/budgets/version/version-history.policy.spec.ts` xanh;
-  `pnpm test:http -- test/http/budgets/budget-attachments.http-spec.ts test/http/platform/api-inventory.http-spec.ts` xanh;
+  `pnpm test:http -- test/http/budgets/budget-attachments.http-spec.ts test/http/platform/api-inventory.http-spec.ts test/http/platform/openapi-presentation.http-spec.ts` xanh;
   `pnpm openapi:export` rồi `pnpm test:http -- test/http/platform/openapi-export.http-spec.ts` xanh; hồi quy
   `pnpm test:integration -- test/integration/requests/budget-versions.integration-spec.ts test/integration/budgets/budget-version-history.integration-spec.ts`
   xanh.
@@ -207,7 +215,7 @@ xanh; tự review diff theo AC-14, AC-16, AC-24, AC-26 và thứ tự khóa spec
   xóa sau commit; audit `DISCARDED`; người khác 404.
 - Verify: ca viết trước →
   `pnpm test:integration -- test/integration/budgets/budget-proposal-attachments.integration-spec.ts` đỏ → xanh;
-  `pnpm test:http -- test/http/budgets/budget-attachments.http-spec.ts test/http/platform/api-inventory.http-spec.ts` xanh.
+  `pnpm test:http -- test/http/budgets/budget-attachments.http-spec.ts test/http/platform/api-inventory.http-spec.ts test/http/platform/openapi-presentation.http-spec.ts` xanh (số operation = số trên `dev` lúc rebase + 10).
 
 ### Task 8: Sweeper hết hạn tệp chưa tải lên hoặc chưa gửi
 
@@ -234,20 +242,23 @@ xanh; `pnpm openapi:export` không diff; tự review diff theo bảng người x
 ### Task 9: Tệp mẫu cho FE sinh bằng script và test giữ chúng khớp server
 
 - **Owner cho phép 01/11/2026** (`GATE-EOL=A` ở `.gitattributes`): thêm dòng `docs/examples/budget-attachments/files/** -text` để Git không
-  đổi xuống dòng của PDF nhỏ/CSV/TXT không có byte `00` khi `core.autocrlf=true`. Owner đồng ý ⟹ commit tệp sinh; không đồng ý ⟹
-  không commit tệp nhị phân, README hướng dẫn chạy lệnh sinh, test chạy trên byte của bộ dựng. Ghi câu trả lời vào spec
-  `## Changes and acceptance`.
+  đổi xuống dòng của PDF nhỏ/CSV/TXT không có byte `00` khi `core.autocrlf=true`, rồi commit tệp sinh cùng `manifest.json`.
 - Files: `test/support/budget-attachment-samples.ts` (bộ dựng byte tất định, ≤ 400 dòng, không dependency mới),
-  `scripts/dev/write-budget-attachment-samples.ts` (ghi tệp; chạy như `scripts/dev/export-openapi.ts`), `scripts/README.md` (dòng
-  lệnh), `.gitattributes` (chỉ khi Owner đồng ý), `docs/examples/budget-attachments/README.md`,
+  `scripts/dev/write-budget-attachment-samples.ts` (ghi tệp và `manifest.json`; `--check` dựng lại byte trong bộ nhớ, so
+  `sizeBytes`/`sha256` từng tệp với `manifest.json` đã commit và với tệp trên đĩa, exit 1 khi lệch/thiếu/thừa, không ghi gì;
+  chạy bằng `ts-node` như `scripts/dev/export-openapi.ts`), `scripts/README.md` (dòng lệnh), `.gitattributes` (dòng `-text` —
+  Owner cho phép 01/11/2026), `docs/examples/budget-attachments/README.md`,
   `docs/examples/budget-attachments/manifest.json`, `docs/examples/budget-attachments/files/*` (mười tệp của spec mục 14),
   `test/integration/budgets/budget-attachment-samples.integration-spec.ts`.
 - Depends on: Task 6.
 - Acceptance: mỗi tệp đúng nội dung/kỳ vọng spec mục 14 và sinh lại được từng byte; `manifest.json` ghim `sizeBytes`/`sha256` của
   mọi tệp kể cả CSV; README nêu lệnh sinh lại, luồng gọi, bảng kỳ vọng, ca không cần tệp và cách tạo tệp quá cỡ tại máy; test xanh;
   không dữ liệu thật hay tên người thật.
-- Verify: chạy lệnh sinh hai lần, `git status --porcelain docs/examples/budget-attachments` không đổi ở lần hai;
-  `git check-attr text -- docs/examples/budget-attachments/files/nhu-cau-2027.csv` in `unset` (khi có dòng `-text`);
+- Verify: `pnpm exec ts-node scripts/dev/write-budget-attachment-samples.ts` một lần, rồi
+  `pnpm exec ts-node scripts/dev/write-budget-attachment-samples.ts --check` hai lần → exit 0 cả hai (`sha256` từng tệp khớp
+  `manifest.json` đã commit); sửa một byte của một tệp ⟹ `--check` exit 1 (thử rồi khôi phục); không dùng
+  `git status --porcelain`/`git diff --exit-code` làm bằng chứng (tệp mới chưa được Git theo dõi thì hai lệnh đó không thấy gì);
+  `git check-attr text -- docs/examples/budget-attachments/files/nhu-cau-2027.csv` in `unset`;
   `pnpm test:integration -- test/integration/budgets/budget-attachment-samples.integration-spec.ts` xanh.
 
 ### Task 10: Tài liệu vận hành, mô tả tham số, tài liệu sinh
@@ -292,6 +303,7 @@ Chạy từ gốc BE theo CONTRIBUTING.md và test/README.md. Không ghi URL ký
 - [ ] Diff cuối đã tự review; tài liệu vận hành (module card, ADR-0014 bổ sung, security-jobs, scripts README) đã cập nhật; phần
       chưa kiểm chứng ghi rõ.
 - [ ] Trước merge: rebase lên `dev` sau `qd93-remove-fallback-substitute-approvers` phase A và `qd93-parameter-labels-dashboard-queues`;
-      đổi lại timestamp hai migration và thêm vào `scripts/verify/merged-migrations.txt`.
+      đổi lại timestamp hai migration cho lớn hơn migration mới nhất trên `dev`; không sửa `scripts/verify/merged-migrations.txt`
+      (Owner thêm khi phát hành).
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau đúng sự kiện
       thật.

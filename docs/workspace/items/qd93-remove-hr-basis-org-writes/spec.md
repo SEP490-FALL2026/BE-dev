@@ -66,9 +66,13 @@ hạn thật và chức năng phòng quá dài không còn trả `DEPARTMENT.NAM
 | US-03-06 | AC-1, AC-22                             | partial  | AC-22 vế đã giao: `g2-department-profile`; AC-25: `qd93-code-format-xlsx-employee-import`; AC khác: `g2-department-profile`, `g2-g4-unit-only-cost-attribution`                                                                                                                                                                                |
 | US-01-11 | AC-7                                    | partial  | AC-1→AC-6, AC-8→AC-10: `g4-provisioning-queue-manual`, `g2-department-profile` (giao trước GOV.1)                                                                                                                                                                                                                                              |
 
-Mỗi AC ở cột 2 sở hữu ở đây **vế `QĐ-93f`** (không thu, không lưu căn cứ; Audit Trail vẫn đủ) và test của vế giữ căn cứ
-cho sự kiện nhân sự (`US-02-02` AC-16, `US-03-06` AC-22 vế sau). Dòng nào cũng `partial` vì Story có AC khác ở hạng mục
-khác. Các dòng tương ứng đã có trong scope map G2 của roadmap (xem `## Changes and acceptance`).
+Bốn khóa `US-02-02` AC-10, `US-02-04` AC-4, `US-03-06` AC-1, `US-01-11` AC-7 là `full` của lát này trong scope map (trước
+đó `not affected` — giao ở lát legacy không có bảng Primary; AC viết lại theo `QĐ-93f`): lát này kiểm **trọn** AC viết lại —
+vế bỏ căn cứ bằng test mới, phần còn lại của AC (phòng một cấp chưa Cost Center và cảnh báo bước 1; tác vụ mới về IT Admin
+mới; so sáu cột khi import lại) bằng test đã có chạy lại trong lát này, nêu tên ở `## Test matrix`. Các AC còn lại ở cột 2
+sở hữu ở đây **vế `QĐ-93f`** (không thu, không lưu căn cứ; Audit Trail vẫn đủ) và test của vế giữ căn cứ cho sự kiện nhân sự
+(`US-02-02` AC-16, `US-03-06` AC-22 vế sau). Dòng nào cũng `partial` vì Story có AC khác ở hạng mục khác. Các dòng tương ứng
+đã có trong scope map G2 của roadmap (xem `## Changes and acceptance`).
 
 ## Supporting references
 
@@ -105,8 +109,9 @@ khác. Các dòng tương ứng đã có trong scope map G2 của roadmap (xem `
 ## Dependencies and blockers
 
 - Không cần migration (căn cứ chỉ nằm trong `audit_events.after` JSON, không có cột). Nếu implement phát sinh migration thì
-  theo luật timestamp của đợt sửa: timestamp thật khi tạo, đổi lại cho đứng sau migration mới nhất trên `dev` trước merge
-  và thêm vào `scripts/verify/merged-migrations.txt`.
+  theo luật timestamp của đợt sửa: timestamp thật khi tạo, đổi lại cho đứng sau migration mới nhất trên `dev` trước merge;
+  KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư mục migration mới xếp sau cùng nên gate
+  `migration-order` vẫn xanh); Owner thêm vào danh sách khi phát hành.
 - Thứ tự merge (Owner 01/11/2026, đợt sửa sau audit; mỗi lần một lát, rebase lên `dev` trước khi merge): lát này merge
   **đầu tiên** ở W1, trước `qd93-remove-in-app-super-admin-transfer` và `qd93-parameter-labels-dashboard-queues`.
   - `qd93-remove-in-app-super-admin-transfer` (W1, sau lát này) xóa
@@ -226,10 +231,13 @@ audit mới không có — consumer Audit Trail (`GET /audit-events`) trả `aft
 | AC / rủi ro                                      | Tình huống (gồm từ chối, edge case)                                                                                  | Cấp test         | Kết quả mong đợi                                                                                    | Bằng chứng sau implement |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------- | ------------------------ |
 | `US-03-06` AC-1, `US-02-04` AC-4                 | Super Admin `POST /departments` không `hrBasis`                                                                      | integration      | 201; audit `DEPARTMENT.CREATED` `after` không có `hrBasis`, có actor/thời điểm/giá trị sau          | planned                  |
+| `US-03-06` AC-1, `US-02-04` AC-4 phần còn lại    | phòng vừa tạo không Cost Center; bước 1 cảnh báo tới khi Finance tạo Cost Center `Unit` (chạy lại, không sửa)        | integration      | phòng một cấp, chưa Cost Center; cảnh báo rồi hết (`department-profile-http`, `onboarding-http`)    | planned                  |
 | `US-03-06` AC-22                                 | update, deactivate (body `{}`/vắng), head-assign, head-vacate, successor-designate, successor-clear không căn cứ     | integration      | thành công; audit trước/sau đủ, không `hrBasis`                                                     | planned                  |
 | `US-03-06` AC-22 vế báo                          | head-assign hiệu lực hôm nay và head-vacate không căn cứ, phòng có một Request đang ở bước nhu cầu                   | integration      | có `organization_change_announcements` `HEAD_PERIOD_START`/`HEAD_PERIOD_END`; bước chuyển người mới | planned                  |
 | `US-03-06` AC-22 không đổi gì                    | `PATCH` `{}` hoặc giá trị như cũ; deactivate phòng đã ngừng; successor-clear khi không có kế nhiệm                   | integration      | 200/204 như hiện có; không thêm dòng `audit_events`                                                 | planned                  |
 | `US-01-11` AC-7                                  | `PATCH /departments/{id}` đổi `itAdminEmployeeId` A1 → A3 không căn cứ                                               | integration      | 200; audit `DEPARTMENT.UPDATED` `before/after.itAdminEmployeeId`; tác vụ mới giao A3 (test có sẵn)  | planned                  |
+| `US-01-11` AC-7 phần còn lại                     | tác vụ tạo sau khi đổi về A3, tác vụ cũ giữ người cũ (chạy lại `provisioning-queue-http` dòng 290)                   | integration      | xanh, không sửa khẳng định                                                                          | planned                  |
+| `US-02-02` AC-10 phần còn lại                    | import lại `E1` khác họ tên/chức vụ; giống sáu cột; hai dòng trùng email (chạy lại `employee-import-preview-http`)   | integration      | _có khác biệt_, không ghi; _trùng, bỏ qua_; dòng sau lỗi email trùng                                | planned                  |
 | `US-02-02` AC-14                                 | `POST /employees` không `hrBasis`                                                                                    | integration      | 201; audit `EMPLOYEE.CREATED` không `hrBasis`; thông báo `H1`, `IT1` như cũ                         | planned                  |
 | `US-02-02` AC-19                                 | `PATCH /employees/{id}` sửa họ tên + chức vụ không căn cứ                                                            | integration      | 200; audit trước/sau; `E1` (có tài khoản) và trưởng phòng nhận `EMPLOYEE_PROFILE_UPDATED`           | planned                  |
 | `US-02-02` AC-1, AC-10, AC-13, AC-16             | xác nhận import `{ previewVersion, idempotencyKey }` không căn cứ                                                    | integration      | ghi đúng số dòng; audit `EMPLOYEE_IMPORT.CONFIRMED` và từng `EMPLOYEE.CREATED` không `hrBasis`      | planned                  |
@@ -245,8 +253,9 @@ audit mới không có — consumer Audit Trail (`GET /audit-events`) trả `aft
 
 ## Definition of Done
 
-- [ ] Mọi primary AC (vế `QĐ-93f`) có test đỏ-trước/xanh-sau ở cấp phù hợp; vế giữ căn cứ của sự kiện nhân sự có test
-      chạy lại xanh.
+- [ ] Mọi primary AC (vế `QĐ-93f`) có test đỏ-trước/xanh-sau ở cấp phù hợp; bốn khóa `full` có thêm bằng chứng phần còn
+      lại của AC (test có sẵn chạy lại xanh, tên ca ghi ở bảng verification); vế giữ căn cứ của sự kiện nhân sự có test chạy
+      lại xanh.
 - [ ] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; `pnpm test:http` theo file đã
       sửa, `pnpm openapi:export` (diff `openapi.json` chỉ ở 10 operation + `API-DOC-F05`), `pnpm arch:docs:check`;
       integration theo file (danh sách ở checkpoint của plan). Toàn bộ `pnpm test:integration`,
@@ -268,6 +277,11 @@ audit mới không có — consumer Audit Trail (`GET /audit-events`) trả `aft
   timing/e2e/toàn bộ integration là "hỏi Owner" (`D-S26`); L5 chuẩn hóa NFC trong schema, schema là giới hạn thật; L6 audit
   chỉ ghi khi có thay đổi, thêm ca vế báo của `US-03-06` AC-22, hai phase cùng một release; thứ tự merge (đầu tiên ở W1, lát
   vai và lát dự án rebase lên lát này).
+- 02/11/2026 — sửa theo rà soát pre-flight cuối (thiết kế vẫn `draft`): quy tắc migration không sửa
+  `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (Owner thêm khi phát hành); Task 2.3 thêm
+  `department-harness.ts:157` và `provisioning-harness.ts:169` (còn gửi `hrBasis` cho đường nhân viên); bốn khóa `full`
+  (`US-02-02` AC-10, `US-02-04` AC-4, `US-03-06` AC-1, `US-01-11` AC-7) nêu rõ lát này kiểm trọn AC và tên test chứng minh
+  phần còn lại — giữ `full` vì scope map không cho `partial` khi chủ phần đã giao không claim khóa.
 
 Dòng scope map G2 của lát này (đã chép vào scope map G2 của roadmap; spec không tự sửa roadmap):
 
@@ -283,4 +297,8 @@ Dòng scope map G2 của lát này (đã chép vào scope map G2 của roadmap; 
 - `US-02-02` AC-19: `partial`, Owner `g2-employee-official-field-maintenance`, Remaining owner lát này.
 - `US-02-03` AC-7: `partial`, Owner `g2-department-profile`, Remaining owner lát này.
 - `US-02-04` AC-4, `US-03-06` AC-1, `US-01-11` AC-7: `full`, Owner lát này (tách khỏi dòng `not affected` hiện có).
+- Bốn khóa `full` ở trên (gồm `US-02-02` AC-10): lát này kiểm trọn AC viết lại (vế bỏ căn cứ bằng test mới, phần còn lại bằng
+  test có sẵn chạy lại — `## Test matrix`). Không ghi được `partial` với chủ phần đã giao (`g2-department-profile`,
+  `g2-onboarding-checklist`, `g2-employee-import-preview-confirm`): spec của chúng không claim các khóa này và
+  `pnpm rules:check` đòi mọi chủ của dòng `partial` claim khóa (đã thử 02/11/2026 — 4 lỗi).
 - `US-03-06` AC-22: `partial`, Owner `g2-department-profile`, Remaining owner lát này.

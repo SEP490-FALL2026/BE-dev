@@ -15,12 +15,15 @@
   `pnpm test:integration`, `pnpm test:e2e` hoặc `pnpm test:integration:timing`. (Trong plan: unit `pnpm test -- <đường dẫn>`,
   integration `pnpm test:integration -- <file>`, HTTP contract `pnpm test:http -- <file>`; chạy cả thư mục integration là chạy
   hàng loạt — hỏi Owner trước.)
-- Thứ tự merge: hạng mục này là W1, không chờ hạng mục `QĐ-93` nào; rebase lên `dev` trước khi mở PR và trước merge.
+- Thứ tự merge: hạng mục này là W1 và merge **sau** `qd93-remove-hr-basis-org-writes` (lát đó sửa
+  `test/integration/identity-access/super-admin-transfer-http.integration-spec.ts` mà Task 2 xóa); không phụ thuộc chức năng
+  vào hạng mục `QĐ-93` nào; rebase lên `dev` trước khi mở PR và trước merge.
   `qd93-direct-manager-spending-approver-roles` (W2) merge sau và rebase lên hạng mục này (danh sách file chung ở spec ›
   _Dependencies and blockers_).
-- Migration: thư mục mới lấy timestamp UTC thật lúc tạo; trước merge đặt lại timestamp sau migration mới nhất trên `dev` và
-  thêm tên thư mục vào `scripts/verify/merged-migrations.txt` (gate `test/gates/migration-order.gate-spec.ts`; danh sách hiện
-  dừng ở `20261028110000_budget_version_detached_at`, không sửa lúc thiết kế). `<ts>` trong plan theo quy tắc này.
+- Migration: thư mục mới lấy timestamp UTC thật lúc tạo; trước merge đặt lại timestamp sau migration mới nhất trên `dev`.
+  KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư mục migration mới xếp sau cùng nên gate
+  `test/gates/migration-order.gate-spec.ts` vẫn xanh); Owner thêm vào danh sách khi phát hành. `<ts>` trong plan theo quy tắc
+  này.
 - Đối chiếu với BE hiện tại: `src/modules/identity-access/accounts/super-admin-transfers/*`,
   `src/modules/identity-access/public/{role-transfer-recovery.api.ts,recovery.errors.ts}`,
   `src/modules/identity-access/recovery/{successor-enrolment.service.ts,recovery-targets.service.ts,recovery-procedure.policy.ts}`,
@@ -57,13 +60,23 @@
 
 - Files: xóa `src/modules/identity-access/accounts/super-admin-transfers/` (4 file); sửa `identity-access.module.ts` (gỡ
   controller, `SuperAdminTransferService`, và hai provider chết `SuccessorEligibility`,
-  `{ provide: APPROVAL_ROLE_HOLDINGS, … }` ở dòng 83-85 — grep lại trước khi gỡ: `grep -rn "SuccessorEligibility\|APPROVAL_ROLE_HOLDINGS" src`),
-  `test/gates/module-graph.gate-spec.ts` (bỏ hai tên khỏi `DECLARED_FOR_API_AND_RECOVERY`),
-  `accounts/account.errors.ts`, `accounts/account.http-errors.ts` (gỡ `SUPER_ADMIN_TRANSFER.*`, `SuperAdminTransferProblem`, đổi
-  `message` của `SUPER_ADMIN_TRANSFER_ONLY`); xóa `test/http/identity-access/super-admin-transfer.http-spec.ts`,
+  `{ provide: APPROVAL_ROLE_HOLDINGS, … }` ở dòng 83-85 — grep lại trước khi gỡ:
+  `grep -rn "SuccessorEligibility\|APPROVAL_ROLE_HOLDINGS" src`), `test/gates/module-graph.gate-spec.ts` (bỏ hai tên khỏi
+  `DECLARED_FOR_API_AND_RECOVERY`), `accounts/account.errors.ts`, `accounts/account.http-errors.ts` (gỡ
+  `SUPER_ADMIN_TRANSFER.*`, `SuperAdminTransferProblem`, đổi `message` của `SUPER_ADMIN_TRANSFER_ONLY`); xóa
+  `test/http/identity-access/super-admin-transfer.http-spec.ts`,
   `test/integration/identity-access/super-admin-transfer-http.integration-spec.ts`; thêm
-  `test/integration/identity-access/super-admin-transfer-removed.integration-spec.ts`; sửa `test/support/api-coverage-manifest.ts`,
-  `test/support/openapi-example-manifest.ts`, `test/support/openapi-example-route-codes-identity-access.ts`.
+  `test/integration/identity-access/super-admin-transfer-removed.integration-spec.ts`; sửa
+  `test/support/api-coverage-manifest.ts`, `test/support/openapi-example-manifest.ts`,
+  `test/support/openapi-example-route-codes-identity-access.ts`, `test/http/platform/openapi-presentation.http-spec.ts:254`
+  (`toHaveLength(306)` → số trên `dev` lúc rebase − 1, tức 305; theo thứ tự merge của gói, từ 306 ở `1a77ffe8`:
+  `qd93-remove-hr-basis-org-writes` 306 → `qd93-remove-in-app-super-admin-transfer` 305 (−1) →
+  `qd93-parameter-labels-dashboard-queues` 305 → `qd93-direct-manager-spending-approver-roles` 305 →
+  `qd93-remove-department-projects` phase 1 301 (−4) → `qd93-remove-fallback-substitute-approvers` phase A 299 (−2) →
+  `qd93-unplaced-employee-first-placement` 300 (+1) → `qd93-code-format-xlsx-employee-import` 300 →
+  `employee-directory-read` 302 (+2) → `qd93-budget-record-attachments` 312 (+10) → `dashboard-request-queues-wiring` 312;
+  mỗi lát đổi số này trên nhánh của mình bằng số trên `dev` lúc rebase cộng/trừ phần của mình (thứ tự đổi thì số trung gian
+  đổi theo)).
 - Depends on: Task 1 (đường thay thế có trước khi gỡ đường cũ).
 - Acceptance: `US-01-09` AC-6, AC-7, `US-01-01` AC-13; `successor-eligibility.service.ts` vẫn được
   `IdentityAccessRecoveryCliModule` dùng; `IdentityAccessModule` không còn provider chết. Nhiều file vì gỡ một capability và các

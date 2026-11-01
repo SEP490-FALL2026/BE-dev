@@ -63,13 +63,23 @@ PostgreSQL riêng và inventory OpenAPI.
 ## Dependencies and blockers
 
 - Thứ tự merge (wave `QĐ-93`, mỗi lần một hạng mục, rebase lên `dev` trước merge): hạng mục này thuộc **W1** (cùng
-  `qd93-remove-hr-basis-org-writes`, `qd93-parameter-labels-dashboard-queues`), không phụ thuộc hạng mục `QĐ-93` nào.
+  `qd93-remove-hr-basis-org-writes`, `qd93-parameter-labels-dashboard-queues`), không phụ thuộc chức năng vào hạng mục
+  `QĐ-93` nào; theo thứ tự W1 merge **sau** `qd93-remove-hr-basis-org-writes` (lát đó sửa
+  `test/integration/identity-access/super-admin-transfer-http.integration-spec.ts` mà lát này xóa — rebase lên nó rồi xóa).
   `qd93-direct-manager-spending-approver-roles` (W2) merge **sau** hạng mục này và rebase lên nó: cùng sửa
   `src/modules/identity-access/accounts/account.errors.ts`, `account.http-errors.ts`, `identity-access.module.ts`,
   `successor-eligibility.service.ts`, `public/recovery.errors.ts`, `test/gates/module-graph.gate-spec.ts`,
-  `test/integration/identity-access/super-admin-recovery-role.integration-spec.ts`. Vì route trong ứng dụng đã gỡ ở đây, hạng
-  mục vai không phải thêm `MANAGER_HELD` vào ánh xạ `SUPER_ADMIN_TRANSFER.*`; nó khai lại binding `APPROVAL_ROLE_HOLDINGS` của
-  `IdentityAccessModule` nếu cần (spec của nó, luật #9a).
+  `test/integration/identity-access/super-admin-recovery-role.integration-spec.ts`. Vì route trong ứng dụng đã gỡ ở đây,
+  hạng mục vai không phải thêm `MANAGER_HELD` vào ánh xạ `SUPER_ADMIN_TRANSFER.*`; nó khai lại binding
+  `APPROVAL_ROLE_HOLDINGS` của `IdentityAccessModule` nếu cần (spec của nó, luật #9a).
+- Số operation ở `test/http/platform/openapi-presentation.http-spec.ts:254`: lát này −1 (305); theo thứ tự merge của gói, từ
+  306 ở `1a77ffe8`: `qd93-remove-hr-basis-org-writes` 306 → `qd93-remove-in-app-super-admin-transfer` 305 (−1) →
+  `qd93-parameter-labels-dashboard-queues` 305 → `qd93-direct-manager-spending-approver-roles` 305 →
+  `qd93-remove-department-projects` phase 1 301 (−4) → `qd93-remove-fallback-substitute-approvers` phase A 299 (−2) →
+  `qd93-unplaced-employee-first-placement` 300 (+1) → `qd93-code-format-xlsx-employee-import` 300 →
+  `employee-directory-read` 302 (+2) → `qd93-budget-record-attachments` 312 (+10) → `dashboard-request-queues-wiring` 312;
+  mỗi lát đổi số này trên nhánh của mình bằng số trên `dev` lúc rebase cộng/trừ phần của mình (thứ tự đổi thì số trung gian
+  đổi theo).
 - OD-1 → OD-3 đã được Owner duyệt 01/11/2026 (`## Behavior and design` › _Quyết định kỹ thuật_); không còn chặn `ready` về
   phía OD — vẫn chờ Owner review toàn spec.
 
@@ -145,9 +155,9 @@ khoản nào được tạo"_ (tài khoản của người nhận do Super Admin
 
 Một migration (OD-2): `…_identity_app_user_employee_immutable` — một hàm + trigger; rollback `DROP TRIGGER`/`DROP FUNCTION`.
 Quy tắc timestamp (chung cho mọi hạng mục `QĐ-93`): `…` là timestamp UTC thật lúc implementer tạo thư mục; trước merge đặt lại
-timestamp sau migration mới nhất trên `dev` và thêm tên thư mục vào `scripts/verify/merged-migrations.txt` (gate
-`test/gates/migration-order.gate-spec.ts`; danh sách hiện dừng ở `20261028110000_budget_version_detached_at` dù `dev` có
-migration mới hơn — không sửa lúc thiết kế).
+timestamp sau migration mới nhất trên `dev`. KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư mục
+migration mới xếp sau cùng nên gate `test/gates/migration-order.gate-spec.ts` vẫn xanh); Owner thêm vào danh sách khi phát
+hành.
 
 ### Quyết định kỹ thuật (Owner duyệt 01/11/2026)
 
@@ -204,3 +214,6 @@ Job/queue/storage, collection `GET`: không áp dụng.
   người vận hành đã có sẵn và thêm `APPROVER_IS_HOLDER` để giữ đúng OD-3; gỡ hai provider chết `SuccessorEligibility`,
   `APPROVAL_ROLE_HOLDINGS` khỏi `IdentityAccessModule` + gate `module-graph`; thứ tự merge W1 (trước hạng mục vai), quy tắc
   timestamp migration, `D-S26`. Thiết kế vẫn `draft`.
+- 02/11/2026 — sửa theo rà soát pre-flight cuối: quy tắc migration không sửa `scripts/verify/merged-migrations.txt` trên
+  nhánh hạng mục (Owner thêm khi phát hành); thứ tự merge ghi khớp roadmap (W1, sau `qd93-remove-hr-basis-org-writes`);
+  Task 2 sửa số operation ở `openapi-presentation.http-spec.ts:254` (306 → 305) và nêu chuỗi số theo thứ tự merge.

@@ -11,18 +11,22 @@
 - Đọc `AGENTS.md`, `CONTRIBUTING.md`, [module structure](../../../rules/module-structure.md),
   [API contract](../../../rules/api-contract.md), [database](../../../rules/database-business.md),
   [lệnh vận hành](../../../rules/operational-commands.md), [test guide](../../../../test/README.md) và spec này.
-- Quyền chạy test (Owner 01/11/2026, `D-S26`): được tự chạy `pnpm typecheck`/`pnpm lint`/`pnpm arch:check`/`pnpm rules:check`,
-  unit test và integration test **theo file đã sửa**, và `pnpm check`; **phải hỏi Owner trước** khi chạy toàn bộ
-  `pnpm test:integration`, `pnpm test:e2e` hoặc `pnpm test:integration:timing`. (Trong plan: unit `pnpm test -- <đường dẫn>`,
-  integration `pnpm test:integration -- <file>`, suite serial `pnpm test:integration:serial -- <file>`, HTTP contract
-  `pnpm test:http -- <file>`; mọi lệnh `pnpm test:e2e` và mọi lần chạy cả thư mục/cả bộ integration đều hỏi Owner trước.)
+- Quyền chạy test (Owner 01/11/2026, `D-S26`): được tự chạy
+  `pnpm typecheck`/`pnpm lint`/`pnpm arch:check`/`pnpm rules:check`, unit test và integration test **theo file đã sửa**, và
+  `pnpm check`; **phải hỏi Owner trước** khi chạy toàn bộ `pnpm test:integration`, `pnpm test:e2e` hoặc
+  `pnpm test:integration:timing`. (Trong plan: unit `pnpm test -- <đường dẫn>`, integration
+  `pnpm test:integration -- <file>`, suite serial `pnpm test:integration:serial -- <file>`, HTTP contract
+  `pnpm test:http -- <file>`; mọi lệnh `pnpm test:e2e` đều hỏi Owner trước.) Chạy cả thư mục (ví dụ
+  `pnpm test:integration -- test/integration/requests`) là chạy hàng loạt, tính như toàn bộ bộ ⟹ hỏi Owner trước; ngoài ra
+  chỉ chạy theo file.
 - Thứ tự merge (spec › _Dependencies and blockers_): hạng mục này là W2 — bắt đầu code sau khi `qd93-remove-hr-basis-org-writes`
   và `qd93-remove-in-app-super-admin-transfer` đã vào `dev`; rebase lên `dev` trước khi mở PR và trước merge. Sau hr-basis,
   helper và ca test không gửi `hrBasis` cho route phòng ban. Hạng mục này phát hành **cùng** `qd93-remove-fallback-substitute-approvers`
   phase A.
-- Migration: mỗi thư mục mới lấy timestamp UTC thật lúc tạo; trước merge đặt lại timestamp sau migration mới nhất trên `dev`
-  và thêm tên thư mục vào `scripts/verify/merged-migrations.txt` (gate `test/gates/migration-order.gate-spec.ts`; danh sách
-  hiện dừng ở `20261028110000_budget_version_detached_at`, không sửa lúc thiết kế). `<ts>` trong plan theo quy tắc này.
+- Migration: mỗi thư mục mới lấy timestamp UTC thật lúc tạo; trước merge đặt lại timestamp sau migration mới nhất trên `dev`.
+  KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư mục migration mới xếp sau cùng nên gate
+  `test/gates/migration-order.gate-spec.ts` vẫn xanh); Owner thêm vào danh sách khi phát hành. `<ts>` trong plan theo quy tắc
+  này.
 - Đối chiếu spec với code ở `dev` lúc bắt đầu (BE `1a77ffe8` lúc thiết kế — nếu khác, ghi khoảng cách vào
   `## Changes and acceptance` của spec trước khi code): `prisma/models/identity-access.prisma`, migration
   `20261012092516_identity_foundation`, `20261012140000_account_invitation`, `20261016170000_approval_role_holders`,
@@ -419,12 +423,17 @@ của mọi spec dựng trưởng phòng/Người duyệt chi mà không sửa f
   `APP_USER.ROLE_DERIVED` đã gỡ ở Task 6a), `test/support/openapi-example-route-codes-organization.ts`,
   `test/support/api-collection-registry.ts` và `test/support/api-collection-registry-nested.ts` (đã đổi ở Task 7: ba khóa
   `meGet#roles.direct|derived|effective` thành một khóa `meGet#roles`; ở đây chốt `businessMaximum` theo `ROLE_GRANTS` và ma trận
-  #4),
+  #4), **viết lại chuỗi nguồn `ROLE_GRANTS`** ở `test/support/api-collection-registry.ts:124` ("AppRole has 4 values and the
+  unique index role_grants_one_effective_per_role allows one effective grant per role" → "AppRole has 6 values …") cùng
+  `maxItems` của các khóa vai dùng nó (`meGet#roles`, `appUserList#roles`, `appUserGet#roles`, `auditEventList#actorRoles` ở
+  `api-collection-registry-nested{,-first-half}.ts`) — `employee-directory-read` (W4) dừng nếu chuỗi trên `dev` còn
+  "4 values",
   `docs/generated/routes.md` (`pnpm arch:routes`), `src/modules/identity-access/README.md`, `src/modules/organization/README.md`,
   `src/modules/personnel/README.md` (người kế nhiệm), ghi chú _superseded_ ở spec `g2-approval-roles`,
   `us-01-account-invitation-activation`, `us-01-bootstrap-login-session`.
 - Depends on: Task 5 → Task 14.
-- Acceptance: ví dụ lỗi mới có trong OpenAPI, `ROLE_DERIVED` biến mất; `MeResponseDto` có `roles` là mảng enum `AppRole` và
+- Acceptance: `ROLE_GRANTS` nói sáu giá trị và gate `api-collection-contract` xanh; ví dụ lỗi mới có trong OpenAPI,
+  `ROLE_DERIVED` biến mất; `MeResponseDto` có `roles` là mảng enum `AppRole` và
   `managerScope` nullable; danh sách contract FE ở spec khớp diff `openapi.json`; báo FE thay đổi phá vỡ của `/me`.
 - Verify: `pnpm openapi:export` rồi `pnpm test:http -- test/http/platform`; `pnpm test:gates -- test/gates/api-collection-contract.gate-spec.ts`;
   `pnpm arch:docs:check`.

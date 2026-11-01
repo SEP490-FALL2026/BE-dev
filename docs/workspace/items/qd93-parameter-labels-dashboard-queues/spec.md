@@ -88,8 +88,9 @@ nghiệp vụ). Không AC nào của `US-01-04` đổi chữ ở Docs `69e8a3d`.
 - Thứ tự merge (lượt `QĐ-93`, sóng W1; merge từng hạng mục một, rebase lên `dev` ngay trước khi merge): hạng mục này ở W1 cùng
   `qd93-remove-hr-basis-org-writes` và `qd93-remove-in-app-super-admin-transfer`, không chờ hạng mục nào.
   `qd93-budget-record-attachments` (W4) merge **sau** và rebase lên hạng mục này.
-- Migration: không có. Nếu implementation buộc phải thêm, áp quy tắc timestamp chung của lượt: timestamp thật lúc tạo, đổi lại cho
-  lớn hơn migration mới nhất trên `dev` trước merge và thêm vào `scripts/verify/merged-migrations.txt` trong lần merge.
+- Migration: không có. Nếu implementation buộc phải thêm, áp quy tắc timestamp chung của lượt: timestamp thật lúc tạo, đổi
+  lại cho lớn hơn migration mới nhất trên `dev` trước merge; KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh
+  hạng mục (thư mục migration mới xếp sau cùng nên gate `migration-order` vẫn xanh); Owner thêm vào danh sách khi phát hành.
 - **Khóa registry mới** (Owner duyệt 01/11/2026): gate `api-collection-contract` chỉ cho thêm mảng lồng khi có quyết định Owner
   (`INITIAL_NESTED_ARRAYS` đóng băng, mỗi khác biệt là một sự kiện ở `REGISTRY_EVENTS_SINCE_INITIAL`). `constraints` có kiểu làm lộ
   mảng `options` của dạng `enum` ⟹ khóa `operatingParameterList#constraints.options`, `bounded`, `maxItems` = `ENUM_OPTIONS_MAX`
@@ -318,3 +319,5 @@ Transaction, khóa, migration, job, storage, audit: không áp dụng (chỉ đ�
   "nếu gate đòi sự kiện cho (i)" — gate không đòi; ghi việc tiếp theo cho hai luật xuyên tham số `constraints` không diễn tả
   (out of scope); ghi rõ tên thư mục là lịch sử ở đầu spec; thứ tự merge W1 và quy tắc migration; plan thêm dòng quyền chạy test
   `D-S26`.
+- 02/11/2026 — sửa theo rà soát pre-flight cuối: quy tắc migration không sửa `scripts/verify/merged-migrations.txt`;
+  câu `D-S26` của plan nói rõ chạy cả thư mục là chạy hàng loạt (hỏi Owner).

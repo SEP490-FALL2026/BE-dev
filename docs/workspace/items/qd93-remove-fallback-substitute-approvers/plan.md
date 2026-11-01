@@ -25,10 +25,9 @@
   tiêm service đó), `getApprovalRoleHolders()` đọc grant, lệnh thu hồi `UPDATE`
   `role_grants.revoked_at` (điều kiện của khóa `FOR SHARE` ở M6), định nghĩa hàm `role_grants_forbid_super_admin_for_heads_and_approvers`.
 - **Luật timestamp migration (`DB-15`):** mỗi thư mục migration mới lấy timestamp thật lúc tạo; trước merge, rebase lên `dev`,
-  đổi timestamp cho đứng sau migration mới nhất trên `dev` và thêm tên thư mục vào `scripts/verify/merged-migrations.txt` (gate
-  migration-order; ở `1a77ffe8` danh sách dừng ở `20261028110000_budget_version_detached_at` trong khi `prisma/migrations` đã tới
-  `20261101000200_licensing_subscription_renewals` — không sửa danh sách lúc thiết kế). `<ts>`/`<ts+1>` dưới đây là chỗ giữ theo
-  luật này.
+  đổi timestamp cho đứng sau migration mới nhất trên `dev` (ở `1a77ffe8`: `20261101000200_licensing_subscription_renewals`).
+  KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư mục migration mới xếp sau cùng nên gate
+  migration-order vẫn xanh); Owner thêm vào danh sách khi phát hành. `<ts>`/`<ts+1>` dưới đây là chỗ giữ theo luật này.
 - Đã xác minh khi sửa sau audit (BE `1a77ffe8`, ghi ở spec): dòng nhóm dùng cùng enum `AccessRequestCancelCause`; đường IT Admin
   chỉ định người chịu trách nhiệm mới là `POST /provisioning-tasks` (`responsibleEmployeeId` →
   `ProvisioningHolderService.service`); sự kiện người giữ vai rời đi cho phiên bản/gia hạn là `OrganizationChange` `EMPLOYEE_LEFT`
@@ -269,21 +268,31 @@ của bước chi bằng người giữ grant hiện tại.
   `accounts/{account.types.ts,successor-eligibility.service.ts}`, `access/jwt-access-token-verifier.service.ts` (+ spec),
   `identity-access{,-facade,-inspection-facade,-recovery-cli}.module.ts`,
   `public/{identity-access.api.ts,identity-access.types.ts,identity-access-inspection.api.ts,identity-access.extension-points.ts}`;
-  người tiêu dùng ở spec › _Gỡ cấu hình hai vai và người tiêu dùng_ (`requests` × 10 tệp, `budgets/budget/budget-facts.service.ts`,
-  `licensing/subscription-renewal/subscription-renewal-parties.service.ts`, `personnel/role-duties/*`, `personnel/public/personnel.types.ts`,
-  `dashboards/super-admin/super-admin-dashboard.service.ts`, `installation/public/{inspection.types.ts,installation-inspection.api.ts}`,
-  `src/cli/inspect/inspect-report.ts`, `src/cli/demo-dataset/{fixture/demo-fixture.types.ts,fixture/shared-demo-v1.ts,steps/organization.steps.ts,steps/finance.steps.ts,steps/request.steps.ts}`);
+  người tiêu dùng ở spec › _Gỡ cấu hình hai vai và người tiêu dùng_ (`requests` × 10 tệp,
+  `budgets/budget/budget-facts.service.ts`, `licensing/subscription-renewal/subscription-renewal-parties.service.ts`,
+  `personnel/role-duties/*`, `personnel/public/personnel.types.ts`,
+  `dashboards/super-admin/super-admin-dashboard.service.ts`,
+  `installation/public/{inspection.types.ts,installation-inspection.api.ts}`, `src/cli/inspect/inspect-report.ts`,
+  `src/cli/demo-dataset/{fixture/demo-fixture.types.ts,fixture/shared-demo-v1.ts,steps/organization.steps.ts,steps/finance.steps.ts,steps/request.steps.ts}`);
   gate `test/gates/architecture-boundaries.gate-spec.ts` (danh sách tệp được đọc `approval_role_holders`: chỉ
   `migration-preflight.repo.ts`); xóa `test/http/identity-access/approval-roles.http-spec.ts`,
-  `test/integration/identity-access/approval-roles-http.integration-spec.ts`; `test/support/{api-coverage-manifest.ts,api-collection-registry.ts,api-collection-registry-exceptions.ts,api-collection-registry-nested.ts,openapi-example-manifest.ts,openapi-example-route-codes-identity-access.ts}`;
-  test còn lại theo danh sách cuối spec › `## Test matrix`.
+  `test/integration/identity-access/approval-roles-http.integration-spec.ts`;
+  `test/support/{api-coverage-manifest.ts,api-collection-registry.ts,api-collection-registry-exceptions.ts,api-collection-registry-nested.ts,openapi-example-manifest.ts,openapi-example-route-codes-identity-access.ts}`;
+  `test/http/platform/openapi-presentation.http-spec.ts:254` (hai operation `approvalRoleList`, `approvalRoleSet` bị gỡ: số
+  trên `dev` lúc rebase − 2, tức 299; theo thứ tự merge của gói, từ 306 ở `1a77ffe8`: `qd93-remove-hr-basis-org-writes` 306
+  → `qd93-remove-in-app-super-admin-transfer` 305 (−1) → `qd93-parameter-labels-dashboard-queues` 305 →
+  `qd93-direct-manager-spending-approver-roles` 305 → `qd93-remove-department-projects` phase 1 301 (−4) →
+  `qd93-remove-fallback-substitute-approvers` phase A 299 (−2) → `qd93-unplaced-employee-first-placement` 300 (+1) →
+  `qd93-code-format-xlsx-employee-import` 300 → `employee-directory-read` 302 (+2) → `qd93-budget-record-attachments` 312
+  (+10) → `dashboard-request-queues-wiring` 312; mỗi lát đổi số này trên nhánh của mình bằng số trên `dev` lúc rebase
+  cộng/trừ phần của mình (thứ tự đổi thì số trung gian đổi theo)); test còn lại theo danh sách cuối spec › `## Test matrix`.
 - Depends on: Task 7, Task 8, Task 8b.
 - Acceptance: `US-12-15` AC-25 (dòng 35); không còn `FALLBACK_APPROVER`/`CONFLICT_SUBSTITUTE`/`getApprovalRoleHolders` trong
   `src/` ngoài giá trị lịch sử; `GET/PUT /approval-roles` ⟹ 404; `ops:recover transfer-role` vẫn đúng với grant; gate đọc bảng xanh.
   Nhiều file vì gỡ một capability và đổi một facade — cơ học; chứng minh bằng typecheck, `arch:check` và test giữ nguyên.
 - Verify: `pnpm typecheck`; `pnpm arch:check`; `pnpm test:gates`; `pnpm test -- src/modules/identity-access src/modules/personnel src/cli/inspect`;
   `pnpm test:http -- test/http/platform/api-inventory.http-spec.ts test/http/platform/openapi-presentation.http-spec.ts test/http/platform/openapi-read-wording.http-spec.ts test/http/requests/need-decision-queue.http-spec.ts`;
-  `pnpm test:integration -- test/integration/personnel/role-duties.integration-spec.ts test/integration/installation/inspect.integration-spec.ts test/integration/installation/installation-bootstrap-facts.integration-spec.ts test/integration/installation/installation.integration-spec.ts test/integration/installation/dev-seed.integration-spec.ts test/integration/identity-access/super-admin-transfer-http.integration-spec.ts test/integration/organization/organization-identity-read-contracts.integration-spec.ts test/integration/notifications/step-sla.integration-spec.ts test/integration/audit/access-request-http.integration-spec.ts test/integration/audit/access-request-need-decision.integration-spec.ts test/integration/requests/assessment-queue.integration-spec.ts test/integration/requests/access-request-new-software.integration-spec.ts test/integration/requests/spend-review-flows.integration-spec.ts`.
+  `pnpm test:integration -- test/integration/personnel/role-duties.integration-spec.ts test/integration/installation/inspect.integration-spec.ts test/integration/installation/installation-bootstrap-facts.integration-spec.ts test/integration/installation/installation.integration-spec.ts test/integration/installation/dev-seed.integration-spec.ts test/integration/organization/organization-identity-read-contracts.integration-spec.ts test/integration/notifications/step-sla.integration-spec.ts test/integration/audit/access-request-http.integration-spec.ts test/integration/audit/access-request-need-decision.integration-spec.ts test/integration/requests/assessment-queue.integration-spec.ts test/integration/requests/access-request-new-software.integration-spec.ts test/integration/requests/spend-review-flows.integration-spec.ts`.
 
 ### Checkpoint A3
 

@@ -8,16 +8,20 @@
 
 ## Before coding
 
-- Quyền chạy test (Owner 01/11/2026, `D-S26`): được tự chạy `pnpm typecheck`/`pnpm lint`/`pnpm arch:check`/`pnpm rules:check`,
-  unit test (`pnpm test -- <tệp>`), gate theo tệp (`pnpm test:gates -- <tệp>`), HTTP và integration test **theo file đã sửa**
-  (`pnpm test:http -- <tệp>`, `pnpm test:integration -- <tệp>`), và `pnpm check`; **phải hỏi Owner trước** khi chạy toàn bộ
-  `pnpm test:integration`, `pnpm test:e2e` hoặc `pnpm test:integration:timing`.
+- Quyền chạy test (Owner 01/11/2026, `D-S26`): được tự chạy
+  `pnpm typecheck`/`pnpm lint`/`pnpm arch:check`/`pnpm rules:check`, unit test (`pnpm test -- <tệp>`), gate theo tệp
+  (`pnpm test:gates -- <tệp>`), HTTP và integration test **theo file đã sửa** (`pnpm test:http -- <tệp>`,
+  `pnpm test:integration -- <tệp>`), và `pnpm check`; **phải hỏi Owner trước** khi chạy toàn bộ `pnpm test:integration`,
+  `pnpm test:e2e` hoặc `pnpm test:integration:timing`. Chạy cả thư mục (ví dụ
+  `pnpm test:integration -- test/integration/requests`) là chạy hàng loạt, tính như toàn bộ bộ ⟹ hỏi Owner trước; ngoài ra
+  chỉ chạy theo file.
 - Thứ tự merge (sóng W4 của lượt `QĐ-93`; merge từng hạng mục một, rebase lên `dev` ngay trước khi merge): merge **sau**
   `qd93-direct-manager-spending-approver-roles` và `qd93-remove-fallback-substitute-approvers` phase A (số đếm phụ thuộc định tuyến
   bước nhu cầu và cách gán vai `MANAGER`). Bắt đầu viết được trước; trước merge chạy lại mọi lệnh theo tệp của Checkpoint trên `dev`
   đã có hai hạng mục đó.
-- Migration: không có. Nếu buộc phải thêm: timestamp thật lúc tạo, đổi lại cho lớn hơn migration mới nhất trên `dev` trước merge
-  và thêm vào `scripts/verify/merged-migrations.txt` trong lần merge.
+- Migration: không có. Nếu buộc phải thêm: timestamp thật lúc tạo, đổi lại cho lớn hơn migration mới nhất trên `dev` trước
+  merge; KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư mục migration mới xếp sau cùng nên gate
+  `migration-order` vẫn xanh); Owner thêm vào danh sách khi phát hành.
 - Đọc `AGENTS.md`, `CONTRIBUTING.md`, `test/README.md`, [module structure](../../../rules/module-structure.md) (R4, R6, R10, ngoại lệ
   capability của `requests`), module card `src/modules/dashboards/README.md`, `src/modules/requests/README.md`.
 - Đọc code: `src/modules/dashboards/{employee,manager,section}/*`, `dashboards.module.ts`;

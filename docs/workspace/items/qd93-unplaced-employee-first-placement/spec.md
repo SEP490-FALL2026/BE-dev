@@ -8,9 +8,9 @@
   xếp phòng_ của `US-01-01` AC-22, `US-03-02` AC-15, `US-03-06` AC-23, `US-05-01` AC-16, `US-05-03` AC-15, `US-05-17` AC-18,
   `US-05-21` AC-8; `US-03-01` AC-25; quyết định `QĐ-93g`(1)–(4), `QĐ-93f`(1), `D-S13`), BE `1a77ffe8`.
 - Bổ sung sau pin: `QĐ-93d`(1) `D-S16`, `QĐ-93g`(5) `D-S14`, `QĐ-93j`(3) `D-S15`; D-S17…D-S26 (Docs chưa commit) — Owner
-  01/11/2026, đã có trong `QĐ-93g` ở Docs working tree; cập nhật pin khi Owner commit. Hạng mục này dùng `D-S14` (`US-03-04`
-  AC-30, User Stories 1 587 AC, BRD `FR-2.2` câu _luồng rút gọn_), `D-S17`, `D-S18`, `D-S21`, `D-S22`, `D-S23`, `D-S25`,
-  `D-S26`.
+  01/11/2026, đã có trong `QĐ-93g` ở Docs working tree; `D-S27`, `D-S28` (Owner 01/11/2026, chưa có ở Docs); cập nhật pin khi
+  Owner commit. Hạng mục này dùng `D-S14` (`US-03-04` AC-30, User Stories 1 587 AC, BRD `FR-2.2` câu _luồng rút gọn_), `D-S17`,
+  `D-S18`, `D-S21`, `D-S22`, `D-S23`, `D-S25`, `D-S26`, `D-S27`, `D-S28`.
 - Nhóm roadmap: G1, G2, G5, G6 — chỉ là planning container, không phải phạm vi (xem `## Sizing decision`).
 - [Kế hoạch](plan.md). [Test plan](test-plan.md) (từng route tạo Request theo hợp đồng `D-S21`, viết lại
   01/11/2026); `## Test matrix` dưới đây thắng khi lệch.
@@ -24,10 +24,12 @@ không căn cứ, không phải sự kiện nhân sự); nhân viên chưa xếp
 chung của `D-S21`, `details.reason = 'UNPLACED'`), không làm trưởng phòng/người kế nhiệm, không vào danh sách phòng nào, ghi
 điều chuyển bị từ chối kèm lý do _chưa xếp phòng — dùng xếp phòng lần đầu_ (`US-03-01` AC-25); người đã xếp phòng lần đầu từ
 ngày tương lai được coi là thành viên phòng đó khi xét Request (`D-S25`); đã xếp phòng thì không quay về _chưa xếp phòng_
-(`INV-20`, có chốt ở CSDL); nhân viên chưa xếp phòng — hoặc mới chỉ có lần xếp phòng chưa hiệu lực — nghỉ việc được Super
-Admin ghi theo **luồng rút gọn** (có căn cứ, không nghĩa vụ trưởng phòng xác nhận bàn giao ở bất kỳ bước nào, khóa tài khoản
-và thu hồi quyền/seat như luồng thường — `QĐ-93g`(5), `D-S18`; lần xếp phòng chưa hiệu lực bị hủy trong cùng thao tác —
-`D-S17`) — kiểm bằng unit, HTTP, integration và migration test.
+(`INV-20`, có chốt ở CSDL); nhân viên chưa xếp phòng — hoặc mới chỉ có lần xếp phòng chưa hiệu lực mà ngày làm việc cuối
+**trước** ngày hiệu lực đó — nghỉ việc được Super Admin ghi theo **luồng rút gọn** (có căn cứ, không nghĩa vụ trưởng phòng xác
+nhận bàn giao ở bất kỳ bước nào, khóa tài khoản và thu hồi quyền/seat như luồng thường — `QĐ-93g`(5), `D-S18`; lần xếp phòng
+chưa hiệu lực bị hủy trong cùng thao tác — `D-S17`, `D-S28`); ngày làm việc cuối từ ngày hiệu lực trở đi ⟹ giữ lần xếp phòng,
+ghi nghỉ việc trước ngày đó bị từ chối kèm lý do, từ ngày đó đi luồng nghỉ việc thường (`D-S28`) — kiểm bằng unit, HTTP,
+integration và migration test.
 
 ## Sizing decision
 
@@ -114,20 +116,26 @@ sung. Registry cần bỏ lát này khỏi _Remaining owner_ của dòng `US-06-
 ## Supporting references
 
 - `QĐ-93g`(1)–(5), `D-S13` (ngày hiệu lực không trước hôm nay, không trước ngày vào), Owner 01/11/2026 (`D-S17`) (xếp phòng
-  chưa hiệu lực bị hủy khi nghỉ việc; người đang bàn giao không được xếp phòng lần đầu), Owner 01/11/2026 (`D-S18`) (hồ sơ
-  không phòng thuộc Super Admin và mọi IT Admin dùng được; không nghĩa vụ trưởng phòng xác nhận ở bất kỳ bước nào), Owner
-  01/11/2026 (`D-S21`, `D-S22`) (một contract từ chối bên Request), Owner 01/11/2026 (`D-S23`) (không thao tác thêm người ở
-  hồ sơ bổ sung), Owner 01/11/2026 (`D-S25`) (định nghĩa _chưa xếp phòng_), `QĐ-93f`(1), `QĐ-87b`(4) (IT Admin phụ trách nhận
-  thông tin tối thiểu), `QĐ-66a` (trưởng phòng phải là thành viên), `QĐ-66ak` (thành viên từ lúc hồ sơ được ghi), `QĐ-68f`.
+  chưa hiệu lực bị hủy khi nghỉ việc; người đang bàn giao không được xếp phòng lần đầu), Owner 01/11/2026 (`D-S28`) (`D-S17`
+  chỉ áp khi ngày làm việc cuối **trước** ngày hiệu lực của lần xếp phòng; từ ngày đó trở đi giữ lần xếp phòng, ghi trước
+  ngày đó bị từ chối, từ ngày đó đi luồng thường), Owner 01/11/2026 (`D-S27`) (duyệt mọi điểm kỹ thuật còn chờ của spec:
+  hình bản xem trước của người chưa xếp phòng, khôi phục xếp phòng khi hủy hồ sơ và cờ `firstPlacementRestored`,
+  `details.reason: 'UNPLACED'` ở hai lỗi có sẵn, `SQLSTATE 23001`), Owner 01/11/2026 (`D-S18`) (hồ sơ không phòng thuộc
+  Super Admin và mọi IT Admin dùng được; không nghĩa vụ trưởng phòng xác nhận ở bất kỳ bước nào), Owner 01/11/2026 (`D-S21`,
+  `D-S22`) (một contract từ chối bên Request), Owner 01/11/2026 (`D-S23`) (không thao tác thêm người ở hồ sơ bổ sung), Owner
+  01/11/2026 (`D-S25`) (định nghĩa _chưa xếp phòng_), `QĐ-93f`(1), `QĐ-87b`(4) (IT Admin phụ trách nhận thông tin tối
+  thiểu), `QĐ-66a` (trưởng phòng phải là thành viên), `QĐ-66ak` (thành viên từ lúc hồ sơ được ghi), `QĐ-68f`.
 - Policy bên Request chung (`D-S21`): [qd93-remove-fallback-substitute-approvers](../qd93-remove-fallback-substitute-approvers/spec.md)
   sở hữu mã lỗi, hình dạng `details`, `blockedBy` của preview, bảng route và luật gộp tạo thay tất-cả-hoặc-không; lát này chỉ
   thêm nhánh `UNPLACED` vào cùng policy và test nó ở từng route.
   [qd93-direct-manager-spending-approver-roles](../qd93-direct-manager-spending-approver-roles/spec.md) — các AC trộn vế
   `MANAGER`.
 - `US-03-06` AC-23 vế `E302` và `US-01-01` AC-22 vế "không làm trưởng phòng/kế nhiệm": đã đúng ở code
-  (`NOT_A_MEMBER_ON_DATE`) — lát này thêm test. `US-03-01` AC-25: code `1a77ffe8` đã từ chối nhưng với
-  `DEPARTMENT_TRANSFER.PLACEMENT_OVERLAP` không `details` (`transfer-preconditions.service.ts:66-67`) — lát này thêm lý do
-  riêng (Phase D) và nhận AC-25.
+  (`NOT_A_MEMBER_ON_DATE`) — lát này thêm test. Lát vai (`qd93-direct-manager-spending-approver-roles`, merge trước) kiểm
+  `DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED` **trước** thành viên, nên test cấp `MANAGER` cho tài khoản `E302` trước (điểm nối
+  `ensureManagerGrant` của lát vai) để ra đúng `NOT_A_MEMBER_ON_DATE`; không `MANAGER` thì ra `HEAD_MANAGER_ROLE_REQUIRED`.
+  `US-03-01` AC-25: code `1a77ffe8` đã từ chối nhưng với `DEPARTMENT_TRANSFER.PLACEMENT_OVERLAP` không `details`
+  (`transfer-preconditions.service.ts:66-67`) — lát này thêm lý do riêng (Phase D) và nhận AC-25.
 - Hạng mục bị **thay thế một phần**: [g2-job-title-catalogue-and-manual-employee](../g2-job-title-catalogue-and-manual-employee/spec.md)
   và [g2-employee-intake-by-super-admin](../g2-employee-intake-by-super-admin/spec.md) (vế "biểu mẫu thiếu phòng ⟹ từ
   chối", `DEPARTMENT_REQUIRED`), [g2-employee-import-preview-confirm](../g2-employee-import-preview-confirm/spec.md) (cột
@@ -178,7 +186,10 @@ sung. Registry cần bỏ lát này khỏi _Remaining owner_ của dòng `US-06-
 - `organization/employee/`: `employee.dto.ts`, `employee-manual.service.ts`, `employee-row.policy.ts` (+ spec),
   `employee.repo.ts` (`createEmployee` thay `createEmployeeWithPlacement`; `unplacedAmong(ids, tx?)` và hàm xuất
   `unplacedEmployeeSql(employeeIdColumn)` — một `NOT EXISTS` dùng chung; `insertFirstPlacement`; `scheduledFirstPlacement`;
-  `cancelScheduledFirstPlacement`, `restoreFirstPlacement`), `employee-record.service.ts`, `employees.controller.ts` (mô tả).
+  `cancelScheduledFirstPlacement`, `restoreFirstPlacement`), `employee-record.service.ts`, `employees.controller.ts` (mô
+  tả). `employee.repo.ts` 380 dòng ở `1a77ffe8`; lint `max-lines` 500 dòng code — vượt thì tách các hàm placement đầu
+  (`insertFirstPlacement`, `scheduledFirstPlacement`, `cancelScheduledFirstPlacement`, `restoreFirstPlacement`) sang một
+  repo cùng thư mục, giữ `unplacedEmployeeSql`/`unplacedAmong` ở `employee.repo.ts` (danh bạ gọi tên này).
 - `organization/department/`: `department-record.service.ts`, `department.repo.ts` (`requestUnitsOn`, `requestMemberIdsOn` —
   placement hiệu lực tại ngày, hoặc lần xếp phòng lần đầu chưa hiệu lực; đếm người sẽ vào khi ngừng phòng).
 - `organization/public/`: `organization.api.ts` (`createEmployee`, `cancelScheduledFirstPlacement`, `restoreFirstPlacement`),
@@ -211,11 +222,15 @@ sung. Registry cần bỏ lát này khỏi _Remaining owner_ của dòng `US-06-
   `detail/offboarding-detail.service.ts`; `personnel/role-duties/role-duties.listener.ts`;
   `personnel/event-notice/personnel-notifier.service.ts` (`departmentId: string | null`); `personnel/transfer/`
   `transfer-preconditions.service.ts`, `transfer.http-errors.ts`, `transfers.controller.ts` (lý do `UNPLACED`).
+- `licensing/provisioning/tasks/provisioning-holder.service.ts` (Phase C, `D-S25`): `problemWith` (dòng 113) đọc
+  `getRequestUnits` thay `getOwningUnits` — người chịu trách nhiệm tài khoản dịch vụ đã xếp phòng lần đầu từ ngày tương lai ở
+  đúng phòng của tài khoản không bị `OUTSIDE_DEPARTMENT`; kiểm chung của fallback vẫn đứng trước.
 - `licensing/handover/` (Phase D, `D-S18`): `handover-confirmer.policy.ts` (+ spec), `handover.service.ts`,
   `handover-issue.service.ts`.
 - Migration `<ts>_organization_placement_keep_one` (trigger) và `<ts>_personnel_offboarding_unplaced` (`offboarding_cases`,
   thay hàm trigger). `<ts>` theo quy tắc: implementer đặt timestamp thật khi tạo thư mục; trước merge đặt lại sau migration
-  mới nhất trên `dev` và thêm vào `scripts/verify/merged-migrations.txt` (danh sách gate thứ tự migration). Bảng: `employees`,
+  mới nhất trên `dev`; KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư mục migration mới xếp sau cùng
+  nên gate `migration-order` vẫn xanh); Owner thêm vào danh sách khi phát hành. Bảng: `employees`,
   `employee_placements` (ghi), `offboarding_cases` (ghi), `audit_events`, `notifications` (ghi).
 
 ## Behavior and design
@@ -236,7 +251,8 @@ WHERE p.employee_id = <col>)`) xuất từ `organization/employee/employee.repo.
   tại `onDate`; không có ⟹ nếu mọi placement của người đó bắt đầu sau `onDate` (chỉ có thể là lần xếp phòng lần đầu) thì phòng
   của placement đó và Unit của nó. `getRequestMemberIds(departmentId, onDate)` = thành viên hiệu lực + người có lần xếp phòng
   lần đầu chưa hiệu lực ở phòng đó. `getOwningUnits`/`getDepartmentMemberIds` (licensing, budgets, seat-baseline, danh sách
-  phòng) **không đổi**.
+  phòng) **không đổi** — trừ kiểm người chịu trách nhiệm khi IT Admin cấp tài khoản dịch vụ (`provisioning-holder.service.ts`
+  `problemWith`): người đó là bên của Request (`D-S21`) nên đọc `getRequestUnits`.
 
 ### Tạo hồ sơ không phòng — nhập tay (`POST /api/v1/employees`)
 
@@ -317,7 +333,8 @@ today` ⟹ 422 `EMPLOYEE.FIRST_PLACEMENT_DATE_IN_PAST` (`details: { today }`); `
   theo thứ tự tên) để lỗi `55000` của guard lịch sử vẫn thắng khi cả hai cùng từ chối
   (`department-transfer-integrity.integration-spec.ts:68-70`). Hàm: khóa dòng nhân viên `FOR UPDATE` (hai lệnh xóa đồng thời
   hai placement cuối của một người tuần tự hóa; đường ứng dụng đã giữ khóa này nên không thêm chờ), rồi nếu không còn dòng
-  khác của nhân viên (`NOT EXISTS ... id <> OLD.id`) ⟹ `RAISE ... USING ERRCODE = 'restrict_violation'` (`23001`),
+  khác của nhân viên (`NOT EXISTS ... id <> OLD.id`) ⟹ `RAISE ... USING ERRCODE = 'restrict_violation'` (`23001`, Owner
+  01/11/2026 — `D-S27`),
   `CONSTRAINT = 'employee_placements_keep_one'`. **Không** dùng `23514` (`check_violation`): `TransferGuardService.guarded`,
   `OffboardingFrame.guarded` và `EmployeeRepo.scheduleStructureChange` ánh xạ mọi `23514` sang `CONCURRENT_CHANGE`/
   `DEPARTMENT_INACTIVE` — chốt `INV-20` mà bị chạm trên đường ứng dụng là lỗi lập trình, phải ra 500 thấy được, không được đội
@@ -360,12 +377,17 @@ today` ⟹ 422 `EMPLOYEE.FIRST_PLACEMENT_DATE_IN_PAST` (`details: { today }`); `
   `{ reason: 'UNPLACED', party: 'REQUESTER', employeeIds: [người gọi] }` (`blockOf`, trước `getRequestUnits`; thay 409
   `ACCESS_REQUEST.NO_DEPARTMENT` hiện hành) — nhánh `SPENDING_APPROVER` của cùng chỗ do fallback làm; người đó không gửi được
   nhóm nên không có danh sách để chọn.
-- **Bản xem trước** của người yêu cầu _chưa xếp phòng_: `blockOf` chạy trước `assess` nên không có phòng để tính. Đề xuất (chờ
-  Owner review cùng spec; đổi wire): 200 với `blockedBy: {UNPLACED, REQUESTER, [người gọi]}`, `canSubmit: false`; trường không
-  phụ thuộc phòng (`plan`, `branch`, `termMonths`, `projectLabel`, `requirements`, `expectedSpendOn`) như thường; `department: null` (nullable mới — null **chỉ** khi
-  `blockedBy.reason = 'UNPLACED'`), `costCenter`/`costEstimate`/`budgetYear`/`existingAccess` null, `pricing.status =
-'NOT_APPLICABLE'`, `spendSubmission: 'NOT_NEEDED'`, `chain: []`, `possibleExtraSteps: []`, `totalExpectedWorkingDays: 0` (schema
-  nới thành `nonnegative`). Đã loại: 409 `ACCESS_REQUEST.NO_DEPARTMENT` (trái `D-S21`: preview 200 + `blockedBy`).
+- **Bản xem trước** của người yêu cầu _chưa xếp phòng_ (Owner 01/11/2026 — `D-S27`; đổi wire): không có phòng để tính, nên
+  preview **trả sớm, không gọi `assess`**, mỗi khi người yêu cầu thuộc tập _chưa xếp phòng_ mà bước kiểm chung đã đọc
+  (`getUnplacedEmployeeIds`; tương đương: `ineligibleReasons` của bên `REQUESTER` có `UNPLACED`) — kể cả khi
+  `blockedBy.reason = 'SPENDING_APPROVER'` vì người đó cũng là Người duyệt chi (lý do đó thắng theo thứ tự chung nhưng người
+  đó vẫn không có phòng; gọi `assess` sẽ ra 409 `ACCESS_REQUEST.NO_DEPARTMENT`). Không quyết theo `blockedBy.reason`. Kết quả:
+  200, `blockedBy` theo thứ tự chung (`{UNPLACED, REQUESTER, [người gọi]}`, hoặc `{SPENDING_APPROVER, REQUESTER, [người gọi]}`
+  cho người vừa là Người duyệt chi), `canSubmit: false`; trường không phụ thuộc phòng (`plan`, `branch`, `termMonths`,
+  `requirements`, `expectedSpendOn`) như thường; `department: null` (nullable mới — null **chỉ** khi người yêu cầu _chưa xếp
+  phòng_), `costCenter`/`costEstimate`/`budgetYear`/`existingAccess` null, `pricing.status = 'NOT_APPLICABLE'`,
+  `spendSubmission: 'NOT_NEEDED'`, `chain: []`, `possibleExtraSteps: []`, `totalExpectedWorkingDays: 0` (schema nới thành
+  `nonnegative`). Đã loại: 409 `ACCESS_REQUEST.NO_DEPARTMENT` (trái `D-S21`: preview 200 + `blockedBy`).
 - Tạo thay (`D-S22`): tất-cả-hoặc-không — có người thụ hưởng _chưa xếp phòng_ ⟹ cả lệnh bị từ chối, `employeeIds` liệt kê
   **mọi** người thụ hưởng có cùng cặp (bên, lý do) được báo — theo thứ tự chung, lệnh có cả Người duyệt chi lẫn người _chưa xếp
   phòng_ chỉ báo `SPENDING_APPROVER` với các Người duyệt chi (để `reason` đúng cho từng id); không Request nào được tạo.
@@ -373,32 +395,38 @@ today` ⟹ 422 `EMPLOYEE.FIRST_PLACEMENT_DATE_IN_PAST` (`details: { today }`); `
   đã xếp phòng lần đầu từ ngày tương lai (`D-S25`).
 - Bộ chọn phần mềm (`catalog`, tầng dưới `requests`, không phải route tạo Request của `D-S21`): đọc `getRequestUnits`; người
   gọi _chưa xếp phòng_ ⟹ giữ 409 `REQUESTABLE_SOFTWARE.NO_DEPARTMENT` và thêm `details: { reason: 'UNPLACED' }` (thêm trường,
-  không mã mới — một mã một status).
+  không mã mới — một mã một status; Owner 01/11/2026 — `D-S27`).
 - Không Request, bước, cam kết hay Cost Center nào được tạo khi từ chối (kiểm số dòng trước/sau).
 
 ### Điều chuyển người _chưa xếp phòng_ (`US-03-01` AC-25)
 
 - `TransferPreconditions.readBeforeLocks`: không có placement hiệu lực hôm nay ⟹ hỏi `getUnplacedEmployeeIds([id])`: _chưa
-  xếp phòng_ ⟹ 409 `DEPARTMENT_TRANSFER.PLACEMENT_OVERLAP` `details: { reason: 'UNPLACED' }` (mô tả: _nhân viên chưa xếp
-  phòng — dùng xếp phòng lần đầu_, FE hiện lối sang `employeeFirstPlacementCreate`); ca khác (lần xếp phòng lần đầu chưa
-  hiệu lực, người đã nghỉ) giữ 409 `PLACEMENT_OVERLAP` như hôm nay. Không mã mới; không giai đoạn nào mở, không `BM-04`, không
-  rà soát. Sau xếp phòng lần đầu có hiệu lực, điều chuyển như AC-1 (căn cứ bắt buộc). Không có thao tác "rời phòng" không
-  đích.
+  xếp phòng_ ⟹ 409 `DEPARTMENT_TRANSFER.PLACEMENT_OVERLAP` `details: { reason: 'UNPLACED' }` (Owner 01/11/2026 — `D-S27`; mô
+  tả: _nhân viên chưa xếp phòng — dùng xếp phòng lần đầu_, FE hiện lối sang `employeeFirstPlacementCreate`); ca khác (lần
+  xếp phòng lần đầu chưa hiệu lực, người đã nghỉ) giữ 409 `PLACEMENT_OVERLAP` như hôm nay. Không mã mới; không giai đoạn nào
+  mở, không `BM-04`, không rà soát. Sau xếp phòng lần đầu có hiệu lực, điều chuyển như AC-1 (căn cứ bắt buộc). Không có thao
+  tác "rời phòng" không đích.
 
 ### Nghỉ việc của người _chưa xếp phòng_ — luồng rút gọn (`US-03-04` AC-30, `QĐ-93g`(5), `D-S14`, `D-S17`, `D-S18`)
 
 Route, body và quyền giữ nguyên: `POST /api/v1/offboarding-cases` (`offboardingCaseRecord`; `lastWorkingDay`, `abrupt`,
 `grounds`, `successor`, …), chỉ Super Admin, không tự ghi cho mình. BE `1a77ffe8` từ chối mọi người không có placement hiệu
 lực hôm nay (`OffboardingPreconditions.readBeforeLocks` ⟹ 409 `OFFBOARDING_CASE.PLACEMENT_OVERLAP`
-`details.reason = 'NO_OPEN_PLACEMENT'`). Thiết kế (01/11/2026, chờ Owner review toàn spec):
+`details.reason = 'NO_OPEN_PLACEMENT'`). Thiết kế (01/11/2026; điểm kỹ thuật Owner duyệt 01/11/2026 — `D-S27`; nhánh hủy xếp
+phòng của `D-S17` giới hạn bởi `D-S28`):
 
 - **Rẽ nhánh** khi không có placement hiệu lực hôm nay:
   - _chưa xếp phòng_ (`getUnplacedEmployeeIds`) ⟹ **nhánh không phòng**;
-  - chỉ có lần xếp phòng lần đầu chưa hiệu lực (`getScheduledFirstPlacement(employeeId, today)` trả `{ placementId,
-departmentId, validFrom }`) ⟹ **nhánh không phòng + hủy lần xếp phòng đó** (`D-S17`) — người đó không vào phòng; ngày
-    cuối không so với `validFrom` (placement bị hủy nên không có giai đoạn thành viên nào);
-  - còn lại ⟹ giữ `NO_OPEN_PLACEMENT`. Lý do `FIRST_PLACEMENT_SCHEDULED` của bản trước **bỏ** (Owner 01/11/2026 — `D-S17`
-    đã loại "luồng nghỉ việc thường với phòng sắp vào").
+  - chỉ có lần xếp phòng lần đầu chưa hiệu lực — `getScheduledFirstPlacement(employeeId, today)` trả
+    `{ placementId, departmentId, validFrom }` — và ngày làm việc cuối (nghỉ đột xuất: ngày ghi) **trước** `validFrom` ⟹
+    **nhánh không phòng + hủy lần xếp phòng đó** (`D-S17`, `D-S28`) — người đó không vào phòng;
+  - chỉ có lần xếp phòng lần đầu chưa hiệu lực và ngày làm việc cuối **từ** `validFrom` trở đi ⟹ 409
+    `OFFBOARDING_CASE.PLACEMENT_OVERLAP` `details: { reason: 'FIRST_PLACEMENT_PENDING', validFrom }` (Owner 01/11/2026 —
+    `D-S28`): giữ lần xếp phòng, không ghi gì; mô tả cho FE: _nhân viên vào phòng từ `validFrom` — ghi nghỉ việc từ ngày đó
+    (trưởng phòng của phòng đó xác nhận bàn giao) hoặc chọn ngày làm việc cuối trước ngày đó_. Từ `validFrom` placement đã
+    hiệu lực ⟹ luồng nghỉ việc thường, không code mới;
+  - còn lại ⟹ giữ `NO_OPEN_PLACEMENT`. Lý do `FIRST_PLACEMENT_SCHEDULED` của bản trước **bỏ**; `FIRST_PLACEMENT_PENDING` là
+    giá trị `details.reason` mới của mã có sẵn (`D-S28`), không phải mã lỗi mới.
 - **Kiểm như mọi lần ghi nghỉ việc**: `subjectRefusal` (`EMPLOYEE_NOT_FOUND`, `EMPLOYEE_LEFT`, `ALREADY_HANDING_OVER`,
   `LAST_WORKING_DAY_REQUIRED`); căn cứ bắt buộc (`QĐ-93f`(2)) ⟹ 422 `OFFBOARDING_CASE.GROUNDS_REQUIRED` /
   `GROUNDS_INCOMPLETE` / `GROUNDS_IS_NOTICE`; ngày cuối như luồng thường, mốc dưới là ngày vào làm thay cho ngày bắt đầu
@@ -431,10 +459,14 @@ departmentId, validFrom }`) ⟹ **nhánh không phòng + hủy lần xếp phòn
   đổi luật. Không tài khoản và không quyền nào ⟹ chỉ có sự kiện nghỉ việc, không tác vụ.
   - Đổi ngày cuối (`change/`): `placementFrom = null` ⟹ mốc `hireDate` (không phải `today`); không `periods.schedule`/`undo`,
     không đọc trưởng phòng khi `departmentId` null — hôm nay `scheduleDepartureEnd` không có placement ⟹ `PLACEMENT_OVERLAP`.
+    Hồ sơ đã hủy một lần xếp phòng (`cancelled_placement_id` có): ngày cuối mới phải vẫn **trước** `cancelled_placement_from`;
+    từ ngày đó trở đi ⟹ 409 `OFFBOARDING_CASE.PLACEMENT_OVERLAP` `details: { reason: 'FIRST_PLACEMENT_PENDING', validFrom }`
+    (`D-S28`; muốn nghỉ từ ngày đó thì hủy hồ sơ — lần xếp phòng được khôi phục — rồi ghi lại theo luồng thường).
   - Hủy hồ sơ: `workState` về trạng thái trước; nhánh hủy xếp phòng **khôi phục** placement đã hủy (cùng id, phòng,
     `valid_from` — hoàn tác đúng như `periods.undo`) qua `OrganizationApi.restoreFirstPlacement` khi phòng đó còn `ACTIVE`
-    (khóa `FOR SHARE`); phòng đã ngừng ⟹ không khôi phục, người đó ở _chưa xếp phòng_, dòng `offboarding_case_changes` ghi
-    `detail.firstPlacementRestored = false` và Super Admin xếp phòng lần đầu lại (thiết kế chờ Owner review).
+    (khóa `FOR SHARE`); phòng đã ngừng ⟹ không khôi phục, người đó ở _chưa xếp phòng_ và Super Admin xếp phòng lần đầu lại.
+    Response của lệnh hủy có cờ `firstPlacementRestored: boolean` (chỉ với hồ sơ có `cancelled_placement_id`) và dòng
+    `offboarding_case_changes` ghi `detail.firstPlacementRestored` cùng giá trị (Owner 01/11/2026 — `D-S27`).
   - Chi tiết hồ sơ (`detail/`): không gọi `getDepartmentBrief` khi `departmentId` null.
 - **Phạm vi đọc** (`D-S18`): hồ sơ `department_id IS NULL` hiện cho Super Admin và **mọi IT Admin dùng được**
   (`OffboardingViewService.scopeOf`, `offboarding-list.repo.ts`); `offboarding-frame.service.ts` không khóa phòng khi
@@ -448,7 +480,8 @@ REPLACE FUNCTION` của `employee_placements_keep_one`: cho xóa placement cuố
   (`cancelled_at IS NULL`) của nhân viên đó với `cancelled_placement_id = OLD.id`. Rollback (SQL ghi trong PR): chỉ khi không
   còn dòng `department_id IS NULL`; khôi phục hàm trigger bản Phase A.
 - **Wire** (FE): hồ sơ nghỉ việc (`offboardingCaseGet`, `offboardingCaseList`, response của các lệnh) có `department: null`;
-  không route, không mã lỗi mới ở `OFFBOARDING_CASE.*`.
+  `OFFBOARDING_CASE.PLACEMENT_OVERLAP` thêm `details.reason: 'FIRST_PLACEMENT_PENDING'` (+ `validFrom`); response hủy hồ sơ
+  thêm `firstPlacementRestored`; không route, không mã lỗi mới ở `OFFBOARDING_CASE.*`.
 - Xếp phòng lần đầu cho người đang bàn giao (`workState = HANDING_OVER`) ⟹ 409 `EMPLOYEE.FIRST_PLACEMENT_EMPLOYEE_LEAVING`;
   đã `TERMINATED` ⟹ `FIRST_PLACEMENT_EMPLOYEE_LEFT` (`D-S17`).
 
@@ -472,11 +505,13 @@ placement hiệu lực.
 ### Tương thích
 
 - Wire đổi: `employeeCreate` response (`memberSince`, `department` nullable; `unplaced` mới); import `summary.newUnplaced`,
-  `result.createdUnplaced` (thêm); `FILE_MISSING_COLUMNS` không còn nêu `department_code`; route mới; mã thông báo mới; nhánh
-  `UNPLACED` của 422 chung và `blockedBy`; `groupRequestCandidateList` của người gọi _chưa xếp phòng_ đổi từ 409
+  `result.createdUnplaced` (thêm); `FILE_MISSING_COLUMNS` không còn nêu `department_code`; route mới; mã thông báo mới;
+  nhánh `UNPLACED` của 422 chung và `blockedBy`; `groupRequestCandidateList` của người gọi _chưa xếp phòng_ đổi từ 409
   `ACCESS_REQUEST.NO_DEPARTMENT` sang 422 `REQUEST_PARTY.INELIGIBLE`; bản xem trước của người _chưa xếp phòng_ có
-  `department: null`, `totalExpectedWorkingDays: 0` (đề xuất, chờ Owner); `REQUESTABLE_SOFTWARE.NO_DEPARTMENT` và
-  `DEPARTMENT_TRANSFER.PLACEMENT_OVERLAP` thêm `details.reason`; hồ sơ nghỉ việc `department` nullable. Không trường nào bị xóa.
+  `department: null`, `totalExpectedWorkingDays: 0` (Owner 01/11/2026 — `D-S27`); `REQUESTABLE_SOFTWARE.NO_DEPARTMENT` và
+  `DEPARTMENT_TRANSFER.PLACEMENT_OVERLAP` thêm `details.reason`; `OFFBOARDING_CASE.PLACEMENT_OVERLAP` thêm
+  `details.reason: 'FIRST_PLACEMENT_PENDING'` (`D-S28`); response hủy hồ sơ nghỉ việc thêm `firstPlacementRestored`; hồ sơ
+  nghỉ việc `department` nullable. Không trường nào bị xóa.
 - Dữ liệu cũ: mọi nhân viên hiện có đều có placement ⟹ không ai bị coi _chưa xếp phòng_ sau deploy; summary/result cũ đọc
   được (mặc định 0).
 
@@ -499,17 +534,19 @@ placement hiệu lực.
 | `US-02-02` AC-16 vế xếp phòng                  | body xếp phòng kèm `hrBasis`                                                                                                                                                                                                                                 | http                                                                                     | 422 `VALIDATION_ERROR` (không có trường căn cứ)                                                                                                                                                                                                                                                     | planned                  |
 | `US-02-03` AC-2, `INV-20`                      | xóa placement cuối bằng SQL; hai phiên cùng xóa hai placement của một người; hủy điều chuyển vẫn chạy                                                                                                                                                        | integration                                                                              | `23001` `employee_placements_keep_one`; phiên sau chờ rồi `23001`; hủy điều chuyển xanh (`department-transfer-change`); guard lịch sử vẫn `55000`                                                                                                                                                   | planned                  |
 | `US-02-03` AC-2                                | sau import + xếp phòng: không ai có hai placement giao nhau; người chưa xếp phòng không Cost Center                                                                                                                                                          | integration                                                                              | `findPlacementCoverageViolations` (bản `INV-20` mới) rỗng; `getOwningUnits` không có người chưa xếp phòng                                                                                                                                                                                           | planned                  |
-| `US-02-02` AC-20 (trưởng phòng)                | gán/chỉ định `E302` chưa xếp phòng làm trưởng phòng/kế nhiệm                                                                                                                                                                                                 | integration                                                                              | 422 `DEPARTMENT.HEAD_NOT_A_MEMBER_ON_DATE`                                                                                                                                                                                                                                                          | planned                  |
+| `US-02-02` AC-20 (trưởng phòng)                | tài khoản `E302` được cấp `MANAGER` trước (lát vai kiểm `HEAD_MANAGER_ROLE_REQUIRED` trước thành viên); gán/chỉ định `E302` chưa xếp phòng làm trưởng phòng/kế nhiệm; đối chứng: `E303` không `MANAGER`                                                      | integration                                                                              | 422 `DEPARTMENT.HEAD_NOT_A_MEMBER_ON_DATE`; đối chứng 422 `DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED`                                                                                                                                                                                                   | planned                  |
 | `US-02-02` AC-20 (danh sách phòng)             | `H1` đọc `GET /departments/{id}/employees` trước/sau ngày hiệu lực                                                                                                                                                                                           | integration                                                                              | không có `E302` trước 05/10; có từ 05/10                                                                                                                                                                                                                                                            | planned                  |
 | `US-02-02` AC-20 (tài khoản), `US-01-01` AC-22 | tạo tài khoản và gán `EMPLOYEE`/`IT_ADMIN` cho `E302`; sau đó xếp phòng lần đầu                                                                                                                                                                              | integration                                                                              | thành công như thường; tài khoản và vai không đổi sau xếp phòng                                                                                                                                                                                                                                     | planned                  |
 | `US-05-02` AC-14                               | `E302` gửi từng loại Request (cá nhân, nháp lưu/gửi, đề xuất, nội bộ, tài khoản dịch vụ, gia hạn và hoàn trả của chính mình, nhóm)                                                                                                                           | integration                                                                              | 422 `REQUEST_PARTY.INELIGIBLE` `{reason: UNPLACED, party: REQUESTER, employeeIds: [E302]}`; không Request/bước/cam kết nào                                                                                                                                                                          | planned                  |
 | `US-05-01` AC-16 vế chưa xếp phòng             | `E302` xem trước                                                                                                                                                                                                                                             | integration                                                                              | 200 `canSubmit: false`, `blockedBy: {UNPLACED, REQUESTER, [E302]}`, `department: null`, `chain: []`; không `ACCESS_REQUEST.NO_DEPARTMENT`                                                                                                                                                           | planned                  |
-| thứ tự phán định và khóa (`D-S21`)             | `C2` giữ grant `SPENDING_APPROVER` và không có placement gửi `POST /access-requests`; `H1` tạo thay cho `E302` (chưa xếp phòng) và `C1` (Người duyệt chi); ghi nghỉ việc `E303` (xếp phòng chưa hiệu lực) song song `H1` tạo thay cho `E303` (cả hai thứ tự) | unit (`identity-access/request-party/request-party.policy.spec.ts`); integration         | `{SPENDING_APPROVER, REQUESTER, [C2]}`; tạo thay ⟹ `{SPENDING_APPROVER, BENEFICIARY, [C1]}` (lý do trước trong cùng bên); song song: không deadlock, nghỉ việc trước ⟹ 422 `{UNPLACED, BENEFICIARY, [E303]}`, tạo thay trước ⟹ 201, ghi nghỉ việc chạy sau khi tạo thay commit (chờ khóa nhân viên) | planned                  |
+| preview trả sớm (`D-S27`)                      | `C2` giữ grant `SPENDING_APPROVER` và không có placement xem trước                                                                                                                                                                                           | integration                                                                              | 200 `canSubmit: false`, `blockedBy: {SPENDING_APPROVER, REQUESTER, [C2]}`, `department: null`, `chain: []`, `totalExpectedWorkingDays: 0`; `assess` không chạy, không 409 `ACCESS_REQUEST.NO_DEPARTMENT`                                                                                            | planned                  |
+| thứ tự phán định và khóa (`D-S21`)             | `C2` giữ grant `SPENDING_APPROVER`, không placement, gửi `POST /access-requests`; `H1` tạo thay cho `E302` (chưa xếp phòng) và `C1` (Người duyệt chi); ghi nghỉ việc `E303` (ngày cuối trước ngày xếp phòng) song song `H1` tạo thay cho `E303` (hai thứ tự) | unit (`identity-access/request-party/request-party.policy.spec.ts`); integration         | `{SPENDING_APPROVER, REQUESTER, [C2]}`; tạo thay ⟹ `{SPENDING_APPROVER, BENEFICIARY, [C1]}` (lý do trước trong cùng bên); song song: không deadlock, nghỉ việc trước ⟹ 422 `{UNPLACED, BENEFICIARY, [E303]}`, tạo thay trước ⟹ 201, ghi nghỉ việc chạy sau khi tạo thay commit (chờ khóa nhân viên) | planned                  |
 | `US-03-02` AC-15 vế chưa xếp phòng (`D-S22`)   | `H1` tạo thay cho `E302` và `E1` cùng lệnh; cho `E303` (giữ seat) gia hạn; IT Admin cấp phát với `responsibleEmployeeId = E302`                                                                                                                              | integration                                                                              | 422 `{UNPLACED, BENEFICIARY, [E302]}`, không Request nào (cả `E1`), không `OUTSIDE_DEPARTMENT`/`NOT_HEAD`; gia hạn ⟹ 422 `{UNPLACED, BENEFICIARY, [E303]}`; cấp phát ⟹ 422 `{UNPLACED, BENEFICIARY, [E302]}`, không `PROVISIONING.RESPONSIBLE_INVALID`                                              | planned                  |
 | `US-05-17` AC-18 vế chưa xếp phòng             | `E1` kiểm/gửi nhóm có `E302`; `E1` mở danh sách ứng viên; `E302` mở danh sách ứng viên                                                                                                                                                                       | integration                                                                              | check: dòng `E302` lý do `UNPLACED` (đứng trước mọi lý do phòng của dòng); gửi bị từ chối theo policy chung, không Request; ứng viên không có `E302`; `E302` gọi ⟹ 422 `{UNPLACED, REQUESTER, [E302]}` (không còn 409 `ACCESS_REQUEST.NO_DEPARTMENT`)                                               | planned                  |
 | `US-05-21` AC-8, `US-05-03` AC-15              | `E302` gửi Request tài khoản dịch vụ; Request có người chịu trách nhiệm `E302` khác người gửi                                                                                                                                                                | integration                                                                              | 422 `party: REQUESTER` / `party: BENEFICIARY`                                                                                                                                                                                                                                                       | planned                  |
 | bộ chọn phần mềm                               | `E302` gọi `GET /requestable-applications`, `/requestable-plans/{id}`                                                                                                                                                                                        | integration                                                                              | 409 `REQUESTABLE_SOFTWARE.NO_DEPARTMENT` `details.reason: UNPLACED`                                                                                                                                                                                                                                 | planned                  |
 | `D-S25` (`QĐ-66ak`)                            | `E302` được xếp vào `P-DES` từ 05/10, hôm nay 03/10: `H1` tạo thay; `E302` tự gửi; `E1` mở ứng viên nhóm; `E302` mở bộ chọn                                                                                                                                  | integration                                                                              | 201 tính vào `CC-DES`, bước nhu cầu theo luật tạo thay/`H1`; ứng viên có `E302`; bộ chọn trả phần mềm của `P-DES`                                                                                                                                                                                   | planned                  |
+| `D-S25` cấp phát                               | `E302` được xếp vào `P-DES` từ 05/10, hôm nay 03/10: IT Admin cấp tài khoản dịch vụ của `P-DES` với `responsibleEmployeeId = E302`                                                                                                                           | integration (`service-account-request.integration-spec.ts`)                              | cấp được như người của `P-DES`; không `PROVISIONING.RESPONSIBLE_INVALID` (`OUTSIDE_DEPARTMENT`)                                                                                                                                                                                                     | planned                  |
 | `US-05-02` AC-14 vế cuối; ca cũ                | sau ngày hiệu lực `E302` gửi; `E9` đã nghỉ việc gửi                                                                                                                                                                                                          | integration                                                                              | 201 tới `H1`; `E9` lỗi cũ (`ACCESS_REQUEST.NO_DEPARTMENT` hoặc chặn tài khoản như hiện hành)                                                                                                                                                                                                        | planned                  |
 | `US-03-01` AC-25                               | Super Admin ghi điều chuyển `E302` (chưa xếp phòng) sang `P-DES`; sau xếp phòng có hiệu lực, chuyển sang `P-FIN` kèm căn cứ                                                                                                                                  | integration                                                                              | 409 `DEPARTMENT_TRANSFER.PLACEMENT_OVERLAP` `details.reason: UNPLACED`, không giai đoạn/`BM-04`/rà soát; ca sau 201 như AC-1                                                                                                                                                                        | planned                  |
 | rủi ro ngừng phòng                             | phòng có người xếp lần đầu từ ngày tương lai, Super Admin ngừng phòng; ngừng phòng và xếp phòng song song (hai thứ tự)                                                                                                                                       | integration                                                                              | 409 `DEPARTMENT.IN_USE` liệt kê người đó; song song: tuần tự, bên sau 422 `…DEPARTMENT_INACTIVE` hoặc 409 `IN_USE`                                                                                                                                                                                  | planned                  |
@@ -520,9 +557,11 @@ placement hiệu lực.
 | `US-03-04` AC-30 (đổi ngày, hủy, vai)          | đổi ngày cuối hồ sơ không phòng (trước ngày vào ⟹ từ chối); hủy hồ sơ; IT Admin `A3` chưa xếp phòng nghỉ                                                                                                                                                     | integration                                                                              | đổi được, mốc `hireDate`; hủy ⟹ `workState` cũ; `ROLE_HOLDER_LEAVING` tới Super Admin với `departmentId: null`                                                                                                                                                                                      | planned                  |
 | `US-03-04` AC-30 (căn cứ)                      | ghi nghỉ việc `E302` thiếu căn cứ / căn cứ thiếu phần / dùng mã thông báo làm căn cứ                                                                                                                                                                         | integration                                                                              | 422 `OFFBOARDING_CASE.GROUNDS_REQUIRED` / `GROUNDS_INCOMPLETE` / `GROUNDS_IS_NOTICE`; không hồ sơ nào                                                                                                                                                                                               | planned                  |
 | `US-03-04` AC-30 (không tài khoản)             | `E304` chưa xếp phòng, không tài khoản, không quyền; ghi nghỉ việc đột xuất                                                                                                                                                                                  | integration                                                                              | chỉ sự kiện nghỉ việc (`LEFT`); không tác vụ; đóng được                                                                                                                                                                                                                                             | planned                  |
-| `D-S17` xếp phòng chưa hiệu lực                | `E303` được xếp vào `P-DES` từ 20/11; hôm nay 05/11 Super Admin ghi nghỉ việc (có kế hoạch, rồi một ca đột xuất)                                                                                                                                             | integration                                                                              | 201 `department: null`; placement bị xóa, hồ sơ giữ `cancelled_placement_*`; audit `EMPLOYEE.FIRST_PLACEMENT_CANCELLED`; `H1` nhận báo nghỉ việc                                                                                                                                                    | planned                  |
-| `D-S17` hủy hồ sơ                              | hủy hồ sơ của `E303` khi `P-DES` còn hoạt động; ca khác `P-DES` đã ngừng trước khi hủy                                                                                                                                                                       | integration                                                                              | placement khôi phục cùng id/phòng/ngày; ca phòng đã ngừng: không khôi phục, `firstPlacementRestored: false`, `E303` _chưa xếp phòng_                                                                                                                                                                | planned                  |
+| `D-S17` xếp phòng chưa hiệu lực                | `E303` được xếp vào `P-DES` từ 20/11; hôm nay 05/11 Super Admin ghi nghỉ việc (có kế hoạch ngày cuối 15/11, rồi một ca đột xuất)                                                                                                                             | integration                                                                              | 201 `department: null`; placement bị xóa, hồ sơ giữ `cancelled_placement_*`; audit `EMPLOYEE.FIRST_PLACEMENT_CANCELLED`; `H1` nhận báo nghỉ việc                                                                                                                                                    | planned                  |
+| `D-S17` hủy hồ sơ                              | hủy hồ sơ của `E303` khi `P-DES` còn hoạt động; ca khác `P-DES` đã ngừng trước khi hủy                                                                                                                                                                       | integration                                                                              | response `firstPlacementRestored: true`, placement khôi phục cùng id/phòng/ngày; ca phòng đã ngừng: không khôi phục, `firstPlacementRestored: false`, `E303` _chưa xếp phòng_                                                                                                                       | planned                  |
 | `D-S17` xếp phòng khi đang bàn giao            | `E303` `HANDING_OVER`, Super Admin xếp phòng lần đầu                                                                                                                                                                                                         | integration                                                                              | 409 `EMPLOYEE.FIRST_PLACEMENT_EMPLOYEE_LEAVING`                                                                                                                                                                                                                                                     | planned                  |
+| `D-S28` ngày cuối từ ngày xếp phòng            | `E305` được xếp vào `P-DES` từ 20/11; hôm nay 05/11 Super Admin ghi nghỉ việc ngày cuối 20/11, rồi 30/11; ngày 20/11 (`pretend-today`) ghi lại ngày cuối 30/11                                                                                               | unit (`offboarding.policy.spec.ts`: trước/bằng/sau `validFrom`) + integration            | 05/11: 409 `OFFBOARDING_CASE.PLACEMENT_OVERLAP` `details: {reason: FIRST_PLACEMENT_PENDING, validFrom: 2026-11-20}`, placement giữ, không hồ sơ/audit; 20/11: 201 luồng thường, `department` `P-DES`, `H1` có nghĩa vụ xác nhận bàn giao                                                            | planned                  |
+| `D-S28` đổi ngày cuối                          | hồ sơ `E303` (đã hủy xếp phòng từ 20/11, ngày cuối 15/11): đổi ngày cuối sang 20/11; sang 18/11                                                                                                                                                              | integration                                                                              | 20/11 ⟹ 409 `PLACEMENT_OVERLAP` `FIRST_PLACEMENT_PENDING`, hồ sơ không đổi; 18/11 ⟹ đổi được                                                                                                                                                                                                        | planned                  |
 | `INV-20` ngoại lệ có điều kiện                 | xóa bằng SQL placement chưa hiệu lực duy nhất khi không có hồ sơ nghỉ việc nêu nó; khi hồ sơ đã hủy                                                                                                                                                          | integration                                                                              | `23001` cả hai                                                                                                                                                                                                                                                                                      | planned                  |
 | AC-30 mốc ngày                                 | ngày cuối trước ngày vào làm; người đã xếp phòng giữ mốc ngày bắt đầu placement                                                                                                                                                                              | unit (`offboarding.policy.spec.ts`, `offboarding-change.policy.spec.ts`)                 | `LAST_WORKING_DAY_INVALID` theo `hireDate` khi không placement; hành vi cũ giữ khi có placement                                                                                                                                                                                                     | planned                  |
 | `D-S18` policy                                 | `requirementOf` nguồn `DEPARTURE`/`ABRUPT_DEPARTURE` có/không phòng; nguồn IT không phòng                                                                                                                                                                    | unit (`handover-confirmer.policy.spec.ts`)                                               | không phòng ⟹ null cho nguồn rời đi; nguồn IT giữ `IT_ADMIN`                                                                                                                                                                                                                                        | planned                  |
@@ -565,7 +604,17 @@ placement hiệu lực.
   mọi đọc phòng/Cost Center; thứ tự bên (`REQUESTER` → `BENEFICIARY`) rồi lý do (`SPENDING_APPROVER` → `UNPLACED`); không khóa
   nhân viên trong kiểm (tài khoản `FOR SHARE` qua `lockSpendingApproverAmong` rồi mới đọc; theo từng người nhân viên → tài khoản);
   người gọi `groupRequestCandidateList` _chưa xếp phòng_ ⟹ 422 chung `REQUESTER` (bỏ ghi chú "chốt khi implement" ở test plan);
-  đề xuất hình bản xem trước của người _chưa xếp phòng_ (`department: null`, chờ Owner); thêm dòng test thứ tự/khóa, cấp phát.
+  đề xuất hình bản xem trước của người _chưa xếp phòng_ (`department: null` — Owner duyệt sau, `D-S27`); thêm dòng test thứ
+  tự/khóa, cấp phát.
+- 02/11/2026 — sửa theo rà soát pre-flight cuối và Owner 01/11/2026 (`D-S27`, `D-S28`): mọi điểm "chờ Owner" của spec đã
+  duyệt (`D-S27`: hình bản xem trước, khôi phục xếp phòng khi hủy hồ sơ với cờ `firstPlacementRestored` ở response,
+  `details.reason: 'UNPLACED'` ở hai lỗi có sẵn, `23001`); `D-S17` chỉ áp khi ngày làm việc cuối trước `validFrom`, ngày
+  cuối từ `validFrom` ⟹ 409 `PLACEMENT_OVERLAP` `FIRST_PLACEMENT_PENDING` (+ `validFrom`), từ `validFrom` luồng thường
+  (`D-S28`, Task D.2, D.3, hai dòng test); preview trả sớm theo tập _chưa xếp phòng_ của người yêu cầu, kể cả khi lý do báo
+  là `SPENDING_APPROVER` (dòng test `C2`); bỏ `projectLabel` khỏi preview (đã gỡ ở `qd93-remove-department-projects` phase
+  1); kiểm người chịu trách nhiệm khi cấp tài khoản dịch vụ đọc `getRequestUnits` (`provisioning-holder.service.ts`, Task
+  C.3); test trưởng phòng `E302` cấp `MANAGER` trước; quy tắc migration không sửa `scripts/verify/merged-migrations.txt`;
+  giới hạn 500 dòng của `employee.repo.ts`.
 
 Quyết định kỹ thuật (Owner duyệt 01/11/2026):
 
@@ -576,10 +625,12 @@ Quyết định kỹ thuật (Owner duyệt 01/11/2026):
 - OQ-4 — đã thay bằng `QĐ-93g`(5) `D-S14` (nghiệp vụ, không phải đề xuất kỹ thuật): luồng rút gọn ở Phase D.
 - OQ-5 — import hiện trạng seat với người chưa xếp phòng: giữ hành vi hiện tại.
 
-Chờ Owner review toàn spec (thiết kế mới của lượt sửa 01/11/2026): khôi phục placement khi hủy hồ sơ `D-S17` và ca phòng đã
-ngừng; `DEPARTURE_RECORDED` báo trưởng phòng của phòng bị hủy; `details.reason: 'UNPLACED'` ở `REQUESTABLE_SOFTWARE.NO_DEPARTMENT`
-và `DEPARTMENT_TRANSFER.PLACEMENT_OVERLAP`; `SQLSTATE 23001` cho trigger; hình bản xem trước của người _chưa xếp phòng_
-(`department: null`, `totalExpectedWorkingDays: 0` — lượt 02/11/2026).
+Owner 01/11/2026 (`D-S27`) duyệt mọi điểm kỹ thuật trước đây còn chờ: khôi phục placement khi hủy hồ sơ (`D-S17`) và ca phòng
+đã ngừng, cờ `firstPlacementRestored` ở response; `DEPARTURE_RECORDED` báo trưởng phòng của phòng bị hủy;
+`details.reason: 'UNPLACED'` ở `REQUESTABLE_SOFTWARE.NO_DEPARTMENT` và `DEPARTMENT_TRANSFER.PLACEMENT_OVERLAP`; `SQLSTATE 23001`
+cho trigger; hình bản xem trước của người _chưa xếp phòng_ (`department: null`, `chain: []`, `totalExpectedWorkingDays: 0`,
+`blockedBy`). Owner 01/11/2026 (`D-S28`): nhánh hủy xếp phòng chỉ khi ngày cuối trước `validFrom`. Còn chờ: Owner review toàn
+spec.
 
 Scope map: các dòng đã có trong roadmap — G1 (`US-01-01` AC-22), G2 (`US-02-02` AC-2, AC-7, AC-20, AC-21; `US-02-03` AC-2,
 AC-4, AC-8; Remaining owner của `US-02-03` AC-1, `US-03-06` AC-23), G5 (`US-05-02` AC-14; Remaining owner của các AC trộn với

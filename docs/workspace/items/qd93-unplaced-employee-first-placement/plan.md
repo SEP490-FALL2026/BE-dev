@@ -2,11 +2,13 @@
 
 - [Spec](spec.md); revision đầu vào: Docs `69e8a3d`, BE `1a77ffe8`. [Test plan](test-plan.md) cho Phase C (từng route
   tạo Request theo hợp đồng `D-S21`, viết lại 01/11/2026).
-- Bổ sung sau pin: D-S17…D-S26 (Docs chưa commit) — Owner 01/11/2026, đã có trong `QĐ-93g` ở Docs working tree.
+- Bổ sung sau pin: D-S17…D-S26 (Docs chưa commit) — Owner 01/11/2026, đã có trong `QĐ-93g` ở Docs working tree; `D-S27`
+  (mọi điểm kỹ thuật còn chờ của spec đã duyệt), `D-S28` (nhánh hủy xếp phòng chỉ khi ngày cuối trước `validFrom`) — Owner
+  01/11/2026, chưa có ở Docs.
 - Phụ trách: chưa phân công (sở hữu cả thiết kế, implementation, test và cập nhật plan). Thiết kế ban đầu bởi: AI theo
   giao việc Owner (gói `QĐ-93`, 01/11/2026).
-- Owner review: đã duyệt các đề xuất kỹ thuật 01/11/2026; chưa review toàn spec (Phase D theo `QĐ-93g`(5) `D-S14`, lượt sửa
-  `D-S17`…`D-S25`). Peer review: tùy chọn.
+- Owner review: đã duyệt các đề xuất kỹ thuật 01/11/2026, gồm mọi điểm còn chờ (`D-S27`) và `D-S28`; chưa review toàn spec
+  (Phase D theo `QĐ-93g`(5) `D-S14`, lượt sửa `D-S17`…`D-S28`). Peer review: tùy chọn.
 - Triển khai: `not-started`. PR: chưa có.
 
 ## Before coding
@@ -25,15 +27,19 @@
   A; `qd93-code-format-xlsx-employee-import` và `employee-directory-read` (W4) merge sau. **A–D là một PR, merge một lần** —
   không merge phase lẻ lên `dev`.
 - Migration: `<ts>` dưới đây là chỗ giữ tên. Implementer đặt timestamp thật khi tạo thư mục; trước merge đặt lại timestamp sau
-  migration mới nhất trên `dev` (hai migration của lát này giữ thứ tự A trước D) và thêm vào
-  `scripts/verify/merged-migrations.txt` (danh sách gate thứ tự migration; đang dừng ở `20261028110000` dù `dev` có migration
-  mới hơn — không sửa danh sách ở lượt thiết kế này).
+  migration mới nhất trên `dev` (hai migration của lát này giữ thứ tự A trước D). KHÔNG sửa `scripts/verify/merged-migrations.txt`
+  trên nhánh hạng mục (thư mục migration mới xếp sau cùng nên gate `migration-order` vẫn xanh); Owner thêm vào danh sách khi
+  phát hành.
 - Đọc chữ `QĐ-93g`(3)–(5) (`D-S17`, `D-S18`, `D-S25`) và `US-03-04` AC-30, `US-03-01` AC-25 ở Docs working tree hoặc commit
   mới hơn `69e8a3d`; đọc lại `src/modules/personnel/offboarding/*`, `personnel/transfer/*`, `licensing/handover/*` trên `dev`.
 - Người gọi writer cũ: `rg -n "createEmployeeWithPlacement" src test scripts` (src: confirmation service, `installation.api.ts`,
   `dev-seed.api.ts`, organization; test: `http-test-app.ts`, `builders/account.builder.ts`,
   `employee-import-service-harness.ts`, `installation-bootstrap-facts`, `organization.integration-spec.ts`, ba unit spec).
 - Nơi xóa placement: `rg -n "DELETE FROM employee_placements|employeePlacement.delete" src test` (danh sách ở Task A.1).
+- `src/modules/organization/employee/employee.repo.ts` 380 dòng ở `1a77ffe8`; lát này thêm `createEmployee`, `unplacedAmong`,
+  `unplacedEmployeeSql`, `insertFirstPlacement`, `scheduledFirstPlacement`, `cancelScheduledFirstPlacement`,
+  `restoreFirstPlacement`. Lint `max-lines` 500 dòng code — vượt thì tách các hàm placement đầu sang một repo cùng thư mục, giữ
+  `unplacedEmployeeSql`/`unplacedAmong` ở `employee.repo.ts` (danh bạ gọi tên này); không nới rule.
 - Database test riêng theo `test/README.md`.
 
 ## Tasks
@@ -151,15 +157,21 @@ DEPARTMENT_INACTIVE | DATE_IN_PAST | BEFORE_HIRE_DATE`).
 
 ### Task B.2: Route, DTO, ánh xạ lỗi và HTTP contract
 
-- Files: `first-placements.controller.ts` (`@Controller({ path: 'employees', version: '1' })`, `@Post(':id/first-placements')`,
-  `@RequireRoles('SUPER_ADMIN')`, operationId `employeeFirstPlacementCreate`, summary ≤ 70 ký tự, 201
-  `EMPLOYEE.FIRST_PLACEMENT_RECORDED`, lỗi 403/404/409/422 có ví dụ), `first-placement.dto.ts`,
+- Files: `first-placements.controller.ts` (`@Controller({ path: 'employees', version: '1' })`,
+  `@Post(':id/first-placements')`, `@RequireRoles('SUPER_ADMIN')`, operationId `employeeFirstPlacementCreate`, summary ≤ 70
+  ký tự, 201 `EMPLOYEE.FIRST_PLACEMENT_RECORDED`, lỗi 403/404/409/422 có ví dụ), `first-placement.dto.ts`,
   `first-placement.http-errors.ts` (`EMPLOYEE.FIRST_PLACEMENT_<PROBLEM>`; 409 cho `ALREADY_PLACED`, `EMPLOYEE_LEFT`,
-  `EMPLOYEE_LEAVING`; 422 còn lại; `FIRST_PLACEMENT_ERROR_EXAMPLES`), `src/modules/organization/organization-http.module.ts`,
-  `test/http/organization/employees.http-spec.ts` (401, 403 cho FINANCE/IT_ADMIN/EMPLOYEE/không vai, 422 body thiếu/thừa khóa/
-  ngày sai/`hrBasis`), `test/support/api-coverage-manifest.ts`, `test/support/openapi-example-manifest.ts`,
-  `test/support/openapi-example-route-codes-organization.ts`, `test/http/platform/openapi-presentation.http-spec.ts` (số
-  operation + 1).
+  `EMPLOYEE_LEAVING`; 422 còn lại; `FIRST_PLACEMENT_ERROR_EXAMPLES`),
+  `src/modules/organization/organization-http.module.ts`, `test/http/organization/employees.http-spec.ts` (401, 403 cho
+  FINANCE/IT_ADMIN/EMPLOYEE/không vai, 422 body thiếu/thừa khóa/ngày sai/`hrBasis`),
+  `test/support/api-coverage-manifest.ts`, `test/support/openapi-example-manifest.ts`,
+  `test/support/openapi-example-route-codes-organization.ts`, `test/http/platform/openapi-presentation.http-spec.ts:254` (số
+  trên `dev` lúc rebase + 1; theo thứ tự merge của gói từ 306 ở `1a77ffe8`: `qd93-remove-hr-basis-org-writes` 306 →
+  `qd93-remove-in-app-super-admin-transfer` 305 (−1) → `qd93-parameter-labels-dashboard-queues` 305 →
+  `qd93-direct-manager-spending-approver-roles` 305 → `qd93-remove-department-projects` phase 1 301 (−4) →
+  `qd93-remove-fallback-substitute-approvers` phase A 299 (−2) → lát này 300 (+1) → `qd93-code-format-xlsx-employee-import`
+  300 → `employee-directory-read` 302 (+2) → `qd93-budget-record-attachments` 312 (+10) → `dashboard-request-queues-wiring`
+  312).
 - Depends on: Task B.1.
 - Acceptance: HTTP contract xanh với service giả qua `createHttpContractApp({ overrides })`; inventory/example gate xanh.
 - Verify: `pnpm openapi:export`; `pnpm test:http -- test/http/organization/employees.http-spec.ts test/http/platform/openapi-presentation.http-spec.ts`
@@ -175,7 +187,9 @@ DEPARTMENT_INACTIVE | DATE_IN_PAST | BEFORE_HIRE_DATE`).
   `test/integration/organization/employee-first-placement-http.integration-spec.ts` (mọi ca AC-21 của spec, hai lần gọi đồng
   thời, xếp phòng ↔ ngừng phòng đồng thời cả hai thứ tự, đọc `GET /departments/{id}/employees` trước/sau ngày hiệu lực, không
   announcement/rà soát/tác vụ, thông báo ba người nhận; `US-01-01` AC-22: tạo tài khoản, gán vai cho `E302` rồi xếp phòng),
-  `test/integration/organization/department-head-http.integration-spec.ts` (gán/chỉ định `E302` ⟹ 422 — vế `E302` của
+  `test/integration/organization/department-head-http.integration-spec.ts` (cấp `MANAGER` cho tài khoản `E302` trước qua
+  điểm nối `ensureManagerGrant` của lát vai — lát vai kiểm `HEAD_MANAGER_ROLE_REQUIRED` trước thành viên; rồi gán/chỉ định
+  `E302` ⟹ 422 `HEAD_NOT_A_MEMBER_ON_DATE`; đối chứng không `MANAGER` ⟹ 422 `HEAD_MANAGER_ROLE_REQUIRED` — vế `E302` của
   `US-03-06` AC-23).
 - Depends on: Task B.2.
 - Acceptance: test integration xanh; audit có trước/sau; không dòng `organization_change_announcements` mới cho placement đầu.
@@ -222,9 +236,11 @@ tx?)`, `scheduledFirstPlacement(employeeId, onDate, tx)`), `employee/employee-re
   `OrganizationReadApi.getUnplacedEmployeeIds(mọi id các bên, tx)` **sau** `lockSpendingApproverAmong`, không khóa nhân viên) và
   `request-party/request-party.policy.ts` (+ `.spec.ts`; nhánh `UNPLACED` của `requestPartyBlock`/`ineligibleReasons`, thứ tự bên
   rồi lý do không đổi); `src/modules/requests/access-request/request-facts.service.ts` (`assess`, `assessProposal` đọc
-  `getRequestUnits` — sau lời gọi kiểm chung), `request-submission/{request-preview.service.ts,request-preview.dto.ts}` (trả sớm
-  khi `blockedBy.reason = 'UNPLACED'`, `department` nullable, `totalExpectedWorkingDays` `nonnegative` — đề xuất chờ Owner, spec ›
-  _Từ chối Request…_), `draft/request-draft.service.ts`, `renewal-request/renewal-request.service.ts`,
+  `getRequestUnits` — sau lời gọi kiểm chung), `request-submission/{request-preview.service.ts,request-preview.dto.ts}` (trả sớm,
+  không gọi `assess`, khi người yêu cầu thuộc tập _chưa xếp phòng_ mà bước kiểm chung đã đọc — kể cả khi
+  `blockedBy.reason = 'SPENDING_APPROVER'` vì người đó cũng là Người duyệt chi; `department` nullable, `chain: []`,
+  `totalExpectedWorkingDays` `nonnegative` — Owner duyệt 01/11/2026 `D-S27`, spec › _Từ chối Request…_),
+  `draft/request-draft.service.ts`, `renewal-request/renewal-request.service.ts`,
   `return-request/return-request.service.ts`, `group-request-submission/group-request.service.ts` (người gửi),
   `group-request-submission/group-candidate.service.ts` (`getRequestMemberIds`; người gọi _chưa xếp phòng_ ⟹ 422 chung qua
   `blockOf` đã đặt ở fallback, trước `getRequestUnits`), `test/support/openapi-example-route-codes-requests-spend.ts`
@@ -234,10 +250,12 @@ tx?)`, `scheduledFirstPlacement(employeeId, onDate, tx)`), `employee/employee-re
   `test/integration/audit/access-request-http.integration-spec.ts` và
   `test/integration/requests/service-account-request.integration-spec.ts` (người không placement ⟹ 422 `UNPLACED`).
 - Depends on: Task C.1.
-- Acceptance: dòng người gửi, preview (`blockedBy`), danh sách ứng viên và dòng _thứ tự phán định và khóa_ của test matrix
-  xanh; không lỗi phòng nào ra trước 422 chung cho người _chưa xếp phòng_; ca `NO_DEPARTMENT` cũ (người đã nghỉ việc) giữ mã cũ;
-  không Request/bước/cam kết nào khi từ chối. Task chạm > 5 file vì một nhánh của một policy chạy ở mọi cửa; tách C.2a (policy +
-  `request-facts`, preview, draft) / C.2b (gia hạn, hoàn trả, nhóm, danh sách ứng viên) nếu diff lớn.
+- Acceptance: dòng người gửi, preview (`blockedBy`, gồm dòng _preview trả sớm_ của `C2` — Người duyệt chi _chưa xếp phòng_:
+  200, `department: null`, không 409 `ACCESS_REQUEST.NO_DEPARTMENT`), danh sách ứng viên và dòng _thứ tự phán định và khóa_
+  của test matrix xanh; không lỗi phòng nào ra trước 422 chung cho người _chưa xếp phòng_; ca `NO_DEPARTMENT` cũ (người đã
+  nghỉ việc) giữ mã cũ; không Request/bước/cam kết nào khi từ chối. Task chạm > 5 file vì một nhánh của một policy chạy ở
+  mọi cửa; tách C.2a (policy + `request-facts`, preview, draft) / C.2b (gia hạn, hoàn trả, nhóm, danh sách ứng viên) nếu
+  diff lớn.
 - Verify: `pnpm test -- src/modules/identity-access/request-party src/modules/requests` (spec cạnh file đã sửa);
   `pnpm test:integration -- test/integration/requests/unplaced-employee-requests.integration-spec.ts test/integration/audit/access-request-http.integration-spec.ts test/integration/requests/service-account-request.integration-spec.ts test/integration/requests/access-request-preview.integration-spec.ts test/integration/requests/access-request-draft-constraints.integration-spec.ts test/integration/requests/return-request.integration-spec.ts test/integration/requests/group-request-submit.integration-spec.ts`
   → xanh; `pnpm arch:capabilities --module identity-access` không vòng.
@@ -251,15 +269,19 @@ tx?)`, `scheduledFirstPlacement(employeeId, onDate, tx)`), `employee/employee-re
   trước mọi lý do phòng), `group-request-submission/group-submission-facts.service.ts` (`getRequestUnits`),
   test integration của Task C.2 (thêm dòng; tách file thứ hai
   `test/integration/requests/unplaced-employee-delegated-group.integration-spec.ts` nếu vượt 800 dòng) gồm ca `D-S25`: `E302`
-  xếp vào `P-DES` từ ngày mai — `H1` tạo thay được, `E302` tự gửi được (tính vào `CC-DES`), ứng viên nhóm có `E302`; và ca cấp
-  phát `responsibleEmployeeId = E302` (kiểm chung của fallback đã nằm trong `problemWith` trước `OUTSIDE_DEPARTMENT` — không sửa
-  `licensing`).
+  xếp vào `P-DES` từ ngày mai — `H1` tạo thay được, `E302` tự gửi được (tính vào `CC-DES`), ứng viên nhóm có `E302`;
+  `src/modules/licensing/provisioning/tasks/provisioning-holder.service.ts:113` (`problemWith`: `getOwningUnits` →
+  `getRequestUnits`, `D-S25` — kiểm chung của fallback vẫn đứng trước `OUTSIDE_DEPARTMENT`) và ca cấp phát trong
+  `test/integration/requests/service-account-request.integration-spec.ts`: `responsibleEmployeeId = E302` khi _chưa xếp phòng_
+  ⟹ 422 `UNPLACED`; sau khi `E302` được xếp vào `P-DES` từ ngày mai ⟹ cấp được tài khoản của `P-DES`, không
+  `PROVISIONING.RESPONSIBLE_INVALID` (`OUTSIDE_DEPARTMENT`).
 - Depends on: Task C.2.
-- Acceptance: dòng tạo thay/nhóm/cấp phát/`D-S25` của test matrix xanh, gồm tạo thay `E302` + `E1` ⟹ 422 chung (không
-  `OUTSIDE_DEPARTMENT`/`NOT_HEAD`) và ca song song ghi nghỉ việc ↔ tạo thay không deadlock; không thao tác thêm người thụ hưởng ở
-  hồ sơ bổ sung (`D-S23`).
-- Verify: `pnpm test -- src/modules/requests/delegated-request src/modules/requests/group-request` → xanh;
-  `pnpm test:integration -- test/integration/requests/unplaced-employee-requests.integration-spec.ts test/integration/requests/spend-delegated-requests.integration-spec.ts test/integration/requests/group-request-submit.integration-spec.ts test/integration/requests/group-request-edge.integration-spec.ts`
+- Acceptance: dòng tạo thay/nhóm/cấp phát/`D-S25` (gồm _`D-S25` cấp phát_) của test matrix xanh, gồm tạo thay `E302` + `E1`
+  ⟹ 422 chung (không `OUTSIDE_DEPARTMENT`/`NOT_HEAD`) và ca song song ghi nghỉ việc ↔ tạo thay không deadlock; không thao
+  tác thêm người thụ hưởng ở hồ sơ bổ sung (`D-S23`).
+- Verify: `pnpm test -- src/modules/requests/delegated-request src/modules/requests/group-request src/modules/licensing/provisioning`
+  → xanh;
+  `pnpm test:integration -- test/integration/requests/unplaced-employee-requests.integration-spec.ts test/integration/requests/spend-delegated-requests.integration-spec.ts test/integration/requests/group-request-submit.integration-spec.ts test/integration/requests/group-request-edge.integration-spec.ts test/integration/requests/service-account-request.integration-spec.ts`
   → xanh.
 
 ### Task C.4: Bộ chọn phần mềm (catalog)
@@ -299,8 +321,10 @@ test plan. Hành trình E2E `pnpm test:e2e -- test/e2e/paid-request-to-seat.e2e-
   việc chưa hủy nêu `cancelled_placement_id = OLD.id`), `prisma/models/personnel.prisma` (`departmentId String?`, quan hệ
   `Department?`, ba cột mới), `src/modules/personnel/offboarding/offboarding.policy.spec.ts`,
   `change/offboarding-change.policy.spec.ts` (mốc `hireDate` khi không placement), file mới
-  `test/integration/personnel/offboarding-unplaced.integration-spec.ts` (các dòng `US-03-04` AC-30 và `D-S17` của test matrix,
-  viết trước — đỏ: hôm nay `PLACEMENT_OVERLAP` `NO_OPEN_PLACEMENT`), ca CHECK và ngoại lệ trigger trong
+  `test/integration/personnel/offboarding-unplaced.integration-spec.ts` (các dòng `US-03-04` AC-30, `D-S17` và `D-S28` của
+  test matrix, viết trước — đỏ: hôm nay `PLACEMENT_OVERLAP` `NO_OPEN_PLACEMENT`; ca `D-S28` "từ `validFrom`" dùng
+  `test/support/pretend-today.ts`), `offboarding.policy.spec.ts` thêm ca ngày cuối trước/bằng/sau `validFrom`, ca CHECK và
+  ngoại lệ trigger trong
   `test/integration/organization/employee-placement-keep-one.integration-spec.ts`.
 - Depends on: Checkpoint Phase C.
 - Acceptance: migration áp trên database mới; CHECK từ chối; trigger vẫn `23001` khi không có hồ sơ nêu placement; ca AC-30
@@ -312,31 +336,41 @@ test plan. Hành trình E2E `pnpm test:e2e -- test/e2e/paid-request-to-seat.e2e-
 ### Task D.2: Nhánh không phòng khi ghi nghỉ việc
 
 - Files: `src/modules/personnel/offboarding/offboarding-preconditions.service.ts` (rẽ nhánh theo `getUnplacedEmployeeIds` /
-  `getScheduledFirstPlacement`, khóa, đọc lại sau khóa), `offboarding.policy.ts` (`placementFrom: BusinessDate | null`),
+  `getScheduledFirstPlacement` và so ngày làm việc cuối với `validFrom` — `D-S28`: trước ⟹ nhánh hủy, từ `validFrom` ⟹ 409
+  `PLACEMENT_OVERLAP` `details: { reason: 'FIRST_PLACEMENT_PENDING', validFrom }`; khóa, đọc lại sau khóa),
+  `offboarding.policy.ts` (`placementFrom: BusinessDate | null`; lý do `FIRST_PLACEMENT_PENDING`), `offboarding.http-errors.ts`
+  (ví dụ `FIRST_PLACEMENT_PENDING`), `offboarding.controller.ts` (mô tả 409),
   `offboarding-endings.service.ts` (bỏ kết thúc placement và bàn giao trưởng phòng khi không phòng),
   `offboarding-case-writer.service.ts` (`department_id` null; không `handovers.open`; thông báo không phòng),
   `offboarding-handover.service.ts` (không mở khi `departmentId` null), `offboarding-revocation.service.ts` (chỉ truyền
   `context.departmentId` khi có), `src/modules/personnel/event-notice/personnel-notifier.service.ts` (`departmentId: string |
 null`), `offboarding.repo.ts`, `offboarding.types.ts`.
 - Depends on: Task D.1.
-- Acceptance: dòng ghi, căn cứ, không tài khoản, đồng thời ↔ xếp phòng lần đầu của test matrix xanh; không mã lỗi mới ở
-  `OFFBOARDING_CASE.*`; luồng của người đã xếp phòng không đổi. Tách D.2a (tiền điều kiện + policy) / D.2b (kết thúc + ghi +
+- Acceptance: dòng ghi, căn cứ, không tài khoản, đồng thời ↔ xếp phòng lần đầu và _`D-S28` ngày cuối từ ngày xếp phòng_ của
+  test matrix xanh; không mã lỗi mới ở `OFFBOARDING_CASE.*` (chỉ thêm `details.reason` `FIRST_PLACEMENT_PENDING`); luồng của
+  người đã xếp phòng không đổi. Tách D.2a (tiền điều kiện + policy) / D.2b (kết thúc + ghi +
   thông báo) nếu diff lớn.
 - Verify: `pnpm test -- src/modules/personnel/offboarding src/modules/personnel/event-notice` → xanh;
   `pnpm test:integration -- test/integration/personnel/offboarding-unplaced.integration-spec.ts test/integration/personnel/offboarding-departure.integration-spec.ts test/integration/requests/offboarding-record.integration-spec.ts test/integration/requests/offboarding-integrity.integration-spec.ts`
   → xanh phần ghi, hồi quy xanh.
 
-### Task D.3: Hủy xếp phòng chưa hiệu lực khi nghỉ việc và khôi phục khi hủy hồ sơ (`D-S17`)
+### Task D.3: Hủy hay giữ xếp phòng chưa hiệu lực theo ngày cuối; khôi phục khi hủy hồ sơ (`D-S17`, `D-S28`)
 
 - Files: `src/modules/organization/employee/employee.repo.ts` (`cancelScheduledFirstPlacement`, `restoreFirstPlacement`),
   `src/modules/organization/public/organization.api.ts` (hai lệnh, audit `EMPLOYEE.FIRST_PLACEMENT_CANCELLED`),
-  `src/modules/personnel/offboarding/offboarding-case-writer.service.ts` (ghi ba cột rồi xóa sau khi chèn hồ sơ, trước
-  `leaveInTx`; `alsoDepartmentIds` cho `DEPARTURE_RECORDED`), `change/offboarding-change-writer.service.ts` (`cancel`: khôi
-  phục khi phòng `ACTIVE`, `detail.firstPlacementRestored`), `offboarding-frame.service.ts` (khóa phòng của placement đã hủy
+  `src/modules/personnel/offboarding/offboarding-case-writer.service.ts` (chỉ nhánh ngày cuối **trước** `validFrom`: ghi ba cột
+  rồi xóa sau khi chèn hồ sơ, trước `leaveInTx`; `alsoDepartmentIds` cho `DEPARTURE_RECORDED`),
+  `change/offboarding-change-writer.service.ts` (`cancel`: khôi phục khi phòng `ACTIVE`, response `firstPlacementRestored` và
+  `detail.firstPlacementRestored` — `D-S27`; đổi ngày cuối của hồ sơ có `cancelled_placement_id` sang ngày từ
+  `cancelled_placement_from` ⟹ 409 `PLACEMENT_OVERLAP` `FIRST_PLACEMENT_PENDING` — `D-S28`), `offboarding.dto.ts`
+  (`firstPlacementRestored` tùy chọn ở response hủy), `offboarding-frame.service.ts` (khóa phòng của placement đã hủy
   `FOR SHARE` trước nhân viên), test của Task D.1.
 - Depends on: Task D.2.
-- Acceptance: dòng `D-S17` của test matrix xanh (ghi có kế hoạch và đột xuất, hủy khi phòng còn/đã ngừng, xếp phòng khi
-  `HANDING_OVER` ⟹ 409 `EMPLOYEE_LEAVING`).
+- Acceptance: dòng `D-S17` và `D-S28` của test matrix xanh: ghi có kế hoạch (ngày cuối trước `validFrom`) và đột xuất ⟹ hủy;
+  ngày cuối từ `validFrom` ghi trước ngày đó ⟹ 409 `FIRST_PLACEMENT_PENDING` (+ `validFrom`), placement giữ, không hồ sơ; từ
+  `validFrom` (`pretend-today`) ⟹ luồng thường, trưởng phòng của phòng đó có nghĩa vụ xác nhận bàn giao; đổi ngày cuối sang từ
+  `validFrom` ⟹ 409, hồ sơ không đổi; hủy khi phòng còn/đã ngừng ⟹ `firstPlacementRestored` `true`/`false`; xếp phòng khi
+  `HANDING_OVER` ⟹ 409 `EMPLOYEE_LEAVING`.
 - Verify: `pnpm test:integration -- test/integration/personnel/offboarding-unplaced.integration-spec.ts test/integration/organization/employee-first-placement-http.integration-spec.ts test/integration/requests/offboarding-change.integration-spec.ts`
   → xanh.
 
@@ -405,8 +439,8 @@ Chạy từ gốc BE: `pnpm check`, `pnpm openapi:export`, HTTP và integration 
 | chưa chạy          | —                     | —                 | thiết kế `draft`        |
 
 - [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
-- [ ] Spec/plan/test plan phản ánh đúng implementation cuối; tên migration (timestamp thật) ghi lại ở spec và
-      `scripts/verify/merged-migrations.txt`.
+- [ ] Spec/plan/test plan phản ánh đúng implementation cuối; tên migration (timestamp thật) ghi lại ở spec (không sửa
+      `scripts/verify/merged-migrations.txt` — Owner thêm khi phát hành).
 - [ ] Diff cuối đã tự review; module card cập nhật; FE được báo route, wire, nhánh `UNPLACED` và mã mới.
 - [ ] Giao Owner review trên revision cụ thể; cập nhật roadmap/PR. Chỉ ghi `merged-dev`, `accepted`, `released` sau
       đúng sự kiện thật.

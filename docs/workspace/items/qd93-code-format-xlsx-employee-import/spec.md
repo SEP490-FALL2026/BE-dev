@@ -175,9 +175,12 @@ Vế sở hữu ở đây: `US-02-02` AC-14 — mã nhân viên sai format và m
 ### Đọc tệp: CSV hoặc `.xlsx`
 
 - Nhận diện theo **nội dung** (không theo tên/đuôi): bắt đầu bằng `50 4B 03 04` (ZIP) ⟹ đường `.xlsx`; bắt đầu bằng
-  `D0 CF 11 E0 A1 B1 1A E1` (OLE2: `.xls` cũ, `.xlsx` đặt mật khẩu) ⟹ 422 `IMPORT.FILE_INVALID` problem
-  `FILE_FORMAT_UNSUPPORTED` (mới); còn lại ⟹ đường CSV hiện hành (có byte NUL ⟹ `FILE_NOT_TEXT`; BOM UTF-8 được bỏ —
-  `src/core/csv.ts`).
+  `D0 CF 11 E0 A1 B1 1A E1` (OLE2: `.xls` cũ, `.xlsx` đặt mật khẩu) ⟹ 422 `IMPORT.FILE_FORMAT_UNSUPPORTED` (mã mới:
+  `FileProblem` thêm `FILE_FORMAT_UNSUPPORTED`, wire `IMPORT.<problem>` như `IMPORT.FILE_NOT_TEXT` —
+  `employee-import.http-errors.ts:29-31`); còn lại ⟹ đường CSV hiện hành (có byte NUL ⟹ `FILE_NOT_TEXT`; BOM UTF-8 được bỏ —
+  `src/core/csv.ts`). Tệp bắt đầu bằng chữ ký ZIP mà hỏng (ví dụ 6 byte `50 4B 03 04 00 00` của
+  `employee-import-preview-http.integration-spec.ts:143-148`, hôm nay `FILE_NOT_TEXT`) ⟹ 422 `IMPORT.FILE_UNREADABLE`
+  `XLSX_INVALID`.
 - Giới hạn chung giữ nguyên: tệp ≤ 2 MiB (multer, 413), ≤ 1 000 dòng dữ liệu (`FILE_TOO_MANY_ROWS`), ≤ 40 cột và ô ≤ 2 000
   ký tự (`IMPORT.FILE_UNREADABLE` `TOO_MANY_COLUMNS`/`CELL_TOO_LONG`), hàng trống bị bỏ, hàng đầu có giá trị là header, bí danh
   header không đổi.
@@ -232,11 +235,17 @@ Vế sở hữu ở đây: `US-02-02` AC-14 — mã nhân viên sai format và m
   (`IMP--13`, `-IMP13`, `IMP_13`, `AB`, 21 ký tự), `EMPLOYEE_CODE_DUPLICATE_IN_FILE`, `FULL_NAME_REQUIRED`,
   `WORK_EMAIL_INVALID`, `WORK_EMAIL_DUPLICATE_IN_FILE`, `WORK_EMAIL_TAKEN`, `EMPLOYMENT_TYPE_INVALID`, `HIRE_DATE_INVALID`,
   `DEPARTMENT_NOT_FOUND`, `JOB_TITLE_TOO_LONG`, cộng một dòng hợp lệ); `employees-missing-column.csv` (thiếu `employee_code` ⟹
-  `IMPORT.FILE_MISSING_COLUMNS`); `README.md`; `expected-results.json` (theo mẫu hiện có: mỗi tệp — tổng dòng, hợp lệ, lỗi,
-  `newUnplaced`, theo phòng, và từng dòng `line`/`outcome`/`errors`).
+  `IMPORT.FILE_MISSING_COLUMNS`); `employees-no-department.csv`, `employees-no-department.xlsx` (header **không** có cột
+  `department_code`, 3 dòng người mới hợp lệ ⟹ cả 3 _chưa xếp phòng_, `newUnplaced: 3` — `US-02-02` AC-2; cột phòng tùy chọn
+  của `qd93-unplaced-employee-first-placement`); `README.md`; `expected-results.json` (theo mẫu hiện có: mỗi tệp — tổng dòng,
+  hợp lệ, lỗi, `newUnplaced`, theo phòng, và từng dòng `line`/`outcome`/`errors`); `manifest.json` (`{ file, sizeBytes,
+sha256 }` của mọi tệp mẫu).
 - CSV ghi UTF-8 **có BOM** (Excel mở đúng tiếng Việt; parser bỏ BOM). `.xlsx` **byte ổn định**: thời điểm tạo/sửa của
   workbook và ngày giờ của mục ZIP cố định (hằng trong script; nếu thư viện không cho đặt ngày mục ZIP thì script ghi lại
-  trường thời gian DOS của Local File Header và Central Directory về hằng đó) — chạy lại script không đổi byte nào.
+  trường thời gian DOS của Local File Header và Central Directory về hằng đó) — chạy lại script không đổi byte nào. Kiểm
+  bằng `sha256`: `generate-employee-import-examples.ts --check` sinh lại trong bộ nhớ và so với `manifest.json` đã commit
+  (không dựa vào `git diff`, vì tệp mới chưa được Git theo dõi). Mọi tệp `.xlsx` (mẫu và tệp thử trong test) do `exceljs` hoặc
+  bộ dựng ZIP của repo sinh ra — không dùng tệp do Excel/LibreOffice tạo.
 - README: cột, bí danh, format mã, ngày `YYYY-MM-DD`, bốn loại nhân sự, phòng/chức vụ/email tùy chọn, dữ liệu nền (bộ demo
   `shared-demo-v1`), cách thử trên FE và kết quả mong đợi; **chạy lặp lại: xem trước rồi hủy**
   (`POST /employee-imports/{id}/cancellations`) — xác
@@ -251,9 +260,9 @@ Vế sở hữu ở đây: `US-02-02` AC-14 — mã nhân viên sai format và m
   thường trước đây lưu nguyên, nay lưu chữ hoa.
 - `employeeCreate`: lý do dòng mới `EMPLOYEE_CODE_INVALID`; mã > 50 trước đây 422 `VALIDATION_ERROR`, nay (≤ 100) là lý do
   dòng.
-- Import: lý do dòng mới `EMPLOYEE_CODE_INVALID`, `EMPLOYEE_CODE_AMBIGUOUS`; `IMPORT.FILE_INVALID` thêm
-  `FILE_FORMAT_UNSUPPORTED`; `IMPORT.FILE_UNREADABLE` thêm bốn `reason` `XLSX_*`; tệp `.xlsx` trước đây `FILE_NOT_TEXT` nay
-  đọc được.
+- Import: lý do dòng mới `EMPLOYEE_CODE_INVALID`, `EMPLOYEE_CODE_AMBIGUOUS`; mã mức tệp mới 422
+  `IMPORT.FILE_FORMAT_UNSUPPORTED`; `IMPORT.FILE_UNREADABLE` thêm bốn `reason` `XLSX_*`; tệp `.xlsx` (và tệp mở đầu bằng chữ
+  ký ZIP) trước đây `FILE_NOT_TEXT` nay đọc được hoặc bị từ chối `XLSX_*`.
 - Lệnh `assign-subscription-owner`: mã phòng chữ thường nay khớp phòng chữ hoa.
 - Không đổi dữ liệu cũ, không migration.
 
@@ -279,8 +288,8 @@ cùng mã mới đồng thời ⟹ chỉ mục duy nhất chốt, bên thua 409 
 | `lockByCode` dùng chung      | `assign-subscription-owner --department-code p-des` khi có `P-DES`; hai phòng cũ `p-x`, `P-X`                                            | integration      | gán cho `P-DES`; hai phòng ⟹ `DEPARTMENT_NOT_ACTIVE`, không ghi                                      | planned                  |
 | `US-02-01` AC-11             | cùng 20 dòng ở CSV và `.xlsx`, upload từng tệp                                                                                           | integration      | hai preview bằng nhau (số hợp lệ/lỗi/bỏ qua, từng dòng `line`, `errors`), chưa ghi; xác nhận mới ghi | planned                  |
 | `US-02-01` AC-11             | tệp mẫu CSV/`.xlsx`                                                                                                                      | integration      | cùng bộ cột = `EMPLOYEE_COLUMNS`; `.xlsx` có sheet hướng dẫn nêu phòng ban tùy chọn                  | planned                  |
-| tệp mẫu                      | upload `employees-valid.*`, `employees-invalid.*`, `employees-missing-column.csv` trên dữ liệu nền dựng từ `SHARED_DEMO_V1`              | integration      | bằng `expected-results.json`                                                                         | planned                  |
-| tệp mẫu ổn định              | chạy script sinh hai lần; CSV có BOM                                                                                                     | script/unit      | `git diff --exit-code docs/examples/employee-import` rỗng (cả `.xlsx`); 3 byte đầu CSV `EF BB BF`    | planned                  |
+| tệp mẫu                      | upload `employees-valid.*`, `-invalid.*`, `-no-department.*`, `-missing-column.csv` trên dữ liệu nền từ `SHARED_DEMO_V1`                 | integration      | bằng `expected-results.json`; tệp không cột phòng ⟹ mọi dòng _chưa xếp phòng_                        | planned                  |
+| tệp mẫu ổn định              | sinh một lần rồi `--check` hai lần; CSV có BOM                                                                                           | script/unit      | `sha256` từng tệp (cả `.xlsx`) khớp `manifest.json` đã commit; 3 byte đầu CSV `EF BB BF`             | planned                  |
 | bảo mật `.xlsx` — nén/khai   | bom nén, khai báo gian, mục > 4 MiB, tổng > 8 MiB, ZIP64, mục mã hóa, nén lạ, > 200 mục, OLE2, macro, `<!DOCTYPE`                        | unit/http        | 422 với đúng `reason`/problem; không giải nén quá `maxOutputLength`                                  | planned                  |
 | bảo mật `.xlsx` — cấu trúc   | tên mục trùng (đúng/khác hoa thường); dữ liệu thừa trước mục đầu hoặc sau EOCD; hai EOCD; Local Header lệch Central Directory; mục chồng | unit             | `XLSX_INVALID`; `exceljs` không được gọi                                                             | planned                  |
 | bảo mật `.xlsx` — số phần tử | sheet 2 001 `<row`; sheet 50 001 `<c` (dưới 4 MiB); `sharedStrings` 50 001 `<si`                                                         | unit             | `XLSX_TOO_LARGE` trước `Workbook.xlsx.load`                                                          | planned                  |
@@ -312,8 +321,15 @@ cùng mã mới đồng thời ⟹ chỉ mục duy nhất chốt, bên thua 409 
   hạng mục 6 ghi chính xác theo thứ tự merge (W4, sau PR A–D của hạng mục 6; chỉ Phase C cần về chức năng); thêm dòng quyền chạy
   test `D-S26` và quy tắc migration (lát này không có migration). Không đổi claim Primary.
 
+- 02/11/2026 — sửa theo rà soát pre-flight cuối: ngưỡng 4/8 MiB và đếm phần tử Owner xác nhận 01/11/2026 (bỏ "chờ xác
+  nhận"); mã OLE2 đúng wire `IMPORT.FILE_FORMAT_UNSUPPORTED` (không có mã `IMPORT.FILE_INVALID`); ca ZIP hỏng của
+  `employee-import-preview-http.integration-spec.ts:143-148` vào Task B.4; tệp thử chỉ do `exceljs`/bộ dựng của repo sinh; lệnh
+  cần mạng (`pnpm add`, `pnpm audit`) ghi "chưa chạy được" khi offline; thêm tệp mẫu không cột phòng; byte ổn định kiểm bằng
+  `sha256` so `manifest.json` (`--check`), không bằng `git diff`; Task A.3 liệt kê fixture có mã sai format mới; quy tắc
+  migration không sửa `scripts/verify/merged-migrations.txt`.
+
 Quyết định kỹ thuật (Owner duyệt 01/11/2026): OQ-1 — chuẩn hóa mã phòng khi tra (Docs đã đóng câu hỏi mở tương ứng); OQ-2 —
-thêm `exceljs` 4.4.0 và giới hạn vỏ ZIP (ngưỡng số đổi ở lượt sửa 01/11/2026, chờ xác nhận); OQ-3 — tệp mẫu tĩnh do FE phục
+thêm `exceljs` 4.4.0 và giới hạn vỏ ZIP (ngưỡng 4/8 MiB và đếm phần tử Owner xác nhận 01/11/2026); OQ-3 — tệp mẫu tĩnh do FE phục
 vụ, không route tải từ BE; OQ-4 — dòng import trùng mã người đã có khác hoa thường là cùng người; OQ-5 — lệnh `bootstrap` dùng
 format mã mới cho phòng đầu và mã Super Admin (Task A.4 của plan, bắt buộc).
 

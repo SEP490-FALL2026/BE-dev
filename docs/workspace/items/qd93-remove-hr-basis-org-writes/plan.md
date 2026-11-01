@@ -22,7 +22,8 @@
   (W2) xóa chúng. `qd93-remove-in-app-super-admin-transfer` (W1) sau đó xóa `super-admin-transfer-http.integration-spec.ts`
   mà lát này sửa; `qd93-direct-manager-spending-approver-roles` (W2) rebase lên lát này (cùng file trưởng phòng/harness).
 - Không migration. Nếu phát sinh: timestamp thật khi tạo thư mục, đổi lại cho đứng sau migration mới nhất trên `dev` trước
-  merge và thêm vào `scripts/verify/merged-migrations.txt` (`DB-15`).
+  merge (`DB-15`); KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư mục migration mới xếp sau cùng
+  nên gate `migration-order` vẫn xanh); Owner thêm vào danh sách khi phát hành.
 - Liệt kê lại nơi dùng: `rg -n "hrBasis|HrBasis|HR_BASIS|hr-basis" src test` (ở `1a77ffe8`: 26 file `src`, 45 file test/
   support — danh sách ở Task 1.3 và 2.3).
 - Database test riêng theo `test/README.md` (PostgreSQL 17, `TEST_DATABASE_ADMIN_URL`). Không chạy trên database dùng chung.
@@ -150,6 +151,9 @@ integration theo file của Task 1.3 (gồm Task 1.1) xanh. Tự review diff the
 ### Task 2.3: Harness, demo dataset và test nhân viên/import không căn cứ
 
 - Files: `test/support/{employee-import-http-harness,employee-import-service-harness}.ts`,
+  `test/support/department-harness.ts:157` (`enter()` vẫn gửi `hrBasis: HR_BASIS` tới `POST /employees` — bỏ khóa; Task 1.3 chỉ
+  bỏ phần `/departments` của `writes()`), `test/support/provisioning-harness.ts:169` (`member()` truyền `hrBasis` vào
+  `enterEmployee` — bỏ khóa),
   `test/integration/data-import/{employee-import-confirm-http,employee-import-preview-http,employee-import-seats-http}.integration-spec.ts`,
   `test/integration/organization/{employee-manual-http,employee-kind-of-staff-assignment-end}.integration-spec.ts`,
   `test/integration/installation/demo-dataset.integration-spec.ts`, `test/e2e/auth-session.e2e-spec.ts`,
@@ -195,7 +199,14 @@ Chạy (database riêng theo `test/README.md`):
   `test/integration/identity-access/organization-unavailable.timing-spec.ts`), `pnpm test:e2e -- test/e2e/auth-session.e2e-spec.ts`.
   Chưa được cho ⟹ ghi giới hạn ở bảng verification.
 
-Tự review diff theo mọi AC trong bảng Primary; ghi thông báo FE (10 body, OD-1 = A strict).
+Tự review diff theo mọi AC trong bảng Primary; ghi thông báo FE (10 body, OD-1 = A strict). Bốn khóa `full` của lát
+(`US-02-02` AC-10, `US-02-04` AC-4, `US-03-06` AC-1, `US-01-11` AC-7 — spec › _Primary Story/AC_): ghi vào bảng verification
+tên ca chứng minh **phần còn lại** của từng AC (đã có, chạy lại theo file ở trên, không sửa khẳng định):
+`department-profile-http.integration-spec.ts` (`creating a department (US-03-06 AC-1 → AC-3, QĐ-87d(1))`),
+`onboarding-http.integration-spec.ts` (`shows a department with no Cost Center as a warning that stops nothing, and drops it once
+Finance creates one for it`), `provisioning-queue-http.integration-spec.ts:290` (`US-01-11 AC-7: …`),
+`employee-import-preview-http.integration-spec.ts` (`lists the columns that differ…`, `refuses a second row with the same work
+email…`).
 
 ## Verification and handoff
 

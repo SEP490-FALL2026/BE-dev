@@ -77,8 +77,9 @@ mục `## Quyết định kỹ thuật (Owner duyệt 01/11/2026)`); đã loại
     nên không cần sửa thêm, nhưng ca integration phải dựng bước theo định tuyến mới và chạy lại trên `dev` đã có phase A;
   - hạng mục vai (`QĐ-93a`) rà các chỗ đọc vai `MANAGER`, gồm `manager-dashboard.service.ts`, và đổi cách harness dựng trưởng
     phòng: hạng mục này rebase lên đó, giữ kiểm vai mới, chỉ thêm mục `needApprovals`.
-- Migration: không có. Nếu implementation buộc phải thêm, áp quy tắc timestamp chung của lượt: timestamp thật lúc tạo, đổi lại cho
-  lớn hơn migration mới nhất trên `dev` trước merge và thêm vào `scripts/verify/merged-migrations.txt` trong lần merge.
+- Migration: không có. Nếu implementation buộc phải thêm, áp quy tắc timestamp chung của lượt: timestamp thật lúc tạo, đổi
+  lại cho lớn hơn migration mới nhất trên `dev` trước merge; KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh
+  hạng mục (thư mục migration mới xếp sau cùng nên gate `migration-order` vẫn xanh); Owner thêm vào danh sách khi phát hành.
 
 ## Ownership: module, data, API
 
@@ -195,3 +196,5 @@ Migration, ghi, transaction, khóa, job, storage, audit: không áp dụng (ch�
   commit): **L8** câu "facade không kiểm vai" sai vì `openRequestsSentBy` quyết ca Super Admin theo vai — giữ trong facade (là luật
   từ chối của chính danh sách nguồn, không phải phân quyền) và ghi rõ lý do; phụ thuộc đổi thành thứ tự merge W4 cứng (sau hạng mục
   vai và fallback phase A, vì số đếm phụ thuộc định tuyến); ghi không có migration; plan thêm dòng quyền chạy test `D-S26`.
+- 02/11/2026 — sửa theo rà soát pre-flight cuối: quy tắc migration không sửa `scripts/verify/merged-migrations.txt`;
+  câu `D-S26` của plan nói rõ chạy cả thư mục là chạy hàng loạt (hỏi Owner).

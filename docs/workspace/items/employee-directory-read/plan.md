@@ -17,12 +17,14 @@
   `pnpm check`; **phải hỏi Owner trước** khi chạy toàn bộ `pnpm test:integration`, `pnpm test:e2e` hoặc
   `pnpm test:integration:timing`. Plan này coi `pnpm test:http -- <file>` và `pnpm test:gates` (không CSDL) như unit test.
 - Thứ tự merge (spec, Dependencies): W4, sau `qd93-unplaced-employee-first-placement` (A–D) đã merge — kiểm trên `dev`: vị
-  từ _chưa xếp phòng_ dùng chung (`EmployeeRepo.unplacedAmong` hoặc mảnh SQL dùng chung, `D-S25`: không có placement nào),
-  route `POST /employees` không phòng và `POST /employees/{id}/first-placements`; `AppRole` sáu giá trị và chuỗi `ROLE_GRANTS`
-  của lát vai; tên `department-manager-http.integration-spec.ts` của lát dự án phase 1. Thiếu một trong các thứ đó ⟹ dừng,
-  báo Owner.
+  từ _chưa xếp phòng_ dùng chung (`unplacedEmployeeSql(employeeIdColumn)` ở `organization/employee/employee.repo.ts`, mà
+  `EmployeeRepo.unplacedAmong` dùng; `D-S25`: không có placement nào), route `POST /employees` không phòng và
+  `POST /employees/{id}/first-placements`; `AppRole` sáu giá trị và chuỗi `ROLE_GRANTS` nói sáu giá trị (Task 15 của lát vai
+  viết lại); tên `department-manager-http.integration-spec.ts` của lát dự án phase 1. Thiếu một trong các thứ đó ⟹ dừng, báo
+  Owner.
 - Không migration. Nếu phát sinh: timestamp thật khi tạo thư mục, đổi lại cho đứng sau migration mới nhất trên `dev` trước
-  merge và thêm vào `scripts/verify/merged-migrations.txt` (`DB-15`).
+  merge (`DB-15`); KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư mục migration mới xếp sau cùng
+  nên gate `migration-order` vẫn xanh); Owner thêm vào danh sách khi phát hành.
 - Mẫu để chép: `department-management/department-technical-members.repo.ts:19-53` (trang + đếm trong một `RepeatableRead`),
   `department-query.service.ts:104-112` (lịch sử có biên + `cutHistory`), `test/integration/organization/organization-identity-read-contracts.integration-spec.ts`
   (đếm câu lệnh, `oneSnapshot`), `test/integration/licensing/licensing-assignment-read-contracts.integration-spec.ts:50-75`
@@ -62,21 +64,23 @@
 
 ### Task 3: Repo, query service, controller và DTO
 
-- Files: `employee-directory.repo.ts` (SQL list với bộ lọc — `unplaced` gọi **vị từ dùng chung** của
-  `organization/employee/` do `qd93-unplaced-employee-first-placement` sở hữu, không viết `NOT EXISTS` riêng; `departmentId`
-  theo `valid_from <= hôm nay AND (valid_to IS NULL OR valid_to > hôm nay)`; email qua `normalized_work_email`; câu trang rồi
-  câu đếm trong một `RepeatableRead`; detail: nhân viên + phòng hiện hành, lịch sử placement `limit + 1`; hằng SQL gập dấu),
-  `employee-directory-query.service.ts` (thứ tự cố định: `businessToday()`, hook `findEmployeeIdsWithAccount` khi có
-  `hasAccount`, repo trang + đếm, rồi `summarizeAccounts` cho id của trang; detail: repo rồi `describeAccount`),
-  `employee-directory.dto.ts` (query strict; param dùng lại `employeeIdParamSchema` của `organization/employee/employee.dto.ts:71`;
-  `EmployeeSummaryDto`, `EmployeeDetailDto = summary.extend`, trang), `employee-directory.controller.ts`
-  (`@ApiTags('employees')`, `@Controller({ path: 'employees', version: '1' })`, `@RequireRoles('SUPER_ADMIN')`,
-  `employeeList`/`employeeGet`, summary ≤ 70 ký tự, message `EMPLOYEE.LISTED`/`EMPLOYEE.FETCHED`, lỗi 401/403/404/422/503 có ví
-  dụ, mô tả 403 theo lời route đọc), `src/modules/organization/organization-http.module.ts`, test integration mới
+- Files: `employee-directory.repo.ts` (SQL list với bộ lọc — `unplaced` gọi `unplacedEmployeeSql('e.id')` của
+  `organization/employee/employee.repo.ts` do `qd93-unplaced-employee-first-placement` sở hữu, không viết `NOT EXISTS`
+  riêng; `departmentId` theo `valid_from <= hôm nay AND (valid_to IS NULL OR valid_to > hôm nay)`; email qua
+  `normalized_work_email`; câu trang rồi câu đếm trong một `RepeatableRead`; detail: nhân viên + phòng hiện hành, lịch sử
+  placement `limit + 1`; hằng SQL gập dấu), `employee-directory-query.service.ts` (thứ tự cố định: `businessToday()`, hook
+  `findEmployeeIdsWithAccount` khi có `hasAccount`, repo trang + đếm, rồi `summarizeAccounts` cho id của trang; detail: repo
+  rồi `describeAccount`), `employee-directory.dto.ts` (query strict; param dùng lại `employeeIdParamSchema` của
+  `organization/employee/employee.dto.ts:71`; `EmployeeSummaryDto`, `EmployeeDetailDto = summary.extend`, trang),
+  `employee-directory.controller.ts` (`@ApiTags('employees')`, `@Controller({ path: 'employees', version: '1' })`,
+  `@RequireRoles('SUPER_ADMIN')`, `employeeList`/`employeeGet`, summary ≤ 70 ký tự, message
+  `EMPLOYEE.LISTED`/`EMPLOYEE.FETCHED`, lỗi 401/403/404/422/503 có ví dụ, mô tả 403 theo lời route đọc),
+  `src/modules/organization/organization-http.module.ts`, test integration mới
   `test/integration/organization/employee-directory-http.integration-spec.ts` (mọi dòng AC-22, AC-24, AC-25 của test matrix;
-  nhân viên _chưa xếp phòng_ tạo qua `POST /employees` không phòng, xếp phòng lần đầu qua `POST /employees/{id}/first-placements`
-  — không dựng bằng SQL; ca `D-S25` so với `OrganizationReadApi.getUnplacedEmployeeIds`; `%`/`_` nghĩa đen; `valid_to` loại
-  trừ; trang sau trang cuối; ngày bằng `test/support/pretend-today.ts`).
+  nhân viên _chưa xếp phòng_ tạo qua `POST /employees` không phòng, xếp phòng lần đầu qua
+  `POST /employees/{id}/first-placements` — không dựng bằng SQL; ca `D-S25` so với
+  `OrganizationReadApi.getUnplacedEmployeeIds`; `%`/`_` nghĩa đen; `valid_to` loại trừ; trang sau trang cuối; ngày bằng
+  `test/support/pretend-today.ts`).
 - Depends on: Task 2.
 - Acceptance: test integration đỏ trước khi có route, xanh sau; thứ tự `employee_code, id`; 404 không lộ dữ liệu;
   `rg -n "NOT EXISTS" src/modules/organization/employee-directory` rỗng (vị từ dùng chung).
@@ -90,7 +94,8 @@
   `test/support/api-coverage-manifest.ts` (`GET /api/v1/employees`, `GET /api/v1/employees/{id}`),
   `test/support/openapi-example-manifest.ts` (`employeeList`, `employeeGet`), `test/support/openapi-example-route-codes-organization.ts`
   (`employeeGet` 404), `test/http/platform/openapi-read-wording.http-spec.ts` (`READ_WORDING` cho hai route — tùy chọn),
-  `test/http/platform/openapi-presentation.http-spec.ts` (số trên `dev` lúc rebase + 2), `test/support/api-collection-registry-nested.ts`
+  `test/http/platform/openapi-presentation.http-spec.ts:254` (số trên `dev` lúc rebase + 2, tức 302 theo thứ tự merge — spec ›
+  Dependencies), `test/support/api-collection-registry-nested.ts`
   (hai mục `bounded`: `employeeGet#placements` `maxItems: 50`, `employeeGet#account.roles` `maxItems: 6` source
   `ROLE_GRANTS` — chuỗi phải nói sáu giá trị, xem spec), `test/support/api-collection-registry-events.ts` (`boundedNested` thêm
   tham số `date` mặc định `'2026-10-23'`; hai `boundedNested(…, 'added', <ngày thật>)`), thêm ca đếm câu lệnh vào

@@ -419,9 +419,9 @@ export interface SuccessorFacts {
 
 Hai thư mục. Quy tắc timestamp (chung cho mọi hạng mục `QĐ-93`): mỗi thư mục mới lấy timestamp UTC thật lúc implementer tạo
 nó (mới nhất trên `dev` lúc thiết kế: `20261101000200_licensing_subscription_renewals`); trước merge, implementer đặt lại
-timestamp sau migration mới nhất trên `dev` (sau khi rebase) và thêm tên thư mục vào `scripts/verify/merged-migrations.txt` —
-danh sách mà gate `test/gates/migration-order.gate-spec.ts` đọc, hiện dừng ở `20261028110000_budget_version_detached_at` dù
-`dev` đã có migration mới hơn; lúc thiết kế không sửa danh sách đó. `…` dưới đây là chỗ của timestamp theo quy tắc này.
+timestamp sau migration mới nhất trên `dev` (sau khi rebase). KHÔNG sửa `scripts/verify/merged-migrations.txt` trên nhánh hạng
+mục (thư mục migration mới xếp sau cùng nên gate `test/gates/migration-order.gate-spec.ts` vẫn xanh); Owner thêm vào danh sách
+khi phát hành. `…` dưới đây là chỗ của timestamp theo quy tắc này.
 
 1. `…_identity_direct_roles_values`: chỉ `ALTER TYPE "AppRole" ADD VALUE IF NOT EXISTS 'MANAGER'; … 'SPENDING_APPROVER';`
    (PostgreSQL không cho dùng giá trị enum mới trong cùng transaction thêm nó — mẫu `…_values` đã có ở repo).
@@ -480,8 +480,10 @@ CREATE UNIQUE INDEX role_grants_one_spending_approver ON role_grants (organizati
   `after.migration = '<tên>'`, mở lại hàng `approval_role_holders` đã đóng cùng thời điểm, `DROP INDEX`/khôi phục hàm trigger
   cũ; giá trị enum thêm vào **không** gỡ (vô hại khi không dùng). Code cũ đọc grant `MANAGER` qua Prisma client cũ sẽ lỗi enum ⟹
   rollback code phải đi cùng SQL hoàn tác.
-- Tương thích: triển khai một instance (VPS) theo thứ tự `migrate deploy` → khởi động bản mới; không có cửa sổ hai phiên bản
-  song song được hỗ trợ.
+- Tương thích: `deploy-release.sh` chạy preflight → backup → `migrate deploy` → `db-roles reconcile` → dừng worker cũ → API
+  mới → worker mới; **trong lúc `migrate deploy` API cũ vẫn phục vụ** (đọc vai suy ra và `approval_role_holders` đã đóng) cho
+  tới khi API mới lên. Dữ liệu cũ sinh ra trong cửa sổ đó do bước đóng băng dữ liệu cũ và lệnh chuyển đổi chạy ngay sau deploy
+  của `qd93-remove-fallback-substitute-approvers` xử lý (spec đó › _Thứ tự triển khai_; hai hạng mục phát hành cùng một bản).
 
 ### Preflight (`pnpm ops:preflight`)
 
@@ -668,3 +670,8 @@ FE (web và Mobile) phải đổi khi đọc `GET /me` — phát hành cùng b�
   `details.reason`, lệnh in `mã: lý do` (mục _Người kế nhiệm trong sự kiện nhân sự_; plan Task 9 thêm ba file + test); **L** plan
   Task 4 nói sai "không lúc nào route cấp `SPENDING_APPROVER` thiếu #6–#10" trong khi #10 tới ở Task 6b ⟹ 6a và 6b cùng một PR,
   không push/merge giữa hai task. Thiết kế vẫn `draft`.
+- 02/11/2026 — sửa theo rà soát pre-flight cuối: quy tắc migration không sửa `scripts/verify/merged-migrations.txt` trên
+  nhánh hạng mục; Task 15 viết lại chuỗi `ROLE_GRANTS` (`test/support/api-collection-registry.ts:124`, sáu giá trị) để
+  `employee-directory-read` không dừng; mục _Tương thích_ bỏ câu "không có cửa sổ hai phiên bản" — trong lúc
+  `migrate deploy` API cũ vẫn phục vụ, bước đóng băng của fallback xử lý; câu `D-S26` về chạy cả thư mục thống nhất với
+  các plan khác.

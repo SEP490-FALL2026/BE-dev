@@ -54,9 +54,10 @@ Bốn AC sở hữu trọn ở đây; dòng `partial` chỉ vì các AC khác c�
   (các bản đọc riêng giữ nguyên — `US-02-02` AC-26 vế sau).
 - `D-S25` (Owner 01/11/2026): _chưa xếp phòng_ ⟺ không có dòng `employee_placements` nào (hiện hành hay tương lai); người có
   placement đầu tiên bắt đầu ở tương lai là thành viên phòng đó về tính hợp lệ của Request; bộ lọc `unplaced=true` của danh
-  bạ dùng **cùng** vị từ, do `qd93-unplaced-employee-first-placement` sở hữu (`EmployeeRepo.unplacedAmong` / mảnh SQL dùng
-  chung). Câu "`E302` không còn trong bộ lọc này từ ngày hiệu lực" của `US-02-02` AC-22 (Docs `69e8a3d`) được `D-S25` thay:
-  không còn từ lúc ghi xếp phòng lần đầu (Docs chưa commit sẽ viết lại).
+  bạ dùng **cùng** vị từ, do `qd93-unplaced-employee-first-placement` sở hữu: hàm SQL
+  `unplacedEmployeeSql(employeeIdColumn)` xuất từ `organization/employee/employee.repo.ts` (`EmployeeRepo.unplacedAmong`
+  dùng nó). Câu "`E302` không còn trong bộ lọc này từ ngày hiệu lực" của `US-02-02` AC-22 (Docs `69e8a3d`) được `D-S25`
+  thay: không còn từ lúc ghi xếp phòng lần đầu (Docs chưa commit sẽ viết lại).
 - `API-GAP-04` (CHANGELOG API-Integration Docs `69e8a3d`): `departmentMemberList` trả mã và tên, không trả `employeeId`, trong
   khi `departmentHeadAssign` cần `employeeId`; khuyến nghị thêm `employeeId` (additive) — làm ở lát này.
 - [api-contract API-LIST-DETAIL.1](../../../rules/api-contract.md#collection-và-detail-api-list-detail1) (quy tắc 5: projection
@@ -87,8 +88,14 @@ Bốn AC sở hữu trọn ở đây; dòng `partial` chỉ vì các AC khác c�
 - Lát vai đã merge ⟹ `AppRole` có sáu giá trị: enum `account.roles` và `ROLE_GRANTS` phải khớp (Registry).
   `qd93-remove-department-projects` phase 1 đã đổi tên `department-manager-and-projects-http.integration-spec.ts` thành
   `department-manager-http.integration-spec.ts` (Task 5 dùng tên mới).
-- `test/http/platform/openapi-presentation.http-spec.ts:254` (306 ở `1a77ffe8`) bị ba lát sửa (dự án −4, chưa xếp phòng +1,
-  lát này +2): tính lại từ số trên `dev` lúc rebase.
+- `test/http/platform/openapi-presentation.http-spec.ts:254` (306 ở `1a77ffe8`): lát này +2 (302); theo thứ tự merge của
+  gói, từ 306 ở `1a77ffe8`: `qd93-remove-hr-basis-org-writes` 306 → `qd93-remove-in-app-super-admin-transfer` 305 (−1) →
+  `qd93-parameter-labels-dashboard-queues` 305 → `qd93-direct-manager-spending-approver-roles` 305 →
+  `qd93-remove-department-projects` phase 1 301 (−4) → `qd93-remove-fallback-substitute-approvers` phase A 299 (−2) →
+  `qd93-unplaced-employee-first-placement` 300 (+1) → `qd93-code-format-xlsx-employee-import` 300 →
+  `employee-directory-read` 302 (+2) → `qd93-budget-record-attachments` 312 (+10) → `dashboard-request-queues-wiring` 312;
+  mỗi lát đổi số này trên nhánh của mình bằng số trên `dev` lúc rebase cộng/trừ phần của mình (thứ tự đổi thì số trung gian
+  đổi theo).
 - Không blocker khác. OQ-1 → OQ-3 đã được Owner duyệt 01/11/2026 đúng như spec ghi; wire chốt theo đó.
 
 ## Ownership: module, data, API
@@ -97,7 +104,8 @@ Bốn AC sở hữu trọn ở đây; dòng `partial` chỉ vì các AC khác c�
   `employee-directory.dto.ts`, `employee-directory-query.service.ts`, `employee-directory.repo.ts`,
   `employee-directory.mapper.ts` (+ spec), `employee-directory-search.policy.ts` (+ spec: phân loại `q`, gập dấu, escape
   `LIKE`), `employee-directory.types.ts`. Đăng ký controller/provider ở `organization-http.module.ts`. Repo đọc vị từ _chưa
-  xếp phòng_ từ `organization/employee/` (hàm/mảnh SQL của lát chưa xếp phòng) — cùng module, không qua facade.
+  xếp phòng_ bằng `unplacedEmployeeSql(employeeIdColumn)` của `organization/employee/employee.repo.ts` (lát chưa xếp phòng) —
+  cùng module, không qua facade.
 - Extension point: `organization/public/organization.extension-points.ts` — `EmployeeAccounts` thêm ba method:
   `findEmployeeIdsWithAccount()` (có sẵn ở `AccountRecordService`, đưa lên hook), `summarizeAccounts(employeeIds)` cho list
   (**một** câu, chỉ `app_users`: `id`, `status`, `activationState`, `employeeLeft` theo `employee_id`; không `role_grants`) và
@@ -135,10 +143,10 @@ Bốn AC sở hữu trọn ở đây; dòng `partial` chỉ vì các AC khác c�
 - `departmentId`: placement **đang hiệu lực hôm nay** thuộc phòng đó:
   `valid_from <= hôm nay AND (valid_to IS NULL OR valid_to > hôm nay)` — `valid_to` là ngày **loại trừ** (ngày đầu tiên
   không còn thuộc phòng), như `department.repo.ts:350-351`.
-- `unplaced=true`: vị từ dùng chung của `qd93-unplaced-employee-first-placement` (`D-S25`: không có dòng `employee_placements`
-  nào); `false`: phủ định của cùng vị từ. Lát này không viết câu `NOT EXISTS` riêng (gate review: `rg` không thấy câu SQL
-  _chưa xếp phòng_ thứ hai). Người có placement đầu tiên bắt đầu ngày mai: `unplaced: false`, `department: null` (chưa hiệu
-  lực hôm nay), detail có placement tương lai.
+- `unplaced=true`: `unplacedEmployeeSql('e.id')` của `qd93-unplaced-employee-first-placement` (`D-S25`: không có dòng
+  `employee_placements` nào); `false`: `NOT (<cùng mảnh SQL>)`. Lát này không viết câu `NOT EXISTS` riêng (gate review: `rg`
+  không thấy câu SQL _chưa xếp phòng_ thứ hai). Người có placement đầu tiên bắt đầu ngày mai: `unplaced: false`,
+  `department: null` (chưa hiệu lực hôm nay), detail có placement tương lai.
 - `hasAccount`: tập id nhân viên có tài khoản lấy qua hook (`findEmployeeIdsWithAccount`, một câu, **trước** snapshot),
   truyền một tham số `uuid[]` (tiền lệ `account-candidates`).
 - Summary projection (schema riêng `EmployeeSummaryDto`), không mảng lồng: `id`, `employeeCode`, `fullName`, `workEmail`,
@@ -191,9 +199,10 @@ Bốn AC sở hữu trọn ở đây; dòng `partial` chỉ vì các AC khác c�
 - `employeeGet` có hai mảng lồng ⟹ hai mục `NESTED_ARRAYS` `bounded` trong `test/support/api-collection-registry-nested.ts`
   (đang 367/400 dòng; nếu vượt thì tách tệp theo mẫu `-first-half`): `employeeGet#placements` (`maxItems: 50`, source nêu
   `EMPLOYEE_PLACEMENT_HISTORY_LIMIT`), `employeeGet#account.roles` (`maxItems: 6`, source `ROLE_GRANTS`). Hằng `ROLE_GRANTS`
-  (`test/support/api-collection-registry.ts:124`) ở `1a77ffe8` nói "AppRole has 4 values": sau lát vai chuỗi phải nói sáu giá
-  trị; lúc implement đọc lại trên `dev` — còn "4 values" ⟹ dừng và báo (sửa chuỗi kéo theo `maxItems: 4` của các khóa vai khác
-  là việc của lát vai, không làm ở đây).
+  (`test/support/api-collection-registry.ts:124`) ở `1a77ffe8` nói "AppRole has 4 values"; Task 15 của
+  `qd93-direct-manager-spending-approver-roles` viết lại chuỗi thành sáu giá trị (cùng `maxItems` của các khóa vai khác). Lúc
+  implement đọc lại trên `dev`: còn "4 values" nghĩa là Task 15 của lát vai chưa có trên `dev` ⟹ dừng và báo Owner (không tự
+  sửa chuỗi ở đây).
 - Hai sự kiện `boundedNested(…, 'LD-14', 'employee-directory-read', …, 'added', <ngày thật>)` trong
   `api-collection-registry-events.ts` (tiền lệ `transferReviewGet#unfinishedRequests`). `boundedNested`
   (`api-collection-registry-events.ts:29-45`) đang ghi cứng `date: '2026-10-23'`: thêm tham số `date` cuối, mặc định
@@ -215,8 +224,9 @@ Bốn AC sở hữu trọn ở đây; dòng `partial` chỉ vì các AC khác c�
 ### Concurrency, migration, jobs
 
 Chỉ đọc; không khóa ghi; không migration (không cột tìm kiếm mới; nếu implement phát sinh migration thì theo luật timestamp:
-timestamp thật khi tạo, đổi lại cho đứng sau migration mới nhất trên `dev` trước merge, thêm vào
-`scripts/verify/merged-migrations.txt`); không job.
+timestamp thật khi tạo, đổi lại cho đứng sau migration mới nhất trên `dev` trước merge; KHÔNG sửa
+`scripts/verify/merged-migrations.txt` trên nhánh hạng mục (thư mục migration mới xếp sau cùng nên gate `migration-order`
+vẫn xanh); Owner thêm vào danh sách khi phát hành); không job.
 
 ## Test matrix
 
@@ -270,3 +280,6 @@ Dòng scope map đã có ở [G2](../../../roadmap.md#work-item-decomposition-g2
   đúng, `boundedNested` nhận ngày; L4 thêm ca biên (không khớp, kết hợp lọc rỗng, trang sau cuối, `page`/`pageSize` 0, khóa
   lạ, `q` 101, `departmentId` sai, UUID viết hoa, `%`/`_`), `validTo` loại trừ, `normalized_work_email`,
   `employeeIdParamSchema`, tên trường `department` theo `EmployeeResponseDto`.
+- 02/11/2026 — sửa theo rà soát pre-flight cuối: quy tắc migration không sửa `scripts/verify/merged-migrations.txt`;
+  gọi đúng tên vị từ `unplacedEmployeeSql(employeeIdColumn)` của `organization/employee/employee.repo.ts`; điều kiện
+  dừng `ROLE_GRANTS` trỏ tới Task 15 của lát vai; số operation +2 (302) với chuỗi theo thứ tự merge.
