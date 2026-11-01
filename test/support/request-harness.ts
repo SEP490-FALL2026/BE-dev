@@ -4,7 +4,6 @@ import request from 'supertest';
 import { ApiAccount } from './api-accounts';
 import { declareSubscription } from './builders/catalog.builder';
 import { assignHead, setApprovalRole } from './builders/organization.builder';
-import { HR_BASIS } from './hr-basis';
 import { OwnedSubscriptions } from './owned-subscriptions';
 import { ProvisioningHarness } from './provisioning-harness';
 import { SeatHarness } from './seat-baseline-harness';
@@ -165,7 +164,6 @@ export class RequestHarness extends ProvisioningHarness {
     await assignHead(this.ctx, this.admin, department.id, {
       employeeId: person.employeeId,
       effectiveFrom: this.today(),
-      hrBasis: HR_BASIS,
     });
   }
 

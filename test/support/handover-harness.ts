@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { HR_BASIS } from './hr-basis';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { HandoverOverdueService } from '../../src/modules/licensing/handover/handover-overdue.service';
@@ -238,7 +237,7 @@ export class HandoverHarness extends TransferHarness {
     await request(this.server())
       .post(`/api/v1/departments/${department.id}/head-assignments`)
       .set({ Authorization: `Bearer ${this.admin}` })
-      .send({ employeeId: person.employeeId, effectiveFrom: day, hrBasis: HR_BASIS })
+      .send({ employeeId: person.employeeId, effectiveFrom: day })
       .expect(200);
   }
 }

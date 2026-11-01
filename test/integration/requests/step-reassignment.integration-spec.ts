@@ -4,7 +4,6 @@ import { ApprovalRoleChangeListeners } from '../../../src/modules/identity-acces
 import { OrganizationChangeListeners } from '../../../src/modules/organization/public/organization.extension-points';
 import { StepReassignmentService } from '../../../src/modules/requests/reassignment/step-reassignment.service';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { HR_BASIS } from '../../support/hr-basis';
 import { ReassignmentHarness } from '../../support/reassignment-harness';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
@@ -481,7 +480,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
         await request(h.server())
           .post(`/api/v1/departments/${unit.department.id}/head-assignments`)
           .set({ Authorization: `Bearer ${h.admin}` })
-          .send({ employeeId: successor.employeeId, effectiveFrom: h.today(), hrBasis: HR_BASIS })
+          .send({ employeeId: successor.employeeId, effectiveFrom: h.today() })
           .expect(500);
       } finally {
         failOrganizationListener = false;

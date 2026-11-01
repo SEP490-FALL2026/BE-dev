@@ -107,7 +107,7 @@ export class EmployeeImportHttpHarness {
     const created = await request(this.server())
       .post('/api/v1/departments')
       .set(this.asSuper())
-      .send({ code, name: `Department ${code}`, hrBasis: HR_BASIS })
+      .send({ code, name: `Department ${code}` })
       .expect(201);
     const centerCode = this.unique('CCI-');
     await request(this.server())
@@ -128,11 +128,7 @@ export class EmployeeImportHttpHarness {
   retireDepartment = async (code: string): Promise<void> => {
     const id = (await this.ctx.sql.query<{ id: string }>('SELECT id FROM departments WHERE code = $1', [code])).rows[0]
       .id;
-    await request(this.server())
-      .post(`/api/v1/departments/${id}/deactivate`)
-      .set(this.asSuper())
-      .send({ hrBasis: HR_BASIS })
-      .expect(200);
+    await request(this.server()).post(`/api/v1/departments/${id}/deactivate`).set(this.asSuper()).expect(200);
   };
 
   personRow = (overrides: Partial<Record<string, string>> = {}): string => {

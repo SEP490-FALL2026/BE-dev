@@ -225,10 +225,7 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
     await request(ctx.app.getHttpServer())
       .patch(`/api/v1/departments/${rows[0].id}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({
-        name: 'Vận hành (đổi tay)',
-        hrBasis: { type: 'Quyết định', reference: 'QD-TEST', issuer: 'Ban Giám đốc', issuedOn: '2026-01-02' },
-      })
+      .send({ name: 'Vận hành (đổi tay)' })
       .expect(200);
 
     const report = reportOf(await run('apply'));

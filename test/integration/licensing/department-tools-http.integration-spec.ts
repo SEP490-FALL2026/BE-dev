@@ -62,7 +62,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
       await request(h.server())
         .post('/api/v1/departments')
         .set({ Authorization: `Bearer ${h.admin}` })
-        .send({ code, name: `Department ${code}`, hrBasis: HR_BASIS })
+        .send({ code, name: `Department ${code}` })
         .then(created),
     );
     await h.costCenterFor(made.id);
@@ -99,7 +99,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     await request(h.server())
       .post(`/api/v1/departments/${dept.id}/head-assignments`)
       .set({ Authorization: `Bearer ${h.admin}` })
-      .send({ employeeId, effectiveFrom: today(), hrBasis: HR_BASIS })
+      .send({ employeeId, effectiveFrom: today() })
       .expect(200);
 
     return account;

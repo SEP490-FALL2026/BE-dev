@@ -2,7 +2,6 @@ import request from 'supertest';
 import { Client } from 'pg';
 import { OperatingParametersApi } from '../../../src/modules/operating-parameters/public/operating-parameters.api';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
-import { HR_BASIS } from '../../support/hr-basis';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
 
 interface ParameterWire {
@@ -57,7 +56,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)
       // The head of a department is named by the Super Admin (QĐ-87).
       .set(asAdmin())
-      .send({ employeeId: head.employeeId, effectiveFrom: today(), hrBasis: HR_BASIS })
+      .send({ employeeId: head.employeeId, effectiveFrom: today() })
       .expect(200);
   }, 120000);
 

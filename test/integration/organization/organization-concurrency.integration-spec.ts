@@ -201,7 +201,7 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
     return request(server())
       .post('/api/v1/departments')
       .set({ Authorization: `Bearer ${superAdmin}` })
-      .send({ code: `P-LM${counter}`, name: `Lock Department ${counter}`, hrBasis: HR_BASIS })
+      .send({ code: `P-LM${counter}`, name: `Lock Department ${counter}` })
       .then((response) => response);
   };
 
@@ -311,7 +311,7 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
       request(server())
         .post(`/api/v1/departments/${departmentId}/head-assignments`)
         .set(asSuperAdminWriter())
-        .send({ employeeId, effectiveFrom: '2099-01-01', hrBasis: HR_BASIS })
+        .send({ employeeId, effectiveFrom: '2099-01-01' })
         .then((response) => response);
 
     it('a manual entry takes its department FOR SHARE: it passes a FOR SHARE holder, waits for FOR NO KEY UPDATE', async () => {
@@ -344,12 +344,11 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
         request(server())
           .patch(`/api/v1/departments/${department.id}`)
           .set(asSuperAdminWriter())
-          .send({ name: unique('Renamed While Held'), hrBasis: HR_BASIS })
+          .send({ name: unique('Renamed While Held') })
           .then((response) => response),
         request(server())
           .post(`/api/v1/departments/${empty.id}/deactivate`)
           .set(asSuperAdminWriter())
-          .send({ hrBasis: HR_BASIS })
           .then((response) => response),
         assignHead(department.id, department.employeeId),
       ];

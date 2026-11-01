@@ -9,7 +9,6 @@ import {
   type SweepResult,
 } from '../../src/modules/requests/public/step-redetermination-sweep.api';
 import type { ApiAccount } from './api-accounts';
-import { HR_BASIS } from './hr-basis';
 import { SpendHarness } from './spend-harness';
 
 /** A step as the database keeps it, with the moments the deadline and the wait are measured from. */
@@ -103,7 +102,7 @@ export class ReassignmentHarness extends SpendHarness {
     request(this.server())
       .post(`/api/v1/departments/${departmentId}/head-vacancies`)
       .set({ Authorization: `Bearer ${this.admin}` })
-      .send({ effectiveFrom: this.today(), hrBasis: HR_BASIS });
+      .send({ effectiveFrom: this.today() });
 
   /** A sweep of the worker that has not run the pass of the day yet, which is what the first sweep of a worker does. */
   freshSweep(): StepRedeterminationSweepApi {

@@ -7,7 +7,6 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../../support/http-test-app';
-import { HR_BASIS } from '../../support/hr-basis';
 
 interface Step {
   step: number;
@@ -152,12 +151,12 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
     await request(server())
       .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)
       .set({ Authorization: `Bearer ${admin}` })
-      .send({ employeeId: head.employeeId, effectiveFrom: today(), hrBasis: HR_BASIS })
+      .send({ employeeId: head.employeeId, effectiveFrom: today() })
       .expect(200);
     await request(server())
       .patch(`/api/v1/departments/${seed.departmentId}`)
       .set({ Authorization: `Bearer ${admin}` })
-      .send({ itAdminEmployeeId: it1.employeeId, hrBasis: HR_BASIS })
+      .send({ itAdminEmployeeId: it1.employeeId })
       .expect(200);
 
     const [first] = await steps();

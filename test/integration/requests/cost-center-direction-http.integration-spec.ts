@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { Department, Person, RequestHarness } from '../../support/request-harness';
-import { HR_BASIS } from '../../support/hr-basis';
 
 /**
  * `g0-g6-final-business-baseline-remediation`, Task 1.1 and 2.2 (F01, spec L.11) over HTTP, in the FINAL release: a department may
@@ -29,7 +28,7 @@ describe('the Cost Center link over HTTP (integration, real PostgreSQL)', () => 
     request(h.server())
       .post('/api/v1/departments')
       .set(superAdmin())
-      .send({ code, name: `Department ${code}`, hrBasis: HR_BASIS });
+      .send({ code, name: `Department ${code}` });
   const errorCode = (response: request.Response) => (response.body as { error: { code: string } }).error.code;
 
   describe('a department with no Cost Center', () => {

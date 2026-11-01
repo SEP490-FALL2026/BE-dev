@@ -186,7 +186,6 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
       await request(server())
         .post(`/api/v1/departments/${(retiredRow.rows[0] as { id: string }).id}/deactivate`)
         .set(asSuper())
-        .send({ hrBasis: HR_BASIS })
         .expect(200);
 
       const data = importOf(
@@ -359,7 +358,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
       await request(server())
         .post(`/api/v1/departments/${h.seed.departmentId}/head-assignments`)
         .set(asSuper())
-        .send({ employeeId: head.employeeId, effectiveFrom: today(), hrBasis: HR_BASIS })
+        .send({ employeeId: head.employeeId, effectiveFrom: today() })
         .expect(200);
       const employee = await createActivatedAccount(h.ctx, h.seed, {
         code: unique('E-EMP'),

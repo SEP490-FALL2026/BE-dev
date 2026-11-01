@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { HR_BASIS } from '../../support/hr-basis';
 import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
 import { TransferHarness, type TransferWire } from '../../support/transfer-harness';
 import type { Department, Person } from '../../support/request-harness';
@@ -221,7 +220,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
       await request(h.server())
         .post('/api/v1/departments')
         .set({ Authorization: `Bearer ${h.admin}` })
-        .send({ code: 'P-BARE', name: 'Department P-BARE', hrBasis: HR_BASIS })
+        .send({ code: 'P-BARE', name: 'Department P-BARE' })
         .expect(201),
     );
     const person = await h.veteran(des, code('E'));

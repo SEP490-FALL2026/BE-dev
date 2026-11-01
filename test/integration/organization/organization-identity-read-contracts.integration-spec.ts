@@ -2,7 +2,6 @@ import request from 'supertest';
 import { PgRelay } from '../../support/pg-relay';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { QueryCounter, tablesOf } from '../../support/query-count';
-import { HR_BASIS } from '../../support/hr-basis';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
@@ -255,7 +254,7 @@ describe('organization and identity read contracts (integration, real PostgreSQL
         await request(h.server())
           .post('/api/v1/departments')
           .set({ Authorization: `Bearer ${h.admin}` })
-          .send({ code, name: code, hrBasis: HR_BASIS })
+          .send({ code, name: code })
           .expect(201);
       }
 

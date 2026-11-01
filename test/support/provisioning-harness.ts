@@ -154,7 +154,6 @@ export class ProvisioningHarness extends SeatHarness {
     const department = await createDepartment(this.ctx, this.admin, {
       code,
       name: `Department ${code}`,
-      hrBasis: HR_BASIS,
       ...(itAdminEmployeeId ? { itAdminEmployeeId } : {}),
     });
     await this.costCenterFor(department.id);
