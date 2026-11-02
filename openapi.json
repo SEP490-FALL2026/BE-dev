@@ -518,12 +518,12 @@
                     }
                   },
                   "EMPLOYEE.ROW_INVALID": {
-                    "summary": "The employee row is not valid.",
+                    "summary": "The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "EMPLOYEE.ROW_INVALID",
-                        "message": "The employee row is not valid.",
+                        "message": "The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.",
                         "details": { "reasons": [{ "field": "employeeCode", "code": "EMPLOYEE_CODE_TAKEN" }] },
                         "requestId": "req_example"
                       }
@@ -783,12 +783,12 @@
                     }
                   },
                   "EMPLOYEE.ROW_INVALID": {
-                    "summary": "The employee row is not valid.",
+                    "summary": "The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "EMPLOYEE.ROW_INVALID",
-                        "message": "The employee row is not valid.",
+                        "message": "The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.",
                         "details": { "reasons": [{ "field": "workEmail", "code": "WORK_EMAIL_TAKEN" }] },
                         "requestId": "req_example"
                       }
@@ -70581,7 +70581,13 @@
       "CreateEmployeeBodyDto": {
         "type": "object",
         "properties": {
-          "employeeCode": { "type": "string", "minLength": 1, "maxLength": 50 },
+          "employeeCode": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 20,
+            "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$",
+            "description": "3 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. NV-0001."
+          },
           "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
           "workEmail": {
             "format": "email",
@@ -70596,7 +70602,14 @@
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
-          "departmentCode": { "type": "string", "maxLength": 50, "nullable": true },
+          "departmentCode": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 2,
+            "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$",
+            "description": "2 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. P-ENG.",
+            "nullable": true
+          },
           "jobTitle": { "type": "string", "maxLength": 1000, "nullable": true }
         },
         "required": ["employeeCode", "fullName", "employmentType", "hireDate"],
@@ -71008,7 +71021,13 @@
       "CreateDepartmentBodyDto": {
         "type": "object",
         "properties": {
-          "code": { "type": "string", "minLength": 1, "maxLength": 50, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+          "code": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 20,
+            "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$",
+            "description": "2 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. P-ENG."
+          },
           "name": { "type": "string", "maxLength": 200 },
           "function": { "type": "string", "maxLength": 1000, "nullable": true },
           "itAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true }

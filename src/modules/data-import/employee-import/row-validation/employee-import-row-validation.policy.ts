@@ -6,6 +6,7 @@ import {
   isJobTitleTooLong,
   placementReasons,
 } from '../../../organization/public/employee-placement.policy';
+import { isEmployeeCodeValid, isDepartmentCodeValid } from '../../../organization/public/organization-code.policy';
 import type { EmployeeImportLookupData } from '../../../organization/public/organization.types';
 import {
   EMPLOYEE_COLUMNS,
@@ -219,6 +220,9 @@ export class EmployeeRowClassifier {
       ...typeAndDateIssues(row),
     );
 
+    if (row.departmentCode !== '' && !isDepartmentCodeValid(row.departmentCode)) {
+      errors.push({ column: 'department_code', code: 'DEPARTMENT_CODE_INVALID' });
+    }
     if (existing !== undefined) {
       if (errors.length > 0) return { outcome: 'ERROR', errors };
 
@@ -226,7 +230,15 @@ export class EmployeeRowClassifier {
     }
 
     const department = row.departmentCode === '' ? undefined : this.lookup.departments.get(row.departmentCode);
-    errors.push(...placementIssues(row, department));
+    if (row.departmentCode === '' || isDepartmentCodeValid(row.departmentCode)) {
+      errors.push(...placementIssues(row, department));
+    } else {
+      errors.push(
+        ...placementReasons({ jobTitle: { tooLong: isJobTitleTooLong(row.jobTitleText) } }).map(
+          ({ subject, code }) => ({ column: FILE_COLUMN[subject], code }),
+        ),
+      );
+    }
     if (errors.length > 0 || !department) return { outcome: 'ERROR', errors };
 
     return { outcome: 'VALID', errors: [], parsed: parsedRow(row, department.id) };
@@ -235,6 +247,7 @@ export class EmployeeRowClassifier {
   /** The employee code: given, and once in the file. */
   private codeIssues(code: string): RowIssue[] {
     if (code === '') return [{ column: 'employee_code', code: 'EMPLOYEE_CODE_REQUIRED' }];
+    if (!isEmployeeCodeValid(code)) return [{ column: 'employee_code', code: 'EMPLOYEE_CODE_INVALID' }];
     const issues: RowIssue[] = this.seenCodes.has(code)
       ? [{ column: 'employee_code', code: 'EMPLOYEE_CODE_DUPLICATE_IN_FILE' }]
       : [];

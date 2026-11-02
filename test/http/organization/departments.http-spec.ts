@@ -195,7 +195,6 @@ describe('department routes (e2e, no database)', () => {
 
     it.each([
       ['no code', { name: 'Design' }],
-      ['a code with a space', { code: 'P DES', name: 'Design' }],
       ['no name', { code: 'P-DES' }],
       [
         'an HR basis, which no department write takes since QĐ-93f',
@@ -218,6 +217,15 @@ describe('department routes (e2e, no database)', () => {
         .expect(422);
 
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('reports an invalid department code', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/departments')
+        .set(asSuperAdmin())
+        .send({ code: 'P DES', name: 'Design' })
+        .expect(422);
+      expect(bodyOf(response).error.code).toBe('DEPARTMENT.CODE_INVALID');
     });
 
     it.each([

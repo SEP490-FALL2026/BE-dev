@@ -5,6 +5,7 @@ import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examp
 import { refuse, toOrganizationApiException } from '../organization.http-errors';
 import {
   DepartmentCodeTakenError,
+  DepartmentCodeInvalidError,
   DepartmentForbiddenError,
   DepartmentInUseError,
   DepartmentInactiveError,
@@ -36,6 +37,9 @@ export function toDepartmentApiException(error: unknown): unknown {
   }
   if (error instanceof DepartmentOutOfScopeError) {
     return refuse(HttpStatus.FORBIDDEN, 'DEPARTMENT.OUT_OF_SCOPE', error.message);
+  }
+  if (error instanceof DepartmentCodeInvalidError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.CODE_INVALID', error.message);
   }
   if (error instanceof DepartmentCodeTakenError) {
     return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.CODE_TAKEN', error.message);
@@ -84,6 +88,7 @@ const example = (error: Error) => errorExampleOf(toDepartmentApiException(error)
 export const DEPARTMENT_ERROR_EXAMPLES = {
   DEPARTMENT_NOT_FOUND: example(new DepartmentNotFoundError()),
   DEPARTMENT_OUT_OF_SCOPE: example(new DepartmentOutOfScopeError()),
+  DEPARTMENT_CODE_INVALID: example(new DepartmentCodeInvalidError()),
   DEPARTMENT_CODE_TAKEN: example(new DepartmentCodeTakenError('D01')),
   DEPARTMENT_NAME_INVALID: example(new DepartmentNameInvalidError()),
   DEPARTMENT_IT_ADMIN_INVALID: example(new DepartmentItAdminInvalidError()),

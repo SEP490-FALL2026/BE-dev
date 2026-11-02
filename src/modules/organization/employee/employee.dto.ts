@@ -29,7 +29,17 @@ const WORK_EMAIL_DESCRIPTION =
  * and a department with none takes people in.
  */
 export const createEmployeeBodySchema = z.strictObject({
-  employeeCode: z.string().trim().min(1).max(50),
+  employeeCode: z
+    .string()
+    .trim()
+    .min(1)
+    .max(50)
+    .meta({
+      minLength: 3,
+      maxLength: 20,
+      pattern: '^[A-Z0-9]+(-[A-Z0-9]+)*$',
+      description: '3 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. NV-0001.',
+    }),
   fullName: z.string().trim().min(1).max(200),
   workEmail: z
     .string()
@@ -41,7 +51,16 @@ export const createEmployeeBodySchema = z.strictObject({
     .nullish(),
   employmentType,
   hireDate: businessDateSchema('hireDate must be a real date as YYYY-MM-DD.'),
-  departmentCode: z.string().max(50).nullish(),
+  departmentCode: z
+    .string()
+    .max(50)
+    .meta({
+      minLength: 2,
+      maxLength: 20,
+      pattern: '^[A-Z0-9]+(-[A-Z0-9]+)*$',
+      description: '2 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. P-ENG.',
+    })
+    .nullish(),
   jobTitle: z.string().max(1000).nullish(),
 });
 

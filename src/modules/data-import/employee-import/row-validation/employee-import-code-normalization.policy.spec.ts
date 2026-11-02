@@ -22,4 +22,25 @@ describe('employee import code normalization', () => {
       parsed: { employeeCode: 'NV-001', departmentCode: 'P-DES' },
     });
   });
+  it('rejects malformed codes in import rows', () => {
+    const classifier = new EmployeeRowClassifier({
+      departments: new Map(),
+      existing: new Map(),
+      emailOwners: new Map(),
+    });
+    expect(
+      classifier.classify({
+        employee_code: 'a_',
+        full_name: 'Example',
+        employment_type: 'STAFF',
+        hire_date: '2026-01-05',
+        department_code: 'bad_',
+      }).errors,
+    ).toEqual(
+      expect.arrayContaining([
+        { column: 'employee_code', code: 'EMPLOYEE_CODE_INVALID' },
+        { column: 'department_code', code: 'DEPARTMENT_CODE_INVALID' },
+      ]),
+    );
+  });
 });

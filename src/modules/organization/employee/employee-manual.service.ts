@@ -92,7 +92,7 @@ export class EmployeeManualService {
           own?.workEmail != null && normalizedEmail !== null && this.normalize(own.workEmail) === normalizedEmail;
 
         const reasons = validateEmployeeRow(
-          { departmentCode, jobTitle },
+          { employeeCode: input.employeeCode, departmentCode, jobTitle },
           {
             department,
             employeeCodeTaken: await this.employees.isCodeTaken(tx, organization.id, input.employeeCode),

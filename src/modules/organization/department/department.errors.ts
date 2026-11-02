@@ -123,3 +123,12 @@ export class UseReaderMissingError extends Error {
     this.name = 'UseReaderMissingError';
   }
 }
+
+export class DepartmentCodeInvalidError extends Error {
+  constructor() {
+    super(
+      'Department code must be 2 to 20 uppercase letters or digits in groups separated by single hyphens (e.g. P-ENG).',
+    );
+    this.name = 'DepartmentCodeInvalidError';
+  }
+}

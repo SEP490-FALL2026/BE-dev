@@ -33,7 +33,9 @@ export class EmployeeUpdateEmptyError extends Error {
 /** A row cannot become an employee; carries every reason at once. */
 export class EmployeeRowInvalidError extends Error {
   constructor(readonly reasons: { field: string; code: string }[]) {
-    super('The employee row is not valid.');
+    super(
+      'The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.',
+    );
     this.name = 'EmployeeRowInvalidError';
   }
 }
