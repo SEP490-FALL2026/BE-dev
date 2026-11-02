@@ -4,6 +4,7 @@ import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import {
   ContractGateFacts,
   ConversionFacts,
+  DirectRoleFacts,
   FORWARD_MIGRATION,
   LegacyReturnFacts,
   MigrationRecord,
@@ -330,6 +331,74 @@ export class MigrationPreflightRepo {
        ORDER BY s."id"`;
 
     return { schema, subscriptionIds: rows.map((row) => row.id) };
+  }
+
+  /**
+   * `QĐ-93k(4)`: the rows `…_identity_direct_roles` stops for, read only while that migration is not applied (the same four
+   * kinds its guard raises for, and no more). Read in the schema the database has **now**, before the migration: the spending
+   * approver is the open row of `approval_role_holders`, and the roles that cannot go with it are read from `role_grants` as text,
+   * so no value of the new enum is named (`'MANAGER'::"AppRole"` does not exist yet). A head is a head today or later in the
+   * calendar of the organization, the day the migration reads. Codes of people and departments only.
+   */
+  async directRoleFacts(tx: DbTx): Promise<DirectRoleFacts> {
+    const none: DirectRoleFacts = {
+      headsWithoutAccount: [],
+      spendingApproverHeads: [],
+      spendingApproverHoldsRoles: [],
+      spendingApproverWithoutAccount: [],
+    };
+    const [probe] = await tx.$queryRaw<{ ready: boolean; history: boolean }[]>`
+      SELECT (to_regclass('public.department_head_periods') IS NOT NULL AND to_regclass('public.approval_role_holders') IS NOT NULL
+              AND to_regclass('public.app_users') IS NOT NULL AND to_regclass('public.role_grants') IS NOT NULL
+              AND to_regclass('public.employees') IS NOT NULL AND to_regclass('public.departments') IS NOT NULL
+              AND to_regclass('public.organizations') IS NOT NULL) AS "ready",
+             to_regclass('public._prisma_migrations') IS NOT NULL AS "history"`;
+    if (!probe.ready) return none;
+    if (probe.history) {
+      const [applied] = await tx.$queryRaw<{ applied: boolean }[]>`
+        SELECT EXISTS (SELECT 1 FROM _prisma_migrations
+                        WHERE migration_name ~ '_identity_direct_roles$'
+                          AND finished_at IS NOT NULL AND rolled_back_at IS NULL) AS "applied"`;
+      if (applied.applied) return none;
+    }
+
+    const headsWithoutAccount = await tx.$queryRaw<DirectRoleFacts['headsWithoutAccount']>`
+      SELECT DISTINCT e."employee_code" AS "employeeCode", d."code" AS "department"
+        FROM "department_head_periods" p
+        JOIN "employees" e ON e."id" = p."employee_id"
+        JOIN "departments" d ON d."id" = p."department_id"
+        JOIN "organizations" o ON o."id" = p."organization_id"
+       WHERE (p."valid_to" IS NULL OR p."valid_to" > (now() AT TIME ZONE o."time_zone")::date)
+         AND NOT EXISTS (SELECT 1 FROM "app_users" u WHERE u."employee_id" = e."id")
+       ORDER BY e."employee_code", d."code"`;
+    const spendingApproverHeads = await tx.$queryRaw<DirectRoleFacts['spendingApproverHeads']>`
+      SELECT DISTINCT e."employee_code" AS "employeeCode", d."code" AS "department"
+        FROM "approval_role_holders" h
+        JOIN "employees" e ON e."id" = h."employee_id"
+        JOIN "department_head_periods" p ON p."employee_id" = e."id"
+        JOIN "departments" d ON d."id" = p."department_id"
+        JOIN "organizations" o ON o."id" = p."organization_id"
+       WHERE h."role"::text = 'SPENDING_APPROVER' AND h."held_until" IS NULL
+         AND (p."valid_to" IS NULL OR p."valid_to" > (now() AT TIME ZONE o."time_zone")::date)
+       ORDER BY e."employee_code", d."code"`;
+    const spendingApproverHoldsRoles = await tx.$queryRaw<DirectRoleFacts['spendingApproverHoldsRoles']>`
+      SELECT DISTINCT e."employee_code" AS "employeeCode", g."role"::text AS "role"
+        FROM "approval_role_holders" h
+        JOIN "employees" e ON e."id" = h."employee_id"
+        JOIN "app_users" u ON u."employee_id" = e."id"
+        JOIN "role_grants" g ON g."app_user_id" = u."id"
+       WHERE h."role"::text = 'SPENDING_APPROVER' AND h."held_until" IS NULL AND g."revoked_at" IS NULL
+         AND g."role"::text IN ('SUPER_ADMIN', 'IT_ADMIN', 'FINANCE')
+       ORDER BY e."employee_code", g."role"::text`;
+    const spendingApproverWithoutAccount = await tx.$queryRaw<DirectRoleFacts['spendingApproverWithoutAccount']>`
+      SELECT DISTINCT e."employee_code" AS "employeeCode"
+        FROM "approval_role_holders" h
+        JOIN "employees" e ON e."id" = h."employee_id"
+       WHERE h."role"::text = 'SPENDING_APPROVER' AND h."held_until" IS NULL
+         AND NOT EXISTS (SELECT 1 FROM "app_users" u WHERE u."employee_id" = e."id")
+       ORDER BY e."employee_code"`;
+
+    return { headsWithoutAccount, spendingApproverHeads, spendingApproverHoldsRoles, spendingApproverWithoutAccount };
   }
 
   /** The facts after the merged migration: every service account has the owning department it stored. */

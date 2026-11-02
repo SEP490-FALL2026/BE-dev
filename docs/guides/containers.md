@@ -609,6 +609,13 @@ read-only (PostgreSQL refuses any write, `25006`). `--json` gives the same repor
   deploy is refused). `SERVICE_ACCOUNT_WITHOUT_DEPARTMENT_ON_START`, `SERVICE_ACCOUNT_WITHOUT_DEPARTMENT_ON_RECORDED_DAY`,
   `COST_ALLOCATION_NAMES_COMPANY`, `DEPARTMENT_CHARGED_TO_COMPANY`: the data cannot be carried without inventing HR or
   finance history. See _Supported and blocked histories_ below for what may happen next.
+  `DIRECT_ROLES_HEAD_WITHOUT_ACCOUNT`, `DIRECT_ROLES_SPENDING_APPROVER_IS_HEAD`, `DIRECT_ROLES_SPENDING_APPROVER_HOLDS_ROLE`,
+  `DIRECT_ROLES_SPENDING_APPROVER_WITHOUT_ACCOUNT` (`QĐ-93k(4)`, read only until `…_identity_direct_roles` is applied): the
+  conversion of `MANAGER` and `SPENDING_APPROVER` to granted roles stops for a head without an account, and for a spending
+  approver who heads a department, holds `SUPER_ADMIN`, `IT_ADMIN` or `FINANCE`, or has no account. Each row is named by
+  employee code (and department or role). The Super Admin fixes them in the running release (give the head an account, end the
+  double role, hand the role over) and runs the command again; a spending approver whose account is locked or not activated, or
+  who is handing over, is carried over and blocks nothing.
 - **1:** the command failed (database unreachable, settings invalid); nothing was judged.
 
 **The preflight is a read-only check, not a repair.** It changes nothing, and no command in this repository invents a

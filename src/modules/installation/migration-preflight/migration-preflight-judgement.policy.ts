@@ -1,6 +1,7 @@
 import {
   ContractGateFacts,
   ConversionFacts,
+  DirectRoleFacts,
   FORWARD_MIGRATION,
   MigrationRecord,
   PreflightBlocker,
@@ -232,6 +233,32 @@ function judgeCostCenterDirection(facts: ContractGateFacts['costCenterDirection'
   return { blockers, information: [] };
 }
 
+/**
+ * `MANAGER` and `SPENDING_APPROVER` become granted roles (`QĐ-93k(4)`, `…_identity_direct_roles`). The migration stops and lists
+ * the same four kinds of row, and fixes none of them: Super Admin gives the head an account, ends the double role or hands the
+ * spending approver over in the running release, before the deploy. One blocker for each row, the person by employee code.
+ */
+export function judgeDirectRoles(facts: DirectRoleFacts): PreflightBlocker[] {
+  return [
+    ...facts.headsWithoutAccount.map((row): PreflightBlocker => ({
+      code: 'DIRECT_ROLES_HEAD_WITHOUT_ACCOUNT',
+      ...row,
+    })),
+    ...facts.spendingApproverHeads.map((row): PreflightBlocker => ({
+      code: 'DIRECT_ROLES_SPENDING_APPROVER_IS_HEAD',
+      ...row,
+    })),
+    ...facts.spendingApproverHoldsRoles.map((row): PreflightBlocker => ({
+      code: 'DIRECT_ROLES_SPENDING_APPROVER_HOLDS_ROLE',
+      ...row,
+    })),
+    ...facts.spendingApproverWithoutAccount.map((row): PreflightBlocker => ({
+      code: 'DIRECT_ROLES_SPENDING_APPROVER_WITHOUT_ACCOUNT',
+      ...row,
+    })),
+  ].sort(byCodeThenRow);
+}
+
 /** The conversion report with the gates added: blocked as soon as one gate blocks. */
 export function withContractGates(
   report: PreflightReport,
@@ -283,6 +310,13 @@ function rowOf(blocker: PreflightBlocker): string {
       return blocker.moveId;
     case 'BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS':
       return blocker.proposalId;
+    case 'DIRECT_ROLES_HEAD_WITHOUT_ACCOUNT':
+    case 'DIRECT_ROLES_SPENDING_APPROVER_IS_HEAD':
+      return `${blocker.employeeCode} ${blocker.department}`;
+    case 'DIRECT_ROLES_SPENDING_APPROVER_HOLDS_ROLE':
+      return `${blocker.employeeCode} ${blocker.role}`;
+    case 'DIRECT_ROLES_SPENDING_APPROVER_WITHOUT_ACCOUNT':
+      return blocker.employeeCode;
     default:
       return blocker.assignmentId;
   }
