@@ -5,7 +5,7 @@ import { ensureManagerGrant } from './builders/account.builder';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from './http-test-app';
 import { UseFacts, registerUseReaders } from './organization-use-readers';
 
-/** The departments, heads and projects over HTTP: the types of the wire, the calendar and the set-up the department specs share. */
+/** The departments and heads over HTTP: the types of the wire, the calendar and the set-up the department specs share. */
 export interface DepartmentWire {
   id: string;
   code: string;

@@ -330,9 +330,6 @@
     }
   },
   "src/modules/requests/assessment/proposal.service.ts": {
-    "complexity": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 2
     }

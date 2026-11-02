@@ -8,7 +8,6 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
     asAdmin,
     as,
     api,
-    unique,
     errorOf,
     dataOf,
     newDepartment,
@@ -18,8 +17,6 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
     assignHead,
     grantManager,
     meOf,
-    auditOf,
-    rowCount,
   } = h;
 
   beforeAll(async () => {

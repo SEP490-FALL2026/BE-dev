@@ -6,7 +6,7 @@ import { SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
 
-/** LD-11, LD-12, LD-14 and LD-15 of the post-merge review: paged projects, one snapshot, histories that say when they are cut. */
+/** LD-11, LD-14 and LD-15 of the post-merge review: one snapshot, histories that say when they are cut (LD-12, the projects, went with QĐ-93h). */
 describe('organization and identity read contracts (integration, real PostgreSQL)', () => {
   let relay: PgRelay;
   let counter: QueryCounter;
@@ -55,6 +55,18 @@ describe('organization and identity read contracts (integration, real PostgreSQL
       statements.slice(begin, commit).some((statement) => /REPEATABLE\s+READ/i.test(statement))
     );
   };
+
+  describe('LD-12 retired (QĐ-93h): no project on the profile', () => {
+    it('reads the department profile with no project key and without touching a project table', async () => {
+      const { result, statements } = await get(`/api/v1/departments/${h.seed.departmentId}`);
+
+      const profile = dataOf<Record<string, unknown>>(result);
+      expect(profile).not.toHaveProperty('projects');
+      expect(profile).not.toHaveProperty('projectTotal');
+      expect(statements.filter((one) => /\b(?:projects|project_departments)\b/i.test(one))).toEqual([]);
+      await request(h.server()).get('/api/v1/projects').set(asAdmin()).expect(404);
+    });
+  });
 
   describe('LD-11: the people of a department and of a Cost Center', () => {
     it('counts and cuts the members in one repeatable-read snapshot, and reads whether there is an email, not the email', async () => {

@@ -1,7 +1,6 @@
-import request from 'supertest';
 import { DepartmentHarness, today, addDays } from '../../support/department-harness';
 
-describe('department profiles, heads and the MANAGER role over HTTP (integration, real PostgreSQL): the contract the moves of the projects and the departments keep', () => {
+describe('department profiles, heads and the MANAGER role over HTTP (integration, real PostgreSQL): the contract the move of the departments keeps', () => {
   const h = new DepartmentHarness();
   const {
     asIt,
