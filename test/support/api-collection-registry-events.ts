@@ -272,6 +272,21 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     'Added with the capped retirement blockers: the plans holding the most seats, since the seats themselves are cut.',
     'added',
   ),
+  // QĐ-93c: the configuration of the substitute and the fallback approver is retired; approvalRoleList goes with it.
+  ...[
+    { registry: 'exceptions' as const, key: 'approvalRoleList#bounded' },
+    { registry: 'nested' as const, key: 'approvalRoleList#history', from: 'bounded' as const },
+  ].map(({ registry, key, from }): RegistryEvent => ({
+    registry,
+    key,
+    change: 'closed',
+    ...(from === undefined ? {} : { from }),
+    finding: 'QĐ-93c',
+    item: 'qd93-remove-fallback-substitute-approvers',
+    date: '2026-11-03',
+    reason:
+      'approvalRoleList is removed: the substitute and the fallback approver are gone, the spending approver is a role grant.',
+  })),
   removedByDecision('departmentGet#projects', 'unbounded'),
   removedByDecision('departmentGet#projects.departments', 'bounded'),
   removedByDecision('projectList#departments', 'bounded'),

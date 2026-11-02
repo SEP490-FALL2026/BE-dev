@@ -96,13 +96,13 @@ export class BudgetInformationService {
       // Read again under the lock: the question may have been closed while this one waited.
       const question = (await this.questions.lockById(tx, id)) as BudgetInformationRecord;
       const step = await this.steps.findLatest(request.id, 'SPEND_APPROVAL', tx);
-      const holders = await this.identity.getApprovalRoleHolders(tx);
+      const spendingApprover = await this.identity.getSpendingApproverEmployeeId(tx);
       const refusal = checkAnswer({
         actorIsFinance: actor.roles.includes('FINANCE'),
         actorEmployeeId: actor.employeeId,
         requesterEmployeeId: request.requesterEmployeeId,
         beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
-        approverEmployeeIds: [step?.assigneeEmployeeId ?? null, holders.spendingApproverEmployeeId],
+        approverEmployeeIds: [step?.assigneeEmployeeId ?? null, spendingApprover],
         questionState: question.state,
       });
       if (refusal) throw new BudgetInformationRefusedError(refusal);

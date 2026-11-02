@@ -284,18 +284,6 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     removeWhen: 'Review when ROLE_HISTORY_LIMIT changes.',
   },
   {
-    key: 'approvalRoleList#history',
-    classification: 'bounded',
-    findings: ['LD-14'],
-    owner: 'g2-approval-roles',
-    businessMaximum: {
-      maxItems: 20,
-      source: 'HISTORY_LIMIT in approval-role.service.ts (take of ApprovalRoleRepo.history)',
-    },
-    rationale: 'The newest holders of one approval role; historyHasMore says there are older ones (LD-14).',
-    removeWhen: 'Review when HISTORY_LIMIT changes.',
-  },
-  {
     key: 'departmentToolsInUse#data.summary',
     classification: 'unbounded',
     findings: ['LD-09'],

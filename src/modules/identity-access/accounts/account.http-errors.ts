@@ -25,7 +25,6 @@ import {
   SpendingApproverEmployeeNotActiveError,
   SpendingApproverHasOpenWorkError,
   SpendingApproverHeadsDepartmentError,
-  SpendingApproverIsSubstituteError,
   SuperAdminHolderNotLockableError,
 } from './account.errors';
 
@@ -109,10 +108,6 @@ export function toAccountApiException(error: unknown): unknown {
   if (error instanceof SpendingApproverAccountNotUsableError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE', error.message);
   }
-  // The code of the approval roles, borrowed: one code keeps one status (API contract) and the substitute role goes away with its own release.
-  if (error instanceof SpendingApproverIsSubstituteError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER', error.message);
-  }
   if (error instanceof FinanceAlreadyAssignedError) {
     return refuse(HttpStatus.CONFLICT, 'APP_USER.FINANCE_ALREADY_ASSIGNED', error.message);
   }
@@ -172,6 +167,5 @@ export const ACCOUNT_ERROR_EXAMPLES = {
   ),
   SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE: example(new SpendingApproverEmployeeNotActiveError()),
   SPENDING_APPROVER_ACCOUNT_NOT_USABLE: example(new SpendingApproverAccountNotUsableError()),
-  SUBSTITUTE_MUST_DIFFER: example(new SpendingApproverIsSubstituteError()),
   INVITATION_INVALID: example(new InvitationInvalidError()),
 } as const;

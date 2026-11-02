@@ -682,7 +682,6 @@ const INVALID_MAXIMA: Record<string, object> = {
 
 /** The arrays review LD-R2-RV-02 named; the recursive inventory must find every one the ledger has not closed. */
 const REVIEW_NAMED_ARRAYS = [
-  'approvalRoleList#history',
   'standardToolsetList#plans',
   'applicationList#domains',
   'vendorGroupList#serviceLines',

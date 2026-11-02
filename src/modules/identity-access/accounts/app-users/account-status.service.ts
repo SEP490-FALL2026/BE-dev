@@ -106,8 +106,7 @@ export class AccountStatusService {
 
   /**
    * Locks the account for a grant or a revoke. SPENDING_APPROVER first takes the advisory key of the approval roles, then the
-   * employee, then the account — the order of `ApprovalRoleService.set` — so the rule that the substitute is never the spending
-   * approver (#9a) is checked one writer at a time, whichever of the two routes changes it.
+   * employee, then the account, so the rules of the grant (rules 6 to 10) are checked one writer at a time.
    */
   private async lockForRoleChange(tx: DbTx, appUserId: string, role: AppRole): Promise<AccountRecord> {
     if (role === 'SPENDING_APPROVER') {

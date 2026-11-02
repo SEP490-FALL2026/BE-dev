@@ -6,8 +6,6 @@ export interface RoleFacts {
   superAdmin: boolean;
   finance: boolean;
   spendingApprover: boolean;
-  substituteApprover: boolean;
-  fallbackApprover: boolean;
   /** How many active departments name the person IT Admin in charge. */
   itAdminDepartments: number;
   headsDepartment: boolean;
@@ -21,8 +19,10 @@ export function flagsOf(facts: RoleFacts): RoleFlag[] {
     SUPER_ADMIN_HOLDER: facts.superAdmin,
     FINANCE: facts.finance,
     SPENDING_APPROVER: facts.spendingApprover,
-    SUBSTITUTE_APPROVER: facts.substituteApprover,
-    FALLBACK_APPROVER: facts.fallbackApprover,
+    // The substitute and the fallback approver are gone (`QĐ-93c`): no flag of them is made now, and the two names stay only to read
+    // the flags of a case recorded before.
+    SUBSTITUTE_APPROVER: false,
+    FALLBACK_APPROVER: false,
     IT_ADMIN_IN_CHARGE: facts.itAdminDepartments > 0,
     DEPARTMENT_HEAD: facts.headsDepartment,
     WORKSPACE_OWNER: facts.workspaces > 0,

@@ -80,8 +80,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   applicationRetirementConfirm: 'APPLICATION.RETIREMENT_CONFIRMED',
   applicationRetirementGet: 'APPLICATION.RETIREMENT_FETCHED',
   applicationUpdate: 'APPLICATION.UPDATED',
-  approvalRoleList: 'APPROVAL_ROLE.LISTED',
-  approvalRoleSet: 'APPROVAL_ROLE.SET',
   assignmentExpiryQueueList: 'ASSIGNMENT_EXPIRY_QUEUE.LISTED',
   assignmentExpiryReminderList: 'ASSIGNMENT_EXPIRY_REMINDER.LISTED',
   assignmentExpiryStartRevocation: 'ASSIGNMENT_EXPIRY.REVOCATION_STARTED',

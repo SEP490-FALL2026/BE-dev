@@ -192,9 +192,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
   describe('SPENDING_APPROVER (US-01-03 AC-1, AC-2, AC-4, AC-6, AC-10, AC-11, M2)', () => {
     const setEmployee = (employeeId: string, set: string) =>
       h.ctx.sql.query(`UPDATE employees SET ${set} WHERE id = $1`, [employeeId]);
-    const approvalRole = (role: string, employeeId: string) =>
-      request(h.server()).put(`/api/v1/approval-roles/${role}`).set(h.as(h.adminToken)).send({ employeeId });
-    const holders = async () => h.ctx.app.get(IdentityAccessApi).getApprovalRoleHolders();
+    const holder = async () => h.ctx.app.get(IdentityAccessApi).getSpendingApproverEmployeeId();
     const tableRows = async () =>
       (
         await h.ctx.sql.query<{ employee_id: string }>(
@@ -221,7 +219,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
 
       expect(bodyOf(response).message).toBe('ROLE.GRANTED');
       expect(await rolesOf(user.appUserId)).toEqual(['SPENDING_APPROVER']);
-      expect((await holders()).spendingApproverEmployeeId).toBe(user.employeeId);
+      expect(await holder()).toBe(user.employeeId);
       expect(await tableRows()).toEqual([]);
       expect(await auditOf('ROLE.GRANTED', user.appUserId)).toHaveLength(1);
     });
@@ -239,7 +237,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
       await h.ctx.sql.query("UPDATE app_users SET status = 'ACTIVE' WHERE id = $1", [first.appUserId]);
       await revoke(first.appUserId, 'SPENDING_APPROVER').expect(200);
       await grant(second.appUserId, 'SPENDING_APPROVER').expect(201);
-      expect((await holders()).spendingApproverEmployeeId).toBe(second.employeeId);
+      expect(await holder()).toBe(second.employeeId);
     });
 
     it('names the roles in the way when SPENDING_APPROVER meets another role (AC-11)', async () => {
@@ -313,33 +311,28 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
       expect((await h.ctx.sql.query('SELECT count(*)::int AS n FROM app_users')).rows).toEqual(before.rows);
     });
 
-    it('refuses the conflict substitute as spending approver, and the spending approver as substitute, changing nothing (M2)', async () => {
-      const substitute = await h.activatedAccount([]);
-      const approver = await h.activatedAccount([]);
-      await approvalRole('CONFLICT_SUBSTITUTE', substitute.employeeId).expect(200);
+    it('has no substitute to keep apart from it: whoever the old table names is granted like anyone else, and the routes of the old configuration are gone (QĐ-93c)', async () => {
+      const person = await h.activatedAccount([]);
 
-      const grantRefusal = await grant(substitute.appUserId, 'SPENDING_APPROVER').expect(422);
+      await grant(person.appUserId, 'SPENDING_APPROVER').expect(201);
 
-      expect(errorCode(grantRefusal)).toBe('APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER');
-      expect(await rolesOf(substitute.appUserId)).toEqual([]);
-      await grant(approver.appUserId, 'SPENDING_APPROVER').expect(201);
-      const reverse = await approvalRole('CONFLICT_SUBSTITUTE', approver.employeeId).expect(422);
-      expect(errorCode(reverse)).toBe('APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER');
-      expect((await holders()).conflictSubstituteEmployeeId).toBe(substitute.employeeId);
-      expect((await holders()).spendingApproverEmployeeId).toBe(approver.employeeId);
+      expect(await holder()).toBe(person.employeeId);
+      await request(h.server())
+        .put('/api/v1/approval-roles/CONFLICT_SUBSTITUTE')
+        .set(h.as(h.adminToken))
+        .send({ employeeId: person.employeeId })
+        .expect(404);
     });
 
-    it('is no longer an approval role: PUT refuses it and GET lists only the two others', async () => {
+    it('is no longer an approval role of a route: GET and PUT /approval-roles answer 404, and the role is granted through the grant route alone', async () => {
       const user = await h.activatedAccount([]);
 
-      const put = await approvalRole('SPENDING_APPROVER', user.employeeId).expect(422);
-      const list = await h.admin.get('/api/v1/approval-roles').expect(200);
-
-      expect(errorCode(put)).toBe('VALIDATION_ERROR');
-      expect(dataOf<{ items: Array<{ role: string }> }>(list).items.map((item) => item.role)).toEqual([
-        'CONFLICT_SUBSTITUTE',
-        'FALLBACK_APPROVER',
-      ]);
+      await request(h.server())
+        .put('/api/v1/approval-roles/SPENDING_APPROVER')
+        .set(h.as(h.adminToken))
+        .send({ employeeId: user.employeeId })
+        .expect(404);
+      await h.admin.get('/api/v1/approval-roles').expect(404);
     });
 
     it('is the Super Admin alone who grants and revokes it: Finance and the IT Admin get 403, and nothing changes (AC-4)', async () => {

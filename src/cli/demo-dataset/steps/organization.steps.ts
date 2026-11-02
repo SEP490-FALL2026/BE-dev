@@ -216,33 +216,9 @@ async function spendingApprover(ctx: DemoRunContext, code: string): Promise<Resu
   return { status: 'done', label };
 }
 
-/** A role somebody outside the dataset holds stays theirs: the dataset never takes an approval role from a real holder. */
+/** The one approval role left: a role somebody outside the dataset holds stays theirs, the dataset never takes it from a real holder. */
 async function approvalRoles(ctx: DemoRunContext): Promise<StepOutcome> {
-  const current = await ctx.api.call<{ items: { role: string; holder: { employeeCode: string } | null }[] }>(
-    ctx.superAdminEmail,
-    'GET',
-    '/approval-roles',
-  );
-  const results: Result[] = [];
-  for (const [role, code] of Object.entries(ctx.fixture.approvalRoles)) {
-    if (role === 'SPENDING_APPROVER') {
-      results.push(await spendingApprover(ctx, code));
-      continue;
-    }
-    const holder = current.items.find((item) => item.role === role)?.holder ?? null;
-    const label = `${role} ← ${code}`;
-    if (holder?.employeeCode === code) results.push({ status: 'present', label });
-    else if (holder) results.push({ status: 'conflict', label: `${label}: đang do ${holder.employeeCode} giữ` });
-    else if (ctx.mode === 'plan') results.push({ status: 'planned', label });
-    else {
-      await ctx.api.call(ctx.superAdminEmail, 'PUT', `/approval-roles/${role}`, {
-        employeeId: ctx.ids.employees.get(code),
-      });
-      results.push({ status: 'done', label });
-    }
-  }
-
-  return summarize(results);
+  return summarize([await spendingApprover(ctx, ctx.fixture.approvalRoles.SPENDING_APPROVER)]);
 }
 
 export const ORGANIZATION_STEPS: readonly DemoStep[] = [
@@ -251,5 +227,5 @@ export const ORGANIZATION_STEPS: readonly DemoStep[] = [
   { key: 'org.accounts', title: 'Tài khoản demo (lệnh vận hành)', needs: ['org.employees'], run: accounts },
   { key: 'org.it-admins', title: 'IT Admin phụ trách phòng (Super Admin)', needs: ['org.accounts'], run: itAdmins },
   { key: 'org.heads', title: 'Trưởng phòng (Super Admin)', needs: ['org.accounts'], run: heads },
-  { key: 'org.approval-roles', title: 'Vai trò phê duyệt (Super Admin)', needs: ['org.accounts'], run: approvalRoles },
+  { key: 'org.approval-roles', title: 'Người duyệt chi (Super Admin)', needs: ['org.accounts'], run: approvalRoles },
 ];

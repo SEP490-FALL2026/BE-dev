@@ -285,8 +285,6 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/me/password',
   'GET /api/v1/account-candidates',
   'GET /api/v1/audit-events',
-  'GET /api/v1/approval-roles',
-  'PUT /api/v1/approval-roles/{role}',
   'GET /api/v1/app-users',
   'POST /api/v1/app-users',
   'GET /api/v1/app-users/{id}',

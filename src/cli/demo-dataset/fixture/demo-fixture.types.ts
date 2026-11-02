@@ -112,7 +112,8 @@ export interface DemoFixture {
   currency: string;
   departments: DemoDepartment[];
   people: DemoPerson[];
-  approvalRoles: { SPENDING_APPROVER: string; CONFLICT_SUBSTITUTE: string; FALLBACK_APPROVER: string };
+  /** The one approval role left, the spending approver (a role grant, `QĐ-93b`); the substitute and the fallback approver are gone (`QĐ-93c`). */
+  approvalRoles: { SPENDING_APPROVER: string };
   applications: DemoApplication[];
   subscriptions: DemoSubscription[];
   /** A Finance-declared tax profile for the vendor of one application. */

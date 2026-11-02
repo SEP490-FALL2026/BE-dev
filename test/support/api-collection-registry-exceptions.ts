@@ -58,20 +58,6 @@ export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     itemProperties: ['code', 'minorUnit', 'name'],
   },
   {
-    operationId: 'approvalRoleList',
-    classification: 'bounded',
-    findings: ['LD-14'],
-    owner: 'g2-approval-roles',
-    businessMaximum: {
-      maxItems: 2,
-      source:
-        'APPROVAL_ROLES in approval-role.repo.ts (the history of each role: NESTED_ARRAYS approvalRoleList#history)',
-    },
-    rationale: 'The fixed set of configured approval roles.',
-    removeWhen: 'Review when APPROVAL_ROLES changes.',
-    itemProperties: ['history', 'historyHasMore', 'holder', 'role'],
-  },
-  {
     operationId: 'operatingParameterList',
     classification: 'bounded',
     findings: [],

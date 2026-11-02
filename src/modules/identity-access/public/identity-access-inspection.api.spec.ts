@@ -1,7 +1,6 @@
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AccountRecordService } from '../accounts/account-record.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
-import { ApprovalRoleFactsService } from '../approval-roles/approval-role-facts.service';
 import { IdentityAccessInspectionApi } from './identity-access-inspection.api';
 
 describe('IdentityAccessInspectionApi', () => {
@@ -12,7 +11,6 @@ describe('IdentityAccessInspectionApi', () => {
     holder?: { status: string; activationState: string; loginEmail: string; passwordHash?: string };
     byState?: { status: string; activationState: string; count: number }[];
     byRole?: [string, number][];
-    approval?: string[];
   }) {
     const accounts = {
       countAccountsByState: jest.fn().mockResolvedValue(state.byState ?? []),
@@ -23,18 +21,16 @@ describe('IdentityAccessInspectionApi', () => {
       findSuperAdminHolderId: jest.fn().mockResolvedValue(state.holderId),
       countEffectiveGrantsByRole: jest.fn().mockResolvedValue(new Map(state.byRole ?? [])),
     };
-    const approvalRoles = { heldRoles: jest.fn().mockResolvedValue(state.approval ?? []) };
     const service = new IdentityAccessInspectionApi(
       accounts as unknown as AccountRecordService,
       grants as unknown as RoleGrantService,
-      approvalRoles as unknown as ApprovalRoleFactsService,
     );
 
-    return { service, accounts, grants, approvalRoles };
+    return { service, accounts, grants };
   }
 
-  it('reports every state, role and approval role, zero included, all read in the caller transaction', async () => {
-    const { service, accounts, grants, approvalRoles } = build({
+  it('reports every state and role, zero included, all read in the caller transaction, and no approval role of the old configuration', async () => {
+    const { service, accounts, grants } = build({
       holderId: 'u-1',
       holder: {
         status: 'ACTIVE',
@@ -50,20 +46,17 @@ describe('IdentityAccessInspectionApi', () => {
         ['SUPER_ADMIN', 1],
         ['IT_ADMIN', 2],
       ],
-      approval: ['SPENDING_APPROVER'],
     });
 
     await expect(service.accountInventory(tx)).resolves.toEqual({
       superAdmin: { holders: 1, status: 'ACTIVE', activationState: 'ACTIVATED', loginEmail: 'bao@acme.vn' },
       accountsByState: { ACTIVE_ACTIVATED: 3, ACTIVE_INVITED: 0, LOCKED_ACTIVATED: 0, LOCKED_INVITED: 1 },
-      directRoles: { SUPER_ADMIN: 1, IT_ADMIN: 2, FINANCE: 0, EMPLOYEE: 0 },
-      approvalRoles: { SPENDING_APPROVER: 1, CONFLICT_SUBSTITUTE: 0, FALLBACK_APPROVER: 0 },
+      directRoles: { SUPER_ADMIN: 1, IT_ADMIN: 2, FINANCE: 0, EMPLOYEE: 0, MANAGER: 0, SPENDING_APPROVER: 0 },
     });
     expect(grants.findSuperAdminHolderId).toHaveBeenCalledWith(tx);
     expect(accounts.findAccountRecord).toHaveBeenCalledWith('u-1', tx);
     expect(accounts.countAccountsByState).toHaveBeenCalledWith(tx);
     expect(grants.countEffectiveGrantsByRole).toHaveBeenCalledWith(tx);
-    expect(approvalRoles.heldRoles).toHaveBeenCalledWith(tx);
   });
 
   it('never passes on a credential field of the Super Admin account', async () => {

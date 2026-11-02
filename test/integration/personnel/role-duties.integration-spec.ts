@@ -139,15 +139,15 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       ).toEqual(expect.arrayContaining([expect.objectContaining({ id: wire.id })]));
     });
 
-    it('flags the fallback approver, and says nothing of a person who holds no role', async () => {
-      const fallback = await h.worker(department, code());
-      await h.setRole('FALLBACK_APPROVER', fallback);
+    it('flags the spending approver, and says nothing of a person who holds no role', async () => {
+      const approver = await h.worker(department, code());
+      await h.setRole('SPENDING_APPROVER', approver);
       const plain = await h.worker(department, code());
 
-      const flagged = await h.recordedCase(fallback);
+      const flagged = await h.recordedCase(approver);
       const none = await h.recordedCase(plain);
 
-      expect(flagsOf(flagged as FlaggedCase)).toEqual(['FALLBACK_APPROVER']);
+      expect(flagsOf(flagged as FlaggedCase)).toEqual(['SPENDING_APPROVER']);
       expect(flagsOf(none as FlaggedCase)).toEqual([]);
       expect(await flaggedEvents(none.id)).toHaveLength(0);
       expect(await stored(none.id)).toEqual([]);
@@ -156,6 +156,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       expect(h.dataOf<FlaggedCase>(await h.readCase(none.id).expect(200)).warnings?.registered).not.toHaveProperty(
         'ROLE_HOLDER_NEEDS_REPLACEMENT',
       );
+      await h.setRole('SPENDING_APPROVER', h.boss);
     });
 
     it('moves the snapshot with the last working day and tells again only when the roles changed', async () => {
@@ -164,16 +165,16 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       await h.changeLastDay(wire.id, { lastWorkingDay: h.day(12), reason: 'Bàn giao muộn hơn' }).expect(200);
       expect(await flaggedEvents(wire.id)).toHaveLength(0);
 
-      await h.setRole('FALLBACK_APPROVER', person);
+      await h.setRole('SPENDING_APPROVER', person);
       await h.changeLastDay(wire.id, { lastWorkingDay: h.day(14), reason: 'Bàn giao muộn hơn nữa' }).expect(200);
       await h.changeLastDay(wire.id, { lastWorkingDay: h.day(15), reason: 'Lại muộn hơn' }).expect(200);
 
       const events = await flaggedEvents(wire.id);
       expect(events.map((event) => [event.after.stage, event.after.flags])).toEqual([
-        ['DUE_CHANGED', ['FALLBACK_APPROVER']],
+        ['DUE_CHANGED', ['SPENDING_APPROVER']],
       ]);
-      expect(await stored(wire.id)).toEqual(['FALLBACK_APPROVER']);
-      await h.setRole('FALLBACK_APPROVER', await h.worker(department, code()));
+      expect(await stored(wire.id)).toEqual(['SPENDING_APPROVER']);
+      await h.setRole('SPENDING_APPROVER', h.boss);
     });
   });
 
@@ -326,13 +327,13 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
   describe('the list by role costs the same statements for any number of cases (LD-07)', () => {
     it('reads a constant number of statements for two cases and for twelve', async () => {
       const department = await h.departmentWithUnit('P-RDL');
-      const fallback = await h.worker(department, code());
-      await h.setRole('FALLBACK_APPROVER', fallback);
-      await h.recordedCase(fallback);
-      const small = await counter.run(() => h.listCases('?roleFlag=FALLBACK_APPROVER&pageSize=100').expect(200));
+      const approver = await h.worker(department, code());
+      await h.setRole('SPENDING_APPROVER', approver);
+      await h.recordedCase(approver);
+      const small = await counter.run(() => h.listCases('?roleFlag=SPENDING_APPROVER&pageSize=100').expect(200));
       for (let i = 0; i < 10; i += 1) await h.recordedCase(await h.worker(department, code()));
       const big = await counter.run(() => h.listCases('?pageSize=100').expect(200));
-      const bigFiltered = await counter.run(() => h.listCases('?roleFlag=FALLBACK_APPROVER&pageSize=100').expect(200));
+      const bigFiltered = await counter.run(() => h.listCases('?roleFlag=SPENDING_APPROVER&pageSize=100').expect(200));
 
       expect(dataStatements(small.statements).length).toBeGreaterThan(0);
       expect(dataStatements(big.statements)).toHaveLength(dataStatements(small.statements).length);
@@ -341,10 +342,11 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       expect(rows.length).toBeGreaterThanOrEqual(12);
       expect(rows.every((row) => Object.keys(row.roleFlags).length === 8)).toBe(true);
       const filtered = h.dataOf<{ items: FlaggedCase[] }>(bigFiltered.result).items;
-      expect(filtered.map((row) => row.employee.id)).toContain(fallback.employeeId);
+      expect(filtered.map((row) => row.employee.id)).toContain(approver.employeeId);
       // The filter reads the snapshot taken when the case was written: fewer cases, not the ones that held no role.
       expect(filtered.length).toBeLessThan(rows.length);
       await h.listCases('?roleFlag=NOT_A_ROLE').expect(422);
+      await h.setRole('SPENDING_APPROVER', h.boss);
     });
   });
 
@@ -370,8 +372,9 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
 
       expect(flagsOf(financeCase as FlaggedCase)).toEqual(['FINANCE']);
       expect(flagsOf(bossCase as FlaggedCase)).toEqual(['SPENDING_APPROVER']); // the approver heads no department (QĐ-93b)
-      const substituted = await h.recordedCase(h.bystander);
-      expect(flagsOf(substituted as FlaggedCase)).toEqual(['SUBSTITUTE_APPROVER']);
+      // The substitute for a conflict of interest is gone (QĐ-93c): whoever held it is a person of no role, and carries no flag.
+      const bystander = await h.recordedCase(h.bystander);
+      expect(flagsOf(bystander as FlaggedCase)).toEqual([]);
       for (const wire of [financeCase, bossCase]) {
         await h.markLeft(wire.id, { accountLock: { note: 'Đã khóa tài khoản công ty' } }).expect(200);
         const closed = h.dataOf<FlaggedCase>(await h.closeCase(wire.id).expect(200));

@@ -46,6 +46,6 @@ export class AssessmentQueryService {
     if (headed?.departmentId === request.departmentId) return true;
     if (assessment.status !== 'COMPLETED') return false;
 
-    return (await this.identity.getApprovalRoleHolders()).spendingApproverEmployeeId === actor.employeeId;
+    return (await this.identity.getSpendingApproverEmployeeId()) === actor.employeeId;
   }
 }

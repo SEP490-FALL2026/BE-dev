@@ -64,7 +64,7 @@ export class SuperAdminDashboardService {
       sections: {
         congestion: atSource('stepCongestionList'),
         backgroundJobs: notAvailable('NO_DATA_SOURCE'),
-        approverConfiguration: atSource('approvalRoleList'),
+        approverConfiguration: atSource('appUserList'),
         superAdminRole: atSource('superAdminWatchGet'),
         departmentsWithoutHead: counted(facts.departmentsWithoutHead.length, 'departmentWarningList'),
         departmentsWithoutItAdmin: counted(withoutItAdmin, 'departmentWarningList'),

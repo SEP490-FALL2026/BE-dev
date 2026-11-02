@@ -11,7 +11,7 @@ const superAdminDashboardSchema = z.strictObject({
   sections: z.strictObject({
     congestion: section('The board of the approval steps that are late or congested.'),
     backgroundJobs: section('The background tasks of the system; nothing records them yet.'),
-    approverConfiguration: section('Who holds each approval role.'),
+    approverConfiguration: section('Who holds the spending approver role: the accounts, with the roles each holds.'),
     superAdminRole: section('Whether the Super Admin role can be used now.'),
     departmentsWithoutHead: section('The active departments nobody heads on the business day.'),
     departmentsWithoutItAdmin: section('The active departments without a usable IT Admin in charge.'),

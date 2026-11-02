@@ -194,7 +194,7 @@ export const SHARED_DEMO_V1: DemoFixture = {
       account: null,
     },
   ],
-  approvalRoles: { SPENDING_APPROVER: 'DS1-CEO', CONFLICT_SUBSTITUTE: 'DS1-DEP', FALLBACK_APPROVER: 'DS1-DEP' },
+  approvalRoles: { SPENDING_APPROVER: 'DS1-CEO' },
   applications: [
     {
       key: 'jira',

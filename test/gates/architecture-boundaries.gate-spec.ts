@@ -298,6 +298,20 @@ describe('architecture boundaries', () => {
     }
   });
 
+  it('reads the table of the old approval roles in no file of src but the preflight repository (qd93-remove-fallback-substitute-approvers)', () => {
+    // The configuration of the substitute and of the fallback approver is gone (`QĐ-93c`): no use case, facade or command reads or writes
+    // the table any more; the image of Phase A stays a valid way back for a database after Phase B only because of this. Neither the
+    // delegate nor the name of the table appears in a file of src, generated code left out, but the one that reads the schema before a migration.
+    const allowed = new Set(['modules/installation/migration-preflight/migration-preflight.repo.ts']);
+    const readers = listTypeScriptFiles(sourceRoot)
+      .filter((file) => !file.includes(`${sep}generated${sep}`))
+      .filter((file) => /approval_role_holders|approvalRoleHolder/.test(readFileSync(file, 'utf8')))
+      .map((file) => relative(sourceRoot, file).split(sep).join('/'))
+      .filter((file) => !allowed.has(file));
+
+    expect(readers).toEqual([]);
+  });
+
   it('reaches each pre-migration reader from the preflight command only: never the API, the worker or another command', () => {
     const importers = new Map<string, string[]>();
     for (const file of listTypeScriptFiles(sourceRoot)) {

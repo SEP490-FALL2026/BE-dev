@@ -22,9 +22,6 @@ import { JwtAccessTokenVerifier } from './access/jwt-access-token-verifier.servi
 import { MeController } from './access/me.controller';
 import { MeService } from './access/me.service';
 import { ApprovalRoleFactsService } from './approval-roles/approval-role-facts.service';
-import { ApprovalRoleRepo } from './approval-roles/approval-role.repo';
-import { ApprovalRolesController } from './approval-roles/approval-roles.controller';
-import { ApprovalRoleService } from './approval-roles/approval-role.service';
 import { AuthController } from './auth/auth.controller';
 import { CredentialChangeService } from './auth/credential-change.service';
 import { LoginService } from './auth/login.service';
@@ -69,11 +66,9 @@ import { RecoveryRepo } from './recovery/recovery.repo';
       }),
     }),
   ],
-  controllers: [AuthController, MeController, AppUsersController, ApprovalRolesController],
+  controllers: [AuthController, MeController, AppUsersController],
   providers: [
-    ApprovalRoleRepo,
     ApprovalRoleFactsService,
-    ApprovalRoleService,
     AccountQueryService,
     ActionLinkRevocation,
     InvitationMailService,

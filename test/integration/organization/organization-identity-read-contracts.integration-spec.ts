@@ -134,26 +134,6 @@ describe('organization and identity read contracts (integration, real PostgreSQL
       expect(dataOf<{ roleHistoryHasMore: boolean }>(result).roleHistoryHasMore).toBe(false);
     });
 
-    it('shows the newest 20 holders of an approval role with historyHasMore', async () => {
-      const holder = await h.person('LD14H');
-      await h.ctx.sql.query(
-        `INSERT INTO approval_role_holders (id, organization_id, role, employee_id, held_from, held_until)
-         SELECT gen_random_uuid(), $1, 'FALLBACK_APPROVER', $2, timestamptz '2025-01-01' + n * interval '1 day',
-                timestamptz '2025-01-01' + n * interval '1 day' + interval '1 hour'
-           FROM generate_series(1, 25) AS n`,
-        [h.seed.organizationId, holder],
-      );
-
-      const { result } = await get('/api/v1/approval-roles', asAdmin());
-
-      const roles = dataOf<{ items: { role: string; history: unknown[]; historyHasMore: boolean }[] }>(result).items;
-      const fallback = roles.find((role) => role.role === 'FALLBACK_APPROVER');
-      expect(fallback?.history).toHaveLength(20);
-      expect(fallback?.historyHasMore).toBe(true);
-      expect(roles.map((role) => role.role)).toEqual(['CONFLICT_SUBSTITUTE', 'FALLBACK_APPROVER']);
-      expect(roles.find((role) => role.role === 'CONFLICT_SUBSTITUTE')?.historyHasMore).toBe(false);
-    });
-
     it('shows the newest 20 values of an operating parameter with hasMore', async () => {
       await h.ctx.sql.query(
         `INSERT INTO parameter_values (id, organization_id, key, value, valid_from, valid_to)

@@ -3,7 +3,6 @@ import type {
   ActivationState,
   AppRole,
   AppUserStatus,
-  ApprovalRoleKind,
 } from '../../identity-access/public/identity-access.types';
 
 /** `INSTALLED` exits 0; the other two exit 2 (the command contract, `pnpm ops:inspect --help`). */
@@ -63,6 +62,5 @@ export interface InstallationInspection {
   } | null;
   accounts: { total: number; byState: Record<AccountStateKey, number> } | null;
   directRoles: Record<AppRole, number> | null;
-  approvalRoles: Record<Exclude<ApprovalRoleKind, 'SPENDING_APPROVER'>, number> | null;
   departments: { active: number; withoutCurrentHead: number; withoutUsableItAdmin: number } | null;
 }

@@ -344,13 +344,12 @@ export class AppUsersController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The role is the Super Admin role, which changes only by the operations command outside the application, or the person cannot be the spending approver (employee not working, account not usable, the substitute).',
+        'The role is the Super Admin role, which changes only by the operations command outside the application, or the person cannot be the spending approver (employee not working, account not usable).',
       examples: [
         VALIDATION_EXAMPLE,
         ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_TRANSFER_ONLY,
         ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE,
         ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_ACCOUNT_NOT_USABLE,
-        ACCOUNT_ERROR_EXAMPLES.SUBSTITUTE_MUST_DIFFER,
       ],
     },
   )
@@ -390,7 +389,7 @@ export class AppUsersController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The role is the Super Admin role, which changes only by the operations command outside the application, or the person cannot be the spending approver (employee not working, account not usable, the substitute).',
+        'The role is the Super Admin role, which changes only by the operations command outside the application, or the person cannot be the spending approver (employee not working, account not usable).',
       examples: [VALIDATION_EXAMPLE, ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_TRANSFER_ONLY],
     },
   )

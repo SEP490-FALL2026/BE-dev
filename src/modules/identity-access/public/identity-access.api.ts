@@ -7,9 +7,7 @@ import { AccountRecordService } from '../accounts/account-record.service';
 import { ActionLinkService } from '../accounts/action-link.service';
 import { CredentialService } from '../credentials/credential.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
-import { ApprovalRoleHoldersService } from '../approval-roles/approval-role-holders.service';
 import {
-  ApprovalRoleHolders,
   BootstrapSuperAdminInput,
   EmployeeAccountInspection,
   LeaverGrantRole,
@@ -26,7 +24,6 @@ export class IdentityAccessApi {
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly approvalRoles: ApprovalRoleHoldersService,
   ) {}
 
   /**
@@ -137,14 +134,6 @@ export class IdentityAccessApi {
   /** How many IT Admins other than this employee can act (an unlocked read, `QĐ-77m`); with `tx`, in the transaction of the act. */
   countUsableItAdminsExcept(employeeId: string, tx?: DbTx): Promise<number> {
     return this.accounts.countUsableItAdminsExcept(employeeId, tx);
-  }
-
-  /**
-   * Who holds the spending approver, the substitute for a conflict of interest and the fallback approver now (an unlocked
-   * read): what the routing of a request needs to name the person who holds a step. A role nobody holds is null.
-   */
-  getApprovalRoleHolders(tx?: DbTx): Promise<ApprovalRoleHolders> {
-    return this.approvalRoles.current(tx);
   }
 
   /**

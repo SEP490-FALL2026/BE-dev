@@ -171,7 +171,6 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       response?.content?.['application/json']?.schema;
     /** Operations that read no path, query or body input, so no request can fail validation. */
     const WITHOUT_VALIDATION = [
-      'approvalRoleList',
       'currencyList',
       'employeeDashboardGet',
       'healthGetLiveness',
@@ -251,7 +250,7 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
         })
         .map((operation) => operation.key);
 
-      expect(operations).toHaveLength(301);
+      expect(operations).toHaveLength(299);
       expect(missing).toEqual([]);
     });
 

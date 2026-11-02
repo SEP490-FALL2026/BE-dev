@@ -82,14 +82,6 @@
       "count": 1
     }
   },
-  "src/modules/identity-access/approval-roles/approval-role.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/modules/identity-access/auth/session.service.ts": {
     "complexity": {
       "count": 1

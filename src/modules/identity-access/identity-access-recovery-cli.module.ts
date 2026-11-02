@@ -8,7 +8,6 @@ import { ACCOUNT_SESSIONS } from './accounts/account-sessions.types';
 import { ActionLinkRevocation } from './accounts/action-link-revocation.service';
 import { SuccessorEligibility } from './accounts/successor-eligibility.service';
 import { ApprovalRoleFactsService } from './approval-roles/approval-role-facts.service';
-import { ApprovalRoleRepo } from './approval-roles/approval-role.repo';
 import { SessionRecordService } from './auth/session-record.service';
 import { SessionRepo } from './auth/session.repo';
 import { IdentityAccessFacadeModule } from './identity-access-facade.module';
@@ -33,7 +32,6 @@ import { SuccessorEnrolment } from './recovery/successor-enrolment.service';
     SessionRepo,
     SessionRecordService,
     { provide: ACCOUNT_SESSIONS, useExisting: SessionRecordService },
-    ApprovalRoleRepo,
     ApprovalRoleFactsService,
     { provide: APPROVAL_ROLE_HOLDINGS, useExisting: ApprovalRoleFactsService },
     SuccessorEligibility,

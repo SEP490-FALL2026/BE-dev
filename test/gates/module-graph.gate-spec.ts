@@ -235,7 +235,6 @@ const DECLARED_FOR_API_AND_RECOVERY = [
   'ActionLinkRevocation',
   'ApprovalRoleFactsService',
   'Symbol(APPROVAL_ROLE_HOLDINGS)',
-  'ApprovalRoleRepo',
   'RecoveryRepo',
   'SessionRecordService',
   'SessionRepo',

@@ -137,7 +137,7 @@ export interface RetiredKindFacts {
 /**
  * The people `QĐ-93k(4)` stops the conversion of `MANAGER` and `SPENDING_APPROVER` to granted roles for
  * (`…_identity_direct_roles`). Read, only while that migration is not applied, in the schema the database has now: the spending
- * approver is the open row of `approval_role_holders`, never a value the new enum has. Codes of people and departments only.
+ * approver is the open row of the table of the old configuration of the approval roles, never a value the new enum has. Codes of people and departments only.
  */
 export interface DirectRoleFacts {
   /** A head of a department today or later who has no account: no `MANAGER` can be granted to them. */

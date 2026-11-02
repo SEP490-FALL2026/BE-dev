@@ -158,7 +158,6 @@ describe('ops:inspect (integration, real PostgreSQL)', () => {
           'Super Admin: 1 holder, ACTIVE, ACTIVATED, b***@a***.vn',
           'Accounts: 1 (ACTIVE_ACTIVATED 1, ACTIVE_INVITED 0, LOCKED_ACTIVATED 0, LOCKED_INVITED 0)',
           'Direct roles: SUPER_ADMIN 1, IT_ADMIN 0, FINANCE 0, EMPLOYEE 0, MANAGER 0, SPENDING_APPROVER 0',
-          'Approval roles: CONFLICT_SUBSTITUTE 0, FALLBACK_APPROVER 0',
           'Departments: 1 active, 1 without a current head, 1 without a usable IT Admin',
           '',
         ]);
@@ -226,7 +225,6 @@ describe('ops:inspect (integration, real PostgreSQL)', () => {
           expect(result.stdout).toContain(
             'Direct roles: SUPER_ADMIN 1, IT_ADMIN 0, FINANCE 0, EMPLOYEE 0, MANAGER 1, SPENDING_APPROVER 1',
           );
-          expect(result.stdout).toContain('Approval roles: CONFLICT_SUBSTITUTE 0, FALLBACK_APPROVER 0');
         } finally {
           await sql.query('DELETE FROM department_head_periods WHERE employee_id = ANY($1::uuid[])', [people]);
           await sql.query('DELETE FROM employee_placements WHERE employee_id = ANY($1::uuid[])', [people]);

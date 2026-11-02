@@ -54,12 +54,12 @@ export class SlaRecipientFactsService {
     const heads = placement
       ? await this.organizationReads.getDepartmentHeads([placement.departmentId], today, tx)
       : new Map<string, { employeeId: string }>();
-    const roles = await this.identity.getApprovalRoleHolders(tx);
+    const spendingApprover = await this.identity.getSpendingApproverEmployeeId(tx);
     const superior = superiorOf({
       holderEmployeeId: holder,
-      isSpendingApprover: roles.spendingApproverEmployeeId === holder,
+      isSpendingApprover: spendingApprover === holder,
       departmentHeadEmployeeId: placement ? (heads.get(placement.departmentId)?.employeeId ?? null) : null,
-      spendingApproverEmployeeId: roles.spendingApproverEmployeeId,
+      spendingApproverEmployeeId: spendingApprover,
     });
 
     return superior !== null && (await this.working(tx, [superior])).has(superior) ? superior : null;

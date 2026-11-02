@@ -89,7 +89,6 @@ export class InstallationInspectionApi {
         byState: inventory.accountsByState,
       },
       directRoles: inventory.directRoles,
-      approvalRoles: inventory.approvalRoles,
       departments: {
         active: facts.activeDepartments,
         withoutCurrentHead: facts.departmentsWithoutHead.length,
@@ -125,7 +124,6 @@ function notInstalled(migrations: MigrationReport): InstallationInspection {
     superAdmin: null,
     accounts: null,
     directRoles: null,
-    approvalRoles: null,
     departments: null,
   };
 }

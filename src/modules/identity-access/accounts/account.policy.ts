@@ -1,6 +1,6 @@
 import type { EmployeeStatus } from '../../organization/public/organization.types';
 
-// Account rules several capabilities share: auth, accounts, access, approval-roles and the module root.
+// Account rules several capabilities share: auth, accounts, access, approval-roles (the facts of the grant) and the module root.
 
 /** An account works only while its Employee has not left (login, refresh, guard, invitations). */
 export function employeeHasNotLeft<T extends { status: EmployeeStatus }>(

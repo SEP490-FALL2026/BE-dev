@@ -39,7 +39,7 @@ export class RoleDutiesService {
     const ids = [...new Set(people.map((person) => person.employeeId))];
     if (ids.length === 0) return new Map();
     const grants = await this.identity.listRoleHoldersAmong(ids, tx);
-    const approval = await this.identity.getApprovalRoleHolders(tx);
+    const spendingApprover = await this.identity.getSpendingApproverEmployeeId(tx);
     const departments = await this.organization.getDepartmentsInChargeOf(ids, tx);
     const duties = await this.catalog.getWorkspaceDutiesOf(ids, tx);
     const heads = new Set(people.filter((person) => person.headsDepartment).map((person) => person.employeeId));
@@ -52,9 +52,7 @@ export class RoleDutiesService {
         const flags = flagsOf({
           superAdmin: held.includes('SUPER_ADMIN'),
           finance: held.includes('FINANCE'),
-          spendingApprover: approval.spendingApproverEmployeeId === employeeId,
-          substituteApprover: approval.conflictSubstituteEmployeeId === employeeId,
-          fallbackApprover: approval.fallbackApproverEmployeeId === employeeId,
+          spendingApprover: spendingApprover === employeeId,
           itAdminDepartments: inCharge.length,
           headsDepartment: heads.has(employeeId),
           workspaces: workspaces.length,

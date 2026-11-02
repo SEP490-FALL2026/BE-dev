@@ -195,43 +195,38 @@ describe('MANAGER and SPENDING_APPROVER when two writers meet (integration, real
     });
   });
 
-  describe('the grant of SPENDING_APPROVER and the substitute for a conflict of interest, for one person (M2)', () => {
-    const setSubstitute = (employeeId: string) =>
-      request(h.server())
-        .put('/api/v1/approval-roles/CONFLICT_SUBSTITUTE')
-        .set(h.as(h.adminToken))
-        .send({ employeeId })
-        .then((response) => response);
-
+  describe('two grants of SPENDING_APPROVER at once, for two people (QĐ-93a)', () => {
     it.each([
-      ['the grant first', true],
-      ['the substitute first', false],
-    ])('lets exactly one of the two through, whichever is served first: %s', async (_name, grantFirst) => {
-      const person = await h.activatedAccount([]);
+      ['the first person first', true],
+      ['the second person first', false],
+    ])('lets exactly one of the two through, whichever is served first: %s', async (_name, firstPersonFirst) => {
+      await h.ctx.sql.query(
+        `UPDATE role_grants SET revoked_at = now() WHERE role = 'SPENDING_APPROVER' AND revoked_at IS NULL`,
+      );
+      const one = await h.activatedAccount([]);
+      const other = await h.activatedAccount([]);
       await holder.query('SELECT pg_advisory_lock($1)', [APPROVAL_ROLES_LOCK_KEY]);
 
-      const sends = [() => grant(person.appUserId, 'SPENDING_APPROVER'), () => setSubstitute(person.employeeId)];
-      const ordered = grantFirst ? sends : [...sends].reverse();
+      const sends = [
+        () => grant(one.appUserId, 'SPENDING_APPROVER'),
+        () => grant(other.appUserId, 'SPENDING_APPROVER'),
+      ];
+      const ordered = firstPersonFirst ? sends : [...sends].reverse();
       const first = ordered[0]();
       await waitForLockWaiters(h.ctx.sql, 1);
       const second = ordered[1]();
       await waitForLockWaiters(h.ctx.sql, 2);
       await holder.query('SELECT pg_advisory_unlock($1)', [APPROVAL_ROLES_LOCK_KEY]);
-      const answers = await Promise.all([first, second]);
-      const [grantAnswer, substituteAnswer] = grantFirst ? answers : [answers[1], answers[0]];
+      const [firstAnswer, secondAnswer] = await Promise.all([first, second]);
 
-      const granted = grantAnswer.status === 201;
-      const substituted = substituteAnswer.status === 200;
-      expect([granted, substituted].filter(Boolean)).toHaveLength(1);
-      // The one that came second is refused with the code of the pairing rule, and nothing of it is written.
-      const refused = granted ? substituteAnswer : grantAnswer;
-      expect([refused.status, errorCode(refused)]).toEqual([422, 'APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER']);
-      const asApprover = await h.ctx.sql.query(
-        `SELECT 1 FROM role_grants g JOIN app_users u ON u.id = g.app_user_id
-          WHERE u.employee_id = $1 AND g.role = 'SPENDING_APPROVER' AND g.revoked_at IS NULL`,
-        [person.employeeId],
+      // The one served first holds the role; the other is refused with the code of the single holder, and nothing of it is written.
+      expect([firstAnswer.status, secondAnswer.status]).toEqual([201, 409]);
+      expect(errorCode(secondAnswer)).toBe('APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED');
+      const held = await h.ctx.sql.query(
+        `SELECT u.employee_id FROM role_grants g JOIN app_users u ON u.id = g.app_user_id
+          WHERE g.role = 'SPENDING_APPROVER' AND g.revoked_at IS NULL`,
       );
-      expect(asApprover.rowCount).toBe(granted ? 1 : 0);
+      expect(held.rows).toHaveLength(1);
     });
   });
 });

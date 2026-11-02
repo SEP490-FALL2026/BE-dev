@@ -64,7 +64,6 @@ const READ_WORDING: Record<string, { '403'?: string; '422'?: string }> = {
   nonWorkingDateList: {
     '403': 'Only the Super Admin reads the operating parameters, their history and the non-working dates.',
   },
-  approvalRoleList: { '403': 'Only the Super Admin reads the approval roles and their holders.' },
   employeeImportGet: { '403': 'Only the Super Admin reads an employee import and its rows.' },
   employeeImportRowList: {
     '403': 'Only the Super Admin reads an employee import and its rows.',

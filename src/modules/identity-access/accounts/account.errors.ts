@@ -162,14 +162,6 @@ export class SpendingApproverHasOpenWorkError extends Error {
   }
 }
 
-/** The person is the substitute for a conflict of interest, and the substitute and the spending approver are two people (US-01-03 AC-7, M2). */
-export class SpendingApproverIsSubstituteError extends Error {
-  constructor() {
-    super('The substitute for a conflict of interest cannot be the spending approver.');
-    this.name = 'SpendingApproverIsSubstituteError';
-  }
-}
-
 export class FinanceAlreadyAssignedError extends Error {
   constructor() {
     super('Another account already holds the FINANCE role.');

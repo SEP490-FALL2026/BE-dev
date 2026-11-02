@@ -25,7 +25,6 @@ import {
   SpendingApproverEmployeeNotActiveError,
   SpendingApproverHasOpenWorkError,
   SpendingApproverHeadsDepartmentError,
-  SpendingApproverIsSubstituteError,
   SuperAdminHolderNotLockableError,
 } from '../account.errors';
 import { AccountInvitationService } from './account-invitation.service';
@@ -156,15 +155,6 @@ describe('AppUsersController — error answers (status, code, message)', () => {
         422,
         'APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE',
         'The account is locked or not activated, so cannot be the spending approver.',
-      ),
-    ],
-    [
-      'a spending approver who is the substitute, with the code of the approval roles',
-      () => new SpendingApproverIsSubstituteError(),
-      refused(
-        422,
-        'APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER',
-        'The substitute for a conflict of interest cannot be the spending approver.',
       ),
     ],
     [

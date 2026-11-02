@@ -12,8 +12,6 @@ import { PasswordHasher } from './credentials/password-hasher.service';
 import { RoleGrantRepo } from './accounts/role-grant.repo';
 import { RoleGrantService } from './accounts/role-grant.service';
 import { SuperAdminHolderRepo } from './accounts/super-admin-holder.repo';
-import { ApprovalRoleHoldersService } from './approval-roles/approval-role-holders.service';
-import { ApprovalRoleReaderRepo } from './approval-roles/approval-role-reader.repo';
 import { IdentityAccessApi } from './public/identity-access.api';
 import { RequestPartyEligibilityApi } from './public/request-party-eligibility.api';
 import { RequestPartyEligibilityService } from './request-party/request-party-eligibility.service';
@@ -34,8 +32,6 @@ import { ApprovalRoleChangeListeners, SpendingApproverGrantChecks } from './publ
     RoleGrantRepo,
     SuperAdminHolderRepo,
     ActionTokenRepo,
-    ApprovalRoleReaderRepo,
-    ApprovalRoleHoldersService,
     ApprovalRoleChangeListeners,
     SpendingApproverGrantChecks,
     PasswordHasher,
