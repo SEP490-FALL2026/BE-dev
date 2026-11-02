@@ -30,7 +30,7 @@ describe('organization code formats (integration)', () => {
         departmentCode: 'bad_',
       })
       .expect(422);
-    expect(response.body.error.details.reasons).toEqual(
+    expect((response.body as { error: { details: { reasons: unknown[] } } }).error.details.reasons).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: 'EMPLOYEE_CODE_INVALID' }),
         expect.objectContaining({ code: 'DEPARTMENT_CODE_INVALID' }),

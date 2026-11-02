@@ -94,6 +94,7 @@ export const IMPORT_ERROR_EXAMPLES = {
   ALREADY_CONFIRMED: example(
     new ImportAlreadyConfirmedError({
       created: 1,
+      newUnplaced: 0,
       existingSame: 0,
       existingDifferent: 0,
       errors: 0,

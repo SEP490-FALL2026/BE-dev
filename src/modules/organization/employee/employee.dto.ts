@@ -29,17 +29,12 @@ const WORK_EMAIL_DESCRIPTION =
  * and a department with none takes people in.
  */
 export const createEmployeeBodySchema = z.strictObject({
-  employeeCode: z
-    .string()
-    .trim()
-    .min(1)
-    .max(50)
-    .meta({
-      minLength: 3,
-      maxLength: 20,
-      pattern: '^[A-Z0-9]+(-[A-Z0-9]+)*$',
-      description: '3 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. NV-0001.',
-    }),
+  employeeCode: z.string().trim().min(1).max(50).meta({
+    minLength: 3,
+    maxLength: 20,
+    pattern: '^[A-Z0-9]+(-[A-Z0-9]+)*$',
+    description: '3 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. NV-0001.',
+  }),
   fullName: z.string().trim().min(1).max(200),
   workEmail: z
     .string()
@@ -95,11 +90,18 @@ const employeeSchema = z.strictObject({
   employmentType,
   hireDate: z.string(),
   status: z.literal('ACTIVE'),
-  workState: z.literal('WORKING'),
-  memberSince: z.string(),
-  department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
+  workState: employeeWorkState,
+  memberSince: z.string().nullable(),
+  department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
+  unplaced: z.boolean(),
   jobTitle: z.string().nullable(),
 });
+
+export const firstPlacementBodySchema = z.strictObject({
+  departmentId: z.uuid(),
+  effectiveFrom: businessDateSchema('effectiveFrom must be a real date as YYYY-MM-DD.'),
+});
+export class FirstPlacementBodyDto extends createZodDto(firstPlacementBodySchema) {}
 
 export class CreateEmployeeBodyDto extends createZodDto(createEmployeeBodySchema) {}
 export class EmployeeResponseDto extends createZodDto(successEnvelopeSchema(employeeSchema)) {}

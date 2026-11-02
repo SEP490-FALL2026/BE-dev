@@ -14,6 +14,7 @@ import { DepartmentService } from './department-management/department.service';
 import { DepartmentsController } from './department-management/departments.controller';
 import { EmployeeMaintenanceController } from './employee/employee-maintenance.controller';
 import { EmployeeMaintenanceService } from './employee/employee-maintenance.service';
+import { EmployeeFirstPlacementService } from './employee/employee-first-placement.service';
 import { EmployeeManualService } from './employee/employee-manual.service';
 import { EmployeesController } from './employee/employees.controller';
 import { OrganizationModule } from './organization.module';
@@ -35,6 +36,7 @@ import { OrganizationModule } from './organization.module';
   ],
   providers: [
     EmployeeManualService,
+    EmployeeFirstPlacementService,
     EmployeeMaintenanceService,
     CostCenterService,
     DepartmentQueryService,

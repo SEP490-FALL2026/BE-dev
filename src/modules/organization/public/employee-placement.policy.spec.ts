@@ -19,7 +19,6 @@ describe('placementReasons (BEH.1, T-16)', () => {
 
   describe('the department (US-02-03 AC-1, AC-5; US-04-09 AC-12)', () => {
     it.each<[string, NonNullable<PlacementFacts['department']>, string]>([
-      ['not named', { named: false, found: null }, 'DEPARTMENT_REQUIRED'],
       ['named but not found', { named: true, found: null }, 'DEPARTMENT_NOT_FOUND'],
       ['retired', { named: true, found: { active: false } }, 'DEPARTMENT_INACTIVE'],
     ])('%s', (_name, department, code) => {
@@ -35,9 +34,7 @@ describe('placementReasons (BEH.1, T-16)', () => {
     });
 
     it('gives one reason only, the first in this order: required, not found, retired', () => {
-      expect(placementReasons({ ...usable, department: { named: false, found: { active: false } } })).toEqual([
-        { subject: 'DEPARTMENT', code: 'DEPARTMENT_REQUIRED' },
-      ]);
+      expect(placementReasons({ ...usable, department: { named: false, found: { active: false } } })).toEqual([]);
       expect(placementReasons({ ...usable, department: { named: true, found: { active: false } } })).toEqual([
         { subject: 'DEPARTMENT', code: 'DEPARTMENT_INACTIVE' },
       ]);
@@ -72,7 +69,7 @@ describe('placementReasons (BEH.1, T-16)', () => {
   });
 
   it('names no field or column: where a reason is shown belongs to each adapter', () => {
-    const reasons = placementReasons({ department: { named: false, found: null }, jobTitle: { tooLong: true } });
+    const reasons = placementReasons({ department: { named: true, found: null }, jobTitle: { tooLong: true } });
 
     expect(reasons.map((reason) => Object.keys(reason).sort())).toEqual([
       ['code', 'subject'],

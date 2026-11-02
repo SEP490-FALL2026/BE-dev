@@ -79,7 +79,7 @@ describe('mapEmployeeColumns (US-02-02 AC-2)', () => {
   it('names the columns that are missing: without a department the whole file is unusable, and the job title is optional (QĐ-87e)', () => {
     const mapped = mapEmployeeColumns(['employee_code', 'full_name', 'employment_type', 'hire_date', 'work_email']);
 
-    expect(mapped.missing).toEqual(['department_code']);
+    expect(mapped.missing).toEqual([]);
   });
 
   it('lets the work email and the job title columns be absent, and lists the columns it does not know instead of using them', () => {
@@ -169,7 +169,6 @@ describe('EmployeeRowClassifier', () => {
     ['hire_date', '2026-02-30', 'HIRE_DATE_INVALID'],
     ['hire_date', '', 'HIRE_DATE_INVALID'],
     ['work_email', 'not-an-email', 'WORK_EMAIL_INVALID'],
-    ['department_code', '', 'DEPARTMENT_REQUIRED'],
     ['department_code', 'P-XYZ', 'DEPARTMENT_NOT_FOUND'],
     ['department_code', 'P-OLD', 'DEPARTMENT_INACTIVE'],
     ['job_title', 'x'.repeat(256), 'JOB_TITLE_TOO_LONG'],
@@ -187,7 +186,6 @@ describe('EmployeeRowClassifier', () => {
 
     expect(result.errors).toEqual([
       { column: 'hire_date', code: 'HIRE_DATE_INVALID' },
-      { column: 'department_code', code: 'DEPARTMENT_REQUIRED' },
       { column: 'job_title', code: 'JOB_TITLE_TOO_LONG' },
     ]);
   });

@@ -53,7 +53,6 @@ const PUBLIC_ROOT_POLICY_FILES: ReadonlyMap<string, PolicyContract> = new Map([
 
 /** The reasons the placement policy decides; written as literals here so the gate does not trust the policy. */
 const PLACEMENT_REASON_CODES: ReadonlySet<string> = new Set([
-  'DEPARTMENT_REQUIRED',
   'DEPARTMENT_NOT_FOUND',
   'DEPARTMENT_INACTIVE',
   'JOB_TITLE_TOO_LONG',

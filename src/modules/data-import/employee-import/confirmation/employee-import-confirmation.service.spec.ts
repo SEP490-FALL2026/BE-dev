@@ -91,6 +91,7 @@ describe('EmployeeImportConfirmationService: confirm (H8 Phase 0 characterizatio
       ]);
       const result = {
         created: 2,
+        newUnplaced: 0,
         existingSame: 1,
         existingDifferent: 1,
         errors: 1,

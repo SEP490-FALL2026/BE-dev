@@ -39,8 +39,9 @@ export interface ManualEmployeeView {
   /** A person just entered works. */
   workState: 'WORKING';
   /** The day the person became a member of the department: the day they were recorded, not the hire date. */
-  memberSince: BusinessDate;
-  department: { id: string; code: string; name: string };
+  memberSince: BusinessDate | null;
+  department: { id: string; code: string; name: string } | null;
+  unplaced: boolean;
   jobTitle: string | null;
 }
 
@@ -102,7 +103,7 @@ export class EmployeeManualService {
             ownEmail,
           },
         );
-        if (reasons.length > 0 || !department) throw new EmployeeRowInvalidError(reasons);
+        if (reasons.length > 0) throw new EmployeeRowInvalidError(reasons);
 
         const { id } = await this.employees.createWithPlacement(tx, {
           organizationId: organization.id,
@@ -112,7 +113,7 @@ export class EmployeeManualService {
           employmentType: input.employmentType,
           hireDate: input.hireDate,
           memberSince,
-          departmentId: department.id,
+          departmentId: department?.id ?? null,
           jobTitle,
         });
         await this.audit.record(
@@ -123,17 +124,19 @@ export class EmployeeManualService {
             workEmail,
             employmentType: input.employmentType,
             hireDate: input.hireDate,
-            department: department.code,
+            department: department?.code ?? null,
             jobTitle,
             memberSince,
           }),
         );
-        const notices = await this.employees.profileNotices(tx, {
-          kind: 'CREATED',
-          organizationId: organization.id,
-          employeeId: id,
-          onDate: memberSince,
-        });
+        const notices = department
+          ? await this.employees.profileNotices(tx, {
+              kind: 'CREATED',
+              organizationId: organization.id,
+              employeeId: id,
+              onDate: memberSince,
+            })
+          : [];
         for (const notice of notices) await this.notifications.notifyInApp(tx, notice);
 
         return {
@@ -145,8 +148,9 @@ export class EmployeeManualService {
           hireDate: input.hireDate,
           status: 'ACTIVE' as const,
           workState: 'WORKING' as const,
-          memberSince,
-          department: { id: department.id, code: department.code, name: department.name },
+          memberSince: department ? memberSince : null,
+          department: department ? { id: department.id, code: department.code, name: department.name } : null,
+          unplaced: department === null,
           jobTitle,
         };
       });

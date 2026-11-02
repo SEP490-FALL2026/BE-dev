@@ -11,6 +11,7 @@ export const meSchema = z.strictObject({
     employeeCode: z.string(),
     fullName: z.string(),
     department: z.strictObject({ code: z.string(), name: z.string() }).nullable(),
+    unplaced: z.boolean(),
     jobTitle: z.string().nullable(),
   }),
   /** The roles granted to the account and still in force, sorted; MANAGER and SPENDING_APPROVER are granted like the others (US-01-01 AC-17). */

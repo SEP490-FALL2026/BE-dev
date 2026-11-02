@@ -21,7 +21,7 @@ import {
  * Without these the file cannot become people (US-02-02 AC-2); the work email and the job title may be left out of the file: the
  * title is optional free text (`QĐ-87e`) and a row without one is a person like any other.
  */
-const OPTIONAL_COLUMNS: readonly EmployeeColumn[] = ['work_email', 'job_title'];
+const OPTIONAL_COLUMNS: readonly EmployeeColumn[] = ['work_email', 'job_title', 'department_code'];
 const REQUIRED_COLUMNS: readonly EmployeeColumn[] = EMPLOYEE_COLUMNS.filter(
   (column) => !OPTIONAL_COLUMNS.includes(column),
 );
@@ -102,7 +102,7 @@ export interface ParsedEmployeeRow {
   departmentCode: string;
   /** The free-text title of the row, or null when the cell is blank. */
   jobTitleName: string | null;
-  departmentId: string;
+  departmentId: string | null;
 }
 
 export interface EmployeeRowResult {
@@ -175,14 +175,21 @@ function typeAndDateIssues(row: RowText): RowIssue[] {
 
 /** Only a person to create is placed; the placement reasons come after this file's own. */
 function placementIssues(row: RowText, department: { id: string; active: boolean } | undefined): RowIssue[] {
+  const invalid = row.departmentCode !== '' && !isDepartmentCodeValid(row.departmentCode);
   return placementReasons({
-    department: { named: row.departmentCode !== '', found: department ?? null },
+    department: invalid ? undefined : { named: row.departmentCode !== '', found: department ?? null },
     jobTitle: { tooLong: isJobTitleTooLong(row.jobTitleText) },
   }).map(({ subject, code }) => ({ column: FILE_COLUMN[subject], code }));
 }
 
+function departmentCodeIssues(code: string): RowIssue[] {
+  return code !== '' && !isDepartmentCodeValid(code)
+    ? [{ column: 'department_code', code: 'DEPARTMENT_CODE_INVALID' }]
+    : [];
+}
+
 /** The person a valid row creates. */
-function parsedRow(row: RowText, departmentId: string): ParsedEmployeeRow {
+function parsedRow(row: RowText, departmentId: string | null): ParsedEmployeeRow {
   return {
     employeeCode: row.code,
     fullName: row.fullName,
@@ -220,9 +227,7 @@ export class EmployeeRowClassifier {
       ...typeAndDateIssues(row),
     );
 
-    if (row.departmentCode !== '' && !isDepartmentCodeValid(row.departmentCode)) {
-      errors.push({ column: 'department_code', code: 'DEPARTMENT_CODE_INVALID' });
-    }
+    errors.push(...departmentCodeIssues(row.departmentCode));
     if (existing !== undefined) {
       if (errors.length > 0) return { outcome: 'ERROR', errors };
 
@@ -230,18 +235,10 @@ export class EmployeeRowClassifier {
     }
 
     const department = row.departmentCode === '' ? undefined : this.lookup.departments.get(row.departmentCode);
-    if (row.departmentCode === '' || isDepartmentCodeValid(row.departmentCode)) {
-      errors.push(...placementIssues(row, department));
-    } else {
-      errors.push(
-        ...placementReasons({ jobTitle: { tooLong: isJobTitleTooLong(row.jobTitleText) } }).map(
-          ({ subject, code }) => ({ column: FILE_COLUMN[subject], code }),
-        ),
-      );
-    }
-    if (errors.length > 0 || !department) return { outcome: 'ERROR', errors };
+    errors.push(...placementIssues(row, department));
+    if (errors.length > 0 || (row.departmentCode !== '' && !department)) return { outcome: 'ERROR', errors };
 
-    return { outcome: 'VALID', errors: [], parsed: parsedRow(row, department.id) };
+    return { outcome: 'VALID', errors: [], parsed: parsedRow(row, department?.id ?? null) };
   }
 
   /** The employee code: given, and once in the file. */
@@ -372,7 +369,7 @@ export function idsUsedByValidRows(
   const departmentIds = new Set<string>();
   for (const row of rows) {
     if (row.outcome !== 'VALID') continue;
-    const department = lookup.departments.get(clean(row.cells.department_code));
+    const department = lookup.departments.get(clean(row.cells.department_code).toUpperCase());
     if (department) departmentIds.add(department.id);
   }
 

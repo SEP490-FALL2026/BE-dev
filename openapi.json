@@ -361,6 +361,120 @@
         "tags": ["audit"]
       }
     },
+    "/api/v1/employees/{id}/first-placements": {
+      "post": {
+        "operationId": "employeeFirstPlacement",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FirstPlacementBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/EmployeeResponseDto" },
+                    { "properties": { "message": { "example": "EMPLOYEE.FIRST_PLACED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Place an employee for the first time",
+        "tags": ["employees"]
+      }
+    },
     "/api/v1/employees": {
       "post": {
         "operationId": "employeeCreate",
@@ -63299,6 +63413,7 @@
                         "details": {
                           "result": {
                             "created": 1,
+                            "newUnplaced": 0,
                             "existingSame": 0,
                             "existingDifferent": 0,
                             "errors": 0,
@@ -70578,6 +70693,71 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "FirstPlacementBodyDto": {
+        "type": "object",
+        "properties": {
+          "departmentId": { "type": "string", "format": "uuid" },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          }
+        },
+        "required": ["departmentId", "effectiveFrom"],
+        "additionalProperties": false
+      },
+      "EmployeeResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "employeeCode": { "type": "string" },
+              "fullName": { "type": "string" },
+              "workEmail": { "type": "string", "nullable": true },
+              "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
+              "hireDate": { "type": "string" },
+              "status": { "type": "string", "enum": ["ACTIVE"] },
+              "workState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE", "HANDING_OVER", "LEFT"] },
+              "memberSince": { "type": "string", "nullable": true },
+              "department": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "code": { "type": "string" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "code", "name"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "unplaced": { "type": "boolean" },
+              "jobTitle": { "type": "string", "nullable": true }
+            },
+            "required": [
+              "id",
+              "employeeCode",
+              "fullName",
+              "workEmail",
+              "employmentType",
+              "hireDate",
+              "status",
+              "workState",
+              "memberSince",
+              "department",
+              "unplaced",
+              "jobTitle"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "CreateEmployeeBodyDto": {
         "type": "object",
         "properties": {
@@ -70613,55 +70793,6 @@
           "jobTitle": { "type": "string", "maxLength": 1000, "nullable": true }
         },
         "required": ["employeeCode", "fullName", "employmentType", "hireDate"],
-        "additionalProperties": false
-      },
-      "EmployeeResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string", "format": "uuid" },
-              "employeeCode": { "type": "string" },
-              "fullName": { "type": "string" },
-              "workEmail": { "type": "string", "nullable": true },
-              "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
-              "hireDate": { "type": "string" },
-              "status": { "type": "string", "enum": ["ACTIVE"] },
-              "workState": { "type": "string", "enum": ["WORKING"] },
-              "memberSince": { "type": "string" },
-              "department": {
-                "type": "object",
-                "properties": {
-                  "id": { "type": "string", "format": "uuid" },
-                  "code": { "type": "string" },
-                  "name": { "type": "string" }
-                },
-                "required": ["id", "code", "name"],
-                "additionalProperties": false
-              },
-              "jobTitle": { "type": "string", "nullable": true }
-            },
-            "required": [
-              "id",
-              "employeeCode",
-              "fullName",
-              "workEmail",
-              "employmentType",
-              "hireDate",
-              "status",
-              "workState",
-              "memberSince",
-              "department",
-              "jobTitle"
-            ],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "UpdateEmployeeBodyDto": {
@@ -90641,6 +90772,7 @@
               "summary": {
                 "type": "object",
                 "properties": {
+                  "newUnplaced": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "totalRows": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "valid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "errors": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -90706,6 +90838,7 @@
                   }
                 },
                 "required": [
+                  "newUnplaced",
                   "totalRows",
                   "valid",
                   "errors",
@@ -90721,6 +90854,7 @@
               "result": {
                 "type": "object",
                 "properties": {
+                  "newUnplaced": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "created": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "existingSame": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "existingDifferent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -90748,6 +90882,7 @@
                   }
                 },
                 "required": [
+                  "newUnplaced",
                   "created",
                   "existingSame",
                   "existingDifferent",
@@ -90887,6 +91022,7 @@
                   "summary": {
                     "type": "object",
                     "properties": {
+                      "newUnplaced": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "totalRows": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "valid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "errors": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -90952,6 +91088,7 @@
                       }
                     },
                     "required": [
+                      "newUnplaced",
                       "totalRows",
                       "valid",
                       "errors",
@@ -90967,6 +91104,7 @@
                   "result": {
                     "type": "object",
                     "properties": {
+                      "newUnplaced": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "created": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "existingSame": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "existingDifferent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -90994,6 +91132,7 @@
                       }
                     },
                     "required": [
+                      "newUnplaced",
                       "created",
                       "existingSame",
                       "existingDifferent",
@@ -91859,9 +91998,10 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "unplaced": { "type": "boolean" },
                   "jobTitle": { "type": "string", "nullable": true }
                 },
-                "required": ["id", "employeeCode", "fullName", "department", "jobTitle"],
+                "required": ["id", "employeeCode", "fullName", "department", "unplaced", "jobTitle"],
                 "additionalProperties": false
               },
               "roles": {

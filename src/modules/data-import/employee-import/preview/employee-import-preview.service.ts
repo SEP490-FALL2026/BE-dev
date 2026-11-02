@@ -166,14 +166,20 @@ export class EmployeeImportPreviewService {
   ): Promise<ImportSummary> {
     const lookup = await this.rowValidation.lookup(rows);
     const byDepartment = new Map<string, number>();
+    let newUnplaced = 0;
     for (const row of rows) {
       if (row.outcome !== 'VALID') continue;
-      const code = clean(row.cells.department_code);
+      const code = clean(row.cells.department_code).toUpperCase();
+      if (!code) {
+        newUnplaced++;
+        continue;
+      }
       byDepartment.set(code, (byDepartment.get(code) ?? 0) + 1);
     }
 
     return {
       totalRows: rows.length,
+      newUnplaced,
       ...outcomeCounts(rows),
       newPeopleByDepartment: [...byDepartment].map(([departmentCode, count]) => ({ departmentCode, count })),
       departmentsWithoutHead: await this.rowValidation.departmentsWithoutHead(lookup, [...byDepartment.keys()]),

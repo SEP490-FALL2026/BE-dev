@@ -11,14 +11,12 @@ import { businessDate } from '../../../infrastructure/http/dto/business-date.dto
  * body that still carries one is an unknown field.
  */
 export const createDepartmentBodySchema = z.strictObject({
-  code: z
-    .string()
-    .meta({
-      minLength: 2,
-      maxLength: 20,
-      pattern: '^[A-Z0-9]+(-[A-Z0-9]+)*$',
-      description: '2 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. P-ENG.',
-    }),
+  code: z.string().meta({
+    minLength: 2,
+    maxLength: 20,
+    pattern: '^[A-Z0-9]+(-[A-Z0-9]+)*$',
+    description: '2 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. P-ENG.',
+  }),
   name: z.string().normalize('NFC').trim().max(DEPARTMENT_NAME_MAX_LENGTH),
   function: z.string().normalize('NFC').trim().max(DEPARTMENT_FUNCTION_MAX_LENGTH).nullish(),
   itAdminEmployeeId: z.uuid().nullish(),

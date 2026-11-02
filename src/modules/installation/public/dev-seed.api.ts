@@ -149,7 +149,7 @@ export class DevSeedApi {
             workEmail: person.workEmail,
             employmentType: 'STAFF',
             hireDate: DEMO_HIRE_DATE,
-            departmentId: departmentId as string,
+            departmentId,
             jobTitle: null,
           })
         ).id;

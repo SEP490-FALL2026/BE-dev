@@ -20,6 +20,7 @@ const departmentCount = z.strictObject({ departmentCode: z.string(), count: z.nu
 const departmentRef = z.strictObject({ code: z.string(), name: z.string() });
 
 const summarySchema = z.strictObject({
+  newUnplaced: z.number().int().nonnegative(),
   totalRows: z.number().int().nonnegative(),
   valid: z.number().int().nonnegative(),
   errors: z.number().int().nonnegative(),
@@ -37,6 +38,7 @@ const summarySchema = z.strictObject({
 });
 
 const resultSchema = z.strictObject({
+  newUnplaced: z.number().int().nonnegative(),
   created: z.number().int().nonnegative(),
   existingSame: z.number().int().nonnegative(),
   existingDifferent: z.number().int().nonnegative(),

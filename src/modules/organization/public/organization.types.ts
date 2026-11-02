@@ -40,7 +40,7 @@ export interface CreateEmployeeWithPlacementInput {
    * recorded, so no placement is ever made up for days before the person was in the system.
    */
   memberSince?: BusinessDate;
-  departmentId: string;
+  departmentId: string | null;
   /** Free text (`QĐ-87e`); the catalogue entry is the database's business, not this call's. */
   jobTitle: string | null;
 }
@@ -84,6 +84,7 @@ export interface EmployeeTechnicalView {
 }
 
 export interface EmployeeProfile {
+  unplaced: boolean;
   id: string;
   employeeCode: string;
   fullName: string;

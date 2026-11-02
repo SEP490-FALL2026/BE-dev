@@ -6,6 +6,7 @@ const count = z.number().int().nonnegative();
 
 /** What the confirmation of a people file wrote. */
 const schema = z.object({
+  newUnplaced: count.default(0),
   created: count,
   existingSame: count,
   existingDifferent: count,

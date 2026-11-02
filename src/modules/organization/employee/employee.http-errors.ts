@@ -2,8 +2,10 @@ import { HttpStatus } from '@nestjs/common';
 import { FORBIDDEN_ERROR } from '../../../infrastructure/http/errors/access-errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { DepartmentInactiveError, DepartmentNotFoundError } from '../department/department.errors';
 import { refuse, toOrganizationApiException } from '../organization.http-errors';
 import {
+  FirstPlacementError,
   EmployeeForbiddenError,
   EmployeeRowInvalidError,
   EmployeeSelfChangeForbiddenError,
@@ -12,6 +14,12 @@ import {
 
 /** Maps the errors of the employee routes to their HTTP answers; every other error goes to the mapper of the module. */
 export function toEmployeeApiException(error: unknown): unknown {
+  if (error instanceof FirstPlacementError)
+    return refuse(
+      error.problem === 'DATE_INVALID' ? HttpStatus.UNPROCESSABLE_ENTITY : HttpStatus.CONFLICT,
+      `EMPLOYEE.${error.problem}`,
+      error.message,
+    );
   if (error instanceof EmployeeForbiddenError) {
     // The policy of a service refuses a role the way the guard of the route does, with the same body.
     return new ApiException(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR);
@@ -28,6 +36,10 @@ export function toEmployeeApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'EMPLOYEE.UPDATE_EMPTY', error.message);
   }
 
+  if (error instanceof DepartmentNotFoundError)
+    return refuse(HttpStatus.NOT_FOUND, 'DEPARTMENT.NOT_FOUND', error.message);
+  if (error instanceof DepartmentInactiveError)
+    return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.INACTIVE', error.message);
   return toOrganizationApiException(error);
 }
 

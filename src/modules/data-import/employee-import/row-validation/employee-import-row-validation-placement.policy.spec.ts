@@ -46,7 +46,6 @@ const judge = (cells: EmployeeCells) => new EmployeeRowClassifier(lookup).classi
 
 describe('import adapter of the placement policy (BEH.1)', () => {
   it.each<[string, EmployeeCells, { column: string; code: string }]>([
-    ['a blank department', { department_code: ' ' }, { column: 'department_code', code: 'DEPARTMENT_REQUIRED' }],
     [
       'an unknown department',
       { department_code: 'P-NONE' },
@@ -113,7 +112,6 @@ describe('import adapter of the placement policy (BEH.1)', () => {
     ).toEqual([
       { column: 'employee_code', code: 'EMPLOYEE_CODE_DUPLICATE_IN_FILE' },
       { column: 'work_email', code: 'WORK_EMAIL_DUPLICATE_IN_FILE' },
-      { column: 'department_code', code: 'DEPARTMENT_REQUIRED' },
       { column: 'job_title', code: 'JOB_TITLE_TOO_LONG' },
     ]);
     expect(judge({ employee_code: '', work_email: 'not an email', department_code: 'P-OFF' }).errors).toEqual([

@@ -12,10 +12,8 @@ describe('validateEmployeeRow (T-16)', () => {
   });
 
   describe('the department (US-02-03 AC-1, AC-4; US-04-09 AC-12)', () => {
-    it.each([[undefined], [null], [''], ['   ']])('is required when it is %j', (departmentCode) => {
-      expect(validateEmployeeRow({ departmentCode, jobTitle: 'Engineer' }, { ...clean, department: null })).toEqual([
-        { field: 'departmentCode', code: 'DEPARTMENT_REQUIRED' },
-      ]);
+    it.each([[undefined], [null], [''], ['   ']])('allows a missing department when it is %j', (departmentCode) => {
+      expect(validateEmployeeRow({ departmentCode, jobTitle: 'Engineer' }, { ...clean, department: null })).toEqual([]);
     });
 
     it('takes people in whether or not it has a Cost Center: the fact is not asked (QĐ-87d(3), F44)', () => {
@@ -87,12 +85,6 @@ describe('validateEmployeeRow (T-16)', () => {
   describe('the form adapter of the placement policy (BEH.1)', () => {
     it.each<[string, Partial<EmployeeRowLookup>, { departmentCode: string; jobTitle: string }, object]>([
       [
-        'a blank department',
-        { department: null },
-        { departmentCode: ' ', jobTitle: 'Engineer' },
-        { field: 'departmentCode', code: 'DEPARTMENT_REQUIRED' },
-      ],
-      [
         'an unknown department',
         { department: null },
         { departmentCode: 'P-X', jobTitle: 'Engineer' },
@@ -140,7 +132,6 @@ describe('validateEmployeeRow (T-16)', () => {
         { department: null, employeeCodeTaken: true, workEmailTaken: true },
       ),
     ).toEqual([
-      { field: 'departmentCode', code: 'DEPARTMENT_REQUIRED' },
       { field: 'jobTitle', code: 'JOB_TITLE_TOO_LONG' },
       { field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' },
       { field: 'workEmail', code: 'WORK_EMAIL_TAKEN' },

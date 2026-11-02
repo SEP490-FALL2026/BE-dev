@@ -1,4 +1,4 @@
-import { Body, Controller, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -11,7 +11,8 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CreateEmployeeBodyDto, EmployeeResponseDto } from './employee.dto';
+import { CreateEmployeeBodyDto, EmployeeResponseDto, EmployeeIdParamDto, FirstPlacementBodyDto } from './employee.dto';
+import { EmployeeFirstPlacementService } from './employee-first-placement.service';
 import { EmployeeManualService } from './employee-manual.service';
 import { EMPLOYEE_ERROR_EXAMPLES, toEmployeeApiException } from './employee.http-errors';
 
@@ -25,7 +26,25 @@ import { EMPLOYEE_ERROR_EXAMPLES, toEmployeeApiException } from './employee.http
 @Controller({ path: 'employees', version: '1' })
 @RequireRoles('SUPER_ADMIN')
 export class EmployeesController {
-  constructor(private readonly employees: EmployeeManualService) {}
+  constructor(
+    private readonly employees: EmployeeManualService,
+    private readonly firstPlacement: EmployeeFirstPlacementService,
+  ) {}
+
+  @Post(':id/first-placements')
+  @ApiOperation({ operationId: 'employeeFirstPlacement', summary: 'Place an employee for the first time' })
+  @ApiSuccessResponse(EmployeeResponseDto, { status: HttpStatus.CREATED, message: 'EMPLOYEE.FIRST_PLACED' })
+  async place(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: EmployeeIdParamDto,
+    @Body() body: FirstPlacementBodyDto,
+  ) {
+    try {
+      return await this.firstPlacement.place(actor, params.id, body);
+    } catch (error) {
+      throw toEmployeeApiException(error);
+    }
+  }
 
   @Post()
   @ApiOperation({ operationId: 'employeeCreate', summary: 'Enter one employee by hand' })
