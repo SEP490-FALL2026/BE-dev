@@ -1,4 +1,4 @@
-import { RecoveryArgumentError, parseRecoveryArguments } from './recover.arguments';
+import { RECOVERY_USAGE, RecoveryArgumentError, parseRecoveryArguments } from './recover.arguments';
 
 const BASE = [
   '--ticket',
@@ -55,6 +55,14 @@ describe('recovery arguments (US-01-09 AC-9 to AC-14)', () => {
 
   it('answers --help without anything else', () => {
     expect(parseRecoveryArguments(['--help'])).toEqual({ help: true });
+  });
+
+  it('describes the planned transfer of the role, and says the holder email is required whenever somebody holds the role', () => {
+    const transferRole = RECOVERY_USAGE.slice(RECOVERY_USAGE.indexOf('  transfer-role'));
+
+    expect(transferRole).toMatch(/planned/i);
+    expect(transferRole).toMatch(/--holder-email[^\n]*Required when somebody holds the role/);
+    expect(RECOVERY_USAGE).not.toMatch(/only way to change the Super Admin when the holder cannot act/);
   });
 
   it.each([

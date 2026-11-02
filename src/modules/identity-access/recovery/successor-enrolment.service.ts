@@ -135,4 +135,14 @@ export class SuccessorEnrolment {
 
     return null;
   }
+
+  /**
+   * The role is handed over while the holder can still act (a planned transfer): the successor's account is made in the
+   * application like any other (US-01-01), so this never creates one and never sends or replaces an invitation. Any
+   * reason the successor cannot take the role, NOT_ACTIVATED included, refuses the run.
+   */
+  async requireReady(tx: DbTx, successorAccountId: string): Promise<void> {
+    const problem = await this.eligibility.check(tx, successorAccountId);
+    if (problem) throw new RecoveryRefusedError(problem);
+  }
 }

@@ -143,15 +143,165 @@ describe('recovering the Super Admin role outside the application (integration, 
     const holderLeaves = () =>
       h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [h.seed.superAdmin.employeeId]);
 
-    it('refuses while the holder can still act', async () => {
+    const countRows = async () => ({
+      accounts: Number((await h.ctx.sql.query<{ n: string }>('SELECT count(*) AS n FROM app_users')).rows[0].n),
+      tokens: Number(
+        (await h.ctx.sql.query<{ n: string }>('SELECT count(*) AS n FROM account_action_tokens')).rows[0].n,
+      ),
+      tickets: Number((await h.ctx.sql.query<{ n: string }>('SELECT count(*) AS n FROM recovery_tickets')).rows[0].n),
+    });
+    const mailCount = async () => (await h.ctx.sql.query('SELECT 1 FROM email_outbox')).rows.length;
+    const activeSuccessor = async (code: string) =>
+      createActivatedAccount(h.ctx, h.seed, {
+        code,
+        email: `${code.toLowerCase()}@acme.vn`,
+        roles: [],
+        admin: await adminToken(h.ctx, h.seed),
+      });
+
+    it('refuses a successor with no account while the holder can still act, creating nothing', async () => {
       await successorEmployee('E-RS0');
+      const before = await countRows();
 
       expect(
         await refusalOf(() =>
           h.recovery.transferRole(context(), { successorEmployeeCode: 'E-RS0', holderEmail: h.seed.superAdmin.email }),
         ),
-      ).toBe('HOLDER_STILL_USABLE');
+      ).toBe('SUCCESSOR_NOT_FOUND_ACCOUNT');
+
+      expect(await countRows()).toEqual(before);
       expect(await holders()).toEqual([h.seed.superAdmin.appUserId]);
+    });
+
+    it('moves the role while the holder is still usable: one holder, the old one turned away at the next request, both recorded under one correlation', async () => {
+      const u2 = await activeSuccessor('E-RS12');
+      const ticket = context();
+      const oldHolderToken = await adminToken(h.ctx, h.seed);
+      await request(server()).get('/api/v1/app-users').set('Authorization', `Bearer ${oldHolderToken}`).expect(200);
+
+      const result = await h.recovery.transferRole(ticket, {
+        successorEmployeeCode: 'E-RS12',
+        holderEmail: h.seed.superAdmin.email,
+      });
+
+      expect(result.outcome).toBe('ROLE_TRANSFERRED');
+      expect(await holders()).toEqual([u2.appUserId]);
+      expect(await ticketRow(ticket.ticketRef)).toMatchObject({ status: 'COMPLETED' });
+      const events = await auditOf(ticket.ticketRef);
+      expect(events.map((event) => event.action).sort()).toEqual([
+        'SUPER_ADMIN.TRANSFERRED_IN',
+        'SUPER_ADMIN.TRANSFERRED_OUT',
+      ]);
+      expect(new Set(events.map((event) => event.correlation_id)).size).toBe(1);
+      for (const event of events) {
+        expect(event.actor_kind).toBe('OPERATOR');
+        expect(event.operator_reference).toBe(ticket.ticketRef);
+        expect(event.after).toMatchObject({ ticket: ticket.ticketRef, operator: 'ops-1', approver: 'cto@acme.vn' });
+      }
+      // The roles are read on every request: the old holder keeps the token and loses the role, the successor is let in.
+      await request(server()).get('/api/v1/app-users').set('Authorization', `Bearer ${oldHolderToken}`).expect(403);
+      await request(server()).get('/api/v1/app-users').set('Authorization', `Bearer ${u2.accessToken}`).expect(200);
+    });
+
+    it('refuses an invited successor without sending the invitation again, while the holder can still act', async () => {
+      await insertAccountFixture(h.ctx.app, h.seed, { code: 'E-RS13', email: 'rs13@acme.vn', activated: false });
+      const before = { ...(await countRows()), mails: await mailCount() };
+
+      expect(
+        await refusalOf(() =>
+          h.recovery.transferRole(context(), { successorEmployeeCode: 'E-RS13', holderEmail: h.seed.superAdmin.email }),
+        ),
+      ).toBe('NOT_ACTIVATED');
+
+      expect({ ...(await countRows()), mails: await mailCount() }).toEqual(before);
+      expect(await holders()).toEqual([h.seed.superAdmin.appUserId]);
+    });
+
+    it('refuses an invited successor on a ticket left awaiting activation, without a new invitation, once the holder can act again', async () => {
+      await successorEmployee('E-RS14');
+      await holderLeaves();
+      const ticket = context();
+      const input = { successorEmployeeCode: 'E-RS14', holderEmail: h.seed.superAdmin.email };
+      expect(await h.recovery.transferRole(ticket, input)).toMatchObject({ outcome: 'ACCOUNT_CREATED' });
+      const account = (
+        await h.ctx.sql.query<{ id: string }>(
+          `SELECT a.id FROM app_users a JOIN employees e ON e.id = a.employee_id WHERE e.employee_code = 'E-RS14'`,
+        )
+      ).rows[0];
+      await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [h.seed.superAdmin.employeeId]);
+      await h.ctx.sql.query(
+        `UPDATE account_action_tokens SET expires_at = now() - interval '1 minute' WHERE app_user_id = $1`,
+        [account.id],
+      );
+      const before = { ...(await countRows()), mails: await mailCount() };
+
+      expect(await refusalOf(() => h.recovery.transferRole(ticket, input))).toBe('NOT_ACTIVATED');
+
+      expect({ ...(await countRows()), mails: await mailCount() }).toEqual(before);
+      expect(await ticketRow(ticket.ticketRef)).toMatchObject({ status: 'AWAITING_ACTIVATION' });
+      expect(await holders()).toEqual([h.seed.superAdmin.appUserId]);
+
+      // They activate through the invitation already sent; the same ticket then moves the role as a planned transfer.
+      await h.ctx.sql.query(
+        `UPDATE account_action_tokens SET expires_at = now() + interval '1 day' WHERE app_user_id = $1`,
+        [account.id],
+      );
+      await activateInvitedAccount(h.ctx, account.id);
+      expect(await h.recovery.transferRole(ticket, input)).toMatchObject({ outcome: 'ROLE_TRANSFERRED' });
+      expect(await holders()).toEqual([account.id]);
+    });
+
+    it('refuses a planned transfer without the holder email: somebody holds the role, so the holder is named', async () => {
+      await activeSuccessor('E-RS15');
+
+      expect(await refusalOf(() => h.recovery.transferRole(context(), { successorEmployeeCode: 'E-RS15' }))).toBe(
+        'TARGET_NOT_HOLDER',
+      );
+      expect(await holders()).toEqual([h.seed.superAdmin.appUserId]);
+    });
+
+    it('refuses an operator who is the holder', async () => {
+      await activeSuccessor('E-RS16');
+
+      expect(
+        await refusalOf(() =>
+          h.recovery.transferRole(context({ operatorRef: h.seed.superAdmin.email }), {
+            successorEmployeeCode: 'E-RS16',
+            holderEmail: h.seed.superAdmin.email,
+          }),
+        ),
+      ).toBe('RECIPIENT_IS_OPERATOR');
+      expect(await holders()).toEqual([h.seed.superAdmin.appUserId]);
+    });
+
+    it('refuses an approver who is the holder', async () => {
+      await activeSuccessor('E-RS19');
+
+      expect(
+        await refusalOf(() =>
+          h.recovery.transferRole(context({ approverRef: h.seed.superAdmin.email }), {
+            successorEmployeeCode: 'E-RS19',
+            holderEmail: h.seed.superAdmin.email,
+          }),
+        ),
+      ).toBe('APPROVER_IS_HOLDER');
+      expect(await holders()).toEqual([h.seed.superAdmin.appUserId]);
+    });
+
+    it('lets one of two planned transfers run at the same time through: the other finds a different holder', async () => {
+      await activeSuccessor('E-RS17');
+      await activeSuccessor('E-RS18');
+      const holderEmail = h.seed.superAdmin.email;
+
+      const outcomes = await Promise.all(
+        ['E-RS17', 'E-RS18'].map((code) =>
+          refusalOf(() => h.recovery.transferRole(context(), { successorEmployeeCode: code, holderEmail })),
+        ),
+      );
+
+      expect([...outcomes].sort()).toEqual(['NO REFUSAL', 'TARGET_NOT_HOLDER']);
+      expect(await holders()).toHaveLength(1);
+      expect(await holders()).not.toEqual([h.seed.superAdmin.appUserId]);
     });
 
     it('moves the role in two stages under one ticket: first an account with no role, then, once it is activated, the role', async () => {

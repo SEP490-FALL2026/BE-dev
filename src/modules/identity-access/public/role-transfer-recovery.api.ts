@@ -11,10 +11,13 @@ import { RoleHandover } from '../recovery/role-handover.service';
 import { SuccessorEnrolment } from '../recovery/successor-enrolment.service';
 
 /**
- * Handing the Super Admin role to a person when the holder cannot act any more (`US-01-09` AC-12): left, locked, or
- * nobody holds it. Run by an operator outside the application. Two stages, one ticket: the first creates the
- * successor's account, which has no role, and invites them; once they have activated it, the same ticket run again
- * moves the role in one transaction. Locks: the employees (by id), then the accounts (by id), then the ticket.
+ * Handing the Super Admin role to a person, run by an operator outside the application: no route of the application
+ * does it. When the holder cannot act any more (`US-01-09` AC-12: left, locked, or nobody holds it) there are two
+ * stages under one ticket: the first creates the successor's account, which has no role, and invites them; once they
+ * have activated it, the same ticket run again moves the role in one transaction. When the holder can still act (a
+ * planned transfer, AC-1) there is one stage: the successor already has an activated account, made in the application,
+ * and the role moves in one transaction; no account is created and no invitation is sent. Locks: the employees (by
+ * id), then the accounts (by id), then the ticket.
  */
 @Injectable()
 export class RoleTransferRecoveryApi {
@@ -36,11 +39,11 @@ export class RoleTransferRecoveryApi {
     const successorEmployee = await this.organizationReads.getEmployeeByCode(input.successorEmployeeCode);
     if (!successorEmployee) throw new RecoveryRefusedError('SUCCESSOR_NOT_FOUND');
     const holder = input.holderEmail ? await this.targets.locateByEmail(organization.id, input.holderEmail) : null;
-    assertSeparation(context, [
-      successorEmployee.workEmail ?? '',
-      input.holderEmail ?? '',
-      successorEmployee.employeeCode,
-    ]);
+    assertSeparation(
+      context,
+      [successorEmployee.workEmail ?? '', input.holderEmail ?? '', successorEmployee.employeeCode],
+      input.holderEmail,
+    );
 
     return this.runner.run(async (tx) => {
       const successorAccountId = await this.targets.lockForTransfer(tx, successorEmployee.id, holder);
@@ -61,7 +64,8 @@ export class RoleTransferRecoveryApi {
         current.account.status === 'ACTIVE' &&
         current.account.activationState === 'ACTIVATED' &&
         employeeHasNotLeft(current.employee);
-      if (holderUsable) throw new RecoveryRefusedError('HOLDER_STILL_USABLE');
+      // A planned transfer never creates the successor's account (AC-12): without one it is refused before a ticket is opened.
+      if (holderUsable && successorAccountId === null) throw new RecoveryRefusedError('SUCCESSOR_NOT_FOUND_ACCOUNT');
       if (current.account && current.account.employeeId === successorEmployee.id) {
         throw new RecoveryRefusedError('SUCCESSOR_IS_HOLDER');
       }
@@ -92,9 +96,14 @@ export class RoleTransferRecoveryApi {
       // Stage 1: the successor has no account yet.
       if (successorAccountId === null) return this.enrolment.createAccount(tx, { ...step, successor });
 
-      // Stage 2, or the wait for it: the successor has an account.
-      const waiting = await this.enrolment.awaitActivation(tx, { ...step, successorAccountId, successor });
-      if (waiting) return waiting;
+      // A planned transfer: the account must be ready now, there is no second stage and no invitation to send again.
+      if (holderUsable) {
+        await this.enrolment.requireReady(tx, successorAccountId);
+      } else {
+        // Stage 2, or the wait for it: the successor has an account.
+        const waiting = await this.enrolment.awaitActivation(tx, { ...step, successorAccountId, successor });
+        if (waiting) return waiting;
+      }
 
       return this.handover.move(tx, { ...step, holderId: current.holderId, successorAccountId });
     });

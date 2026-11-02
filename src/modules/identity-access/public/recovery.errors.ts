@@ -7,6 +7,7 @@ export type RecoveryProblem =
   // Who runs it (US-01-09 AC-13)
   | 'APPROVER_IS_OPERATOR'
   | 'RECIPIENT_IS_OPERATOR'
+  | 'APPROVER_IS_HOLDER'
   // The account it acts on
   | 'TARGET_NOT_FOUND'
   | 'TARGET_NOT_HOLDER'
@@ -16,7 +17,6 @@ export type RecoveryProblem =
   | 'NEW_EMAIL_INVALID'
   | 'NEW_EMAIL_TAKEN'
   // Handing the role to someone else (US-01-09 AC-12)
-  | 'HOLDER_STILL_USABLE'
   | 'HOLDER_NOT_FOUND'
   | 'SUCCESSOR_IS_HOLDER'
   | 'SUCCESSOR_NOT_FOUND'
