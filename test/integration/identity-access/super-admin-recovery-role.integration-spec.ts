@@ -10,6 +10,7 @@ import { SuperAdminRecoveryHarness } from '../../support/super-admin-recovery-ha
 import { setSpendingApprover } from '../../support/builders/account.builder';
 import { assignHead } from '../../support/builders/organization.builder';
 import { RoleGrantService } from '../../../src/modules/identity-access/accounts/role-grant.service';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 
 describe('recovering the Super Admin role outside the application (integration, real PostgreSQL): who may run it, a locked holder and the role that has to move', () => {
   const h = new SuperAdminRecoveryHarness();
@@ -534,7 +535,7 @@ describe('recovering the Super Admin role outside the application (integration, 
       });
       await assignHead(h.ctx, token, h.seed.departmentId, {
         employeeId: head.employeeId,
-        effectiveFrom: (await h.ctx.sql.query<{ d: string }>('SELECT current_date::text AS d')).rows[0].d,
+        effectiveFrom: await h.ctx.app.get(OrganizationReadApi, { strict: false }).businessToday(),
       });
       const approver = await createActivatedAccount(h.ctx, h.seed, {
         code: 'E-RM3',
