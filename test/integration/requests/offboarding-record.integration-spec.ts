@@ -1,3 +1,4 @@
+import { clearSpendingApprover, setSpendingApprover } from '../../support/builders/account.builder';
 import { OffboardingHarness, type CaseWire, type RightWire } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
 import type { TransferWire } from '../../support/transfer-harness';
@@ -172,7 +173,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       const department = await h.departmentWithUnit(code('P'));
       const head = await h.worker(department, code('E'));
       await h.makeHead(department, head);
-      const next = await h.worker(department, code('H'));
+      const next = await h.worker(department, code('H'), ['MANAGER']);
 
       return { department, head, next };
     };
@@ -200,6 +201,37 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
         expect.objectContaining({ employee_id: head.employeeId, valid_to: h.day(11) }),
         expect.objectContaining({ employee_id: next.employeeId, valid_from: h.day(11), valid_to: null }),
       ]);
+    });
+
+    it('refuses a successor without MANAGER and the spending approver, writes nothing, and still records the departure with nobody (US-03-04 AC-8, US-03-06 AC-23, AC-24)', async () => {
+      const { department, head } = await headedDepartment();
+      const withoutRole = await h.worker(department, code('N'));
+      const approver = await h.worker(department, code('A'));
+      await setSpendingApprover(h.ctx, h.admin, approver.employeeId);
+      const before = await nothingWritten(head);
+      const refusal = async (employeeId: string) => {
+        const response = await h.recordCase(h.body(head, { successor: { kind: 'EMPLOYEE', employeeId } }));
+
+        return [response.status, h.codeOf(response), h.detailsOf(response)];
+      };
+
+      expect(await refusal(withoutRole.employeeId)).toEqual([
+        422,
+        'OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE',
+        { reason: 'MANAGER_ROLE_REQUIRED' },
+      ]);
+      expect(await refusal(approver.employeeId)).toEqual([
+        422,
+        'OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE',
+        { reason: 'SPENDING_APPROVER_CANNOT_HEAD' },
+      ]);
+      expect(await nothingWritten(head)).toEqual(before);
+      await clearSpendingApprover(h.ctx, h.admin);
+
+      const recorded = await h.recordedCase(head, { successor: { kind: 'NONE' } });
+
+      expect(recorded.headSuccessor).toEqual({ kind: 'NONE', employee: null });
+      expect(await h.headPeriods(department.id)).toEqual([expect.objectContaining({ employee_id: head.employeeId })]);
     });
 
     it('refuses a successor who is not a member of the department that day, and writes nothing', async () => {

@@ -83,6 +83,8 @@ export class TransferGuardService {
         memberOfOldDepartmentOnDay: placement?.departmentId === input.oldDepartmentId,
         stillWorking: employee.status === 'ACTIVE' && employee.workState !== 'LEFT',
         holdsSuperAdmin: account.roles.includes('SUPER_ADMIN'),
+        holdsManager: account.roles.includes('MANAGER'),
+        holdsSpendingApprover: account.roles.includes('SPENDING_APPROVER'),
         hasPendingTransfer: (await this.transfers.findPendingOf(tx, candidateId)) !== null,
       },
     };

@@ -130,7 +130,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
 
     it('refuses the whole command, saving nothing, when the successor cannot follow on the new day', async () => {
       const { department, head } = await headedDepartment('P-MV1');
-      const heir = await h.veteran(department, code('H'));
+      const heir = await h.veteran(department, code('H'), ['MANAGER']);
       const wire = await h.recorded(
         body(head.employeeId, { successor: { kind: 'EMPLOYEE', employeeId: heir.employeeId } }),
       );
@@ -150,9 +150,33 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
       expect(h.dataOf<TransferWire>(await h.readTransfer(wire.id).expect(200)).effectiveOn).toBe(h.day(30));
     });
 
+    it('refuses a new successor without MANAGER when the day moves, and saves nothing (US-03-01 AC-8)', async () => {
+      const { department, head } = await headedDepartment('P-MV3');
+      const heir = await h.veteran(department, code('H'), ['MANAGER']);
+      const withoutRole = await h.veteran(department, code('N'));
+      const wire = await h.recorded(
+        body(head.employeeId, { successor: { kind: 'EMPLOYEE', employeeId: heir.employeeId } }),
+      );
+      const periods = await h.headPeriods(department.id);
+
+      const response = await h.rescheduleTransfer(wire.id, {
+        newEffectiveOn: h.day(50),
+        successor: { kind: 'EMPLOYEE', employeeId: withoutRole.employeeId },
+        ...why,
+      });
+
+      expect([response.status, h.codeOf(response)]).toEqual([
+        422,
+        'DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE',
+      ]);
+      expect(h.detailsOf(response)).toEqual({ reason: 'MANAGER_ROLE_REQUIRED' });
+      expect(await h.headPeriods(department.id)).toEqual(periods);
+      expect(h.dataOf<TransferWire>(await h.readTransfer(wire.id).expect(200)).effectiveOn).toBe(h.day(30));
+    });
+
     it('moves the handover of the head with the day, and the successor becomes the head from the new day', async () => {
       const { department, head } = await headedDepartment('P-MV2');
-      const heir = await h.veteran(department, code('H'));
+      const heir = await h.veteran(department, code('H'), ['MANAGER']);
       const wire = await h.recorded(
         body(head.employeeId, { successor: { kind: 'EMPLOYEE', employeeId: heir.employeeId } }),
       );
@@ -169,7 +193,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
   describe('cancelling a waiting transfer (AC-20)', () => {
     it('brings back the head and the placement: the successor is removed and the old period is open again', async () => {
       const { department, head } = await headedDepartment('P-CX1');
-      const heir = await h.veteran(department, code('H'));
+      const heir = await h.veteran(department, code('H'), ['MANAGER']);
       const wire = await h.recorded(
         body(head.employeeId, { successor: { kind: 'EMPLOYEE', employeeId: heir.employeeId } }),
       );
@@ -278,7 +302,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
 
     it('tells the end of the head and the start of the successor when the handover takes effect', async () => {
       const { department, head } = await headedDepartment('P-EV1');
-      const heir = await h.veteran(department, code('H'));
+      const heir = await h.veteran(department, code('H'), ['MANAGER']);
       await h.recorded(
         body(head.employeeId, {
           effectiveOn: h.day(10),
@@ -307,8 +331,8 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
 
     it('tells the naming of a head for today in the transaction of the route, once', async () => {
       const department = await h.departmentWithUnit(code('P-EV'));
-      const first = await h.veteran(department, code('H'));
-      const second = await h.veteran(department, code('H'));
+      const first = await h.veteran(department, code('H'), ['MANAGER']);
+      const second = await h.veteran(department, code('H'), ['MANAGER']);
 
       await h.makeHead(department, first);
       await h.makeHead(department, second);
