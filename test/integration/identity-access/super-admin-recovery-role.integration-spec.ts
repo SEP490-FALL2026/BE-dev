@@ -7,6 +7,7 @@ import {
 } from '../../support/api-accounts';
 import { SEED_PASSWORD, insertAccountFixture, insertEmployeeFixture } from '../../support/http-test-app';
 import { SuperAdminRecoveryHarness } from '../../support/super-admin-recovery-harness';
+import { RoleGrantService } from '../../../src/modules/identity-access/accounts/role-grant.service';
 
 describe('recovering the Super Admin role outside the application (integration, real PostgreSQL): who may run it, a locked holder and the role that has to move', () => {
   const h = new SuperAdminRecoveryHarness();
@@ -201,6 +202,31 @@ describe('recovering the Super Admin role outside the application (integration, 
       // The roles are read on every request: the old holder keeps the token and loses the role, the successor is let in.
       await request(server()).get('/api/v1/app-users').set('Authorization', `Bearer ${oldHolderToken}`).expect(403);
       await request(server()).get('/api/v1/app-users').set('Authorization', `Bearer ${u2.accessToken}`).expect(200);
+    });
+
+    it('rolls a planned transfer back when granting the successor fails after the holder was revoked (US-01-09 AC-4)', async () => {
+      const u2 = await activeSuccessor('E-RS21');
+      const ticket = context();
+      const input = { successorEmployeeCode: 'E-RS21', holderEmail: h.seed.superAdmin.email };
+      const grants = h.recoveryModule.get(RoleGrantService, { strict: false });
+      const grantFails = jest.spyOn(grants, 'grantRole').mockRejectedValueOnce(new Error('grant failed'));
+
+      try {
+        await expect(h.recovery.transferRole(ticket, input)).rejects.toThrow('grant failed');
+        expect(grantFails).toHaveBeenCalledTimes(1);
+      } finally {
+        grantFails.mockRestore();
+      }
+
+      // The holder was revoked first inside the same transaction: nothing of it may remain.
+      expect(await holders()).toEqual([h.seed.superAdmin.appUserId]);
+      expect(await ticketRow(ticket.ticketRef)).toBeUndefined();
+      expect(
+        (await auditOf(ticket.ticketRef)).filter((event) => event.action.startsWith('SUPER_ADMIN.TRANSFERRED_')),
+      ).toEqual([]);
+      // The same ticket then moves the role once the fault is gone.
+      expect(await h.recovery.transferRole(ticket, input)).toMatchObject({ outcome: 'ROLE_TRANSFERRED' });
+      expect(await holders()).toEqual([u2.appUserId]);
     });
 
     it('refuses an invited successor without sending the invitation again, while the holder can still act', async () => {
