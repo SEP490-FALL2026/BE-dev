@@ -75,4 +75,30 @@ describe('retired project labels and old drafts (integration)', () => {
       ].filter((sql) => /project_label/i.test(sql)),
     ).toEqual([]);
   }, 240000);
+  it('reads and updates department profiles without project fields or SQL', async () => {
+    const department = await h.departmentWithUnit('P-NOPROJECT');
+    const counter = QueryCounter.on(relay);
+    const read = await counter.run(() =>
+      request(h.server())
+        .get(`/api/v1/departments/${department.id}`)
+        .set({ Authorization: `Bearer ${h.admin}` })
+        .then((response) => response),
+    );
+    expect(read.result.status).toBe(200);
+    expect((read.result.body as { data: object }).data).not.toHaveProperty('projects');
+    expect((read.result.body as { data: object }).data).not.toHaveProperty('projectTotal');
+    const update = await counter.run(() =>
+      request(h.server())
+        .patch(`/api/v1/departments/${department.id}`)
+        .set({ Authorization: `Bearer ${h.admin}` })
+        .send({ name: 'No project' })
+        .then((response) => response),
+    );
+    expect(update.result.status).toBe(200);
+    expect((update.result.body as { data: object }).data).not.toHaveProperty('projects');
+    expect((update.result.body as { data: object }).data).not.toHaveProperty('projectTotal');
+    expect(
+      [...read.statements, ...update.statements].filter((sql) => /\b(?:projects|project_departments)\b/i.test(sql)),
+    ).toEqual([]);
+  }, 240000);
 });
