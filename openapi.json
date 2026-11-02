@@ -2252,7 +2252,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin changes department data, on an HR basis. The IT Admin does not.",
+            "description": "Only the Super Admin changes department data. The IT Admin does not.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -2336,7 +2336,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.",
+            "description": "The request is invalid (VALIDATION_ERROR, among them a name or a function over its limit or a field the route does not take) or a rule of the department refuses it; details name the reason.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -2634,7 +2634,7 @@
         },
         "responses": {
           "200": {
-            "description": "The name, the description or the IT Admin in charge changed, on the HR basis given. The Cost Center and the people do not.",
+            "description": "The name, the description or the IT Admin in charge changed. The Cost Center and the people do not. A body that carries an HR basis is refused (VALIDATION_ERROR): the Audit Trail records who, when, before and after.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2700,7 +2700,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin changes department data, on an HR basis. The IT Admin does not.",
+            "description": "Only the Super Admin changes department data. The IT Admin does not.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -2733,6 +2733,27 @@
                       "error": {
                         "code": "DEPARTMENT.NOT_FOUND",
                         "message": "Department not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The department is retired (DEPARTMENT.INACTIVE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT.INACTIVE": {
+                    "summary": "The department is no longer in use.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.INACTIVE",
+                        "message": "The department is no longer in use.",
                         "requestId": "req_example"
                       }
                     }
@@ -2784,7 +2805,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.",
+            "description": "The request is invalid (VALIDATION_ERROR, among them a name or a function over its limit or a field the route does not take) or a rule of the department refuses it; details name the reason.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -2911,7 +2932,7 @@
         },
         "responses": {
           "200": {
-            "description": "The department is retired, on the HR basis given: it takes no new member or head. If it is already retired, the answer is the same.",
+            "description": "The department is retired (the body is empty): it takes no new member or head. If it is already retired, the answer is the same.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2977,7 +2998,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin changes department data, on an HR basis. The IT Admin does not.",
+            "description": "Only the Super Admin changes department data. The IT Admin does not.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -3092,7 +3113,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.",
+            "description": "The request is invalid (VALIDATION_ERROR, among them a name or a function over its limit or a field the route does not take) or a rule of the department refuses it; details name the reason.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -3752,7 +3773,7 @@
         },
         "responses": {
           "200": {
-            "description": "The person heads the department from the date, on the HR basis given; the head before ends the day before. The person must be a member of the department that day. What was kept for the department while nobody headed it is handed to them.",
+            "description": "The person heads the department from the date; the head before ends the day before. The person must be a member of the department that day. What was kept for the department while nobody headed it is handed to them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3818,7 +3839,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin changes department data, on an HR basis. The IT Admin does not.",
+            "description": "Only the Super Admin changes department data. The IT Admin does not.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -3851,6 +3872,27 @@
                       "error": {
                         "code": "DEPARTMENT.NOT_FOUND",
                         "message": "Department not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The department is retired (DEPARTMENT.INACTIVE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT.INACTIVE": {
+                    "summary": "The department is no longer in use.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.INACTIVE",
+                        "message": "The department is no longer in use.",
                         "requestId": "req_example"
                       }
                     }
@@ -3902,7 +3944,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.",
+            "description": "The request is invalid (VALIDATION_ERROR, among them a name or a function over its limit or a field the route does not take) or a rule of the department refuses it; details name the reason.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -4060,7 +4102,7 @@
         },
         "responses": {
           "200": {
-            "description": "Nobody heads the department from the date, on the HR basis given; it shows as missing a head. If there is no head to end, nothing changes.",
+            "description": "Nobody heads the department from the date; it shows as missing a head. If there is no head to end, nothing changes.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4126,7 +4168,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin changes department data, on an HR basis. The IT Admin does not.",
+            "description": "Only the Super Admin changes department data. The IT Admin does not.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -4210,7 +4252,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.",
+            "description": "The request is invalid (VALIDATION_ERROR, among them a name or a function over its limit or a field the route does not take) or a rule of the department refuses it; details name the reason.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -4313,7 +4355,7 @@
         },
         "responses": {
           "200": {
-            "description": "The person is named to head the department from a day after today, on the HR basis given: the head in force now ends the day before, and the profile shows the person as the successor. The person must be a member of the department that day. Somebody has to head the department today.",
+            "description": "The person is named to head the department from a day after today: the head in force now ends the day before, and the profile shows the person as the successor. The person must be a member of the department that day. Somebody has to head the department today.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4379,7 +4421,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin changes department data, on an HR basis. The IT Admin does not.",
+            "description": "Only the Super Admin changes department data. The IT Admin does not.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -4436,6 +4478,17 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "DEPARTMENT.INACTIVE": {
+                    "summary": "The department is no longer in use.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.INACTIVE",
+                        "message": "The department is no longer in use.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
@@ -4484,7 +4537,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.",
+            "description": "The request is invalid (VALIDATION_ERROR, among them a name or a function over its limit or a field the route does not take) or a rule of the department refuses it; details name the reason.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -4664,7 +4717,7 @@
         },
         "responses": {
           "200": {
-            "description": "Nobody is named to follow the head any more, on the HR basis given: the head keeps the department. If nobody is named, nothing changes.",
+            "description": "Nobody is named to follow the head any more: the head keeps the department. If nobody is named, nothing changes.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4730,7 +4783,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin changes department data, on an HR basis. The IT Admin does not.",
+            "description": "Only the Super Admin changes department data. The IT Admin does not.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -4814,7 +4867,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.",
+            "description": "The request is invalid (VALIDATION_ERROR, among them a name or a function over its limit or a field the route does not take) or a rule of the department refuses it; details name the reason.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -72224,26 +72277,11 @@
         "type": "object",
         "properties": {
           "code": { "type": "string", "minLength": 1, "maxLength": 50, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
-          "name": { "type": "string", "maxLength": 1000 },
-          "function": { "type": "string", "maxLength": 5000, "nullable": true },
-          "itAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
-          "hrBasis": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          }
+          "name": { "type": "string", "maxLength": 200 },
+          "function": { "type": "string", "maxLength": 1000, "nullable": true },
+          "itAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true }
         },
-        "required": ["code", "name", "hrBasis"],
+        "required": ["code", "name"],
         "additionalProperties": false
       },
       "DepartmentResponseDto": {
@@ -72392,50 +72430,13 @@
       "UpdateDepartmentBodyDto": {
         "type": "object",
         "properties": {
-          "name": { "type": "string", "maxLength": 1000 },
-          "function": { "type": "string", "maxLength": 5000, "nullable": true },
-          "itAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
-          "hrBasis": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          }
+          "name": { "type": "string", "maxLength": 200 },
+          "function": { "type": "string", "maxLength": 1000, "nullable": true },
+          "itAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true }
         },
-        "required": ["hrBasis"],
         "additionalProperties": false
       },
-      "DeactivateDepartmentBodyDto": {
-        "type": "object",
-        "properties": {
-          "hrBasis": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          }
-        },
-        "required": ["hrBasis"],
-        "additionalProperties": false
-      },
+      "DeactivateDepartmentBodyDto": { "type": "object", "properties": {}, "additionalProperties": false },
       "DepartmentMembersResponseDto": {
         "type": "object",
         "properties": {
@@ -72592,24 +72593,9 @@
             "type": "string",
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-          },
-          "hrBasis": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
           }
         },
-        "required": ["employeeId", "effectiveFrom", "hrBasis"],
+        "required": ["employeeId", "effectiveFrom"],
         "additionalProperties": false
       },
       "VacateHeadBodyDto": {
@@ -72619,24 +72605,9 @@
             "type": "string",
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-          },
-          "hrBasis": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
           }
         },
-        "required": ["effectiveFrom", "hrBasis"],
+        "required": ["effectiveFrom"],
         "additionalProperties": false
       },
       "DesignateSuccessorBodyDto": {
@@ -72647,48 +72618,12 @@
             "type": "string",
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-          },
-          "hrBasis": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
           }
         },
-        "required": ["employeeId", "effectiveFrom", "hrBasis"],
+        "required": ["employeeId", "effectiveFrom"],
         "additionalProperties": false
       },
-      "ClearSuccessorBodyDto": {
-        "type": "object",
-        "properties": {
-          "hrBasis": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          }
-        },
-        "required": ["hrBasis"],
-        "additionalProperties": false
-      },
+      "ClearSuccessorBodyDto": { "type": "object", "properties": {}, "additionalProperties": false },
       "ProjectListResponseDto": {
         "type": "object",
         "properties": {

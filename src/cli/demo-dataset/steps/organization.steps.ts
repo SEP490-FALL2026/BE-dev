@@ -51,7 +51,6 @@ async function oneDepartment(
     code: department.code,
     name: department.name,
     function: department.function,
-    hrBasis: basis(ctx),
   });
   ctx.ids.departments.set(department.code, created.id);
 
@@ -158,7 +157,6 @@ async function itAdmins(ctx: DemoRunContext): Promise<StepOutcome> {
     else {
       await ctx.api.call(ctx.superAdminEmail, 'PATCH', `/departments/${profile.id}`, {
         itAdminEmployeeId: ctx.ids.employees.get(department.itAdmin!),
-        hrBasis: basis(ctx),
       });
       results.push({ status: 'done', label });
     }
@@ -179,7 +177,6 @@ async function heads(ctx: DemoRunContext): Promise<StepOutcome> {
       await ctx.api.call(ctx.superAdminEmail, 'POST', `/departments/${profile.id}/head-assignments`, {
         employeeId: ctx.ids.employees.get(department.head!),
         effectiveFrom: ctx.today,
-        hrBasis: basis(ctx),
       });
       results.push({ status: 'done', label });
     }
