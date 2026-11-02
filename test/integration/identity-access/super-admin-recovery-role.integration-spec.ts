@@ -7,6 +7,8 @@ import {
 } from '../../support/api-accounts';
 import { SEED_PASSWORD, insertAccountFixture, insertEmployeeFixture } from '../../support/http-test-app';
 import { SuperAdminRecoveryHarness } from '../../support/super-admin-recovery-harness';
+import { setSpendingApprover } from '../../support/builders/account.builder';
+import { assignHead } from '../../support/builders/organization.builder';
 import { RoleGrantService } from '../../../src/modules/identity-access/accounts/role-grant.service';
 
 describe('recovering the Super Admin role outside the application (integration, real PostgreSQL): who may run it, a locked holder and the role that has to move', () => {
@@ -514,6 +516,54 @@ describe('recovering the Super Admin role outside the application (integration, 
       expect(await holders()).toEqual([h.seed.superAdmin.appUserId]);
       expect(withItRole.appUserId).toBeDefined();
       expect(invited.appUserId).toBeDefined();
+    });
+
+    it('refuses direct approval roles and distinguishes a head from another MANAGER', async () => {
+      const token = await adminToken(h.ctx, h.seed);
+      const manager = await createActivatedAccount(h.ctx, h.seed, {
+        code: 'E-RM1',
+        email: 'rm1@acme.vn',
+        roles: ['MANAGER'],
+        admin: token,
+      });
+      const head = await createActivatedAccount(h.ctx, h.seed, {
+        code: 'E-RM2',
+        email: 'rm2@acme.vn',
+        roles: ['MANAGER'],
+        admin: token,
+      });
+      await assignHead(h.ctx, token, h.seed.departmentId, {
+        employeeId: head.employeeId,
+        effectiveFrom: (await h.ctx.sql.query<{ d: string }>('SELECT current_date::text AS d')).rows[0].d,
+      });
+      const approver = await createActivatedAccount(h.ctx, h.seed, {
+        code: 'E-RM3',
+        email: 'rm3@acme.vn',
+        roles: [],
+        admin: token,
+      });
+      await setSpendingApprover(h.ctx, token, approver.employeeId);
+      await holderLeaves();
+      for (const [code, expected] of [
+        ['E-RM1', 'MANAGER_HELD'],
+        ['E-RM2', 'HEADS_DEPARTMENT'],
+        ['E-RM3', 'APPROVAL_ROLE_HELD'],
+      ]) {
+        expect(
+          await refusalOf(() =>
+            h.recovery.transferRole(context(), {
+              successorEmployeeCode: code,
+              holderEmail: h.seed.superAdmin.email,
+            }),
+          ),
+        ).toBe(expected);
+      }
+      expect(await holders()).toEqual([h.seed.superAdmin.appUserId]);
+      expect(manager.appUserId).toBeDefined();
+      await h.ctx.sql.query(
+        `UPDATE role_grants SET revoked_at = GREATEST(now(), granted_at) WHERE app_user_id = $1 AND role = 'SPENDING_APPROVER' AND revoked_at IS NULL`,
+        [approver.appUserId],
+      );
     });
 
     it('leaves every account with the person it was made for: a transfer and a credential reset move no account to another employee (US-01-09 AC-16)', async () => {

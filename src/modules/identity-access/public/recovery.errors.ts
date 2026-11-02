@@ -30,7 +30,8 @@ export type RecoveryProblem =
   | 'EMAIL_NOT_VERIFIED'
   | 'WORK_ROLE_HELD'
   | 'APPROVAL_ROLE_HELD'
-  | 'HEADS_DEPARTMENT';
+  | 'HEADS_DEPARTMENT'
+  | 'MANAGER_HELD';
 
 /**
  * The recovery cannot be done as asked: nothing was changed, the ticket included (unless the message says it was
