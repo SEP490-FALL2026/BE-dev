@@ -140,12 +140,12 @@ interface RowText {
 
 function readRow(cells: EmployeeCells): RowText {
   return {
-    code: clean(cells.employee_code),
+    code: clean(cells.employee_code).toUpperCase(),
     fullName: clean(cells.full_name),
     emailText: clean(cells.work_email),
     typeText: clean(cells.employment_type).toUpperCase(),
     hireDate: clean(cells.hire_date),
-    departmentCode: clean(cells.department_code),
+    departmentCode: clean(cells.department_code).toUpperCase(),
     jobTitleText: clean(cells.job_title),
   };
 }
@@ -326,8 +326,8 @@ export function lookupNamesOf(rows: readonly { cells: EmployeeCells }[]): {
   const unique = (values: string[]) => [...new Set(values.filter((value) => value !== ''))];
 
   return {
-    departmentCodes: unique(cells.map((cell) => clean(cell.department_code))),
-    employeeCodes: unique(cells.map((cell) => clean(cell.employee_code))),
+    departmentCodes: unique(cells.map((cell) => clean(cell.department_code).toUpperCase())),
+    employeeCodes: unique(cells.map((cell) => clean(cell.employee_code).toUpperCase())),
     normalizedEmails: unique(cells.map((cell) => safeNormalize(clean(cell.work_email)) ?? '')),
   };
 }

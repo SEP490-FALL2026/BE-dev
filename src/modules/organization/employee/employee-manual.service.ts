@@ -68,6 +68,7 @@ export class EmployeeManualService {
    */
   async create(actor: AuthenticatedPrincipal, input: ManualEmployeeInput, now?: Date): Promise<ManualEmployeeView> {
     assertMayEnterEmployees(actor.roles);
+    input = { ...input, employeeCode: input.employeeCode.trim().toUpperCase() };
     const organization = await this.context.findOrganization();
     if (!organization) throw new Error('An employee was entered before installation');
     try {
@@ -77,7 +78,7 @@ export class EmployeeManualService {
         // test fixed the clock.
         const memberSince = businessDateAt(now ?? (await this.employees.recordingInstant(tx)), organization.timeZone);
         // Lock order: the department, then the employee rows that get written.
-        const departmentCode = input.departmentCode?.trim() ?? '';
+        const departmentCode = input.departmentCode?.trim().toUpperCase() ?? '';
         const department = departmentCode
           ? await this.departments.lockForEntry(tx, organization.id, departmentCode)
           : null;
