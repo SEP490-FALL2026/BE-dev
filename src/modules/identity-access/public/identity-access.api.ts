@@ -148,6 +148,16 @@ export class IdentityAccessApi {
   }
 
   /**
+   * The employee who holds the spending approver role now — the effective grant, whatever the state of the account or of the
+   * employee, who may have left: a consumer that needs somebody who works filters that itself. Null when nobody holds it. With
+   * `forShare`, in the transaction `tx`, the row of the grant is locked `FOR SHARE` until it ends, so a step opened on this answer
+   * and a revocation of the role take turns (`M6`).
+   */
+  getSpendingApproverEmployeeId(tx?: DbTx, options?: { forShare?: boolean }): Promise<string | null> {
+    return this.grants.spendingApproverEmployeeId(tx, options);
+  }
+
+  /**
    * Which of these employees holds the spending approver role, or null: the accounts of all of them are locked `FOR SHARE` first, in the
    * order of their ids, so a Request that is being created and a grant of the role that is being made meet on the same rows
    * (`QĐ-93d`(3)). Call it in the transaction of the Request; the lock lasts to its end.

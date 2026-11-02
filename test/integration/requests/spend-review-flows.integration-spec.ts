@@ -364,13 +364,13 @@ describe('what follows the review of Finance over PostgreSQL (US-06-13 AC-4, AC-
 
       expect(h.codeOf(first)).toBe('SPEND.NO_BUDGET_TO_MAKE');
 
-      const fallback = await h.staff(await h.departmentWithUnit('P-FB'), 'FB-R0');
-      await h.setRole('FALLBACK_APPROVER', fallback);
-      const headless = await h.departmentWithUnit('P-HL');
-      const member = await h.staff(headless, 'HL-E1');
-      const sent = await h.sent(member, plan, { termMonths: 1 });
-      // Nobody heads the department, so nobody sends it on: it was checked when the fallback approver approved the need.
-      await h.decide(sent.id, { decision: 'APPROVE' }, fallback.account).expect(200);
+      // The head of the department leaves after the need was approved: nobody is left to propose a budget (a department with no head
+      // cannot get here otherwise, since its need step waits for a head, QĐ-93c).
+      const headless = await unit();
+      await h.budgetFor(headless, { total: 100 * M, held: 20 * M, spent: 40 * M });
+      const sent = { id: await h.paidRequest(headless, plan, { amount: 45 * M }) };
+      await h.route(sent.id, headless.head.account);
+      await h.withoutHead(headless.department);
 
       const second = await h.completeReview(sent.id, { outcome: 'NEEDS_BUDGET', reason: 'Make one' }).expect(409);
 

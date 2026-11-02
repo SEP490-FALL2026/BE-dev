@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import type { ApprovalRoleHolders } from '../../identity-access/public/identity-access.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RoutingFactsService } from '../access-request/routing-facts.service';
 import { routeNeedStep } from '../access-request/routing.policy';
@@ -10,11 +9,11 @@ import { routeFinanceReview, routeSpendStep } from './spend-routing.policy';
 import type { StepTarget } from './reassignment.policy';
 import type { ReassignableRequest, ReassignableStep } from './step-reassignment.repo';
 
-/** What the tables read on one day, once for a pass over many requests: the roles whose holders can act today. */
+/** What the tables read on one day, once for a pass over many requests: the spending approver who can act today. */
 export interface TodayFacts {
   today: BusinessDate;
-  /** The holders of the three approval roles who still work: a role whose holder has left is held by nobody. */
-  roles: ApprovalRoleHolders;
+  /** The spending approver when they still work: a role whose holder has left is held by nobody. */
+  spendingApproverEmployeeId: string | null;
   /** Finance on an account that can act now, or null. */
   financeEmployeeId: string | null;
 }
@@ -34,32 +33,22 @@ export class StepTargetService {
     private readonly routing: RoutingFactsService,
   ) {}
 
-  /** Who holds the three approval roles now, leaving out whoever has left the company. */
-  async usableApprovalRoleHolders(tx: DbTx): Promise<ApprovalRoleHolders> {
-    const holders = await this.identity.getApprovalRoleHolders(tx);
-    const named = [
-      holders.spendingApproverEmployeeId,
-      holders.conflictSubstituteEmployeeId,
-      holders.fallbackApproverEmployeeId,
-    ].filter((id): id is string => id !== null);
-    const working = new Set(
-      (named.length === 0 ? [] : await this.organizationReads.getEmployees(named, tx))
-        .filter((employee) => employee.status === 'ACTIVE')
-        .map((employee) => employee.id),
-    );
-    const whoCanAct = (id: string | null): string | null => (id !== null && working.has(id) ? id : null);
+  /**
+   * The spending approver now, leaving out one who has left the company. With `forShare` the row of the grant is locked until the
+   * transaction ends, which a step that is being opened asks for (`M6`).
+   */
+  async usableSpendingApproverEmployeeId(tx: DbTx, options?: { forShare?: boolean }): Promise<string | null> {
+    const holder = await this.identity.getSpendingApproverEmployeeId(tx, options);
+    if (holder === null) return null;
+    const [found] = await this.organizationReads.getEmployees([holder], tx);
 
-    return {
-      spendingApproverEmployeeId: whoCanAct(holders.spendingApproverEmployeeId),
-      conflictSubstituteEmployeeId: whoCanAct(holders.conflictSubstituteEmployeeId),
-      fallbackApproverEmployeeId: whoCanAct(holders.fallbackApproverEmployeeId),
-    };
+    return found?.status === 'ACTIVE' ? holder : null;
   }
 
   async gatherToday(tx: DbTx, now: Date): Promise<TodayFacts> {
     return {
       today: await this.organizationReads.businessToday(now, tx),
-      roles: await this.usableApprovalRoleHolders(tx),
+      spendingApproverEmployeeId: await this.usableSpendingApproverEmployeeId(tx),
       financeEmployeeId: await this.identity.findUsableFinanceEmployeeId(tx),
     };
   }
@@ -96,10 +85,7 @@ export class StepTargetService {
           : { assigneeEmployeeId: null, reason: decision.reason };
       }
       case 'SPEND_APPROVAL': {
-        const assignment = routeSpendStep(people, {
-          spendingApproverEmployeeId: facts.roles.spendingApproverEmployeeId,
-          conflictSubstituteEmployeeId: facts.roles.conflictSubstituteEmployeeId,
-        });
+        const assignment = routeSpendStep(people, facts.spendingApproverEmployeeId);
 
         return assignment.outcome === 'ASSIGNED'
           ? { assigneeEmployeeId: assignment.assigneeEmployeeId, routingRow: null }

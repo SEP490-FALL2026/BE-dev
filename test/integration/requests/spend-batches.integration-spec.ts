@@ -1,5 +1,4 @@
 import request from 'supertest';
-import type { Person } from '../../support/request-harness';
 import { SpendHarness, Unit } from '../../support/spend-harness';
 
 const h = new SpendHarness();
@@ -25,7 +24,6 @@ interface QueueWire {
 describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
   let plan: string;
   let design: Unit;
-  let substitute: Person;
 
   beforeAll(async () => {
     await h.start();
@@ -34,8 +32,6 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
     await h
       .declareTaxProfile((await h.vendorOf(plan)).id, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }])
       .expect(200);
-    substitute = await h.staff(await h.departmentWithUnit('P-LEG'), 'LEG-S1');
-    await h.setRole('CONFLICT_SUBSTITUTE', substitute);
     design = await h.departmentWithHead('P-DES');
     await h.budgetFor(design, { total: 1000 * M });
   }, 240000);
@@ -308,8 +304,8 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
     });
   });
 
-  describe('when the approver is a party (AC-7)', () => {
-    it('leaves the batch of the approver: the substitute holds the step, the others stay with the approver', async () => {
+  describe('when the approver is a party (data of before QĐ-93, SoD-7)', () => {
+    it('gives the step of that request to nobody: it waits for the approver, no substitute holds it, and the others stay with the approver', async () => {
       const own = await waiting();
       const conflicted = await waiting();
       await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
@@ -319,15 +315,23 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
 
       const batch = await send([own, conflicted]);
 
+      // No item leaves the batch for a conflict of interest any more: that reason is only read from the history.
       expect((await items(batch.id)).map((item) => [item.outcome, item.leftReason])).toEqual([
         ['SENT_TO_APPROVER', null],
-        ['SENT_TO_APPROVER', 'CONFLICT_OF_INTEREST'],
+        ['SENT_TO_APPROVER', null],
       ]);
       expect(await h.steps(conflicted, 'SPEND_APPROVAL')).toEqual([
-        expect.objectContaining({ assignee_employee_id: substitute.employeeId }),
+        expect.objectContaining({
+          state: 'WAITING',
+          assignee_employee_id: null,
+          waiting_reason: 'SPENDING_APPROVER_IS_PARTY',
+        }),
       ]);
       expect((await items(batch.id, h.boss.account)).map((item) => item.requestId)).toEqual([own]);
-      expect((await items(batch.id, substitute.account)).map((item) => item.requestId)).toEqual([conflicted]);
+      await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
+        conflicted,
+        design.member.employeeId,
+      ]);
     });
   });
 

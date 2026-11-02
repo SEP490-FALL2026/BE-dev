@@ -370,7 +370,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
 
       expect(flagsOf(financeCase as FlaggedCase)).toEqual(['FINANCE']);
       expect(flagsOf(bossCase as FlaggedCase)).toEqual(['SPENDING_APPROVER']); // the approver heads no department (QĐ-93b)
-      const substituted = await h.recordedCase(h.substitute);
+      const substituted = await h.recordedCase(h.bystander);
       expect(flagsOf(substituted as FlaggedCase)).toEqual(['SUBSTITUTE_APPROVER']);
       for (const wire of [financeCase, bossCase]) {
         await h.markLeft(wire.id, { accountLock: { note: 'Đã khóa tài khoản công ty' } }).expect(200);

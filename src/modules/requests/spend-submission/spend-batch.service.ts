@@ -115,7 +115,7 @@ export class SpendBatchService {
       requestId: request.id,
       outcome: outcome.opened === 'FINANCE_REVIEW' ? 'SENT_TO_FINANCE' : 'SENT_TO_APPROVER',
       stopReason: null,
-      leftReason: outcome.substituted ? 'CONFLICT_OF_INTEREST' : null,
+      leftReason: null,
     };
   }
 }

@@ -20,12 +20,10 @@ export type RoutingOutcome =
       check: CheckRecord;
       /** Which step the request was given, if any. */
       opened: 'FINANCE_REVIEW' | 'SPEND_APPROVAL' | null;
-      /** The spend step is held by the substitute because the approver is in conflict (`US-06-14` AC-7). */
-      substituted: boolean;
     }
   | { status: 'NOT_CHECKABLE'; reason: NotCheckable };
 
-type Opened = { state: AccessRequestState; opened: 'FINANCE_REVIEW' | 'SPEND_APPROVAL'; substituted: boolean };
+type Opened = { state: AccessRequestState; opened: 'FINANCE_REVIEW' | 'SPEND_APPROVAL' };
 
 /**
  * Checks a request against the budget and puts it where the check says (`US-06-12`, `US-06-13`): nowhere when the data is at
@@ -69,7 +67,6 @@ export class SpendRoutingService {
       route: check.route,
       check,
       opened: moved?.opened ?? null,
-      substituted: moved?.substituted ?? false,
     };
   }
 
@@ -100,8 +97,6 @@ export class SpendRoutingService {
           codes: codesOf(check).join(','),
           state,
           opened: moved?.opened ?? null,
-          // The approver is a party, so the substitute holds the spend step (`US-06-08` AC-1).
-          conflictOfInterest: moved?.substituted ?? false,
           offPlan: check.offPlan,
         },
       ),
@@ -109,15 +104,14 @@ export class SpendRoutingService {
   }
 
   /**
-   * Who holds, or would hold, the spend step of the request: the spending approver, or the substitute when the approver is a party to it,
-   * and nobody when nobody who still works can (the step then waits). Finance does not complete the review of a request they will decide
+   * Who holds, or would hold, the spend step of the request: the spending approver, and nobody when nobody who still works can (the
+   * step then waits). Finance does not complete the review of a request they will decide
    * (`SoD-8`); the same table gave the spend step in the first place.
    */
   async spendDeciderOf(tx: DbTx, request: AccessRequestRecord): Promise<string | null> {
-    const holders = await this.targets.usableApprovalRoleHolders(tx);
     const assignment = routeSpendStep(
       { requesterEmployeeId: request.requesterEmployeeId, beneficiaryEmployeeIds: request.beneficiaryEmployeeIds },
-      holders,
+      await this.targets.usableSpendingApproverEmployeeId(tx),
     );
 
     return assignment.outcome === 'ASSIGNED' ? assignment.assigneeEmployeeId : null;
@@ -161,7 +155,6 @@ export class SpendRoutingService {
     await this.recordChecked(tx, actor, request, check, 'FINANCE_OUTCOME_WHILE_WAITING', state, {
       state,
       opened: 'SPEND_APPROVAL',
-      substituted: false,
     });
   }
 
@@ -243,22 +236,21 @@ export class SpendRoutingService {
     return {
       state: review.outcome === 'ASSIGNED' ? 'AWAITING_FINANCE_REVIEW' : 'WAITING_CONTROLLED',
       opened: 'FINANCE_REVIEW',
-      substituted: false,
     };
   }
 
-  /** Opens the spend step for the spending approver, or for the substitute in a conflict, or leaves it waiting. */
+  /** Opens the spend step for the spending approver, or leaves it waiting: nobody takes it in their place. */
   private async openSpend(
     tx: DbTx,
     request: AccessRequestRecord,
     noIndependentReview: boolean,
     now: Date,
   ): Promise<Opened> {
-    // Whoever holds a role and has left the company holds nothing, though the role still names them (`FR-3.16`).
-    const holders = await this.targets.usableApprovalRoleHolders(tx);
+    // Whoever holds the role and has left the company holds nothing, though the grant still names them (`FR-3.16`). The row of the
+    // grant is locked `FOR SHARE`, so a revocation that is being made and this step take turns (`M6`).
     const assignment = routeSpendStep(
       { requesterEmployeeId: request.requesterEmployeeId, beneficiaryEmployeeIds: request.beneficiaryEmployeeIds },
-      holders,
+      await this.targets.usableSpendingApproverEmployeeId(tx, { forShare: true }),
     );
     const assignee = assignment.outcome === 'ASSIGNED' ? assignment.assigneeEmployeeId : null;
     const samePerson = assignee !== null && request.needSteps.some((step) => step.assigneeEmployeeId === assignee);
@@ -278,7 +270,6 @@ export class SpendRoutingService {
     return {
       state: assignment.outcome === 'ASSIGNED' ? 'AWAITING_SPEND_DECISION' : 'WAITING_CONTROLLED',
       opened: 'SPEND_APPROVAL',
-      substituted: assignment.outcome === 'ASSIGNED' && assignment.substituted,
     };
   }
 }

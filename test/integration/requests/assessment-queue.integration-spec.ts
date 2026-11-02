@@ -22,17 +22,17 @@ describe('the proposals waiting for IT assessment (integration, real PostgreSQL)
   let counter: QueryCounter;
   let design: Department;
   let ops: Department;
-  let headless: Department;
+  let noItInCharge: Department; // has a head, and nobody who works is in charge of it for IT
   let head: Person; // head of design
   let designer: Person;
   let opsHead: Person;
   let opsStaff: Person;
   let boss: Person; // the spending approver
-  let fallback: Person; // decides the need of the headless department
+  let noItHead: Person; // decides the need of the department nobody is in charge of for IT
   let itDesign: Person; // the IT Admin in charge of design
   let itOps: Person; // the IT Admin in charge of ops, who is also placed there
   let itOps2: Person; // another IT Admin of ops, in charge later
-  let headlessStaff: Person;
+  let noItStaff: Person;
   let counted = 0;
 
   const read = (account: ApiAccount | null, query: Record<string, string | number> = {}) => {
@@ -72,15 +72,15 @@ describe('the proposals waiting for IT assessment (integration, real PostgreSQL)
     counter = QueryCounter.on(relay);
     design = await h.departmentWithUnit('Q-DES');
     ops = await h.departmentWithUnit('Q-OPS');
-    headless = await h.departmentWithUnit('Q-HR');
+    noItInCharge = await h.departmentWithUnit('Q-HR');
     const executive = await h.departmentWithUnit('Q-EXE');
     head = await h.staff(design, 'QD-H1');
     designer = await h.staff(design, 'QD-E1');
     opsHead = await h.staff(ops, 'QO-H1');
     opsStaff = await h.staff(ops, 'QO-E1');
     boss = await h.staff(executive, 'QE-C1');
-    fallback = await h.staff(headless, 'QH-R0');
-    headlessStaff = await h.staff(headless, 'QH-E1');
+    noItHead = await h.staff(noItInCharge, 'QH-H1');
+    noItStaff = await h.staff(noItInCharge, 'QH-E1');
     itDesign = { employeeId: h.it1.employeeId, account: h.it1 };
     itOps = await h.staff(ops, 'QO-IT1', ['IT_ADMIN']);
     itOps2 = await h.staff(ops, 'QO-IT2', ['IT_ADMIN']);
@@ -88,10 +88,10 @@ describe('the proposals waiting for IT assessment (integration, real PostgreSQL)
     await h.makeHead(ops, opsHead);
     await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
-    await h.setRole('FALLBACK_APPROVER', fallback);
+    await h.makeHead(noItInCharge, noItHead);
     await h.setItAdminInCharge(design, itDesign);
     await h.setItAdminInCharge(ops, itOps);
-    // Every other department that exists has somebody usable in charge, so that only `headless` is open to every IT Admin.
+    // Every other department that exists has somebody usable in charge, so that only `noItInCharge` is open to every IT Admin.
     await h.setItAdminInCharge(executive, itDesign);
     await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
       h.seed.departmentId,
@@ -162,7 +162,7 @@ describe('the proposals waiting for IT assessment (integration, real PostgreSQL)
     });
 
     it('opens a department nobody who works is in charge of to every IT Admin, as held by nobody', async () => {
-      const proposed = await awaiting(headlessStaff, fallback);
+      const proposed = await awaiting(noItStaff, noItHead);
 
       for (const account of [itDesign.account, itOps.account]) {
         expect(await itemOf(account, proposed.id)).toMatchObject({

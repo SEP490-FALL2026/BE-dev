@@ -61,25 +61,16 @@ describe('sending a request on (US-06-14 AC-5)', () => {
 });
 
 describe('where an approved request goes (US-06-14 AC-8)', () => {
-  const base = { deciderEmployeeId: 'h1', spendingApproverEmployeeId: 'c1' };
-
-  it('is the queue of the head when the head decided the need and is not the approver', () => {
-    expect(entryFor({ ...base, deciderRole: 'MANAGER' })).toBe('HEAD_QUEUE');
+  it('is the queue of the head when the head decided the need', () => {
+    expect(entryFor({ deciderRole: 'MANAGER' })).toBe('HEAD_QUEUE');
   });
 
-  it('is straight to the check when the fallback approver decided it, who has no queue', () => {
-    expect(entryFor({ ...base, deciderRole: 'FALLBACK_APPROVER', deciderEmployeeId: 'r0' })).toBe('DIRECT');
+  it('is straight to the check when the spending approver decided it in the place of the head who sent it', () => {
+    expect(entryFor({ deciderRole: 'SPENDING_APPROVER' })).toBe('DIRECT');
   });
 
-  it('is straight to the check when the spending approver decided it, as the head or in the place of one', () => {
-    expect(entryFor({ ...base, deciderRole: 'MANAGER', deciderEmployeeId: 'c1' })).toBe('DIRECT');
-    expect(entryFor({ ...base, deciderRole: 'SPENDING_APPROVER', deciderEmployeeId: 'c1' })).toBe('DIRECT');
-  });
-
-  it('is the queue of the head when nobody holds the role of the approver', () => {
-    expect(entryFor({ deciderRole: 'MANAGER', deciderEmployeeId: 'h1', spendingApproverEmployeeId: null })).toBe(
-      'HEAD_QUEUE',
-    );
+  it('is straight to the check for a need decided before QĐ-93 by the fallback approver, who had no queue', () => {
+    expect(entryFor({ deciderRole: 'FALLBACK_APPROVER' })).toBe('DIRECT');
   });
 });
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { AccessRequestState, DeciderRole } from '../access-request/access-request.types';
+import type { AccessRequestState } from '../access-request/access-request.types';
 
 export interface SpendDecisionRecord {
   stepId: string;
@@ -20,7 +20,8 @@ export interface NewSpendDecision {
   stepId: string;
   departmentId: string;
   decision: 'APPROVED' | 'REJECTED';
-  deciderRole: DeciderRole;
+  /** The spending approver: nobody decides in their place any more (`QĐ-93c`). */
+  deciderRole: 'SPENDING_APPROVER';
   reason: string | null;
   checkId: string | null;
   overrideReason: string | null;

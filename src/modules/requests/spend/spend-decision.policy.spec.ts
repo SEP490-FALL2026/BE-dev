@@ -1,5 +1,5 @@
 import type { YearResult } from './budget-check.policy';
-import { checkSpendDecider, judgeApproval, spendDeciderRoleOf, spendDecisionRecordOf } from './spend-decision.policy';
+import { checkSpendDecider, judgeApproval, spendDecisionRecordOf } from './spend-decision.policy';
 
 const year = (value: number, code: YearResult['code']): YearResult => ({
   year: value,
@@ -146,8 +146,6 @@ describe('what the decision of the spend step is recorded as (US-06-01 AC-2, AC-
   it('records an approval in the role the person decided in, sends the request to be carried out, and says what was overridden', () => {
     expect(
       spendDecisionRecordOf(
-        { conflictSubstituteEmployeeId: null },
-        'approver',
         { request, step },
         {
           decision: 'APPROVED',
@@ -174,38 +172,35 @@ describe('what the decision of the spend step is recorded as (US-06-01 AC-2, AC-
     });
   });
 
-  it('records a refusal as REJECTED, with no override, and the substitute in the role of the substitute for the conflict', () => {
+  it('records a refusal as REJECTED, with no override, in the role of the spending approver and no other', () => {
     const recorded = spendDecisionRecordOf(
-      { conflictSubstituteEmployeeId: 'substitute' },
-      'substitute',
       { request, step },
       { decision: 'REJECTED', checkId: null, reason: 'Không đủ ngân sách', override: null },
     );
 
     expect(recorded).toMatchObject({
-      deciderRole: 'CONFLICT_SUBSTITUTE',
+      deciderRole: 'SPENDING_APPROVER',
       requestState: 'REJECTED',
       action: 'ACCESS_REQUEST.SPEND_REJECTED',
-      detail: { checkId: null, decision: 'REJECTED', override: false, overrideYears: '' },
+      detail: {
+        checkId: null,
+        decision: 'REJECTED',
+        override: false,
+        overrideYears: '',
+        deciderRole: 'SPENDING_APPROVER',
+      },
     });
   });
 
-  it('is the approver when somebody else is the substitute', () => {
-    expect(
-      spendDecisionRecordOf(
-        { conflictSubstituteEmployeeId: 'substitute' },
-        'approver',
+  it('never writes a substitute for a conflict of interest as the role of the decision', () => {
+    for (const decision of ['APPROVED', 'REJECTED'] as const) {
+      const recorded = spendDecisionRecordOf(
         { request, step },
-        { decision: 'REJECTED', checkId: null, reason: null, override: null },
-      ).deciderRole,
-    ).toBe('SPENDING_APPROVER');
-  });
-});
+        { decision, checkId: null, reason: null, override: null },
+      );
 
-describe('the role the spending approver decides in (US-06-01)', () => {
-  it('is the substitute for the conflict when the person is the one named so, and the approver otherwise', () => {
-    expect(spendDeciderRoleOf({ conflictSubstituteEmployeeId: 'sub' }, 'sub')).toBe('CONFLICT_SUBSTITUTE');
-    expect(spendDeciderRoleOf({ conflictSubstituteEmployeeId: 'sub' }, 'approver')).toBe('SPENDING_APPROVER');
-    expect(spendDeciderRoleOf({ conflictSubstituteEmployeeId: null }, 'approver')).toBe('SPENDING_APPROVER');
+      expect(recorded.deciderRole).toBe('SPENDING_APPROVER');
+      expect(JSON.stringify(recorded)).not.toContain('CONFLICT_SUBSTITUTE');
+    }
   });
 });

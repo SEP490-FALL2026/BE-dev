@@ -129,7 +129,7 @@ describe('the question of the spending approver to Finance over PostgreSQL (US-0
       const u = await unit();
       const id = await waiting(u);
 
-      for (const account of [h.finance, u.head.account, h.it1, u.member.account, h.substitute.account]) {
+      for (const account of [h.finance, u.head.account, h.it1, u.member.account, h.bystander.account]) {
         await ask(id, undefined, account).expect(403);
       }
       expect(h.codeOf(await ask(id, undefined, h.finance))).toBe('BUDGET_INFORMATION.NOT_THE_ASSIGNEE');
@@ -250,7 +250,7 @@ describe('the question of the spending approver to Finance over PostgreSQL (US-0
         await h.approvalOf(id, h.boss.account).expect(200),
       ).spendApproval.latestBudgetInformation;
       expect(latest.id).toBe(second.id);
-      for (const account of [u.head.account, h.it1, u.member.account, h.substitute.account]) {
+      for (const account of [u.head.account, h.it1, u.member.account, h.bystander.account]) {
         await h.questionsOf(id, account).expect(404);
       }
     });

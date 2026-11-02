@@ -370,7 +370,7 @@ export class StepReassignmentService {
       ? need.assigneeEmployeeId !== null && need.assigneeEmployeeId === spend.assigneeEmployeeId
       : request.chainHasSpendStep &&
         need.assigneeEmployeeId !== null &&
-        need.assigneeEmployeeId === facts.roles.spendingApproverEmployeeId;
+        need.assigneeEmployeeId === facts.spendingApproverEmployeeId;
     const changing = [need, ...(spend ? [spend] : [])].filter((step) => step.samePersonAsSpend !== same);
     await this.repo.flagSamePerson(
       tx,

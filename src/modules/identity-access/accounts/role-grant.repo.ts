@@ -34,13 +34,30 @@ export class RoleGrantRepo {
   }
 
   /** The employee who holds the effective SPENDING_APPROVER grant, whatever the state of the account; null when nobody does. */
-  async spendingApproverEmployeeId(client?: DbTx): Promise<string | null> {
+  async spendingApproverEmployeeId(client?: DbTx, options?: { forShare?: boolean }): Promise<string | null> {
+    if (options?.forShare === true && client !== undefined) return this.spendingApproverLockedFor(client);
     const row = await (client ?? this.prisma).roleGrant.findFirst({
       where: { role: 'SPENDING_APPROVER', revokedAt: null },
       select: { appUser: { select: { employeeId: true } } },
     });
 
     return row?.appUser.employeeId ?? null;
+  }
+
+  /**
+   * The same, with the row of the grant locked `FOR SHARE` until the transaction ends: the revocation `UPDATE`s that very row, so a step
+   * that is being opened and a revocation that is being made meet on it and take turns (`M6`). A revocation that commits first is seen
+   * here — the row no longer matches once the statement is re-evaluated — and nobody holds the role.
+   */
+  private async spendingApproverLockedFor(tx: DbTx): Promise<string | null> {
+    const rows = await tx.$queryRaw<{ employee_id: string }[]>`
+      SELECT u.employee_id
+        FROM role_grants g
+        JOIN app_users u ON u.id = g.app_user_id
+       WHERE g.role = 'SPENDING_APPROVER' AND g.revoked_at IS NULL
+         FOR SHARE OF g`;
+
+    return rows[0]?.employee_id ?? null;
   }
 
   /**

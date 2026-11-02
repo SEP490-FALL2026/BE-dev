@@ -75,8 +75,8 @@ export class RoleGrantService {
   }
 
   /** The employee who is the spending approver (the effective grant, whatever the state of the account); null when nobody is. */
-  spendingApproverEmployeeId(client?: DbTx): Promise<string | null> {
-    return this.grants.spendingApproverEmployeeId(client);
+  spendingApproverEmployeeId(client?: DbTx, options?: { forShare?: boolean }): Promise<string | null> {
+    return this.grants.spendingApproverEmployeeId(client, options);
   }
 
   /** Which of these employees has ever held a SPENDING_APPROVER grant, revoked or not (an unlocked read, `QĐ-93k(2)`). */

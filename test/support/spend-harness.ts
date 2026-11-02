@@ -66,8 +66,8 @@ export class SpendHarness extends BudgetHarness {
   boss!: Person;
   /** The head of the executive department: the spending approver is a member of it, never its head (QĐ-93b). */
   executiveHead!: Person;
-  /** The substitute `withApprover` names; a test may name another. */
-  substitute!: Person;
+  /** Somebody of another department who holds no role: what a test uses for a person who must be refused (nobody decides in the place of the approver, `QĐ-93c`). */
+  bystander!: Person;
 
   /** The principal a call of the service is made as: what the access token would carry. */
   principal(account: ApiAccount, roles: string[] = []): AuthenticatedPrincipal {
@@ -88,9 +88,7 @@ export class SpendHarness extends BudgetHarness {
     this.executiveHead = await this.staff(executive, 'EXE-H1');
     await this.makeHead(executive, this.executiveHead);
     await this.setRole('SPENDING_APPROVER', this.boss);
-    // Somebody decides in the place of the approver when they are a party; a test that is about it names its own.
-    this.substitute = await this.staff(await this.departmentWithUnit('P-SBS'), 'SBS-S1');
-    await this.setRole('CONFLICT_SUBSTITUTE', this.substitute);
+    this.bystander = await this.staff(await this.departmentWithUnit('P-SBS'), 'SBS-S1');
   }
 
   /** The person who decides the budget of any unit: the spending approver, who heads no unit (QĐ-93b; US-06-08 is retired, QĐ-93d). */
