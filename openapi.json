@@ -68770,6 +68770,7 @@
         "tags": ["app-users"]
       },
       "get": {
+        "description": "Filter by department membership on a date; memberOn requires departmentId.",
         "operationId": "appUserList",
         "parameters": [
           {
@@ -68810,6 +68811,19 @@
               "type": "string",
               "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
             }
+          },
+          {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "memberOn",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
           },
           {
             "name": "employeeLeft",

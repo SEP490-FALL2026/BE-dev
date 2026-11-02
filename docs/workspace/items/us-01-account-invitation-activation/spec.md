@@ -1,5 +1,7 @@
 # Spec: Tài khoản từ Employee, lời mời, kích hoạt, khóa và vai gán (lát 1b)
 
+> Parts concerning direct roles and `/me` are superseded by [QĐ-93 direct roles](../qd93-direct-manager-spending-approver-roles/spec.md).
+
 - Phụ trách: BE Dev A (theo roadmap). Thiết kế ban đầu bởi: Owner. Peer review: review toàn bộ spec/code là tùy chọn theo [quy trình](../../README.md); review **giá trị kỹ thuật `US-01-10`** (thời hạn lời mời/phiên, chính sách mật khẩu, giới hạn tần suất) **bắt buộc theo nguồn — `pending`**, xem _Sẵn sàng bàn giao_.
 - Thiết kế: ready (đã implement). Triển khai: `verified` local tại `d60d306`; refactor module sau đó ở `ab0c43a`. Owner review cuối: chưa có; chưa `accepted`/`released`.
 - Nguồn: [snapshot `S-2026-10-12b`](../../sources.md) — US v0.15 (bổ sung `QĐ-67`) `US-01-01`, `US-01-10` (`EP-01`); BRD v3.36 `FR-8.1`, `FR-8.3`, `FR-8.6`→`FR-8.11`, `FR-3.11` (ngoại lệ thư vòng đời tài khoản), bảng vai trò 4.1 (Finance); quyết định `QĐ-39b`, `QĐ-39c`, `QĐ-41a`, `QĐ-44`, `QĐ-46a`, `QĐ-47c`, `QĐ-52d`, `QĐ-67e`.

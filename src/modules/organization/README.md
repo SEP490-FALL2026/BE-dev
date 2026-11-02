@@ -121,3 +121,5 @@ Từ vựng trạng thái nhân viên (`EmployeeStatus`, `EmployeeWorkState`, `E
 
 - Unit: `src/modules/organization/**/*.spec.ts`; HTTP: `test/http/organization/`; integration:
   `test/integration/organization/`.
+
+Head and successor assignments require a direct `MANAGER` grant and reject `SPENDING_APPROVER`; the account check is made through the identity extension point.

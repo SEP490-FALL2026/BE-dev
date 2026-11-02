@@ -57,8 +57,7 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
   `invitations/redeem`; đều `@Public`) → `login.service.ts`, `session.service.ts`, `password-reset*.service.ts`,
   `invitation-redemption.service.ts` (ở `accounts/`); `login-throttle.service.ts`, `token.service.ts`.
 - `access/` — `me.controller.ts` (`GET /me`, `POST /me/password`) → `me.service.ts`;
-  `jwt-access-token-verifier.service.ts`; `effective-roles.policy.ts` (vai trò suy ra, ví dụ MANAGER khi đang làm trưởng
-  phòng).
+  `jwt-access-token-verifier.service.ts`; `effective-roles.policy.ts` authorizes direct grants with manager scope limited to the departments currently headed. `/me` returns the direct `roles` array and nullable `managerScope`.
 - `accounts/` — `app-users/app-users.controller.ts` (`/app-users*`, `/account-candidates`) →
   `account-invitation.service.ts`, `account-status.service.ts`, `account-query.service.ts`,
   `account-administration.policy.ts`; `role-grant.service.ts`, `action-link.service.ts`. Không còn route đổi người giữ vai
@@ -85,3 +84,5 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
 
 - Unit: `src/modules/identity-access/**/*.spec.ts`; HTTP: `test/http/identity-access/`; integration:
   `test/integration/identity-access/`.
+
+`MANAGER` and `SPENDING_APPROVER` are direct grants; the latter is unique and cannot be a department head. Account listing can filter department membership on a date.
