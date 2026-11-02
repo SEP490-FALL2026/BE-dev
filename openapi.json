@@ -68750,7 +68750,10 @@
             "name": "role",
             "required": false,
             "in": "query",
-            "schema": { "type": "string", "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE"] }
+            "schema": {
+              "type": "string",
+              "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
+            }
           },
           {
             "name": "employeeLeft",
@@ -92995,14 +92998,20 @@
               },
               "roles": {
                 "type": "array",
-                "items": { "type": "string", "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE"] }
+                "items": {
+                  "type": "string",
+                  "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
+                }
               },
               "roleHistory": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "properties": {
-                    "role": { "type": "string", "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE"] },
+                    "role": {
+                      "type": "string",
+                      "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
+                    },
                     "grantedAt": { "type": "string", "format": "date-time" },
                     "revokedAt": { "type": "string", "format": "date-time", "nullable": true }
                   },
@@ -93084,7 +93093,10 @@
                     },
                     "roles": {
                       "type": "array",
-                      "items": { "type": "string", "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE"] }
+                      "items": {
+                        "type": "string",
+                        "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
+                      }
                     }
                   },
                   "required": ["id", "loginEmail", "status", "activationState", "createdAt", "employee", "roles"],

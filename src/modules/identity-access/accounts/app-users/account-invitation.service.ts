@@ -19,6 +19,7 @@ import {
   FinanceAlreadyAssignedError,
   LoginEmailInvalidError,
   LoginEmailRequiredError,
+  RoleCombinationForbiddenError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
 } from '../account.errors';
@@ -50,6 +51,7 @@ export class AccountInvitationService {
   /** Creates the account, grants its roles and queues the invitation. Returns the new account's id. */
   async createAccount(actor: AuthenticatedPrincipal, input: CreateAccountInput): Promise<string> {
     const violation = validateRoleSet(input.roles);
+    if (violation === 'ROLE_COMBINATION_FORBIDDEN') throw new RoleCombinationForbiddenError();
     if (violation) throw new RoleRequestRefusedError(violation);
 
     const organization = await this.organizationReads.getOrganization();

@@ -6,6 +6,7 @@ import { AppRole } from '../../public/identity-access.types';
 export type RequestedRole = AppRole | 'MANAGER' | 'SPENDING_APPROVER';
 
 export type RoleRequestViolation = 'ROLE_DERIVED' | 'SUPER_ADMIN_TRANSFER_ONLY';
+export type RoleSetViolation = RoleRequestViolation | 'ROLE_COMBINATION_FORBIDDEN';
 
 /**
  * A role cannot be granted by hand when it is derived from data (MANAGER from heading a
@@ -19,23 +20,48 @@ export function checkRoleRequest(role: RequestedRole): RoleRequestViolation | nu
   return null;
 }
 
-/** FR-8.7: SUPER_ADMIN is never held together with IT_ADMIN or FINANCE. */
-export function forbidsCombination(held: readonly AppRole[], adding: AppRole): boolean {
-  const workRoles: AppRole[] = ['IT_ADMIN', 'FINANCE'];
-  if (adding === 'SUPER_ADMIN') return held.some((role) => workRoles.includes(role));
-  if (workRoles.includes(adding)) return held.includes('SUPER_ADMIN');
+/**
+ * The pairs of roles that are never held together (FR-8.7, QĐ-93b, US-01-01 AC-12, US-01-03 AC-11): SUPER_ADMIN with IT_ADMIN,
+ * FINANCE or MANAGER, and SPENDING_APPROVER with SUPER_ADMIN, IT_ADMIN, FINANCE or MANAGER. EMPLOYEE goes with every role. The
+ * database says the same in `role_grants_forbid_combination`.
+ */
+const FORBIDDEN_WITH: Readonly<Record<AppRole, readonly AppRole[]>> = {
+  SUPER_ADMIN: ['IT_ADMIN', 'FINANCE', 'MANAGER', 'SPENDING_APPROVER'],
+  SPENDING_APPROVER: ['SUPER_ADMIN', 'IT_ADMIN', 'FINANCE', 'MANAGER'],
+  IT_ADMIN: ['SUPER_ADMIN', 'SPENDING_APPROVER'],
+  FINANCE: ['SUPER_ADMIN', 'SPENDING_APPROVER'],
+  MANAGER: ['SUPER_ADMIN', 'SPENDING_APPROVER'],
+  EMPLOYEE: [],
+};
 
-  return false;
+/** The roles already held that cannot go with `adding`, in the order they are held (empty: it can be granted). */
+export function conflictingRoles(held: readonly AppRole[], adding: AppRole): AppRole[] {
+  return held.filter((role) => FORBIDDEN_WITH[adding].includes(role));
 }
 
-/** The first violation in a set of roles requested at account creation, or null. */
-export function validateRoleSet(roles: readonly RequestedRole[]): RoleRequestViolation | null {
+export function forbidsCombination(held: readonly AppRole[], adding: AppRole): boolean {
+  return conflictingRoles(held, adding).length > 0;
+}
+
+/** The first pair in a set of roles asked for at creation that cannot be held together (the later role of the pair is the one added). */
+export function forbiddenPairInSet(roles: readonly AppRole[]): [AppRole, AppRole] | null {
+  const distinct = [...new Set(roles)];
+  for (let index = 1; index < distinct.length; index += 1) {
+    const [conflict] = conflictingRoles(distinct.slice(0, index), distinct[index]);
+    if (conflict) return [conflict, distinct[index]];
+  }
+
+  return null;
+}
+
+/** The first violation in a set of roles requested at account creation, or null: one role at a time, then the combination. */
+export function validateRoleSet(roles: readonly RequestedRole[]): RoleSetViolation | null {
   for (const role of new Set(roles)) {
     const violation = checkRoleRequest(role);
     if (violation) return violation;
   }
 
-  return null;
+  return forbiddenPairInSet(roles) ? 'ROLE_COMBINATION_FORBIDDEN' : null;
 }
 
 /** US-01-01 AC-13: nobody changes their own account's lock state, roles or invitation. */
