@@ -198,9 +198,11 @@ Chạy từ gốc BE, mỗi phase: `pnpm check`, `pnpm test:http -- <file đã s
 (danh sách ở checkpoint, database riêng), drift `DB-16`. Hỏi Owner trước toàn bộ `pnpm test:integration` và
 `pnpm test:e2e -- test/e2e/paid-request-to-seat.e2e-spec.ts` (một hành trình Request qua HTTP) — `D-S26`.
 
-| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại |
-| ------------------ | --------------------- | ----------------- | ----------------------- |
-| chưa chạy          | —                     | —                 | thiết kế `draft`        |
+| Lệnh / kiểm tra AC              | Revision / môi trường       | Kết quả thực chạy                                                                                                                                            | Giới hạn / việc còn lại                                                                                                       |
+| ------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Phase 1A.1 HTTP and integration | `e18d4c0`, local            | HTTP 9/9 red on old contract; old draft integration red because response retains label                                                                       | Test-first evidence                                                                                                           |
+| Phase 1A.2                      | `7799987`, local PostgreSQL | HTTP 9/9; retired-draft integration 1/1; preview 23/23; audit 29/29; leaver closure 11/11; 4 unit files 25/25; prisma validate/generate and typecheck passed | OpenAPI diff removes label; local migrate diff `No difference detected`                                                       |
+| Phase 1B.1 new retirement tests | `c73bfda`, local            | 4 HTTP cases red; department profile integration red on existing `projects`                                                                                  | Existing legacy project assertions retained; conflict between plan deletion and no deletion/skip/weakening constraint remains |
 
 - [ ] Ca n/a `QĐ-93h` có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
 - [ ] Spec/plan phản ánh implementation cuối; tên hai migration (timestamp cuối) ghi lại ở spec; release N và N+1 ghi SHA.
