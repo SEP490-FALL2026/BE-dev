@@ -2,19 +2,19 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import type { AuditEventInput, AuditValue } from '../../../audit/public/audit.types';
 import { AppRole } from '../../public/identity-access.types';
 
-/** Role names a client may send. MANAGER and SPENDING_APPROVER exist only to be refused with a clear reason. */
-export type RequestedRole = AppRole | 'MANAGER' | 'SPENDING_APPROVER';
+/** Role names a client may send: the six roles (QĐ-93a). */
+export type RequestedRole = AppRole;
 
 export type RoleRequestViolation = 'ROLE_DERIVED' | 'SUPER_ADMIN_TRANSFER_ONLY';
 export type RoleSetViolation = RoleRequestViolation | 'ROLE_COMBINATION_FORBIDDEN';
 
 /**
- * A role cannot be granted by hand when it is derived from data (MANAGER from heading a
- * department, the spending approver from configuration — US-01-01 AC-4) or when it only moves
- * by the operations command outside the application (SUPER_ADMIN — US-01-09 AC-7).
+ * A role cannot be granted or revoked by hand when it only moves by the operations command outside the application (SUPER_ADMIN —
+ * US-01-09 AC-7), or while it is still derived from data (SPENDING_APPROVER: until its rules are in, QĐ-93a). MANAGER is granted like
+ * IT_ADMIN (US-01-01 AC-4); it only counts while its holder heads a department.
  */
 export function checkRoleRequest(role: RequestedRole): RoleRequestViolation | null {
-  if (role === 'MANAGER' || role === 'SPENDING_APPROVER') return 'ROLE_DERIVED';
+  if (role === 'SPENDING_APPROVER') return 'ROLE_DERIVED';
   if (role === 'SUPER_ADMIN') return 'SUPER_ADMIN_TRANSFER_ONLY';
 
   return null;

@@ -242,6 +242,18 @@ export interface LocalSeedFixtureFacts {
   } | null;
 }
 
+/**
+ * A period in which an employee heads a department that has not ended on the day asked about (`headPeriodsFrom`): `CURRENT` when it
+ * has begun by then, `UPCOMING` when it begins later (a head from a later day, or a successor named for it).
+ */
+export interface EmployeeHeadPeriod {
+  departmentId: string;
+  departmentCode: string;
+  validFrom: BusinessDate;
+  validTo: BusinessDate | null;
+  timing: 'CURRENT' | 'UPCOMING';
+}
+
 /** What another module needs to know of a department to point at it: its code, name and whether it and its Cost Center are active. */
 export interface DepartmentBrief {
   id: string;

@@ -2,13 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { AppRole } from '../../public/identity-access.types';
 import { translateAccountWriteError } from './account-constraints.errors';
 import { AccountRecordService } from '../account-record.service';
 import {
   accountAuditEvent,
   checkRoleRequest,
-  forbidsCombination,
+  conflictingRoles,
   isSelfChange,
   RequestedRole,
   stopsLocking,
@@ -16,6 +17,7 @@ import {
 import {
   AccountNotFoundError,
   FinanceAlreadyAssignedError,
+  ManagerStillHeadingError,
   RoleAlreadyGrantedError,
   RoleCombinationForbiddenError,
   RoleNotGrantedError,
@@ -39,6 +41,7 @@ export class AccountStatusService {
     private readonly revocation: ActionLinkRevocation,
     @Inject(ACCOUNT_SESSIONS) private readonly sessions: AccountSessions,
     private readonly audit: AuditApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -109,7 +112,8 @@ export class AccountStatusService {
         if (!account) throw new AccountNotFoundError();
         const held = await this.grants.effectiveRoles(appUserId, tx);
         if (held.includes(granted)) throw new RoleAlreadyGrantedError();
-        if (forbidsCombination(held, granted)) throw new RoleCombinationForbiddenError();
+        const conflicts = conflictingRoles(held, granted);
+        if (conflicts.length > 0) throw new RoleCombinationForbiddenError(conflicts);
         if (granted === 'FINANCE' && (await this.grants.financeIsHeld(tx, account.organizationId))) {
           throw new FinanceAlreadyAssignedError();
         }
@@ -145,28 +149,45 @@ export class AccountStatusService {
     const violation = checkRoleRequest(role);
     if (violation) throw new RoleRequestRefusedError(violation);
     const revoked: AppRole = role;
+    let employeeId: string | null = null;
 
-    await this.runner.run(async (tx) => {
-      const account = await this.accounts.lockAndReadAccount(tx, appUserId);
-      if (!account) throw new AccountNotFoundError();
-      const held = await this.grants.effectiveRoles(appUserId, tx);
-      if (!held.includes(revoked)) throw new RoleNotGrantedError();
+    await this.runner
+      .run(async (tx) => {
+        const account = await this.accounts.lockAndReadAccount(tx, appUserId);
+        if (!account) throw new AccountNotFoundError();
+        employeeId = account.employeeId;
+        const held = await this.grants.effectiveRoles(appUserId, tx);
+        if (!held.includes(revoked)) throw new RoleNotGrantedError();
+        if (revoked === 'MANAGER') {
+          // The role stays while the person heads a department, will head one, or is named as a successor (US-01-01 AC-21).
+          const periods = await this.organizationReads.headPeriodsFrom(account.employeeId, undefined, tx);
+          if (periods.length > 0) throw new ManagerStillHeadingError(periods);
+        }
 
-      await this.grants.revokeRole(tx, { appUserId, role: revoked, revokedBy: actor.appUserId, now: new Date() });
-      await this.audit.record(
-        tx,
-        accountAuditEvent(
-          actor,
-          account.organizationId,
-          'ROLE.REVOKED',
-          appUserId,
-          { roles: held },
-          {
-            roles: held.filter((entry) => entry !== revoked),
-            role: revoked,
-          },
-        ),
-      );
-    });
+        await this.grants.revokeRole(tx, { appUserId, role: revoked, revokedBy: actor.appUserId, now: new Date() });
+        await this.audit.record(
+          tx,
+          accountAuditEvent(
+            actor,
+            account.organizationId,
+            'ROLE.REVOKED',
+            appUserId,
+            { roles: held },
+            {
+              roles: held.filter((entry) => entry !== revoked),
+              role: revoked,
+            },
+          ),
+        );
+      })
+      .catch(async (error: unknown) => {
+        const translated = translateAccountWriteError(error);
+        // The database refused after the check passed (a head assignment committed in between): the refusal shows the periods as they are now.
+        if (translated instanceof ManagerStillHeadingError && employeeId !== null) {
+          throw new ManagerStillHeadingError(await this.organizationReads.headPeriodsFrom(employeeId));
+        }
+
+        throw translated;
+      });
   }
 }

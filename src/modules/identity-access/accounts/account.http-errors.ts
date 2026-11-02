@@ -14,6 +14,7 @@ import {
   LoginEmailInvalidError,
   LoginEmailRequiredError,
   LoginEmailTakenError,
+  ManagerStillHeadingError,
   RoleAlreadyGrantedError,
   RoleCombinationForbiddenError,
   RoleNotGrantedError,
@@ -73,7 +74,14 @@ export function toAccountApiException(error: unknown): unknown {
     return refuse(HttpStatus.NOT_FOUND, 'APP_USER.ROLE_NOT_GRANTED', error.message);
   }
   if (error instanceof RoleCombinationForbiddenError) {
-    return refuse(HttpStatus.CONFLICT, 'APP_USER.ROLE_COMBINATION_FORBIDDEN', error.message);
+    return refuse(HttpStatus.CONFLICT, 'APP_USER.ROLE_COMBINATION_FORBIDDEN', error.message, {
+      conflictingRoles: [...error.conflictingRoles],
+    });
+  }
+  if (error instanceof ManagerStillHeadingError) {
+    return refuse(HttpStatus.CONFLICT, 'APP_USER.MANAGER_STILL_HEADING', error.message, {
+      headPeriods: error.headPeriods.map((period) => ({ ...period })),
+    });
   }
   if (error instanceof FinanceAlreadyAssignedError) {
     return refuse(HttpStatus.CONFLICT, 'APP_USER.FINANCE_ALREADY_ASSIGNED', error.message);
@@ -102,7 +110,18 @@ export const ACCOUNT_ERROR_EXAMPLES = {
   SUPER_ADMIN_HOLDER_NOT_LOCKABLE: example(new SuperAdminHolderNotLockableError()),
   ROLE_ALREADY_GRANTED: example(new RoleAlreadyGrantedError()),
   ROLE_NOT_GRANTED: example(new RoleNotGrantedError()),
-  ROLE_COMBINATION_FORBIDDEN: example(new RoleCombinationForbiddenError()),
+  ROLE_COMBINATION_FORBIDDEN: example(new RoleCombinationForbiddenError(['IT_ADMIN'])),
+  MANAGER_STILL_HEADING: example(
+    new ManagerStillHeadingError([
+      {
+        departmentId: '<department-id>',
+        departmentCode: '<department-code>',
+        validFrom: '2026-01-01',
+        validTo: null,
+        timing: 'CURRENT',
+      },
+    ]),
+  ),
   FINANCE_ALREADY_ASSIGNED: example(new FinanceAlreadyAssignedError()),
   INVITATION_INVALID: example(new InvitationInvalidError()),
 } as const;

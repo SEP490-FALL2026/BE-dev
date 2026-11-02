@@ -70005,6 +70005,7 @@
                       "error": {
                         "code": "APP_USER.ROLE_COMBINATION_FORBIDDEN",
                         "message": "This role cannot be combined with the roles the account holds.",
+                        "details": { "conflictingRoles": ["IT_ADMIN"] },
                         "requestId": "req_example"
                       }
                     }
@@ -70284,7 +70285,7 @@
             }
           },
           "409": {
-            "description": "The caller cannot change their own account.",
+            "description": "The caller cannot change their own account, or the account still heads a department, will head one, or is named as a successor (MANAGER).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -70296,6 +70297,28 @@
                       "error": {
                         "code": "APP_USER.SELF_CHANGE_FORBIDDEN",
                         "message": "You cannot change your own account.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APP_USER.MANAGER_STILL_HEADING": {
+                    "summary": "The account heads a department, will head one from a later day, or is named as a successor: end or take back that period before revoking MANAGER.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APP_USER.MANAGER_STILL_HEADING",
+                        "message": "The account heads a department, will head one from a later day, or is named as a successor: end or take back that period before revoking MANAGER.",
+                        "details": {
+                          "headPeriods": [
+                            {
+                              "departmentId": "<department-id>",
+                              "departmentCode": "<department-code>",
+                              "validFrom": "2026-01-01",
+                              "validTo": null,
+                              "timing": "CURRENT"
+                            }
+                          ]
+                        },
                         "requestId": "req_example"
                       }
                     }

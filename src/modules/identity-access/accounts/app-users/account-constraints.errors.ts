@@ -3,6 +3,7 @@ import {
   AccountAlreadyExistsError,
   FinanceAlreadyAssignedError,
   LoginEmailTakenError,
+  ManagerStillHeadingError,
   RoleAlreadyGrantedError,
   RoleCombinationForbiddenError,
 } from '../account.errors';
@@ -15,6 +16,8 @@ export function translateAccountWriteError(error: unknown): unknown {
   if (isUniqueViolation(error, 'app_users_organization_id_normalized_login_email_key', 'normalized_login_email')) {
     return new LoginEmailTakenError();
   }
+  // The two triggers of the new roles name themselves; any other refusal of the table is the combination.
+  if (isCheckViolation(error, 'role_grants_manager_revoke_guard')) return new ManagerStillHeadingError();
   if (isCheckViolation(error)) return new RoleCombinationForbiddenError();
 
   return error;

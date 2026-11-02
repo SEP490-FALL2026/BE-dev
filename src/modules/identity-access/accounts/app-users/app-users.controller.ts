@@ -371,8 +371,9 @@ export class AppUsersController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description: 'The caller cannot change their own account.',
-      examples: [ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN],
+      description:
+        'The caller cannot change their own account, or the account still heads a department, will head one, or is named as a successor (MANAGER).',
+      examples: [ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN, ACCOUNT_ERROR_EXAMPLES.MANAGER_STILL_HEADING],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

@@ -11,16 +11,16 @@ import {
 
 describe('account administration policy', () => {
   describe('checkRoleRequest', () => {
-    it.each(['IT_ADMIN', 'FINANCE', 'EMPLOYEE'] as const)('accepts a hand-granted %s', (role) => {
-      expect(checkRoleRequest(role)).toBeNull();
-    });
-
-    it.each(['MANAGER', 'SPENDING_APPROVER'] as const)(
-      'refuses %s, which is derived and never granted (AC-4)',
+    it.each(['IT_ADMIN', 'FINANCE', 'EMPLOYEE', 'MANAGER'] as const)(
+      'accepts a hand-granted %s (US-01-01 AC-4)',
       (role) => {
-        expect(checkRoleRequest(role)).toBe('ROLE_DERIVED');
+        expect(checkRoleRequest(role)).toBeNull();
       },
     );
+
+    it('refuses SPENDING_APPROVER by hand until its own rules are in (it is still configured as an approval role)', () => {
+      expect(checkRoleRequest('SPENDING_APPROVER')).toBe('ROLE_DERIVED');
+    });
 
     it('refuses SUPER_ADMIN, which only moves by transfer (AC-14)', () => {
       expect(checkRoleRequest('SUPER_ADMIN')).toBe('SUPER_ADMIN_TRANSFER_ONLY');
@@ -115,7 +115,8 @@ describe('account administration policy', () => {
     it('reports the first violation for a set requested at creation', () => {
       expect(validateRoleSet([])).toBeNull();
       expect(validateRoleSet(['IT_ADMIN', 'EMPLOYEE'])).toBeNull();
-      expect(validateRoleSet(['IT_ADMIN', 'MANAGER'])).toBe('ROLE_DERIVED');
+      expect(validateRoleSet(['IT_ADMIN', 'MANAGER'])).toBeNull();
+      expect(validateRoleSet(['IT_ADMIN', 'SPENDING_APPROVER'])).toBe('ROLE_DERIVED');
       expect(validateRoleSet(['SUPER_ADMIN', 'IT_ADMIN'])).toBe('SUPER_ADMIN_TRANSFER_ONLY');
     });
 

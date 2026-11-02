@@ -14,6 +14,7 @@ import {
   LoginEmailInvalidError,
   LoginEmailRequiredError,
   LoginEmailTakenError,
+  ManagerStillHeadingError,
   RoleAlreadyGrantedError,
   RoleCombinationForbiddenError,
   RoleNotGrantedError,
@@ -72,7 +73,10 @@ async function answerOf(route: Route, error: Error) {
   return { status: exception.getStatus(), body: exception.getResponse() };
 }
 
-const refused = (status: HttpStatus, code: string, message: string) => ({ status, body: { code, message } });
+const refused = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>) => ({
+  status,
+  body: { code, message, ...(details ? { details } : {}) },
+});
 
 describe('AppUsersController — error answers (status, code, message)', () => {
   it.each<[string, () => Error, { status: HttpStatus; body: object }]>([
@@ -152,12 +156,30 @@ describe('AppUsersController — error answers (status, code, message)', () => {
       refused(404, 'APP_USER.ROLE_NOT_GRANTED', 'The account does not hold this role.'),
     ],
     [
-      'a forbidden combination',
-      () => new RoleCombinationForbiddenError(),
+      'a forbidden combination, with the roles in the way',
+      () => new RoleCombinationForbiddenError(['IT_ADMIN', 'MANAGER']),
       refused(
         409,
         'APP_USER.ROLE_COMBINATION_FORBIDDEN',
         'This role cannot be combined with the roles the account holds.',
+        { conflictingRoles: ['IT_ADMIN', 'MANAGER'] },
+      ),
+    ],
+    [
+      'a MANAGER role that still heads a department, with the periods',
+      () =>
+        new ManagerStillHeadingError([
+          { departmentId: id, departmentCode: 'P-ENG', validFrom: '2026-10-01', validTo: null, timing: 'CURRENT' },
+        ]),
+      refused(
+        409,
+        'APP_USER.MANAGER_STILL_HEADING',
+        'The account heads a department, will head one from a later day, or is named as a successor: end or take back that period before revoking MANAGER.',
+        {
+          headPeriods: [
+            { departmentId: id, departmentCode: 'P-ENG', validFrom: '2026-10-01', validTo: null, timing: 'CURRENT' },
+          ],
+        },
       ),
     ],
     [

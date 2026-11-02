@@ -1,3 +1,5 @@
+import type { AppRole } from '../public/identity-access.types';
+
 export class AccountNotFoundError extends Error {
   constructor() {
     super('Account not found.');
@@ -95,9 +97,28 @@ export class RoleNotGrantedError extends Error {
 }
 
 export class RoleCombinationForbiddenError extends Error {
-  constructor() {
+  /** The roles the account holds that stand in the way (empty when only the database could say: a write around the service). */
+  constructor(readonly conflictingRoles: readonly AppRole[] = []) {
     super('This role cannot be combined with the roles the account holds.');
     this.name = 'RoleCombinationForbiddenError';
+  }
+}
+
+/** The periods that keep MANAGER in place, as the refusal shows them (`QĐ-93a`, US-01-01 AC-21). */
+export interface HeadPeriodDetail {
+  departmentId: string;
+  departmentCode: string;
+  validFrom: string;
+  validTo: string | null;
+  timing: 'CURRENT' | 'UPCOMING';
+}
+
+export class ManagerStillHeadingError extends Error {
+  constructor(readonly headPeriods: readonly HeadPeriodDetail[] = []) {
+    super(
+      'The account heads a department, will head one from a later day, or is named as a successor: end or take back that period before revoking MANAGER.',
+    );
+    this.name = 'ManagerStillHeadingError';
   }
 }
 

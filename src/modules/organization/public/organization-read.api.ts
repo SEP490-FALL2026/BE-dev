@@ -15,6 +15,7 @@ import {
   DepartmentBrief,
   DepartmentEntryLock,
   EmployeeCandidate,
+  EmployeeHeadPeriod,
   EmployeeImportNames,
   EmployeePlacementIds,
   EmployeeImportLookupData,
@@ -59,6 +60,27 @@ export class OrganizationReadApi {
   /** The department this employee heads on `onDate` (default today), or null; unlocked, for the per-request role check. */
   async getHeadedDepartment(employeeId: string, onDate?: BusinessDate): Promise<{ departmentId: string } | null> {
     return this.departments.headedDepartment(employeeId, onDate ?? (await this.businessToday()));
+  }
+
+  /**
+   * The periods in which the employee heads a department that have not ended on `onDate` (default today in the organization's
+   * calendar), oldest first, each with the code of its department and `CURRENT` or `UPCOMING`. Empty when there is none. `tx` reads
+   * in the caller's transaction (the revoke of `MANAGER` and the grant of `SPENDING_APPROVER` give the periods in their refusal).
+   */
+  async headPeriodsFrom(employeeId: string, onDate?: BusinessDate, tx?: DbTx): Promise<EmployeeHeadPeriod[]> {
+    const day = onDate ?? (await this.businessToday(new Date(), tx));
+    const periods = await this.departments.headPeriodsOf(employeeId, day, tx);
+    if (periods.length === 0) return [];
+    const briefs = await this.getDepartmentBriefs([...new Set(periods.map((period) => period.departmentId))], tx);
+    const codes = new Map(briefs.map((brief) => [brief.id, brief.code]));
+
+    return periods.map((period) => ({
+      departmentId: period.departmentId,
+      departmentCode: codes.get(period.departmentId) ?? '',
+      validFrom: period.validFrom,
+      validTo: period.validTo,
+      timing: period.validFrom <= day ? 'CURRENT' : 'UPCOMING',
+    }));
   }
 
   /** The department with this id: its code, name and whether it is still active; null when there is none. */

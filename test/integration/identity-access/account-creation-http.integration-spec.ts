@@ -158,7 +158,7 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
       const before = await h.ctx.sql.query('SELECT count(*)::int AS n FROM app_users');
 
       const derived = await h.admin
-        .post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['MANAGER'] })
+        .post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['SPENDING_APPROVER'] })
         .expect(422);
       const transfer = await h.admin
         .post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['SUPER_ADMIN', 'IT_ADMIN'] })
