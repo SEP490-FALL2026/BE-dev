@@ -45,7 +45,7 @@ export interface CreateEmployeeWithPlacementInput {
   jobTitle: string | null;
 }
 
-/** The official fields of an employee record the Super Admin may correct on an HR basis (`US-02-02` AC-19, `QĐ-87a`). */
+/** The official fields of an employee record the Super Admin may correct (`US-02-02` AC-19, `QĐ-87a`, no HR basis since `QĐ-93f`). */
 export interface OfficialFieldsPatch {
   fullName?: string;
   workEmail?: string | null;

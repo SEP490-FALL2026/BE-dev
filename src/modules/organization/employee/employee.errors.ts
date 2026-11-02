@@ -1,5 +1,5 @@
 /**
- * The caller is not the Super Admin: employee records are entered and corrected by the Super Admin alone, on an HR basis (`QĐ-87a`),
+ * The caller is not the Super Admin: employee records are entered and corrected by the Super Admin alone (`QĐ-87a`),
  * decided in the service whatever the route let through.
  */
 export class EmployeeForbiddenError extends Error {

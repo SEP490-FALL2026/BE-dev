@@ -99,7 +99,7 @@ function toWire(view: ImportView) {
 
 /**
  * Importing people from a file in six steps (`US-02-01`): upload → read → preview → confirm → write → summary. The Super
- * Admin uploads a CSV file and confirms it with the HR basis it is entered on; nothing is written until the preview is
+ * Admin uploads a CSV file and confirms it with no HR basis to give (`QĐ-93f`); nothing is written until the preview is
  * confirmed, and then once. The IT Admin, Managers and Finance do not import people (`US-02-02` AC-12, `QĐ-82i`).
  * Upload, reading, judging again and cancelling are the preview (`preview/`); writing the people is the confirmation
  * (`confirmation/`).
@@ -228,14 +228,15 @@ export class EmployeeImportsController {
   @ApiSuccessResponse(EmployeeImportConfirmationResponseDto, {
     message: 'EMPLOYEE_IMPORT.CONFIRMED',
     description:
-      'The people the preview promised are created, once, on the HR basis given; each carries it in the Audit Trail. The same confirmation sent again (same idempotency key) returns the first answer with replayed set.',
+      'The people the preview promised are created, once; the Audit Trail keeps who, when and what was created, and no HR basis. The same confirmation sent again (same idempotency key) returns the first answer with replayed set.',
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
     NOT_FOUND,
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The request is invalid or lacks a part of the HR basis (VALIDATION_ERROR).',
+      description:
+        'The request is invalid, among them one that still carries an HR basis, which no confirmation takes (VALIDATION_ERROR).',
       examples: [VALIDATION_EXAMPLE],
     },
     {

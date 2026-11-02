@@ -16,7 +16,7 @@ import { EmployeeManualService } from './employee-manual.service';
 import { EMPLOYEE_ERROR_EXAMPLES, toEmployeeApiException } from './employee.http-errors';
 
 /**
- * Entering people by hand (`US-02-02` AC-14). Super Admin only, on an HR basis (`QĐ-82i`, `US-01-05` AC-14): the IT
+ * Entering people by hand (`US-02-02` AC-14). Super Admin only, with no HR basis to give (`QĐ-82i`, `QĐ-93f`): the IT
  * Admin, a department head and Finance do not enter new records, whatever the route lets through. It creates the person
  * and their one placement and tells the head of the department and the IT Admin in charge; it never creates a login, a
  * role or an invitation.
@@ -45,7 +45,7 @@ export class EmployeesController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        "The body is malformed or lacks a part of the HR basis (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code, among them OWN_RECORD for the Super Admin's own code or email).",
+        "The body is malformed, or still carries an HR basis, which no entry takes (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code, among them OWN_RECORD for the Super Admin's own code or email).",
       examples: [VALIDATION_EXAMPLE, EMPLOYEE_ERROR_EXAMPLES.EMPLOYEE_ROW_INVALID],
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,

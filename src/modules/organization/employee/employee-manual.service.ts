@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate, businessDateAt } from '../../../core/business-date';
 import { normalizeDisplayName } from '../../../core/display-name';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
-import type { HrBasis } from '../public/hr-basis.types';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -27,8 +26,6 @@ export interface ManualEmployeeInput {
   departmentCode?: string | null;
   /** Free text (`QĐ-87e`): its display form is stored on the person. */
   jobTitle?: string | null;
-  /** The HR document the record is entered on (`US-02-02` AC-16). */
-  hrBasis: HrBasis;
 }
 
 export interface ManualEmployeeView {
@@ -49,7 +46,7 @@ export interface ManualEmployeeView {
 
 /**
  * Entering one person by hand (`US-02-02` AC-14, `QĐ-67d`, `QĐ-82i`): the Employee and its single placement, in one
- * transaction, on the HR document the caller cites, and nothing else but the in-app notices a new record owes (AC-17): the head of
+ * transaction, with no HR document to cite (`QĐ-93f`), and nothing else but the in-app notices a new record owes (AC-17): the head of
  * the department and the IT Admin in charge are told, in the same transaction. It creates no account, role, invitation or mail; giving the
  * person a login is a separate step. Whoever enters is never the person entered (AC-18). The Super Admin alone enters people:
  * `employee.policy.ts` says so before anything is read.
@@ -128,7 +125,6 @@ export class EmployeeManualService {
             department: department.code,
             jobTitle,
             memberSince,
-            hrBasis: { ...input.hrBasis },
           }),
         );
         const notices = await this.employees.profileNotices(tx, {

@@ -1,7 +1,7 @@
 import { EmployeeColumn } from './employee-import-row.types';
 
 /**
- * The caller is not the Super Admin: people are imported by the Super Admin alone, on an HR basis (`QĐ-87a`), decided in the service
+ * The caller is not the Super Admin: people are imported by the Super Admin alone (`QĐ-87a`), decided in the service
  * whatever the route let through.
  */
 export class ImportForbiddenError extends Error {

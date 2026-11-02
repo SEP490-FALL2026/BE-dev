@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
-import { hrBasisSchema } from '../../../infrastructure/http/dto/hr-basis.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { businessDateSchema } from '../../../infrastructure/http/dto/business-date.dto';
@@ -44,13 +43,11 @@ export const createEmployeeBodySchema = z.strictObject({
   hireDate: businessDateSchema('hireDate must be a real date as YYYY-MM-DD.'),
   departmentCode: z.string().max(50).nullish(),
   jobTitle: z.string().max(1000).nullish(),
-  /** The HR document the record is entered on (`US-02-02` AC-16): required. */
-  hrBasis: hrBasisSchema,
 });
 
 /**
  * What the Super Admin may correct of a record that exists (`US-02-02` AC-19, `QĐ-87a`): the official fields, among them the free-text
- * job title (`null` clears it), always on an HR basis. Any other field, among them the department and the status, is refused as unknown.
+ * job title (`null` clears it), with no HR basis to give (`QĐ-93f`). Any other field, among them the department and the status, is refused as unknown.
  */
 export const updateEmployeeBodySchema = z.strictObject({
   fullName: z.string().trim().min(1).max(200).optional(),
@@ -66,7 +63,6 @@ export const updateEmployeeBodySchema = z.strictObject({
   employmentType: employmentType.optional(),
   hireDate: businessDateSchema('hireDate must be a real date as YYYY-MM-DD.').optional(),
   jobTitle: z.string().max(1000).nullable().optional(),
-  hrBasis: hrBasisSchema,
 });
 export const employeeIdParamSchema = z.strictObject({ id: z.uuid() });
 

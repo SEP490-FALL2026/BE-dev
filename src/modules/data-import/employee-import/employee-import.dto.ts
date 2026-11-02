@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { hrBasisSchema } from '../../../infrastructure/http/dto/hr-basis.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
@@ -15,8 +14,6 @@ export const confirmImportBodySchema = z.strictObject({
   previewVersion: z.number().int().positive(),
   idempotencyKey: z.string().min(8).max(100),
   acknowledgeDuplicateFile: z.boolean().default(false),
-  /** The HR document every person of this file is entered on (`US-02-02` AC-16): required. */
-  hrBasis: hrBasisSchema,
 });
 
 const departmentCount = z.strictObject({ departmentCode: z.string(), count: z.number().int().nonnegative() });
