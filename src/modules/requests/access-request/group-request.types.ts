@@ -26,8 +26,11 @@ export type LineStage = 'NEED' | 'SPEND';
  */
 export type LineCancelCause = 'BENEFICIARY_LEFT' | 'BENEFICIARY_TRANSFERRED';
 
-/** What a row can carry as the cause of such a closing: the same two causes, written and read. */
-export type ReadableCancelCause = LineCancelCause;
+/**
+ * What a row can carry as the cause of a closing, as it is read: the two causes of the IT Admin and the one the conversion command
+ * writes when the spending approver is a party of the request (`QĐ-93k(1)`); nobody closed that one (OD-6).
+ */
+export type ReadableCancelCause = LineCancelCause | 'SPENDING_APPROVER_PARTY';
 
 /** The states in which a line has ended: nothing happens to it again. */
 export const ENDED_LINE_STATES: readonly LineState[] = [

@@ -178,7 +178,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
           }
         : null,
     cancellation:
-      row.cancelledAt !== null && row.cancelledByEmployeeId !== null && row.cancelCause !== null
+      row.cancelledAt !== null && row.cancelCause !== null
         ? {
             cancelledAt: row.cancelledAt,
             cancelledByEmployeeId: row.cancelledByEmployeeId,

@@ -11,12 +11,23 @@ import {
   recoveryTargetJson,
 } from './recovery-target.policy';
 
-const FINAL_READS = ['access-request-null-cost-center'];
+/** The release before `QĐ-93` (it declares only the first representation) and the release of this source (declares all). */
+const BEFORE_QD93_READS = ['access-request-null-cost-center'];
+const FINAL_READS = Object.keys(DATA_REPRESENTATIONS);
 /** What `docker image inspect --format '{{json .Config.Labels}}'` prints for an image of this source. */
 const FINAL_LABELS = JSON.stringify({ [DATA_READS_LABEL]: FINAL_READS.join(' ') });
-const facts = (rows: number, migrated = true): RecoveryTargetFacts => ({
+const facts = (
+  rows: number,
+  migrated = true,
+  qd93: Partial<RecoveryTargetFacts['rows']> = {},
+): RecoveryTargetFacts => ({
   migrated,
-  rows: { 'access-request-null-cost-center': rows },
+  rows: {
+    'access-request-null-cost-center': rows,
+    'access-request-cancel-spending-approver-party': 0,
+    'access-request-step-qd93-waiting-reason': 0,
+    ...qd93,
+  },
 });
 
 describe('recovery target labels (P04-CPE-04)', () => {
@@ -28,6 +39,12 @@ describe('recovery target labels (P04-CPE-04)', () => {
 
   it('reads the declared representations, space-separated, duplicates removed, unknown ones kept', () => {
     expect(readsOfLabels(FINAL_LABELS)).toEqual(FINAL_READS);
+    expect(FINAL_READS).toEqual(
+      expect.arrayContaining([
+        'access-request-cancel-spending-approver-party',
+        'access-request-step-qd93-waiting-reason',
+      ]),
+    );
     expect(
       readsOfLabels(
         JSON.stringify({
@@ -66,6 +83,39 @@ describe('recovery target judgement (P04-CPE-04)', () => {
     expect(RECOVERY_TARGET_EXIT[report.status]).toBe(2);
   });
 
+  it('refuses the release before QĐ-93 once a request or a line was closed for the spending approver, or a step waits for a head', () => {
+    const closed = judgeRecoveryTarget(
+      facts(0, true, { 'access-request-cancel-spending-approver-party': 2 }),
+      BEFORE_QD93_READS,
+    );
+    expect(closed).toEqual({
+      status: 'INCOMPATIBLE',
+      reads: BEFORE_QD93_READS,
+      held: [{ representation: 'access-request-cancel-spending-approver-party', rows: 2, readable: false }],
+    });
+    expect(RECOVERY_TARGET_EXIT[closed.status]).toBe(2);
+
+    const waiting = judgeRecoveryTarget(
+      facts(0, true, { 'access-request-step-qd93-waiting-reason': 1 }),
+      BEFORE_QD93_READS,
+    );
+    expect(waiting.status).toBe('INCOMPATIBLE');
+    expect(waiting.held).toEqual([
+      { representation: 'access-request-step-qd93-waiting-reason', rows: 1, readable: false },
+    ]);
+    // The same rows are read by an image of this source, and the release before QĐ-93 is still a way back while none exists.
+    expect(
+      judgeRecoveryTarget(
+        facts(0, true, {
+          'access-request-cancel-spending-approver-party': 2,
+          'access-request-step-qd93-waiting-reason': 1,
+        }),
+        FINAL_READS,
+      ).status,
+    ).toBe('COMPATIBLE');
+    expect(judgeRecoveryTarget(facts(0), BEFORE_QD93_READS).status).toBe('COMPATIBLE');
+  });
+
   it('lets an image that declares the representation serve it (a later rollback to the final release)', () => {
     expect(judgeRecoveryTarget(facts(7), FINAL_READS)).toEqual({
       status: 'COMPATIBLE',
@@ -93,7 +143,7 @@ describe('recovery target judgement (P04-CPE-04)', () => {
     expect(text).toContain('access-request-null-cost-center: 3 row(s), NOT read by the image');
     expect(formatRecoveryTarget(judgeRecoveryTarget(facts(0, false), []))).toMatch(/^Recovery target: NO_HISTORY/);
     expect(formatRecoveryTarget(judgeRecoveryTarget(facts(3), FINAL_READS))).toMatch(
-      /^Recovery target: COMPATIBLE[\s\S]*The image declares: access-request-null-cost-center\.[\s\S]*3 row\(s\), read by the image/,
+      /^Recovery target: COMPATIBLE[\s\S]*The image declares: access-request-null-cost-center access-request-cancel-spending-approver-party access-request-step-qd93-waiting-reason\.[\s\S]*3 row\(s\), read by the image/,
     );
     const report = judgeRecoveryTarget(facts(3), []);
     expect(JSON.parse(recoveryTargetJson(report))).toEqual(report);

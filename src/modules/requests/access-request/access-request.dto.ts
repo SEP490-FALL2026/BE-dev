@@ -292,12 +292,16 @@ export const requestSchema = z.strictObject({
       withdrawnAt: z.iso.datetime().nullable(),
     })
     .nullable(),
-  /** Who closed the request because the person it was for left, when, why and the note they gave; null for any other request. */
+  /**
+   * Who closed the request because the person it was for left, when, why and the note they gave; null for any other request.
+   * `cancelledBy` is null, and `cause` is `SPENDING_APPROVER_PARTY`, when the conversion command closed it because the spending
+   * approver is one of its parties (`QĐ-93k(1)`): no employee closed it.
+   */
   cancellation: z
     .strictObject({
-      cancelledBy: employeeRef,
+      cancelledBy: employeeRef.nullable(),
       cancelledAt: z.iso.datetime(),
-      cause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED']),
+      cause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED', 'SPENDING_APPROVER_PARTY']),
       note: z.string().nullable(),
     })
     .nullable(),

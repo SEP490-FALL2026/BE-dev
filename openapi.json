@@ -81224,10 +81224,14 @@
                           "fullName": { "type": "string" }
                         },
                         "required": ["employeeId", "employeeCode", "fullName"],
-                        "additionalProperties": false
+                        "additionalProperties": false,
+                        "nullable": true
                       },
                       "cancelledAt": { "type": "string", "format": "date-time" },
-                      "cause": { "type": "string", "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED"] },
+                      "cause": {
+                        "type": "string",
+                        "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY"]
+                      },
                       "note": { "type": "string", "nullable": true }
                     },
                     "required": ["cancelledBy", "cancelledAt", "cause", "note"],
@@ -81711,10 +81715,14 @@
                           "fullName": { "type": "string" }
                         },
                         "required": ["employeeId", "employeeCode", "fullName"],
-                        "additionalProperties": false
+                        "additionalProperties": false,
+                        "nullable": true
                       },
                       "cancelledAt": { "type": "string", "format": "date-time" },
-                      "cause": { "type": "string", "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED"] },
+                      "cause": {
+                        "type": "string",
+                        "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY"]
+                      },
                       "note": { "type": "string", "nullable": true }
                     },
                     "required": ["cancelledBy", "cancelledAt", "cause", "note"],
@@ -82512,10 +82520,14 @@
                               "fullName": { "type": "string" }
                             },
                             "required": ["employeeId", "employeeCode", "fullName"],
-                            "additionalProperties": false
+                            "additionalProperties": false,
+                            "nullable": true
                           },
                           "cancelledAt": { "type": "string", "format": "date-time" },
-                          "cause": { "type": "string", "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED"] },
+                          "cause": {
+                            "type": "string",
+                            "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY"]
+                          },
                           "note": { "type": "string", "nullable": true }
                         },
                         "required": ["cancelledBy", "cancelledAt", "cause", "note"],
@@ -85742,10 +85754,14 @@
                             "fullName": { "type": "string" }
                           },
                           "required": ["employeeId", "employeeCode", "fullName"],
-                          "additionalProperties": false
+                          "additionalProperties": false,
+                          "nullable": true
                         },
                         "cancelledAt": { "type": "string", "format": "date-time" },
-                        "cause": { "type": "string", "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED"] },
+                        "cause": {
+                          "type": "string",
+                          "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY"]
+                        },
                         "note": { "type": "string", "nullable": true }
                       },
                       "required": ["cancelledBy", "cancelledAt", "cause", "note"],
@@ -86738,10 +86754,14 @@
                           "fullName": { "type": "string" }
                         },
                         "required": ["employeeId", "employeeCode", "fullName"],
-                        "additionalProperties": false
+                        "additionalProperties": false,
+                        "nullable": true
                       },
                       "cancelledAt": { "type": "string", "format": "date-time" },
-                      "cause": { "type": "string", "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED"] },
+                      "cause": {
+                        "type": "string",
+                        "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY"]
+                      },
                       "note": { "type": "string", "nullable": true }
                     },
                     "required": ["cancelledBy", "cancelledAt", "cause", "note"],
@@ -87842,10 +87862,14 @@
                           "fullName": { "type": "string" }
                         },
                         "required": ["employeeId", "employeeCode", "fullName"],
-                        "additionalProperties": false
+                        "additionalProperties": false,
+                        "nullable": true
                       },
                       "cancelledAt": { "type": "string", "format": "date-time" },
-                      "cause": { "type": "string", "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED"] },
+                      "cause": {
+                        "type": "string",
+                        "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY"]
+                      },
                       "note": { "type": "string", "nullable": true }
                     },
                     "required": ["cancelledBy", "cancelledAt", "cause", "note"],
@@ -88087,7 +88111,7 @@
                     "endReason": { "type": "string", "nullable": true },
                     "cancelCause": {
                       "type": "string",
-                      "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", null],
+                      "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY", null],
                       "nullable": true
                     }
                   },

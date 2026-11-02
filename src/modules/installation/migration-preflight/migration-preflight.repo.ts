@@ -56,7 +56,8 @@ export class MigrationPreflightRepo {
    * P04-CPE-04 (spec L.12): the facts `--recovery-target` judges, in the schema the database has now. Probed first: an empty
    * database has no table at all (no history, no request). Before `…_access_request_draft` the column is `NOT NULL`, so the
    * count is 0 there. A draft keeps no Cost Center too, but no release reads a draft it did not write (the compatibility image
-   * filters `DRAFT` out of every read), so only sent requests count.
+   * filters `DRAFT` out of every read), so only sent requests count. The two `QĐ-93` representations count rows in tables and
+   * columns that older schemas lack, so each is probed before it is read.
    */
   async recoveryTargetFacts(tx: DbTx): Promise<RecoveryTargetFacts> {
     const [probe] = await tx.$queryRaw<{ history: boolean; requests: boolean }[]>`
@@ -75,7 +76,59 @@ export class MigrationPreflightRepo {
            WHERE "cost_center_id" IS NULL AND "state"::text <> 'DRAFT'`
       : [{ rows: 0 }];
 
-    return { migrated: history.migrated, rows: { 'access-request-null-cost-center': requests.rows } };
+    return {
+      migrated: history.migrated,
+      rows: {
+        'access-request-null-cost-center': requests.rows,
+        'access-request-cancel-spending-approver-party': await this.cancelledBySpendingApproverPartyRows(tx),
+        'access-request-step-qd93-waiting-reason': await this.qd93WaitingReasonRows(tx),
+      },
+    };
+  }
+
+  /** Whether the table has the column in this schema (an older database lacks the table or the column). */
+  private async hasColumn(tx: DbTx, table: string, column: string): Promise<boolean> {
+    const [row] = await tx.$queryRaw<{ present: boolean }[]>`
+      SELECT EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema = 'public' AND table_name = ${table} AND column_name = ${column}) AS "present"`;
+
+    return row.present;
+  }
+
+  /** `access-request-cancel-spending-approver-party`: the requests and the lines closed for the spending approver (`QĐ-93k(1)`). */
+  private async cancelledBySpendingApproverPartyRows(tx: DbTx): Promise<number> {
+    let rows = 0;
+    if (await this.hasColumn(tx, 'access_requests', 'cancel_cause')) {
+      const [requests] = await tx.$queryRaw<{ rows: number }[]>`
+        SELECT count(*)::int AS "rows" FROM "access_requests" WHERE "cancel_cause"::text = 'SPENDING_APPROVER_PARTY'`;
+      rows += requests.rows;
+    }
+    if (await this.hasColumn(tx, 'access_request_lines', 'cancel_cause')) {
+      const [lines] = await tx.$queryRaw<{ rows: number }[]>`
+        SELECT count(*)::int AS "rows" FROM "access_request_lines" WHERE "cancel_cause"::text = 'SPENDING_APPROVER_PARTY'`;
+      rows += lines.rows;
+    }
+
+    return rows;
+  }
+
+  /** `access-request-step-qd93-waiting-reason`: the steps and the alerts that wait for a reason the release before it cannot list. */
+  private async qd93WaitingReasonRows(tx: DbTx): Promise<number> {
+    let rows = 0;
+    if (await this.hasColumn(tx, 'access_request_steps', 'waiting_reason')) {
+      const [steps] = await tx.$queryRaw<{ rows: number }[]>`
+        SELECT count(*)::int AS "rows" FROM "access_request_steps"
+         WHERE "waiting_reason" IN ('NO_DEPARTMENT_HEAD', 'SPENDING_APPROVER_IS_PARTY')`;
+      rows += steps.rows;
+    }
+    if (await this.hasColumn(tx, 'controlled_wait_alerts', 'waiting_reason')) {
+      const [alerts] = await tx.$queryRaw<{ rows: number }[]>`
+        SELECT count(*)::int AS "rows" FROM "controlled_wait_alerts"
+         WHERE "waiting_reason" IN ('NO_DEPARTMENT_HEAD', 'SPENDING_APPROVER_IS_PARTY')`;
+      rows += alerts.rows;
+    }
+
+    return rows;
   }
 
   /** The facts in the schema before the merged migration (or after a failed attempt, which left that schema). */

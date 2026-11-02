@@ -115,8 +115,8 @@ const lineSchema = z.strictObject({
   endedAt: z.iso.datetime().nullable(),
   endedBy: employeeRef.nullable(),
   endReason: z.string().nullable(),
-  /** Why the IT Admin closed the line, when it ended as cancelled. */
-  cancelCause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED']).nullable(),
+  /** Why the line ended as cancelled: the IT Admin closed it, or the conversion command because the spending approver is a party. */
+  cancelCause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED', 'SPENDING_APPROVER_PARTY']).nullable(),
 });
 
 export class GroupBodyDto extends createZodDto(groupBodySchema) {}

@@ -160,10 +160,13 @@ export interface WithdrawalRecord {
   withdrawnAt: Date | null;
 }
 
-/** The closing of a request whose beneficiary left: who closed it, when, why and the note they gave (`US-03-04` AC-25). */
+/**
+ * The closing of a request whose beneficiary left: who closed it, when, why and the note they gave (`US-03-04` AC-25). Nobody
+ * (`null`) when the conversion command closed it for the spending approver (`SPENDING_APPROVER_PARTY`, OD-6).
+ */
 export interface CancellationRecord {
   cancelledAt: Date;
-  cancelledByEmployeeId: string;
+  cancelledByEmployeeId: string | null;
   cause: ReadableCancelCause;
   note: string | null;
 }
