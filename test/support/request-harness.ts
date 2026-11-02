@@ -47,7 +47,6 @@ export interface AccessRequestWire {
   beneficiary: EmployeeRefWire;
   businessReason: string;
   termMonths: number;
-  projectLabel: string | null;
   expectedSpendOn: string | null;
   budgetYear: number | null;
   pricing: {

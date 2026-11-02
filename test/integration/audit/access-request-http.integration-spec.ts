@@ -48,7 +48,7 @@ describe('requests over HTTP: sending and routing the need step (integration, re
 
   describe('the routing table of US-05-03', () => {
     it('row 1: gives the need step to the head of the department of the sender, charged to its Unit (AC-1, AC-7)', async () => {
-      const sent = await h.sent(designer, internalPlan, { projectLabel: 'Rebrand' });
+      const sent = await h.sent(designer, internalPlan);
 
       expect(sent).toMatchObject({
         state: 'PENDING',
@@ -57,7 +57,6 @@ describe('requests over HTTP: sending and routing the need step (integration, re
         costCenter: { id: design.unitId },
         requester: { employeeId: designer.employeeId },
         beneficiary: { employeeId: designer.employeeId },
-        projectLabel: 'Rebrand',
         needStep: { state: 'PENDING', routingRow: 1, assignee: { employeeId: head.employeeId }, waitingReason: null },
       });
     });

@@ -86,7 +86,6 @@ describe('requests over HTTP: the preview before sending (integration, real Post
           'plan',
           'branch',
           'termMonths',
-          'projectLabel',
           'department',
           'costCenter',
           'requirements',
@@ -225,11 +224,11 @@ describe('requests over HTTP: the preview before sending (integration, real Post
 
   describe('the Cost Center (AC-7)', () => {
     it('is the Unit of the department of the day, read only: neither a form field nor a project changes it', async () => {
-      const preview = await h.previewed(designer, paidPlan, { projectLabel: 'Brand 2027' });
-      const other = await h.previewed(designer, paidPlan, { projectLabel: 'Another project' });
+      const preview = await h.previewed(designer, paidPlan);
+      const other = await h.previewed(designer, paidPlan);
 
       expect(preview.costCenter?.id).toBe(design.unitId);
-      expect(preview.projectLabel).toBe('Brand 2027');
+      expect(preview).not.toHaveProperty('projectLabel');
       expect(other.costCenter).toEqual(preview.costCenter);
       expect(other.chain).toEqual(preview.chain);
       expect(
