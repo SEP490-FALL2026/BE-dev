@@ -74,6 +74,16 @@ describe('LocalDemoAccountApi', () => {
     }
   });
 
+  it('accepts only the additional direct roles declared by the shared fixture', async () => {
+    const existing = build({ accountId: 'u-1', account: usable, roles: ['IT_ADMIN', 'MANAGER'] });
+    await expect(
+      existing.service.describeDemoAccount(tx, { ...ask(), allowedExtraRoles: ['MANAGER'] }),
+    ).resolves.toEqual({ state: 'present' });
+    await expect(
+      existing.service.describeDemoAccount(tx, { ...ask(), allowedExtraRoles: ['SPENDING_APPROVER'] }),
+    ).resolves.toEqual({ state: 'conflict', reason: 'ACCOUNT_DIFFERS' });
+  });
+
   it('conflicts when the login email belongs to another account, or FINANCE is held by someone else', async () => {
     await expect(build({ emailOwner: { id: 'u-9' } }).service.describeDemoAccount(tx, ask())).resolves.toEqual({
       state: 'conflict',

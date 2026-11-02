@@ -63,6 +63,6 @@ export interface InstallationInspection {
   } | null;
   accounts: { total: number; byState: Record<AccountStateKey, number> } | null;
   directRoles: Record<AppRole, number> | null;
-  approvalRoles: Record<ApprovalRoleKind, number> | null;
+  approvalRoles: Record<Exclude<ApprovalRoleKind, 'SPENDING_APPROVER'>, number> | null;
   departments: { active: number; withoutCurrentHead: number; withoutUsableItAdmin: number } | null;
 }

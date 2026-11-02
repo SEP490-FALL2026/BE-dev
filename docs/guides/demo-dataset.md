@@ -25,7 +25,7 @@ không có endpoint seed, không dùng `dev:seed`, không thay image API/worker,
   trạng thái, khoản cam kết và Audit Trail là của ứng dụng; lệnh không chèn trạng thái bằng SQL.
 - **Ngoại lệ duy nhất là tài khoản đăng nhập của người demo**: lời mời sẽ gửi email tới hộp thư không tồn tại, nên lệnh
   tạo tài khoản đã kích hoạt qua hợp đồng tài khoản demo có sẵn (cùng hợp đồng với `pnpm dev:seed`: một vai trực tiếp
-  `EMPLOYEE`/`IT_ADMIN`/`FINANCE`, không bao giờ vai suy ra hay `SUPER_ADMIN`), mật khẩu hash bằng Argon2id của
+  `EMPLOYEE`/`IT_ADMIN`/`FINANCE`, không bao giờ `SUPER_ADMIN`; vai trực tiếp khác được cấp ở bước riêng), mật khẩu hash bằng Argon2id của
   `IdentityAccessApi.prepareCredential`, và ghi Audit Trail `DEMO_DATASET.ACCOUNT_CREATED` với
   `operatorReference = DEMO_DATASET:<fixture>:<tham chiếu operator>`. Phần này chạy bằng **runtime role** của API: với
   `NODE_ENV=production` lệnh kiểm vai PostgreSQL trước mọi việc và dừng nếu là superuser, owner hay deploy role.

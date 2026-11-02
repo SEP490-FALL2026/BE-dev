@@ -26,8 +26,8 @@ lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu
    điều phối.
 5. **Không commit mật khẩu, token, hash hay private key mặc định.** Credential sinh ra (CSPRNG) chỉ được in **một lần**
    ra terminal gọi lệnh; không log, không audit, không trả lại ở lần chạy lặp.
-6. **Vai demo theo đúng ownership:** `SUPER_ADMIN`, `IT_ADMIN`, `FINANCE`, `EMPLOYEE` là vai trực tiếp; `MANAGER`,
-   `SPENDING_APPROVER` suy ra từ dữ liệu phòng/cấu hình và **không bao giờ** được chèn thành grant.
+6. **Vai demo theo đúng ownership:** `SUPER_ADMIN`, `IT_ADMIN`, `FINANCE`, `EMPLOYEE`, `MANAGER` và
+   `SPENDING_APPROVER` là vai trực tiếp; cấp và thu hồi qua capability sở hữu cùng các luật nghiệp vụ.
 7. **Lệnh, fixture và test chia theo capability/use case** dưới cùng ngưỡng kích thước và quy tắc phụ thuộc của
    [module structure](module-structure.md).
 8. **Dọn tài nguyên:** mọi bước kiểm tra tạo container, image, database tạm, tiến trình hay file phải **đăng ký cleanup
@@ -49,7 +49,7 @@ lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu
 - Seed chạy trong bootstrap của API; chấp nhận mọi môi trường khác `production`.
 - Kết nối tới host `postgres` (tên service Docker) hay một hostname/IP từ xa.
 - Commit `Password123!` hay bất kỳ mật khẩu mặc định nào.
-- Grant trực tiếp `MANAGER`; ghi Prisma thẳng vào bảng của module khác.
+- Ghi Prisma thẳng vào bảng của module khác.
 
 **Lách sai (cũng là sai):**
 

@@ -11,8 +11,18 @@ const ACCOUNT_STATES: readonly AccountStateKey[] = [
   'LOCKED_ACTIVATED',
   'LOCKED_INVITED',
 ];
-const DIRECT_ROLES: readonly AppRole[] = ['SUPER_ADMIN', 'IT_ADMIN', 'FINANCE', 'EMPLOYEE'];
-const APPROVAL_ROLES: readonly ApprovalRoleKind[] = ['SPENDING_APPROVER', 'CONFLICT_SUBSTITUTE', 'FALLBACK_APPROVER'];
+const DIRECT_ROLES: readonly AppRole[] = [
+  'SUPER_ADMIN',
+  'IT_ADMIN',
+  'FINANCE',
+  'EMPLOYEE',
+  'MANAGER',
+  'SPENDING_APPROVER',
+];
+const APPROVAL_ROLES: readonly Exclude<ApprovalRoleKind, 'SPENDING_APPROVER'>[] = [
+  'CONFLICT_SUBSTITUTE',
+  'FALLBACK_APPROVER',
+];
 
 const zeroes = <K extends string>(keys: readonly K[]): Record<K, number> =>
   Object.fromEntries(keys.map((key) => [key, 0])) as Record<K, number>;
@@ -39,7 +49,8 @@ export class IdentityAccessInspectionApi {
     const directRoles = zeroes(DIRECT_ROLES);
     for (const [role, count] of await this.grants.countEffectiveGrantsByRole(tx)) directRoles[role] = count;
     const approvalRoles = zeroes(APPROVAL_ROLES);
-    for (const role of await this.approvalRoles.heldRoles(tx)) approvalRoles[role] += 1;
+    for (const role of await this.approvalRoles.heldRoles(tx))
+      if (role !== 'SPENDING_APPROVER') approvalRoles[role] += 1;
 
     return {
       superAdmin:

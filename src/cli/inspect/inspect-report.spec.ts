@@ -26,7 +26,7 @@ const incomplete: InstallationInspection = {
   superAdmin: null,
   accounts: { total: 0, byState: { ACTIVE_ACTIVATED: 0, ACTIVE_INVITED: 0, LOCKED_ACTIVATED: 0, LOCKED_INVITED: 0 } },
   directRoles: { SUPER_ADMIN: 0, IT_ADMIN: 0, FINANCE: 0, EMPLOYEE: 0, MANAGER: 0, SPENDING_APPROVER: 0 },
-  approvalRoles: { SPENDING_APPROVER: 0, CONFLICT_SUBSTITUTE: 0, FALLBACK_APPROVER: 0 },
+  approvalRoles: { CONFLICT_SUBSTITUTE: 0, FALLBACK_APPROVER: 0 },
   departments: { active: 1, withoutCurrentHead: 1, withoutUsableItAdmin: 1 },
 };
 
@@ -57,7 +57,7 @@ describe('formatInspection', () => {
         'Super Admin: none',
         'Accounts: 0 (ACTIVE_ACTIVATED 0, ACTIVE_INVITED 0, LOCKED_ACTIVATED 0, LOCKED_INVITED 0)',
         'Direct roles: SUPER_ADMIN 0, IT_ADMIN 0, FINANCE 0, EMPLOYEE 0, MANAGER 0, SPENDING_APPROVER 0',
-        'Approval roles: SPENDING_APPROVER 0, CONFLICT_SUBSTITUTE 0, FALLBACK_APPROVER 0',
+        'Approval roles: CONFLICT_SUBSTITUTE 0, FALLBACK_APPROVER 0',
         'Departments: 1 active, 1 without a current head, 1 without a usable IT Admin',
         '',
       ].join('\n'),

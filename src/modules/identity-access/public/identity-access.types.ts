@@ -185,7 +185,7 @@ export interface AccountInventory {
   superAdmin: { holders: number; status: AppUserStatus; activationState: ActivationState; loginEmail: string } | null;
   accountsByState: Record<AccountStateKey, number>;
   directRoles: Record<AppRole, number>;
-  approvalRoles: Record<ApprovalRoleKind, number>;
+  approvalRoles: Record<Exclude<ApprovalRoleKind, 'SPENDING_APPROVER'>, number>;
 }
 
 /** The direct roles a local demo account may hold (`pnpm dev:seed`): never SUPER_ADMIN, never a derived role. */
