@@ -17,8 +17,15 @@ import {
   loginAs,
 } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
-import { HR_BASIS } from '../../support/hr-basis';
 import { findPlacementCoverageViolations } from '../../support/placement-coverage';
+
+/** What a form carried before `QĐ-93f`: no entry takes an HR basis any more, so a body that still carries one is refused. */
+const HR_BASIS_BODY = {
+  type: 'LABOR_CONTRACT',
+  reference: 'HD-2026-001',
+  issuer: 'HR Department',
+  issuedOn: '2026-10-01',
+};
 
 interface Reason {
   field: string;
@@ -85,7 +92,6 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       hireDate: '2026-10-01',
       departmentCode: 'P-OPS',
       jobTitle: 'Administrator',
-      hrBasis: HR_BASIS,
       ...overrides,
     };
   };
@@ -186,9 +192,9 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
           hireDate: '2026-10-01',
           department: 'P-OPS',
           jobTitle: 'Administrator',
-          hrBasis: HR_BASIS,
         },
       });
+      expect(audit.rows[0].after).not.toHaveProperty('hrBasis');
     });
 
     it('records exactly what was entered, with the department code, the title name and the day of membership', async () => {
@@ -211,7 +217,6 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
             department: data.department.code,
             jobTitle: data.jobTitle,
             memberSince: data.memberSince,
-            hrBasis: HR_BASIS,
           },
         },
       ]);
@@ -352,19 +357,13 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       expect(await sideTables()).toEqual(before);
     });
 
-    it.each([
-      ['no HR basis at all', undefined, 'hrBasis'],
-      ['an HR basis without its type', { ...HR_BASIS, type: undefined }, 'type'],
-      ['an HR basis without its reference', { ...HR_BASIS, reference: '  ' }, 'reference'],
-      ['an HR basis without its issuer', { ...HR_BASIS, issuer: undefined }, 'issuer'],
-      ['an HR basis without a real date', { ...HR_BASIS, issuedOn: '2026-02-30' }, 'issuedOn'],
-    ])('refuses %s, naming what is missing, and writes nothing (AC-16)', async (_name, hrBasis, field) => {
+    it('refuses a body that still carries an HR basis, which no entry takes since QĐ-93f, and writes nothing', async () => {
       const people = (await ctx.sql.query<{ n: number }>('SELECT count(*)::int AS n FROM employees')).rows[0];
 
-      const response = await enter(row({ hrBasis })).expect(422);
+      const response = await enter(row({ hrBasis: HR_BASIS_BODY })).expect(422);
 
       expect(errorCodeOf(response)).toBe('VALIDATION_ERROR');
-      expect(JSON.stringify(response.body)).toContain(field);
+      expect(JSON.stringify(response.body)).toContain('hrBasis');
       expect((await ctx.sql.query('SELECT count(*)::int AS n FROM employees')).rows[0]).toEqual(people);
     });
 
@@ -589,7 +588,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
   });
 
   describe('the first Finance officer (QĐ-67c, QĐ-73b)', () => {
-    it('is entered by hand by the Super Admin on an HR basis, given an account and the FINANCE role by them, and signs in', async () => {
+    it('is entered by hand by the Super Admin, given an account and the FINANCE role by them, and signs in', async () => {
       // An installation holds one Finance officer (QĐ-52d). The one this suite made to prove a refusal steps down.
       await request(server())
         .delete(`/api/v1/app-users/${finance.appUserId}/role-grants/FINANCE`)

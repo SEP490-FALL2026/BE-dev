@@ -1,10 +1,17 @@
 import { createHash } from 'node:crypto';
 import request from 'supertest';
 import { NotificationsApi } from '../../../src/modules/notifications/public/notifications.api';
-import { HR_BASIS } from '../../support/hr-basis';
 import { EmployeeImportHttpHarness, HEADER, today } from '../../support/employee-import-http-harness';
 
-describe('importing people from a file over HTTP (integration, real PostgreSQL): the exact wire and Audit Trail, the HR basis and the notices of the people created', () => {
+/** What a confirmation carried before `QĐ-93f`: it takes no HR basis any more, so a body that still carries one is refused. */
+const HR_BASIS_BODY = {
+  type: 'LABOR_CONTRACT',
+  reference: 'HD-2026-001',
+  issuer: 'HR Department',
+  issuedOn: '2026-10-01',
+};
+
+describe('importing people from a file over HTTP (integration, real PostgreSQL): the exact wire and Audit Trail, no HR basis and the notices of the people created', () => {
   const h = new EmployeeImportHttpHarness();
   const {
     server,
@@ -228,7 +235,6 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
             existingDifferent: 0,
             errors: 1,
             repeatedFile: false,
-            hrBasis: HR_BASIS,
           },
         ),
       ]);
@@ -332,26 +338,20 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
     });
   });
 
-  describe('the HR basis and the record of the Super Admin (US-02-02 AC-16, AC-18)', () => {
-    it.each([
-      ['no HR basis', undefined],
-      ['no type', { ...HR_BASIS, type: undefined }],
-      ['no reference', { ...HR_BASIS, reference: '' }],
-      ['no issuer', { ...HR_BASIS, issuer: undefined }],
-      ['no date of issue', { ...HR_BASIS, issuedOn: undefined }],
-    ])('writes nothing and says what is missing when the confirmation has %s', async (_name, hrBasis) => {
+  describe('no HR basis and the record of the Super Admin (US-02-02 AC-16, AC-18, QĐ-93f)', () => {
+    it('refuses a confirmation that still carries an HR basis, which none takes since QĐ-93f, and writes nothing', async () => {
       const department = await newDepartment();
       const uploaded = importOf(await upload(csv([personRow({ department_code: department })])).expect(201));
       const people = await count('employees');
 
       const refused = await confirm(
         uploaded.id,
-        { previewVersion: 1, idempotencyKey: unique('key-0000'), hrBasis },
+        { previewVersion: 1, idempotencyKey: unique('key-0000'), hrBasis: HR_BASIS_BODY },
         asSuper(),
       ).expect(422);
 
       expect(errorOf(refused).code).toBe('VALIDATION_ERROR');
-      expect(JSON.stringify(refused.body)).toMatch(/hrBasis|type|reference|issuer|issuedOn/);
+      expect(JSON.stringify(refused.body)).toContain('hrBasis');
       expect(await count('employees')).toBe(people);
       expect(
         importOf(await request(server()).get(`/api/v1/employee-imports/${uploaded.id}`).set(asSuper()).expect(200))
@@ -359,7 +359,17 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
       ).toBe('PREVIEW');
     });
 
-    it('puts the HR basis in the Audit Trail of every person created, with the code, the department and the title and no name or email', async () => {
+    it('confirms with no HR basis at all and writes the people (US-02-02 AC-1, AC-13, QĐ-93f)', async () => {
+      const department = await newDepartment();
+      const uploaded = importOf(await upload(csv([personRow({ department_code: department })])).expect(201));
+      const people = await count('employees');
+
+      await confirm(uploaded.id, { previewVersion: 1, idempotencyKey: unique('key-0000') }, asSuper()).expect(200);
+
+      expect(await count('employees')).toBe(people + 1);
+    });
+
+    it('puts no HR basis in the Audit Trail of every person created, only the code, the department and the title and no name or email (QĐ-93f)', async () => {
       const department = await newDepartment();
       const rows = [personRow({ department_code: department }), personRow({ department_code: department })];
       const uploaded = importOf(await upload(csv(rows)).expect(201));
@@ -385,7 +395,6 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
           department,
           jobTitle: 'Administrator',
           importId: uploaded.id,
-          hrBasis: HR_BASIS,
         });
       }
     });
@@ -434,7 +443,6 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
             .post('/api/v1/employees')
             .set(asSuper())
             .send({
-              hrBasis: HR_BASIS,
               employeeCode: headCode,
               fullName: 'Head Person',
               employmentType: 'STAFF',
@@ -489,7 +497,6 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
             .post('/api/v1/employees')
             .set(asSuper())
             .send({
-              hrBasis: HR_BASIS,
               employeeCode: unique('E-HEADED'),
               fullName: 'Head Person',
               employmentType: 'STAFF',
