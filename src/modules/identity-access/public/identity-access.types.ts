@@ -1,4 +1,4 @@
-export type AppRole = 'SUPER_ADMIN' | 'IT_ADMIN' | 'FINANCE' | 'EMPLOYEE';
+export type AppRole = 'SUPER_ADMIN' | 'IT_ADMIN' | 'FINANCE' | 'EMPLOYEE' | 'MANAGER' | 'SPENDING_APPROVER';
 export type AppUserStatus = 'ACTIVE' | 'LOCKED';
 export type ActivationState = 'INVITED' | 'ACTIVATED';
 export type SessionRevokedReason =

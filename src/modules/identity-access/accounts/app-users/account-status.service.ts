@@ -101,7 +101,7 @@ export class AccountStatusService {
     if (isSelfChange(actor.appUserId, appUserId)) throw new SelfChangeForbiddenError();
     const violation = checkRoleRequest(role);
     if (violation) throw new RoleRequestRefusedError(violation);
-    const granted = role as AppRole;
+    const granted: AppRole = role;
 
     await this.runner
       .run(async (tx) => {
@@ -144,7 +144,7 @@ export class AccountStatusService {
     if (isSelfChange(actor.appUserId, appUserId)) throw new SelfChangeForbiddenError();
     const violation = checkRoleRequest(role);
     if (violation) throw new RoleRequestRefusedError(violation);
-    const revoked = role as AppRole;
+    const revoked: AppRole = role;
 
     await this.runner.run(async (tx) => {
       const account = await this.accounts.lockAndReadAccount(tx, appUserId);
