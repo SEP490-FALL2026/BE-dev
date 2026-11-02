@@ -86,7 +86,7 @@ describe('the proposals waiting for IT assessment (integration, real PostgreSQL)
     itOps2 = await h.staff(ops, 'QO-IT2', ['IT_ADMIN']);
     await h.makeHead(design, head);
     await h.makeHead(ops, opsHead);
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     await h.setRole('FALLBACK_APPROVER', fallback);
     await h.setItAdminInCharge(design, itDesign);

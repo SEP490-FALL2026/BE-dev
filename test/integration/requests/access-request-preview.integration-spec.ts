@@ -9,7 +9,7 @@ describe('requests over HTTP: the preview before sending (integration, real Post
   let headless: Department;
   let head: Person; // head of design
   let designer: Person;
-  let boss: Person; // head of executive and the spending approver
+  let boss: Person; // the spending approver, a member of executive (QĐ-93b)
   let fallback: Person; // the fallback approver, a member of the department with no head
   let newcomer: Person; // a member of the department with no head
   let internalPlan: string;
@@ -27,7 +27,7 @@ describe('requests over HTTP: the preview before sending (integration, real Post
     fallback = await h.staff(headless, 'HR-R0');
     newcomer = await h.staff(headless, 'HR-E4');
     await h.makeHead(design, head);
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     await h.setRole('FALLBACK_APPROVER', fallback);
     internalPlan = await h.plan('K5');
@@ -169,12 +169,6 @@ describe('requests over HTTP: the preview before sending (integration, real Post
   describe('the routing table (AC-5)', () => {
     it.each([
       ['a head asking for themselves: the spending approver', () => head, () => boss, 'HEAD_ASKS_FOR_SELF'],
-      [
-        'the spending approver who heads a department: the fallback approver',
-        () => boss,
-        () => fallback,
-        'HEAD_IS_THE_APPROVER',
-      ],
       [
         'a member of a department with no head: the fallback approver, saying so',
         () => newcomer,

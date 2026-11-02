@@ -16,15 +16,13 @@ const h = new BudgetHarness();
 describe('the notices of the budget loops (integration, real PostgreSQL)', () => {
   let boss: Person;
   let substitute: Person;
-  let executiveUnitId: string;
   let counter = 0;
 
   beforeAll(async () => {
     await h.start();
     const executive = await h.departmentWithUnit('P-EXE');
-    executiveUnitId = executive.unitId;
     boss = await h.staff(executive, 'EXE-C1');
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     substitute = await h.staff(await h.departmentWithUnit('P-SBS'), 'SBS-S1');
     await h.setRole('CONFLICT_SUBSTITUTE', substitute);
@@ -75,17 +73,6 @@ describe('the notices of the budget loops (integration, real PostgreSQL)', () =>
         boss.employeeId,
         boss.employeeId,
       ]);
-    });
-
-    it('is told to the substitute, not the approver, when the approver sent the proposal behind it', async () => {
-      const proposal = h.dataOf<{ proposal: ProposalWire }>(
-        await h.submitProposal(h.proposalBody(executiveUnitId), boss.account).expect(201),
-      ).proposal;
-      const version = await h.built(proposal.id);
-
-      await h.sendVersion(version.id).expect(200);
-
-      expect(await recipients('BUDGET_VERSION_AWAITING_DECISION', version.id)).toEqual([substitute.employeeId]);
     });
   });
 

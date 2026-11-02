@@ -124,7 +124,7 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
     outsider = await h.staff(elsewhere, 'MKT-E1');
     const boss = await h.staff(executive, 'EXE-C1');
     await h.makeHead(design, head);
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     approver = boss;
 

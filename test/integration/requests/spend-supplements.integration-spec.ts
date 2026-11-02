@@ -157,7 +157,7 @@ describe('the supplementary file of the head over PostgreSQL (US-06-14 AC-13, AC
       await supplement(id, {}, other.head.account).expect(404);
       await supplement(id, {}, design.member.account).expect(403);
       await supplement(id, {}, h.finance).expect(403);
-      await supplement(id, {}, h.boss.account).expect(404);
+      await supplement(id, {}, h.boss.account).expect(403); // the approver heads no department (QĐ-93b)
       expect(await history(id)).toEqual([]);
     });
 

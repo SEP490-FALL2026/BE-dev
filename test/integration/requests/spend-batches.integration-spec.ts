@@ -375,8 +375,8 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
 
       expect((await queue()).map((item) => item.requestId)).toContain(id);
       expect((await queue(other.head.account)).map((item) => item.requestId)).not.toContain(id);
-      await h.spendQueue(h.boss.account).expect(200); // the approver is the head of another department, with a queue of its own
-      expect((await queue(h.boss.account)).map((item) => item.requestId)).not.toContain(id);
+      // The approver heads no department (QĐ-93b), so the queue of a head is not theirs to read.
+      await h.spendQueue(h.boss.account).expect(403);
     });
   });
 });

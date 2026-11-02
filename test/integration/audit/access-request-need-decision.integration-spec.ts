@@ -11,7 +11,7 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
   let head: Person; // head of design
   let designer: Person;
   let otherHead: Person; // head of engineering
-  let boss: Person; // head of executive and the spending approver
+  let boss: Person; // the spending approver, a member of executive (QĐ-93b)
   let fallback: Person; // the fallback approver, a member of the department with no head
   let internalPlan: string;
   let paidPlan: string;
@@ -29,7 +29,7 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
     fallback = await h.staff(headless, 'HR-R0');
     await h.makeHead(design, head);
     await h.makeHead(engineering, otherHead);
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     await h.setRole('FALLBACK_APPROVER', fallback);
     internalPlan = await h.plan('K5');
@@ -155,17 +155,6 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
       expect(after.needDecision).toMatchObject({
         decidedBy: { employeeId: boss.employeeId },
         deciderRole: 'SPENDING_APPROVER',
-      });
-    });
-
-    it('lets the fallback approver decide when the spending approver is the head who asked, in that role', async () => {
-      const sent = await h.sent(boss, internalPlan);
-
-      const after = await decided(sent.id, approve, fallback.account);
-
-      expect(after.needDecision).toMatchObject({
-        decidedBy: { employeeId: fallback.employeeId },
-        deciderRole: 'FALLBACK_APPROVER',
       });
     });
 

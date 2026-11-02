@@ -14,7 +14,7 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
     await h.start();
     const executive = await h.departmentWithUnit('P-EXE');
     boss = await h.staff(executive, 'EXE-C1');
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     financePerson = { employeeId: h.finance.employeeId, account: h.finance };
   }, 240000);

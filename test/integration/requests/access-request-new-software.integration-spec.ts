@@ -9,7 +9,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
   let headless: Department;
   let head: Person; // head of design
   let designer: Person;
-  let boss: Person; // head of executive and the spending approver
+  let boss: Person; // the spending approver, a member of executive (QĐ-93b)
   let fallback: Person;
   let itInCharge: Person; // the IT Admin in charge of design
   let otherIt: Person; // another IT Admin, acting for them
@@ -30,7 +30,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
     itInCharge = { employeeId: h.it1.employeeId, account: h.it1 };
     itPerson = await h.staff(design, 'DES-IT3', ['IT_ADMIN']);
     await h.makeHead(design, head);
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     await h.setRole('FALLBACK_APPROVER', fallback);
     await h.setItAdminInCharge(design, itInCharge);

@@ -420,16 +420,16 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
   describe('the roles that unlock the approver tasks follow the data as well (US-16-04 AC-6; US-01-03 AC-2)', () => {
     it('shows the spending approver the derived role while they hold it and drops it at the next call when the holding ends', async () => {
       const token = h.boss.account.accessToken;
-      // The approver heads their own department here, so the two derived roles show together and none is a grant.
+      // The approver heads no department (QĐ-93b), so the one derived role is the approver's and it is no grant.
       expect((await meOf(token)).roles).toEqual({
         direct: [],
-        derived: ['MANAGER', 'SPENDING_APPROVER'],
-        effective: ['MANAGER', 'SPENDING_APPROVER'],
+        derived: ['SPENDING_APPROVER'],
+        effective: ['SPENDING_APPROVER'],
       });
 
       await h.clearRole('SPENDING_APPROVER');
 
-      expect((await meOf(token)).roles).toEqual({ direct: [], derived: ['MANAGER'], effective: ['MANAGER'] });
+      expect((await meOf(token)).roles).toEqual({ direct: [], derived: [], effective: [] });
     });
   });
 

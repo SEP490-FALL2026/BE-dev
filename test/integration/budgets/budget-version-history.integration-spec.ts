@@ -13,15 +13,13 @@ const h = new BudgetHarness();
 describe('the history of the edits of a version (integration, real PostgreSQL)', () => {
   let boss: Person;
   let substitute: Person;
-  let executiveUnitId: string;
   let counter = 0;
 
   beforeAll(async () => {
     await h.start();
     const executive = await h.departmentWithUnit('P-EXE');
-    executiveUnitId = executive.unitId;
     boss = await h.staff(executive, 'EXE-C1');
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     substitute = await h.staff(await h.departmentWithUnit('P-SBS'), 'SBS-S1');
     await h.setRole('CONFLICT_SUBSTITUTE', substitute);
@@ -301,19 +299,6 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
         200, 200, 403, 403, 403,
       ]);
       expect(h.codeOf(head)).toBe('AUTHORIZATION.FORBIDDEN');
-    });
-
-    it('is read by the substitute, and not by the approver, when the approver sent the proposal behind the version', async () => {
-      const own = h.dataOf<{ proposal: { id: string } }>(
-        await h.submitProposal(h.proposalBody(executiveUnitId), boss.account).expect(201),
-      ).proposal;
-      const version = await h.built(own.id);
-      await h.updateVersion(version.id, { reserve: h.money(10_000_000) }).expect(200);
-
-      const approver = await h.versionHistory(version.id, boss.account);
-      const standIn = await h.versionHistory(version.id, substitute.account);
-
-      expect([approver.status, standIn.status]).toEqual([403, 200]);
     });
 
     it('answers 404 for a version that is not there, to Finance and to the approver; and refuses a caller that holds no role in the service itself', async () => {

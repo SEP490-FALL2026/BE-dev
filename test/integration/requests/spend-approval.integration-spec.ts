@@ -269,14 +269,12 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
     });
 
     it('has two records of two decisions, each flagged as one person, when the same person holds both steps (AC-7)', async () => {
-      const executive = await h.ctx.sql.query<{ id: string; cost_center_id: string }>(
-        `SELECT d.id, c.id AS cost_center_id FROM departments d
-           JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
-      );
-      const department = { id: executive.rows[0].id, code: 'P-EXE', unitId: executive.rows[0].cost_center_id };
-      const exe: Unit = { department, head: h.boss, member: await h.staff(department, 'EXE-E9') };
-      await h.budgetFor(exe, { total: 100 * M });
-      const id = await h.paidRequest(exe, plan, { amount: 10 * M });
+      // A head's own request goes to the spending approver for the need (row 2), who also holds the spend step.
+      const { u } = await example();
+      const sent = await h.sent(u.head, plan, { termMonths: 1 });
+      await h.decide(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
+      await h.setPayments(sent.id, { amount: 10 * M });
+      const id = sent.id;
 
       await approve(id).expect(200);
 

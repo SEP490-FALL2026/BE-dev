@@ -426,7 +426,7 @@ describe('the request that waits for a version of the budget (integration, real 
       ).version;
       await h.sendVersion(revision.id).expect(200);
 
-      await h.decideVersion(revision.id, { decision: 'APPROVE' }, await h.deciderOf(u)).expect(200);
+      await h.decideVersion(revision.id, { decision: 'APPROVE' }, h.deciderOf()).expect(200);
 
       expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
       expect((await checks(id)).map((check) => [check.number, check.trigger, check.route])).toEqual([

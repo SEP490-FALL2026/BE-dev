@@ -30,7 +30,7 @@ describe('a budget version from the proposal to the version in force (e2e)', () 
     // The spending approver heads a department of their own and is named by the Super Admin.
     const executive = await h.departmentWithUnit('P-EXE');
     boss = await h.staff(executive, 'EXE-C1');
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     ({ department, head } = await h.departmentWithHead('P-DES'));
   }, 180000);

@@ -18,7 +18,7 @@ describe('the version after a refusal and the successor of a proposal (integrati
     await h.start();
     const executive = await h.departmentWithUnit('P-EXE');
     boss = await h.staff(executive, 'EXE-C1');
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
   }, 240000);
 

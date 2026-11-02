@@ -111,22 +111,14 @@ describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-
     }
   });
 
-  it('is made at once, with both steps flagged, when the head who approved the need is the spending approver (US-06-14 AC-8, US-05-03 AC-9)', async () => {
-    const executive = await h.ctx.sql.query<{ id: string; code: string; cost_center_id: string }>(
-      `SELECT d.id, d.code, c.id AS cost_center_id FROM departments d
-       JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
-    );
-    const unit: Unit = {
-      department: { id: executive.rows[0].id, code: 'P-EXE', unitId: executive.rows[0].cost_center_id },
-      head: h.boss,
-      member: await h.staff(
-        { id: executive.rows[0].id, code: 'P-EXE', unitId: executive.rows[0].cost_center_id },
-        'EXE-E1',
-      ),
-    };
+  it('is made at once, with both steps flagged, when the spending approver approved the need of a head (US-06-14 AC-8, US-05-03 AC-9)', async () => {
+    const unit = await h.departmentWithHead('P-RT9');
     await h.budgetFor(unit, { total: 100 * M });
-    // The head is the approver: nobody sends it on, so the check ran when the need was approved.
-    const id = await h.paidRequest(unit, plan, { amount: 10 * M });
+    // A head's own request goes to the spending approver (row 2): nobody sends it on, so the check ran when the need was approved.
+    const sent = await h.sent(unit.head, plan, { termMonths: 1 });
+    await h.decide(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    await h.setPayments(sent.id, { amount: 10 * M });
+    const id = sent.id;
 
     expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([
       expect.objectContaining({ assignee_employee_id: h.boss.employeeId, same_person_as_spend: true }),

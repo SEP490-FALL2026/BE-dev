@@ -12,7 +12,7 @@ describe('requests over HTTP: sending and routing the need step (integration, re
   let headless: Department;
   let head: Person; // head of design
   let designer: Person; // member of design
-  let boss: Person; // head of executive and the spending approver
+  let boss: Person; // the spending approver, a member of executive (QĐ-93b)
   let fallback: Person; // the fallback approver, a member of the department that has no head
   let clerk: Person; // member of the department that has no head
   let internalPlan: string;
@@ -30,7 +30,7 @@ describe('requests over HTTP: sending and routing the need step (integration, re
     fallback = await h.staff(headless, 'HR-R0');
     clerk = await h.staff(headless, 'HR-E4');
     await h.makeHead(design, head);
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     await h.setRole('FALLBACK_APPROVER', fallback);
     internalPlan = await h.plan('K5');
@@ -91,12 +91,6 @@ describe('requests over HTTP: sending and routing the need step (integration, re
 
       expect(sent.needStep).toMatchObject({ routingRow: 2, assignee: { employeeId: boss.employeeId } });
       expect(sent.needStep.assignee?.employeeId).not.toBe(head.employeeId);
-    });
-
-    it('row 3: a head who is the spending approver sends: the fallback approver holds the step (AC-3)', async () => {
-      const sent = await h.sent(boss, paidPlan);
-
-      expect(sent.needStep).toMatchObject({ routingRow: 3, assignee: { employeeId: fallback.employeeId } });
     });
 
     it('row 4: a department that has no head gives the step to the fallback approver (AC-4)', async () => {
@@ -166,10 +160,9 @@ describe('requests over HTTP: sending and routing the need step (integration, re
     });
 
     it('flags the same person holding the need step and the spend step only when there is a spend step (AC-9)', async () => {
-      const member = await h.staff(executive, 'EXE-E6');
-
-      const paid = await h.sent(member, paidPlan);
-      const internal = await h.sent(member, internalPlan);
+      // A head's request goes to the spending approver for the need (row 2), who also holds the spend step.
+      const paid = await h.sent(head, paidPlan);
+      const internal = await h.sent(head, internalPlan);
 
       expect(paid.needStep).toMatchObject({ assignee: { employeeId: boss.employeeId }, samePersonAsSpend: true });
       expect(internal.needStep).toMatchObject({ assignee: { employeeId: boss.employeeId }, samePersonAsSpend: false });

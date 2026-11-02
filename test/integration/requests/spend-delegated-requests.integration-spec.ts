@@ -386,33 +386,5 @@ describe('a head sends requests for the people of the department over PostgreSQL
         await h.setRole('SPENDING_APPROVER', h.boss);
       }
     });
-
-    it('gives the spend step to the substitute when the approver is the head who sent, and the approver decides nothing on it', async () => {
-      const row = await h.ctx.sql.query<{ id: string; cost_center_id: string }>(
-        `SELECT d.id, c.id AS cost_center_id FROM departments d
-           JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
-      );
-      const department = { id: row.rows[0].id, code: 'P-EXE', unitId: row.rows[0].cost_center_id };
-      const executive = { department, head: h.boss, member: await h.staff(department, 'EXE-D7') };
-      await h.ctx.sql.query(`UPDATE employees SET hire_date = current_date WHERE id = $1`, [
-        executive.member.employeeId,
-      ]);
-      const version = await h.budgetFor(executive, { total: 100 * M });
-
-      const [request] = (await sent(h.boss.account, form([executive.member.employeeId], [paidA]))).requests;
-      expect(request.needDecision).toMatchObject({
-        decision: 'APPROVED',
-        decidedBy: { employeeId: h.boss.employeeId },
-      });
-      await h.setPayments(request.id, { amount: 5 * M });
-      await h.attachLine(request.id, version.id, 1);
-      await h.sendOn([request.id], h.boss.account).expect(201);
-
-      expect(await h.steps(request.id, 'SPEND_APPROVAL')).toEqual([
-        expect.objectContaining({ state: 'PENDING', assignee_employee_id: h.substitute.employeeId }),
-      ]);
-      await h.decideSpend(request.id, { decision: 'APPROVE' }, h.boss.account).expect(403);
-      await h.approvalOf(request.id, h.boss.account).expect(404);
-    });
   });
 });

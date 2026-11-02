@@ -387,20 +387,14 @@ describe('who holds a step when the organization or a role changes, over Postgre
     });
 
     it('flags both steps when one person ends up holding the need step and the spend step, and clears it when they do not', async () => {
-      // The head of the department of the approver is the approver: the check ran when the head approved the need.
-      const { rows } = await h.ctx.sql.query<{ id: string; cost_center_id: string }>(
-        `SELECT d.id, c.id AS cost_center_id FROM departments d
-           JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
-      );
-      const executive = { id: rows[0].id, code: 'P-EXE', unitId: rows[0].cost_center_id };
-      const unit: Unit = {
-        department: executive,
-        head: h.boss,
-        member: await h.staff(executive, `EXE-S${(counter += 1)}`),
-      };
+      // A head's own request goes to the spending approver for the need (row 2): the check ran when the approver approved it.
+      const unit = await h.departmentWithHead(`P-C3-${(counter += 1)}`);
       await h.budgetFor(unit, { total: 100 * M });
-      const c2 = await h.staff(await h.departmentWithUnit(`P-C3-${counter}`), `C3-${counter}`);
-      const id = await h.paidRequest(unit, paid, { amount: 5 * M });
+      const c2 = await h.staff(await h.departmentWithUnit(`P-C3X-${counter}`), `C3-${counter}`);
+      const sent = await h.sent(unit.head, paid, { termMonths: 1 });
+      await h.decide(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
+      await h.setPayments(sent.id, { amount: 5 * M });
+      const id = sent.id;
       // One person holds the need step they approved and the spend step: both are flagged (US-05-03 AC-9).
       expect(await h.stepOf(id, 'NEED')).toMatchObject({ same_person_as_spend: true });
       expect(await h.stepOf(id, 'SPEND_APPROVAL')).toMatchObject({

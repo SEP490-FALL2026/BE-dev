@@ -64,17 +64,10 @@ export interface Page<T> {
  */
 export class SpendHarness extends BudgetHarness {
   boss!: Person;
+  /** The head of the executive department: the spending approver is a member of it, never its head (QĐ-93b). */
+  executiveHead!: Person;
   /** The substitute `withApprover` names; a test may name another. */
   substitute!: Person;
-  private readonly known = new Map<string, ApiAccount>();
-
-  /** A person of the department with an account, remembered so that a test can act as whoever holds a role. */
-  override async staff(department: Department, code: string, roles: string[] = []): Promise<Person> {
-    const person = await super.staff(department, code, roles);
-    this.known.set(person.employeeId, person.account);
-
-    return person;
-  }
 
   /** The principal a call of the service is made as: what the access token would carry. */
   principal(account: ApiAccount, roles: string[] = []): AuthenticatedPrincipal {
@@ -89,27 +82,21 @@ export class SpendHarness extends BudgetHarness {
     };
   }
 
-  /** The spending approver of the installation, in a department of their own. */
+  /** The spending approver of the installation, a member (not the head) of a department of their own. */
   async withApprover(): Promise<void> {
     const executive = await this.departmentWithUnit('P-EXE');
     this.boss = await this.staff(executive, 'EXE-C1');
-    await this.makeHead(executive, this.boss);
+    this.executiveHead = await this.staff(executive, 'EXE-H1');
+    await this.makeHead(executive, this.executiveHead);
     await this.setRole('SPENDING_APPROVER', this.boss);
     // Somebody decides in the place of the approver when they are a party; a test that is about it names its own.
     this.substitute = await this.staff(await this.departmentWithUnit('P-SBS'), 'SBS-S1');
     await this.setRole('CONFLICT_SUBSTITUTE', this.substitute);
   }
 
-  /** The person who decides the budget of the unit: the spending approver, or the substitute when they head it (US-06-08 AC-11). */
-  async deciderOf(unit: Unit): Promise<ApiAccount> {
-    if (unit.head.employeeId !== this.boss.employeeId) return this.boss.account;
-    const { rows } = await this.ctx.sql.query<{ employee_id: string }>(
-      `SELECT employee_id FROM approval_role_holders WHERE role = 'CONFLICT_SUBSTITUTE'::"ApprovalRole" AND held_until IS NULL`,
-    );
-    const account = rows[0] ? this.known.get(rows[0].employee_id) : undefined;
-    if (!account) throw new Error('The approver heads the unit and nobody the test knows is the substitute.');
-
-    return account;
+  /** The person who decides the budget of any unit: the spending approver, who heads no unit (QĐ-93b; US-06-08 is retired, QĐ-93d). */
+  deciderOf(): ApiAccount {
+    return this.boss.account;
   }
 
   /** Checks the request the way the submission will: locked, in one transaction, routed where the check says. */
@@ -177,7 +164,7 @@ export class SpendHarness extends BudgetHarness {
     const version = await approvedBudget<VersionWire>(this.ctx, {
       headToken: unit.head.account.accessToken,
       financeToken: this.finance.accessToken,
-      deciderToken: (await this.deciderOf(unit)).accessToken,
+      deciderToken: this.deciderOf().accessToken,
       proposal: this.proposalBody(unit.department.unitId, spec.lines ?? [this.line(window)], year),
       version: {
         base: this.money(spec.total),

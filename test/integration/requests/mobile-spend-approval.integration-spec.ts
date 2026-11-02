@@ -84,7 +84,7 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
     );
     const department = { id: rows[0].id, code: 'P-EXE', unitId: rows[0].cost_center_id };
 
-    return { department, head: h.boss, member: await h.staff(department, 'EXE-E1') };
+    return { department, head: h.executiveHead, member: await h.staff(department, 'EXE-E1') };
   };
 
   beforeAll(async () => {
@@ -284,8 +284,10 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
       const unitOfBoss = await exe();
       await h.budgetFor(unitOfBoss, { total: 100 * M });
       const r5 = await h.sent(h.boss, plan, { termMonths: 1 });
-      expect(r5.needStep.assignee?.employeeId).toBe(fallback.employeeId);
-      await h.decide(r5.id, { decision: 'APPROVE' }, fallback.account).expect(200);
+      expect(r5.needStep.assignee?.employeeId).toBe(h.executiveHead.employeeId);
+      await h.decide(r5.id, { decision: 'APPROVE' }, h.executiveHead.account).expect(200);
+      await h.setPayments(r5.id, {});
+      await h.sendOn([r5.id], h.executiveHead.account).expect(201);
       expect((await h.steps(r5.id, 'SPEND_APPROVAL'))[0]).toMatchObject({
         assignee_employee_id: h.substitute.employeeId,
       });

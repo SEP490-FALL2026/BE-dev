@@ -369,7 +369,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       const bossCase = await h.recordedCase(h.boss, { successor: { kind: 'NONE' } });
 
       expect(flagsOf(financeCase as FlaggedCase)).toEqual(['FINANCE']);
-      expect(flagsOf(bossCase as FlaggedCase)).toEqual(['SPENDING_APPROVER', 'DEPARTMENT_HEAD']);
+      expect(flagsOf(bossCase as FlaggedCase)).toEqual(['SPENDING_APPROVER']); // the approver heads no department (QĐ-93b)
       const substituted = await h.recordedCase(h.substitute);
       expect(flagsOf(substituted as FlaggedCase)).toEqual(['SUBSTITUTE_APPROVER']);
       for (const wire of [financeCase, bossCase]) {

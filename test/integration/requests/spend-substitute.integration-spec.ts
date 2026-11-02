@@ -1,6 +1,5 @@
 import request from 'supertest';
 import { SpendHarness, Unit } from '../../support/spend-harness';
-import type { Person } from '../../support/request-harness';
 
 const h = new SpendHarness();
 const M = 1_000_000;
@@ -8,7 +7,6 @@ const M = 1_000_000;
 describe('the substitute for a conflict of interest over PostgreSQL (US-06-08)', () => {
   let plan: string;
   let executive: Unit;
-  let fallback: Person;
 
   beforeAll(async () => {
     await h.start();
@@ -17,14 +15,13 @@ describe('the substitute for a conflict of interest over PostgreSQL (US-06-08)',
     await h
       .declareTaxProfile((await h.vendorOf(plan)).id, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }])
       .expect(200);
-    fallback = await h.staff(await h.departmentWithUnit('P-FB'), 'FB-R0');
-    await h.setRole('FALLBACK_APPROVER', fallback);
+    await h.setRole('FALLBACK_APPROVER', await h.staff(await h.departmentWithUnit('P-FB'), 'FB-R0'));
     const row = await h.ctx.sql.query<{ id: string; cost_center_id: string }>(
       `SELECT d.id, c.id AS cost_center_id FROM departments d
          JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
     );
     const department = { id: row.rows[0].id, code: 'P-EXE', unitId: row.rows[0].cost_center_id };
-    executive = { department, head: h.boss, member: await h.staff(department, 'EXE-E1') };
+    executive = { department, head: h.executiveHead, member: await h.staff(department, 'EXE-E1') };
     await h.budgetFor(executive, { total: 100 * M });
   }, 240000);
 
@@ -32,10 +29,13 @@ describe('the substitute for a conflict of interest over PostgreSQL (US-06-08)',
     await h.stop();
   });
 
-  /** The approver sends a request for themselves: their need goes to the fallback approver and the check runs at once. */
+  /** The approver sends a request for themselves: their need goes to the head of their department and the check runs at once. */
   const askedByTheApprover = async () => {
     const sent = await h.sent(h.boss, plan, { termMonths: 1 });
-    await h.decide(sent.id, { decision: 'APPROVE' }, fallback.account).expect(200);
+    await h.decide(sent.id, { decision: 'APPROVE' }, h.executiveHead.account).expect(200);
+    // The head sends the approved request on, so the check runs and the spend step is made.
+    await h.setPayments(sent.id, {});
+    await h.sendOn([sent.id], h.executiveHead.account).expect(201);
 
     return sent.id;
   };
@@ -90,7 +90,10 @@ describe('the substitute for a conflict of interest over PostgreSQL (US-06-08)',
         id,
         h.substitute.employeeId,
       ]);
-      await h.decide(id, { decision: 'APPROVE' }, fallback.account).expect(200);
+      await h.decide(id, { decision: 'APPROVE' }, h.executiveHead.account).expect(200);
+      // The head sends the approved request on, so the check runs and the spend step is made.
+      await h.setPayments(id, {});
+      await h.sendOn([id], h.executiveHead.account).expect(201);
 
       expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([
         expect.objectContaining({
@@ -106,7 +109,10 @@ describe('the substitute for a conflict of interest over PostgreSQL (US-06-08)',
       await h.clearRole('CONFLICT_SUBSTITUTE');
       try {
         const id = (await h.sent(h.boss, plan, { termMonths: 1 })).id;
-        await h.decide(id, { decision: 'APPROVE' }, fallback.account).expect(200);
+        await h.decide(id, { decision: 'APPROVE' }, h.executiveHead.account).expect(200);
+        // The head sends the approved request on, so the check runs and the spend step is made.
+        await h.setPayments(id, {});
+        await h.sendOn([id], h.executiveHead.account).expect(201);
 
         expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([
           expect.objectContaining({
@@ -134,34 +140,7 @@ describe('the substitute for a conflict of interest over PostgreSQL (US-06-08)',
     });
   });
 
-  describe('a version of the budget the approver proposed (AC-11)', () => {
-    /** The approver, as head of their department, sends the proposal; Finance builds the version and sends it. */
-    const proposedByTheApprover = async (year: number) => {
-      const proposal = await h.budgetProposed(h.boss, executive.department.unitId, undefined, year);
-      const version = await h.built(proposal.id);
-      await h.sendVersion(version.id).expect(200);
-
-      return version.id;
-    };
-
-    it('is decided by the substitute and not by the approver, and the record says who', async () => {
-      const id = await proposedByTheApprover(h.next);
-
-      const refused = await h.decideVersion(id, { decision: 'APPROVE' }, h.boss.account).expect(403);
-      await h.versionOf(id, h.substitute.account).expect(200);
-      const decided = await h.decideVersion(id, { decision: 'APPROVE' }, h.substitute.account).expect(200);
-
-      expect(h.codeOf(refused)).toBe('BUDGET.CONFLICT_OF_INTEREST');
-      expect(h.dataOf<{ version: { state: string } }>(decided).version.state).toBe('APPROVED');
-      const record = await h.ctx.sql.query<{ decider_role: string; decided_by_employee_id: string }>(
-        `SELECT decider_role, decided_by_employee_id FROM budget_version_decisions WHERE version_id = $1`,
-        [id],
-      );
-      expect(record.rows).toEqual([
-        { decider_role: 'CONFLICT_SUBSTITUTE', decided_by_employee_id: h.substitute.employeeId },
-      ]);
-    });
-
+  describe('a version of the budget somebody else proposed (AC-11)', () => {
     it('is decided by the approver when somebody else proposed it, and not by the substitute', async () => {
       const other = await h.departmentWithHead('P-VER');
       const proposal = await h.budgetProposed(other.head, other.department.unitId, undefined, h.next);
@@ -170,25 +149,6 @@ describe('the substitute for a conflict of interest over PostgreSQL (US-06-08)',
 
       await h.decideVersion(version.id, { decision: 'APPROVE' }, h.substitute.account).expect(403);
       await h.decideVersion(version.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
-    });
-
-    it('waits for somebody when the approver proposed it and there is no substitute', async () => {
-      await h.clearRole('CONFLICT_SUBSTITUTE');
-      try {
-        const proposal = await h.budgetProposed(h.boss, executive.department.unitId, undefined, h.next + 1);
-        const version = await h.built(proposal.id);
-        await h.sendVersion(version.id).expect(200);
-
-        const response = await h.decideVersion(version.id, { decision: 'APPROVE' }, h.boss.account).expect(403);
-
-        expect(h.codeOf(response)).toBe('BUDGET.CONFLICT_OF_INTEREST');
-        expect(
-          (await h.ctx.sql.query<{ state: string }>(`SELECT state FROM budget_versions WHERE id = $1`, [version.id]))
-            .rows[0].state,
-        ).toBe('SENT');
-      } finally {
-        await h.setRole('CONFLICT_SUBSTITUTE', h.substitute);
-      }
     });
   });
 });
