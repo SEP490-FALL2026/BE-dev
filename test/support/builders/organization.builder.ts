@@ -14,7 +14,7 @@ import {
 import { EmployeeManualService } from '../../../src/modules/organization/employee/employee-manual.service';
 import { CreateEmployeeBodyDto } from '../../../src/modules/organization/employee/employee.dto';
 import type { HttpTestApp } from '../http-test-app';
-import { principalOf, sent } from './account.builder';
+import { ensureManagerGrant, principalOf, sent, setSpendingApprover } from './account.builder';
 
 /*
  * T2.2 (spec "Integration: dựng fixture không qua HTTP"): the organization a suite only needs as a precondition, made by the
@@ -69,8 +69,10 @@ export async function assignHead(
   ctx: HttpTestApp,
   adminToken: string,
   departmentId: string,
-  body: object,
+  body: { employeeId: string; effectiveFrom?: string },
 ): Promise<void> {
+  // The head is a MANAGER first (US-03-06 AC-23); the seam grants it once the application stops deriving the role.
+  await ensureManagerGrant(ctx, adminToken, body.employeeId);
   const actor = await principalOf(ctx, adminToken);
   await ctx.app
     .get(DepartmentHeadService, { strict: false })
@@ -84,6 +86,7 @@ export async function setApprovalRole(
   role: string,
   employeeId: string,
 ): Promise<void> {
+  if (role === 'SPENDING_APPROVER') return setSpendingApprover(ctx, adminToken, employeeId);
   const actor = await principalOf(ctx, adminToken);
   await ctx.app
     .get(ApprovalRoleService, { strict: false })

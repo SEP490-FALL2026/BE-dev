@@ -7,6 +7,7 @@ import { TransactionRunner } from '../../../src/infrastructure/database/transact
 import { ReassignmentHarness } from '../../support/reassignment-harness';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
+import { ensureManagerGrant } from '../../support/builders/account.builder';
 
 const h = new ReassignmentHarness();
 const M = 1_000_000;
@@ -477,6 +478,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
 
       failOrganizationListener = true;
       try {
+        await ensureManagerGrant(h.ctx, h.admin, successor.employeeId);
         await request(h.server())
           .post(`/api/v1/departments/${unit.department.id}/head-assignments`)
           .set({ Authorization: `Bearer ${h.admin}` })

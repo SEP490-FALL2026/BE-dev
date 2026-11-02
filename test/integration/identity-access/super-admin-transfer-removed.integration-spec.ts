@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
+import { ensureManagerGrant } from '../../support/builders/account.builder';
 
 const ORG_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
@@ -66,6 +67,7 @@ describe('the Super Admin role cannot be handed over in the application (integra
       roles: [],
       admin,
     });
+    await ensureManagerGrant(ctx, admin, head.employeeId);
     await request(server())
       .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)
       .set('Authorization', `Bearer ${admin}`)

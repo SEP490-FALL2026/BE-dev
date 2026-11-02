@@ -3,6 +3,7 @@ import { Client } from 'pg';
 import { OperatingParametersApi } from '../../../src/modules/operating-parameters/public/operating-parameters.api';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
+import { ensureManagerGrant } from '../../support/builders/account.builder';
 
 interface ParameterWire {
   key: string;
@@ -56,6 +57,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
     admin = await adminToken(ctx, seed);
     it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
     head = await createActivatedAccount(ctx, seed, { code: 'E-HEAD', email: 'head@acme.vn', roles: [], admin });
+    await ensureManagerGrant(ctx, admin, head.employeeId);
     await request(server())
       .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)
       // The head of a department is named by the Super Admin (QĐ-87).

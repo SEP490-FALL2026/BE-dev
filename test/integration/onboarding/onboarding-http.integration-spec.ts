@@ -7,6 +7,7 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../../support/http-test-app';
+import { ensureManagerGrant } from '../../support/builders/account.builder';
 
 interface Step {
   step: number;
@@ -148,6 +149,7 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
 
   it('stops warning about a department once it has a head and an IT Admin in charge', async () => {
     const head = await createActivatedAccount(ctx, seed, { code: 'E-HEAD', email: 'head@acme.vn', roles: [], admin });
+    await ensureManagerGrant(ctx, admin, head.employeeId);
     await request(server())
       .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)
       .set({ Authorization: `Bearer ${admin}` })

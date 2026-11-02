@@ -5,6 +5,11 @@ import {
   type AccessTokenVerifierPort,
   type AuthenticatedPrincipal,
 } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
+import {
+  ApprovalRoleParamDto,
+  SetApprovalRoleBodyDto,
+} from '../../../src/modules/identity-access/approval-roles/approval-role.dto';
+import { ApprovalRoleService } from '../../../src/modules/identity-access/approval-roles/approval-role.service';
 import { AccountRecordService } from '../../../src/modules/identity-access/accounts/account-record.service';
 import { CredentialService } from '../../../src/modules/identity-access/credentials/credential.service';
 import { RoleGrantService } from '../../../src/modules/identity-access/accounts/role-grant.service';
@@ -103,4 +108,53 @@ export async function buildActivatedAccount(
   });
 
   return { ...made, email: spec.email, accessToken: await signIn(ctx, spec.email, password) };
+}
+
+/*
+ * The one place a suite gives a person `MANAGER` or `SPENDING_APPROVER` as a precondition, or reads who holds the second
+ * (QĐ-93b). `MANAGER` is still derived from a head period until the principal stops deriving roles (plan task 7), so
+ * `ensureManagerGrant` grants nothing yet; `SPENDING_APPROVER` is still the approval-role holder row until task 6a. Only
+ * these four helpers change when the application accepts the new grants — no spec reaches for the role tables itself.
+ */
+
+/**
+ * The person is a `MANAGER` before a spec makes them a head or a successor. `MANAGER` is still derived (until task 7), so
+ * nothing is granted yet; the call only checks what the later grant needs — the Super Admin resolves and the employee exists.
+ */
+export async function ensureManagerGrant(ctx: HttpTestApp, adminToken: string, employeeId: string): Promise<void> {
+  await principalOf(ctx, adminToken);
+  const { rowCount } = await ctx.sql.query('SELECT 1 FROM employees WHERE id = $1', [employeeId]);
+  if (rowCount !== 1) throw new Error(`The employee ${employeeId} does not exist, so no MANAGER grant can follow.`);
+}
+
+/** The Super Admin names the one spending approver, through the service of the route (T2.2: no HTTP). */
+export async function setSpendingApprover(ctx: HttpTestApp, adminToken: string, employeeId: string): Promise<void> {
+  const actor = await principalOf(ctx, adminToken);
+  await ctx.app
+    .get(ApprovalRoleService, { strict: false })
+    .set(
+      actor,
+      ApprovalRoleParamDto.create({ role: 'SPENDING_APPROVER' }).role,
+      SetApprovalRoleBodyDto.create({ employeeId }).employeeId,
+    );
+}
+
+/**
+ * Nobody is the spending approver any more: the way the role is left empty, which no route does. `held_from` carries the
+ * application's clock, which can run ahead of the database's on a developer machine, so the holding never ends before it began.
+ */
+export async function clearSpendingApprover(ctx: HttpTestApp): Promise<void> {
+  await ctx.sql.query(
+    `UPDATE approval_role_holders SET held_until = GREATEST(now(), held_from)
+      WHERE role = 'SPENDING_APPROVER'::"ApprovalRole" AND held_until IS NULL`,
+  );
+}
+
+/** The employee who is the spending approver now; null when nobody is. */
+export async function spendingApproverEmployeeId(ctx: HttpTestApp): Promise<string | null> {
+  const { rows } = await ctx.sql.query<{ employee_id: string }>(
+    `SELECT employee_id FROM approval_role_holders WHERE role = 'SPENDING_APPROVER'::"ApprovalRole" AND held_until IS NULL`,
+  );
+
+  return rows[0]?.employee_id ?? null;
 }

@@ -3,6 +3,7 @@ import type { PreviewWire } from '../../src/modules/requests/request-submission/
 import request from 'supertest';
 import { ApiAccount } from './api-accounts';
 import { declareSubscription } from './builders/catalog.builder';
+import { clearSpendingApprover, setSpendingApprover } from './builders/account.builder';
 import { assignHead, setApprovalRole } from './builders/organization.builder';
 import { OwnedSubscriptions } from './owned-subscriptions';
 import { ProvisioningHarness } from './provisioning-harness';
@@ -172,7 +173,8 @@ export class RequestHarness extends ProvisioningHarness {
     role: 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'FALLBACK_APPROVER',
     person: Person,
   ): Promise<void> {
-    await setApprovalRole(this.ctx, this.admin, role, person.employeeId);
+    if (role === 'SPENDING_APPROVER') await setSpendingApprover(this.ctx, this.admin, person.employeeId);
+    else await setApprovalRole(this.ctx, this.admin, role, person.employeeId);
   }
 
   /**
@@ -180,6 +182,7 @@ export class RequestHarness extends ProvisioningHarness {
    * clock, which can run ahead of the database's on a developer machine, so the holding never ends before it began.
    */
   async clearRole(role: 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'FALLBACK_APPROVER'): Promise<void> {
+    if (role === 'SPENDING_APPROVER') return clearSpendingApprover(this.ctx);
     await this.ctx.sql.query(
       `UPDATE approval_role_holders SET held_until = GREATEST(now(), held_from) WHERE role = $1::"ApprovalRole" AND held_until IS NULL`,
       [role],

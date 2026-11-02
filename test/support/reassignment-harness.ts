@@ -9,6 +9,7 @@ import {
   type SweepResult,
 } from '../../src/modules/requests/public/step-redetermination-sweep.api';
 import type { ApiAccount } from './api-accounts';
+import { spendingApproverEmployeeId } from './builders/account.builder';
 import { SpendHarness } from './spend-harness';
 
 /** A step as the database keeps it, with the moments the deadline and the wait are measured from. */
@@ -140,6 +141,7 @@ export class ReassignmentHarness extends SpendHarness {
 
   /** Who holds the approval role now, by employee id; null when nobody does. */
   async getApprovalRoleHolder(role: string): Promise<string | null> {
+    if (role === 'SPENDING_APPROVER') return spendingApproverEmployeeId(this.ctx);
     const { rows } = await this.ctx.sql.query<{ employee_id: string }>(
       `SELECT employee_id FROM approval_role_holders WHERE role = $1::"ApprovalRole" AND held_until IS NULL`,
       [role],
