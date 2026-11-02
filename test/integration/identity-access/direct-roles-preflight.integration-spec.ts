@@ -235,4 +235,21 @@ describe('ops:preflight, the conversion of MANAGER and SPENDING_APPROVER (integr
     },
     CLI_COLD_START_MS,
   );
+
+  it(
+    'reports nothing once the migration is applied, even for a row of the kinds it would have stopped for',
+    async () => {
+      const deployed = await deployMigrations(database);
+      if (deployed.code !== 0) throw new Error(`Deploying the conversion failed: ${deployed.stdout}`);
+      const head = await addPerson(sql, world, { code: 'E-H8', department: 'P-ENG' });
+      await addHeadPeriod(sql, world, { department: 'P-ENG', employeeId: head.employeeId });
+
+      const { code, report } = await preflight();
+
+      expect(code).toBe(0);
+      expect(report.status).toBe('READY');
+      expect(ofRoles(report)).toEqual([]);
+    },
+    DEPLOY_TIMEOUT_MS + CLI_COLD_START_MS,
+  );
 });
