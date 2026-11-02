@@ -52,13 +52,14 @@ const SUBMIT_ERRORS = [
   {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The form is incomplete or invalid (VALIDATION_ERROR). The end is not after the end the right has, or after today (RENEWAL_REQUEST.END_NOT_AFTER), the term is too long (RENEWAL_REQUEST.END_TOO_FAR), a head who sends it for more than twelve months gives no confirmation (RENEWAL_REQUEST.TERM_CONFIRMATION_REQUIRED). Nothing is written.',
+      'The form is incomplete or invalid (VALIDATION_ERROR). The end is not after the end the right has, or after today (RENEWAL_REQUEST.END_NOT_AFTER), the term is too long (RENEWAL_REQUEST.END_TOO_FAR), a head who sends it for more than twelve months gives no confirmation (RENEWAL_REQUEST.TERM_CONFIRMATION_REQUIRED), or the sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.',
     examples: [
       VALIDATION_EXAMPLE,
       RENEWAL_ERROR_EXAMPLES.END_NOT_AFTER,
       RENEWAL_ERROR_EXAMPLES.END_TOO_FAR,
       RENEWAL_ERROR_EXAMPLES.TERM_CONFIRMATION_REQUIRED,
       RENEWAL_ERROR_EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE,
+      RENEWAL_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE,
     ],
   },
 ] as const;

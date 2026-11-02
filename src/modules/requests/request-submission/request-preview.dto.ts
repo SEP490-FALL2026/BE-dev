@@ -49,6 +49,17 @@ const previewSchema = z.strictObject({
   existingAccess: z
     .strictObject({ assignmentId: z.uuid(), effectiveFrom: z.string(), validUntil: z.string().nullable() })
     .nullable(),
+  /**
+   * Why the request cannot be sent whoever sends it: the first side and reason that apply, with every person of the request that has
+   * them (`D-S21`). Null when nobody is refused; the rest of the preview is then what sending would fix, as for anybody else.
+   */
+  blockedBy: z
+    .strictObject({
+      reason: z.enum(['SPENDING_APPROVER', 'UNPLACED']),
+      party: z.enum(['REQUESTER', 'BENEFICIARY']),
+      employeeIds: z.array(z.uuid()),
+    })
+    .nullable(),
   canSubmit: z.boolean(),
   expectedSpendOn: z.string().nullable(),
   budgetYear: z.number().int().nullable(),

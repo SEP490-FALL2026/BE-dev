@@ -1,7 +1,6 @@
 import { SpendHarness, Unit } from '../../support/spend-harness';
 
 const h = new SpendHarness();
-const M = 1_000_000;
 
 interface RequestWire {
   id: string;
@@ -346,7 +345,7 @@ describe('a head sends requests for the people of the department over PostgreSQL
     });
   });
 
-  describe('the head among the people (AC-8, US-06-08 AC-2, AC-9)', () => {
+  describe('the head among the people (AC-8, US-06-08 AC-2, AC-9), and the spending approver who is none of them (US-03-02 AC-15)', () => {
     it('has the share of the head routed like any request of theirs, and not confirmed by the sending', async () => {
       const u = await unit();
       const n1 = await colleague(u);
@@ -367,24 +366,39 @@ describe('a head sends requests for the people of the department over PostgreSQL
       expect(own.delegatedBatchId).toBe(other.delegatedBatchId);
     });
 
-    it('gives the spend step to the substitute when the approver is the person it is for (US-06-08 AC-2)', async () => {
+    it('refuses a delegated request naming the spending approver before any department check', async () => {
       const u = await unit();
-      const version = await h.budgetFor(u, { total: 100 * M });
-      const approver = await colleague(u);
-      await h.setRole('SPENDING_APPROVER', approver);
-      try {
-        const [request] = (await sent(u.head.account, form([approver.employeeId], [paidA]))).requests;
-        await h.setPayments(request.id, { amount: 5 * M });
-        await h.attachLine(request.id, version.id, 1);
-        await h.sendOn([request.id], u.head.account).expect(201);
+      const n1 = await colleague(u);
+      const requestsBefore = await h.requestRows();
+      const commitmentsBefore = await h.count('budget_commitments');
 
-        expect(await h.steps(request.id, 'SPEND_APPROVAL')).toEqual([
-          expect.objectContaining({ state: 'PENDING', assignee_employee_id: h.substitute.employeeId }),
-        ]);
-        await h.decideSpend(request.id, { decision: 'APPROVE' }, approver.account).expect(403);
-      } finally {
-        await h.setRole('SPENDING_APPROVER', h.boss);
-      }
+      // The spending approver is of another department (P-EXE): outside the department would be the answer of a department check.
+      const refused = await send(u.head.account, form([n1.employeeId, h.boss.employeeId], [paidA])).expect(422);
+
+      expect(h.codeOf(refused)).toBe('REQUEST_PARTY.INELIGIBLE');
+      expect(h.detailsOf(refused)).toEqual({
+        reason: 'SPENDING_APPROVER',
+        party: 'BENEFICIARY',
+        employeeIds: [h.boss.employeeId],
+      });
+      expect(await h.requestRows()).toBe(requestsBefore);
+      expect(await h.count('budget_commitments')).toBe(commitmentsBefore);
+    });
+
+    it('refuses the spending approver who sends for people of a department, as the sender', async () => {
+      const u = await unit();
+      const n1 = await colleague(u);
+      const requestsBefore = await h.requestRows();
+
+      const refused = await send(h.boss.account, form([n1.employeeId], [paidA])).expect(422);
+
+      expect(h.codeOf(refused)).toBe('REQUEST_PARTY.INELIGIBLE');
+      expect(h.detailsOf(refused)).toEqual({
+        reason: 'SPENDING_APPROVER',
+        party: 'REQUESTER',
+        employeeIds: [h.boss.employeeId],
+      });
+      expect(await h.requestRows()).toBe(requestsBefore);
     });
   });
 });

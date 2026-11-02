@@ -75,6 +75,7 @@ export class GroupRequestService {
 
     return this.runner.run(async (tx) => {
       await this.requireSender(tx, actor);
+      await this.facts.requireEligibleSender(tx, actor.employeeId, { lock: false });
       const judged = await this.facts.judge(tx, this.input(actor, body, settings, false));
       const refused = new Map(judged.refused.map((line) => [line.employeeId, line.reason]));
 
@@ -94,7 +95,8 @@ export class GroupRequestService {
   }
 
   /**
-   * Throws AccessRequestSuperAdminCannotRequestError, GroupRequestPlanNotEligibleError, GroupRequestTooManyLinesError,
+   * Throws AccessRequestSuperAdminCannotRequestError, RequestPartyIneligibleError (the sender; a line is a reason of its line),
+   * GroupRequestPlanNotEligibleError, GroupRequestTooManyLinesError,
    * GroupRequestDuplicateLineError, GroupRequestLinesRefusedError, GroupRequestTermConfirmationRequiredError,
    * AccessRequestNoDepartmentError and the errors of assessing a plan. A draft (draftId) is the request being sent: it is locked first,
    * judged again under the lock, and its row becomes the request; AccessRequestNotFoundError and AccessRequestNotDraftError.
@@ -114,6 +116,7 @@ export class GroupRequestService {
         if (verdict === 'NOT_DRAFT') throw new AccessRequestNotDraftError();
       }
       const organizationId = await this.requireSender(tx, actor);
+      await this.facts.requireEligibleSender(tx, actor.employeeId, { lock: true });
       const judged = await this.facts.judge(tx, this.input(actor, body, settings, true));
       this.refuse(judged, body);
 

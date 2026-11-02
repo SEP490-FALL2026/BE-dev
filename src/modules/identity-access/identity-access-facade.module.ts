@@ -15,6 +15,8 @@ import { SuperAdminHolderRepo } from './accounts/super-admin-holder.repo';
 import { ApprovalRoleHoldersService } from './approval-roles/approval-role-holders.service';
 import { ApprovalRoleReaderRepo } from './approval-roles/approval-role-reader.repo';
 import { IdentityAccessApi } from './public/identity-access.api';
+import { RequestPartyEligibilityApi } from './public/request-party-eligibility.api';
+import { RequestPartyEligibilityService } from './request-party/request-party-eligibility.service';
 import { ApprovalRoleChangeListeners, SpendingApproverGrantChecks } from './public/identity-access.extension-points';
 
 /**
@@ -42,10 +44,13 @@ import { ApprovalRoleChangeListeners, SpendingApproverGrantChecks } from './publ
     ActionLinkService,
     CredentialService,
     IdentityAccessApi,
+    RequestPartyEligibilityService,
+    RequestPartyEligibilityApi,
     EmployeeAccountsListener,
   ],
   exports: [
     IdentityAccessApi,
+    RequestPartyEligibilityApi,
     AccountRecordService,
     RoleGrantService,
     ActionLinkService,

@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 import { ReturnRequestRefusedError, type ReturnRefusal } from './return-request.errors';
 
@@ -45,6 +46,13 @@ export const RETURN_ERROR_EXAMPLES = {
   ASSIGNMENT_NOT_FOUND: example(new ReturnRequestRefusedError('ASSIGNMENT_NOT_FOUND')),
   NOT_FOUND: example(new ReturnRequestRefusedError('NOT_FOUND')),
   NO_DEPARTMENT: example(new ReturnRequestRefusedError('NO_DEPARTMENT')),
+  REQUEST_PARTY_INELIGIBLE: example(
+    new RequestPartyIneligibleError({
+      reason: 'SPENDING_APPROVER',
+      party: 'BENEFICIARY',
+      employeeIds: ['<employee-id>'],
+    }),
+  ),
   ASSIGNMENT_NOT_RETURNABLE: example(new ReturnRequestRefusedError('ASSIGNMENT_NOT_RETURNABLE', 'NOT_OPEN')),
   ALREADY_REQUESTED: example(new ReturnRequestRefusedError('ALREADY_REQUESTED')),
   RENEWAL_PENDING: example(new ReturnRequestRefusedError('RENEWAL_PENDING')),

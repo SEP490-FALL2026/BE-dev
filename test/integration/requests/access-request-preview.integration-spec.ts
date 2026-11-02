@@ -87,6 +87,7 @@ describe('requests over HTTP: the preview before sending (integration, real Post
           'costCenter',
           'requirements',
           'existingAccess',
+          'blockedBy',
           'canSubmit',
           'expectedSpendOn',
           'budgetYear',
@@ -421,6 +422,24 @@ describe('requests over HTTP: the preview before sending (integration, real Post
       ]) {
         expect(h.codeOf(await h.previewRequest(body, designer.account).expect(422))).toBe('VALIDATION_ERROR');
       }
+    });
+  });
+
+  describe('the spending approver is no party of a request (US-05-01 AC-16, D-S21)', () => {
+    it('says who is refused and why, with the rest of the preview as for anybody, and cannot be sent', async () => {
+      const preview = await h.previewed(boss, paidPlan);
+
+      expect(preview.blockedBy).toEqual({
+        reason: 'SPENDING_APPROVER',
+        party: 'REQUESTER',
+        employeeIds: [boss.employeeId],
+      });
+      expect(preview).toMatchObject({ canSubmit: false, branch: 'PAID_IN_CATALOG', department: { id: executive.id } });
+      expect((await h.previewed(boss, internalPlan)).blockedBy).toMatchObject({ reason: 'SPENDING_APPROVER' });
+    });
+
+    it('names nobody for a person who may send, whose preview is not blocked', async () => {
+      expect((await h.previewed(designer, paidPlan)).blockedBy).toBeNull();
     });
   });
 });

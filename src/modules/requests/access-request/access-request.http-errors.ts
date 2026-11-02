@@ -1,6 +1,10 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import {
+  RequestPartyIneligibleError,
+  requestPartyRefusalBody,
+} from '../../identity-access/public/request-party.errors';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
@@ -46,6 +50,11 @@ export function toAccessRequestApiException(error: unknown): unknown {
   // The department has no Cost Center in use yet (`QĐ-87d(1)`): Finance creates it first. Nothing was written.
   if (error instanceof FinanceSetupIncompleteError) {
     return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
+  }
+
+  // The spending approver, whatever the route, is no party of a Request (`D-S21`): one code, one body.
+  if (error instanceof RequestPartyIneligibleError) {
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, requestPartyRefusalBody(error));
   }
 
   // The Super Admin does no business work: no request is sent in their name, whatever the route.
@@ -155,6 +164,13 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  REQUEST_PARTY_INELIGIBLE: example(
+    new RequestPartyIneligibleError({
+      reason: 'SPENDING_APPROVER',
+      party: 'REQUESTER',
+      employeeIds: ['<employee-id>'],
+    }),
+  ),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
   NOT_DRAFT: example(new AccessRequestNotDraftError()),

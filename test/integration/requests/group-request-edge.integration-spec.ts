@@ -220,31 +220,23 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     expect((await h.steps(id, 'FINANCE_REVIEW')).map((step) => step.state)).toEqual(['PENDING']);
   });
 
-  it('hands the people of the line of the approver back when no substitute is set: the step waits under control and nobody decides it (US-06-08 AC-10)', async () => {
+  it('has no line of the spending approver any more: the group is refused for that line, and nothing is written (US-05-17 AC-18, D-S21)', async () => {
     const u = await unit();
     const plan = await h.planOf(await h.subscription(10));
     const [e1] = await h.colleagues(u, 1);
     const approver = await h.colleague(u);
     await h.setRole('SPENDING_APPROVER', approver);
-    await h.clearRole('CONFLICT_SUBSTITUTE');
+    const rows = await h.requestRows();
     try {
-      const id = await h.groupWaiting(u, plan, [e1, approver]);
+      const refused = await h.submitGroup(h.groupBody(plan, [e1, approver]), u.head.account).expect(422);
 
-      const steps = await h.steps(id, 'SPEND_APPROVAL');
-
-      expect(steps).toHaveLength(1);
-      expect(steps[0]).toMatchObject({ state: 'WAITING', assignee_employee_id: null });
-      expect(await h.state(id)).toBe('WAITING_CONTROLLED');
-      expect(
-        h.codeOf(
-          await h
-            .decideSpendLines(id, { lines: [approve(e1.employeeId), approve(approver.employeeId)] }, approver.account)
-            .expect(403),
-        ),
-      ).toBe('SPEND.OWN_REQUEST');
+      expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+      expect(h.detailsOf(refused)).toEqual({
+        lines: [{ employeeId: approver.employeeId, reason: 'SPENDING_APPROVER' }],
+      });
+      expect(await h.requestRows()).toBe(rows);
     } finally {
       await h.setRole('SPENDING_APPROVER', h.boss);
-      await h.setRole('CONFLICT_SUBSTITUTE', h.substitute);
     }
   });
 });

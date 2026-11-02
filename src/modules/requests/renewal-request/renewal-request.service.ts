@@ -3,8 +3,6 @@ import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { AssignmentNotFoundError } from '../../licensing/public/licensing.errors';
-import { LicensingRenewalApi } from '../../licensing/public/licensing-renewal.api';
 import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
@@ -15,6 +13,7 @@ import { AccessRequestService } from '../request-intake/access-request.service';
 import { RequestFactsService, type RequestSettings } from '../access-request/request-facts.service';
 import { RenewalRequestRepo } from '../renewal-apply/renewal-request.repo';
 import { RenewalRequestWriter, type RenewalSubmitted } from './renewal-request-writer.service';
+import { RenewalSeatFactsService } from './renewal-seat-facts.service';
 import type { RenewalBodyDto } from './renewal-request.dto';
 import { RenewalRequestRefusedError } from './renewal-request.errors';
 import { checkNewEnd, checkRenewable, checkRenewalSender, monthsBetween, routeRenewal } from './renewal-request.policy';
@@ -36,9 +35,9 @@ export class RenewalRequestService {
     private readonly accessRequests: AccessRequestService,
     private readonly assessment: RequestFactsService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly licensingRenewals: LicensingRenewalApi,
     private readonly audit: AuditApi,
     private readonly writer: RenewalRequestWriter,
+    private readonly seatFacts: RenewalSeatFactsService,
   ) {}
 
   /**
@@ -69,7 +68,8 @@ export class RenewalRequestService {
 
   /** The seat, locked, and who may ask: the holder or the head of their department, for a seat that has an end, renewed to a day that may be. */
   private async requireSendable(tx: DbTx, actor: AuthenticatedPrincipal, body: RenewalBodyDto, today: BusinessDate) {
-    const facts = await this.lockedFacts(tx, body.assignmentId);
+    // The sender and the holder cannot be the spending approver (`D-S21`): judged before any department is read.
+    const facts = await this.seatFacts.lockedFactsOf(tx, actor.employeeId, body.assignmentId);
     const holderUnit = (await this.organizationReads.getOwningUnits([facts.employeeId], today, tx)).get(
       facts.employeeId,
     );
@@ -96,16 +96,6 @@ export class RenewalRequestService {
     if (endRefusal) throw new RenewalRequestRefusedError(endRefusal);
 
     return { facts, byHead: sender.byHead, previousEnd };
-  }
-
-  /** The seat, read under the lock of its subscription and then of itself. Throws RenewalRequestRefusedError. */
-  private async lockedFacts(tx: DbTx, assignmentId: string): Promise<AssignmentFacts> {
-    try {
-      return await this.licensingRenewals.getAssignmentFacts(tx, assignmentId, { lock: true });
-    } catch (error) {
-      if (error instanceof AssignmentNotFoundError) throw new RenewalRequestRefusedError('ASSIGNMENT_NOT_FOUND');
-      throw error;
-    }
   }
 
   /** The right has ended: the person asks for the tool again, as for any tool, for the term from today to the end they gave. */

@@ -38,6 +38,7 @@ export const groupBodySchema = z.strictObject({
 });
 
 const LINE_REASONS = [
+  'SPENDING_APPROVER',
   'OUTSIDE_DEPARTMENT',
   'NOT_ACTIVE',
   'EMAIL_REQUIRED',

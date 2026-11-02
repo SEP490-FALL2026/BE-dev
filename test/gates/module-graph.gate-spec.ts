@@ -74,6 +74,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // The audited exchange-rate use case the finance HTTP module serves; the raw ledger is not exported.
   'FinanceModule: ExchangeRateService',
   'IdentityAccessFacadeModule: IdentityAccessApi',
+  // D-S21 (qd93-remove-fallback-substitute-approvers): who can never ask for or be given access through a Request, one facade for every route that makes one.
+  'IdentityAccessFacadeModule: RequestPartyEligibilityApi',
   // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the handover
   // duties of a departure, the open grant tasks of a person, the service account duties, and (G4, ADR-0013) the seat baseline the import reads and writes through.
   'LicensingModule: LicensingApi',

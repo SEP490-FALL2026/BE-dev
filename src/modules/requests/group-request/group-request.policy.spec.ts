@@ -20,6 +20,7 @@ const person = (over: Partial<LineFacts> = {}): LineFacts => ({
   holdsAccess: false,
   hasOpenRequest: false,
   isHeadOwnLine: false,
+  spendingApprover: false,
   ...over,
 });
 
@@ -90,6 +91,18 @@ describe('what each person named must have (US-05-17 AC-2, AC-8, AC-12, AC-15)',
     ['a person with a request for the plan open', { hasOpenRequest: true }, 'HAS_OPEN_REQUEST'],
   ] as const)('refuses %s', (_name, change, reason) => {
     expect(check([person({ employeeId: 'x', ...change })])).toEqual([{ employeeId: 'x', reason }]);
+  });
+
+  it('refuses the spending approver with a reason of their own, whatever else is true of the line (D-S21)', () => {
+    const approver = person({ employeeId: 'c1', spendingApprover: true });
+
+    expect(check([approver])).toEqual([{ employeeId: 'c1', reason: 'SPENDING_APPROVER' }]);
+    expect(check([{ ...approver, departmentId: 'P-ENG', active: false, workEmail: null, holdsAccess: true }])).toEqual([
+      { employeeId: 'c1', reason: 'SPENDING_APPROVER' },
+    ]);
+    expect(check([person({ employeeId: 'e2' }), approver])).toEqual([
+      { employeeId: 'c1', reason: 'SPENDING_APPROVER' },
+    ]);
   });
 
   it('takes an intern who has a day of their own that is not before today', () => {

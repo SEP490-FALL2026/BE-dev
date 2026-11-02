@@ -9,6 +9,7 @@ import {
   AccessRequestSpendDateNotAllowedError,
   AccessRequestSuperAdminCannotRequestError,
 } from '../access-request/access-request.errors';
+import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 import { RenewalRequestRefusedError, type RenewalRefusal } from './renewal-request.errors';
 
@@ -61,6 +62,13 @@ export const RENEWAL_ERROR_EXAMPLES = {
     }),
   ),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  REQUEST_PARTY_INELIGIBLE: example(
+    new RequestPartyIneligibleError({
+      reason: 'SPENDING_APPROVER',
+      party: 'BENEFICIARY',
+      employeeIds: ['<employee-id>'],
+    }),
+  ),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
   NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),

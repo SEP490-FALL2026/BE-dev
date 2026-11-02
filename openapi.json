@@ -28632,7 +28632,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, ACCOUNT_IDENTIFIER_REQUIRED (a service account without the identifier the IT Admin enters), RESPONSIBLE_INVALID (the person named is not active in the owning department, or the request is not for a service account), SUBSCRIPTION_REQUIRED, SUBSCRIPTION_NOT_ALLOWED, SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_QUANTITY_UNKNOWN, SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP, IDENTIFIER_IN_USE or EXPECTED_END_REQUIRED.",
+            "description": "The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, ACCOUNT_IDENTIFIER_REQUIRED (a service account without the identifier the IT Admin enters), RESPONSIBLE_INVALID (the person named is not active in the owning department, or the request is not for a service account), REQUEST_PARTY.INELIGIBLE (the person named is the spending approver, who answers for no account of a request), SUBSCRIPTION_REQUIRED, SUBSCRIPTION_NOT_ALLOWED, SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_QUANTITY_UNKNOWN, SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP, IDENTIFIER_IN_USE or EXPECTED_END_REQUIRED.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -28690,6 +28690,22 @@
                         "code": "PROVISIONING.RESPONSIBLE_INVALID",
                         "message": "The person named cannot answer for the service account: OUTSIDE_DEPARTMENT.",
                         "details": { "problem": "OUTSIDE_DEPARTMENT" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "BENEFICIARY",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -37693,7 +37709,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid for its kind (VALIDATION_ERROR). Nothing is saved.",
+            "description": "The body is invalid for its kind (VALIDATION_ERROR), or the sender, or a person of a group draft, is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -37706,6 +37722,22 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "REQUESTER",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -38181,7 +38213,7 @@
             }
           },
           "422": {
-            "description": "The id is invalid (VALIDATION_ERROR), or an expected spend date is saved for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE). Nothing changes.",
+            "description": "The id is invalid (VALIDATION_ERROR), an expected spend date is saved for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing changes.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -38205,6 +38237,22 @@
                       "error": {
                         "code": "ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE",
                         "message": "A request for internal software has no expected spend date: nothing is paid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "REQUESTER",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -38689,7 +38737,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required. Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE, with the sender in details.employeeIds). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -38713,6 +38761,22 @@
                       "error": {
                         "code": "ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE",
                         "message": "A request for internal software has no expected spend date: nothing is paid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "REQUESTER",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -40560,7 +40624,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required. Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40573,6 +40637,22 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "REQUESTER",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -47373,7 +47453,7 @@
             }
           },
           "422": {
-            "description": "The form is invalid (VALIDATION_ERROR), a person is outside the department (DELEGATED_REQUEST.OUTSIDE_DEPARTMENT), has no work email (DELEGATED_REQUEST.EMAIL_REQUIRED), is a contractor, freelancer or intern without the day the access ends (DELEGATED_REQUEST.END_DATE_REQUIRED, DELEGATED_REQUEST.END_DATE_TOO_EARLY), a long term is not confirmed (DELEGATED_REQUEST.TERM_CONFIRMATION_REQUIRED).",
+            "description": "The form is invalid (VALIDATION_ERROR), a person is outside the department (DELEGATED_REQUEST.OUTSIDE_DEPARTMENT), has no work email (DELEGATED_REQUEST.EMAIL_REQUIRED), is a contractor, freelancer or intern without the day the access ends (DELEGATED_REQUEST.END_DATE_REQUIRED, DELEGATED_REQUEST.END_DATE_TOO_EARLY), a long term is not confirmed (DELEGATED_REQUEST.TERM_CONFIRMATION_REQUIRED), or the head or one of the people is the spending approver (REQUEST_PARTY.INELIGIBLE: nothing is sent for anybody).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -47386,6 +47466,22 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "REQUESTER",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -48088,7 +48184,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the purpose, the identifier, the reason and the term are required. The plan is granted by a key tied to a device or cannot be granted yet (SERVICE_ACCOUNT_REQUEST.PLAN_NOT_SUPPORTED), or an expected spend date is given for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE). Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the purpose, the identifier, the reason and the term are required. The plan is granted by a key tied to a device or cannot be granted yet (SERVICE_ACCOUNT_REQUEST.PLAN_NOT_SUPPORTED), or an expected spend date is given for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -48123,6 +48219,22 @@
                       "error": {
                         "code": "ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE",
                         "message": "A request for internal software has no expected spend date: nothing is paid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "REQUESTER",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -48703,7 +48815,7 @@
             }
           },
           "422": {
-            "description": "The form is invalid (VALIDATION_ERROR): exactly one seat and a reason are required. The request named is not the one whose grant made the seat, or the caller has no part in it (RETURN_REQUEST.ORIGIN_MISMATCH). Nothing is written.",
+            "description": "The form is invalid (VALIDATION_ERROR): exactly one seat and a reason are required. The request named is not the one whose grant made the seat, or the caller has no part in it (RETURN_REQUEST.ORIGIN_MISMATCH). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -48727,6 +48839,22 @@
                       "error": {
                         "code": "RETURN_REQUEST.ORIGIN_MISMATCH",
                         "message": "The return of the seat is refused: ORIGIN_MISMATCH.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "BENEFICIARY",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -49598,7 +49726,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR). The end is not after the end the right has, or after today (RENEWAL_REQUEST.END_NOT_AFTER), the term is too long (RENEWAL_REQUEST.END_TOO_FAR), a head who sends it for more than twelve months gives no confirmation (RENEWAL_REQUEST.TERM_CONFIRMATION_REQUIRED). Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR). The end is not after the end the right has, or after today (RENEWAL_REQUEST.END_NOT_AFTER), the term is too long (RENEWAL_REQUEST.END_TOO_FAR), a head who sends it for more than twelve months gives no confirmation (RENEWAL_REQUEST.TERM_CONFIRMATION_REQUIRED), or the sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -49655,6 +49783,22 @@
                       "error": {
                         "code": "ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE",
                         "message": "A request for internal software has no expected spend date: nothing is paid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "BENEFICIARY",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -50986,7 +51130,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR).",
+            "description": "The body is invalid (VALIDATION_ERROR), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -51010,6 +51154,22 @@
                       "error": {
                         "code": "ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE",
                         "message": "A request for internal software has no expected spend date: nothing is paid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "REQUESTER",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -51280,7 +51440,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE); too many people are named (GROUP_REQUEST.TOO_MANY_LINES) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); a head sends a term over twelve months without confirming it (GROUP_REQUEST.TERM_CONFIRMATION_REQUIRED). Nothing is written.",
+            "description": "The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE); too many people are named (GROUP_REQUEST.TOO_MANY_LINES) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); a head sends a term over twelve months without confirming it (GROUP_REQUEST.TERM_CONFIRMATION_REQUIRED); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER. Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -51363,6 +51523,22 @@
                       "error": {
                         "code": "ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE",
                         "message": "A request for internal software has no expected spend date: nothing is paid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "REQUESTER",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -51527,7 +51703,7 @@
             }
           },
           "422": {
-            "description": "The query is invalid (VALIDATION_ERROR).",
+            "description": "The query is invalid (VALIDATION_ERROR), or the caller is the spending approver and so sends no group (REQUEST_PARTY.INELIGIBLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -51540,6 +51716,22 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "REQUESTER",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -81909,6 +82101,17 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "blockedBy": {
+                    "type": "object",
+                    "properties": {
+                      "reason": { "type": "string", "enum": ["SPENDING_APPROVER", "UNPLACED"] },
+                      "party": { "type": "string", "enum": ["REQUESTER", "BENEFICIARY"] },
+                      "employeeIds": { "type": "array", "items": { "type": "string", "format": "uuid" } }
+                    },
+                    "required": ["reason", "party", "employeeIds"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "canSubmit": { "type": "boolean" },
                   "expectedSpendOn": { "type": "string", "nullable": true },
                   "budgetYear": {
@@ -82121,6 +82324,7 @@
                   "costCenter",
                   "requirements",
                   "existingAccess",
+                  "blockedBy",
                   "canSubmit",
                   "expectedSpendOn",
                   "budgetYear",
@@ -87424,6 +87628,7 @@
                     "reason": {
                       "type": "string",
                       "enum": [
+                        "SPENDING_APPROVER",
                         "OUTSIDE_DEPARTMENT",
                         "NOT_ACTIVE",
                         "EMAIL_REQUIRED",

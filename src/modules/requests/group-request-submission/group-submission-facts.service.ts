@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { RequestPartyEligibilityApi } from '../../identity-access/public/request-party-eligibility.api';
+import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -64,7 +66,21 @@ export class GroupSubmissionFactsService {
     private readonly licensing: LicensingApi,
     private readonly assessment: RequestFactsService,
     private readonly requests: AccessRequestRepo,
+    private readonly requestParties: RequestPartyEligibilityApi,
   ) {}
+
+  /**
+   * A sender who can never be a party of a Request (the spending approver) is refused with the answer of every route that sends one,
+   * before any department is read (`D-S21`). Sending judges under the lock of the account, the check judges without one.
+   * Throws RequestPartyIneligibleError.
+   */
+  async requireEligibleSender(tx: DbTx, senderEmployeeId: string, options: { lock: boolean }): Promise<void> {
+    const parties = { requesterEmployeeId: senderEmployeeId, beneficiaryEmployeeIds: [senderEmployeeId] };
+    if (options.lock) return this.requestParties.assertEligible(tx, parties);
+
+    const block = await this.requestParties.blockOf(parties, tx);
+    if (block !== null) throw new RequestPartyIneligibleError(block);
+  }
 
   /** Throws AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError and AccessRequestApplicationRetiredError. */
   async judge(tx: DbTx, input: GroupSubmissionInput): Promise<GroupJudgement> {
@@ -91,11 +107,17 @@ export class GroupSubmissionFactsService {
     const units = await this.organizationReads.getOwningUnits(ids, today, tx);
     const open = await this.requests.openRequestHolders(tx, input.planId, ids);
     const known = new Map(people.map((person) => [person.id, person]));
+    // The employees are locked first and their accounts after (employee, then account); checking locks nothing (`D-S21`).
+    if (input.lockPeople) {
+      for (const line of lines) {
+        if (known.has(line.employeeId)) await this.organizationReads.lockEmployeeForShare(tx, line.employeeId);
+      }
+    }
+    const party = await this.requestParties.ineligibleAmong(ids, tx, { lockForShare: input.lockPeople });
     const facts: LineFacts[] = [];
     for (const line of lines) {
       const person = known.get(line.employeeId);
       const own = units.get(line.employeeId);
-      if (input.lockPeople && person) await this.organizationReads.lockEmployeeForShare(tx, line.employeeId);
       facts.push({
         employeeId: line.employeeId,
         departmentId: person ? (own?.departmentId ?? null) : null,
@@ -107,6 +129,7 @@ export class GroupSubmissionFactsService {
         holdsAccess: person ? await this.holds(line.employeeId, input.planId) : false,
         hasOpenRequest: open.has(line.employeeId),
         isHeadOwnLine: senderIsHead && line.employeeId === input.senderEmployeeId,
+        spendingApprover: party.get(line.employeeId) === 'SPENDING_APPROVER',
       });
     }
 

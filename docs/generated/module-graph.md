@@ -67,7 +67,7 @@ flowchart BT
   licensing -->|29| audit
   licensing -->|48| catalog
   licensing -->|2| finance
-  licensing -->|6| identity_access
+  licensing -->|8| identity_access
   licensing -->|6| notifications
   licensing -->|6| operating_parameters
   licensing -->|55| organization
@@ -93,11 +93,11 @@ flowchart BT
   requests -->|16| budgets
   requests -->|24| catalog
   requests -->|7| finance
-  requests -->|18| identity_access
-  requests -->|37| licensing
+  requests -->|35| identity_access
+  requests -->|40| licensing
   requests -->|7| notifications
   requests -->|10| operating_parameters
-  requests -->|79| organization
+  requests -->|78| organization
 ```
 
 64 module edges.

@@ -231,8 +231,8 @@ describe('the spend of the people of a request for a group, decided one by one o
     });
   });
 
-  describe('the spending approver among the people (US-06-08 AC-10)', () => {
-    it('gives the step to the substitute, who decides in the place of the approver, and the approver decides none of it', async () => {
+  describe('the spending approver among the people (US-06-08 AC-10, US-05-17 AC-18, D-S21)', () => {
+    it('is never a line, so no step is given to a substitute: the group of the others goes to the spending approver, who decides it', async () => {
       const u = await unit();
       await h.budgetFor(u, { total: 100_000 * M, percent: 100 });
       await h.budgetFor(u, { total: 100_000 * M, percent: 100, year: h.next });
@@ -240,21 +240,23 @@ describe('the spend of the people of a request for a group, decided one by one o
       const approver = await h.colleague(u);
       await h.setRole('SPENDING_APPROVER', approver);
       try {
+        const refused = await h.submitGroup(h.groupBody(paid, [e1, approver]), u.head.account).expect(422);
+        expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+        expect(h.detailsOf(refused)).toEqual({
+          lines: [{ employeeId: approver.employeeId, reason: 'SPENDING_APPROVER' }],
+        });
+
         const sent = h.dataOf<{ request: { id: string } }>(
-          await h.submitGroup(h.groupBody(paid, [e1, approver]), u.head.account).expect(201),
+          await h.submitGroup(h.groupBody(paid, [e1]), u.head.account).expect(201),
         ).request;
         await h.setPlanLine(sent.id, { offPlan: true }, u.head.account).expect(200);
         await h.sendOn([sent.id], u.head.account).expect(201);
 
         const steps = await h.steps(sent.id, 'SPEND_APPROVAL');
         expect(steps).toHaveLength(1);
-        expect(steps[0].assignee_employee_id).toBe(h.substitute.employeeId);
-        const all = [approve(e1.employeeId), approve(approver.employeeId)];
-        expect(h.codeOf(await h.decideSpendLines(sent.id, { lines: all }, approver.account).expect(403))).toBe(
-          'SPEND.OWN_REQUEST',
-        );
-        await h.decideSpendLines(sent.id, { lines: all }, h.substitute.account).expect(200);
-        expect(await h.lineStates(sent.id)).toEqual(['APPROVED', 'APPROVED']);
+        expect(steps[0].assignee_employee_id).toBe(approver.employeeId);
+        await h.decideSpendLines(sent.id, { lines: [approve(e1.employeeId)] }, approver.account).expect(200);
+        expect(await h.lineStates(sent.id)).toEqual(['APPROVED']);
       } finally {
         await h.setRole('SPENDING_APPROVER', h.boss);
       }
