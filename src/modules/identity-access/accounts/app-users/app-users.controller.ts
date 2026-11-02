@@ -157,7 +157,11 @@ export class AppUsersController {
   }
 
   @Get('app-users')
-  @ApiOperation({ operationId: 'appUserList', summary: 'List accounts' })
+  @ApiOperation({
+    operationId: 'appUserList',
+    summary: 'List accounts',
+    description: 'Filter by department membership on a date; memberOn requires departmentId.',
+  })
   @ApiSuccessResponse(AccountPageResponseDto, { message: 'APP_USER.LISTED', description: 'A page of accounts.' })
   @ApiErrorResponses(...COMMON_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

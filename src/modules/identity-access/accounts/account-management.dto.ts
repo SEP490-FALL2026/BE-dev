@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
@@ -26,17 +27,24 @@ export const accountStatusChangeBodySchema = z.strictObject({
 export const appUserIdParamSchema = z.strictObject({ id: z.uuid() });
 export const appUserRoleParamSchema = z.strictObject({ id: z.uuid(), role: requestedRoleSchema });
 
-export const listAppUsersQuerySchema = z.strictObject({
-  page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(20),
-  status: z.enum(['ACTIVE', 'LOCKED']).optional(),
-  activationState: z.enum(['INVITED', 'ACTIVATED']).optional(),
-  role: appRoleSchema.optional(),
-  employeeLeft: z
-    .enum(['true', 'false'])
-    .transform((value) => value === 'true')
-    .optional(),
-});
+export const listAppUsersQuerySchema = z
+  .strictObject({
+    page: z.coerce.number().int().positive().default(1),
+    pageSize: z.coerce.number().int().positive().max(100).default(20),
+    status: z.enum(['ACTIVE', 'LOCKED']).optional(),
+    activationState: z.enum(['INVITED', 'ACTIVATED']).optional(),
+    role: appRoleSchema.optional(),
+    departmentId: z.uuid().optional(),
+    memberOn: businessDate.optional(),
+    employeeLeft: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .optional(),
+  })
+  .refine((query) => query.memberOn === undefined || query.departmentId !== undefined, {
+    path: ['memberOn'],
+    message: 'departmentId is required with memberOn',
+  });
 
 export const accountCandidatesQuerySchema = z.strictObject({ search: z.string().trim().max(100).optional() });
 

@@ -105,6 +105,7 @@ export interface AccountListFilter {
   status?: AppUserStatus;
   activationState?: ActivationState;
   role?: AppRole;
+  employeeIds?: string[];
   /** True: only the accounts of people who have left; false: only those of people who have not. */
   employeeLeft?: boolean;
   skip: number;

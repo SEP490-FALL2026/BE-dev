@@ -10,6 +10,7 @@ import {
   seedInstallation,
 } from '../../support/http-test-app';
 import { PgRelay } from '../../support/pg-relay';
+import { QueryCounter, dataStatements } from '../../support/query-count';
 
 /** R-14 (page and count from one snapshot) and R-09 (no Argon2 for a token that cannot be redeemed). */
 describe('account list snapshot and redeem cost (integration, real PostgreSQL)', () => {
@@ -74,6 +75,82 @@ describe('account list snapshot and redeem cost (integration, real PostgreSQL)',
     const data = (response.body as { data: { items: unknown[]; pagination: { totalItems: number } } }).data;
     expect(data.pagination.totalItems).toBe(data.items.length);
   }, 30000);
+
+  it('lists managers placed in a department on the requested day with constant query count', async () => {
+    const rows = (
+      await ctx.sql.query<{ employee: string; account: string }>(
+        `SELECT e.id AS employee, u.id AS account FROM employees e JOIN app_users u ON u.employee_id = e.id
+       WHERE e.employee_code LIKE 'LST-%' ORDER BY e.employee_code`,
+      )
+    ).rows;
+    for (const row of rows.slice(0, 2)) {
+      await ctx.sql.query(
+        `INSERT INTO role_grants (id, organization_id, app_user_id, role)
+        VALUES (gen_random_uuid(), $1, $2, 'MANAGER')`,
+        [seed.organizationId, row.account],
+      );
+    }
+    await ctx.sql.query(
+      `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+      VALUES (gen_random_uuid(), $1, $2, $3, '2026-02-01')`,
+      [seed.organizationId, rows[0].employee, seed.departmentId],
+    );
+    const list = () =>
+      request(ctx.app.getHttpServer())
+        .get(`/api/v1/app-users?departmentId=${seed.departmentId}&memberOn=2026-03-01&role=MANAGER`)
+        .set({ Authorization: `Bearer ${token}` })
+        .then((response) => response);
+    const first = await QueryCounter.on(relay).run(list);
+    expect(first.result.status).toBe(200);
+    expect((first.result.body as { data: { items: { id: string }[] } }).data.items.map((item) => item.id)).toEqual([
+      rows[0].account,
+    ]);
+    await ctx.sql.query(
+      `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+      VALUES (gen_random_uuid(), $1, $2, $3, '2026-02-01')`,
+      [seed.organizationId, rows[1].employee, seed.departmentId],
+    );
+    const second = await QueryCounter.on(relay).run(list);
+    expect(second.result.status).toBe(200);
+    expect(
+      (second.result.body as { data: { items: { id: string }[] } }).data.items.map((item) => item.id).sort(),
+    ).toEqual(
+      rows
+        .slice(0, 2)
+        .map((row) => row.account)
+        .sort(),
+    );
+    expect(dataStatements(second.statements).length).toBe(dataStatements(first.statements).length);
+    await ctx.sql.query(
+      `INSERT INTO role_grants (id, organization_id, app_user_id, role)
+      VALUES (gen_random_uuid(), $1, $2, 'SPENDING_APPROVER')`,
+      [seed.organizationId, rows[2].account],
+    );
+    const approvers = await request(ctx.app.getHttpServer())
+      .get('/api/v1/app-users?role=SPENDING_APPROVER')
+      .set({ Authorization: `Bearer ${token}` });
+    expect(approvers.status).toBe(200);
+    expect((approvers.body as { data: { items: { id: string }[] } }).data.items.map((item) => item.id)).toEqual([
+      rows[2].account,
+    ]);
+    const beforePlacement = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/app-users?departmentId=${seed.departmentId}&memberOn=2026-01-20&role=MANAGER`)
+      .set({ Authorization: `Bearer ${token}` });
+    expect(beforePlacement.status).toBe(200);
+    expect((beforePlacement.body as { data: { items: unknown[] } }).data.items).toEqual([]);
+    const missing = await request(ctx.app.getHttpServer())
+      .get('/api/v1/app-users?memberOn=2026-03-01')
+      .set({ Authorization: `Bearer ${token}` });
+    expect([missing.status, (missing.body as { error: { code: string } }).error.code]).toEqual([
+      422,
+      'VALIDATION_ERROR',
+    ]);
+    const unknown = await request(ctx.app.getHttpServer())
+      .get('/api/v1/app-users?departmentId=00000000-0000-4000-8000-000000000001')
+      .set({ Authorization: `Bearer ${token}` });
+    expect(unknown.status).toBe(200);
+    expect((unknown.body as { data: { items: unknown[] } }).data.items).toEqual([]);
+  });
 
   it.each([
     ['malformed', 'not-a-token'],

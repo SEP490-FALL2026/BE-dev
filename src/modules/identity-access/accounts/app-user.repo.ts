@@ -265,6 +265,7 @@ export class AppUserRepo {
 
   async listAccountRecords(filter: AccountListFilter): Promise<{ items: AccountRecord[]; total: number }> {
     const where = {
+      ...(filter.employeeIds === undefined ? {} : { employeeId: { in: filter.employeeIds } }),
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.activationState ? { activationState: filter.activationState } : {}),
       ...(filter.role ? { roleGrants: { some: { role: filter.role, revokedAt: null } } } : {}),
