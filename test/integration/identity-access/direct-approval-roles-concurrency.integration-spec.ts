@@ -2,6 +2,7 @@ import { Client } from 'pg';
 import request from 'supertest';
 import { AccountManagementHttpHarness, errorCode } from '../../support/account-management-http-harness';
 import { waitForLockWaiters } from '../../support/lock-wait';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 
 /** The advisory key every change of the approval roles and every grant of SPENDING_APPROVER takes first (`role-grant.repo.ts`). */
 const APPROVAL_ROLES_LOCK_KEY = 7_300_001;
@@ -41,7 +42,13 @@ describe('MANAGER and SPENDING_APPROVER when two writers meet (integration, real
   });
 
   const day = async (offset: number): Promise<string> =>
-    (await h.ctx.sql.query<{ d: string }>('SELECT (current_date + $1::int)::text AS d', [offset])).rows[0].d;
+    // The business day of the organization (Asia/Ho_Chi_Minh), not current_date of the database (UTC): a head from today.
+    (
+      await h.ctx.sql.query<{ d: string }>('SELECT ($1::date + $2::int)::text AS d', [
+        await h.ctx.app.get(OrganizationReadApi, { strict: false }).businessToday(),
+        offset,
+      ])
+    ).rows[0].d;
   const grant = (appUserId: string, role: string) =>
     h.admin.post(`/api/v1/app-users/${appUserId}/role-grants`, { role }).then((response) => response);
   const revoke = (appUserId: string, role: string) =>

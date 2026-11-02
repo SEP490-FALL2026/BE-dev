@@ -29,7 +29,13 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
 
   const detailsOf = <T>(response: Response): T => bodyOf(response).error.details as unknown as T;
   const day = async (offset: number): Promise<string> =>
-    (await h.ctx.sql.query<{ d: string }>('SELECT (current_date + $1::int)::text AS d', [offset])).rows[0].d;
+    // The business day of the organization (Asia/Ho_Chi_Minh), not current_date of the database (UTC): a head from today.
+    (
+      await h.ctx.sql.query<{ d: string }>('SELECT ($1::date + $2::int)::text AS d', [
+        await h.ctx.app.get(OrganizationReadApi, { strict: false }).businessToday(),
+        offset,
+      ])
+    ).rows[0].d;
   const grant = (appUserId: string, role: string) =>
     h.admin.post(`/api/v1/app-users/${appUserId}/role-grants`, { role });
   const revoke = (appUserId: string, role: string) =>

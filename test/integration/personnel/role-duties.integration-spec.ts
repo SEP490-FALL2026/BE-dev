@@ -160,21 +160,28 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
     });
 
     it('moves the snapshot with the last working day and tells again only when the roles changed', async () => {
+      // The role cannot be granted to a person who is handing over (QD-93b), so the person holds it before the case.
       const person = await h.worker(department, code());
-      const wire = await h.recordedCase(person);
-      await h.changeLastDay(wire.id, { lastWorkingDay: h.day(12), reason: 'Bàn giao muộn hơn' }).expect(200);
-      expect(await flaggedEvents(wire.id)).toHaveLength(0);
-
       await h.setRole('SPENDING_APPROVER', person);
-      await h.changeLastDay(wire.id, { lastWorkingDay: h.day(14), reason: 'Bàn giao muộn hơn nữa' }).expect(200);
-      await h.changeLastDay(wire.id, { lastWorkingDay: h.day(15), reason: 'Lại muộn hơn' }).expect(200);
+      try {
+        const wire = await h.recordedCase(person);
+        const atRecord = await flaggedEvents(wire.id);
+        expect(atRecord.map((event) => event.after.flags)).toEqual([['SPENDING_APPROVER']]);
 
-      const events = await flaggedEvents(wire.id);
-      expect(events.map((event) => [event.after.stage, event.after.flags])).toEqual([
-        ['DUE_CHANGED', ['SPENDING_APPROVER']],
-      ]);
-      expect(await stored(wire.id)).toEqual(['SPENDING_APPROVER']);
-      await h.setRole('SPENDING_APPROVER', h.boss);
+        // The roles did not change: moving the last working day twice tells nobody again.
+        await h.changeLastDay(wire.id, { lastWorkingDay: h.day(14), reason: 'Bàn giao muộn hơn nữa' }).expect(200);
+        await h.changeLastDay(wire.id, { lastWorkingDay: h.day(15), reason: 'Lại muộn hơn' }).expect(200);
+
+        expect(await flaggedEvents(wire.id)).toHaveLength(atRecord.length);
+        expect(await stored(wire.id)).toEqual(['SPENDING_APPROVER']);
+
+        // The role is taken back: the next move of the day stores the roles as they are now.
+        await h.setRole('SPENDING_APPROVER', h.boss);
+        await h.changeLastDay(wire.id, { lastWorkingDay: h.day(16), reason: 'Muộn thêm' }).expect(200);
+        expect(await stored(wire.id)).toEqual([]);
+      } finally {
+        await h.setRole('SPENDING_APPROVER', h.boss);
+      }
     });
   });
 

@@ -398,16 +398,29 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
       const w = await waiting();
       const version = await h.built(w.proposal.id);
       await h.sendVersion(version.id).expect(200);
+      const submitter = (
+        await h.ctx.sql.query<{ id: string }>(
+          `SELECT submitted_by_employee_id AS id FROM budget_proposals WHERE id = $1`,
+          [w.proposal.id],
+        )
+      ).rows[0].id;
       await h.ctx.sql.query(`UPDATE budget_proposals SET submitted_by_employee_id = $2 WHERE id = $1`, [
         w.proposal.id,
         boss.employeeId,
       ]);
+      try {
+        const own = await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account).expect(403);
+        await h.decideVersion(version.id, { decision: 'APPROVE' }, bystander.account).expect(403);
 
-      const own = await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account).expect(403);
-      await h.decideVersion(version.id, { decision: 'APPROVE' }, bystander.account).expect(403);
-
-      expect(h.codeOf(own)).toBe('BUDGET.CONFLICT_OF_INTEREST');
-      expect(await wireOf(version.id)).toMatchObject({ state: 'SENT' });
+        expect(h.codeOf(own)).toBe('BUDGET.CONFLICT_OF_INTEREST');
+        expect(await wireOf(version.id)).toMatchObject({ state: 'SENT' });
+      } finally {
+        // An open proposal sent by the approver keeps them from being granted the role again (QD-93d(3)): give it back.
+        await h.ctx.sql.query(`UPDATE budget_proposals SET submitted_by_employee_id = $2 WHERE id = $1`, [
+          w.proposal.id,
+          submitter,
+        ]);
+      }
     });
 
     it('writes only the spending approver as the role of a decision', async () => {
