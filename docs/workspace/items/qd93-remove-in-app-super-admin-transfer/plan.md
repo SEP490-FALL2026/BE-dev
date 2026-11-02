@@ -4,7 +4,7 @@
 - Bổ sung sau pin: `D-S17`…`D-S26` (Owner 01/11/2026, Docs chưa commit lúc ghi) — plan dùng `D-S26`.
 - Phụ trách: chưa giao. Thiết kế ban đầu bởi: AI theo giao việc của Owner (01/11/2026).
 - Owner review: đã duyệt các đề xuất kỹ thuật 01/11/2026; chưa review toàn spec. Peer review: tùy chọn; chưa có.
-- Triển khai: `not-started`. PR: chưa có.
+- Triển khai: `in-progress` — implemented-local (phase A; full integration/e2e/timing pending phase B). PR: chưa có.
 
 ## Before coding
 
@@ -121,9 +121,14 @@ Chọn lệnh theo CONTRIBUTING.md và test/README.md, chạy từ gốc BE, tro
 và — sau khi Owner đồng ý — `pnpm test:integration`, `pnpm test:e2e` (database riêng theo test guide); `pnpm openapi:export`;
 chỉ tài liệu dùng `pnpm rules:check` và `pnpm rules:format`.
 
-| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại  |
-| ------------------ | --------------------- | ----------------- | ------------------------ |
-| —                  | —                     | chưa chạy         | thiết kế, chưa implement |
+| Lệnh / kiểm tra AC                                                                                                                                                                              | Revision / môi trường                                                                                          | Kết quả thực chạy                                                                        | Giới hạn / việc còn lại                                                                               |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `pnpm test:integration -- test/integration/identity-access/{super-admin-recovery-role,recovery-cli,super-admin-transfer-removed,account-roles-http,role-grant-constraints}.integration-spec.ts` | nhánh `feat/qd93-remove-in-app-super-admin-transfer` (cây sạch sau `57754e43`), PostgreSQL local `slm-test-db` | 5 suite, 51 test xanh; Task 1/2/3 đỏ trước (đã chạy), xanh sau                           | không chạy toàn bộ `pnpm test:integration`, `pnpm test:e2e`, `pnpm test:integration:timing` — phase B |
+| `pnpm test:http`                                                                                                                                                                                | như trên                                                                                                       | 57 suite, 1447 test xanh (inventory 305 operation)                                       | —                                                                                                     |
+| `pnpm test:gates -- test/gates/module-graph.gate-spec.ts`, `migration-order.gate-spec.ts`; `pnpm arch:check`; `pnpm arch:docs:check`; `pnpm prisma:validate`                                    | như trên                                                                                                       | 37/37, 6/6; không vi phạm; khớp; schema hợp lệ                                           | —                                                                                                     |
+| `pnpm test -- src/modules/identity-access src/cli/recover`                                                                                                                                      | như trên                                                                                                       | xanh (191 test module; 33 test recovery + CLI ở Task 1)                                  | —                                                                                                     |
+| `pnpm openapi:export`                                                                                                                                                                           | như trên                                                                                                       | không drift (305 operation)                                                              | —                                                                                                     |
+| `pnpm check`                                                                                                                                                                                    | như trên                                                                                                       | xem nhật ký `A-qd93-remove-in-app-super-admin-transfer-implement.md` (mã thoát ghi ở đó) | CI GitHub chưa chạy                                                                                   |
 
 - [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
 - [ ] Spec/plan/test design phản ánh đúng implementation cuối; peer review nếu có đã xử lý hoặc ghi disposition.
