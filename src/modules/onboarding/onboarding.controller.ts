@@ -67,7 +67,7 @@ const checklistSchema = z.strictObject({
 class OnboardingChecklistResponseDto extends createZodDto(successEnvelopeSchema(checklistSchema)) {}
 
 /**
- * The onboarding checklist (`US-02-04`): for the Super Admin, who does step 1 (the organization and its people, on an HR basis), and
+ * The onboarding checklist (`US-02-04`): for the Super Admin, who does step 1 (the organization and its people, with no HR basis to give, `QĐ-93f`), and
  * the IT Admin, who does steps 2 to 5. Nobody else sees it, whatever the route lets through.
  */
 @ApiTags('onboarding')

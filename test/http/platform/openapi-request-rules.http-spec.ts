@@ -75,7 +75,7 @@ describe('what the document says of the rules of a request (F01)', () => {
   it('gives `format: date` and its description to every date a request carries, in a body, a query and a path', () => {
     const leaves = dateNodes();
 
-    expect(leaves.length).toBeGreaterThanOrEqual(95);
+    expect(leaves.length).toBeGreaterThanOrEqual(92);
     expect(nodesWithoutKeyword(leaves, 'format', 'date')).toEqual([]);
     expect(leaves.filter(({ node }) => typeof node?.description !== 'string').map(({ where }) => where)).toEqual([]);
     expect(leaves.filter(({ node }) => node?.pattern !== undefined).map(({ where }) => where)).toEqual([]);

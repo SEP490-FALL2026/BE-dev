@@ -500,7 +500,7 @@
             }
           },
           "422": {
-            "description": "The body is malformed or lacks a part of the HR basis (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code, among them OWN_RECORD for the Super Admin's own code or email).",
+            "description": "The body is malformed, or still carries an HR basis, which no entry takes (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code, among them OWN_RECORD for the Super Admin's own code or email).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -604,7 +604,7 @@
         },
         "responses": {
           "200": {
-            "description": "The name, work email, kind of staff, job title (free text; null clears it) or a hire date still to come were changed on the HR basis given; the Audit Trail keeps the values before and after and the basis, and the employee and the head of their department are told. The login email, the department and the status are untouched.",
+            "description": "The name, work email, kind of staff, job title (free text; null clears it) or a hire date still to come were changed; the Audit Trail keeps who, when and the values before and after, and the employee and the head of their department are told. The login email, the department and the status are untouched.",
             "content": {
               "application/json": {
                 "schema": {
@@ -765,7 +765,7 @@
             }
           },
           "422": {
-            "description": "The body is malformed, names a field that is not an official one or lacks a part of the HR basis (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST, JOB_TITLE_TOO_LONG, OPEN_ASSIGNMENT_NEEDS_EXPECTED_END — a contractor, freelancer or intern needs an expected end on every open seat).",
+            "description": "The body is malformed, names a field that is not an official one, among them an HR basis, which no correction takes (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST, JOB_TITLE_TOO_LONG, OPEN_ASSIGNMENT_NEEDS_EXPECTED_END — a contractor, freelancer or intern needs an expected end on every open seat).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -63729,7 +63729,7 @@
         },
         "responses": {
           "200": {
-            "description": "The people the preview promised are created, once, on the HR basis given; each carries it in the Audit Trail. The same confirmation sent again (same idempotency key) returns the first answer with replayed set.",
+            "description": "The people the preview promised are created, once; the Audit Trail keeps who, when and what was created, and no HR basis. The same confirmation sent again (same idempotency key) returns the first answer with replayed set.",
             "content": {
               "application/json": {
                 "schema": {
@@ -63974,7 +63974,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid or lacks a part of the HR basis (VALIDATION_ERROR).",
+            "description": "The request is invalid, among them one that still carries an HR basis, which no confirmation takes (VALIDATION_ERROR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -71834,24 +71834,9 @@
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
           "departmentCode": { "type": "string", "maxLength": 50, "nullable": true },
-          "jobTitle": { "type": "string", "maxLength": 1000, "nullable": true },
-          "hrBasis": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          }
+          "jobTitle": { "type": "string", "maxLength": 1000, "nullable": true }
         },
-        "required": ["employeeCode", "fullName", "employmentType", "hireDate", "hrBasis"],
+        "required": ["employeeCode", "fullName", "employmentType", "hireDate"],
         "additionalProperties": false
       },
       "EmployeeResponseDto": {
@@ -71920,24 +71905,8 @@
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
-          "jobTitle": { "type": "string", "maxLength": 1000, "nullable": true },
-          "hrBasis": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          }
+          "jobTitle": { "type": "string", "maxLength": 1000, "nullable": true }
         },
-        "required": ["hrBasis"],
         "additionalProperties": false
       },
       "MaintainedEmployeeResponseDto": {
@@ -92075,24 +92044,9 @@
         "properties": {
           "previewVersion": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
           "idempotencyKey": { "type": "string", "minLength": 8, "maxLength": 100 },
-          "acknowledgeDuplicateFile": { "default": false, "type": "boolean" },
-          "hrBasis": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "minLength": 1, "maxLength": 100 },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          }
+          "acknowledgeDuplicateFile": { "default": false, "type": "boolean" }
         },
-        "required": ["previewVersion", "idempotencyKey", "hrBasis"],
+        "required": ["previewVersion", "idempotencyKey"],
         "additionalProperties": false
       },
       "EmployeeImportConfirmationResponseDto": {

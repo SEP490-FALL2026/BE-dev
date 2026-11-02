@@ -1,7 +1,8 @@
 import type { BusinessDate } from '../../../core/business-date';
 
 /**
- * The reference to the HR document an employee record is entered or changed on (`FR-2.1`, `QĐ-82i`): what kind of
+ * The reference to an HR document that a `/projects` write still cites until `qd93-remove-department-projects` removes it (no
+ * employee or department write takes one since `QĐ-93f`): what kind of
  * document, its number, who issued it and when. Only the reference is kept; the file itself is not (the number
  * is the proof the Super Admin cites, the original stays with HR).
  */

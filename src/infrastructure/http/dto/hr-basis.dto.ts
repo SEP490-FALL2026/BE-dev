@@ -2,8 +2,9 @@ import { z } from 'zod';
 import { businessDateSchema } from './business-date.dto';
 
 /**
- * The HR basis of a new employee record (`US-02-02` AC-16): every part is required, and a missing one is named by the
- * validation error. It is only a reference; whether the document exists is HR's to say.
+ * The HR basis a `/projects` write still cites until `qd93-remove-department-projects` removes those routes (and this file with
+ * them). No employee, department, head or import write takes one since `QĐ-93f`. It is only a reference; whether the document
+ * exists is HR's to say.
  */
 export const hrBasisSchema = z.strictObject({
   type: z.string().trim().min(1).max(100),

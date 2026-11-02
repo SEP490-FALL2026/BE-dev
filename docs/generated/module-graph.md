@@ -54,7 +54,7 @@ flowchart BT
   data_import -->|1| catalog
   data_import -->|9| licensing
   data_import -->|2| notifications
-  data_import -->|12| organization
+  data_import -->|10| organization
   finance -->|4| audit
   finance -->|4| organization
   identity_access -->|18| audit
