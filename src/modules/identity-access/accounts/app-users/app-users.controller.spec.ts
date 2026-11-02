@@ -98,7 +98,7 @@ describe('AppUsersController — error answers (status, code, message)', () => {
       refused(
         422,
         'APP_USER.SUPER_ADMIN_TRANSFER_ONLY',
-        'The role cannot be granted by hand: SUPER_ADMIN_TRANSFER_ONLY.',
+        'The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.',
       ),
     ],
     [

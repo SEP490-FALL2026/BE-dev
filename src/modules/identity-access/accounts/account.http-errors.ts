@@ -20,8 +20,6 @@ import {
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
   SuperAdminHolderNotLockableError,
-  SuperAdminTransferRefusedError,
-  type SuperAdminTransferProblem,
 } from './account.errors';
 
 // Shared by account administration (accounts/) and the invitation redeem route of the auth controller (auth/).
@@ -86,28 +84,7 @@ export function toAccountApiException(error: unknown): unknown {
   return toUnavailableApiException(error) ?? error;
 }
 
-/** The Super Admin transfer (`US-01-09`): its refusals first, then the account answers. */
-export function toSuperAdminTransferApiException(error: unknown): unknown {
-  if (error instanceof SuperAdminTransferRefusedError) {
-    if (error.problem === 'NOT_HOLDER') {
-      // The role moved while this request was waiting (US-01-09 AC-5): the same answer as a caller who never had it.
-      return new ApiException(HttpStatus.FORBIDDEN, {
-        code: 'AUTHORIZATION.FORBIDDEN',
-        message: 'You do not have permission to perform this action.',
-      });
-    }
-    const status = error.problem === 'SUCCESSOR_NOT_FOUND' ? HttpStatus.NOT_FOUND : HttpStatus.UNPROCESSABLE_ENTITY;
-
-    return new ApiException(status, { code: `SUPER_ADMIN_TRANSFER.${error.problem}`, message: error.message });
-  }
-
-  return toAccountApiException(error);
-}
-
 const example = (error: Error) => errorExampleOf(toAccountApiException(error));
-const transferExample = (problem: SuperAdminTransferProblem) =>
-  errorExampleOf(toSuperAdminTransferApiException(new SuperAdminTransferRefusedError(problem)));
-
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
 export const ACCOUNT_ERROR_EXAMPLES = {
   NOT_FOUND: example(new AccountNotFoundError()),
@@ -128,17 +105,4 @@ export const ACCOUNT_ERROR_EXAMPLES = {
   ROLE_COMBINATION_FORBIDDEN: example(new RoleCombinationForbiddenError()),
   FINANCE_ALREADY_ASSIGNED: example(new FinanceAlreadyAssignedError()),
   INVITATION_INVALID: example(new InvitationInvalidError()),
-} as const;
-
-/** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
-export const SUPER_ADMIN_TRANSFER_ERROR_EXAMPLES = {
-  SUCCESSOR_NOT_FOUND: transferExample('SUCCESSOR_NOT_FOUND'),
-  SUCCESSOR_IS_HOLDER: transferExample('SUCCESSOR_IS_HOLDER'),
-  ACCOUNT_LOCKED: transferExample('ACCOUNT_LOCKED'),
-  EMPLOYEE_NOT_WORKING: transferExample('EMPLOYEE_NOT_WORKING'),
-  NOT_ACTIVATED: transferExample('NOT_ACTIVATED'),
-  EMAIL_NOT_VERIFIED: transferExample('EMAIL_NOT_VERIFIED'),
-  WORK_ROLE_HELD: transferExample('WORK_ROLE_HELD'),
-  APPROVAL_ROLE_HELD: transferExample('APPROVAL_ROLE_HELD'),
-  HEADS_DEPARTMENT: transferExample('HEADS_DEPARTMENT'),
 } as const;

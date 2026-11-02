@@ -68619,12 +68619,12 @@
                     }
                   },
                   "APP_USER.SUPER_ADMIN_TRANSFER_ONLY": {
-                    "summary": "The role cannot be granted by hand: SUPER_ADMIN_TRANSFER_ONLY.",
+                    "summary": "The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "APP_USER.SUPER_ADMIN_TRANSFER_ONLY",
-                        "message": "The role cannot be granted by hand: SUPER_ADMIN_TRANSFER_ONLY.",
+                        "message": "The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.",
                         "requestId": "req_example"
                       }
                     }
@@ -70064,7 +70064,7 @@
             }
           },
           "422": {
-            "description": "The role is derived or moves only by transfer.",
+            "description": "The role is derived, or it is the Super Admin role, which changes only by the operations command outside the application.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -70093,12 +70093,12 @@
                     }
                   },
                   "APP_USER.SUPER_ADMIN_TRANSFER_ONLY": {
-                    "summary": "The role cannot be granted by hand: SUPER_ADMIN_TRANSFER_ONLY.",
+                    "summary": "The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "APP_USER.SUPER_ADMIN_TRANSFER_ONLY",
-                        "message": "The role cannot be granted by hand: SUPER_ADMIN_TRANSFER_ONLY.",
+                        "message": "The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.",
                         "requestId": "req_example"
                       }
                     }
@@ -70302,7 +70302,7 @@
             }
           },
           "422": {
-            "description": "The role is derived or moves only by transfer.",
+            "description": "The role is derived, or it is the Super Admin role, which changes only by the operations command outside the application.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -70331,12 +70331,12 @@
                     }
                   },
                   "APP_USER.SUPER_ADMIN_TRANSFER_ONLY": {
-                    "summary": "The role cannot be granted by hand: SUPER_ADMIN_TRANSFER_ONLY.",
+                    "summary": "The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "APP_USER.SUPER_ADMIN_TRANSFER_ONLY",
-                        "message": "The role cannot be granted by hand: SUPER_ADMIN_TRANSFER_ONLY.",
+                        "message": "The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.",
                         "requestId": "req_example"
                       }
                     }
@@ -70823,334 +70823,6 @@
         "security": [{ "bearer": [] }],
         "summary": "Set the holder of an approval role",
         "tags": ["approval-roles"]
-      }
-    },
-    "/api/v1/super-admin-transfers": {
-      "post": {
-        "operationId": "superAdminTransfer",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SuperAdminTransferBodyDto" } } }
-        },
-        "responses": {
-          "200": {
-            "description": "The successor holds the Super Admin role and the caller no longer does; from the caller’s next request on they hold only the roles they had besides it.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/SuperAdminTransferResponseDto" },
-                    { "properties": { "message": { "example": "SUPER_ADMIN.TRANSFERRED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller does not hold the Super Admin role (any more).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The successor account does not exist (SUPER_ADMIN_TRANSFER.SUCCESSOR_NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "SUPER_ADMIN_TRANSFER.SUCCESSOR_NOT_FOUND": {
-                    "summary": "The Super Admin role cannot be transferred: SUCCESSOR_NOT_FOUND.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUPER_ADMIN_TRANSFER.SUCCESSOR_NOT_FOUND",
-                        "message": "The Super Admin role cannot be transferred: SUCCESSOR_NOT_FOUND.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or the successor does not qualify: the caller themselves, a locked account, a person who is not working, an account not activated or with an unverified email, one holding the IT Admin or Finance role, an approval role, or heading a department.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SUPER_ADMIN_TRANSFER.SUCCESSOR_IS_HOLDER": {
-                    "summary": "The Super Admin role cannot be transferred: SUCCESSOR_IS_HOLDER.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUPER_ADMIN_TRANSFER.SUCCESSOR_IS_HOLDER",
-                        "message": "The Super Admin role cannot be transferred: SUCCESSOR_IS_HOLDER.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SUPER_ADMIN_TRANSFER.ACCOUNT_LOCKED": {
-                    "summary": "The Super Admin role cannot be transferred: ACCOUNT_LOCKED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUPER_ADMIN_TRANSFER.ACCOUNT_LOCKED",
-                        "message": "The Super Admin role cannot be transferred: ACCOUNT_LOCKED.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SUPER_ADMIN_TRANSFER.EMPLOYEE_NOT_WORKING": {
-                    "summary": "The Super Admin role cannot be transferred: EMPLOYEE_NOT_WORKING.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUPER_ADMIN_TRANSFER.EMPLOYEE_NOT_WORKING",
-                        "message": "The Super Admin role cannot be transferred: EMPLOYEE_NOT_WORKING.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SUPER_ADMIN_TRANSFER.NOT_ACTIVATED": {
-                    "summary": "The Super Admin role cannot be transferred: NOT_ACTIVATED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUPER_ADMIN_TRANSFER.NOT_ACTIVATED",
-                        "message": "The Super Admin role cannot be transferred: NOT_ACTIVATED.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SUPER_ADMIN_TRANSFER.EMAIL_NOT_VERIFIED": {
-                    "summary": "The Super Admin role cannot be transferred: EMAIL_NOT_VERIFIED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUPER_ADMIN_TRANSFER.EMAIL_NOT_VERIFIED",
-                        "message": "The Super Admin role cannot be transferred: EMAIL_NOT_VERIFIED.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SUPER_ADMIN_TRANSFER.WORK_ROLE_HELD": {
-                    "summary": "The Super Admin role cannot be transferred: WORK_ROLE_HELD.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUPER_ADMIN_TRANSFER.WORK_ROLE_HELD",
-                        "message": "The Super Admin role cannot be transferred: WORK_ROLE_HELD.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SUPER_ADMIN_TRANSFER.APPROVAL_ROLE_HELD": {
-                    "summary": "The Super Admin role cannot be transferred: APPROVAL_ROLE_HELD.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUPER_ADMIN_TRANSFER.APPROVAL_ROLE_HELD",
-                        "message": "The Super Admin role cannot be transferred: APPROVAL_ROLE_HELD.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SUPER_ADMIN_TRANSFER.HEADS_DEPARTMENT": {
-                    "summary": "The Super Admin role cannot be transferred: HEADS_DEPARTMENT.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUPER_ADMIN_TRANSFER.HEADS_DEPARTMENT",
-                        "message": "The Super Admin role cannot be transferred: HEADS_DEPARTMENT.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Transfer the Super Admin role",
-        "tags": ["super-admin-transfers"]
       }
     },
     "/api/v1/dashboards/employee": {
@@ -93380,42 +93052,6 @@
         "type": "object",
         "properties": { "employeeId": { "type": "string", "format": "uuid" } },
         "required": ["employeeId"],
-        "additionalProperties": false
-      },
-      "SuperAdminTransferBodyDto": {
-        "type": "object",
-        "properties": { "successorAppUserId": { "type": "string", "format": "uuid" } },
-        "required": ["successorAppUserId"],
-        "additionalProperties": false
-      },
-      "SuperAdminTransferResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "transferId": { "type": "string", "format": "uuid" },
-              "from": {
-                "type": "object",
-                "properties": { "appUserId": { "type": "string", "format": "uuid" } },
-                "required": ["appUserId"],
-                "additionalProperties": false
-              },
-              "to": {
-                "type": "object",
-                "properties": { "appUserId": { "type": "string", "format": "uuid" } },
-                "required": ["appUserId"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["transferId", "from", "to"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "EmployeeDashboardResponseDto": {

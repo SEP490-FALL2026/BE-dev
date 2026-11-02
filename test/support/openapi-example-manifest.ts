@@ -317,7 +317,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   subscriptionSeatUsage: 'SUBSCRIPTION_SEAT_USAGE.FETCHED',
   subscriptionUpdate: 'SUBSCRIPTION.UPDATED',
   superAdminDashboardGet: 'DASHBOARD.SUPER_ADMIN_RETRIEVED',
-  superAdminTransfer: 'SUPER_ADMIN.TRANSFERRED',
   superAdminWatchGet: 'SUPER_ADMIN_WATCH.RETRIEVED',
   transferReviewDecide: 'TRANSFER_REVIEW.DECIDED',
   transferReviewGet: 'TRANSFER_REVIEW.RETRIEVED',

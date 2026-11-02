@@ -1,5 +1,3 @@
-import type { SuccessorProblem } from './successor-eligibility.service';
-
 export class AccountNotFoundError extends Error {
   constructor() {
     super('Account not found.');
@@ -17,7 +15,11 @@ export class SelfChangeForbiddenError extends Error {
 
 export class RoleRequestRefusedError extends Error {
   constructor(readonly reason: 'ROLE_DERIVED' | 'SUPER_ADMIN_TRANSFER_ONLY') {
-    super(`The role cannot be granted by hand: ${reason}.`);
+    super(
+      reason === 'SUPER_ADMIN_TRANSFER_ONLY'
+        ? 'The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.'
+        : `The role cannot be granted by hand: ${reason}.`,
+    );
     this.name = 'RoleRequestRefusedError';
   }
 }
@@ -111,15 +113,5 @@ export class InvitationInvalidError extends Error {
   constructor() {
     super('The invitation link is not valid.');
     this.name = 'InvitationInvalidError';
-  }
-}
-
-export type SuperAdminTransferProblem = SuccessorProblem | 'NOT_HOLDER' | 'SUCCESSOR_IS_HOLDER';
-
-/** The transfer cannot happen; nothing was changed and nothing was recorded (US-01-09 AC-3, AC-5). */
-export class SuperAdminTransferRefusedError extends Error {
-  constructor(readonly problem: SuperAdminTransferProblem) {
-    super(`The Super Admin role cannot be transferred: ${problem}.`);
-    this.name = 'SuperAdminTransferRefusedError';
   }
 }

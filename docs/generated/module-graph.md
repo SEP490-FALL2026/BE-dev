@@ -57,9 +57,9 @@ flowchart BT
   data_import -->|10| organization
   finance -->|4| audit
   finance -->|4| organization
-  identity_access -->|18| audit
+  identity_access -->|17| audit
   identity_access -->|10| notifications
-  identity_access -->|32| organization
+  identity_access -->|31| organization
   installation -->|8| audit
   installation -->|2| finance
   installation -->|18| identity_access

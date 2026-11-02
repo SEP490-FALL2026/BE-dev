@@ -10,7 +10,7 @@ export type RoleRequestViolation = 'ROLE_DERIVED' | 'SUPER_ADMIN_TRANSFER_ONLY';
 /**
  * A role cannot be granted by hand when it is derived from data (MANAGER from heading a
  * department, the spending approver from configuration — US-01-01 AC-4) or when it only moves
- * through the transfer procedure (SUPER_ADMIN — AC-14).
+ * by the operations command outside the application (SUPER_ADMIN — US-01-09 AC-7).
  */
 export function checkRoleRequest(role: RequestedRole): RoleRequestViolation | null {
   if (role === 'MANAGER' || role === 'SPENDING_APPROVER') return 'ROLE_DERIVED';

@@ -291,7 +291,6 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/audit-events',
   'GET /api/v1/approval-roles',
   'PUT /api/v1/approval-roles/{role}',
-  'POST /api/v1/super-admin-transfers',
   'GET /api/v1/app-users',
   'POST /api/v1/app-users',
   'GET /api/v1/app-users/{id}',

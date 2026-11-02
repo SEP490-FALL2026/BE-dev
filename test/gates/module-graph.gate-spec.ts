@@ -233,9 +233,7 @@ const DECLARED_FOR_API_AND_RECOVERY = [
   'RecoveryRepo',
   'SessionRecordService',
   'SessionRepo',
-  'SuccessorEligibility',
   'Symbol(ACCOUNT_SESSIONS)',
-  'Symbol(APPROVAL_ROLE_HOLDINGS)',
 ];
 
 /** GATE.2: the one file that declares the session port shared by accounts and recovery (implemented by auth). */

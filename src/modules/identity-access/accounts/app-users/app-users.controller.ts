@@ -333,7 +333,8 @@ export class AppUsersController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The role is derived or moves only by transfer.',
+      description:
+        'The role is derived, or it is the Super Admin role, which changes only by the operations command outside the application.',
       examples: [
         VALIDATION_EXAMPLE,
         ACCOUNT_ERROR_EXAMPLES.ROLE_DERIVED,
@@ -375,7 +376,8 @@ export class AppUsersController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The role is derived or moves only by transfer.',
+      description:
+        'The role is derived, or it is the Super Admin role, which changes only by the operations command outside the application.',
       examples: [
         VALIDATION_EXAMPLE,
         ACCOUNT_ERROR_EXAMPLES.ROLE_DERIVED,
