@@ -28,15 +28,15 @@ export class RoleGrantService {
     return this.grants.grantHistory(appUserId, limit);
   }
 
-  /** Granting FINANCE tells the modules that act on who holds a step (`FR-3.16`), in this transaction. */
+  /** Granting FINANCE or SPENDING_APPROVER tells the modules that act on who holds a step (`FR-3.16`), in this transaction. */
   async grantRole(
     tx: DbTx,
     input: { organizationId: string; appUserId: string; role: AppRole; grantedBy?: string },
   ): Promise<{ id: string }> {
     const granted = await this.grants.grantRole(tx, input);
-    if (input.role === 'FINANCE') {
+    if (input.role === 'FINANCE' || input.role === 'SPENDING_APPROVER') {
       await this.roleChanges.emit(tx, {
-        role: 'FINANCE',
+        role: input.role,
         fromEmployeeId: null,
         toEmployeeId: await this.grants.employeeOf(tx, input.appUserId),
         id: randomUUID(),
@@ -52,9 +52,9 @@ export class RoleGrantService {
     input: { appUserId: string; role: AppRole; revokedBy: string; now: Date },
   ): Promise<boolean> {
     const revoked = await this.grants.revokeRole(tx, input);
-    if (revoked && input.role === 'FINANCE') {
+    if (revoked && (input.role === 'FINANCE' || input.role === 'SPENDING_APPROVER')) {
       await this.roleChanges.emit(tx, {
-        role: 'FINANCE',
+        role: input.role,
         fromEmployeeId: await this.grants.employeeOf(tx, input.appUserId),
         toEmployeeId: null,
         id: randomUUID(),
@@ -62,6 +62,21 @@ export class RoleGrantService {
     }
 
     return revoked;
+  }
+
+  /** Serializes every change to the approval roles and to the grant of SPENDING_APPROVER; taken before the account lock (lock order). */
+  lockApprovalRolesForChange(tx: DbTx): Promise<void> {
+    return this.grants.lockApprovalRolesForChange(tx);
+  }
+
+  /** True when any account in the organization holds an effective SPENDING_APPROVER grant, whatever its state (QĐ-93a). */
+  spendingApproverIsHeld(tx: DbTx, organizationId: string): Promise<boolean> {
+    return this.grants.spendingApproverIsHeld(tx, organizationId);
+  }
+
+  /** The employee who is the spending approver (the effective grant, whatever the state of the account); null when nobody is. */
+  spendingApproverEmployeeId(client?: DbTx): Promise<string | null> {
+    return this.grants.spendingApproverEmployeeId(client);
   }
 
   /** True when any account in the organization holds an effective FINANCE grant, whatever its state (QĐ-67e). */

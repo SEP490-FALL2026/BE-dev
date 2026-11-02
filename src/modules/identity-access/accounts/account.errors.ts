@@ -16,11 +16,9 @@ export class SelfChangeForbiddenError extends Error {
 }
 
 export class RoleRequestRefusedError extends Error {
-  constructor(readonly reason: 'ROLE_DERIVED' | 'SUPER_ADMIN_TRANSFER_ONLY') {
+  constructor(readonly reason: 'SUPER_ADMIN_TRANSFER_ONLY') {
     super(
-      reason === 'SUPER_ADMIN_TRANSFER_ONLY'
-        ? 'The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.'
-        : `The role cannot be granted by hand: ${reason}.`,
+      'The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.',
     );
     this.name = 'RoleRequestRefusedError';
   }
@@ -119,6 +117,44 @@ export class ManagerStillHeadingError extends Error {
       'The account heads a department, will head one from a later day, or is named as a successor: end or take back that period before revoking MANAGER.',
     );
     this.name = 'ManagerStillHeadingError';
+  }
+}
+
+export class SpendingApproverAlreadyAssignedError extends Error {
+  constructor() {
+    super('Another account already holds the SPENDING_APPROVER role.');
+    this.name = 'SpendingApproverAlreadyAssignedError';
+  }
+}
+
+export class SpendingApproverEmployeeNotActiveError extends Error {
+  constructor() {
+    super('The employee has left, is on long leave or is handing over, so cannot be the spending approver.');
+    this.name = 'SpendingApproverEmployeeNotActiveError';
+  }
+}
+
+export class SpendingApproverAccountNotUsableError extends Error {
+  constructor() {
+    super('The account is locked or not activated, so cannot be the spending approver.');
+    this.name = 'SpendingApproverAccountNotUsableError';
+  }
+}
+
+export class SpendingApproverHeadsDepartmentError extends Error {
+  constructor(readonly headPeriods: readonly HeadPeriodDetail[] = []) {
+    super(
+      'The employee heads a department, will head one from a later day, or is named as a successor, so cannot be the spending approver.',
+    );
+    this.name = 'SpendingApproverHeadsDepartmentError';
+  }
+}
+
+/** The person is the substitute for a conflict of interest, and the substitute and the spending approver are two people (US-01-03 AC-7, M2). */
+export class SpendingApproverIsSubstituteError extends Error {
+  constructor() {
+    super('The substitute for a conflict of interest cannot be the spending approver.');
+    this.name = 'SpendingApproverIsSubstituteError';
   }
 }
 

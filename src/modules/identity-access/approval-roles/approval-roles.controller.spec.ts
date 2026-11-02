@@ -18,7 +18,7 @@ const employeeId = '00000000-0000-4000-8000-000000000002';
 
 const routes = {
   list: (c: ApprovalRolesController) => c.list(),
-  set: (c: ApprovalRolesController) => c.set(actor, { role: 'SPENDING_APPROVER' }, { employeeId }),
+  set: (c: ApprovalRolesController) => c.set(actor, { role: 'CONFLICT_SUBSTITUTE' }, { employeeId }),
 };
 type Route = keyof typeof routes;
 const allRoutes = Object.keys(routes) as Route[];

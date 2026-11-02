@@ -62,12 +62,11 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
       expect(detail.roleHistory?.filter((entry) => entry.revokedAt !== null)).toHaveLength(1);
     });
 
-    it('refuses derived, transfer-only, repeated, missing and forbidden-combination roles with their own codes', async () => {
+    it('refuses transfer-only, repeated and missing roles with their own codes', async () => {
       const user = await activatedAccount(['IT_ADMIN']);
       const grant = (role: string) => h.admin.post(`/api/v1/app-users/${user.appUserId}/role-grants`, { role });
 
-      // MANAGER is granted like IT_ADMIN since QĐ-93a (direct-approval-roles); SPENDING_APPROVER stays refused until its rules are in.
-      expect(errorCode(await grant('SPENDING_APPROVER').expect(422))).toBe('APP_USER.ROLE_DERIVED');
+      // MANAGER and SPENDING_APPROVER are granted like IT_ADMIN and FINANCE since QĐ-93a (their rules: direct-approval-roles).
       expect(errorCode(await grant('SUPER_ADMIN').expect(422))).toBe('APP_USER.SUPER_ADMIN_TRANSFER_ONLY');
       expect(errorCode(await grant('IT_ADMIN').expect(409))).toBe('APP_USER.ROLE_ALREADY_GRANTED');
       expect(

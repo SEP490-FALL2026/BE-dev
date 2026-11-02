@@ -87,7 +87,7 @@
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   },
   "src/modules/identity-access/auth/session.service.ts": {

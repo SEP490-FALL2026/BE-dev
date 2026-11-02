@@ -372,7 +372,11 @@ describe('who holds a step when the organization or a role changes, over Postgre
           state: 'PENDING',
           assignee_employee_id: h.substitute.employeeId,
         });
-        expect((await h.audit('ACCESS_REQUEST.STEP_REDETERMINED', movedSpend.id))[0].after).toMatchObject({
+        // The role is handed over in two steps (revoke, then grant): the step waits, then goes to the new approver (US-01-03 AC-3, AC-9).
+        expect((await h.audit('ACCESS_REQUEST.STEP_WAITING', movedSpend.id))[0].after).toMatchObject({
+          trigger: 'ROLE_HOLDER_CHANGED',
+        });
+        expect((await h.audit('ACCESS_REQUEST.STEP_ASSIGNED_FROM_WAIT', movedSpend.id))[0].after).toMatchObject({
           trigger: 'ROLE_HOLDER_CHANGED',
           assigneeEmployeeId: c2.employeeId,
         });
@@ -487,20 +491,18 @@ describe('who holds a step when the organization or a role changes, over Postgre
       expect(await auditCount()).toBe(events);
     });
 
-    it('rolls the setting of a role back when a listener of the roles refuses it', async () => {
+    it('rolls the revoke of the spending approver role back when a listener of the roles refuses it', async () => {
       const unit = await scene();
       await h.budgetFor(unit, { total: 100 * M });
-      counter += 1;
-      const c2 = await h.staff(await h.departmentWithUnit(`P-C4-${counter}`), `C4-${counter}`);
       const id = await h.waitingForApprover(unit, paid, { amount: 5 * M });
       const before = await h.stepOf(id, 'SPEND_APPROVAL');
 
       failRoleListener = true;
       try {
+        // Taking the role from the approver is the change; the listener that refuses it takes the revoke back with it.
         await request(h.server())
-          .put('/api/v1/approval-roles/SPENDING_APPROVER')
+          .delete(`/api/v1/app-users/${h.boss.account.appUserId}/role-grants/SPENDING_APPROVER`)
           .set({ Authorization: `Bearer ${h.admin}` })
-          .send({ employeeId: c2.employeeId })
           .expect(500);
       } finally {
         failRoleListener = false;

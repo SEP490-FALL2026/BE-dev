@@ -212,7 +212,8 @@ describe('organization and identity read contracts (integration, real PostgreSQL
       const fallback = roles.find((role) => role.role === 'FALLBACK_APPROVER');
       expect(fallback?.history).toHaveLength(20);
       expect(fallback?.historyHasMore).toBe(true);
-      expect(roles.find((role) => role.role === 'SPENDING_APPROVER')?.historyHasMore).toBe(false);
+      expect(roles.map((role) => role.role)).toEqual(['CONFLICT_SUBSTITUTE', 'FALLBACK_APPROVER']);
+      expect(roles.find((role) => role.role === 'CONFLICT_SUBSTITUTE')?.historyHasMore).toBe(false);
     });
 
     it('shows the newest 20 values of an operating parameter with hasMore', async () => {

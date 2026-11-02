@@ -1,13 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
-import { AppRole } from '../../public/identity-access.types';
+import { AccountRecord, AppRole } from '../../public/identity-access.types';
 import { translateAccountWriteError } from './account-constraints.errors';
 import { AccountRecordService } from '../account-record.service';
 import {
   accountAuditEvent,
+  accountIsUsable,
+  canBeSpendingApprover,
   checkRoleRequest,
   conflictingRoles,
   isSelfChange,
@@ -23,8 +26,14 @@ import {
   RoleNotGrantedError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
+  SpendingApproverAccountNotUsableError,
+  SpendingApproverAlreadyAssignedError,
+  SpendingApproverEmployeeNotActiveError,
+  SpendingApproverHeadsDepartmentError,
+  SpendingApproverIsSubstituteError,
   SuperAdminHolderNotLockableError,
 } from '../account.errors';
+import { APPROVAL_ROLE_HOLDINGS, ApprovalRoleHoldings } from '../account.types';
 import { ACCOUNT_SESSIONS, AccountSessions } from '../account-sessions.types';
 import { ActionLinkRevocation } from '../action-link-revocation.service';
 import { RoleGrantService } from '../role-grant.service';
@@ -42,6 +51,7 @@ export class AccountStatusService {
     @Inject(ACCOUNT_SESSIONS) private readonly sessions: AccountSessions,
     private readonly audit: AuditApi,
     private readonly organizationReads: OrganizationReadApi,
+    @Inject(APPROVAL_ROLE_HOLDINGS) private readonly approvalRoles: ApprovalRoleHoldings,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -100,16 +110,64 @@ export class AccountStatusService {
 
   // --- role grants ------------------------------------------------------------------
 
+  /**
+   * Locks the account for a grant or a revoke. SPENDING_APPROVER first takes the advisory key of the approval roles, then the
+   * employee, then the account — the order of `ApprovalRoleService.set` — so the rule that the substitute is never the spending
+   * approver (#9a) is checked one writer at a time, whichever of the two routes changes it.
+   */
+  private async lockForRoleChange(tx: DbTx, appUserId: string, role: AppRole): Promise<AccountRecord> {
+    if (role === 'SPENDING_APPROVER') {
+      await this.grants.lockApprovalRolesForChange(tx);
+      const known = await this.accounts.readAccount(tx, appUserId);
+      if (!known) throw new AccountNotFoundError();
+      await this.organizationReads.lockEmployeeForShare(tx, known.employeeId);
+    }
+    const account = await this.accounts.lockAndReadAccount(tx, appUserId);
+    if (!account) throw new AccountNotFoundError();
+
+    return account;
+  }
+
+  /** Rules 6 to 9a of the grant of SPENDING_APPROVER, in the order of the spec (rules 1 to 5 are the same for every role). */
+  private async checkSpendingApprover(tx: DbTx, account: AccountRecord): Promise<void> {
+    if (await this.grants.spendingApproverIsHeld(tx, account.organizationId)) {
+      throw new SpendingApproverAlreadyAssignedError();
+    }
+    const employee = await this.organizationReads.getEmployee(account.employeeId, tx);
+    if (!employee || !canBeSpendingApprover(employee)) throw new SpendingApproverEmployeeNotActiveError();
+    if (!accountIsUsable(account)) throw new SpendingApproverAccountNotUsableError();
+    const periods = await this.organizationReads.headPeriodsFrom(account.employeeId, undefined, tx);
+    if (periods.length > 0) throw new SpendingApproverHeadsDepartmentError(periods);
+    if ((await this.approvalRoles.rolesHeldBy(tx, account.employeeId)).includes('CONFLICT_SUBSTITUTE')) {
+      throw new SpendingApproverIsSubstituteError();
+    }
+  }
+
+  /** A refusal that only the database could make (the race with a head assignment) shows the periods as they are now. */
+  private async translateRoleWriteError(error: unknown, employeeId: string | null): Promise<unknown> {
+    const translated = translateAccountWriteError(error);
+    if (employeeId === null) return translated;
+    if (translated instanceof ManagerStillHeadingError) {
+      return new ManagerStillHeadingError(await this.organizationReads.headPeriodsFrom(employeeId));
+    }
+    if (translated instanceof SpendingApproverHeadsDepartmentError) {
+      return new SpendingApproverHeadsDepartmentError(await this.organizationReads.headPeriodsFrom(employeeId));
+    }
+
+    return translated;
+  }
+
   async grantRole(actor: AuthenticatedPrincipal, appUserId: string, role: RequestedRole): Promise<void> {
     if (isSelfChange(actor.appUserId, appUserId)) throw new SelfChangeForbiddenError();
     const violation = checkRoleRequest(role);
     if (violation) throw new RoleRequestRefusedError(violation);
     const granted: AppRole = role;
+    let employeeId: string | null = null;
 
     await this.runner
       .run(async (tx) => {
-        const account = await this.accounts.lockAndReadAccount(tx, appUserId);
-        if (!account) throw new AccountNotFoundError();
+        const account = await this.lockForRoleChange(tx, appUserId, granted);
+        employeeId = account.employeeId;
         const held = await this.grants.effectiveRoles(appUserId, tx);
         if (held.includes(granted)) throw new RoleAlreadyGrantedError();
         const conflicts = conflictingRoles(held, granted);
@@ -117,6 +175,7 @@ export class AccountStatusService {
         if (granted === 'FINANCE' && (await this.grants.financeIsHeld(tx, account.organizationId))) {
           throw new FinanceAlreadyAssignedError();
         }
+        if (granted === 'SPENDING_APPROVER') await this.checkSpendingApprover(tx, account);
 
         await this.grants.grantRole(tx, {
           organizationId: account.organizationId,
@@ -139,8 +198,8 @@ export class AccountStatusService {
           ),
         );
       })
-      .catch((error: unknown) => {
-        throw translateAccountWriteError(error);
+      .catch(async (error: unknown) => {
+        throw await this.translateRoleWriteError(error, employeeId);
       });
   }
 
@@ -153,8 +212,7 @@ export class AccountStatusService {
 
     await this.runner
       .run(async (tx) => {
-        const account = await this.accounts.lockAndReadAccount(tx, appUserId);
-        if (!account) throw new AccountNotFoundError();
+        const account = await this.lockForRoleChange(tx, appUserId, revoked);
         employeeId = account.employeeId;
         const held = await this.grants.effectiveRoles(appUserId, tx);
         if (!held.includes(revoked)) throw new RoleNotGrantedError();
@@ -181,13 +239,7 @@ export class AccountStatusService {
         );
       })
       .catch(async (error: unknown) => {
-        const translated = translateAccountWriteError(error);
-        // The database refused after the check passed (a head assignment committed in between): the refusal shows the periods as they are now.
-        if (translated instanceof ManagerStillHeadingError && employeeId !== null) {
-          throw new ManagerStillHeadingError(await this.organizationReads.headPeriodsFrom(employeeId));
-        }
-
-        throw translated;
+        throw await this.translateRoleWriteError(error, employeeId);
       });
   }
 }

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
-const approvalRole = z.enum(['SPENDING_APPROVER', 'CONFLICT_SUBSTITUTE', 'FALLBACK_APPROVER']);
+const approvalRole = z.enum(['CONFLICT_SUBSTITUTE', 'FALLBACK_APPROVER']);
 
 export const approvalRoleParamSchema = z.strictObject({ role: approvalRole });
 export const setApprovalRoleBodySchema = z.strictObject({ employeeId: z.uuid() });

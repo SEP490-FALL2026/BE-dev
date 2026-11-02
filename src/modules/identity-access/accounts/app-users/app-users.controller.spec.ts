@@ -20,6 +20,11 @@ import {
   RoleNotGrantedError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
+  SpendingApproverAccountNotUsableError,
+  SpendingApproverAlreadyAssignedError,
+  SpendingApproverEmployeeNotActiveError,
+  SpendingApproverHeadsDepartmentError,
+  SpendingApproverIsSubstituteError,
   SuperAdminHolderNotLockableError,
 } from '../account.errors';
 import { AccountInvitationService } from './account-invitation.service';
@@ -92,9 +97,57 @@ describe('AppUsersController — error answers (status, code, message)', () => {
       refused(409, 'APP_USER.SELF_CHANGE_FORBIDDEN', 'You cannot change your own account.'),
     ],
     [
-      'a derived role',
-      () => new RoleRequestRefusedError('ROLE_DERIVED'),
-      refused(422, 'APP_USER.ROLE_DERIVED', 'The role cannot be granted by hand: ROLE_DERIVED.'),
+      'a second spending approver',
+      () => new SpendingApproverAlreadyAssignedError(),
+      refused(
+        409,
+        'APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED',
+        'Another account already holds the SPENDING_APPROVER role.',
+      ),
+    ],
+    [
+      'a spending approver who is a head, with the periods',
+      () =>
+        new SpendingApproverHeadsDepartmentError([
+          { departmentId: id, departmentCode: 'P-ENG', validFrom: '2026-10-01', validTo: null, timing: 'CURRENT' },
+        ]),
+      refused(
+        409,
+        'APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT',
+        'The employee heads a department, will head one from a later day, or is named as a successor, so cannot be the spending approver.',
+        {
+          headPeriods: [
+            { departmentId: id, departmentCode: 'P-ENG', validFrom: '2026-10-01', validTo: null, timing: 'CURRENT' },
+          ],
+        },
+      ),
+    ],
+    [
+      'a spending approver whose employee is not working',
+      () => new SpendingApproverEmployeeNotActiveError(),
+      refused(
+        422,
+        'APP_USER.SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE',
+        'The employee has left, is on long leave or is handing over, so cannot be the spending approver.',
+      ),
+    ],
+    [
+      'a spending approver whose account is not usable',
+      () => new SpendingApproverAccountNotUsableError(),
+      refused(
+        422,
+        'APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE',
+        'The account is locked or not activated, so cannot be the spending approver.',
+      ),
+    ],
+    [
+      'a spending approver who is the substitute, with the code of the approval roles',
+      () => new SpendingApproverIsSubstituteError(),
+      refused(
+        422,
+        'APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER',
+        'The substitute for a conflict of interest cannot be the spending approver.',
+      ),
     ],
     [
       'the Super Admin role',

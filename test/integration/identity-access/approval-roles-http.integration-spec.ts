@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { Client } from 'pg';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
+import { setSpendingApprover } from '../../support/builders/account.builder';
 import {
   HttpTestApp,
   SeededInstallation,
@@ -10,7 +11,8 @@ import {
   seedInstallation,
 } from '../../support/http-test-app';
 
-type Role = 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'FALLBACK_APPROVER';
+/** The two roles configured here; the spending approver is a role grant since QĐ-93a (direct-approval-roles). */
+type Role = 'CONFLICT_SUBSTITUTE' | 'FALLBACK_APPROVER';
 
 interface RoleView {
   role: Role;
@@ -64,12 +66,13 @@ describe('the approval roles over HTTP (integration, real PostgreSQL)', () => {
   const roleOf = (response: request.Response, role: Role): RoleView =>
     viewOf(response).find((view) => view.role === role) as RoleView;
   const errorCode = (response: request.Response) => (response.body as { error: { code: string } }).error.code;
-  const derivedRoles = async (account: ApiAccount): Promise<string[]> =>
-    (
-      (await request(server()).get('/api/v1/me').set(as(account)).expect(200)).body as {
-        data: { roles: { derived: string[] } };
-      }
-    ).data.roles.derived;
+  const revokeApprover = () =>
+    ctx.sql.query("UPDATE role_grants SET revoked_at = now() WHERE role = 'SPENDING_APPROVER' AND revoked_at IS NULL");
+  const grantSpendingApprover = (appUserId: string) =>
+    request(server())
+      .post(`/api/v1/app-users/${appUserId}/role-grants`)
+      .set(asAdmin())
+      .send({ role: 'SPENDING_APPROVER' });
   const currentRows = async () =>
     (
       await ctx.sql.query<{ role: string; employee_id: string }>(
@@ -86,70 +89,57 @@ describe('the approval roles over HTTP (integration, real PostgreSQL)', () => {
     ).rows;
 
   describe('configuring the roles (US-01-03 AC-1, AC-3)', () => {
-    it('shows the three roles with nobody in them before anything is set', async () => {
+    it('shows the two roles with nobody in them before anything is set (the spending approver is a role grant now)', async () => {
       const response = await request(server()).get('/api/v1/approval-roles').set(asAdmin()).expect(200);
 
       expect(viewOf(response)).toEqual([
-        { role: 'SPENDING_APPROVER', holder: null, history: [], historyHasMore: false },
         { role: 'CONFLICT_SUBSTITUTE', holder: null, history: [], historyHasMore: false },
         { role: 'FALLBACK_APPROVER', holder: null, history: [], historyHasMore: false },
       ]);
     });
 
-    it('names the spending approver, who becomes SPENDING_APPROVER from the next request (AC-1)', async () => {
-      const ceo = await person();
-      expect(await derivedRoles(ceo)).toEqual([]);
+    it('names the substitute for a conflict of interest, and says who did it in the Audit Trail (AC-1)', async () => {
+      const substitute = await person();
 
-      const response = await setRole('SPENDING_APPROVER', ceo.employeeId).expect(200);
+      const response = await setRole('CONFLICT_SUBSTITUTE', substitute.employeeId).expect(200);
 
       expect((response.body as { message: string }).message).toBe('APPROVAL_ROLE.SET');
-      expect(roleOf(response, 'SPENDING_APPROVER').holder).toMatchObject({
-        employeeId: ceo.employeeId,
-        employeeCode: ceo.code,
+      expect(roleOf(response, 'CONFLICT_SUBSTITUTE').holder).toMatchObject({
+        employeeId: substitute.employeeId,
+        employeeCode: substitute.code,
       });
-      expect(await derivedRoles(ceo)).toEqual(['SPENDING_APPROVER']);
-      const roles = (
-        (await request(server()).get('/api/v1/me').set(as(ceo)).expect(200)).body as {
-          data: { roles: { direct: string[]; effective: string[] } };
-        }
-      ).data.roles;
-      // The role is derived, never a grant: the account holds no role of its own.
-      expect(roles.direct).toEqual([]);
-      expect(roles.effective).toEqual(['SPENDING_APPROVER']);
-      expect((await auditOf('SPENDING_APPROVER')).at(-1)).toMatchObject({
+      expect((await auditOf('CONFLICT_SUBSTITUTE')).at(-1)).toMatchObject({
         action: 'APPROVAL_ROLE.CHANGED',
-        before: { role: 'SPENDING_APPROVER', holder: null },
-        after: { role: 'SPENDING_APPROVER', holder: ceo.code },
+        before: { role: 'CONFLICT_SUBSTITUTE', holder: null },
+        after: { role: 'CONFLICT_SUBSTITUTE', holder: substitute.code },
       });
       const actor = await ctx.sql.query<{ actor_kind: string; actor_app_user_id: string }>(
         `SELECT actor_kind, actor_app_user_id FROM audit_events WHERE action = 'APPROVAL_ROLE.CHANGED'
           AND after ->> 'holder' = $1`,
-        [ceo.code],
+        [substitute.code],
       );
       expect(actor.rows[0]).toMatchObject({ actor_kind: 'USER', actor_app_user_id: seed.superAdmin.appUserId });
     });
 
-    it('changes the holder: the one before stops being SPENDING_APPROVER at once, and the history keeps both (AC-3)', async () => {
+    it('changes the holder: the history keeps both and the table keeps one current holder (AC-3)', async () => {
       const first = await person();
       const second = await person();
-      await setRole('SPENDING_APPROVER', first.employeeId).expect(200);
+      await setRole('FALLBACK_APPROVER', first.employeeId).expect(200);
 
-      const response = await setRole('SPENDING_APPROVER', second.employeeId).expect(200);
+      const response = await setRole('FALLBACK_APPROVER', second.employeeId).expect(200);
 
-      expect(roleOf(response, 'SPENDING_APPROVER').holder).toMatchObject({ employeeCode: second.code });
+      expect(roleOf(response, 'FALLBACK_APPROVER').holder).toMatchObject({ employeeCode: second.code });
       expect(
-        roleOf(response, 'SPENDING_APPROVER')
+        roleOf(response, 'FALLBACK_APPROVER')
           .history.map((entry) => entry.employeeCode)
           .slice(0, 2),
       ).toEqual([second.code, first.code]);
-      expect(roleOf(response, 'SPENDING_APPROVER').history[1].until).not.toBeNull();
-      expect(await derivedRoles(first)).toEqual([]);
-      expect(await derivedRoles(second)).toEqual(['SPENDING_APPROVER']);
-      expect((await auditOf('SPENDING_APPROVER')).at(-1)).toMatchObject({
-        before: { role: 'SPENDING_APPROVER', holder: first.code },
-        after: { role: 'SPENDING_APPROVER', holder: second.code },
+      expect(roleOf(response, 'FALLBACK_APPROVER').history[1].until).not.toBeNull();
+      expect((await auditOf('FALLBACK_APPROVER')).at(-1)).toMatchObject({
+        before: { role: 'FALLBACK_APPROVER', holder: first.code },
+        after: { role: 'FALLBACK_APPROVER', holder: second.code },
       });
-      expect((await currentRows()).filter((row) => row.role === 'SPENDING_APPROVER')).toHaveLength(1);
+      expect((await currentRows()).filter((row) => row.role === 'FALLBACK_APPROVER')).toHaveLength(1);
     });
 
     it('answers the person who already holds the role with the roles and records nothing', async () => {
@@ -157,15 +147,20 @@ describe('the approval roles over HTTP (integration, real PostgreSQL)', () => {
       await setRole('FALLBACK_APPROVER', holder.employeeId).expect(200);
       const events = (await auditOf('FALLBACK_APPROVER')).length;
 
+      const historyBefore = roleOf(
+        await request(server()).get('/api/v1/approval-roles').set(asAdmin()),
+        'FALLBACK_APPROVER',
+      ).history;
+
       const response = await setRole('FALLBACK_APPROVER', holder.employeeId).expect(200);
 
-      expect(roleOf(response, 'FALLBACK_APPROVER').history).toHaveLength(1);
+      expect(roleOf(response, 'FALLBACK_APPROVER').history).toEqual(historyBefore);
       expect(await auditOf('FALLBACK_APPROVER')).toHaveLength(events);
     });
 
-    it('lets the fallback approver be a person who also holds another approval role', async () => {
+    it('lets the fallback approver be the spending approver too', async () => {
       const both = await person();
-      await setRole('SPENDING_APPROVER', both.employeeId).expect(200);
+      await grantSpendingApprover(both.appUserId).expect(201);
 
       const response = await setRole('FALLBACK_APPROVER', both.employeeId).expect(200);
 
@@ -174,7 +169,7 @@ describe('the approval roles over HTTP (integration, real PostgreSQL)', () => {
   });
 
   describe('who may hold a role (AC-2, AC-6)', () => {
-    it.each<Role>(['SPENDING_APPROVER', 'CONFLICT_SUBSTITUTE', 'FALLBACK_APPROVER'])(
+    it.each<Role>(['CONFLICT_SUBSTITUTE', 'FALLBACK_APPROVER'])(
       'refuses the Super Admin as the %s, and nothing changes (AC-2)',
       async (role) => {
         const before = await currentRows();
@@ -210,32 +205,15 @@ describe('the approval roles over HTTP (integration, real PostgreSQL)', () => {
         ['whose account is locked', locked.employeeId, 'APPROVAL_ROLE.NO_USABLE_ACCOUNT'],
       ];
       for (const [, employeeId, code] of cases) {
-        expect(errorCode(await setRole('SPENDING_APPROVER', employeeId).expect(422))).toBe(code);
+        expect(errorCode(await setRole('CONFLICT_SUBSTITUTE', employeeId).expect(422))).toBe(code);
       }
       expect(await currentRows()).toEqual(before);
     });
 
     it('is 404 for an employee that does not exist', async () => {
-      const response = await setRole('SPENDING_APPROVER', '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11').expect(404);
+      const response = await setRole('CONFLICT_SUBSTITUTE', '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11').expect(404);
 
       expect(errorCode(response)).toBe('ORGANIZATION.EMPLOYEE_NOT_FOUND');
-    });
-
-    it('never shows the derived role on a Super Admin even if the data says they hold it (US-01-03 AC-2)', async () => {
-      // Written by SQL on purpose: the service refuses it, so only a hand edit or a defect can produce it.
-      await ctx.sql.query(
-        `UPDATE approval_role_holders SET held_until = GREATEST(now(), held_from) WHERE role = 'SPENDING_APPROVER' AND held_until IS NULL`,
-      );
-      await ctx.sql.query(
-        `INSERT INTO approval_role_holders (id, organization_id, role, employee_id, held_from)
-         VALUES (gen_random_uuid(), $1, 'SPENDING_APPROVER', $2, now())`,
-        [seed.organizationId, seed.superAdmin.employeeId],
-      );
-
-      const me = await request(server()).get('/api/v1/me').set(asAdmin()).expect(200);
-
-      expect((me.body as { data: { roles: { derived: string[] } } }).data.roles.derived).toEqual([]);
-      await ctx.sql.query('DELETE FROM approval_role_holders WHERE employee_id = $1', [seed.superAdmin.employeeId]);
     });
   });
 
@@ -243,34 +221,25 @@ describe('the approval roles over HTTP (integration, real PostgreSQL)', () => {
     it('refuses the approver as the substitute, and the substitute as the approver', async () => {
       const approver = await person();
       const substitute = await person();
-      await setRole('SPENDING_APPROVER', approver.employeeId).expect(200);
-
+      await revokeApprover();
+      await setRole('CONFLICT_SUBSTITUTE', substitute.employeeId).expect(200);
+      expect(errorCode(await grantSpendingApprover(substitute.appUserId).expect(422))).toBe(
+        'APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER',
+      );
+      await setSpendingApprover(ctx, admin, approver.employeeId);
       expect(errorCode(await setRole('CONFLICT_SUBSTITUTE', approver.employeeId).expect(422))).toBe(
         'APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER',
       );
-      await setRole('CONFLICT_SUBSTITUTE', substitute.employeeId).expect(200);
-      expect(errorCode(await setRole('SPENDING_APPROVER', substitute.employeeId).expect(422))).toBe(
-        'APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER',
-      );
       const rows = await currentRows();
-      expect(rows.find((row) => row.role === 'SPENDING_APPROVER')?.employee_id).toBe(approver.employeeId);
       expect(rows.find((row) => row.role === 'CONFLICT_SUBSTITUTE')?.employee_id).toBe(substitute.employeeId);
-    });
-
-    it('is also kept by the database when something writes around the service', async () => {
-      const approver = await person();
-      await setRole('SPENDING_APPROVER', approver.employeeId).expect(200);
-      await ctx.sql.query(
-        `UPDATE approval_role_holders SET held_until = GREATEST(now(), held_from) WHERE role = 'CONFLICT_SUBSTITUTE' AND held_until IS NULL`,
-      );
-
-      await expect(
-        ctx.sql.query(
-          `INSERT INTO approval_role_holders (id, organization_id, role, employee_id)
-           VALUES (gen_random_uuid(), $1, 'CONFLICT_SUBSTITUTE', $2)`,
-          [seed.organizationId, approver.employeeId],
-        ),
-      ).rejects.toMatchObject({ code: '23514' });
+      expect(
+        (
+          await ctx.sql.query<{ employee_id: string }>(
+            `SELECT u.employee_id FROM role_grants g JOIN app_users u ON u.id = g.app_user_id
+              WHERE g.role = 'SPENDING_APPROVER' AND g.revoked_at IS NULL`,
+          )
+        ).rows.map((row) => row.employee_id),
+      ).toEqual([approver.employeeId]);
     });
 
     it('keeps at most one current holder per role', async () => {
@@ -292,11 +261,11 @@ describe('the approval roles over HTTP (integration, real PostgreSQL)', () => {
     it('refuses Finance, an IT Admin, an employee and the approver, and changes nothing', async () => {
       const ceo = await person();
       const employee = await person();
-      await setRole('SPENDING_APPROVER', ceo.employeeId).expect(200);
+      await setSpendingApprover(ctx, admin, ceo.employeeId);
       const before = await currentRows();
 
       for (const headers of [as(finance), as(it1), as(employee), as(ceo)]) {
-        await setRole('SPENDING_APPROVER', employee.employeeId, headers).expect(403);
+        await setRole('CONFLICT_SUBSTITUTE', employee.employeeId, headers).expect(403);
         await request(server()).get('/api/v1/approval-roles').set(headers).expect(403);
       }
 
@@ -332,13 +301,14 @@ describe('the approval roles over HTTP (integration, real PostgreSQL)', () => {
       }
     }
 
-    it('lets only one of "approver" and "substitute" for the same person win, in either order, with no deadlock', async () => {
+    it('lets only one of "spending approver" (the grant) and "substitute" (the PUT) for the same person win, in either order, with no deadlock', async () => {
       const deadlocks = async () =>
         (
           await ctx.sql.query<{ n: number }>(
             'SELECT deadlocks::int AS n FROM pg_stat_database WHERE datname = current_database()',
           )
         ).rows[0].n;
+      await revokeApprover();
       const deadlocksBefore = await deadlocks();
       for (let round = 0; round < 4; round += 1) {
         const target = await person();
@@ -348,14 +318,18 @@ describe('the approval roles over HTTP (integration, real PostgreSQL)', () => {
 
         await holder.query('BEGIN');
         await holder.query('SELECT pg_advisory_xact_lock($1)', [APPROVAL_ROLES_LOCK_KEY]);
-        const asApprover = setRole('SPENDING_APPROVER', target.employeeId).then((r) => r);
+        const asApprover = grantSpendingApprover(target.appUserId).then((r) => r);
         const asSubstitute = setRole('CONFLICT_SUBSTITUTE', target.employeeId).then((r) => r);
         await waitForWaiters(ctx.sql, 2);
         await holder.query('COMMIT');
-        const answers = (await Promise.all([asApprover, asSubstitute])).map((r) => r.status).sort();
+        const answers = (await Promise.all([asApprover, asSubstitute])).map((r) => r.status);
 
-        expect(answers).toEqual([200, 422]);
-        expect(await currentRows()).toHaveLength(1);
+        // Exactly one of the two takes the person, the other is refused with 422, and either order is fine.
+        expect(answers.filter((status) => status === 422)).toHaveLength(1);
+        expect(answers.filter((status) => status === 200 || status === 201)).toHaveLength(1);
+        await ctx.sql.query(
+          `UPDATE role_grants SET revoked_at = now() WHERE role = 'SPENDING_APPROVER' AND revoked_at IS NULL`,
+        );
       }
       expect(await deadlocks()).toBe(deadlocksBefore);
     });

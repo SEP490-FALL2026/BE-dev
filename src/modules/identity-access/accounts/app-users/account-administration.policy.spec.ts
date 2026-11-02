@@ -11,16 +11,12 @@ import {
 
 describe('account administration policy', () => {
   describe('checkRoleRequest', () => {
-    it.each(['IT_ADMIN', 'FINANCE', 'EMPLOYEE', 'MANAGER'] as const)(
-      'accepts a hand-granted %s (US-01-01 AC-4)',
+    it.each(['IT_ADMIN', 'FINANCE', 'EMPLOYEE', 'MANAGER', 'SPENDING_APPROVER'] as const)(
+      'accepts a hand-granted %s (US-01-01 AC-4, US-01-03 AC-1): the rules of the role are in the grant, not here',
       (role) => {
         expect(checkRoleRequest(role)).toBeNull();
       },
     );
-
-    it('refuses SPENDING_APPROVER by hand until its own rules are in (it is still configured as an approval role)', () => {
-      expect(checkRoleRequest('SPENDING_APPROVER')).toBe('ROLE_DERIVED');
-    });
 
     it('refuses SUPER_ADMIN, which only moves by transfer (AC-14)', () => {
       expect(checkRoleRequest('SUPER_ADMIN')).toBe('SUPER_ADMIN_TRANSFER_ONLY');
@@ -116,7 +112,9 @@ describe('account administration policy', () => {
       expect(validateRoleSet([])).toBeNull();
       expect(validateRoleSet(['IT_ADMIN', 'EMPLOYEE'])).toBeNull();
       expect(validateRoleSet(['IT_ADMIN', 'MANAGER'])).toBeNull();
-      expect(validateRoleSet(['IT_ADMIN', 'SPENDING_APPROVER'])).toBe('ROLE_DERIVED');
+      expect(validateRoleSet(['IT_ADMIN', 'SPENDING_APPROVER'])).toBe('ROLE_COMBINATION_FORBIDDEN');
+      expect(validateRoleSet(['MANAGER', 'SPENDING_APPROVER'])).toBe('ROLE_COMBINATION_FORBIDDEN');
+      expect(validateRoleSet(['SPENDING_APPROVER', 'EMPLOYEE'])).toBeNull();
       expect(validateRoleSet(['SUPER_ADMIN', 'IT_ADMIN'])).toBe('SUPER_ADMIN_TRANSFER_ONLY');
     });
 

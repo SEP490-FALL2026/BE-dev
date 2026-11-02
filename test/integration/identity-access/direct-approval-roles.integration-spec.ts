@@ -1,4 +1,5 @@
-import type { Response } from 'supertest';
+import request, { type Response } from 'supertest';
+import { IdentityAccessApi } from '../../../src/modules/identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { bodyOf } from '../../support/api-body';
 import { AccountManagementHttpHarness, dataOf, errorCode } from '../../support/account-management-http-harness';
@@ -185,6 +186,182 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
       expect(detailsOf<{ headPeriods: unknown[] }>(response).headPeriods).toHaveLength(1);
       expect(await rolesOf(user.appUserId)).toEqual(['MANAGER']);
       await clearHeads();
+    });
+  });
+
+  describe('SPENDING_APPROVER (US-01-03 AC-1, AC-2, AC-4, AC-6, AC-10, AC-11, M2)', () => {
+    const setEmployee = (employeeId: string, set: string) =>
+      h.ctx.sql.query(`UPDATE employees SET ${set} WHERE id = $1`, [employeeId]);
+    const approvalRole = (role: string, employeeId: string) =>
+      request(h.server()).put(`/api/v1/approval-roles/${role}`).set(h.as(h.adminToken)).send({ employeeId });
+    const holders = async () => h.ctx.app.get(IdentityAccessApi).getApprovalRoleHolders();
+    const tableRows = async () =>
+      (
+        await h.ctx.sql.query<{ employee_id: string }>(
+          "SELECT employee_id FROM approval_role_holders WHERE role = 'SPENDING_APPROVER' AND held_until IS NULL",
+        )
+      ).rows;
+    const clearApprover = () =>
+      h.ctx.sql.query(
+        "UPDATE role_grants SET revoked_at = now() WHERE role = 'SPENDING_APPROVER' AND revoked_at IS NULL",
+      );
+
+    afterEach(async () => {
+      await clearApprover();
+      await h.ctx.sql.query(
+        'UPDATE approval_role_holders SET held_until = GREATEST(now(), held_from) WHERE held_until IS NULL',
+      );
+      await clearHeads();
+    });
+
+    it('grants SPENDING_APPROVER and reads the holder from the role grant, not from the approval-role table', async () => {
+      const user = await h.activatedAccount([]);
+
+      const response = await grant(user.appUserId, 'SPENDING_APPROVER').expect(201);
+
+      expect(bodyOf(response).message).toBe('ROLE.GRANTED');
+      expect(await rolesOf(user.appUserId)).toEqual(['SPENDING_APPROVER']);
+      expect((await holders()).spendingApproverEmployeeId).toBe(user.employeeId);
+      expect(await tableRows()).toEqual([]);
+      expect(await auditOf('ROLE.GRANTED', user.appUserId)).toHaveLength(1);
+    });
+
+    it('refuses a second spending approver, whatever the state of the first holder account, and allows one after a revoke (AC-10)', async () => {
+      const first = await h.activatedAccount([]);
+      const second = await h.activatedAccount([]);
+      await grant(first.appUserId, 'SPENDING_APPROVER').expect(201);
+      await h.ctx.sql.query("UPDATE app_users SET status = 'LOCKED' WHERE id = $1", [first.appUserId]);
+
+      const refused = await grant(second.appUserId, 'SPENDING_APPROVER').expect(409);
+
+      expect(errorCode(refused)).toBe('APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED');
+      expect(await rolesOf(second.appUserId)).toEqual([]);
+      await h.ctx.sql.query("UPDATE app_users SET status = 'ACTIVE' WHERE id = $1", [first.appUserId]);
+      await revoke(first.appUserId, 'SPENDING_APPROVER').expect(200);
+      await grant(second.appUserId, 'SPENDING_APPROVER').expect(201);
+      expect((await holders()).spendingApproverEmployeeId).toBe(second.employeeId);
+    });
+
+    it('names the roles in the way when SPENDING_APPROVER meets another role (AC-11)', async () => {
+      const itAdmin = await h.activatedAccount(['IT_ADMIN']);
+      const manager = await h.activatedAccount(['MANAGER']);
+
+      const withIt = await grant(itAdmin.appUserId, 'SPENDING_APPROVER').expect(409);
+      const withManager = await grant(manager.appUserId, 'SPENDING_APPROVER').expect(409);
+
+      const finance = await h.activatedAccount(['FINANCE']);
+      const withFinance = await grant(finance.appUserId, 'SPENDING_APPROVER').expect(409);
+      // SoD-7, SoD-8 (US-01-05 AC-7, AC-8): Finance never holds the role that decides what Finance reviews.
+      expect(detailsOf<{ conflictingRoles: string[] }>(withFinance).conflictingRoles).toEqual(['FINANCE']);
+      await revoke(finance.appUserId, 'FINANCE').expect(200);
+      expect(errorCode(withIt)).toBe('APP_USER.ROLE_COMBINATION_FORBIDDEN');
+      expect(detailsOf<{ conflictingRoles: string[] }>(withIt).conflictingRoles).toEqual(['IT_ADMIN']);
+      expect(detailsOf<{ conflictingRoles: string[] }>(withManager).conflictingRoles).toEqual(['MANAGER']);
+      expect(await rolesOf(manager.appUserId)).toEqual(['MANAGER']);
+    });
+
+    it('refuses a head today or from a later day with the periods (AC-11)', async () => {
+      const head = await h.activatedAccount([]);
+      const periodsOfRefusal = async () => {
+        const refused = await grant(head.appUserId, 'SPENDING_APPROVER').expect(409);
+        expect(errorCode(refused)).toBe('APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT');
+
+        return detailsOf<{ headPeriods: Array<{ timing: string }> }>(refused).headPeriods;
+      };
+
+      await headPeriod(head.employeeId, await day(-2));
+      expect(await periodsOfRefusal()).toMatchObject([{ timing: 'CURRENT' }]);
+      await clearHeads();
+      await headPeriod(head.employeeId, await day(7));
+      expect(await periodsOfRefusal()).toMatchObject([{ timing: 'UPCOMING' }]);
+      expect(await rolesOf(head.appUserId)).toEqual([]);
+    });
+
+    it('refuses a person who left, is on long leave or is handing over (AC-6, OD-3)', async () => {
+      for (const state of ["work_state = 'ON_LONG_LEAVE'", "work_state = 'HANDING_OVER'", "status = 'TERMINATED'"]) {
+        const person = await h.activatedAccount([]);
+        await setEmployee(person.employeeId, state);
+
+        const refused = await grant(person.appUserId, 'SPENDING_APPROVER').expect(422);
+
+        expect(errorCode(refused)).toBe('APP_USER.SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE');
+        expect(await rolesOf(person.appUserId)).toEqual([]);
+      }
+    });
+
+    it('refuses an account that is locked or not activated, and a new account created with the role, creating nothing (AC-6)', async () => {
+      const locked = await h.activatedAccount([]);
+      await h.ctx.sql.query("UPDATE app_users SET status = 'LOCKED' WHERE id = $1", [locked.appUserId]);
+      const invited = await h.newEmployee();
+      const created = await h.admin
+        .post('/api/v1/app-users', { employeeId: invited.employeeId, roles: [] })
+        .expect(201);
+      const before = await h.ctx.sql.query('SELECT count(*)::int AS n FROM app_users');
+      const fresh = await h.newEmployee();
+      const afterFresh = await h.ctx.sql.query('SELECT count(*)::int AS n FROM app_users');
+
+      const lockedRefusal = await grant(locked.appUserId, 'SPENDING_APPROVER').expect(422);
+      const invitedRefusal = await grant(dataOf(created).id, 'SPENDING_APPROVER').expect(422);
+      const creation = await h.admin
+        .post('/api/v1/app-users', { employeeId: fresh.employeeId, roles: ['SPENDING_APPROVER'] })
+        .expect(422);
+
+      for (const response of [lockedRefusal, invitedRefusal, creation]) {
+        expect(errorCode(response)).toBe('APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE');
+      }
+      expect(afterFresh.rows).toEqual(before.rows);
+      expect((await h.ctx.sql.query('SELECT count(*)::int AS n FROM app_users')).rows).toEqual(before.rows);
+    });
+
+    it('refuses the conflict substitute as spending approver, and the spending approver as substitute, changing nothing (M2)', async () => {
+      const substitute = await h.activatedAccount([]);
+      const approver = await h.activatedAccount([]);
+      await approvalRole('CONFLICT_SUBSTITUTE', substitute.employeeId).expect(200);
+
+      const grantRefusal = await grant(substitute.appUserId, 'SPENDING_APPROVER').expect(422);
+
+      expect(errorCode(grantRefusal)).toBe('APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER');
+      expect(await rolesOf(substitute.appUserId)).toEqual([]);
+      await grant(approver.appUserId, 'SPENDING_APPROVER').expect(201);
+      const reverse = await approvalRole('CONFLICT_SUBSTITUTE', approver.employeeId).expect(422);
+      expect(errorCode(reverse)).toBe('APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER');
+      expect((await holders()).conflictSubstituteEmployeeId).toBe(substitute.employeeId);
+      expect((await holders()).spendingApproverEmployeeId).toBe(approver.employeeId);
+    });
+
+    it('is no longer an approval role: PUT refuses it and GET lists only the two others', async () => {
+      const user = await h.activatedAccount([]);
+
+      const put = await approvalRole('SPENDING_APPROVER', user.employeeId).expect(422);
+      const list = await h.admin.get('/api/v1/approval-roles').expect(200);
+
+      expect(errorCode(put)).toBe('VALIDATION_ERROR');
+      expect(dataOf<{ items: Array<{ role: string }> }>(list).items.map((item) => item.role)).toEqual([
+        'CONFLICT_SUBSTITUTE',
+        'FALLBACK_APPROVER',
+      ]);
+    });
+
+    it('is the Super Admin alone who grants and revokes it: Finance and the IT Admin get 403, and nothing changes (AC-4)', async () => {
+      const target = await h.activatedAccount([]);
+      for (const role of ['FINANCE', 'IT_ADMIN']) {
+        const caller = await h.activatedAccount([role]);
+        const { token } = await h.signIn(caller.email, caller.password);
+        const grantCall = request(h.server())
+          .post(`/api/v1/app-users/${target.appUserId}/role-grants`)
+          .set(h.as(token))
+          .send({ role: 'SPENDING_APPROVER' });
+        const revokeCall = request(h.server())
+          .delete(`/api/v1/app-users/${target.appUserId}/role-grants/SPENDING_APPROVER`)
+          .set(h.as(token));
+        for (const call of [grantCall, revokeCall])
+          expect(errorCode(await call.expect(403))).toBe('AUTHORIZATION.FORBIDDEN');
+        await h.ctx.sql.query(
+          'UPDATE role_grants SET revoked_at = now() WHERE app_user_id = $1 AND revoked_at IS NULL',
+          [caller.appUserId],
+        );
+      }
+      expect(await rolesOf(target.appUserId)).toEqual([]);
     });
   });
 });

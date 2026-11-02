@@ -68542,6 +68542,18 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "APP_USER.ROLE_COMBINATION_FORBIDDEN": {
+                    "summary": "This role cannot be combined with the roles the account holds.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APP_USER.ROLE_COMBINATION_FORBIDDEN",
+                        "message": "This role cannot be combined with the roles the account holds.",
+                        "details": { "conflictingRoles": ["IT_ADMIN"] },
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
@@ -68590,7 +68602,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid or a requested role cannot be granted by hand.",
+            "description": "The body is invalid, or a requested role cannot be granted by hand, or the new account cannot hold SPENDING_APPROVER.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -68607,17 +68619,6 @@
                       }
                     }
                   },
-                  "APP_USER.ROLE_DERIVED": {
-                    "summary": "The role cannot be granted by hand: ROLE_DERIVED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APP_USER.ROLE_DERIVED",
-                        "message": "The role cannot be granted by hand: ROLE_DERIVED.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
                   "APP_USER.SUPER_ADMIN_TRANSFER_ONLY": {
                     "summary": "The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.",
                     "value": {
@@ -68625,6 +68626,17 @@
                       "error": {
                         "code": "APP_USER.SUPER_ADMIN_TRANSFER_ONLY",
                         "message": "The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE": {
+                    "summary": "The account is locked or not activated, so cannot be the spending approver.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE",
+                        "message": "The account is locked or not activated, so cannot be the spending approver.",
                         "requestId": "req_example"
                       }
                     }
@@ -69971,7 +69983,7 @@
             }
           },
           "409": {
-            "description": "Already granted, forbidden combination, Finance seat taken, or the caller.",
+            "description": "Already granted, forbidden combination, Finance seat taken, a second spending approver, a head asked to be the spending approver, or the caller.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -70017,6 +70029,39 @@
                       "error": {
                         "code": "APP_USER.FINANCE_ALREADY_ASSIGNED",
                         "message": "Another account already holds the FINANCE role.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED": {
+                    "summary": "Another account already holds the SPENDING_APPROVER role.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED",
+                        "message": "Another account already holds the SPENDING_APPROVER role.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT": {
+                    "summary": "The employee heads a department, will head one from a later day, or is named as a successor, so cannot be the spending approver.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT",
+                        "message": "The employee heads a department, will head one from a later day, or is named as a successor, so cannot be the spending approver.",
+                        "details": {
+                          "headPeriods": [
+                            {
+                              "departmentId": "<department-id>",
+                              "departmentCode": "<department-code>",
+                              "validFrom": "2026-01-01",
+                              "validTo": null,
+                              "timing": "CURRENT"
+                            }
+                          ]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -70068,7 +70113,7 @@
             }
           },
           "422": {
-            "description": "The role is derived, or it is the Super Admin role, which changes only by the operations command outside the application.",
+            "description": "The role is the Super Admin role, which changes only by the operations command outside the application, or the person cannot be the spending approver (employee not working, account not usable, the substitute).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -70085,17 +70130,6 @@
                       }
                     }
                   },
-                  "APP_USER.ROLE_DERIVED": {
-                    "summary": "The role cannot be granted by hand: ROLE_DERIVED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APP_USER.ROLE_DERIVED",
-                        "message": "The role cannot be granted by hand: ROLE_DERIVED.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
                   "APP_USER.SUPER_ADMIN_TRANSFER_ONLY": {
                     "summary": "The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.",
                     "value": {
@@ -70103,6 +70137,39 @@
                       "error": {
                         "code": "APP_USER.SUPER_ADMIN_TRANSFER_ONLY",
                         "message": "The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APP_USER.SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE": {
+                    "summary": "The employee has left, is on long leave or is handing over, so cannot be the spending approver.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APP_USER.SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE",
+                        "message": "The employee has left, is on long leave or is handing over, so cannot be the spending approver.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE": {
+                    "summary": "The account is locked or not activated, so cannot be the spending approver.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE",
+                        "message": "The account is locked or not activated, so cannot be the spending approver.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER": {
+                    "summary": "The substitute for a conflict of interest cannot be the spending approver.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER",
+                        "message": "The substitute for a conflict of interest cannot be the spending approver.",
                         "requestId": "req_example"
                       }
                     }
@@ -70328,7 +70395,7 @@
             }
           },
           "422": {
-            "description": "The role is derived, or it is the Super Admin role, which changes only by the operations command outside the application.",
+            "description": "The role is the Super Admin role, which changes only by the operations command outside the application, or the person cannot be the spending approver (employee not working, account not usable, the substitute).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -70341,17 +70408,6 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APP_USER.ROLE_DERIVED": {
-                    "summary": "The role cannot be granted by hand: ROLE_DERIVED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APP_USER.ROLE_DERIVED",
-                        "message": "The role cannot be granted by hand: ROLE_DERIVED.",
                         "requestId": "req_example"
                       }
                     }
@@ -70568,7 +70624,7 @@
             "name": "role",
             "required": true,
             "in": "path",
-            "schema": { "type": "string", "enum": ["SPENDING_APPROVER", "CONFLICT_SUBSTITUTE", "FALLBACK_APPROVER"] }
+            "schema": { "type": "string", "enum": ["CONFLICT_SUBSTITUTE", "FALLBACK_APPROVER"] }
           }
         ],
         "requestBody": {
@@ -93188,10 +93244,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "role": {
-                      "type": "string",
-                      "enum": ["SPENDING_APPROVER", "CONFLICT_SUBSTITUTE", "FALLBACK_APPROVER"]
-                    },
+                    "role": { "type": "string", "enum": ["CONFLICT_SUBSTITUTE", "FALLBACK_APPROVER"] },
                     "holder": {
                       "type": "object",
                       "properties": {

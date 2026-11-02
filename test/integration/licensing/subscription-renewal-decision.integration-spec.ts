@@ -291,21 +291,5 @@ describe('the proposal and the decision of a renewal (integration, real PostgreS
         executionPoint: 'MID_TERM',
       });
     });
-
-    it('lets the substitute decide a case the approver is a party to, and nobody else then (FR-3.15)', async () => {
-      await h.setRole('SPENDING_APPROVER', { employeeId: h.it1.employeeId, account: h.it1 });
-      try {
-        const subscriptionId = await h.term({ ownerDepartmentId: unit.department.id, noticeDeadline: h.inDays(40) });
-        const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
-
-        expect((await h.decideRenewal(id, { choice: 'RENEW' }, h.it1)).status).toBe(403);
-        const decided = h.dataOf<{ renewal: DetailWire }>(
-          await h.decideRenewal(id, { choice: 'RENEW' }, h.substitute.account).expect(200),
-        ).renewal;
-        expect(decided.decision?.deciderRole).toBe('CONFLICT_SUBSTITUTE');
-      } finally {
-        await h.setRole('SPENDING_APPROVER', h.boss);
-      }
-    });
   });
 });

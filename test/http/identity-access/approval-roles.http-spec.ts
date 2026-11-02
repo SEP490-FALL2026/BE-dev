@@ -12,7 +12,7 @@ const ROUTES: Array<[string, Call]> = [
   ['GET /approval-roles', (server) => request(server).get('/api/v1/approval-roles')],
   [
     'PUT /approval-roles/{role}',
-    (server) => request(server).put('/api/v1/approval-roles/SPENDING_APPROVER').send({ employeeId: ID }),
+    (server) => request(server).put('/api/v1/approval-roles/CONFLICT_SUBSTITUTE').send({ employeeId: ID }),
   ],
 ];
 
@@ -54,9 +54,14 @@ describe('approval role routes (e2e, no database)', () => {
 
     it.each([
       ['a role that is not one', '/api/v1/approval-roles/CEO', { employeeId: ID }],
-      ['a person that is not an id', '/api/v1/approval-roles/SPENDING_APPROVER', { employeeId: 'E-1' }],
-      ['no person', '/api/v1/approval-roles/SPENDING_APPROVER', {}],
-      ['an unknown field', '/api/v1/approval-roles/SPENDING_APPROVER', { employeeId: ID, requestId: ID }],
+      [
+        'SPENDING_APPROVER, a granted role since QĐ-93a',
+        '/api/v1/approval-roles/SPENDING_APPROVER',
+        { employeeId: ID },
+      ],
+      ['a person that is not an id', '/api/v1/approval-roles/CONFLICT_SUBSTITUTE', { employeeId: 'E-1' }],
+      ['no person', '/api/v1/approval-roles/FALLBACK_APPROVER', {}],
+      ['an unknown field', '/api/v1/approval-roles/CONFLICT_SUBSTITUTE', { employeeId: ID, requestId: ID }],
     ])('turns away %s, 422 VALIDATION_ERROR', async (_name, path, body) => {
       const response = await request(app.getHttpServer()).put(path).set(asAdmin()).send(body).expect(422);
 

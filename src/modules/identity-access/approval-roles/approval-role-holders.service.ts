@@ -17,7 +17,7 @@ export class ApprovalRoleHoldersService {
       holders.find((holder) => holder.role === role)?.employeeId ?? null;
 
     return {
-      spendingApproverEmployeeId: holderOf('SPENDING_APPROVER'),
+      spendingApproverEmployeeId: await this.reader.spendingApproverEmployeeId(tx),
       conflictSubstituteEmployeeId: holderOf('CONFLICT_SUBSTITUTE'),
       fallbackApproverEmployeeId: holderOf('FALLBACK_APPROVER'),
     };

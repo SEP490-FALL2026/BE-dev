@@ -3,6 +3,9 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AppRole, RoleGrantRecord } from '../public/identity-access.types';
 
+/** One advisory-lock key for every change to the approval roles and to the grant of SPENDING_APPROVER, so the pairing rule is checked one writer at a time. */
+const APPROVAL_ROLES_LOCK_KEY = 7_300_001;
+
 /** Owns RoleGrant: the roles granted to accounts, with their history. The one writer of `role_grants`. */
 @Injectable()
 export class RoleGrantRepo {
@@ -13,6 +16,31 @@ export class RoleGrantRepo {
     input: { organizationId: string; appUserId: string; role: AppRole; grantedBy?: string },
   ): Promise<{ id: string }> {
     return tx.roleGrant.create({ data: input, select: { id: true } });
+  }
+
+  /** Serializes everything that changes the approval roles or grants SPENDING_APPROVER, for the rest of the transaction. Taken first. */
+  async lockApprovalRolesForChange(tx: DbTx): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${APPROVAL_ROLES_LOCK_KEY}::bigint)`;
+  }
+
+  /** True when an account of the organization holds an effective SPENDING_APPROVER grant, whatever its state (QĐ-93a). */
+  async spendingApproverIsHeld(tx: DbTx, organizationId: string): Promise<boolean> {
+    const row = await tx.roleGrant.findFirst({
+      where: { organizationId, role: 'SPENDING_APPROVER', revokedAt: null },
+      select: { id: true },
+    });
+
+    return row !== null;
+  }
+
+  /** The employee who holds the effective SPENDING_APPROVER grant, whatever the state of the account; null when nobody does. */
+  async spendingApproverEmployeeId(client?: DbTx): Promise<string | null> {
+    const row = await (client ?? this.prisma).roleGrant.findFirst({
+      where: { role: 'SPENDING_APPROVER', revokedAt: null },
+      select: { appUser: { select: { employeeId: true } } },
+    });
+
+    return row?.appUser.employeeId ?? null;
   }
 
   /** The employee an account belongs to; null when there is no such account. */
@@ -32,7 +60,7 @@ export class RoleGrantRepo {
     return row?.appUserId ?? null;
   }
 
-  /** Which of the roles `roles` each of these employees holds on an effective grant, whatever the state of the account (one read). */
+  /** Which of the roles `roles` each of these people holds on an effective grant, whatever the state of the account (one read). */
   async listHoldersAmong(
     employeeIds: readonly string[],
     roles: readonly AppRole[],

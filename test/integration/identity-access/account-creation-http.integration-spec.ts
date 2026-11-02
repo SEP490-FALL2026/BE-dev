@@ -153,7 +153,7 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
       expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
     });
 
-    it('refuses derived and transfer-only roles at creation without creating anything (AC-4, AC-14)', async () => {
+    it('refuses SPENDING_APPROVER for a new account and the transfer-only role at creation without creating anything (US-01-03 AC-6, AC-14)', async () => {
       const employee = await newEmployee();
       const before = await h.ctx.sql.query('SELECT count(*)::int AS n FROM app_users');
 
@@ -164,7 +164,7 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
         .post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['SUPER_ADMIN', 'IT_ADMIN'] })
         .expect(422);
 
-      expect(errorCode(derived)).toBe('APP_USER.ROLE_DERIVED');
+      expect(errorCode(derived)).toBe('APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE');
       expect(errorCode(transfer)).toBe('APP_USER.SUPER_ADMIN_TRANSFER_ONLY');
       expect((await h.ctx.sql.query('SELECT count(*)::int AS n FROM app_users')).rows).toEqual(before.rows);
     });

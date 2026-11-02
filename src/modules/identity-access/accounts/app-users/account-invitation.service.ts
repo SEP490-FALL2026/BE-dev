@@ -21,6 +21,7 @@ import {
   LoginEmailRequiredError,
   RoleCombinationForbiddenError,
   RoleRequestRefusedError,
+  SpendingApproverAccountNotUsableError,
   SelfChangeForbiddenError,
 } from '../account.errors';
 import { InvitationMailService } from './invitation-mail.service';
@@ -60,6 +61,8 @@ export class AccountInvitationService {
     if (!employee) throw new EmployeeNotFoundError(input.employeeId);
 
     const roles = [...new Set(input.roles)] as AppRole[];
+    // A new account has not been activated, so it cannot be given the role: the whole command is refused (rule 8 of the grant).
+    if (roles.includes('SPENDING_APPROVER')) throw new SpendingApproverAccountNotUsableError();
 
     return this.runner
       .run(async (tx) => {

@@ -63,7 +63,7 @@ export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     findings: ['LD-14'],
     owner: 'g2-approval-roles',
     businessMaximum: {
-      maxItems: 3,
+      maxItems: 2,
       source:
         'APPROVAL_ROLES in approval-role.repo.ts (the history of each role: NESTED_ARRAYS approvalRoleList#history)',
     },

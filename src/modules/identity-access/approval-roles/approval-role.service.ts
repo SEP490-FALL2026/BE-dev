@@ -23,9 +23,9 @@ export interface ApprovalRoleView {
 }
 
 /**
- * The three approval roles the Super Admin sets (`US-01-03`): the spending approver (the one person who decides
- * spending), the substitute who decides instead when the approver is the requester or the beneficiary, and the
- * fallback approver who stands in as a Manager for a department that has no head. Setting a role is configuration,
+ * The two approval roles the Super Admin sets here (`US-01-03`): the substitute who decides instead when the approver is the
+ * requester or the beneficiary, and the fallback approver who stands in as a Manager for a department that has no head. The
+ * spending approver, the one person who decides spending, is a role grant since QĐ-93a. Setting a role is configuration,
  * never an approval (`SoD-1`); there is no way to delegate it to anyone else (AC-5). Who holds each role is read by the
  * approval workflow when it is built; nothing here decides a request.
  */
@@ -87,7 +87,7 @@ export class ApprovalRoleService {
 
     await this.runner.run(async (tx) => {
       // Lock order: the advisory key for these roles, then the employee, then the account (lock protocol).
-      await this.repo.lockForChange(tx);
+      await this.grants.lockApprovalRolesForChange(tx);
       await this.organizationReads.lockEmployeeForShare(tx, employeeId);
       const employee = await this.organizationReads.getEmployee(employeeId, tx);
       if (!employeeHasNotLeft(employee)) throw new ApprovalRoleHolderInvalidError('EMPLOYEE_NOT_ACTIVE');
@@ -106,13 +106,8 @@ export class ApprovalRoleService {
       const holders = await this.repo.currentHolders(tx);
       const current = holders.find((row) => row.role === role);
       if (current?.employeeId === employeeId) return;
-      const counterpart =
-        role === 'SPENDING_APPROVER'
-          ? 'CONFLICT_SUBSTITUTE'
-          : role === 'CONFLICT_SUBSTITUTE'
-            ? 'SPENDING_APPROVER'
-            : null;
-      if (counterpart && holders.find((row) => row.role === counterpart)?.employeeId === employeeId) {
+      // The substitute is never the spending approver; the approver is the holder of the role grant (QĐ-93a).
+      if (role === 'CONFLICT_SUBSTITUTE' && (await this.grants.spendingApproverEmployeeId(tx)) === employeeId) {
         throw new ApprovalRolePairingError();
       }
 

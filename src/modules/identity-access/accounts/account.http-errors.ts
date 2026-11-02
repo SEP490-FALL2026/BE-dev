@@ -20,6 +20,11 @@ import {
   RoleNotGrantedError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
+  SpendingApproverAccountNotUsableError,
+  SpendingApproverAlreadyAssignedError,
+  SpendingApproverEmployeeNotActiveError,
+  SpendingApproverHeadsDepartmentError,
+  SpendingApproverIsSubstituteError,
   SuperAdminHolderNotLockableError,
 } from './account.errors';
 
@@ -83,6 +88,24 @@ export function toAccountApiException(error: unknown): unknown {
       headPeriods: error.headPeriods.map((period) => ({ ...period })),
     });
   }
+  if (error instanceof SpendingApproverAlreadyAssignedError) {
+    return refuse(HttpStatus.CONFLICT, 'APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED', error.message);
+  }
+  if (error instanceof SpendingApproverHeadsDepartmentError) {
+    return refuse(HttpStatus.CONFLICT, 'APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT', error.message, {
+      headPeriods: error.headPeriods.map((period) => ({ ...period })),
+    });
+  }
+  if (error instanceof SpendingApproverEmployeeNotActiveError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'APP_USER.SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE', error.message);
+  }
+  if (error instanceof SpendingApproverAccountNotUsableError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE', error.message);
+  }
+  // The code of the approval roles, borrowed: one code keeps one status (API contract) and the substitute role goes away with its own release.
+  if (error instanceof SpendingApproverIsSubstituteError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER', error.message);
+  }
   if (error instanceof FinanceAlreadyAssignedError) {
     return refuse(HttpStatus.CONFLICT, 'APP_USER.FINANCE_ALREADY_ASSIGNED', error.message);
   }
@@ -98,7 +121,6 @@ export const ACCOUNT_ERROR_EXAMPLES = {
   NOT_FOUND: example(new AccountNotFoundError()),
   EMPLOYEE_NOT_FOUND: example(new EmployeeNotFoundError('<employee-id>')),
   SELF_CHANGE_FORBIDDEN: example(new SelfChangeForbiddenError()),
-  ROLE_DERIVED: example(new RoleRequestRefusedError('ROLE_DERIVED')),
   SUPER_ADMIN_TRANSFER_ONLY: example(new RoleRequestRefusedError('SUPER_ADMIN_TRANSFER_ONLY')),
   EMPLOYEE_TERMINATED: example(new EmployeeTerminatedError()),
   ALREADY_EXISTS_FOR_EMPLOYEE: example(new AccountAlreadyExistsError()),
@@ -123,5 +145,20 @@ export const ACCOUNT_ERROR_EXAMPLES = {
     ]),
   ),
   FINANCE_ALREADY_ASSIGNED: example(new FinanceAlreadyAssignedError()),
+  SPENDING_APPROVER_ALREADY_ASSIGNED: example(new SpendingApproverAlreadyAssignedError()),
+  SPENDING_APPROVER_HEADS_DEPARTMENT: example(
+    new SpendingApproverHeadsDepartmentError([
+      {
+        departmentId: '<department-id>',
+        departmentCode: '<department-code>',
+        validFrom: '2026-01-01',
+        validTo: null,
+        timing: 'CURRENT',
+      },
+    ]),
+  ),
+  SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE: example(new SpendingApproverEmployeeNotActiveError()),
+  SPENDING_APPROVER_ACCOUNT_NOT_USABLE: example(new SpendingApproverAccountNotUsableError()),
+  SUBSTITUTE_MUST_DIFFER: example(new SpendingApproverIsSubstituteError()),
   INVITATION_INVALID: example(new InvitationInvalidError()),
 } as const;

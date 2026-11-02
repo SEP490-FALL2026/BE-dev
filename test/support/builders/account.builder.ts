@@ -5,11 +5,7 @@ import {
   type AccessTokenVerifierPort,
   type AuthenticatedPrincipal,
 } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
-import {
-  ApprovalRoleParamDto,
-  SetApprovalRoleBodyDto,
-} from '../../../src/modules/identity-access/approval-roles/approval-role.dto';
-import { ApprovalRoleService } from '../../../src/modules/identity-access/approval-roles/approval-role.service';
+import { AccountStatusService } from '../../../src/modules/identity-access/accounts/app-users/account-status.service';
 import { AccountRecordService } from '../../../src/modules/identity-access/accounts/account-record.service';
 import { CredentialService } from '../../../src/modules/identity-access/credentials/credential.service';
 import { RoleGrantService } from '../../../src/modules/identity-access/accounts/role-grant.service';
@@ -113,8 +109,9 @@ export async function buildActivatedAccount(
 /*
  * The one place a suite gives a person `MANAGER` or `SPENDING_APPROVER` as a precondition, or reads who holds the second
  * (QĐ-93b). `MANAGER` is still derived from a head period until the principal stops deriving roles (plan task 7), so
- * `ensureManagerGrant` grants nothing yet; `SPENDING_APPROVER` is still the approval-role holder row until task 6a. Only
- * these four helpers change when the application accepts the new grants — no spec reaches for the role tables itself.
+ * `ensureManagerGrant` grants nothing yet; `SPENDING_APPROVER` is a role grant since task 6a, given through the service of the
+ * route (`POST /app-users/{id}/role-grants`), so every rule of the grant holds for a fixture too. Only these four helpers change
+ * when the application accepts the new grants — no spec reaches for the role tables itself.
  */
 
 /**
@@ -127,33 +124,40 @@ export async function ensureManagerGrant(ctx: HttpTestApp, adminToken: string, e
   if (rowCount !== 1) throw new Error(`The employee ${employeeId} does not exist, so no MANAGER grant can follow.`);
 }
 
-/** The Super Admin names the one spending approver, through the service of the route (T2.2: no HTTP). */
-export async function setSpendingApprover(ctx: HttpTestApp, adminToken: string, employeeId: string): Promise<void> {
-  const actor = await principalOf(ctx, adminToken);
-  await ctx.app
-    .get(ApprovalRoleService, { strict: false })
-    .set(
-      actor,
-      ApprovalRoleParamDto.create({ role: 'SPENDING_APPROVER' }).role,
-      SetApprovalRoleBodyDto.create({ employeeId }).employeeId,
-    );
+async function appUserOf(ctx: HttpTestApp, employeeId: string): Promise<string> {
+  const { rows } = await ctx.sql.query<{ id: string }>('SELECT id FROM app_users WHERE employee_id = $1', [employeeId]);
+  if (rows.length !== 1) throw new Error(`The employee ${employeeId} has no account to hold a role.`);
+
+  return rows[0].id;
 }
 
 /**
- * Nobody is the spending approver any more: the way the role is left empty, which no route does. `held_from` carries the
- * application's clock, which can run ahead of the database's on a developer machine, so the holding never ends before it began.
+ * The Super Admin names the one spending approver, through the service of the route (T2.2: no HTTP): whoever holds the role is
+ * revoked first (the one holder the grant allows), then the new person is granted it.
  */
-export async function clearSpendingApprover(ctx: HttpTestApp): Promise<void> {
-  await ctx.sql.query(
-    `UPDATE approval_role_holders SET held_until = GREATEST(now(), held_from)
-      WHERE role = 'SPENDING_APPROVER'::"ApprovalRole" AND held_until IS NULL`,
-  );
+export async function setSpendingApprover(ctx: HttpTestApp, adminToken: string, employeeId: string): Promise<void> {
+  const actor = await principalOf(ctx, adminToken);
+  const status = ctx.app.get(AccountStatusService, { strict: false });
+  const current = await spendingApproverEmployeeId(ctx);
+  if (current === employeeId) return;
+  if (current !== null) await status.revokeRole(actor, await appUserOf(ctx, current), 'SPENDING_APPROVER');
+  await status.grantRole(actor, await appUserOf(ctx, employeeId), 'SPENDING_APPROVER');
+}
+
+/** Nobody is the spending approver any more: the Super Admin revokes the role, through the service of the route. */
+export async function clearSpendingApprover(ctx: HttpTestApp, adminToken: string): Promise<void> {
+  const current = await spendingApproverEmployeeId(ctx);
+  if (current === null) return;
+  await ctx.app
+    .get(AccountStatusService, { strict: false })
+    .revokeRole(await principalOf(ctx, adminToken), await appUserOf(ctx, current), 'SPENDING_APPROVER');
 }
 
 /** The employee who is the spending approver now; null when nobody is. */
 export async function spendingApproverEmployeeId(ctx: HttpTestApp): Promise<string | null> {
   const { rows } = await ctx.sql.query<{ employee_id: string }>(
-    `SELECT employee_id FROM approval_role_holders WHERE role = 'SPENDING_APPROVER'::"ApprovalRole" AND held_until IS NULL`,
+    `SELECT u.employee_id FROM role_grants g JOIN app_users u ON u.id = g.app_user_id
+      WHERE g.role = 'SPENDING_APPROVER' AND g.revoked_at IS NULL`,
   );
 
   return rows[0]?.employee_id ?? null;

@@ -59,7 +59,7 @@ flowchart BT
   finance -->|4| organization
   identity_access -->|17| audit
   identity_access -->|10| notifications
-  identity_access -->|31| organization
+  identity_access -->|32| organization
   installation -->|8| audit
   installation -->|2| finance
   installation -->|18| identity_access

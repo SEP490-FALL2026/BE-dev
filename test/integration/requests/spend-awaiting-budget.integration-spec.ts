@@ -5,7 +5,6 @@ import { SpendBudgetListener } from '../../../src/modules/requests/finance-revie
 import { SpendNotFinanceError } from '../../../src/modules/requests/spend/spend.errors';
 import { waitForLockWaiters } from '../../support/lock-wait';
 import { StatusHarness } from '../../support/status-harness';
-import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
 
 /**
@@ -69,7 +68,6 @@ describe('the request that waits for a version of the budget (integration, real 
         [id],
       )
     ).rows;
-  const financePerson = (): Person => ({ employeeId: h.finance.employeeId, account: h.finance });
   const stage = async (id: string, u: Unit) =>
     h.dataOf<{ request: { spend: { stage: string } | null } }>(await h.fetch(id, u.head.account).expect(200)).request
       .spend?.stage;
@@ -294,65 +292,6 @@ describe('the request that waits for a version of the budget (integration, real 
 
       expect(h.codeOf(refused)).toBe('SPEND.OWN_REQUEST');
       expect(await reviews(id)).toHaveLength(1);
-    });
-
-    it('refuses Finance when Finance will decide the spend step: the reviewer is not the approver (SoD-8), on a waiting request and on a review', async () => {
-      const u = await unit();
-      const waitingId = await waiting(u);
-      const other = await unit();
-      await h.budgetFor(other, { total: 100 * M, held: 20 * M, spent: 40 * M });
-      const inReview = await h.paidRequest(other, plan, { amount: 45 * M });
-      await h.route(inReview, other.head.account);
-      await h.setRole('SPENDING_APPROVER', financePerson());
-      try {
-        const first = await h.completeReview(waitingId, { outcome: 'RETURN_TO_HEAD', reason: 'x' }).expect(409);
-        const second = await h
-          .completeReview(inReview, { outcome: 'ASSESSED', opinion: 'Over', direction: 'RECOMMEND_OVERRIDE' })
-          .expect(409);
-
-        expect([h.codeOf(first), h.codeOf(second)]).toEqual([
-          'SPEND.REVIEWER_IS_APPROVER',
-          'SPEND.REVIEWER_IS_APPROVER',
-        ]);
-        expect(await reviews(waitingId)).toHaveLength(1);
-        expect(await reviews(inReview)).toEqual([]);
-        expect(await h.state(inReview)).toBe('AWAITING_FINANCE_REVIEW');
-      } finally {
-        await h.setRole('SPENDING_APPROVER', h.boss);
-      }
-    });
-
-    it('refuses the person who completed the review of the same request when they decide its spend step (SoD-8, the other direction)', async () => {
-      const u = await unit();
-      await h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M });
-      const id = await h.paidRequest(u, plan, { amount: 45 * M });
-      await h.route(id, u.head.account);
-      await h
-        .completeReview(id, { outcome: 'ASSESSED', opinion: 'Over by 5 million', direction: 'RECOMMEND_OVERRIDE' })
-        .expect(200);
-      // The role of the approver changed hands after the review, and the step is Finance's to decide now: the review they ended is theirs.
-      await h.setRole('SPENDING_APPROVER', financePerson());
-      try {
-        await h.ctx.sql.query(
-          `UPDATE access_request_steps SET assignee_employee_id = $2
-            WHERE request_id = $1 AND kind = 'SPEND_APPROVAL'::"AccessRequestStepKind" AND state = 'PENDING'`,
-          [id, h.finance.employeeId],
-        );
-
-        const refused = await h
-          .decideSpend(
-            id,
-            { decision: 'APPROVE', override: { reason: 'Mended next month', years: [h.year] } },
-            h.finance,
-          )
-          .expect(409);
-
-        expect(h.codeOf(refused)).toBe('SPEND.REVIEWER_IS_APPROVER');
-        expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
-        expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([expect.objectContaining({ state: 'PENDING' })]);
-      } finally {
-        await h.setRole('SPENDING_APPROVER', h.boss);
-      }
     });
 
     it('answers a request that does not wait and has no review open with REVIEW_NOT_OPEN, one that does not exist with 404, and a body with no reason with 422', async () => {

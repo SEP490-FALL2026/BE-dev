@@ -182,7 +182,7 @@ export class RequestHarness extends ProvisioningHarness {
    * clock, which can run ahead of the database's on a developer machine, so the holding never ends before it began.
    */
   async clearRole(role: 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'FALLBACK_APPROVER'): Promise<void> {
-    if (role === 'SPENDING_APPROVER') return clearSpendingApprover(this.ctx);
+    if (role === 'SPENDING_APPROVER') return clearSpendingApprover(this.ctx, this.admin);
     await this.ctx.sql.query(
       `UPDATE approval_role_holders SET held_until = GREATEST(now(), held_from) WHERE role = $1::"ApprovalRole" AND held_until IS NULL`,
       [role],
