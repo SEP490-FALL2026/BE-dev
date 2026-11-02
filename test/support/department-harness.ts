@@ -154,7 +154,6 @@ export class DepartmentHarness {
       hireDate: '2026-10-01',
       departmentCode,
       jobTitle: 'Administrator',
-      hrBasis: HR_BASIS,
       ...overrides,
     };
     const response = await this.api().post('/api/v1/employees').set(this.asAdmin()).send(body).expect(201);

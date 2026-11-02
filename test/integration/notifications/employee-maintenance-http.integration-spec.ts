@@ -248,7 +248,7 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       const response = await patch(id, { fullName: 'Changed', hrBasis: HR_BASIS_BODY }).expect(422);
 
       expect(codeOf(response)).toBe('VALIDATION_ERROR');
-      expect(JSON.stringify(response.body)).toContain('hrBasis');
+      expect(JSON.stringify(response.body)).toContain('unrecognized_keys');
       expect(await rowOf(id)).toEqual(before);
       expect(await auditOf(id)).toEqual([]);
     });

@@ -454,7 +454,6 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         .post('/api/v1/employees')
         .set(asAdmin())
         .send({
-          hrBasis: HR_BASIS,
           employeeCode: unique('E-LATE'),
           fullName: 'Late Joiner',
           employmentType: 'STAFF',

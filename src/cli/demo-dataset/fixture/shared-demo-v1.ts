@@ -14,12 +14,6 @@ export const SHARED_DEMO_V1: DemoFixture = {
   marker: 'DS1',
   emailDomain: 'ds1.slm-demo.example',
   currency: 'VND',
-  basis: {
-    type: 'Quyết định nhân sự (dữ liệu giả lập)',
-    reference: 'DS1-QD-2026-001',
-    issuer: 'Ban Giám đốc (giả lập)',
-    issuedOn: '2026-01-02',
-  },
   departments: [
     {
       code: 'DS1-BOD',

@@ -106,7 +106,7 @@ export class EmployeeMaintenanceService {
     const workEmailTaken = toCheck !== null && (await this.employees.isWorkEmailTaken(tx, who.organizationId, toCheck));
     const correction = correctionOf(current, input, { today: who.today, workEmailTaken });
     if (correction.reasons.length > 0) throw new EmployeeRowInvalidError(correction.reasons);
-    if (Object.keys(correction.changes).length > 0) await this.writeChanges(tx, who, current, correction, input);
+    if (Object.keys(correction.changes).length > 0) await this.writeChanges(tx, who, current, correction);
 
     return viewOf(current, correction, input);
   }
@@ -117,7 +117,6 @@ export class EmployeeMaintenanceService {
     who: { actor: AuthenticatedPrincipal; organizationId: string; employeeId: string; today: BusinessDate },
     current: EmployeeRecord,
     correction: Correction,
-    input: OfficialFieldsInput,
   ): Promise<void> {
     await this.employees.updateOfficialFields(tx, who.employeeId, correction.changes);
     await this.audit.record(

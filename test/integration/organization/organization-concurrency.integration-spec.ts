@@ -6,7 +6,6 @@ import { TransactionRunner } from '../../../src/infrastructure/database/transact
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { findPlacementCoverageViolations } from '../../support/placement-coverage';
-import { HR_BASIS } from '../../support/hr-basis';
 import { registerUseReaders } from '../../support/organization-use-readers';
 import { waitForLockWaiters } from '../../support/lock-wait';
 
@@ -80,7 +79,6 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
       hireDate: '2026-10-01',
       departmentCode: 'P-OPS',
       jobTitle: 'Administrator',
-      hrBasis: HR_BASIS,
       ...overrides,
     };
   };

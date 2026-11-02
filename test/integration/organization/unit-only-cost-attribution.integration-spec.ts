@@ -10,7 +10,6 @@ import {
 } from '../../support/disposable-database';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { AssignmentWire, SeatHarness } from '../../support/seat-baseline-harness';
-import { HR_BASIS } from '../../support/hr-basis';
 
 const MIGRATIONS = join(process.cwd(), 'prisma', 'migrations');
 const UNIT_ONLY = '_cost_centers_unit_only';
@@ -205,7 +204,6 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
           .post('/api/v1/employees')
           .set({ Authorization: `Bearer ${h.admin}` })
           .send({
-            hrBasis: HR_BASIS,
             employeeCode: code,
             fullName: `Person ${code}`,
             workEmail: `${code.toLowerCase()}@acme.vn`,

@@ -1,6 +1,5 @@
 import request from 'supertest';
 import { SeatHarness } from '../../support/seat-baseline-harness';
-import { HR_BASIS } from '../../support/hr-basis';
 
 const h = new SeatHarness();
 const HEADER = 'employee_code,full_name,work_email,employment_type,hire_date,department_code,job_title';
@@ -57,7 +56,7 @@ describe('the people file and the people who hold seats (US-02-02 AC-4, integrat
     await request(h.server())
       .post(`/api/v1/employee-imports/${id}/confirmations`)
       .set(superAdmin())
-      .send({ previewVersion: 1, idempotencyKey: 'key-queue-0001', acknowledgeDuplicateFile: false, hrBasis: HR_BASIS })
+      .send({ previewVersion: 1, idempotencyKey: 'key-queue-0001', acknowledgeDuplicateFile: false })
       .expect(200);
     const status = await h.ctx.sql.query<{ status: string }>(`SELECT status FROM employees WHERE id = $1`, [e7]);
     expect(status.rows[0].status).toBe('ACTIVE');

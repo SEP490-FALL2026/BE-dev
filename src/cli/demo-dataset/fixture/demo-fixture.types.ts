@@ -110,7 +110,6 @@ export interface DemoFixture {
   emailDomain: string;
   /** Every amount of the fixture is in this currency, which must be the reporting currency of the installation. */
   currency: string;
-  basis: { type: string; reference: string; issuer: string; issuedOn: string };
   departments: DemoDepartment[];
   people: DemoPerson[];
   approvalRoles: { SPENDING_APPROVER: string; CONFLICT_SUBSTITUTE: string; FALLBACK_APPROVER: string };

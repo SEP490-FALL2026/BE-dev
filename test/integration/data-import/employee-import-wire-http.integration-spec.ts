@@ -351,7 +351,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
       ).expect(422);
 
       expect(errorOf(refused).code).toBe('VALIDATION_ERROR');
-      expect(JSON.stringify(refused.body)).toContain('hrBasis');
+      expect(JSON.stringify(refused.body)).toContain('unrecognized_keys');
       expect(await count('employees')).toBe(people);
       expect(
         importOf(await request(server()).get(`/api/v1/employee-imports/${uploaded.id}`).set(asSuper()).expect(200))

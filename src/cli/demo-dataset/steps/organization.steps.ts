@@ -1,5 +1,5 @@
 import type { DemoAccountSpec } from '../../../modules/installation/public/demo-accounts.types';
-import { basis, emailOf, listAll, summarize } from '../demo-step-kit';
+import { emailOf, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoDepartment, DemoPerson } from '../fixture/demo-fixture.types';
 
@@ -79,7 +79,6 @@ async function employees(ctx: DemoRunContext): Promise<StepOutcome> {
       employmentType: person.employmentType,
       hireDate: HIRE_DATE,
       departmentCode: person.department,
-      hrBasis: basis(ctx),
     });
     ctx.ids.employees.set(person.code, created.id);
     results.push({ status: 'done', label: person.code });

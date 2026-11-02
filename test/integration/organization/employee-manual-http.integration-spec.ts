@@ -363,7 +363,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       const response = await enter(row({ hrBasis: HR_BASIS_BODY })).expect(422);
 
       expect(errorCodeOf(response)).toBe('VALIDATION_ERROR');
-      expect(JSON.stringify(response.body)).toContain('hrBasis');
+      expect(JSON.stringify(response.body)).toContain('unrecognized_keys');
       expect((await ctx.sql.query('SELECT count(*)::int AS n FROM employees')).rows[0]).toEqual(people);
     });
 

@@ -3,6 +3,9 @@
 Mục đích: dữ liệu tổ chức của một cài đặt — tổ chức, phòng ban và trưởng phòng, nhân viên và bố trí theo ngày, Cost
 Center, dự án — và việc báo thay đổi tổ chức cho các module phía trên. Story chính: US-02-02 (nhập tay, sửa hồ sơ nhân
 viên), US-03-06 (hồ sơ phòng ban, trưởng phòng, dự án), US-04-09 (danh mục Cost Center), US-01-11 (IT Admin phụ trách).
+Các thao tác ghi tổ chức và hồ sơ của Super Admin không thu căn cứ HR (QĐ-93f): Audit Trail ghi người thực hiện, thời
+điểm, trước/sau; sự kiện nhân sự (module `personnel`) vẫn có căn cứ. Riêng `/projects` còn nhận căn cứ tới khi lát
+`qd93-remove-department-projects` xóa.
 
 Tầng: T2 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit, notifications; không import identity-access
 (D5). Được dùng bởi: budgets, catalog, data-import, finance, identity-access, installation, licensing, onboarding,

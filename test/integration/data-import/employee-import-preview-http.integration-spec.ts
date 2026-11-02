@@ -1,6 +1,5 @@
 import request from 'supertest';
 import { createActivatedAccount } from '../../support/api-accounts';
-import { HR_BASIS } from '../../support/hr-basis';
 import { EmployeeImportHttpHarness, type ImportWire, HEADER, today } from '../../support/employee-import-http-harness';
 
 describe('importing people from a file over HTTP (integration, real PostgreSQL): upload, preview, the file and the rows that are wrong, and who may import', () => {
@@ -40,7 +39,6 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
         .post('/api/v1/employees')
         .set(asSuper())
         .send({
-          hrBasis: HR_BASIS,
           employeeCode: existingCode,
           fullName: existing.split(',')[1],
           workEmail: existing.split(',')[2],
@@ -296,7 +294,6 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
         .post('/api/v1/employees')
         .set(asSuper())
         .send({
-          hrBasis: HR_BASIS,
           employeeCode: code,
           fullName: 'Nguyen Van A',
           workEmail: `${code.toLowerCase()}@acme.vn`,

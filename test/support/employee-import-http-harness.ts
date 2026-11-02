@@ -2,7 +2,6 @@ import { findPlacementCoverageViolations } from './placement-coverage';
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from './api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from './http-test-app';
-import { HR_BASIS } from './hr-basis';
 import { registerUseReaders } from './organization-use-readers';
 
 /** The people import over HTTP: the file header, the calendar and the set-up the import specs share. */
@@ -166,11 +165,7 @@ export class EmployeeImportHttpHarness {
     id: string,
     body: { previewVersion: number; idempotencyKey: string; acknowledgeDuplicateFile?: boolean; hrBasis?: unknown },
     headers = this.asSuper(),
-  ) =>
-    request(this.server())
-      .post(`/api/v1/employee-imports/${id}/confirmations`)
-      .set(headers)
-      .send({ hrBasis: HR_BASIS, ...body });
+  ) => request(this.server()).post(`/api/v1/employee-imports/${id}/confirmations`).set(headers).send(body);
 
   rowsOf = async (id: string, outcome?: string): Promise<RowWire[]> =>
     (

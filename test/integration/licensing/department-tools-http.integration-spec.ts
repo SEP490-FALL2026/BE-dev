@@ -4,7 +4,6 @@ import { TransactionRunner } from '../../../src/infrastructure/database/transact
 import { LicensingRenewalApi } from '../../../src/modules/licensing/public/licensing-renewal.api';
 import { ApiAccount, createActivatedAccount } from '../../support/api-accounts';
 import { RevocationHarness } from '../../support/revocation-harness';
-import { HR_BASIS } from '../../support/hr-basis';
 
 const h = new RevocationHarness();
 
@@ -75,7 +74,6 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
         .post('/api/v1/employees')
         .set({ Authorization: `Bearer ${h.admin}` })
         .send({
-          hrBasis: HR_BASIS,
           employeeCode: code,
           fullName: `Person ${code}`,
           workEmail: `${code.toLowerCase()}@acme.vn`,

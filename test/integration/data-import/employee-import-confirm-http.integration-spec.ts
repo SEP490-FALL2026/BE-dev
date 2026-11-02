@@ -1,6 +1,5 @@
 import request from 'supertest';
 import { Client } from 'pg';
-import { HR_BASIS } from '../../support/hr-basis';
 import { EmployeeImportHttpHarness, type ImportWire, today, addDays } from '../../support/employee-import-http-harness';
 
 describe('importing people from a file over HTTP (integration, real PostgreSQL): confirmation, the same file twice, a stale preview and two confirmations at once', () => {
@@ -192,7 +191,6 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
         .post('/api/v1/employees')
         .set(asSuper())
         .send({
-          hrBasis: HR_BASIS,
           employeeCode: taken,
           fullName: 'Entered by hand first',
           employmentType: 'STAFF',
