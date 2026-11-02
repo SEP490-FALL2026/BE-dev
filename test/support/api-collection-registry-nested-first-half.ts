@@ -140,6 +140,19 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     removeWhen: 'Review when an int-list definition or its default changes.',
   },
   {
+    key: 'operatingParameterList#constraints.options',
+    classification: 'bounded',
+    findings: ['LD-17'],
+    owner: 'qd93-parameter-labels-dashboard-queues',
+    businessMaximum: {
+      maxItems: 10,
+      source: 'ENUM_OPTIONS_MAX in parameter-definitions.policy.ts, checked by its unit spec',
+    },
+    rationale:
+      'The choices of an enum parameter (two for each rule schedule); the constraints of the other shapes hold no array.',
+    removeWhen: 'Review when ENUM_OPTIONS_MAX changes or a parameter of the enum shape is added.',
+  },
+  {
     key: 'operatingParameterHistory#value',
     classification: 'bounded',
     findings: [],

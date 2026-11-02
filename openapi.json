@@ -91242,6 +91242,24 @@
                   "type": "object",
                   "properties": {
                     "key": { "type": "string" },
+                    "label": {
+                      "type": "string",
+                      "description": "What the screen shows for the parameter, in Vietnamese."
+                    },
+                    "group": {
+                      "type": "string",
+                      "enum": [
+                        "WORKFLOW",
+                        "BUDGET",
+                        "PERSONNEL",
+                        "PROVISIONING",
+                        "ACCOUNT",
+                        "DOCUMENT",
+                        "SUBSCRIPTION",
+                        "USAGE"
+                      ]
+                    },
+                    "groupLabel": { "type": "string", "description": "The name of the group, in Vietnamese." },
                     "value": {
                       "anyOf": [
                         { "type": "number" },
@@ -91258,16 +91276,73 @@
                     },
                     "isDefault": { "type": "boolean" },
                     "unit": { "type": "string" },
+                    "unitLabel": { "type": "string", "description": "The unit, in Vietnamese." },
                     "description": { "type": "string" },
-                    "constraints": { "type": "object", "additionalProperties": {} },
+                    "constraints": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["int"] },
+                            "min": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                            "max": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 }
+                          },
+                          "required": ["kind", "min", "max"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["enum"] },
+                            "options": {
+                              "minItems": 1,
+                              "maxItems": 10,
+                              "type": "array",
+                              "items": { "type": "string" }
+                            },
+                            "optionLabels": {
+                              "type": "object",
+                              "additionalProperties": { "type": "string" },
+                              "description": "The Vietnamese label of each option, by option."
+                            }
+                          },
+                          "required": ["kind", "options", "optionLabels"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["int-list"] },
+                            "min": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                            "max": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                            "length": {
+                              "type": "object",
+                              "properties": {
+                                "min": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                                "max": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 }
+                              },
+                              "required": ["min", "max"],
+                              "additionalProperties": false
+                            },
+                            "order": { "type": "string", "enum": ["ascending", "descending"] }
+                          },
+                          "required": ["kind", "min", "max", "length", "order"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
                     "changedAt": { "type": "string", "format": "date-time", "nullable": true }
                   },
                   "required": [
                     "key",
+                    "label",
+                    "group",
+                    "groupLabel",
                     "value",
                     "default",
                     "isDefault",
                     "unit",
+                    "unitLabel",
                     "description",
                     "constraints",
                     "changedAt"
@@ -91299,6 +91374,21 @@
             "type": "object",
             "properties": {
               "key": { "type": "string" },
+              "label": { "type": "string", "description": "What the screen shows for the parameter, in Vietnamese." },
+              "group": {
+                "type": "string",
+                "enum": [
+                  "WORKFLOW",
+                  "BUDGET",
+                  "PERSONNEL",
+                  "PROVISIONING",
+                  "ACCOUNT",
+                  "DOCUMENT",
+                  "SUBSCRIPTION",
+                  "USAGE"
+                ]
+              },
+              "groupLabel": { "type": "string", "description": "The name of the group, in Vietnamese." },
               "value": {
                 "anyOf": [
                   { "type": "number" },
@@ -91315,11 +91405,72 @@
               },
               "isDefault": { "type": "boolean" },
               "unit": { "type": "string" },
+              "unitLabel": { "type": "string", "description": "The unit, in Vietnamese." },
               "description": { "type": "string" },
-              "constraints": { "type": "object", "additionalProperties": {} },
+              "constraints": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["int"] },
+                      "min": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                      "max": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 }
+                    },
+                    "required": ["kind", "min", "max"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["enum"] },
+                      "options": { "minItems": 1, "maxItems": 10, "type": "array", "items": { "type": "string" } },
+                      "optionLabels": {
+                        "type": "object",
+                        "additionalProperties": { "type": "string" },
+                        "description": "The Vietnamese label of each option, by option."
+                      }
+                    },
+                    "required": ["kind", "options", "optionLabels"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["int-list"] },
+                      "min": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                      "max": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                      "length": {
+                        "type": "object",
+                        "properties": {
+                          "min": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                          "max": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 }
+                        },
+                        "required": ["min", "max"],
+                        "additionalProperties": false
+                      },
+                      "order": { "type": "string", "enum": ["ascending", "descending"] }
+                    },
+                    "required": ["kind", "min", "max", "length", "order"],
+                    "additionalProperties": false
+                  }
+                ]
+              },
               "changedAt": { "type": "string", "format": "date-time", "nullable": true }
             },
-            "required": ["key", "value", "default", "isDefault", "unit", "description", "constraints", "changedAt"],
+            "required": [
+              "key",
+              "label",
+              "group",
+              "groupLabel",
+              "value",
+              "default",
+              "isDefault",
+              "unit",
+              "unitLabel",
+              "description",
+              "constraints",
+              "changedAt"
+            ],
             "additionalProperties": false,
             "nullable": true
           }

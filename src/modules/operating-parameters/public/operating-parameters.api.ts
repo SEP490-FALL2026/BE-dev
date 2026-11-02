@@ -6,8 +6,10 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { ParameterNotFoundError } from '../operating-parameters.errors';
 import { OperatingParametersRepo } from '../operating-parameters.repo';
 import {
+  GROUP_LABELS,
   PARAMETER_DEFINITIONS,
   ParameterDefinition,
+  ParameterGroup,
   ParameterValue,
   definitionOf,
   effectiveValues,
@@ -17,10 +19,17 @@ const HISTORY_LIMIT = 20;
 
 export interface ParameterView {
   key: string;
+  /** What the screen shows for the parameter, in Vietnamese. */
+  label: string;
+  group: ParameterGroup;
+  /** The name of the group, in Vietnamese. */
+  groupLabel: string;
   value: ParameterValue;
   default: ParameterValue;
   isDefault: boolean;
   unit: string;
+  /** The unit, in Vietnamese. */
+  unitLabel: string;
   description: string;
   constraints: ParameterDefinition['shape'];
   /** When the current value took effect; null while the default stands. */
@@ -107,10 +116,14 @@ export class OperatingParametersApi {
 
       return {
         key: definition.key,
+        label: definition.label,
+        group: definition.group,
+        groupLabel: GROUP_LABELS[definition.group],
         value: row ? row.value : definition.default,
         default: definition.default,
         isDefault: !row || JSON.stringify(row.value) === JSON.stringify(definition.default),
         unit: definition.unit,
+        unitLabel: definition.unitLabel,
         description: definition.description,
         constraints: definition.shape,
         changedAt: row ? row.validFrom : null,

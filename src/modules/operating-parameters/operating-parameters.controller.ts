@@ -71,10 +71,14 @@ const NON_WORKING_DATE_NOT_FOUND = {
 function toWire(view: ParameterView) {
   return {
     key: view.key,
+    label: view.label,
+    group: view.group,
+    groupLabel: view.groupLabel,
     value: view.value,
     default: view.default,
     isDefault: view.isDefault,
     unit: view.unit,
+    unitLabel: view.unitLabel,
     description: view.description,
     constraints: view.constraints,
     changedAt: view.changedAt ? view.changedAt.toISOString() : null,

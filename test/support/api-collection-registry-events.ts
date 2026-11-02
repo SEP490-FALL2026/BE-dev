@@ -306,4 +306,17 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     'The review of a transfer lists the open Requests of the person beside the tools (F29), at most UNFINISHED_REQUESTS_MAX.',
     'added',
   ),
+  {
+    registry: 'nested',
+    key: 'operatingParameterList#constraints.options',
+    change: 'added',
+    to: 'bounded',
+    bound: 'ENUM_OPTIONS_MAX',
+    finding: 'LD-17',
+    item: 'qd93-parameter-labels-dashboard-queues',
+    date: '2026-11-02',
+    reason:
+      'The constraints of an operating parameter are typed (int, enum, int-list); the enum shape lists its options, at most ENUM_OPTIONS_MAX (QĐ-93, API-DOC-F07).',
+    ownerDecision: 'Owner 01/11/2026',
+  },
 ];
