@@ -6,7 +6,7 @@
   [`dashboard-request-queues-wiring`](../dashboard-request-queues-wiring/plan.md).
 - Phụ trách: chưa phân công (người nhận ghi tên). Thiết kế ban đầu bởi: AI theo giao việc của điều phối (01/11/2026).
 - Owner review: đã duyệt các đề xuất kỹ thuật 01/11/2026; chưa review toàn spec. Peer review: tùy chọn.
-- Triển khai: `not-started`. PR: chưa có. Sửa sau audit độc lập 01/11/2026: xem spec `## Changes and acceptance`.
+- Triển khai: `in-progress` — implemented-local (phase A; full integration/e2e/timing pending phase B), nhánh `feat/qd93-parameter-labels-dashboard-queues` xếp trên `feat/qd93-remove-in-app-super-admin-transfer` @7daf6856; commit task 1–3: 9f720744, cf33c7b1, 799da96f. PR: chưa có. Sửa sau audit độc lập 01/11/2026: xem spec `## Changes and acceptance`.
 
 ## Before coding
 
@@ -91,14 +91,14 @@ không diff; tự review diff theo spec mục 2–5 (không `key`/giá trị/mi�
 
 ## Verification and handoff
 
-| Lệnh / kiểm tra AC                                                           | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại         |
-| ---------------------------------------------------------------------------- | --------------------- | ----------------- | ------------------------------- |
-| `pnpm check`                                                                 | —                     | chưa chạy         | —                               |
-| `pnpm test:http -- <tệp của Checkpoint>`                                     | —                     | chưa chạy         | —                               |
-| `pnpm test:integration -- <tệp trong test/integration/operating-parameters>` | —                     | chưa chạy         | PostgreSQL 17 riêng             |
-| `pnpm test:gates -- test/gates/api-collection-contract.gate-spec.ts`         | —                     | chưa chạy         | —                               |
-| `pnpm test:integration` toàn bộ / `pnpm test:e2e`                            | —                     | không cần         | chỉ sau khi hỏi Owner (`D-S26`) |
-| `pnpm openapi:export` (không diff sau commit)                                | —                     | chưa chạy         | báo FE sinh lại client          |
+| Lệnh / kiểm tra AC                                                                                | Revision / môi trường                         | Kết quả thực chạy                                                                   | Giới hạn / việc còn lại                                               |
+| ------------------------------------------------------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `pnpm check`                                                                                      | 799da96f, Windows local                       | exit 0 (lint, typecheck, unit, gates, arch, scripts, discovery, build)              | `test:scripts` mất ~12 phút trên host này (`deploy-release.test.mjs`) |
+| `pnpm test:http -- <4 tệp của Checkpoint>`                                                        | cf33c7b1, local                               | 4 suite, 42 test xanh; thêm `openapi-presentation`, `openapi-read-wording`: 33 xanh | không DB                                                              |
+| `pnpm test:integration -- <3 tệp trong test/integration/operating-parameters>`                    | 799da96f, PostgreSQL 17 `slm-test-db` (local) | 3 suite, 42 test xanh                                                               | chạy theo file (`D-S26`)                                              |
+| `pnpm test:gates -- test/gates/api-collection-contract.gate-spec.ts` (+ `test-support-structure`) | cf33c7b1, local                               | 54 test xanh (đỏ trước khi thêm khóa registry/`itemProperties`)                     | —                                                                     |
+| `pnpm test:integration` toàn bộ / `pnpm test:e2e` / timing                                        | —                                             | deferred to phase B                                                                 | chỉ sau khi hỏi Owner (`D-S26`)                                       |
+| `pnpm openapi:export` (không diff sau commit)                                                     | cf33c7b1, local                               | exit 0, `openapi.json` +154/-3 (đã commit), chạy lại không đổi thêm                 | báo FE sinh lại client                                                |
 
 - [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
 - [ ] Spec/plan phản ánh implementation cuối; quyết định Owner về khóa registry và finding `LD-17` đã ghi ở spec và ledger review.
