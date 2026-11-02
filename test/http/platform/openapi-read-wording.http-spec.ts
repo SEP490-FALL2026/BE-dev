@@ -22,7 +22,6 @@ const WRITE_ONLY_WORDING = new RegExp(
   [
     'changes department data',
     'HR basis',
-    'PROJECT\\.INVALID',
     'COST_CENTER\\.(?:KIND|NAME|DEPARTMENT)',
     'maintains the Cost Center',
     'among them an HR basis',
@@ -43,14 +42,6 @@ const READ_WORDING: Record<string, { '403'?: string; '422'?: string }> = {
   costCenterEmployeeList: {
     '403': 'Only Finance reads the people in a cost center (the IT Admin and the Super Admin do not).',
     '422': 'The id or the query is invalid (VALIDATION_ERROR).',
-  },
-  projectList: {
-    '403': 'Only the Super Admin lists and reads the projects described on department profiles; the IT Admin does not.',
-    '422': 'The query is invalid (VALIDATION_ERROR).',
-  },
-  projectGet: {
-    '403': 'Only the Super Admin lists and reads the projects described on department profiles; the IT Admin does not.',
-    '422': 'The id is not a UUID (VALIDATION_ERROR).',
   },
   budgetVersionList: {
     '403':

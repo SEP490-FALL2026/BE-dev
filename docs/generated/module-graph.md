@@ -79,7 +79,7 @@ flowchart BT
   operating_parameters -->|5| audit
   operating_parameters -->|2| finance
   operating_parameters -->|7| organization
-  organization -->|10| audit
+  organization -->|9| audit
   organization -->|4| notifications
   personnel -->|24| audit
   personnel -->|7| catalog

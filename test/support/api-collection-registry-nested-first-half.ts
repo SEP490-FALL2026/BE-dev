@@ -66,55 +66,6 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     removeWhen: 'Review when DEPARTMENT_HEAD_HISTORY_LIMIT changes.',
   },
   {
-    key: 'departmentGet#projects',
-    classification: 'bounded',
-    findings: ['LD-12'],
-    owner: 'organization-identity-read-contracts',
-    businessMaximum: {
-      maxItems: 20,
-      source:
-        'PROFILE_PROJECT_LIMIT in project.types.ts (take of ProjectRepo.forDepartment); projectTotal counts them all',
-    },
-    rationale: 'The first projects the department takes part in; the rest are read from the paginated project list.',
-    removeWhen: 'Review when PROFILE_PROJECT_LIMIT changes.',
-  },
-  {
-    key: 'projectGet#departments',
-    classification: 'bounded',
-    findings: [],
-    owner: 'organization-identity-read-contracts',
-    businessMaximum: {
-      maxItems: 100,
-      source: 'departmentIds .max(100) in project.dto.ts on create and update; ProjectRepo replaces the set',
-    },
-    rationale: 'The departments one project names (the detail route GET /projects/{id}, added with LD-12).',
-    removeWhen: 'Review when the departmentIds limit or the project write path changes.',
-  },
-  {
-    key: 'departmentGet#projects.departments',
-    classification: 'bounded',
-    findings: [],
-    owner: 'g2-department-profile',
-    businessMaximum: {
-      maxItems: 100,
-      source: 'departmentIds .max(100) in project.dto.ts on create and update; ProjectRepo replaces the set',
-    },
-    rationale: 'The departments one project names.',
-    removeWhen: 'Review when the departmentIds limit or the project write path changes.',
-  },
-  {
-    key: 'projectList#departments',
-    classification: 'bounded',
-    findings: [],
-    owner: 'g2-department-profile',
-    businessMaximum: {
-      maxItems: 100,
-      source: 'departmentIds .max(100) in project.dto.ts on create and update; ProjectRepo replaces the set',
-    },
-    rationale: 'The departments one project names.',
-    removeWhen: 'Review when the departmentIds limit or the project write path changes.',
-  },
-  {
     key: 'operatingParameterList#value',
     classification: 'bounded',
     findings: [],

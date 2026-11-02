@@ -46,6 +46,18 @@ export const boundedNested = (
   reason,
 });
 
+/** QĐ-93h removes the project capability and its profile arrays. */
+export const removedByDecision = (key: string, from: NestedClassification): RegistryEvent => ({
+  registry: 'nested',
+  key,
+  change: 'closed',
+  from,
+  finding: 'QĐ-93h',
+  item: 'qd93-remove-department-projects',
+  date: '2026-11-02',
+  reason: 'The project capability and the profile fields were retired by the Owner decision.',
+});
+
 /**
  * Every difference between INITIAL_EXCEPTION_KEYS / INITIAL_NESTED_ARRAYS and COLLECTION_EXCEPTIONS / NESTED_ARRAYS,
  * one event each (P28-07). The gate fails on a difference without an event (a silent rewrite) and on an event without
@@ -253,14 +265,6 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     reason: 'The application summary no longer carries the domains; applicationGet#domains keeps them.',
   },
   boundedNested(
-    'projectGet#departments',
-    'departmentIds .max(100)',
-    'LD-12',
-    'organization-identity-read-contracts',
-    'The new detail route GET /projects/{id} that the item spec names returns the departments of one project.',
-    'added',
-  ),
-  boundedNested(
     'applicationRetirementGet#retirement.blockers.assignmentsByPlan',
     'RETIREMENT_LIST_LIMIT',
     'LD-06',
@@ -268,13 +272,9 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     'Added with the capped retirement blockers: the plans holding the most seats, since the seats themselves are cut.',
     'added',
   ),
-  boundedNested(
-    'departmentGet#projects',
-    'PROFILE_PROJECT_LIMIT',
-    'LD-12',
-    'organization-identity-read-contracts',
-    'The profile embeds the first projects with projectTotal; the rest are read from the paginated project list.',
-  ),
+  removedByDecision('departmentGet#projects', 'unbounded'),
+  removedByDecision('departmentGet#projects.departments', 'bounded'),
+  removedByDecision('projectList#departments', 'bounded'),
   boundedNested(
     'applicationGet#similarApplications',
     'SIMILAR_APPLICATION_LIMIT',

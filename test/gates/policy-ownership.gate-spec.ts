@@ -76,11 +76,6 @@ const OTHER_DECISIONS: ReadonlyMap<string, { codes: readonly string[]; reason: s
     { codes: ['DEPARTMENT_INACTIVE'], reason: 'the SeedConflict type of the same comparison' },
   ],
   [
-    'organization/project/project.errors.ts',
-    { codes: ['DEPARTMENT_NOT_FOUND'], reason: 'a project names departments that must exist (ProjectInvalidError)' },
-  ],
-  ['organization/project/project.service.ts', { codes: ['DEPARTMENT_NOT_FOUND'], reason: 'raises that project error' }],
-  [
     'organization/public/cost-center-direction.errors.ts',
     {
       codes: ['DEPARTMENT_NOT_FOUND'],
