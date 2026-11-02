@@ -43,7 +43,7 @@ describe('approval role routes (e2e, no database)', () => {
   ])('refuses %s with 403 on every route (US-01-03 AC-4)', async (_name, direct, derived) => {
     for (const [route, call] of ROUTES) {
       const response = await call(app.getHttpServer())
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
       expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
     }
@@ -76,7 +76,7 @@ describe('approval role routes (e2e, no database)', () => {
       ['POST', '/api/v1/approval-roles/SPENDING_APPROVER/delegations'],
       ['DELETE', '/api/v1/approval-roles/SPENDING_APPROVER'],
     ])('has no %s %s: 404 or 405 even for the Super Admin and the spending approver', async (method, path) => {
-      for (const identity of [principal(['SUPER_ADMIN']), principal([], ['SPENDING_APPROVER'])]) {
+      for (const identity of [principal(['SUPER_ADMIN']), principal(['SPENDING_APPROVER'])]) {
         const response = await request(app.getHttpServer())
           [method.toLowerCase() as 'post' | 'delete'](path)
           .set('Authorization', bearer(identity))

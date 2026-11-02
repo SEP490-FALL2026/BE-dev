@@ -90,7 +90,6 @@ export class HandoverHarness extends TransferHarness {
       sessionId: randomUUID(),
       employeeId: account.employeeId,
       directRoles: roles,
-      derivedRoles: [],
       roles,
     };
   }

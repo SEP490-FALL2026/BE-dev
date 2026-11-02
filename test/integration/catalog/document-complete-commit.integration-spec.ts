@@ -229,7 +229,6 @@ describe('completing a file and the commit that records it (integration, P28-11,
       sessionId: 'p29-n7',
       employeeId: h.it1.employeeId,
       directRoles: ['IT_ADMIN'],
-      derivedRoles: [],
       roles: ['IT_ADMIN'],
     });
     /** The wire answer the API gives for an error the service throws. */

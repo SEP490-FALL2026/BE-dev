@@ -91,7 +91,8 @@ describe('authentication over HTTP (integration, real PostgreSQL)', () => {
             department: { code: 'P-OPS', name: 'Operations' },
             jobTitle: 'Administrator',
           },
-          roles: { direct: ['SUPER_ADMIN'], derived: [], effective: ['SUPER_ADMIN'] },
+          roles: ['SUPER_ADMIN'],
+          managerScope: null,
           selfServiceOnly: false,
         },
       });

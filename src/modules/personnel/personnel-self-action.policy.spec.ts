@@ -16,7 +16,6 @@ const user = (roles: string[], employeeId = 'actor'): PersonnelActor => ({
     sessionId: 'x',
     employeeId,
     directRoles: roles,
-    derivedRoles: [],
     roles,
   },
 });

@@ -43,7 +43,6 @@ describe('DepartmentHeadService announces the head periods that take effect toda
     sessionId: 's',
     employeeId: 'actor',
     directRoles: ['SUPER_ADMIN'],
-    derivedRoles: [],
     roles: ['SUPER_ADMIN'],
   } as AuthenticatedPrincipal;
   const organization = {

@@ -7,7 +7,6 @@ const actor: AuthenticatedPrincipal = {
   sessionId: 'session-1',
   employeeId: 'employee-1',
   directRoles: ['SUPER_ADMIN'],
-  derivedRoles: [],
   roles: ['SUPER_ADMIN'],
 };
 const after = { dueOn: '2026-11-10' };

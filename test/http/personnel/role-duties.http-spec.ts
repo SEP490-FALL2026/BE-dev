@@ -30,7 +30,7 @@ describe('departure notice and Super Admin watch routes (e2e, no database)', () 
   ])('refuses %s on the state of the Super Admin role with 403', async (_name, direct, derived) => {
     const response = await request(app.getHttpServer())
       .get('/api/v1/super-admin-watch')
-      .set('Authorization', bearer(principal(direct, derived)))
+      .set('Authorization', bearer(principal([...direct, ...derived])))
       .expect(403);
 
     expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
@@ -54,7 +54,7 @@ describe('departure notice and Super Admin watch routes (e2e, no database)', () 
   ])('lets %s past the guard of their own departure notice: it asks for no role', async (_name, direct, derived) => {
     const response = await request(app.getHttpServer())
       .get('/api/v1/me/departure-notice')
-      .set('Authorization', bearer(principal(direct, derived)));
+      .set('Authorization', bearer(principal([...direct, ...derived])));
 
     expect([401, 403]).not.toContain(response.status);
   });

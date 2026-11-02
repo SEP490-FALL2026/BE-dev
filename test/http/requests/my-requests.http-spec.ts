@@ -57,7 +57,7 @@ describe('my requests route (e2e, no database)', () => {
     await app?.close();
   });
 
-  const get = (path: string, who = principal(['EMPLOYEE'], [], { employeeId: 'e-77' })) =>
+  const get = (path: string, who = principal(['EMPLOYEE'], { employeeId: 'e-77' })) =>
     request(app.getHttpServer()).get(path).set('Authorization', bearer(who));
 
   it('without a token is 401', async () => {
@@ -96,7 +96,7 @@ describe('my requests route (e2e, no database)', () => {
     ['an IT Admin', ['IT_ADMIN'], []],
     ['Finance', ['FINANCE'], []],
   ])('lists the requests %s sent: no role is asked for, as for the drafts', async (_name, direct, derived) => {
-    await get(PATH, principal(direct, derived, { employeeId: 'e-5' })).expect(200);
+    await get(PATH, principal([...direct, ...derived], { employeeId: 'e-5' })).expect(200);
 
     expect(list).toHaveBeenCalledWith(expect.objectContaining({ employeeId: 'e-5' }), expect.anything());
   });

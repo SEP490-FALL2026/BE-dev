@@ -384,7 +384,6 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       sessionId: 'clock-test-session',
       employeeId: adminAccount.employeeId,
       directRoles: ['SUPER_ADMIN'],
-      derivedRoles: [],
       roles: ['SUPER_ADMIN'],
     });
     const service = () => ctx.app.get(EmployeeManualService, { strict: false });
@@ -477,7 +476,6 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
         sessionId: 'service-level-session',
         employeeId: it1.employeeId,
         directRoles: ['IT_ADMIN'],
-        derivedRoles: [],
         roles: ['IT_ADMIN'],
       };
 
@@ -617,7 +615,8 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
           department: { code: 'P-OPS' },
           jobTitle: 'Administrator',
         },
-        roles: { direct: ['FINANCE'], effective: ['FINANCE'] },
+        roles: ['FINANCE'],
+        managerScope: null,
         selfServiceOnly: false,
       });
     });

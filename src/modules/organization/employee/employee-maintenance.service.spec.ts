@@ -27,7 +27,6 @@ describe('EmployeeMaintenanceService', () => {
     sessionId: 'session-1',
     employeeId: 'emp-sa',
     directRoles: ['SUPER_ADMIN'],
-    derivedRoles: [],
     roles: ['SUPER_ADMIN'],
   };
   const itAdmin: AuthenticatedPrincipal = { ...superAdmin, directRoles: ['IT_ADMIN'], roles: ['IT_ADMIN'] };

@@ -65,7 +65,7 @@ describe('my software rights route (e2e, no database)', () => {
   ])('refuses %s with 403: only the Employee role reads it', async (_name, direct, derived) => {
     const response = await request(app.getHttpServer())
       .get(PATH)
-      .set('Authorization', bearer(principal(direct, derived)))
+      .set('Authorization', bearer(principal([...direct, ...derived])))
       .expect(403);
 
     expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
@@ -75,7 +75,7 @@ describe('my software rights route (e2e, no database)', () => {
   it('answers a page for the Employee, read for the caller with the defaults, under its own message', async () => {
     const response = await request(app.getHttpServer())
       .get(PATH)
-      .set('Authorization', bearer(principal(['EMPLOYEE'], [], { employeeId: 'e-77' })))
+      .set('Authorization', bearer(principal(['EMPLOYEE'], { employeeId: 'e-77' })))
       .expect(200);
 
     expect(response.body).toEqual({
@@ -99,7 +99,7 @@ describe('my software rights route (e2e, no database)', () => {
   it('lets a person with another role who also holds the Employee role read their own list', async () => {
     await request(app.getHttpServer())
       .get(`${PATH}?view=ended&page=2&pageSize=5`)
-      .set('Authorization', bearer(principal(['IT_ADMIN', 'EMPLOYEE'], ['MANAGER'])))
+      .set('Authorization', bearer(principal(['IT_ADMIN', 'EMPLOYEE', 'MANAGER'])))
       .expect(200);
 
     expect(list).toHaveBeenCalledWith(expect.objectContaining({ employeeId: 'e1' }), {

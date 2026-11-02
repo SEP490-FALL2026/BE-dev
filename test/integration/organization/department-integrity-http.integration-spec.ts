@@ -1,7 +1,7 @@
 import { Client } from 'pg';
 import { DepartmentHarness, today, addDays } from '../../support/department-harness';
 
-describe('department profiles, heads and the derived MANAGER role over HTTP (integration, real PostgreSQL): what the database keeps true and the lock protocol', () => {
+describe('department profiles, heads and the MANAGER role over HTTP (integration, real PostgreSQL): what the database keeps true and the lock protocol', () => {
   const h = new DepartmentHarness();
   const { newDepartment, enter, assignHead } = h;
 

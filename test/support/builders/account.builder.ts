@@ -108,20 +108,20 @@ export async function buildActivatedAccount(
 
 /*
  * The one place a suite gives a person `MANAGER` or `SPENDING_APPROVER` as a precondition, or reads who holds the second
- * (QĐ-93b). `MANAGER` is still derived from a head period until the principal stops deriving roles (plan task 7), so
- * `ensureManagerGrant` grants nothing yet; `SPENDING_APPROVER` is a role grant since task 6a, given through the service of the
- * route (`POST /app-users/{id}/role-grants`), so every rule of the grant holds for a fixture too. Only these four helpers change
- * when the application accepts the new grants — no spec reaches for the role tables itself.
+ * (QĐ-93b). Both are role grants (QĐ-93a), given through the service of the route (`POST /app-users/{id}/role-grants`) so every
+ * rule of the grant holds for a fixture too. No spec reaches for the role tables itself.
  */
 
 /**
- * The person is a `MANAGER` before a spec makes them a head or a successor. `MANAGER` is still derived (until task 7), so
- * nothing is granted yet; the call only checks what the later grant needs — the Super Admin resolves and the employee exists.
+ * The person is a `MANAGER` before a spec makes them a head or a successor: the Super Admin grants the role through the service of the
+ * route, unless they hold it already. The person needs an account (the department screen refuses anybody without one, `US-03-06` AC-23).
  */
 export async function ensureManagerGrant(ctx: HttpTestApp, adminToken: string, employeeId: string): Promise<void> {
-  await principalOf(ctx, adminToken);
-  const { rowCount } = await ctx.sql.query('SELECT 1 FROM employees WHERE id = $1', [employeeId]);
-  if (rowCount !== 1) throw new Error(`The employee ${employeeId} does not exist, so no MANAGER grant can follow.`);
+  const actor = await principalOf(ctx, adminToken);
+  const appUserId = await appUserOf(ctx, employeeId);
+  const held = await ctx.app.get(RoleGrantService, { strict: false }).effectiveRoles(appUserId);
+  if (held.includes('MANAGER')) return;
+  await ctx.app.get(AccountStatusService, { strict: false }).grantRole(actor, appUserId, 'MANAGER');
 }
 
 async function appUserOf(ctx: HttpTestApp, employeeId: string): Promise<string> {

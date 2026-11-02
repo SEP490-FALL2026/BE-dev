@@ -115,7 +115,7 @@ describe('department routes (e2e, no database)', () => {
     ])('refuses %s on every Super Admin route with 403', async (_name, direct, derived) => {
       for (const [route, call] of SUPER_ADMIN_ONLY) {
         const response = await call(app.getHttpServer())
-          .set('Authorization', bearer(principal(direct, derived)))
+          .set('Authorization', bearer(principal([...direct, ...derived])))
           .expect(403);
         expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
       }
@@ -128,7 +128,7 @@ describe('department routes (e2e, no database)', () => {
       async (_name, direct, derived) => {
         for (const [route, call] of LISTS) {
           const response = await call(app.getHttpServer())
-            .set('Authorization', bearer(principal(direct, derived)))
+            .set('Authorization', bearer(principal([...direct, ...derived])))
             .expect(403);
           expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
         }
@@ -141,7 +141,7 @@ describe('department routes (e2e, no database)', () => {
         const [route, call] = PROFILE;
 
         const response = await call(app.getHttpServer())
-          .set('Authorization', bearer(principal(direct, derived)))
+          .set('Authorization', bearer(principal([...direct, ...derived])))
           .expect(403);
 
         expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
@@ -155,7 +155,7 @@ describe('department routes (e2e, no database)', () => {
       const [route, call] = PEOPLE;
 
       const response = await call(app.getHttpServer())
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
 
       expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
@@ -167,7 +167,7 @@ describe('department routes (e2e, no database)', () => {
         const [route, call] = TECHNICAL;
 
         const response = await call(app.getHttpServer())
-          .set('Authorization', bearer(principal(direct, derived)))
+          .set('Authorization', bearer(principal([...direct, ...derived])))
           .expect(403);
 
         expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
@@ -188,7 +188,7 @@ describe('department routes (e2e, no database)', () => {
     ])('refuses %s with 403', async (_name, direct, derived) => {
       const response = await request(app.getHttpServer())
         .post('/api/v1/departments')
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .send(body)
         .expect(403);
 

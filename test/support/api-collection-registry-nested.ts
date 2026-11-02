@@ -243,38 +243,14 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
       'The warnings of the step get a proved maximum or a paginated form; the contract and the future package are not chosen here (LD-16).',
   },
   {
-    key: 'meGet#roles.direct',
+    key: 'meGet#roles',
     classification: 'bounded',
     findings: [],
     owner: 'us-01-bootstrap-login-session',
-    businessMaximum: { maxItems: 4, source: ROLE_GRANTS },
-    rationale: 'The roles granted to the caller and still in force.',
+    businessMaximum: { maxItems: 6, source: ROLE_GRANTS },
+    rationale:
+      'The roles granted to the caller and still in force (QĐ-93a: MANAGER and SPENDING_APPROVER are granted like the others).',
     removeWhen: 'Review when AppRole or the unique index changes.',
-  },
-  {
-    key: 'meGet#roles.derived',
-    classification: 'bounded',
-    findings: [],
-    owner: 'us-01-bootstrap-login-session',
-    businessMaximum: {
-      maxItems: 2,
-      source:
-        'resolveEffectiveRoles in effective-roles.policy.ts derives MANAGER and SPENDING_APPROVER, each at most once',
-    },
-    rationale: 'The roles the caller holds from data.',
-    removeWhen: 'Review when resolveEffectiveRoles derives another role.',
-  },
-  {
-    key: 'meGet#roles.effective',
-    classification: 'bounded',
-    findings: [],
-    owner: 'us-01-bootstrap-login-session',
-    businessMaximum: {
-      maxItems: 6,
-      source: `resolveEffectiveRoles in effective-roles.policy.ts: a set of the direct roles (${ROLE_GRANTS}) and the 2 derived roles`,
-    },
-    rationale: 'Direct plus derived roles: what authorization checks.',
-    removeWhen: 'Review when AppRole, the unique index or resolveEffectiveRoles changes.',
   },
   {
     key: 'appUserList#roles',

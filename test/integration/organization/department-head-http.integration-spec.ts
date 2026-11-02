@@ -3,7 +3,7 @@ import { OrganizationHistoryApi } from '../../../src/modules/organization/public
 import { HR_BASIS } from '../../support/hr-basis';
 import { DepartmentHarness, today, addDays } from '../../support/department-harness';
 
-describe('department profiles, heads and the derived MANAGER role over HTTP (integration, real PostgreSQL): the head, the successor and the notices handed to the first head', () => {
+describe('department profiles, heads and the MANAGER role over HTTP (integration, real PostgreSQL): the head, the successor and the notices handed to the first head', () => {
   const h = new DepartmentHarness();
   const {
     asFinance,
@@ -19,6 +19,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     getDepartment,
     accountIn,
     assignHead,
+    assignHeadRaw,
     auditOf,
     closePlacements,
   } = h;
@@ -222,7 +223,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     });
 
     it('refuses the Super Admin as a head and leaves the department as it was (AC-7)', async () => {
-      const response = await assignHead(h.seed.departmentId, h.seed.superAdmin.employeeId).expect(422);
+      const response = await assignHeadRaw(h.seed.departmentId, h.seed.superAdmin.employeeId).expect(422);
 
       expect(errorOf(response).code).toBe('DEPARTMENT.HEAD_SUPER_ADMIN_CANNOT_HEAD');
       expect(

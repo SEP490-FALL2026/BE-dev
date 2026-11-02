@@ -17,7 +17,6 @@ const itAdmin = (employeeId: string): AuthenticatedPrincipal => ({
   sessionId: 'session-it',
   employeeId,
   directRoles: ['IT_ADMIN'],
-  derivedRoles: [],
   roles: ['IT_ADMIN'],
 });
 

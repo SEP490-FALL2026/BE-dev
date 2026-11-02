@@ -67886,7 +67886,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "The signed-in account, its employee record and its effective roles.",
+            "description": "The signed-in account, its employee record, its directly granted roles and the department it heads today.",
             "content": {
               "application/json": {
                 "schema": {
@@ -92979,18 +92979,26 @@
                 "additionalProperties": false
               },
               "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
+                }
+              },
+              "managerScope": {
                 "type": "object",
                 "properties": {
-                  "direct": { "type": "array", "items": { "type": "string" } },
-                  "derived": { "type": "array", "items": { "type": "string" } },
-                  "effective": { "type": "array", "items": { "type": "string" } }
+                  "departmentId": { "type": "string", "format": "uuid" },
+                  "departmentCode": { "type": "string" },
+                  "departmentName": { "type": "string" }
                 },
-                "required": ["direct", "derived", "effective"],
-                "additionalProperties": false
+                "required": ["departmentId", "departmentCode", "departmentName"],
+                "additionalProperties": false,
+                "nullable": true
               },
               "selfServiceOnly": { "type": "boolean" }
             },
-            "required": ["appUserId", "loginEmail", "employee", "roles", "selfServiceOnly"],
+            "required": ["appUserId", "loginEmail", "employee", "roles", "managerScope", "selfServiceOnly"],
             "additionalProperties": false,
             "nullable": true
           }

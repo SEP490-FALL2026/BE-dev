@@ -2,7 +2,7 @@ import { insertEmployeeFixture } from '../../support/http-test-app';
 import { HR_BASIS } from '../../support/hr-basis';
 import { DepartmentHarness, type DepartmentWire, today } from '../../support/department-harness';
 
-describe('department profiles, heads and the derived MANAGER role over HTTP (integration, real PostgreSQL): creating, keeping, listing and retiring a profile', () => {
+describe('department profiles, heads and the MANAGER role over HTTP (integration, real PostgreSQL): creating, keeping, listing and retiring a profile', () => {
   const h = new DepartmentHarness();
   const {
     asFinance,

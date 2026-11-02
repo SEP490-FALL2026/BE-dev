@@ -22,7 +22,6 @@ describe('ProjectService', () => {
     sessionId: 'session-1',
     employeeId: 'emp-actor',
     directRoles: ['SUPER_ADMIN'],
-    derivedRoles: [],
     roles: ['SUPER_ADMIN'],
   };
   const itAdmin: AuthenticatedPrincipal = {

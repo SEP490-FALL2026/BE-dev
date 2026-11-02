@@ -32,7 +32,7 @@ describe('onboarding checklist route (e2e, no database)', () => {
     async (_name, direct, derived) => {
       const response = await request(app.getHttpServer())
         .get('/api/v1/onboarding-checklist')
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
 
       expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');

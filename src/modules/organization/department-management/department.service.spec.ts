@@ -22,7 +22,6 @@ const principal = (role: string): AuthenticatedPrincipal => ({
   sessionId: 'session-1',
   employeeId: 'emp-actor',
   directRoles: [role],
-  derivedRoles: [],
   roles: [role],
 });
 

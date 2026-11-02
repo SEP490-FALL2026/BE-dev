@@ -39,7 +39,6 @@ export const ACTOR: AuthenticatedPrincipal = {
   sessionId: 'session-1',
   employeeId: 'e-sa',
   directRoles: ['SUPER_ADMIN'],
-  derivedRoles: [],
   roles: ['SUPER_ADMIN'],
 };
 export const OWN_EMPLOYEE_CODE = 'E-SA';

@@ -869,7 +869,7 @@ describe('collection and detail contract gate', () => {
         { ...eventOf('licenseKeyList#query'), key: 'currencyList#bounded' },
         { ...eventOf('licenseKeyList#query'), key: 'thingList#query' },
         { ...eventOf('provisioningTaskList#steps'), key: 'healthGetReadiness#checks' },
-        { ...eventOf('projectGet#departments'), key: 'auditEventList#actorRoles', bound: 'resolveEffectiveRoles' },
+        { ...eventOf('projectGet#departments'), key: 'auditEventList#actorRoles', bound: 'authorizingRoles' },
       ];
 
       expect(check({}, [...REGISTRY_EVENTS_SINCE_INITIAL, ...idle])).toEqual([

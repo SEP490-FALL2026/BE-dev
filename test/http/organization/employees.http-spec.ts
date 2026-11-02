@@ -54,7 +54,7 @@ describe('POST /api/v1/employees (e2e, no database)', () => {
     ['an account with no role', [], []],
     ['a department head, whose role is derived', [], ['MANAGER']],
   ])('refuses %s with 403', async (_name, direct, derived) => {
-    const response = await post(VALID, principal(direct, derived)).expect(403);
+    const response = await post(VALID, principal([...direct, ...derived])).expect(403);
 
     expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
   });
@@ -108,7 +108,7 @@ describe('PATCH /api/v1/employees/{id} (e2e, no database)', () => {
     ['an account with no role', [], []],
     ['a department head, whose role is derived', [], ['MANAGER']],
   ])('refuses %s with 403', async (_name, direct, derived) => {
-    const response = await patch(`/api/v1/employees/${ID}`, CHANGE, principal(direct, derived)).expect(403);
+    const response = await patch(`/api/v1/employees/${ID}`, CHANGE, principal([...direct, ...derived])).expect(403);
 
     expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
   });

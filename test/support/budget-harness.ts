@@ -271,7 +271,6 @@ export class BudgetHarness extends RequestHarness {
       sessionId: 'budget-harness-session',
       employeeId: account.employeeId,
       directRoles: roles,
-      derivedRoles: [],
       roles,
     };
   }

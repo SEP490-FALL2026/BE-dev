@@ -39,7 +39,6 @@ describe('DepartmentHeadService', () => {
     sessionId: 'session-1',
     employeeId: 'emp-actor',
     directRoles: [role],
-    derivedRoles: [],
     roles: [role],
   });
   const superAdmin = principal('SUPER_ADMIN');

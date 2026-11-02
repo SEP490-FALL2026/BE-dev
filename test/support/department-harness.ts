@@ -1,6 +1,7 @@
 import { findPlacementCoverageViolations } from './placement-coverage';
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from './api-accounts';
+import { ensureManagerGrant } from './builders/account.builder';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from './http-test-app';
 import { HR_BASIS } from './hr-basis';
 import { UseFacts, registerUseReaders } from './organization-use-readers';
@@ -175,18 +176,55 @@ export class DepartmentHarness {
     return { ...account, code: person.code };
   };
 
-  assignHead = (departmentId: string, employeeId: string, effectiveFrom = today(), headers = this.asAdmin()) =>
+  /** `MANAGER` is granted by the Super Admin before a person is named head (QĐ-93a); a person with no account has none to give. */
+  grantManager = async (employeeId: string): Promise<void> => {
+    const { rowCount } = await this.ctx.sql.query('SELECT 1 FROM app_users WHERE employee_id = $1', [employeeId]);
+    if (rowCount === 1) await ensureManagerGrant(this.ctx, this.admin, employeeId);
+  };
+
+  /** The call of the route as it is, with no grant given first: what the specs of the refusals send. */
+  assignHeadRaw = (departmentId: string, employeeId: string, effectiveFrom = today(), headers = this.asAdmin()) =>
     this.api()
       .post(`/api/v1/departments/${departmentId}/head-assignments`)
       .set(headers)
       .send({ employeeId, effectiveFrom });
 
-  rolesOf = async (account: ApiAccount): Promise<{ derived: string[]; effective: string[] }> =>
+  /**
+   * The same call, after the Super Admin gave the person `MANAGER` (the seam of QĐ-93a: a head holds the grant). The grant is made when
+   * the request is sent, so `.expect(...)` chains as before.
+   */
+  assignHead = (departmentId: string, employeeId: string, effectiveFrom = today(), headers = this.asAdmin()) => {
+    const call = this.assignHeadRaw(departmentId, employeeId, effectiveFrom, headers);
+    const send = call.end.bind(call);
+    call.end = (callback?: request.CallbackHandler) => {
+      void this.grantManager(employeeId).then(
+        () => send(callback),
+        (error: unknown) => callback?.(error as Error, undefined as unknown as request.Response),
+      );
+
+      return call;
+    };
+
+    return call;
+  };
+
+  /** What `GET /me` says of the account: its granted roles and the department it heads today. */
+  meOf = async (
+    account: ApiAccount,
+  ): Promise<{
+    roles: string[];
+    managerScope: { departmentId: string; departmentCode: string } | null;
+    selfServiceOnly: boolean;
+  }> =>
     (
       (await this.api().get('/api/v1/me').set(this.as(account)).expect(200)).body as {
-        data: { roles: { derived: string[]; effective: string[] } };
+        data: {
+          roles: string[];
+          managerScope: { departmentId: string; departmentCode: string } | null;
+          selfServiceOnly: boolean;
+        };
       }
-    ).data.roles;
+    ).data;
 
   auditOf = async (resourceId: string): Promise<{ action: string; before: unknown; after: unknown }[]> =>
     (

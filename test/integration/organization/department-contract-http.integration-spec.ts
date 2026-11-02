@@ -2,7 +2,7 @@ import request from 'supertest';
 import { HR_BASIS } from '../../support/hr-basis';
 import { DepartmentHarness, today, addDays } from '../../support/department-harness';
 
-describe('department profiles, heads and the derived MANAGER role over HTTP (integration, real PostgreSQL): the contract the moves of the projects and the departments keep', () => {
+describe('department profiles, heads and the MANAGER role over HTTP (integration, real PostgreSQL): the contract the moves of the projects and the departments keep', () => {
   const h = new DepartmentHarness();
   const {
     asIt,

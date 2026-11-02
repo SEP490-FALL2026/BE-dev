@@ -77,7 +77,6 @@ export class SpendHarness extends BudgetHarness {
       sessionId: 'spend-harness-session',
       employeeId: account.employeeId,
       directRoles: roles,
-      derivedRoles: [],
       roles,
     };
   }

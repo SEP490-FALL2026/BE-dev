@@ -33,6 +33,29 @@ describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-
     return id;
   };
 
+  /**
+   * The approver becomes the person the request is for, as the premise of the two cases that route around a conflict needs; the returned
+   * function puts the person back, because the grant of the role is refused while the approver is a party of an open request (rule 10,
+   * QĐ-93d(3)) and the cases that follow give the role back to the approver.
+   */
+  const approverIsTheBeneficiary = async (id: string): Promise<() => Promise<void>> => {
+    const { rows } = await h.ctx.sql.query<{ employee_id: string }>(
+      `SELECT employee_id FROM access_request_beneficiaries WHERE request_id = $1`,
+      [id],
+    );
+    await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
+      id,
+      h.boss.employeeId,
+    ]);
+
+    return async () => {
+      await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
+        id,
+        rows[0].employee_id,
+      ]);
+    };
+  };
+
   it('is the spending approver, for the step that follows a check that is in order', async () => {
     const id = await ready();
 
@@ -49,10 +72,7 @@ describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-
 
   it('is the substitute when the approver is the one the request is for, and the approver does not read it (FR-3.15)', async () => {
     const id = await ready();
-    await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
-      id,
-      h.boss.employeeId,
-    ]);
+    const restore = await approverIsTheBeneficiary(id);
 
     await h.route(id, design.head.account);
 
@@ -61,14 +81,12 @@ describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-
     ]);
     await h.checkOf(id, substitute.account).expect(200);
     await h.checkOf(id, h.boss.account).expect(404);
+    await restore();
   });
 
   it('waits under control when the approver is in conflict and there is no substitute, and decides nothing', async () => {
     const id = await ready();
-    await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
-      id,
-      h.boss.employeeId,
-    ]);
+    const restore = await approverIsTheBeneficiary(id);
     await h.clearRole('CONFLICT_SUBSTITUTE');
 
     try {
@@ -84,6 +102,7 @@ describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-
       expect(await h.state(id)).toBe('WAITING_CONTROLLED');
     } finally {
       await h.setRole('CONFLICT_SUBSTITUTE', substitute);
+      await restore();
     }
   });
 

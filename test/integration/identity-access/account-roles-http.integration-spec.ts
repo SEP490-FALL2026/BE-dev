@@ -256,7 +256,6 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
         sessionId: other.appUserId,
         employeeId: other.employeeId,
         directRoles: ['IT_ADMIN'],
-        derivedRoles: [],
         roles: ['IT_ADMIN'],
       };
       const lockedBefore = await countAudit('APP_USER.LOCKED', h.seed.superAdmin.appUserId);

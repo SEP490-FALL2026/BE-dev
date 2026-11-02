@@ -5,8 +5,7 @@ import { RoleGrantService } from '../accounts/role-grant.service';
 import { ApprovalRoleName, ApprovalRoleRepo } from './approval-role.repo';
 
 /**
- * Who holds an approval role now, for the capabilities that only need to know it: the per-request role check
- * (`SPENDING_APPROVER` is a granted role, QĐ-93a), the grant of that role (the substitute is never the spending approver) and the
+ * Who holds an approval role now, for the capabilities that only need to know it: the grant of that role (the substitute is never the spending approver) and the
  * successor check of the role transfer (US-01-09 AC-3). The spending approver is read from the role grant, the other two from the
  * approval-role table.
  */
@@ -16,11 +15,6 @@ export class ApprovalRoleFactsService implements ApprovalRoleHoldings {
     private readonly holders: ApprovalRoleRepo,
     private readonly grants: RoleGrantService,
   ) {}
-
-  /** Whether the employee is the current spending approver. An unlocked read, for the per-request role check. */
-  async isSpendingApprover(employeeId: string): Promise<boolean> {
-    return (await this.grants.spendingApproverEmployeeId()) === employeeId;
-  }
 
   /** The approval roles somebody holds now, one entry per current holder (no employee leaves this method). */
   async heldRoles(client: DbTx): Promise<(ApprovalRoleName | 'SPENDING_APPROVER')[]> {

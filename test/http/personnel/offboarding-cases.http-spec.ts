@@ -102,7 +102,7 @@ describe('offboarding case routes (e2e, no database)', () => {
       for (const [route, call] of ROUTES) {
         if (ALLOWED[route].some((role) => (direct as string[]).includes(role))) continue;
         const response = await call(app.getHttpServer())
-          .set('Authorization', bearer(principal(direct, derived)))
+          .set('Authorization', bearer(principal([...direct, ...derived])))
           .expect(403);
         expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
       }

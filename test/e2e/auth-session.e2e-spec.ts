@@ -84,7 +84,7 @@ describe('a session from the installation to the logout (e2e)', () => {
     const me = await request(server()).get('/api/v1/me').set(bearer(adminToken)).expect(200);
 
     expect(bodyOf(me).data).toMatchObject({ appUserId: seed.superAdmin.appUserId, loginEmail: seed.superAdmin.email });
-    expect((me.body as { data: { roles: { effective: string[] } } }).data.roles.effective).toContain('SUPER_ADMIN');
+    expect((me.body as { data: { roles: string[] } }).data.roles).toContain('SUPER_ADMIN');
   });
 
   it('enters an employee and invites their first account; the mail service of the worker sends the link', async () => {

@@ -50,7 +50,7 @@ describe('cost center catalogue routes (e2e, no database)', () => {
     ])('refuses %s on every Finance route with 403', async (_name, direct, derived) => {
       for (const [route, call] of FINANCE_ROUTES) {
         const response = await call(app.getHttpServer())
-          .set('Authorization', bearer(principal(direct, derived)))
+          .set('Authorization', bearer(principal([...direct, ...derived])))
           .expect(403);
         expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
       }
@@ -67,7 +67,7 @@ describe('cost center catalogue routes (e2e, no database)', () => {
       async (_name, direct, derived) => {
         const response = await request(app.getHttpServer())
           .get('/api/v1/cost-centers')
-          .set('Authorization', bearer(principal(direct, derived)))
+          .set('Authorization', bearer(principal([...direct, ...derived])))
           .expect(403);
 
         expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');

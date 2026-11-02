@@ -12,7 +12,6 @@ const ACTOR: AuthenticatedPrincipal = {
   sessionId: 'session-1',
   employeeId: 'employee-1',
   directRoles: ['SUPER_ADMIN'],
-  derivedRoles: [],
   roles: ['SUPER_ADMIN'],
 };
 const QUERY: ControlledWaitListQueryDto = { page: 1, pageSize: 20 };

@@ -38,7 +38,7 @@ describe('the proposals waiting for IT assessment (e2e, no database)', () => {
   ])('refuses %s with 403', async (_name, direct, derived) => {
     const response = await request(app.getHttpServer())
       .get(URL)
-      .set('Authorization', bearer(principal(direct, derived)))
+      .set('Authorization', bearer(principal([...direct, ...derived])))
       .expect(403);
 
     expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');

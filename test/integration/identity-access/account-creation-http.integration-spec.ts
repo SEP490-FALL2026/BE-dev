@@ -177,7 +177,7 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
       const { token } = await signIn(user.email, user.password);
 
       const me = await request(server()).get('/api/v1/me').set(as(token)).expect(200);
-      expect(dataOf<{ roles: { effective: string[] } }>(me).roles.effective).toEqual(['IT_ADMIN']);
+      expect(dataOf<{ roles: string[] }>(me).roles).toEqual(['IT_ADMIN']);
       await request(server()).get('/api/v1/probe/it').set(as(token)).expect(200);
       const row = await h.ctx.sql.query(
         'SELECT activation_state, email_verification_source FROM app_users WHERE id = $1',

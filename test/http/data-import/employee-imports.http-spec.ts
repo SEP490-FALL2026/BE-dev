@@ -67,7 +67,7 @@ describe('people import routes (e2e, no database)', () => {
   ])('refuses %s with 403 on every route (US-02-02 AC-12)', async (_name, direct, derived) => {
     for (const [route, call] of ROUTES) {
       const response = await call(app.getHttpServer())
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
       expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
     }

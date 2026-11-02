@@ -52,6 +52,28 @@ export const boundedNested = (
  * its difference. Prompt 10 (23/10/2026, commit 4cc9a47) closed these with the remediation items of the G0-G4 review.
  */
 export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
+  // QĐ-93a, D-S19 (Owner 01/11/2026): `GET /me` returns `roles` as one array of the granted roles; the object { direct, derived, effective } goes.
+  ...['meGet#roles.direct', 'meGet#roles.derived', 'meGet#roles.effective'].map((key): RegistryEvent => ({
+    registry: 'nested',
+    key,
+    change: 'closed',
+    from: 'bounded',
+    finding: 'LD-17',
+    item: 'qd93-direct-manager-spending-approver-roles',
+    date: '2026-11-02',
+    reason: '`roles` of `GET /me` is one array of the granted roles; no role is derived any more (QĐ-93a, D-S19).',
+  })),
+  {
+    registry: 'nested',
+    key: 'meGet#roles',
+    change: 'added',
+    to: 'bounded',
+    bound: 'role_grants_one_effective_per_role',
+    finding: 'LD-17',
+    item: 'qd93-direct-manager-spending-approver-roles',
+    date: '2026-11-02',
+    reason: 'The granted roles of the caller as one array, at most one effective grant per role (QĐ-93a, D-S19).',
+  },
   removedOperation('exceptions', 'standardToolsetList#detail-reuse', 'F04', 'standardToolsetList is removed (QĐ-87h).'),
   removedOperation(
     'exceptions',

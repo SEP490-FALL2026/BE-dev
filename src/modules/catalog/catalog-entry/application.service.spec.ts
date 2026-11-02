@@ -21,7 +21,6 @@ const ACTOR: AuthenticatedPrincipal = {
   sessionId: 'session-1',
   employeeId: 'employee-actor',
   directRoles: ['IT_ADMIN'],
-  derivedRoles: [],
   roles: ['IT_ADMIN'],
 };
 const TODAY = '2026-01-01';

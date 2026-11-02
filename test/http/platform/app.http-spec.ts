@@ -108,7 +108,6 @@ function principalWithRoles(...roles: string[]) {
     sessionId: 's1',
     employeeId: 'e1',
     directRoles: roles,
-    derivedRoles: [],
     roles,
   };
 }

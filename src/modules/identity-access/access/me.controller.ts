@@ -30,7 +30,8 @@ export class MeController {
   @ApiOperation({ operationId: 'meGet', summary: 'Get the signed-in account' })
   @ApiSuccessResponse(MeResponseDto, {
     message: 'ME.RETRIEVED',
-    description: 'The signed-in account, its employee record and its effective roles.',
+    description:
+      'The signed-in account, its employee record, its directly granted roles and the department it heads today.',
   })
   @ApiErrorResponses(UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE)
   async get(@CurrentPrincipal() principal: AuthenticatedPrincipal): Promise<MeView> {

@@ -497,7 +497,6 @@ describe('the contracts and the files kept for them over HTTP (integration, real
           sessionId: 'late',
           employeeId: h.it1.employeeId,
           directRoles: ['IT_ADMIN'],
-          derivedRoles: [],
           roles: ['IT_ADMIN'],
         };
 

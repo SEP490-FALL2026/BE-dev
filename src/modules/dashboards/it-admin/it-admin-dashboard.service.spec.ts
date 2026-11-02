@@ -12,7 +12,6 @@ const actor = (roles: readonly string[]): AuthenticatedPrincipal => ({
   sessionId: 's1',
   employeeId: 'it-1',
   directRoles: roles,
-  derivedRoles: [],
   roles,
 });
 

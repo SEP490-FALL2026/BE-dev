@@ -127,7 +127,6 @@ export class TransferGuardService {
       sessionId: actor.ticketId,
       employeeId: holder.employeeId,
       directRoles: ['SUPER_ADMIN'],
-      derivedRoles: [],
       roles: ['SUPER_ADMIN'],
     };
   }

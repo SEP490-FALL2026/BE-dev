@@ -22,10 +22,10 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     owner: 'us-01-audit-trail-query',
     businessMaximum: {
       maxItems: 6,
-      source: `resolveEffectiveRoles in effective-roles.policy.ts: a set of the direct roles (${ROLE_GRANTS}) and MANAGER, SPENDING_APPROVER; AuditRepo.insert is the only writer and every caller passes actor.roles or none`,
+      source: `authorizingRoles in effective-roles.policy.ts: a subset of the direct roles (${ROLE_GRANTS}); AuditRepo.insert is the only writer and every caller passes actor.roles or none`,
     },
     rationale: 'The roles the actor held when the event was written.',
-    removeWhen: 'Review when AppRole, the derived roles of resolveEffectiveRoles or an audit writer changes.',
+    removeWhen: 'Review when AppRole, authorizingRoles or an audit writer changes.',
   },
   {
     key: 'departmentList#warnings',
