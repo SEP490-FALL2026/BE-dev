@@ -1,5 +1,7 @@
 # Spec: trưởng phòng gắn dòng kế hoạch và trình Request cần duyệt chi theo lô
 
+> `US-06-14` AC-8 as first written (the spend step goes straight on when nobody submits) is superseded by [QĐ-93c](../qd93-remove-fallback-substitute-approvers/spec.md).
+
 - Phụ trách: AI theo giao việc của người dùng (23/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc của người dùng (23/10/2026) — khung từ bản đồ phân rã G5.
 - Thiết kế: `ready`. Owner review: chưa review.

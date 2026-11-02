@@ -1,5 +1,7 @@
 # Spec: gia hạn subscription — đề xuất của IT Admin và quyết định của Người duyệt chi
 
+> The substitute who decides a renewal is superseded by [QĐ-93c](../qd93-remove-fallback-substitute-approvers/spec.md): only the spending approver decides.
+
 - Phụ trách: AI theo giao việc A-06 của người dùng (31/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc A-06 của người dùng (31/10/2026).
 - Thiết kế: `ready`. Triển khai: `verified` (local, worktree cô lập tại `6eb12d1`, chưa commit, 31/10/2026). Owner review: chưa review.

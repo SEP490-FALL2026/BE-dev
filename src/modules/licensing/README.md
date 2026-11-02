@@ -62,6 +62,10 @@ dashboards; gốc `src/app/app.module.ts`.
   sở hữu ngân sách/chi phí (requests/budgets) thêm reader; chưa có thì snapshot đóng băng ghi `NOT_CONNECTED`, không 0.
 - Mở `RenewalUsageContributions` (`licensing.renewal-usage-evidence`, Contributions) — chưa có bên thêm: chủ evidence
   usage (G7) thêm reader; chưa có thì gia hạn nói `usage NOT_AVAILABLE` và xếp ghế không dùng dữ liệu sử dụng.
+- Đăng ký vào `identity-access.approval-role-change-listeners` và `organization.change-listeners` —
+  `subscription-renewal/spending-approver-wait.listener.ts`: mục gia hạn chờ Người duyệt chi (`waitingReason`
+  `NO_SPENDING_APPROVER`, không người thay thế, QĐ-93c) báo Super Admin một `CONTROLLED_WAIT_ALERT` (`subject`
+  `SUBSCRIPTION_RENEWAL`) mỗi đoạn chờ (gửi, thu hồi vai, người giữ vai nghỉ việc).
 - Đăng ký vào: `catalog.seat-occupancy` — `assignment/assignment-seat-occupancy.listener.ts`;
   `organization.department-service-account-reader` — `assignment/assignment-service-account.listener.ts`;
   `organization.department-use-readers` — `provisioning/department-use/department-open-work.listener.ts`.

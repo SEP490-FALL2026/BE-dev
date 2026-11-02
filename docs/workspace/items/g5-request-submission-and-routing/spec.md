@@ -1,5 +1,7 @@
 # Spec: gửi Request, chốt nhánh và giao bước nhu cầu theo bảng định tuyến
 
+> Rows 3 and 4 of the routing table (the fallback approver) are superseded by [QĐ-93c](../qd93-remove-fallback-substitute-approvers/spec.md): a department without a head makes the need step wait (`NO_DEPARTMENT_HEAD`).
+
 - Phụ trách: AI theo giao việc của người dùng (23/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc của người dùng (23/10/2026) — từ bản đồ phân rã G5 và BRD/US đã pin.
 - Thiết kế: `ready`. Owner review: chưa review; ADR-0015 vẫn `Proposed`.

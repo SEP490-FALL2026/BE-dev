@@ -1,8 +1,9 @@
 # identity-access
 
-Mục đích: tài khoản đăng nhập (tách khỏi hồ sơ nhân sự), vai trò, phiên và token, mật khẩu, vai trò phê duyệt, chuyển
-và khôi phục Super Admin. Story chính: US-01-01 (quản trị tài khoản, đăng nhập), US-01-02 (vai trò suy ra), US-01-03
-(vai trò phê duyệt), US-01-09 (chuyển, khôi phục Super Admin), US-01-10 (phiên, mật khẩu).
+Mục đích: tài khoản đăng nhập (tách khỏi hồ sơ nhân sự), vai trò (một grant `SPENDING_APPROVER` duy nhất là vai phê duyệt;
+không còn approver dự phòng hay người thay thế, QĐ-93c), phiên và token, mật khẩu, chuyển và khôi phục Super Admin. Story
+chính: US-01-01 (quản trị tài khoản, đăng nhập), US-01-02 (vai trò suy ra), US-01-03 (vai trò phê duyệt), US-01-09 (chuyển,
+khôi phục Super Admin), US-01-10 (phiên, mật khẩu).
 
 Tầng: T2 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit, notifications, organization (cạnh cùng tầng
 duy nhất được phép). Được dùng bởi: budgets, catalog, installation, licensing, onboarding, personnel, requests
@@ -20,8 +21,15 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
   - `markEmployeeLeft` — ghi ngày người rời đi lên tài khoản của họ.
   - `findUsableItAdminEmployeeIds`, `findUsableFinanceEmployeeId`, `countUsableItAdminsExcept`, `getSuperAdminHolder`,
     `listRoleHoldersAmong` — ai đang giữ vai trò nào.
-  - `getApprovalRoleHolders` — ai giữ ba vai trò phê duyệt (định tuyến bước của Request).
+  - `getSpendingApproverEmployeeId(tx?, { forShare? })` — ai giữ vai Người duyệt chi (grant còn hiệu lực); với `forShare` khóa
+    dòng grant tới hết transaction để mở bước chi và thu hồi vai lần lượt (M6). `lockSpendingApproverAmong` — khóa tài khoản
+    `FOR SHARE` rồi nói ai trong danh sách giữ vai. `everHeldSpendingApproverAmong` — ai từng có grant `SPENDING_APPROVER` (chỉ để
+    nhận ra bước chi cũ đóng băng; gỡ ở Phase B). Không còn `getApprovalRoleHolders`, không còn route `/approval-roles`.
   - `findAccountIdOfEmployee`, `findLoginEmailOfEmployee`, `employeeIdsOfAccounts` — ánh xạ tài khoản ↔ nhân viên.
+- `RequestPartyEligibilityApi` (`public/request-party-eligibility.api.ts`) — hợp đồng chung D-S21: Người duyệt chi không bao giờ là
+  bên của Request (người gửi, người được cấp, người chịu trách nhiệm); `assertEligible` (khóa rồi phán, ném
+  `REQUEST_PARTY.INELIGIBLE` 422), `blockOf` (không khóa), `ineligibleAmong` (lọc danh sách chọn, lý do từng dòng nhóm). Phán định thuần
+  ở `request-party/request-party.policy.ts`.
 - `HolderRecoveryApi`, `RoleTransferRecoveryApi` (`public/holder-recovery.api.ts`, `role-transfer-recovery.api.ts`) —
   khôi phục và đổi người giữ vai Super Admin (ca có kế hoạch lẫn khẩn cấp), chỉ lệnh `pnpm ops:recover` (qua
   `identity-access-recovery-cli.module.ts`).
@@ -32,15 +40,17 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
 ## Bảng sở hữu
 
 - `app_users`, `password_credentials`, `role_grants`, `auth_sessions`, `refresh_tokens`, `login_throttles`,
-  `account_action_tokens`, `approval_role_holders`, `recovery_tickets`
+  `account_action_tokens`, `recovery_tickets`; `approval_role_holders` còn trong schema nhưng không ai ghi hay đọc (chỉ
+  `migration-preflight.repo.ts` đếm; bảng gỡ ở Phase B, QĐ-93c)
   ([prisma/models/identity-access.prisma](../../../prisma/models/identity-access.prisma)).
 
 ## Extension point
 
 - Mở: `ApprovalRoleChangeListeners` (`identity-access.approval-role-change-listeners`,
   [public/identity-access.extension-points.ts](public/identity-access.extension-points.ts)), phát từ
-  `accounts/role-grant.service.ts` và `approval-roles/approval-role.service.ts` — bên đăng ký: requests
-  `reassignment/approval-role.listener.ts`.
+  `accounts/role-grant.service.ts` (cấp/thu hồi/chuyển `SPENDING_APPROVER`) — bên đăng ký: requests
+  `reassignment/approval-role.listener.ts`, budgets `budget/spending-approver-wait.listener.ts` và licensing
+  `subscription-renewal/spending-approver-wait.listener.ts` (báo Super Admin một lần mỗi đoạn chờ).
 - Đăng ký vào: `organization.employee-accounts` (`EmployeeAccountsHook`) — `accounts/employee-accounts.listener.ts`.
 - Token DI nội bộ, không phải point liên module: `ACCOUNT_SESSIONS` (`accounts/account-sessions.types.ts`),
   `APPROVAL_ROLE_HOLDINGS` (`accounts/account.types.ts`); gate `test/gates/module-graph.gate-spec.ts` ghim chúng.
@@ -48,7 +58,8 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
 ## Hướng phụ thuộc giữa capability (R6)
 
 Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capability-graph`). Từ thấp lên cao: `credentials` →
-`accounts` → `approval-roles`, `recovery` → `auth` → `access`. Thứ gì `accounts/` và `recovery/` cùng cần thì ở `accounts/`
+`accounts` → `approval-roles` (chỉ `approval-role-facts.service.ts`, đọc grant), `request-party` (đọc qua `accounts/`),
+`recovery` → `auth` → `access`. Thứ gì `accounts/` và `recovery/` cùng cần thì ở `accounts/`
 (ví dụ `account-sessions.types.ts`), không đặt ở `auth/` vì `auth/` đứng trên cả hai.
 
 ## Capability → file chính
@@ -65,8 +76,9 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
 - `credentials/` — mật khẩu của tài khoản: `credential.service.ts`, `credential.repo.ts`, `password-hasher.service.ts` (Argon2id),
   `password.policy.ts`; không import capability nào, `accounts/`, `auth/` và `recovery/` import nó (tách khỏi `accounts/` để thư
   mục đó dưới trần 25 file sau khi `mappers/`, `dto/`, `policies/` được dời vào).
-- `approval-roles/` — `approval-roles.controller.ts` (`GET /approval-roles`, `PUT /approval-roles/{role}`) →
-  `approval-role.service.ts`. `recovery/` — các bước của `pnpm ops:recover` (không có controller).
+- `approval-roles/` — chỉ còn `approval-role-facts.service.ts` (dữ kiện vai của grant cho kiểm tra khi cấp); không controller,
+  `GET`/`PUT /approval-roles` trả 404 (QĐ-93c). `request-party/` — `request-party.policy.ts` (thuần) và
+  `request-party-eligibility.service.ts`; service tiêm `accounts/`, không tiêm `IdentityAccessApi`. `recovery/` — các bước của `pnpm ops:recover` (không có controller).
 - Nest: `identity-access.module.ts` (API: controller, JWT), `identity-access-facade.module.ts` (facade, mọi graph),
   `identity-access-recovery-cli.module.ts`, `identity-access-inspection-facade.module.ts`, `identity-access-local-seed-facade.module.ts`.
 

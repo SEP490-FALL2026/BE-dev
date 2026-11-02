@@ -242,8 +242,11 @@ is ready`, `RECOVERY: FAILED — …` (the previous release does not answer read
   reads its rows. Each runtime image declares in its label `io.github.baophipham.slm.data-reads` the data representations
   it reads that an older runtime cannot (Dockerfile, stage `runtime`); an image built before that label (the compatibility
   image `fba4dfe` and every older one) declares none. `ops:preflight --recovery-target "<labels>"`, run read-only from the
-  candidate as the deploy role, counts the rows of each representation the database holds (today one:
-  `access-request-null-cost-center`, a sent internal free Request with no Cost Center) and says `COMPATIBLE` (exit 0),
+  candidate as the deploy role, counts the rows of each representation the database holds (today three:
+  `access-request-null-cost-center`, a sent internal free Request with no Cost Center;
+  `access-request-cancel-spending-approver-party`, a Request or a group line closed with cause `SPENDING_APPROVER_PARTY` and no
+  closing employee; `access-request-step-qd93-waiting-reason`, a step that waits with `NO_DEPARTMENT_HEAD`, `NO_SPENDING_APPROVER`
+  or `SPENDING_APPROVER_IS_PARTY`, values an image before `QĐ-93c` cannot read) and says `COMPATIBLE` (exit 0),
   `INCOMPATIBLE` (2) or `NO_HISTORY` (3: no migration ever ran here). The script judges the previous image twice:
   - **before `migrate deploy`:** an image that is not on the host (its labels cannot be read) or a database with no
     migration history while the host names a previous release (a reset database under an old release state) stops the
@@ -617,6 +620,13 @@ read-only (PostgreSQL refuses any write, `25006`). `--json` gives the same repor
   double role, hand the role over) and runs the command again; a spending approver whose account is locked or not activated, or
   who is handing over, is carried over and blocks nothing.
 - **1:** the command failed (database unreachable, settings invalid); nothing was judged.
+
+**No conversion command for the removal of the fallback approver and the substitute (`QĐ-93c`).** The release that removes
+the two roles goes onto a new VPS with an empty database, created by CI/CD and then seeded (Owner 03/11/2026), so there is no
+fallback- or substitute-held step, no request of a spending approver and no old waiting reason to carry over: nothing runs
+between `migrate` and the start of `api`, and `pnpm ops:approval-role-conversion` does not exist. Steps of the old rule would
+only appear on a database that ran an older release; the code still reads and freezes them (`STEP_AWAITING_CONVERSION`), and
+that database needs its own plan before this release.
 
 **The preflight is a read-only check, not a repair.** It changes nothing, and no command in this repository invents a
 department or `Unit`, rewrites immutable placement or allocation history, or recreates a database (`P29-RV-01`).

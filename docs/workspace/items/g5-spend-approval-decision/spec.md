@@ -1,5 +1,7 @@
 # Spec: Người duyệt chi quyết định trên snapshot ngân sách, kể cả quyết trong lô
 
+> The substitute who decides in a conflict of interest (`US-06-08`) is superseded by [QĐ-93c](../qd93-remove-fallback-substitute-approvers/spec.md): the spending approver alone decides the spend step, nobody takes their place.
+
 - Phụ trách: AI theo giao việc của người dùng (23/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc của người dùng (23/10/2026) — khung từ bản đồ phân rã G5.
 - Thiết kế: `ready`. Owner review: chưa review.

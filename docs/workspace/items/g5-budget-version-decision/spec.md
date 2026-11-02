@@ -1,5 +1,7 @@
 # Spec: Người duyệt chi quyết định phiên bản ngân sách và gắn ngược khoản cam kết
 
+> The substitute who decides a version when the approver sent the proposal is superseded by [QĐ-93c](../qd93-remove-fallback-substitute-approvers/spec.md): only the spending approver decides, and a version waits with `NO_SPENDING_APPROVER`.
+
 - Phụ trách: AI theo giao việc của người dùng (23/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc của người dùng (23/10/2026) — khung từ bản đồ phân rã G5.
 - Thiết kế: `ready`. Owner review: chưa review.

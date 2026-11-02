@@ -20,7 +20,7 @@ không có endpoint seed, không dùng `dev:seed`, không thay image API/worker,
   liệu giả; email dùng miền `ds1.slm-demo.example` (miền `.example` dành cho ví dụ, không thư nào tới người thật).
   Mô tả cho FE: Docs `Figma UI-UX/API-Integration/demo/`.
 - **Mọi bản ghi được ghi qua HTTP API đang chạy**, bằng đúng vai mà nghiệp vụ quy định (Super Admin tạo phòng/nhân
-  viên/trưởng phòng/vai trò phê duyệt; Finance tạo Cost Center và lập ngân sách; IT Admin khai danh mục và cấp ghế;
+  viên/trưởng phòng/Người duyệt chi (một grant `SPENDING_APPROVER`, không còn approver dự phòng hay người thay thế, QĐ-93c); Finance tạo Cost Center và lập ngân sách; IT Admin khai danh mục và cấp ghế;
   trưởng phòng duyệt nhu cầu và trình lô; Người duyệt chi duyệt chi; nhân viên gửi Request). Mọi validation, chuyển
   trạng thái, khoản cam kết và Audit Trail là của ứng dụng; lệnh không chèn trạng thái bằng SQL.
 - **Ngoại lệ duy nhất là tài khoản đăng nhập của người demo**: lời mời sẽ gửi email tới hộp thư không tồn tại, nên lệnh
@@ -29,7 +29,7 @@ không có endpoint seed, không dùng `dev:seed`, không thay image API/worker,
   `IdentityAccessApi.prepareCredential`, và ghi Audit Trail `DEMO_DATASET.ACCOUNT_CREATED` với
   `operatorReference = DEMO_DATASET:<fixture>:<tham chiếu operator>`. Phần này chạy bằng **runtime role** của API: với
   `NODE_ENV=production` lệnh kiểm vai PostgreSQL trước mọi việc và dừng nếu là superuser, owner hay deploy role.
-- **Giới hạn của tài khoản `FINANCE` (Owner 30/10/2026):** cấp vai `FINANCE` phát thay đổi vai trò phê duyệt mà graph của lệnh
+- **Giới hạn của tài khoản `FINANCE` (Owner 30/10/2026):** cấp vai `FINANCE` phát thay đổi vai (`ApprovalRoleChange`) mà graph của lệnh
   không có listener của `requests` trả lời, nên một step đang chờ Finance **không** được thử lại (đường API thì thử lại); trên
   database dataset nhắm tới chưa có step nào chờ Finance.
 - **Trước khi ghi**, lệnh chứng minh đúng đích: database có tổ chức đúng tên `DEMO_ORGANIZATION_NAME`, tiền tệ báo cáo
@@ -47,19 +47,19 @@ không có endpoint seed, không dùng `dev:seed`, không thay image API/worker,
   dữ liệu ngoài dataset đang giữ, hoặc **một bản ghi của dataset đã bị sửa khác fixture**, là **xung đột**: bước đó không
   ghi, bước phụ thuộc bị chặn, phần độc lập vẫn chạy (exit 4). Những gì được so:
 
-  | Bản ghi                                             | Nhận ra bằng                                | So với fixture (khác ⟹ xung đột)                                         |
-  | --------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------ |
-  | Phòng                                               | mã `DS1-*`                                  | tên, đang hoạt động                                                      |
-  | Nhân viên                                           | mã                                          | là thành viên đúng phòng, họ tên                                         |
-  | Tài khoản                                           | nhân viên                                   | email đăng nhập, vai trực tiếp (hợp đồng tài khoản demo)                 |
-  | Trưởng phòng, IT Admin phụ trách, vai trò phê duyệt | phòng/vai                                   | người giữ                                                                |
-  | Ứng dụng                                            | tên + nhà cung cấp                          | Business Owner                                                           |
-  | Gói                                                 | tên trong ứng dụng                          | kiểu cấp, mô hình giá, mức kiểm soát, mất dữ liệu khi gỡ, chia sẻ        |
-  | Thuê bao                                            | gói + phòng sở hữu                          | số lượng, đơn giá và tiền tệ, chu kỳ, ngày đầu/cuối kỳ, thời hạn báo hủy |
-  | Cost Center                                         | mã                                          | phòng gắn                                                                |
-  | Hồ sơ thuế nhà cung cấp                             | nhà cung cấp                                | nhóm thuế                                                                |
-  | Request R1→R9                                       | Audit Trail của người gửi + thẻ `[DS1-Rn]`  | gói; trạng thái phải đi được tới đích theo kịch bản                      |
-  | Phiếu báo lỗi, thông báo BM-09                      | thẻ `[DS1-ISSUE]`/`[DS1-NOTICE]` ở nội dung | —                                                                        |
+  | Bản ghi                                           | Nhận ra bằng                                | So với fixture (khác ⟹ xung đột)                                         |
+  | ------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------ |
+  | Phòng                                             | mã `DS1-*`                                  | tên, đang hoạt động                                                      |
+  | Nhân viên                                         | mã                                          | là thành viên đúng phòng, họ tên                                         |
+  | Tài khoản                                         | nhân viên                                   | email đăng nhập, vai trực tiếp (hợp đồng tài khoản demo)                 |
+  | Trưởng phòng, IT Admin phụ trách, Người duyệt chi | phòng/vai                                   | người giữ                                                                |
+  | Ứng dụng                                          | tên + nhà cung cấp                          | Business Owner                                                           |
+  | Gói                                               | tên trong ứng dụng                          | kiểu cấp, mô hình giá, mức kiểm soát, mất dữ liệu khi gỡ, chia sẻ        |
+  | Thuê bao                                          | gói + phòng sở hữu                          | số lượng, đơn giá và tiền tệ, chu kỳ, ngày đầu/cuối kỳ, thời hạn báo hủy |
+  | Cost Center                                       | mã                                          | phòng gắn                                                                |
+  | Hồ sơ thuế nhà cung cấp                           | nhà cung cấp                                | nhóm thuế                                                                |
+  | Request R1→R9                                     | Audit Trail của người gửi + thẻ `[DS1-Rn]`  | gói; trạng thái phải đi được tới đích theo kịch bản                      |
+  | Phiếu báo lỗi, thông báo BM-09                    | thẻ `[DS1-ISSUE]`/`[DS1-NOTICE]` ở nội dung | —                                                                        |
 
   Được **dùng lại có chủ đích**: ngân sách năm hiện hành `APPROVED` của `DS1-CC-ENG` dù ở phiên bản nào (Finance được sửa
   ngân sách khi demo); bản nháp `INDIVIDUAL` cùng gói của `DS1-DEV3` (route bản nháp không trả nội dung để so); mật khẩu
