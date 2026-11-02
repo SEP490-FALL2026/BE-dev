@@ -61,8 +61,6 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
         successor: null,
         headHistory: [],
         headHistoryHasMore: false,
-        projects: [],
-        projectTotal: 0,
       });
       expect(await auditOf(dataOf(response).id)).toEqual([
         {

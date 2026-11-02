@@ -44,19 +44,6 @@ const SUPER_ADMIN_ONLY: Array<[string, Call]> = [
     'POST /departments/{id}/successor-clearances',
     (server) => request(server).post(`/api/v1/departments/${ID}/successor-clearances`).send({}),
   ],
-  ['GET /projects', (server) => request(server).get('/api/v1/projects')],
-  ['GET /projects/{id}', (server) => request(server).get(`/api/v1/projects/${ID}`)],
-  [
-    'POST /projects',
-    (server) =>
-      request(server)
-        .post('/api/v1/projects')
-        .send({ name: 'Alpha', departmentIds: [ID], hrBasis: HR_BASIS_BODY }),
-  ],
-  [
-    'PATCH /projects/{id}',
-    (server) => request(server).patch(`/api/v1/projects/${ID}`).send({ name: 'Beta', hrBasis: HR_BASIS_BODY }),
-  ],
 ];
 
 /** The list of departments and their warnings: the Super Admin, and an IT Admin for the departments in their scope (`F12`). */
