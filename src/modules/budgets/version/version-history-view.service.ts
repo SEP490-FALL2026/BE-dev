@@ -12,7 +12,7 @@ import type { HistoryEntryWire } from './budget-history.dto';
 
 /**
  * The history of the edits of a version, read by Finance and by the person who decides the version now, as `decide` finds them:
- * the spending approver, or the substitute when the approver sent the proposal behind it. Whoever else asks is
+ * the spending approver, and nobody in their place (`QĐ-93d`(1)). Whoever else asks is
  * refused here, not by the route. The history is its own table; the Audit Trail is never read for it.
  */
 @Injectable()
@@ -52,7 +52,10 @@ export class VersionHistoryViewService {
   private async requireReader(actor: AuthenticatedPrincipal, version: VersionRecord | null): Promise<void> {
     if (actor.roles.includes('FINANCE')) return;
     const proposal = version?.proposalId ? await this.proposals.findById(version.proposalId) : null;
-    const decider = deciderOf(await this.facts.holders(), proposal?.submittedByEmployeeId ?? null);
+    const decider = deciderOf(
+      await this.facts.usableSpendingApproverEmployeeId(),
+      proposal?.submittedByEmployeeId ?? null,
+    );
     if (decider.employeeId === null || decider.employeeId !== actor.employeeId)
       throw new BudgetNotAHistoryReaderError();
   }

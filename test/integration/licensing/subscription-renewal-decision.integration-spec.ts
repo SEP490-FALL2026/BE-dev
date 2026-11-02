@@ -9,6 +9,7 @@ interface DetailWire {
   milestone: { basis: string; baseDate: string };
   usage: { status: string };
   period: { seatsInUse: number };
+  waitingReason: string | null;
   proposal: { choice: string; quantity: number | null; businessOwnerOpinion: string | null };
   decision: {
     choice: string;
@@ -290,6 +291,44 @@ describe('the proposal and the decision of a renewal (integration, real PostgreS
         decidedAfterDeadline: true,
         executionPoint: 'MID_TERM',
       });
+    });
+  });
+
+  describe('who decides a renewal when the spending approver is away (US-11-02 AC-23, QĐ-93d(1))', () => {
+    it('a renewal waits for the spending approver and nobody else may decide', async () => {
+      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 18);
+      const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
+      await h.clearRole('SPENDING_APPROVER');
+      try {
+        expect(await detail(id)).toMatchObject({ state: 'PROPOSED', waitingReason: 'NO_SPENDING_APPROVER' });
+        // Nobody takes the place of the approver, and the person who held the old role of the substitute does not even read the cases.
+        for (const account of [h.it1, h.finance, h.employee, unit.head.account]) {
+          expect(h.codeOf(await h.decideRenewal(id, { choice: 'RENEW' }, account).expect(403))).toBe(
+            'SUBSCRIPTION_RENEWAL.NOT_DECIDER',
+          );
+        }
+        expect(h.codeOf(await h.read(id, h.bystander.account).expect(403))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
+        expect((await detail(id)).state).toBe('PROPOSED');
+      } finally {
+        await h.setRole('SPENDING_APPROVER', h.boss);
+      }
+
+      expect(await detail(id)).toMatchObject({ state: 'PROPOSED', waitingReason: null });
+      await h.decideRenewal(id, { choice: 'RENEW' }, h.boss.account).expect(200);
+      expect(await detail(id)).toMatchObject({ state: 'DECIDED', waitingReason: null });
+    });
+
+    it('writes only the spending approver as the role of a decision', async () => {
+      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 19);
+      const id = await h.proposedRenewal({ subscriptionId, choice: 'CANCEL' });
+
+      await h.decideRenewal(id, { choice: 'CANCEL' }, h.boss.account).expect(200);
+
+      const { rows } = await h.ctx.sql.query<{ decider_role: string }>(
+        `SELECT decider_role FROM subscription_renewals WHERE id = $1`,
+        [id],
+      );
+      expect(rows).toEqual([{ decider_role: 'SPENDING_APPROVER' }]);
     });
   });
 });

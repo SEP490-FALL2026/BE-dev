@@ -44,20 +44,16 @@ const READ_WORDING: Record<string, { '403'?: string; '422'?: string }> = {
     '422': 'The id or the query is invalid (VALIDATION_ERROR).',
   },
   budgetVersionList: {
-    '403':
-      'Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.',
+    '403': 'Only Finance and the spending approver read the versions of a budget.',
   },
   budgetVersionGet: {
-    '403':
-      'Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.',
+    '403': 'Only Finance and the spending approver read the versions of a budget.',
   },
   budgetVersionLineList: {
-    '403':
-      'Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.',
+    '403': 'Only Finance and the spending approver read the versions of a budget.',
   },
   budgetVersionLineChangeList: {
-    '403':
-      'Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.',
+    '403': 'Only Finance and the spending approver read the versions of a budget.',
   },
   operatingParameterList: {
     '403': 'Only the Super Admin reads the operating parameters, their history and the non-working dates.',

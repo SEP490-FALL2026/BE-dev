@@ -40,7 +40,7 @@ const INVALID: ErrorResponseDeclaration = {
 const READERS_ONLY: ErrorResponseDeclaration = {
   status: HttpStatus.FORBIDDEN,
   description:
-    'Only the IT Admin, Finance, the person who decides spending and the substitute read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN).',
+    'Only the IT Admin, Finance and the person who decides spending read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN).',
   examples: [EXAMPLES.READ_FORBIDDEN],
 };
 const NOT_FOUND: ErrorResponseDeclaration = {
@@ -169,7 +169,7 @@ export class SubscriptionRenewalsController {
   @ApiSuccessResponse(SubscriptionRenewalResponseDto, {
     message: 'SUBSCRIPTION_RENEWAL.DECIDED',
     description:
-      'The person who decides spending (or the substitute when that person proposed the case) renews as it is, reduces or cancels. A cancellation while seats are in use is confirmed after seeing how many; a reduction below the seats in use names exactly the seats to take back, chosen from the ranked list, and their revocations are opened. A decision after the milestone is never voided: it is carried out mid-term when the subscription allows a reduction mid-term, else at the next renewal. The decision is written with the snapshot the decider saw; it holds no budget commitment, creates no new period and records no savings. The IT Admin who carries it out is told.',
+      'The person who decides spending, and nobody in their place, renews as it is, reduces or cancels. A cancellation while seats are in use is confirmed after seeing how many; a reduction below the seats in use names exactly the seats to take back, chosen from the ranked list, and their revocations are opened. A decision after the milestone is never voided: it is carried out mid-term when the subscription allows a reduction mid-term, else at the next renewal. The decision is written with the snapshot the decider saw; it holds no budget commitment, creates no new period and records no savings. The IT Admin who carries it out is told.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

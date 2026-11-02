@@ -13,6 +13,7 @@ import type {
   RenewalSummaryWire,
 } from './subscription-renewal.dto';
 import { RenewalError } from './subscription-renewal.errors';
+import { renewalWaitingReason } from './decision/renewal-decision.policy';
 import { toDeadlineEvent, toRenewalDetail, toRenewalSummary } from './subscription-renewal.mapper';
 import { RenewalPartiesService } from './subscription-renewal-parties.service';
 import { RenewalRankingService } from './subscription-renewal-ranking.service';
@@ -23,7 +24,7 @@ type PageQuery = { page: number; pageSize: number };
 
 /**
  * The reads of the renewals (`US-11-02`, `US-11-05`): the queue of the cases and their pages, the ranked seats a reduction is
- * chosen from, and the events of milestones passed with no decision. Only the IT Admin, Finance, the decider and the substitute
+ * chosen from, and the events of milestones passed with no decision. Only the IT Admin, Finance and the decider
  * read them; a head of department and an employee never do (`SoD-2`). A fixed number of statements per page.
  */
 @Injectable()
@@ -42,19 +43,21 @@ export class RenewalViewService {
     actor: AuthenticatedPrincipal,
     query: PageQuery & { state?: RenewalState; subscriptionId?: string; late?: boolean },
   ): Promise<Page<RenewalSummaryWire>> {
-    await this.assertReader(actor);
+    this.assertReader(actor);
     const { items, total } = await this.repo.page(
       { state: query.state, subscriptionId: query.subscriptionId, late: query.late },
       (query.page - 1) * query.pageSize,
       query.pageSize,
     );
     const periods = await this.periodsOf(items.map((item) => item.subscriptionId));
+    // Read once for the page, and only when some case waits for a decision.
+    const approver = items.some((item) => item.state === 'PROPOSED') ? await this.parties.usableApproverOf() : null;
 
     return pageOf(
       items.flatMap((item) => {
         const period = periods.get(item.subscriptionId);
 
-        return period ? [toRenewalSummary(item, period)] : [];
+        return period ? [toRenewalSummary(item, period, renewalWaitingReason(item.state, approver))] : [];
       }),
       total,
       query.page,
@@ -64,7 +67,7 @@ export class RenewalViewService {
 
   /** Throws RenewalError (`READ_FORBIDDEN`, `NOT_FOUND`). */
   async get(actor: AuthenticatedPrincipal, id: string): Promise<RenewalDetailWire> {
-    await this.assertReader(actor);
+    this.assertReader(actor);
     const record = await this.repo.find(id);
     if (!record) throw new RenewalError('NOT_FOUND');
 
@@ -84,6 +87,10 @@ export class RenewalViewService {
       usageAvailable: seats.usageAvailable,
       released: await this.repo.releasedOf(record.id),
       savings: await this.savingsOf(record),
+      waitingReason: renewalWaitingReason(
+        record.state,
+        record.state === 'PROPOSED' ? await this.parties.usableApproverOf() : null,
+      ),
     });
   }
 
@@ -96,7 +103,7 @@ export class RenewalViewService {
     id: string,
     query: PageQuery,
   ): Promise<Page<RankedSeatWire> & { usage: { status: 'AVAILABLE' | 'NOT_AVAILABLE' }; seatsInUse: number }> {
-    await this.assertReader(actor);
+    this.assertReader(actor);
     const record = await this.repo.find(id);
     if (!record) throw new RenewalError('NOT_FOUND');
     const seats = await this.ranking.seatsOf(record.subscriptionId, await this.organizationReads.businessToday());
@@ -154,8 +161,8 @@ export class RenewalViewService {
     );
   }
 
-  private async assertReader(actor: AuthenticatedPrincipal): Promise<void> {
-    if (!(await this.parties.canRead(actor))) throw new RenewalError('READ_FORBIDDEN');
+  private assertReader(actor: AuthenticatedPrincipal): void {
+    if (!this.parties.canRead(actor)) throw new RenewalError('READ_FORBIDDEN');
   }
 
   private async periodsOf(ids: readonly string[]): Promise<Map<string, RenewalPeriodFacts>> {

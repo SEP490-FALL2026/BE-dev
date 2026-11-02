@@ -132,12 +132,15 @@ export type DecisionRefusal = 'NOT_SPENDING_APPROVER' | 'CONFLICT_OF_INTEREST' |
 
 /**
  * Whether the person may decide the version now (`US-06-11`): only the person who decides it does (`US-06-11` AC-8), which is
- * the spending approver, or the substitute when the approver sent the proposal behind the version (`US-06-08` AC-11); never a
- * version they built or sent (`SoD-8`, AC-7), and only one that was sent and waits. The first reason is the one to tell.
+ * the spending approver and nobody else (`QĐ-93d`(1)); never a version they built or sent (`SoD-8`, AC-7), and only one that was
+ * sent and waits. The first reason is the one to tell.
  */
 export function checkVersionDecision(facts: {
   actorIsDecider: boolean;
-  /** The actor is the spending approver and a party to the version, so the substitute decides in their place. */
+  /**
+   * The actor is the spending approver and a party to the version: a version made from their own proposal, which a proposal sent
+   * by the approver was possible before `QĐ-93`. Nobody decides it now (`SoD-8`); the Super Admin is told by the conversion command.
+   */
   actorHasConflict: boolean;
   actorEmployeeId: string;
   createdByEmployeeId: string;
@@ -156,23 +159,29 @@ export function checkVersionDecision(facts: {
 export const isOverdue = (line: { windowTo: BusinessDate }, today: BusinessDate): boolean => line.windowTo < today;
 
 /**
- * Who decides a version now, as `decide` finds it (`US-06-08` AC-11): the spending approver, or the substitute when the
- * approver sent the proposal behind the version. `approverIsParty` says the second case; the employee is null while the
- * role that decides has no holder.
+ * Who decides a version now, as `decide` finds it (`QĐ-93d`(1)): the spending approver who works, and nobody else — no substitute
+ * takes their place. When the approver is the one who sent the proposal behind the version (data of before `QĐ-93`) nobody decides
+ * it: `approverIsParty` says so, and the approver is refused with `CONFLICT_OF_INTEREST` (`SoD-8`). The employee is null too while
+ * the role has no holder who works.
  */
 export function deciderOf(
-  holders: { spendingApproverEmployeeId: string | null; conflictSubstituteEmployeeId: string | null },
+  spendingApproverEmployeeId: string | null,
   proposalSubmittedBy: string | null,
 ): { employeeId: string | null; approverIsParty: boolean } {
   const approverIsParty =
     proposalSubmittedBy !== null &&
-    holders.spendingApproverEmployeeId !== null &&
-    proposalSubmittedBy === holders.spendingApproverEmployeeId;
+    spendingApproverEmployeeId !== null &&
+    proposalSubmittedBy === spendingApproverEmployeeId;
 
-  return {
-    approverIsParty,
-    employeeId: approverIsParty ? holders.conflictSubstituteEmployeeId : holders.spendingApproverEmployeeId,
-  };
+  return { approverIsParty, employeeId: approverIsParty ? null : spendingApproverEmployeeId };
+}
+
+/** What a version that was sent waits for when nobody who works holds the role of the spending approver (`US-06-11` AC-12). */
+export function versionWaitingReason(
+  state: VersionStateName,
+  usableSpendingApproverEmployeeId: string | null,
+): 'NO_SPENDING_APPROVER' | null {
+  return state === 'SENT' && usableSpendingApproverEmployeeId === null ? 'NO_SPENDING_APPROVER' : null;
 }
 
 /** Whether the fiscal year has ended, so that nothing of it is written any more (`QĐ-91c`, `US-06-09` AC-11, `US-06-10` AC-9). */

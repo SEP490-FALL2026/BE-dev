@@ -84,19 +84,20 @@ export class BudgetFactsService {
 
   /** Whether the person holds the role of the spending approver now: who decides the versions of a budget. */
   async isSpendingApprover(employeeId: string, tx?: DbTx): Promise<boolean> {
-    return (await this.identity.getApprovalRoleHolders(tx)).spendingApproverEmployeeId === employeeId;
+    return (await this.identity.getSpendingApproverEmployeeId(tx)) === employeeId;
   }
 
-  /** Who holds the roles that decide a budget now: the spending approver and the substitute for a conflict. */
-  holders(tx?: DbTx) {
-    return this.identity.getApprovalRoleHolders(tx);
-  }
+  /**
+   * The spending approver, when they still work: who decides the versions of a budget now, and nobody else does (`QĐ-93d`(1)). Null
+   * when nobody holds the role or the holder has left, which is what a version that was sent waits for. With `forShare`, in the
+   * transaction `tx`, the row of the grant is locked until it ends, so a version that is being sent and a revocation take turns (`M6`).
+   */
+  async usableSpendingApproverEmployeeId(tx?: DbTx, options?: { forShare?: boolean }): Promise<string | null> {
+    const holder = await this.identity.getSpendingApproverEmployeeId(tx, options);
+    if (holder === null) return null;
+    const [found] = await this.organizationReads.getEmployees([holder], tx);
 
-  /** Whether the person is the spending approver or the substitute: the two who read what is to be decided. */
-  async isDecider(employeeId: string, tx?: DbTx): Promise<boolean> {
-    const holders = await this.holders(tx);
-
-    return holders.spendingApproverEmployeeId === employeeId || holders.conflictSubstituteEmployeeId === employeeId;
+    return found?.status === 'ACTIVE' ? holder : null;
   }
 
   /** Throws BudgetNotFinanceError: what Finance builds is Finance's, whatever route it was reached by. */
@@ -104,9 +105,9 @@ export class BudgetFactsService {
     if (!actor.roles.includes('FINANCE')) throw new BudgetNotFinanceError();
   }
 
-  /** Throws BudgetNotAReaderError: Finance, the spending approver and the substitute read the versions; nobody else does. */
+  /** Throws BudgetNotAReaderError: Finance and the spending approver read the versions; nobody else does. */
   async requireVersionReader(actor: AuthenticatedPrincipal): Promise<void> {
-    if (actor.roles.includes('FINANCE') || (await this.isDecider(actor.employeeId))) return;
+    if (actor.roles.includes('FINANCE') || (await this.isSpendingApprover(actor.employeeId))) return;
 
     throw new BudgetNotAReaderError();
   }

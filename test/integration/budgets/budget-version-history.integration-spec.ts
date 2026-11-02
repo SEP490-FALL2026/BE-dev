@@ -1,6 +1,6 @@
 import { VersionHistoryViewService } from '../../../src/modules/budgets/version/version-history-view.service';
 import { BudgetNotAHistoryReaderError } from '../../../src/modules/budgets/budget/budget.errors';
-import { BudgetHarness, type HistoryEntryWire, type Pageable } from '../../support/budget-harness';
+import { BudgetHarness, type HistoryEntryWire, type Pageable, type VersionWire } from '../../support/budget-harness';
 import type { Person } from '../../support/request-harness';
 
 const h = new BudgetHarness();
@@ -12,7 +12,7 @@ const h = new BudgetHarness();
  */
 describe('the history of the edits of a version (integration, real PostgreSQL)', () => {
   let boss: Person;
-  let substitute: Person;
+  let bystander: Person;
   let counter = 0;
 
   beforeAll(async () => {
@@ -21,8 +21,7 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
     boss = await h.staff(executive, 'EXE-C1');
     await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
-    substitute = await h.staff(await h.departmentWithUnit('P-SBS'), 'SBS-S1');
-    await h.setRole('CONFLICT_SUBSTITUTE', substitute);
+    bystander = await h.staff(await h.departmentWithUnit('P-SBS'), 'SBS-S1');
   }, 240000);
 
   afterAll(async () => {
@@ -293,7 +292,7 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
       const approver = await h.versionHistory(s.version.id, boss.account);
       const head = await h.versionHistory(s.version.id, s.head.account);
       const itAdmin = await h.versionHistory(s.version.id, h.it1);
-      const other = await h.versionHistory(s.version.id, substitute.account);
+      const other = await h.versionHistory(s.version.id, bystander.account);
 
       expect([finance.status, approver.status, head.status, itAdmin.status, other.status]).toEqual([
         200, 200, 403, 403, 403,
@@ -355,6 +354,72 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
       expect(entry.by.id).toBe(h.finance.employeeId);
       expect(typeof entry.by.name).toBe('string');
       expect(JSON.stringify(entry)).not.toMatch(/correlation|session|roles|FINANCE/i);
+    });
+  });
+
+  describe('who decides a version (US-06-11 AC-12, QĐ-93d(1))', () => {
+    const wireOf = async (id: string) =>
+      h.dataOf<{ version: VersionWire }>(await h.versionOf(id, h.finance).expect(200)).version;
+
+    it('a version waits for the spending approver and nobody else may decide', async () => {
+      const w = await waiting();
+      const version = await h.built(w.proposal.id);
+      await h.clearRole('SPENDING_APPROVER');
+      try {
+        await h.sendVersion(version.id).expect(200);
+
+        expect(await wireOf(version.id)).toMatchObject({ state: 'SENT', waitingReason: 'NO_SPENDING_APPROVER' });
+        // Nobody takes the place of the approver: not Finance, the head, an IT Admin, nor the person who held the old role of the substitute.
+        for (const account of [h.finance, w.head.account, h.it1, bystander.account]) {
+          await h.decideVersion(version.id, { decision: 'APPROVE' }, account).expect(403);
+        }
+        expect(await wireOf(version.id)).toMatchObject({ state: 'SENT' });
+      } finally {
+        await h.setRole('SPENDING_APPROVER', boss);
+      }
+
+      expect(await wireOf(version.id)).toMatchObject({ state: 'SENT', waitingReason: null });
+      await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account).expect(200);
+      expect(await wireOf(version.id)).toMatchObject({ state: 'APPROVED', waitingReason: null });
+    });
+
+    it('is decided by the spending approver, and by nobody else, when somebody else proposed the budget', async () => {
+      const w = await waiting();
+      const version = await h.built(w.proposal.id);
+      await h.sendVersion(version.id).expect(200);
+
+      await h.decideVersion(version.id, { decision: 'APPROVE' }, bystander.account).expect(403);
+      await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account).expect(200);
+    });
+
+    it('is decided by nobody when the approver sent the proposal behind it (data of before QĐ-93): the approver is refused as the party, no substitute decides', async () => {
+      const w = await waiting();
+      const version = await h.built(w.proposal.id);
+      await h.sendVersion(version.id).expect(200);
+      await h.ctx.sql.query(`UPDATE budget_proposals SET submitted_by_employee_id = $2 WHERE id = $1`, [
+        w.proposal.id,
+        boss.employeeId,
+      ]);
+
+      const own = await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account).expect(403);
+      await h.decideVersion(version.id, { decision: 'APPROVE' }, bystander.account).expect(403);
+
+      expect(h.codeOf(own)).toBe('BUDGET.CONFLICT_OF_INTEREST');
+      expect(await wireOf(version.id)).toMatchObject({ state: 'SENT' });
+    });
+
+    it('writes only the spending approver as the role of a decision', async () => {
+      const w = await waiting();
+      const version = await h.built(w.proposal.id);
+      await h.sendVersion(version.id).expect(200);
+
+      await h.decideVersion(version.id, { decision: 'REJECT', reason: 'No' }, boss.account).expect(200);
+
+      const { rows } = await h.ctx.sql.query<{ decider_role: string }>(
+        `SELECT decider_role FROM budget_version_decisions WHERE version_id = $1`,
+        [version.id],
+      );
+      expect(rows).toEqual([{ decider_role: 'SPENDING_APPROVER' }]);
     });
   });
 });

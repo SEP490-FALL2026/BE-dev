@@ -119,7 +119,7 @@ export class BudgetNotifierService {
   /** Finance sent the version: the person who decides it is told (row 18); sent again after a request to look again, it is told again. */
   async versionSent(tx: DbTx, version: VersionRecord, proposalSubmittedBy: string | null): Promise<void> {
     if (version.sentAt === null) return;
-    const decider = deciderOf(await this.facts.holders(tx), proposalSubmittedBy);
+    const decider = deciderOf(await this.facts.usableSpendingApproverEmployeeId(tx), proposalSubmittedBy);
     await this.tell(tx, decider.employeeId, {
       organizationId: version.organizationId,
       code: 'BUDGET_VERSION_AWAITING_DECISION',
@@ -171,7 +171,11 @@ export class BudgetNotifierService {
     };
     await this.tell(tx, await this.facts.financeEmployeeId(tx), notice);
     if (input.wasWaitingForDecision) {
-      await this.tell(tx, deciderOf(await this.facts.holders(tx), input.proposalSubmittedBy).employeeId, notice);
+      await this.tell(
+        tx,
+        deciderOf(await this.facts.usableSpendingApproverEmployeeId(tx), input.proposalSubmittedBy).employeeId,
+        notice,
+      );
     }
   }
 

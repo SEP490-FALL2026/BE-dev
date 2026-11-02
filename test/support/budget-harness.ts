@@ -41,6 +41,8 @@ export interface VersionWire {
   quarters: Record<'q1' | 'q2' | 'q3' | 'q4', { amount: string }> | null;
   reason: string | null;
   previousTotal: { amount: string } | null;
+  /** Set while the version was sent and nobody who works holds the role of the spending approver. */
+  waitingReason: 'NO_SPENDING_APPROVER' | null;
   decision: {
     decision: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
     reason: string | null;

@@ -12,7 +12,11 @@ const briefOf = (period: RenewalPeriodFacts) => ({
 });
 
 /** A case as a list shows it: the period it is about, the milestone, the choice proposed and where the case stands. */
-export function toRenewalSummary(record: RenewalRecord, period: RenewalPeriodFacts): RenewalSummaryWire {
+export function toRenewalSummary(
+  record: RenewalRecord,
+  period: RenewalPeriodFacts,
+  waitingReason: RenewalSummaryWire['waitingReason'],
+): RenewalSummaryWire {
   return {
     id: record.id,
     state: record.state,
@@ -24,6 +28,7 @@ export function toRenewalSummary(record: RenewalRecord, period: RenewalPeriodFac
     executionPoint: record.decision?.executionPoint ?? null,
     outcome: record.outcome?.kind ?? null,
     lateFlagged: record.lateFlaggedAt !== null,
+    waitingReason,
     proposedAt: record.proposedAt.toISOString(),
   };
 }
@@ -37,13 +42,14 @@ export function toRenewalDetail(
     usageAvailable: boolean;
     released: readonly ReleasedSeat[];
     savings: { amount: string; currency: string } | null;
+    waitingReason: RenewalSummaryWire['waitingReason'];
   },
 ): RenewalDetailWire {
   const { period, released } = context;
   const { decision, outcome } = record;
 
   return {
-    ...toRenewalSummary(record, period),
+    ...toRenewalSummary(record, period, context.waitingReason),
     period: {
       purchasedQuantity: period.purchasedQuantity,
       billingCycle: period.billingCycle,

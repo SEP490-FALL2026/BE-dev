@@ -35904,7 +35904,7 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin, Finance, the person who decides spending and the substitute read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN).",
+            "description": "Only the IT Admin, Finance and the person who decides spending read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -36352,7 +36352,7 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin, Finance, the person who decides spending and the substitute read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN).",
+            "description": "Only the IT Admin, Finance and the person who decides spending read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -36545,7 +36545,7 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin, Finance, the person who decides spending and the substitute read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN).",
+            "description": "Only the IT Admin, Finance and the person who decides spending read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -36681,7 +36681,7 @@
         },
         "responses": {
           "200": {
-            "description": "The person who decides spending (or the substitute when that person proposed the case) renews as it is, reduces or cancels. A cancellation while seats are in use is confirmed after seeing how many; a reduction below the seats in use names exactly the seats to take back, chosen from the ranked list, and their revocations are opened. A decision after the milestone is never voided: it is carried out mid-term when the subscription allows a reduction mid-term, else at the next renewal. The decision is written with the snapshot the decider saw; it holds no budget commitment, creates no new period and records no savings. The IT Admin who carries it out is told.",
+            "description": "The person who decides spending, and nobody in their place, renews as it is, reduces or cancels. A cancellation while seats are in use is confirmed after seeing how many; a reduction below the seats in use names exactly the seats to take back, chosen from the ranked list, and their revocations are opened. A decision after the milestone is never voided: it is carried out mid-term when the subscription allows a reduction mid-term, else at the next renewal. The decision is written with the snapshot the decider saw; it holds no budget commitment, creates no new period and records no savings. The IT Admin who carries it out is told.",
             "content": {
               "application/json": {
                 "schema": {
@@ -55707,7 +55707,7 @@
             }
           },
           "403": {
-            "description": "Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.",
+            "description": "Only Finance and the spending approver read the versions of a budget.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -56418,7 +56418,7 @@
             }
           },
           "403": {
-            "description": "Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.",
+            "description": "Only Finance and the spending approver read the versions of a budget.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -57193,7 +57193,7 @@
             }
           },
           "403": {
-            "description": "The caller is not the spending approver (BUDGET.NOT_SPENDING_APPROVER) or built or sent the version (BUDGET.OWN_VERSION).",
+            "description": "The caller is not the spending approver (BUDGET.NOT_SPENDING_APPROVER), is the spending approver who sent the proposal behind the version, which nobody then decides (BUDGET.CONFLICT_OF_INTEREST), or built or sent the version (BUDGET.OWN_VERSION).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -57483,7 +57483,7 @@
             }
           },
           "403": {
-            "description": "Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.",
+            "description": "Only Finance and the spending approver read the versions of a budget.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -58787,7 +58787,7 @@
             }
           },
           "403": {
-            "description": "Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.",
+            "description": "Only Finance and the spending approver read the versions of a budget.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -80324,6 +80324,7 @@
                       "nullable": true
                     },
                     "lateFlagged": { "type": "boolean" },
+                    "waitingReason": { "type": "string", "enum": ["NO_SPENDING_APPROVER", null], "nullable": true },
                     "proposedAt": { "type": "string", "format": "date-time" }
                   },
                   "required": [
@@ -80337,6 +80338,7 @@
                     "executionPoint",
                     "outcome",
                     "lateFlagged",
+                    "waitingReason",
                     "proposedAt"
                   ],
                   "additionalProperties": false
@@ -80421,6 +80423,7 @@
                     "nullable": true
                   },
                   "lateFlagged": { "type": "boolean" },
+                  "waitingReason": { "type": "string", "enum": ["NO_SPENDING_APPROVER", null], "nullable": true },
                   "proposedAt": { "type": "string", "format": "date-time" },
                   "period": {
                     "type": "object",
@@ -80625,6 +80628,7 @@
                   "executionPoint",
                   "outcome",
                   "lateFlagged",
+                  "waitingReason",
                   "proposedAt",
                   "period",
                   "usage",
@@ -84770,7 +84774,7 @@
                       "state": { "type": "string", "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED"] },
                       "waitingReason": {
                         "type": "string",
-                        "enum": ["NO_SPENDING_APPROVER", "NO_CONFLICT_SUBSTITUTE", null],
+                        "enum": ["NO_SPENDING_APPROVER", "SPENDING_APPROVER_IS_PARTY", "NO_CONFLICT_SUBSTITUTE", null],
                         "nullable": true
                       },
                       "assignee": {
@@ -89273,6 +89277,7 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "waitingReason": { "type": "string", "enum": ["NO_SPENDING_APPROVER", null], "nullable": true },
                   "decision": {
                     "type": "object",
                     "properties": {
@@ -89330,6 +89335,7 @@
                   "quarters",
                   "reason",
                   "previousTotal",
+                  "waitingReason",
                   "decision",
                   "createdBy",
                   "createdAt",

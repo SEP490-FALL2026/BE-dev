@@ -21,6 +21,7 @@ import {
   quartersMatch,
   totalOf,
   versionSourceOf,
+  versionWaitingReason,
   yearEndOfVersion,
   yearHasEnded,
   yearIsOpen,
@@ -142,18 +143,31 @@ describe('the year that has ended (F62, QĐ-91c)', () => {
   });
 });
 
-describe('who decides a version (US-06-08 AC-11)', () => {
-  const holders = { spendingApproverEmployeeId: 'approver', conflictSubstituteEmployeeId: 'substitute' };
+describe('who decides a version (US-06-11 AC-12, QĐ-93d(1))', () => {
+  it('is the spending approver, and nobody in their place', () => {
+    expect(deciderOf('approver', 'head')).toEqual({ employeeId: 'approver', approverIsParty: false });
+    expect(deciderOf('approver', null)).toEqual({ employeeId: 'approver', approverIsParty: false });
+  });
 
-  it('is the spending approver, or the substitute when the approver sent the proposal behind the version', () => {
-    expect(deciderOf(holders, 'head')).toEqual({ employeeId: 'approver', approverIsParty: false });
-    expect(deciderOf(holders, null)).toEqual({ employeeId: 'approver', approverIsParty: false });
-    expect(deciderOf(holders, 'approver')).toEqual({ employeeId: 'substitute', approverIsParty: true });
+  it('is nobody when the approver sent the proposal behind the version: no substitute takes the place (data of before QĐ-93)', () => {
+    expect(deciderOf('approver', 'approver')).toEqual({ employeeId: null, approverIsParty: true });
   });
 
   it('is nobody while the role that decides has no holder', () => {
-    expect(deciderOf({ ...holders, spendingApproverEmployeeId: null }, 'head').employeeId).toBeNull();
-    expect(deciderOf({ ...holders, conflictSubstituteEmployeeId: null }, 'approver').employeeId).toBeNull();
+    expect(deciderOf(null, 'head')).toEqual({ employeeId: null, approverIsParty: false });
+  });
+});
+
+describe('what a version waits for (US-06-11 AC-12)', () => {
+  it('waits for the spending approver when it was sent and nobody who works holds the role', () => {
+    expect(versionWaitingReason('SENT', null)).toBe('NO_SPENDING_APPROVER');
+  });
+
+  it('waits for nothing when somebody holds the role, or when it is not waiting for a decision', () => {
+    expect(versionWaitingReason('SENT', 'approver')).toBeNull();
+    for (const state of ['DRAFT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED'] as const) {
+      expect(versionWaitingReason(state, null)).toBeNull();
+    }
   });
 });
 
@@ -233,11 +247,13 @@ describe('who may decide a version, and when (US-06-11 AC-7, AC-8, SoD-8)', () =
     expect(checkVersionDecision({ ...facts, actorIsDecider: false, state: 'DRAFT' })).toBe('NOT_SPENDING_APPROVER');
   });
 
-  it('is told apart when the approver is a party and the substitute decides in their place (US-06-08 AC-11)', () => {
+  it('is told apart when the approver is a party to the version: nobody decides it, and they are refused as the party (SoD-8)', () => {
     expect(checkVersionDecision({ ...facts, actorIsDecider: false, actorHasConflict: true })).toBe(
       'CONFLICT_OF_INTEREST',
     );
-    expect(checkVersionDecision({ ...facts, actorEmployeeId: 's1', actorIsDecider: true })).toBeNull();
+    expect(checkVersionDecision({ ...facts, actorEmployeeId: 's1', actorIsDecider: false })).toBe(
+      'NOT_SPENDING_APPROVER',
+    );
   });
 
   it('is never a version the approver built or sent', () => {

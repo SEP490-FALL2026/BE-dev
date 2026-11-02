@@ -3,18 +3,25 @@ import type { RenewalProblem } from '../subscription-renewal.errors';
 import type { DeciderRole, ExecutionPoint, RenewalChoice } from '../subscription-renewal.types';
 
 /**
- * Who decides a renewal now (`FR-3.13`, `FR-3.15`): the person who decides spending, or the substitute when that person is a
- * party to the case because they proposed it. The employee is null while the role has no holder.
+ * Who decides a renewal now (`FR-3.13`, `QĐ-93d`(1)): the person who decides spending, and nobody in their place. When that person is
+ * a party to the case because they proposed it (data of before `QĐ-93`) nobody decides it, and the same when the role has no holder who
+ * works.
  */
 export function renewalDeciderOf(
-  holders: { spendingApproverEmployeeId: string | null; conflictSubstituteEmployeeId: string | null },
+  spendingApproverEmployeeId: string | null,
   proposerEmployeeId: string,
-): { employeeId: string | null; role: DeciderRole } {
-  const approverIsParty = holders.spendingApproverEmployeeId === proposerEmployeeId;
+): { employeeId: string | null; role: Extract<DeciderRole, 'SPENDING_APPROVER'> } {
+  const approverIsParty = spendingApproverEmployeeId === proposerEmployeeId;
 
-  return approverIsParty
-    ? { employeeId: holders.conflictSubstituteEmployeeId, role: 'CONFLICT_SUBSTITUTE' }
-    : { employeeId: holders.spendingApproverEmployeeId, role: 'SPENDING_APPROVER' };
+  return { employeeId: approverIsParty ? null : spendingApproverEmployeeId, role: 'SPENDING_APPROVER' };
+}
+
+/** What a case that waits for its decision waits for when nobody who works holds the role of the spending approver (`US-11-02` AC-23). */
+export function renewalWaitingReason(
+  state: 'PROPOSED' | 'DECIDED' | 'OUTCOME_RECORDED',
+  usableSpendingApproverEmployeeId: string | null,
+): 'NO_SPENDING_APPROVER' | null {
+  return state === 'PROPOSED' && usableSpendingApproverEmployeeId === null ? 'NO_SPENDING_APPROVER' : null;
 }
 
 /**

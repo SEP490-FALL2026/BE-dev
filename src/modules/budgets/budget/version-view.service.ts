@@ -3,7 +3,7 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCostCenterNotFoundError, BudgetLineNotFoundError, BudgetVersionNotFoundError } from './budget.errors';
-import { isOverdue } from './budget.policy';
+import { isOverdue, versionWaitingReason } from './budget.policy';
 import { BudgetFactsService } from './budget-facts.service';
 import { DecisionRepo, type DecisionRecord } from './decision.repo';
 import { VersionLineRepo, type LineChangeRecord, type VersionLineRecord } from './version-line.repo';
@@ -123,6 +123,10 @@ export class VersionViewService {
       ),
       this.facts.costCenters(versions.map((version) => version.costCenterId)),
     ]);
+    // Read once for the page, and only when some version waits for a decision.
+    const approver = versions.some((version) => version.state === 'SENT')
+      ? await this.facts.usableSpendingApproverEmployeeId()
+      : null;
     const people = await this.facts.people([
       ...versions.map((version) => version.createdByEmployeeId),
       ...[...latest.values()].map((decision) => decision.decidedByEmployeeId),
@@ -156,6 +160,7 @@ export class VersionViewService {
               : { q1: money(q1), q2: money(q2), q3: money(q3), q4: money(q4) },
           reason: version.reason,
           previousTotal: version.basedOnVersionId ? money(previous.get(version.basedOnVersionId) ?? 0n) : null,
+          waitingReason: versionWaitingReason(version.state, approver),
           decision: toDecisionWire(latest.get(version.id), people),
           createdBy: people.get(version.createdByEmployeeId) ?? null,
           createdAt: version.createdAt.toISOString(),
