@@ -492,7 +492,12 @@ describe('recovering the Super Admin role outside the application (integration, 
 
     it('leaves every account with the person it was made for: a transfer and a credential reset move no account to another employee (US-01-09 AC-16)', async () => {
       await activeSuccessor('E-RS20');
-      const accountsOf = async () => (await h.ctx.sql.query('SELECT id, employee_id FROM app_users ORDER BY id')).rows;
+      const accountsOf = async () =>
+        (
+          await h.ctx.sql.query<{ id: string; employee_id: string }>(
+            'SELECT id, employee_id FROM app_users ORDER BY id',
+          )
+        ).rows;
       const before = await accountsOf();
 
       expect(
