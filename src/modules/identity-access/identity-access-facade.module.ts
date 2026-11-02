@@ -15,13 +15,13 @@ import { SuperAdminHolderRepo } from './accounts/super-admin-holder.repo';
 import { ApprovalRoleHoldersService } from './approval-roles/approval-role-holders.service';
 import { ApprovalRoleReaderRepo } from './approval-roles/approval-role-reader.repo';
 import { IdentityAccessApi } from './public/identity-access.api';
-import { ApprovalRoleChangeListeners } from './public/identity-access.extension-points';
+import { ApprovalRoleChangeListeners, SpendingApproverGrantChecks } from './public/identity-access.extension-points';
 
 /**
  * IdentityAccessApi is the public facade installation and the worker use. The account persistence is declared
  * here once, because every graph needs it (API, worker, installation, recovery); the API and the recovery command reach
  * it only through the account contracts exported below. No repository, hasher or helper is exported. The change listeners of the
- * approval roles are held here once per graph, and `EmployeeAccountsListener` binds the organization's `EmployeeAccountsHook` to
+ * approval roles and the checks of the grant of SPENDING_APPROVER are held here once per graph, and `EmployeeAccountsListener` binds the organization's `EmployeeAccountsHook` to
  * the facade (D5) in every graph that loads it.
  */
 @Module({
@@ -35,6 +35,7 @@ import { ApprovalRoleChangeListeners } from './public/identity-access.extension-
     ApprovalRoleReaderRepo,
     ApprovalRoleHoldersService,
     ApprovalRoleChangeListeners,
+    SpendingApproverGrantChecks,
     PasswordHasher,
     AccountRecordService,
     RoleGrantService,
@@ -50,6 +51,7 @@ import { ApprovalRoleChangeListeners } from './public/identity-access.extension-
     ActionLinkService,
     CredentialService,
     ApprovalRoleChangeListeners,
+    SpendingApproverGrantChecks,
   ],
 })
 export class IdentityAccessFacadeModule {}

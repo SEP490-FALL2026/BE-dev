@@ -9,6 +9,7 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
 import { OrganizationModule } from '../organization/organization.module';
 import { BudgetCostCenterUseReader } from './commitment/budget-cost-center-use.listener';
 import { BudgetHeadChangeListener } from './proposal/budget-head-change.listener';
+import { BudgetSpendingApproverGrantCheck } from './proposal/spending-approver-grant.listener';
 import { FiscalYearStartLockReader } from './version/fiscal-year-start-lock.listener';
 import { BudgetFactsRepo } from './budget/budget-facts.repo';
 import { BudgetNotifierService } from './budget/budget-notifier.service';
@@ -113,6 +114,7 @@ import { BudgetYearEndSweeper } from './year-end/year-end.job';
     CommitmentReleaseGuardHook,
     BudgetCostCenterUseReader,
     BudgetHeadChangeListener,
+    BudgetSpendingApproverGrantCheck,
     FiscalYearStartLockReader,
     CommitmentService,
     BudgetsApi,

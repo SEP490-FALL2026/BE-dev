@@ -17,6 +17,7 @@ import { ServiceAccountDutiesController } from './assignment/service-account-dut
 import { ServiceAccountDutyRepo } from './assignment/service-account-duty/service-account-duty.repo';
 import { ServiceAccountDutyService } from './assignment/service-account-duty/service-account-duty.service';
 import { ServiceAccountDutySweeper } from './assignment/service-account-duty/service-account-duty.job';
+import { ServiceAccountSpendingApproverGrantCheck } from './assignment/service-account-duty/spending-approver-grant.listener';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
 import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
@@ -177,6 +178,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     ServiceAccountDutyRepo,
     ServiceAccountDutyService,
     ServiceAccountDutySweeper,
+    ServiceAccountSpendingApproverGrantCheck,
     AssignmentListService,
     DepartmentToolsService,
     SeatBaselineRepo,

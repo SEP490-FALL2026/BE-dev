@@ -51,6 +51,18 @@ export class AccountRecordService {
     return this.accounts.lockAppUser(tx, appUserId, mode);
   }
 
+  /**
+   * Who, among these employees, holds the SPENDING_APPROVER role (QĐ-93a): the accounts of all of them are locked `FOR SHARE` first, in the
+   * order of their ids, and the grants are read in a statement of their own. The side that creates a Request calls it, so it and the
+   * grant of the role (which holds the account `FOR UPDATE`) wait on the same row. Null when none of them holds it.
+   */
+  async lockSpendingApproverAmong(tx: DbTx, employeeIds: readonly string[]): Promise<string | null> {
+    await this.accounts.lockAppUsersOfEmployees(tx, employeeIds);
+    const held = await this.grants.listHoldersAmong(employeeIds, ['SPENDING_APPROVER'], tx);
+
+    return [...held.keys()][0] ?? null;
+  }
+
   readAccount(tx: DbTx, appUserId: string): Promise<AccountSnapshot | null> {
     return this.accounts.readAccount(tx, appUserId);
   }

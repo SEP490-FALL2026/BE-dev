@@ -9,8 +9,6 @@ import { translateAccountWriteError } from './account-constraints.errors';
 import { AccountRecordService } from '../account-record.service';
 import {
   accountAuditEvent,
-  accountIsUsable,
-  canBeSpendingApprover,
   checkRoleRequest,
   conflictingRoles,
   isSelfChange,
@@ -26,17 +24,13 @@ import {
   RoleNotGrantedError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
-  SpendingApproverAccountNotUsableError,
-  SpendingApproverAlreadyAssignedError,
-  SpendingApproverEmployeeNotActiveError,
   SpendingApproverHeadsDepartmentError,
-  SpendingApproverIsSubstituteError,
   SuperAdminHolderNotLockableError,
 } from '../account.errors';
-import { APPROVAL_ROLE_HOLDINGS, ApprovalRoleHoldings } from '../account.types';
 import { ACCOUNT_SESSIONS, AccountSessions } from '../account-sessions.types';
 import { ActionLinkRevocation } from '../action-link-revocation.service';
 import { RoleGrantService } from '../role-grant.service';
+import { SpendingApproverGrantService } from './spending-approver-grant.service';
 
 /**
  * Lock, unlock and role grants of an account. Every method takes the AppUser row lock
@@ -51,7 +45,7 @@ export class AccountStatusService {
     @Inject(ACCOUNT_SESSIONS) private readonly sessions: AccountSessions,
     private readonly audit: AuditApi,
     private readonly organizationReads: OrganizationReadApi,
-    @Inject(APPROVAL_ROLE_HOLDINGS) private readonly approvalRoles: ApprovalRoleHoldings,
+    private readonly spendingApprover: SpendingApproverGrantService,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -128,21 +122,6 @@ export class AccountStatusService {
     return account;
   }
 
-  /** Rules 6 to 9a of the grant of SPENDING_APPROVER, in the order of the spec (rules 1 to 5 are the same for every role). */
-  private async checkSpendingApprover(tx: DbTx, account: AccountRecord): Promise<void> {
-    if (await this.grants.spendingApproverIsHeld(tx, account.organizationId)) {
-      throw new SpendingApproverAlreadyAssignedError();
-    }
-    const employee = await this.organizationReads.getEmployee(account.employeeId, tx);
-    if (!employee || !canBeSpendingApprover(employee)) throw new SpendingApproverEmployeeNotActiveError();
-    if (!accountIsUsable(account)) throw new SpendingApproverAccountNotUsableError();
-    const periods = await this.organizationReads.headPeriodsFrom(account.employeeId, undefined, tx);
-    if (periods.length > 0) throw new SpendingApproverHeadsDepartmentError(periods);
-    if ((await this.approvalRoles.rolesHeldBy(tx, account.employeeId)).includes('CONFLICT_SUBSTITUTE')) {
-      throw new SpendingApproverIsSubstituteError();
-    }
-  }
-
   /** A refusal that only the database could make (the race with a head assignment) shows the periods as they are now. */
   private async translateRoleWriteError(error: unknown, employeeId: string | null): Promise<unknown> {
     const translated = translateAccountWriteError(error);
@@ -175,7 +154,7 @@ export class AccountStatusService {
         if (granted === 'FINANCE' && (await this.grants.financeIsHeld(tx, account.organizationId))) {
           throw new FinanceAlreadyAssignedError();
         }
-        if (granted === 'SPENDING_APPROVER') await this.checkSpendingApprover(tx, account);
+        if (granted === 'SPENDING_APPROVER') await this.spendingApprover.check(tx, account);
 
         await this.grants.grantRole(tx, {
           organizationId: account.organizationId,

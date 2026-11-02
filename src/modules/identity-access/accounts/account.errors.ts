@@ -1,3 +1,4 @@
+import type { SpendingApproverBlocker } from '../public/identity-access.extension-points';
 import type { AppRole } from '../public/identity-access.types';
 
 export class AccountNotFoundError extends Error {
@@ -147,6 +148,17 @@ export class SpendingApproverHeadsDepartmentError extends Error {
       'The employee heads a department, will head one from a later day, or is named as a successor, so cannot be the spending approver.',
     );
     this.name = 'SpendingApproverHeadsDepartmentError';
+  }
+}
+
+/** The person is a party of work that is still open (`QĐ-93d`(3), US-01-03 AC-12, AC-13): the work is listed, up to a limit, and the list says when it was cut. */
+export class SpendingApproverHasOpenWorkError extends Error {
+  constructor(
+    readonly blockers: readonly SpendingApproverBlocker[],
+    readonly truncated: boolean,
+  ) {
+    super('The employee is a party of work that is still open, so cannot be the spending approver yet.');
+    this.name = 'SpendingApproverHasOpenWorkError';
   }
 }
 

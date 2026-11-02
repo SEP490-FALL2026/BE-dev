@@ -326,7 +326,7 @@ export class AppUsersController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'Already granted, forbidden combination, Finance seat taken, a second spending approver, a head asked to be the spending approver, or the caller.',
+        'Already granted, forbidden combination, Finance seat taken, a second spending approver, a head asked to be the spending approver, a person with open work asked to be the spending approver, or the caller.',
       examples: [
         ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN,
         ACCOUNT_ERROR_EXAMPLES.ROLE_ALREADY_GRANTED,
@@ -334,6 +334,7 @@ export class AppUsersController {
         ACCOUNT_ERROR_EXAMPLES.FINANCE_ALREADY_ASSIGNED,
         ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_ALREADY_ASSIGNED,
         ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_HEADS_DEPARTMENT,
+        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_HAS_OPEN_WORK,
       ],
     },
     {

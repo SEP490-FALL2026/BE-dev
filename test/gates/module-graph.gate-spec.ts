@@ -100,6 +100,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // G5 (FR-3.16): where the approval roles and the role of Finance announce that they changed hands, so the account
   // services of the API emit into the one extension point the facade holds and requests listens to.
   'IdentityAccessFacadeModule: ApprovalRoleChangeListeners',
+  // QĐ-93d(3): where the grant of SPENDING_APPROVER asks the modules above it for the open work of a person; requests, budgets and
+  // licensing add a check each from a `*.listener.ts`, so the one point the facade holds is injected by them.
+  'IdentityAccessFacadeModule: SpendingApproverGrantChecks',
   'IdentityAccessFacadeModule: RoleGrantService',
   // H6.1: the read-only account contract of `ops:inspect`, declared only in the inspection graph.
   'IdentityAccessInspectionFacadeModule: IdentityAccessInspectionApi',

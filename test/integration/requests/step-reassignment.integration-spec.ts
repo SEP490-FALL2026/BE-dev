@@ -342,17 +342,12 @@ describe('who holds a step when the organization or a role changes, over Postgre
   });
 
   describe('an approval role changes hands (AC-4)', () => {
-    it('gives the spend step and the need step the approver held to the new approver, and a request the new approver is party to goes to the substitute', async () => {
+    it('gives the spend step and the need step the approver held to the new approver', async () => {
       const unit = await scene();
       await h.budgetFor(unit, { total: 100 * M });
       counter += 1;
       const c2 = await h.staff(await h.departmentWithUnit(`P-C2-${counter}`), `C2-${counter}`);
       const spend = await h.waitingForApprover(unit, paid, { amount: 5 * M });
-      const party = await h.waitingForApprover(unit, paid, { amount: 5 * M });
-      await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
-        party,
-        c2.employeeId,
-      ]);
       const own = await h.sent(unit.head, paid);
       expect(await h.stepOf(own.id, 'NEED')).toMatchObject({ assignee_employee_id: h.boss.employeeId, routing_row: 2 });
       const created = {
@@ -368,10 +363,6 @@ describe('who holds a step when the organization or a role changes, over Postgre
         const movedOwn = await h.stepOf(own.id, 'NEED');
         expect(movedOwn).toMatchObject({ state: 'PENDING', assignee_employee_id: c2.employeeId, routing_row: 2 });
         expect(movedOwn.created_at).toEqual(created.own);
-        expect(await h.stepOf(party, 'SPEND_APPROVAL')).toMatchObject({
-          state: 'PENDING',
-          assignee_employee_id: h.substitute.employeeId,
-        });
         // The role is handed over in two steps (revoke, then grant): the step waits, then goes to the new approver (US-01-03 AC-3, AC-9).
         expect((await h.audit('ACCESS_REQUEST.STEP_WAITING', movedSpend.id))[0].after).toMatchObject({
           trigger: 'ROLE_HOLDER_CHANGED',

@@ -23,6 +23,7 @@ import {
   SpendingApproverAccountNotUsableError,
   SpendingApproverAlreadyAssignedError,
   SpendingApproverEmployeeNotActiveError,
+  SpendingApproverHasOpenWorkError,
   SpendingApproverHeadsDepartmentError,
   SpendingApproverIsSubstituteError,
   SuperAdminHolderNotLockableError,
@@ -119,6 +120,23 @@ describe('AppUsersController — error answers (status, code, message)', () => {
           headPeriods: [
             { departmentId: id, departmentCode: 'P-ENG', validFrom: '2026-10-01', validTo: null, timing: 'CURRENT' },
           ],
+        },
+      ),
+    ],
+    [
+      'a spending approver with open work, listed and marked as cut or not',
+      () =>
+        new SpendingApproverHasOpenWorkError(
+          [{ kind: 'REQUEST', id, label: 'Access request that is not over', partyRole: 'REQUESTER' }],
+          true,
+        ),
+      refused(
+        409,
+        'APP_USER.SPENDING_APPROVER_HAS_OPEN_WORK',
+        'The employee is a party of work that is still open, so cannot be the spending approver yet.',
+        {
+          blockers: [{ kind: 'REQUEST', id, label: 'Access request that is not over', partyRole: 'REQUESTER' }],
+          truncated: true,
         },
       ),
     ],

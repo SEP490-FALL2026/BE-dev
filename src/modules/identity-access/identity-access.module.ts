@@ -10,6 +10,8 @@ import { OrganizationModule } from '../organization/organization.module';
 import { AccountInvitationService } from './accounts/app-users/account-invitation.service';
 import { AccountQueryService } from './accounts/app-users/account-query.service';
 import { AccountStatusService } from './accounts/app-users/account-status.service';
+import { SpendingApproverBlockersService } from './accounts/app-users/spending-approver-blockers.service';
+import { SpendingApproverGrantService } from './accounts/app-users/spending-approver-grant.service';
 import { ACCOUNT_SESSIONS } from './accounts/account-sessions.types';
 import { APPROVAL_ROLE_HOLDINGS } from './accounts/account.types';
 import { ActionLinkRevocation } from './accounts/action-link-revocation.service';
@@ -78,6 +80,8 @@ import { RecoveryRepo } from './recovery/recovery.repo';
     AccountInvitationService,
     InvitationRedemptionService,
     AccountStatusService,
+    SpendingApproverBlockersService,
+    SpendingApproverGrantService,
     CredentialChangeService,
     LoginService,
     LoginThrottle,

@@ -147,6 +147,15 @@ export class IdentityAccessApi {
     return this.approvalRoles.current(tx);
   }
 
+  /**
+   * Which of these employees holds the spending approver role, or null: the accounts of all of them are locked `FOR SHARE` first, in the
+   * order of their ids, so a Request that is being created and a grant of the role that is being made meet on the same rows
+   * (`QĐ-93d`(3)). Call it in the transaction of the Request; the lock lasts to its end.
+   */
+  lockSpendingApproverAmong(tx: DbTx, employeeIds: readonly string[]): Promise<string | null> {
+    return this.accounts.lockSpendingApproverAmong(tx, employeeIds);
+  }
+
   /** The one account that holds the Super Admin role and what decides whether it can act; null when nobody holds it (an unlocked read). */
   getSuperAdminHolder(tx?: DbTx): Promise<SuperAdminHolder | null> {
     return this.accounts.findSuperAdminHolder(tx);

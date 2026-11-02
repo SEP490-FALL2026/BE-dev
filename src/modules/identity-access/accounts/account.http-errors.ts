@@ -23,6 +23,7 @@ import {
   SpendingApproverAccountNotUsableError,
   SpendingApproverAlreadyAssignedError,
   SpendingApproverEmployeeNotActiveError,
+  SpendingApproverHasOpenWorkError,
   SpendingApproverHeadsDepartmentError,
   SpendingApproverIsSubstituteError,
   SuperAdminHolderNotLockableError,
@@ -96,6 +97,12 @@ export function toAccountApiException(error: unknown): unknown {
       headPeriods: error.headPeriods.map((period) => ({ ...period })),
     });
   }
+  if (error instanceof SpendingApproverHasOpenWorkError) {
+    return refuse(HttpStatus.CONFLICT, 'APP_USER.SPENDING_APPROVER_HAS_OPEN_WORK', error.message, {
+      blockers: error.blockers.map((blocker) => ({ ...blocker })),
+      truncated: error.truncated,
+    });
+  }
   if (error instanceof SpendingApproverEmployeeNotActiveError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'APP_USER.SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE', error.message);
   }
@@ -156,6 +163,12 @@ export const ACCOUNT_ERROR_EXAMPLES = {
         timing: 'CURRENT',
       },
     ]),
+  ),
+  SPENDING_APPROVER_HAS_OPEN_WORK: example(
+    new SpendingApproverHasOpenWorkError(
+      [{ kind: 'REQUEST', id: '<request-id>', label: 'Request awaiting a decision', partyRole: 'REQUESTER' }],
+      false,
+    ),
   ),
   SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE: example(new SpendingApproverEmployeeNotActiveError()),
   SPENDING_APPROVER_ACCOUNT_NOT_USABLE: example(new SpendingApproverAccountNotUsableError()),
