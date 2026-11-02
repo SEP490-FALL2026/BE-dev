@@ -5,7 +5,6 @@ import { businessDate } from '../../../infrastructure/http/dto/business-date.dto
 
 /** The longest note of a reason or a label a request keeps; the DTO bounds the request with them. */
 export const REASON_MAX_LENGTH = 1000;
-export const PROJECT_LABEL_MAX_LENGTH = 200;
 /** The longest term a request may ask for, in months: a bound against a typo, not a business rule of the BRD. */
 export const TERM_MONTHS_MAX = 120;
 
@@ -18,7 +17,6 @@ export const submitBodySchema = z.strictObject({
   planId: z.uuid(),
   businessReason: z.string().trim().min(1).max(REASON_MAX_LENGTH),
   termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
-  projectLabel: z.string().trim().min(1).max(PROJECT_LABEL_MAX_LENGTH).optional(),
   /** The day the money is expected to go out (paid software only); it fixes the budget year. Today when left out. */
   expectedSpendOn: businessDate.optional(),
 });
@@ -209,7 +207,6 @@ export const requestSchema = z.strictObject({
   lineCount: z.number().int().positive(),
   businessReason: z.string(),
   termMonths: z.number().int().positive(),
-  projectLabel: z.string().nullable(),
   /** The head chose "outside the plan": a flag for Finance and the approver, never a stop. */
   offPlan: z.boolean(),
   /** The code the requests a head sent for people of the department in one go share; null for any other request. */

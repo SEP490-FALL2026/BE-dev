@@ -1,4 +1,5 @@
 import { JsonColumnShapeError } from '../../../infrastructure/database/json-column.errors';
+import { contentOf } from '../draft/request-draft-content.mapper';
 import { draftPolicyJson } from './request-draft-policy.json';
 
 const stored = {
@@ -8,6 +9,23 @@ const stored = {
 describe('draftPolicyJson (access_requests.policy of a draft)', () => {
   it('reads the content a draft was saved with: its kind and the body beside it', () => {
     expect(draftPolicyJson.decode(JSON.parse(JSON.stringify(stored)))).toEqual(stored);
+  });
+
+  it('reads an old draft without forwarding the retired project label', () => {
+    const policy = {
+      draft: {
+        kind: 'INDIVIDUAL',
+        planId: '8a4d7c1e-2b3f-4c5d-9e6f-0a1b2c3d4e5f',
+        businessReason: 'Work',
+        termMonths: 3,
+        projectLabel: 'old',
+      },
+    };
+    expect(contentOf({ id: 'draft-1', policy })).toEqual({
+      kind: 'INDIVIDUAL',
+      body: { planId: policy.draft.planId, businessReason: 'Work', termMonths: 3 },
+    });
+    expect(policy.draft.projectLabel).toBe('old');
   });
 
   it.each([

@@ -2,7 +2,6 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import {
-  PROJECT_LABEL_MAX_LENGTH,
   REASON_MAX_LENGTH,
   TERM_MONTHS_MAX,
   employeeRef,
@@ -34,7 +33,6 @@ export const groupBodySchema = z.strictObject({
     .max(GROUP_BODY_LINES_MAX),
   businessReason: reason,
   termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
-  projectLabel: z.string().trim().min(1).max(PROJECT_LABEL_MAX_LENGTH).optional(),
   expectedSpendOn: businessDate.optional(),
   termConfirmation: z.strictObject({ reason }).optional(),
 });

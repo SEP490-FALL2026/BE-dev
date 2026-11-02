@@ -67,7 +67,6 @@ export class ProposalService {
         costCenterId: unit.costCenter.id,
         businessReason: body.purpose,
         termMonths: body.termMonths,
-        projectLabel: body.projectLabel ?? null,
         pricing,
         policy,
         createdByAppUserId: actor.appUserId,

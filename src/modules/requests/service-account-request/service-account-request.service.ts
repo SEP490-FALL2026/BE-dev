@@ -105,7 +105,6 @@ export class ServiceAccountRequestService {
         costCenterId: unit.costCenter?.id ?? null,
         businessReason: body.businessReason,
         termMonths: body.termMonths,
-        projectLabel: body.projectLabel ?? null,
         pricing,
         policy,
         createdByAppUserId: actor.appUserId,

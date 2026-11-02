@@ -65,7 +65,6 @@ export class RequestDraftService {
         departmentId: unit.departmentId,
         businessReason: body.businessReason,
         termMonths: body.termMonths,
-        projectLabel: body.projectLabel ?? null,
         content: toContentJson(body),
         createdByAppUserId: actor.appUserId,
       });

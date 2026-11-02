@@ -36,7 +36,6 @@ export interface GroupBody {
   lines: readonly GroupLineInput[];
   businessReason: string;
   termMonths: number;
-  projectLabel?: string;
   expectedSpendOn?: string;
   termConfirmation?: { reason: string };
 }

@@ -129,7 +129,6 @@ export class RenewalRequestService {
         planId: facts.planId,
         businessReason: body.businessReason,
         termMonths,
-        ...(body.projectLabel === undefined ? {} : { projectLabel: body.projectLabel }),
         ...(body.expectedSpendOn === undefined ? {} : { expectedSpendOn: body.expectedSpendOn }),
       },
       input.settings,

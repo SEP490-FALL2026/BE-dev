@@ -91,7 +91,6 @@ export interface NewAccessRequest {
   costCenterId: string | null;
   businessReason: string;
   termMonths: number;
-  projectLabel: string | null;
   pricing: PricingRecord;
   policy: RequestPolicy;
   delegatedBatchId?: string | null;
@@ -182,7 +181,6 @@ export interface AccessRequestRecord {
   costCenterId: string | null;
   businessReason: string;
   termMonths: number;
-  projectLabel: string | null;
   pricing: PricingRecord;
   /** The line of the plan of the budget it is attached to; null when it is attached to none. */
   planLine: { versionId: string; position: number; confirmed: boolean } | null;

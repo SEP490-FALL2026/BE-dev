@@ -208,7 +208,6 @@ export class AccessRequestQueryService {
       lineCount: record.beneficiaryEmployeeIds.length,
       businessReason: record.businessReason,
       termMonths: record.termMonths,
-      projectLabel: record.projectLabel,
       offPlan: record.offPlan,
       delegatedBatchId: record.delegatedBatchId,
       expectedEndDate: record.expectedEndDate,

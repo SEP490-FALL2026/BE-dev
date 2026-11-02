@@ -11,7 +11,6 @@ import { costEstimateSchema, employeeRef, pricingSchema, submitBodySchema } from
 export const previewBodySchema = submitBodySchema.pick({
   planId: true,
   termMonths: true,
-  projectLabel: true,
   expectedSpendOn: true,
 });
 
@@ -42,7 +41,6 @@ const previewSchema = z.strictObject({
   }),
   branch: z.enum(['INTERNAL_FREE', 'PAID_IN_CATALOG']),
   termMonths: z.number().int().positive(),
-  projectLabel: z.string().nullable(),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
   /**
    * Read only: the Unit of the department of the day; nothing the sender or a project changes (`US-05-01` AC-7). Null when the

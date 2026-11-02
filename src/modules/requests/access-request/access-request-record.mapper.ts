@@ -18,7 +18,6 @@ export const SELECT_REQUEST = {
   costCenterId: true,
   businessReason: true,
   termMonths: true,
-  projectLabel: true,
   pricingStatus: true,
   priceMissingReason: true,
   expectedSpendOn: true,
@@ -159,7 +158,6 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     costCenterId: sent.costCenterId,
     businessReason: row.businessReason,
     termMonths: row.termMonths,
-    projectLabel: row.projectLabel,
     pricing: toPricing(row),
     planLine:
       row.planLineVersionId !== null && row.planLinePosition !== null

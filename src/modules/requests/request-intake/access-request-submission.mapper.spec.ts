@@ -46,7 +46,6 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
       beneficiaryEmployeeIds: ['emp-1'],
       departmentId: 'dep-1',
       costCenterId: 'cc-1',
-      projectLabel: null,
       expectedEndDate: null,
       draftId: null,
       createdByAppUserId: 'user-1',

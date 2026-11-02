@@ -19,7 +19,7 @@ const sent = (decision: unknown, byHead: boolean): RenewalSubmission => ({
   actor: { employeeId: 'actor-1', appUserId: 'user-1' },
   organizationId: 'org-1',
   holder: { employeeId: 'holder-1', planId: 'plan-1' },
-  body: { businessReason: 'Gia hạn cho dự án', projectLabel: 'P-1' },
+  body: { businessReason: 'Gia hạn cho dự án' },
   termMonths: 6,
   newEnd: '2027-06-30',
   byHead,
@@ -50,7 +50,6 @@ describe('the row of a request that asks to renew a right (US-05-14)', () => {
       costCenterId: 'cc-1',
       businessReason: 'Gia hạn cho dự án',
       termMonths: 6,
-      projectLabel: 'P-1',
       expectedEndDate: '2027-06-30',
       createdByAppUserId: 'user-1',
     });
@@ -99,7 +98,8 @@ describe('the row of a request that asks to renew a right (US-05-14)', () => {
     facts.body = { businessReason: 'x' };
     (facts.assessed.unit as { costCenter: unknown }).costCenter = null;
 
-    expect(renewalRequestOf(facts)).toMatchObject({ projectLabel: null, costCenterId: null });
+    expect(renewalRequestOf(facts)).toMatchObject({ costCenterId: null });
+    expect(renewalRequestOf(facts)).not.toHaveProperty('projectLabel');
   });
 
   it('starts pending when the head confirmed the need or the table named somebody (byHead, tableNamedSomebody), and waits under control otherwise', () => {

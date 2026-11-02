@@ -81700,7 +81700,6 @@
               "planId": { "type": "string", "format": "uuid" },
               "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
               "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
-              "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
               "expectedSpendOn": {
                 "type": "string",
                 "format": "date",
@@ -81735,7 +81734,6 @@
               },
               "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
               "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
-              "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
               "expectedSpendOn": {
                 "type": "string",
                 "format": "date",
@@ -81760,7 +81758,6 @@
               "expectedIdentifier": { "type": "string", "minLength": 1, "maxLength": 254 },
               "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
               "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
-              "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
               "expectedSpendOn": {
                 "type": "string",
                 "format": "date",
@@ -81979,7 +81976,6 @@
                     "maximum": 9007199254740991,
                     "minimum": 0
                   },
-                  "projectLabel": { "type": "string", "nullable": true },
                   "offPlan": { "type": "boolean" },
                   "delegatedBatchId": { "type": "string", "format": "uuid", "nullable": true },
                   "expectedEndDate": { "type": "string", "nullable": true },
@@ -82308,7 +82304,6 @@
                   "lineCount",
                   "businessReason",
                   "termMonths",
-                  "projectLabel",
                   "offPlan",
                   "delegatedBatchId",
                   "expectedEndDate",
@@ -82343,7 +82338,6 @@
           "planId": { "type": "string", "format": "uuid" },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
-          "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
           "expectedSpendOn": {
             "type": "string",
             "format": "date",
@@ -82469,7 +82463,6 @@
                     "maximum": 9007199254740991,
                     "minimum": 0
                   },
-                  "projectLabel": { "type": "string", "nullable": true },
                   "offPlan": { "type": "boolean" },
                   "delegatedBatchId": { "type": "string", "format": "uuid", "nullable": true },
                   "expectedEndDate": { "type": "string", "nullable": true },
@@ -82798,7 +82791,6 @@
                   "lineCount",
                   "businessReason",
                   "termMonths",
-                  "projectLabel",
                   "offPlan",
                   "delegatedBatchId",
                   "expectedEndDate",
@@ -82832,7 +82824,6 @@
         "properties": {
           "planId": { "type": "string", "format": "uuid" },
           "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
-          "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
           "expectedSpendOn": {
             "type": "string",
             "format": "date",
@@ -82871,7 +82862,6 @@
                     "maximum": 9007199254740991,
                     "minimum": 0
                   },
-                  "projectLabel": { "type": "string", "nullable": true },
                   "department": {
                     "type": "object",
                     "properties": {
@@ -83122,7 +83112,6 @@
                   "plan",
                   "branch",
                   "termMonths",
-                  "projectLabel",
                   "department",
                   "costCenter",
                   "requirements",
@@ -83266,7 +83255,6 @@
                         "maximum": 9007199254740991,
                         "minimum": 0
                       },
-                      "projectLabel": { "type": "string", "nullable": true },
                       "offPlan": { "type": "boolean" },
                       "delegatedBatchId": { "type": "string", "format": "uuid", "nullable": true },
                       "expectedEndDate": { "type": "string", "nullable": true },
@@ -83604,7 +83592,6 @@
                       "lineCount",
                       "businessReason",
                       "termMonths",
-                      "projectLabel",
                       "offPlan",
                       "delegatedBatchId",
                       "expectedEndDate",
@@ -83784,7 +83771,6 @@
           "dataDescription": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "expectedUsers": { "type": "integer", "minimum": 1, "maximum": 1000000 },
           "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
-          "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
           "expectedSpendOn": {
             "type": "string",
             "format": "date",
@@ -86367,7 +86353,6 @@
           },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
-          "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
           "expectedEndDate": {
             "type": "string",
             "format": "date",
@@ -86503,7 +86488,6 @@
                       "maximum": 9007199254740991,
                       "minimum": 0
                     },
-                    "projectLabel": { "type": "string", "nullable": true },
                     "offPlan": { "type": "boolean" },
                     "delegatedBatchId": { "type": "string", "format": "uuid", "nullable": true },
                     "expectedEndDate": { "type": "string", "nullable": true },
@@ -86838,7 +86822,6 @@
                     "lineCount",
                     "businessReason",
                     "termMonths",
-                    "projectLabel",
                     "offPlan",
                     "delegatedBatchId",
                     "expectedEndDate",
@@ -87099,7 +87082,6 @@
           "expectedIdentifier": { "type": "string", "minLength": 1, "maxLength": 254 },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
-          "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
           "expectedSpendOn": {
             "type": "string",
             "format": "date",
@@ -87376,7 +87358,6 @@
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
           "expectedSpendOn": {
             "type": "string",
             "format": "date",
@@ -87509,7 +87490,6 @@
                     "maximum": 9007199254740991,
                     "minimum": 0
                   },
-                  "projectLabel": { "type": "string", "nullable": true },
                   "offPlan": { "type": "boolean" },
                   "delegatedBatchId": { "type": "string", "format": "uuid", "nullable": true },
                   "expectedEndDate": { "type": "string", "nullable": true },
@@ -87838,7 +87818,6 @@
                   "lineCount",
                   "businessReason",
                   "termMonths",
-                  "projectLabel",
                   "offPlan",
                   "delegatedBatchId",
                   "expectedEndDate",
@@ -88352,7 +88331,6 @@
           },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "termMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
-          "projectLabel": { "type": "string", "minLength": 1, "maxLength": 200 },
           "expectedSpendOn": {
             "type": "string",
             "format": "date",
@@ -88616,7 +88594,6 @@
                     "maximum": 9007199254740991,
                     "minimum": 0
                   },
-                  "projectLabel": { "type": "string", "nullable": true },
                   "offPlan": { "type": "boolean" },
                   "delegatedBatchId": { "type": "string", "format": "uuid", "nullable": true },
                   "expectedEndDate": { "type": "string", "nullable": true },
@@ -88945,7 +88922,6 @@
                   "lineCount",
                   "businessReason",
                   "termMonths",
-                  "projectLabel",
                   "offPlan",
                   "delegatedBatchId",
                   "expectedEndDate",

@@ -70,7 +70,6 @@ export class RequestPreviewService {
       },
       branch: policy.branch,
       termMonths: body.termMonths,
-      projectLabel: body.projectLabel ?? null,
       department: { id: department.id, code: department.code, name: department.name },
       costCenter: costCenter && { id: costCenter.id, code: costCenter.code, name: costCenter.name },
       requirements: {
