@@ -39338,7 +39338,7 @@
             }
           },
           "409": {
-            "description": "The step is not pending: it is decided, or waits for somebody to hold it (ACCESS_REQUEST.STEP_NOT_PENDING).",
+            "description": "The step is not pending: it is decided, or waits for somebody to hold it (ACCESS_REQUEST.STEP_NOT_PENDING); or it is held under the earlier rule of approvers of last resort and waits for the conversion command to move it (ACCESS_REQUEST.STEP_AWAITING_CONVERSION, transitional).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -39350,6 +39350,17 @@
                       "error": {
                         "code": "ACCESS_REQUEST.STEP_NOT_PENDING",
                         "message": "The need step cannot be decided: STEP_NOT_PENDING.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.STEP_AWAITING_CONVERSION": {
+                    "summary": "The need step cannot be decided: STEP_AWAITING_CONVERSION.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.STEP_AWAITING_CONVERSION",
+                        "message": "The need step cannot be decided: STEP_AWAITING_CONVERSION.",
                         "requestId": "req_example"
                       }
                     }
@@ -45599,7 +45610,7 @@
             }
           },
           "409": {
-            "description": "The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).",
+            "description": "The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the step is held under the earlier rule of approvers of last resort and waits for the conversion command to move it (ACCESS_REQUEST.STEP_AWAITING_CONVERSION, transitional), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45611,6 +45622,17 @@
                       "error": {
                         "code": "SPEND.NO_SPEND_STEP",
                         "message": "The spend step cannot be decided: NO_SPEND_STEP.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.STEP_AWAITING_CONVERSION": {
+                    "summary": "The spend step cannot be decided: STEP_AWAITING_CONVERSION.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.STEP_AWAITING_CONVERSION",
+                        "message": "The spend step cannot be decided: STEP_AWAITING_CONVERSION.",
                         "requestId": "req_example"
                       }
                     }
@@ -51888,7 +51910,7 @@
             }
           },
           "409": {
-            "description": "The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), or a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched.",
+            "description": "The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), it is held under the earlier rule of approvers of last resort and waits for the conversion command to move it (ACCESS_REQUEST.STEP_AWAITING_CONVERSION, transitional), or a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -51900,6 +51922,17 @@
                       "error": {
                         "code": "ACCESS_REQUEST.STEP_NOT_PENDING",
                         "message": "The need step cannot be decided: STEP_NOT_PENDING.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.STEP_AWAITING_CONVERSION": {
+                    "summary": "The need step cannot be decided: STEP_AWAITING_CONVERSION.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.STEP_AWAITING_CONVERSION",
+                        "message": "The need step cannot be decided: STEP_AWAITING_CONVERSION.",
                         "requestId": "req_example"
                       }
                     }
@@ -52241,7 +52274,7 @@
             }
           },
           "409": {
-            "description": "The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).",
+            "description": "The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the step is held under the earlier rule of approvers of last resort and waits for the conversion command to move it (ACCESS_REQUEST.STEP_AWAITING_CONVERSION, transitional), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -52253,6 +52286,17 @@
                       "error": {
                         "code": "SPEND.NO_SPEND_STEP",
                         "message": "The spend step cannot be decided: NO_SPEND_STEP.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.STEP_AWAITING_CONVERSION": {
+                    "summary": "The spend step cannot be decided: STEP_AWAITING_CONVERSION.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.STEP_AWAITING_CONVERSION",
+                        "message": "The spend step cannot be decided: STEP_AWAITING_CONVERSION.",
                         "requestId": "req_example"
                       }
                     }
@@ -81131,7 +81175,13 @@
                       "routingRow": { "type": "integer", "minimum": 1, "maximum": 9 },
                       "waitingReason": {
                         "type": "string",
-                        "enum": ["NO_SPENDING_APPROVER", "NO_FALLBACK_APPROVER", "FALLBACK_IS_REQUESTER", null],
+                        "enum": [
+                          "NO_SPENDING_APPROVER",
+                          "NO_DEPARTMENT_HEAD",
+                          "NO_FALLBACK_APPROVER",
+                          "FALLBACK_IS_REQUESTER",
+                          null
+                        ],
                         "nullable": true
                       },
                       "samePersonAsSpend": { "type": "boolean" },
@@ -81622,7 +81672,13 @@
                       "routingRow": { "type": "integer", "minimum": 1, "maximum": 9 },
                       "waitingReason": {
                         "type": "string",
-                        "enum": ["NO_SPENDING_APPROVER", "NO_FALLBACK_APPROVER", "FALLBACK_IS_REQUESTER", null],
+                        "enum": [
+                          "NO_SPENDING_APPROVER",
+                          "NO_DEPARTMENT_HEAD",
+                          "NO_FALLBACK_APPROVER",
+                          "FALLBACK_IS_REQUESTER",
+                          null
+                        ],
                         "nullable": true
                       },
                       "samePersonAsSpend": { "type": "boolean" },
@@ -81991,10 +82047,7 @@
                           "type": "string",
                           "enum": ["NEED", "SPEND_SUBMISSION", "SPEND_APPROVAL", "IT_EXECUTION"]
                         },
-                        "role": {
-                          "type": "string",
-                          "enum": ["MANAGER", "SPENDING_APPROVER", "FALLBACK_APPROVER", "IT_ADMIN"]
-                        },
+                        "role": { "type": "string", "enum": ["MANAGER", "SPENDING_APPROVER", "IT_ADMIN"] },
                         "assignee": {
                           "type": "object",
                           "properties": {
@@ -82017,8 +82070,7 @@
                           "enum": [
                             "DEPARTMENT_HEAD",
                             "HEAD_ASKS_FOR_SELF",
-                            "HEAD_IS_THE_APPROVER",
-                            "DEPARTMENT_HAS_NO_HEAD",
+                            "WAITS_FOR_DEPARTMENT_HEAD",
                             "WAITING_FOR_AN_APPROVER",
                             null
                           ],
@@ -82026,7 +82078,7 @@
                         },
                         "waitingReason": {
                           "type": "string",
-                          "enum": ["NO_SPENDING_APPROVER", "NO_FALLBACK_APPROVER", "FALLBACK_IS_REQUESTER", null],
+                          "enum": ["NO_SPENDING_APPROVER", "NO_DEPARTMENT_HEAD", null],
                           "nullable": true
                         }
                       },
@@ -82427,7 +82479,13 @@
                           "routingRow": { "type": "integer", "minimum": 1, "maximum": 9 },
                           "waitingReason": {
                             "type": "string",
-                            "enum": ["NO_SPENDING_APPROVER", "NO_FALLBACK_APPROVER", "FALLBACK_IS_REQUESTER", null],
+                            "enum": [
+                              "NO_SPENDING_APPROVER",
+                              "NO_DEPARTMENT_HEAD",
+                              "NO_FALLBACK_APPROVER",
+                              "FALLBACK_IS_REQUESTER",
+                              null
+                            ],
                             "nullable": true
                           },
                           "samePersonAsSpend": { "type": "boolean" },
@@ -84916,6 +84974,7 @@
                         "OWN_REQUEST",
                         "REVIEWER_IS_APPROVER",
                         "STEP_NOT_PENDING",
+                        "STEP_AWAITING_CONVERSION",
                         "NO_SPEND_STEP",
                         "OVERRIDE_REQUIRED",
                         "NOT_CHECKABLE",
@@ -85661,7 +85720,13 @@
                         "routingRow": { "type": "integer", "minimum": 1, "maximum": 9 },
                         "waitingReason": {
                           "type": "string",
-                          "enum": ["NO_SPENDING_APPROVER", "NO_FALLBACK_APPROVER", "FALLBACK_IS_REQUESTER", null],
+                          "enum": [
+                            "NO_SPENDING_APPROVER",
+                            "NO_DEPARTMENT_HEAD",
+                            "NO_FALLBACK_APPROVER",
+                            "FALLBACK_IS_REQUESTER",
+                            null
+                          ],
                           "nullable": true
                         },
                         "samePersonAsSpend": { "type": "boolean" },
@@ -86661,7 +86726,13 @@
                       "routingRow": { "type": "integer", "minimum": 1, "maximum": 9 },
                       "waitingReason": {
                         "type": "string",
-                        "enum": ["NO_SPENDING_APPROVER", "NO_FALLBACK_APPROVER", "FALLBACK_IS_REQUESTER", null],
+                        "enum": [
+                          "NO_SPENDING_APPROVER",
+                          "NO_DEPARTMENT_HEAD",
+                          "NO_FALLBACK_APPROVER",
+                          "FALLBACK_IS_REQUESTER",
+                          null
+                        ],
                         "nullable": true
                       },
                       "samePersonAsSpend": { "type": "boolean" },
@@ -86834,11 +86905,13 @@
                       "type": "string",
                       "enum": [
                         "NO_SPENDING_APPROVER",
+                        "NO_DEPARTMENT_HEAD",
+                        "SPENDING_APPROVER_IS_PARTY",
+                        "NO_FINANCE_REVIEWER",
+                        "NO_IT_ADMIN_IN_CHARGE",
                         "NO_FALLBACK_APPROVER",
                         "FALLBACK_IS_REQUESTER",
-                        "NO_CONFLICT_SUBSTITUTE",
-                        "NO_FINANCE_REVIEWER",
-                        "NO_IT_ADMIN_IN_CHARGE"
+                        "NO_CONFLICT_SUBSTITUTE"
                       ]
                     },
                     "configurationHint": {
@@ -87769,7 +87842,13 @@
                       "routingRow": { "type": "integer", "minimum": 1, "maximum": 9 },
                       "waitingReason": {
                         "type": "string",
-                        "enum": ["NO_SPENDING_APPROVER", "NO_FALLBACK_APPROVER", "FALLBACK_IS_REQUESTER", null],
+                        "enum": [
+                          "NO_SPENDING_APPROVER",
+                          "NO_DEPARTMENT_HEAD",
+                          "NO_FALLBACK_APPROVER",
+                          "FALLBACK_IS_REQUESTER",
+                          null
+                        ],
                         "nullable": true
                       },
                       "samePersonAsSpend": { "type": "boolean" },
@@ -88357,7 +88436,13 @@
                         },
                         "waitingReason": {
                           "type": "string",
-                          "enum": ["NO_SPENDING_APPROVER", "NO_FALLBACK_APPROVER", "FALLBACK_IS_REQUESTER", null],
+                          "enum": [
+                            "NO_SPENDING_APPROVER",
+                            "NO_DEPARTMENT_HEAD",
+                            "NO_FALLBACK_APPROVER",
+                            "FALLBACK_IS_REQUESTER",
+                            null
+                          ],
                           "nullable": true
                         }
                       },

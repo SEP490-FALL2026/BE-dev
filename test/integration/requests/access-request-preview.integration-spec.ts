@@ -10,7 +10,6 @@ describe('requests over HTTP: the preview before sending (integration, real Post
   let head: Person; // head of design
   let designer: Person;
   let boss: Person; // the spending approver, a member of executive (QĐ-93b)
-  let fallback: Person; // the fallback approver, a member of the department with no head
   let newcomer: Person; // a member of the department with no head
   let internalPlan: string;
   let paidPlan: string; // 1 000 000 VND per seat per month, billed monthly
@@ -24,12 +23,10 @@ describe('requests over HTTP: the preview before sending (integration, real Post
     head = await h.staff(design, 'DES-H1');
     designer = await h.staff(design, 'DES-E1');
     boss = await h.staff(executive, 'EXE-C1');
-    fallback = await h.staff(headless, 'HR-R0');
     newcomer = await h.staff(headless, 'HR-E4');
     await h.makeHead(design, head);
     await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
-    await h.setRole('FALLBACK_APPROVER', fallback);
     internalPlan = await h.plan('K5');
     paidPlan = await h.planOf(await h.subscription(10));
     unpricedPlan = await h.plan('K2');
@@ -166,24 +163,37 @@ describe('requests over HTTP: the preview before sending (integration, real Post
   });
 
   describe('the routing table (AC-5)', () => {
-    it.each([
-      ['a head asking for themselves: the spending approver', () => head, () => boss, 'HEAD_ASKS_FOR_SELF'],
-      [
-        'a member of a department with no head: the fallback approver, saying so',
-        () => newcomer,
-        () => fallback,
-        'DEPARTMENT_HAS_NO_HEAD',
-      ],
-    ])('%s', async (_name, who, holder, explanation) => {
-      const preview = await h.previewed(who(), paidPlan);
-      const sent = await h.sent(who(), paidPlan);
+    it('a head asking for themselves: the spending approver', async () => {
+      const preview = await h.previewed(head, paidPlan);
+      const sent = await h.sent(head, paidPlan);
 
       expect(preview.chain[0]).toMatchObject({
         kind: 'NEED',
-        assignee: { employeeId: holder().employeeId },
-        explanation,
+        assignee: { employeeId: boss.employeeId },
+        explanation: 'HEAD_ASKS_FOR_SELF',
       });
-      expect(sent.needStep.assignee?.employeeId).toBe(holder().employeeId);
+      expect(sent.needStep.assignee?.employeeId).toBe(boss.employeeId);
+    });
+
+    it('a member of a department with no head: waits for the head, naming nobody and saying why', async () => {
+      const preview = await h.previewed(newcomer, paidPlan);
+      const sent = await h.sent(newcomer, paidPlan);
+
+      expect(preview.chain[0]).toMatchObject({
+        kind: 'NEED',
+        role: 'MANAGER',
+        assignee: null,
+        explanation: 'WAITS_FOR_DEPARTMENT_HEAD',
+        waitingReason: 'NO_DEPARTMENT_HEAD',
+      });
+      // The chain shown is the chain made (AC-11): nobody takes the step in place of a head.
+      expect(sent.needStep).toMatchObject({
+        state: 'WAITING',
+        assignee: null,
+        routingRow: 4,
+        waitingReason: 'NO_DEPARTMENT_HEAD',
+      });
+      expect(JSON.stringify(preview)).not.toMatch(/FALLBACK|DEPARTMENT_HAS_NO_HEAD|HEAD_IS_THE_APPROVER/);
     });
   });
 

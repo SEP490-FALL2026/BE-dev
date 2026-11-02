@@ -12,6 +12,7 @@ const facts = (patch: Partial<DecisionFacts> = {}): DecisionFacts => ({
   beneficiaryEmployeeIds: ['sender'],
   assigneeEmployeeId: 'head',
   stepState: 'PENDING',
+  stepAwaitsConversion: false,
   termMonths: 6,
   ...patch,
 });
@@ -38,6 +39,27 @@ describe('who may decide the need step, and when (US-05-04)', () => {
   it('refuses anybody who does not hold the step (AC-4)', () => {
     expect(checkNeedDecision(facts({ actorEmployeeId: 'other-head' }), approve)).toBe('NOT_THE_ASSIGNEE');
     expect(checkNeedDecision(facts({ assigneeEmployeeId: null }), approve)).toBe('NOT_THE_ASSIGNEE');
+  });
+
+  it('refuses a decision on a legacy step: it is frozen until the conversion, and the answer is neither of the others', () => {
+    // The holder is the assignee and is not a party, and still may not decide: the step is of the rule before QĐ-93.
+    expect(checkNeedDecision(facts({ stepAwaitsConversion: true }), approve)).toBe('STEP_AWAITING_CONVERSION');
+    expect(checkNeedDecision(facts({ stepAwaitsConversion: true }), { decision: 'REJECT', reason: 'No' })).toBe(
+      'STEP_AWAITING_CONVERSION',
+    );
+    // After OWN_REQUEST and NOT_THE_ASSIGNEE (nobody learns of the freeze who may not know of the step), before STEP_NOT_PENDING.
+    expect(
+      checkNeedDecision(
+        facts({ stepAwaitsConversion: true, actorEmployeeId: 'sender', assigneeEmployeeId: 'sender' }),
+        approve,
+      ),
+    ).toBe('OWN_REQUEST');
+    expect(checkNeedDecision(facts({ stepAwaitsConversion: true, actorEmployeeId: 'other-head' }), approve)).toBe(
+      'NOT_THE_ASSIGNEE',
+    );
+    expect(checkNeedDecision(facts({ stepAwaitsConversion: true, stepState: 'WAITING' }), approve)).toBe(
+      'STEP_AWAITING_CONVERSION',
+    );
   });
 
   it.each(['WAITING', 'APPROVED', 'REJECTED'] as const)(
@@ -75,12 +97,12 @@ describe('what a decision leads to', () => {
   });
 
   it('names the role a person decided in from the row of the routing table that gave them the step', () => {
-    expect([1, 2, 3, 4].map(deciderRoleOf)).toEqual([
-      'MANAGER',
-      'SPENDING_APPROVER',
-      'FALLBACK_APPROVER',
-      'FALLBACK_APPROVER',
-    ]);
+    expect([1, 2].map(deciderRoleOf)).toEqual(['MANAGER', 'SPENDING_APPROVER']);
+  });
+
+  it('names no decider role for a legacy row 3 or 4', () => {
+    // A step held by the approver of last resort (QĐ-93c) is frozen until the conversion rewrites its row: it is not decided.
+    expect([3, 4].map(deciderRoleOf)).toEqual([null, null]);
   });
 
   it('names the head the role of the manager in the rows of a request for a group: sent by the head (5) and sent by an Employee (9)', () => {
@@ -109,15 +131,19 @@ describe('what a decision of the need step leads to (US-05-04 AC-12, AC-16, US-0
       requestState: 'AWAITING_EXECUTION',
       deciderRole: 'MANAGER',
     });
-    expect(needDecisionOutcome(asked('NEW_SOFTWARE', 3), approve)).toMatchObject({
+    expect(needDecisionOutcome(asked('NEW_SOFTWARE', 2), approve)).toMatchObject({
       requestState: 'AWAITING_IT_ASSESSMENT',
-      deciderRole: 'FALLBACK_APPROVER',
+      deciderRole: 'SPENDING_APPROVER',
     });
     expect(needDecisionOutcome(asked('PAID_IN_CATALOG', 2), { decision: 'REJECT' })).toMatchObject({
       approved: false,
       requestState: 'REJECTED',
       deciderRole: 'SPENDING_APPROVER',
     });
+  });
+
+  it('records no decision for a legacy row 3 or 4: nobody decides in it', () => {
+    for (const row of [3, 4]) expect(() => needDecisionOutcome(asked('PAID_IN_CATALOG', row), approve)).toThrow();
   });
 
   it('has the head choose the line only when a head approves a request that costs money', () => {

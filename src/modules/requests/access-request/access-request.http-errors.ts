@@ -94,7 +94,7 @@ export function toAccessRequestApiException(error: unknown): unknown {
   }
   if (error instanceof AccessRequestDecisionRefusedError) {
     const status =
-      error.reason === 'STEP_NOT_PENDING'
+      error.reason === 'STEP_NOT_PENDING' || error.reason === 'STEP_AWAITING_CONVERSION'
         ? HttpStatus.CONFLICT
         : error.reason === 'OWN_REQUEST' || error.reason === 'NOT_THE_ASSIGNEE'
           ? HttpStatus.FORBIDDEN
@@ -172,6 +172,7 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   DECISION_OWN_REQUEST: decision('OWN_REQUEST'),
   DECISION_NOT_THE_ASSIGNEE: decision('NOT_THE_ASSIGNEE'),
   STEP_NOT_PENDING: decision('STEP_NOT_PENDING'),
+  STEP_AWAITING_CONVERSION: decision('STEP_AWAITING_CONVERSION'),
   TERM_CONFIRMATION_REQUIRED: decision('TERM_CONFIRMATION_REQUIRED'),
   PLAN_LINE_REQUIRED: decision('PLAN_LINE_REQUIRED'),
   SPEND_NOT_APPLICABLE: decision('SPEND_NOT_APPLICABLE'),

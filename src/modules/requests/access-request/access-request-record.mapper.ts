@@ -1,8 +1,7 @@
 import type { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn } from '../../../core/business-date';
 import { toPricing } from './access-request-pricing.mapper';
-import type { WaitingReason } from './routing.policy';
-import type { NeedStepState, AccessRequestRecord } from './access-request.types';
+import type { NeedStepState, AccessRequestRecord, ReadableNeedWaitingReason } from './access-request.types';
 import { requestPolicyJson } from './access-request.json';
 
 /** What a request is read as: the columns, the people it is for, its need steps with their decisions, and the lines of a group. */
@@ -134,7 +133,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     state: step.state as NeedStepState,
     assigneeEmployeeId: step.assigneeEmployeeId,
     routingRow: step.routingRow,
-    waitingReason: step.waitingReason as WaitingReason | null,
+    waitingReason: step.waitingReason as ReadableNeedWaitingReason | null,
     samePersonAsSpend: step.samePersonAsSpend,
     slaWorkingDays: step.slaWorkingDays,
     createdAt: step.createdAt,

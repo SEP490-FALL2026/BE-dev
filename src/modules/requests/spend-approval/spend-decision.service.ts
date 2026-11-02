@@ -83,6 +83,8 @@ export class SpendDecisionService {
       beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
       assigneeEmployeeId: step.assigneeEmployeeId,
       stepState: step.state,
+      // Held by somebody who never held the role (the substitute of the rule before `QĐ-93`): frozen until the conversion.
+      stepAwaitsConversion: await this.effects.awaitsConversion(tx, step),
     });
     if (refusal) throw new SpendDecisionRefusedError(refusal);
     await this.effects.refuseReviewer(tx, request, actor.employeeId);

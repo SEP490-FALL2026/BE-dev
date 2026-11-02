@@ -17,19 +17,13 @@ export const previewBodySchema = submitBodySchema.pick({
 const chainStepSchema = z.strictObject({
   sequence: z.number().int().positive(),
   kind: z.enum(['NEED', 'SPEND_SUBMISSION', 'SPEND_APPROVAL', 'IT_EXECUTION']),
-  role: z.enum(['MANAGER', 'SPENDING_APPROVER', 'FALLBACK_APPROVER', 'IT_ADMIN']),
+  role: z.enum(['MANAGER', 'SPENDING_APPROVER', 'IT_ADMIN']),
   assignee: employeeRef.nullable(),
   expectedWorkingDays: z.number().int().positive(),
   explanation: z
-    .enum([
-      'DEPARTMENT_HEAD',
-      'HEAD_ASKS_FOR_SELF',
-      'HEAD_IS_THE_APPROVER',
-      'DEPARTMENT_HAS_NO_HEAD',
-      'WAITING_FOR_AN_APPROVER',
-    ])
+    .enum(['DEPARTMENT_HEAD', 'HEAD_ASKS_FOR_SELF', 'WAITS_FOR_DEPARTMENT_HEAD', 'WAITING_FOR_AN_APPROVER'])
     .nullable(),
-  waitingReason: z.enum(['NO_SPENDING_APPROVER', 'NO_FALLBACK_APPROVER', 'FALLBACK_IS_REQUESTER']).nullable(),
+  waitingReason: z.enum(['NO_SPENDING_APPROVER', 'NO_DEPARTMENT_HEAD']).nullable(),
 });
 
 const previewSchema = z.strictObject({

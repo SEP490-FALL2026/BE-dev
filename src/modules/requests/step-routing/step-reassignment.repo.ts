@@ -223,6 +223,14 @@ export class StepReassignmentRepo {
     });
   }
 
+  /**
+   * Changes only the reason a waiting step waits for. The state stays `WAITING`, so the trigger on the step keeps `waiting_since`
+   * (the stretch, and the alert it keyed), and `created_at` (the deadline) and `routing_row` are not touched.
+   */
+  async rewait(tx: DbTx, stepId: string, reason: string): Promise<void> {
+    await tx.accessRequestStep.update({ where: { id: stepId }, data: { waitingReason: reason } });
+  }
+
   /** When the step began its present stretch of waiting, as the database set it when the step went to WAITING. */
   async waitingSinceOf(tx: DbTx, stepId: string): Promise<Date | null> {
     const row = await tx.accessRequestStep.findUnique({ where: { id: stepId }, select: { waitingSince: true } });

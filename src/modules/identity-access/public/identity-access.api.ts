@@ -156,6 +156,15 @@ export class IdentityAccessApi {
     return this.accounts.lockSpendingApproverAmong(tx, employeeIds);
   }
 
+  /**
+   * Which of these employees has ever had a SPENDING_APPROVER grant, revoked or not (one unlocked read): what tells a spend step of
+   * the old rule — held by a substitute who never had the role — from the step of a spending approver whose role was revoked or
+   * transferred (`QĐ-93k(2)`). Removed with the old rule (Phase B).
+   */
+  everHeldSpendingApproverAmong(tx: DbTx, employeeIds: readonly string[]): Promise<Set<string>> {
+    return this.grants.everHeldSpendingApproverAmong(tx, employeeIds);
+  }
+
   /** The one account that holds the Super Admin role and what decides whether it can act; null when nobody holds it (an unlocked read). */
   getSuperAdminHolder(tx?: DbTx): Promise<SuperAdminHolder | null> {
     return this.accounts.findSuperAdminHolder(tx);

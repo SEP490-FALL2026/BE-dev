@@ -109,7 +109,10 @@ const needStepSchema = z.strictObject({
   state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED']),
   assignee: employeeRef.nullable(),
   routingRow: z.number().int().min(1).max(9),
-  waitingReason: z.enum(['NO_SPENDING_APPROVER', 'NO_FALLBACK_APPROVER', 'FALLBACK_IS_REQUESTER']).nullable(),
+  /** `NO_FALLBACK_APPROVER` and `FALLBACK_IS_REQUESTER` are historical: a step of before `QĐ-93c` that the conversion has not yet rewaited. */
+  waitingReason: z
+    .enum(['NO_SPENDING_APPROVER', 'NO_DEPARTMENT_HEAD', 'NO_FALLBACK_APPROVER', 'FALLBACK_IS_REQUESTER'])
+    .nullable(),
   samePersonAsSpend: z.boolean(),
   slaWorkingDays: z.number().int().positive(),
   createdAt: z.iso.datetime(),

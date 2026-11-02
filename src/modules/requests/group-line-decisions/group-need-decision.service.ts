@@ -55,7 +55,9 @@ export class GroupNeedDecisionService {
     return this.runner.run(async (tx) => {
       const { request, step, open, approves } = await this.preconditions.require(tx, actor, requestId, input);
       const now = new Date();
+      // A step on row 3 or 4 is frozen and was refused by the preconditions: nobody gets here with one.
       const deciderRole = deciderRoleOf(step.routingRow);
+      if (deciderRole === null) throw new Error(`The step ${step.id} is a legacy step: nobody decides it.`);
       const headChoosesLine = approves && deciderRole === 'MANAGER';
       if (input.spend !== undefined && !headChoosesLine) {
         throw new AccessRequestDecisionRefusedError('SPEND_NOT_APPLICABLE');

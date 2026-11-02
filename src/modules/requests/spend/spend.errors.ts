@@ -101,6 +101,8 @@ export class SpendDecisionRefusedError extends Error {
     readonly reason:
       | 'NOT_THE_ASSIGNEE'
       | 'OWN_REQUEST'
+      /** The step is of the rule before `QĐ-93`: frozen until the conversion command moves it (`QĐ-93k(2)`). Removed with the rule. */
+      | 'STEP_AWAITING_CONVERSION'
       | 'STEP_NOT_PENDING'
       /** The request has no spend step open: it is not yet at the approver, or was decided, or went back. */
       | 'NO_SPEND_STEP'

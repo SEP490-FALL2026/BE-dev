@@ -9,7 +9,12 @@ import type { LineState } from '../access-request/group-request.types';
 
 export type LineDecisionRefusal =
   /** The one who decides is not the one who asked or a person of the lines of this step, whatever role they hold (`SoD-4`). */
-  'OWN_REQUEST' | 'NOT_THE_ASSIGNEE' | 'STEP_NOT_PENDING' | 'TERM_CONFIRMATION_REQUIRED';
+  | 'OWN_REQUEST'
+  | 'NOT_THE_ASSIGNEE'
+  /** A legacy step (row 3 or 4, held by the approver of last resort): frozen until the conversion command moves it. */
+  | 'STEP_AWAITING_CONVERSION'
+  | 'STEP_NOT_PENDING'
+  | 'TERM_CONFIRMATION_REQUIRED';
 
 export interface LineDeciderFacts {
   actorEmployeeId: string;
@@ -19,6 +24,8 @@ export interface LineDeciderFacts {
   /** Who holds the step; null while it waits for somebody. */
   assigneeEmployeeId: string | null;
   stepState: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
+  /** The step is of the rule before `QĐ-93` (`isLegacyStep`): frozen until the conversion command moves it (`QĐ-93k(2)`). */
+  stepAwaitsConversion: boolean;
   termMonths: number;
   /** Whether the decision approves at least one line. */
   approves: boolean;
@@ -33,6 +40,7 @@ export function checkLineNeedDecider(facts: LineDeciderFacts): LineDecisionRefus
   if (facts.assigneeEmployeeId === null || facts.actorEmployeeId !== facts.assigneeEmployeeId) {
     return 'NOT_THE_ASSIGNEE';
   }
+  if (facts.stepAwaitsConversion) return 'STEP_AWAITING_CONVERSION';
   if (facts.stepState !== 'PENDING') return 'STEP_NOT_PENDING';
   if (facts.approves && facts.termMonths > LONG_TERM_MONTHS && !facts.confirmed) return 'TERM_CONFIRMATION_REQUIRED';
 

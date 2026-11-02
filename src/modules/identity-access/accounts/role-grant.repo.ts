@@ -43,6 +43,20 @@ export class RoleGrantRepo {
     return row?.appUser.employeeId ?? null;
   }
 
+  /**
+   * Which of these people has a `role_grants` row of SPENDING_APPROVER, revoked or not (one unlocked read): the history of the grant,
+   * which only grows — a grant is revoked by `revoked_at` and no row is ever deleted (the foreign key to `app_users` restricts).
+   */
+  async everHeldSpendingApproverAmong(tx: DbTx, employeeIds: readonly string[]): Promise<Set<string>> {
+    if (employeeIds.length === 0) return new Set();
+    const rows = await tx.roleGrant.findMany({
+      where: { role: 'SPENDING_APPROVER', appUser: { employeeId: { in: [...employeeIds] } } },
+      select: { appUser: { select: { employeeId: true } } },
+    });
+
+    return new Set(rows.map((row) => row.appUser.employeeId));
+  }
+
   /** The employee an account belongs to; null when there is no such account. */
   async employeeOf(tx: DbTx, appUserId: string): Promise<string | null> {
     const row = await tx.appUser.findUnique({ where: { id: appUserId }, select: { employeeId: true } });

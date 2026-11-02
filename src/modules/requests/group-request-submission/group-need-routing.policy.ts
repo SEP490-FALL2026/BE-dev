@@ -73,21 +73,20 @@ export function planNeedSteps<Line extends { employeeId: string }>(
         step: held(input.senderEmployeeId, SENT_BY_HEAD_ROW, slaWorkingDays),
       });
     } else {
+      // The one who would decide the people is the head, who is none of them (`others` leaves the head out); a department with
+      // no head leaves the step waiting for one (`NO_DEPARTMENT_HEAD`, row 4), and no fallback approver takes it (`QĐ-93c`).
       const decision = routeNeedStep(input.facts);
-      // The one who would decide the people is never one of them: a fallback approver named among them leaves the step waiting.
-      const named =
-        decision.outcome === 'ASSIGNED' && others.some((line) => line.employeeId === decision.assigneeEmployeeId);
       planned.push({
         lines: others,
         confirmedBySending: false,
         step:
-          decision.outcome === 'ASSIGNED' && !named
+          decision.outcome === 'ASSIGNED'
             ? held(
                 decision.assigneeEmployeeId,
                 decision.row === 1 ? SENT_BY_EMPLOYEE_ROW : decision.row,
                 slaWorkingDays,
               )
-            : waiting(8, decision.outcome === 'WAITING' ? decision.reason : 'FALLBACK_IS_REQUESTER', slaWorkingDays),
+            : waiting(decision.row, decision.reason, slaWorkingDays),
       });
     }
   }

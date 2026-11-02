@@ -1,6 +1,10 @@
-import type { AccessRequestKind, AccessRequestState, NeedStepState } from '../access-request/access-request.types';
+import type {
+  AccessRequestKind,
+  AccessRequestState,
+  NeedStepState,
+  ReadableNeedWaitingReason,
+} from '../access-request/access-request.types';
 import type { AccessRequestBranchCode } from '../access-request/access-request.policy';
-import type { WaitingReason } from '../access-request/routing.policy';
 import type { CheckRecord } from '../spend/budget-check.repo';
 import type { FinanceReviewRecord } from '../spend/finance-review.repo';
 
@@ -36,7 +40,7 @@ export interface MyRequestFilter {
 export interface MyRequestNeedStep {
   state: NeedStepState;
   assigneeEmployeeId: string | null;
-  waitingReason: WaitingReason | null;
+  waitingReason: ReadableNeedWaitingReason | null;
 }
 
 /** A request of the caller as the repository reads it for a row of the list: no price, no check, no commitment, no reason. */

@@ -13,6 +13,7 @@ import { FinanceReviewRepo } from '../spend/finance-review.repo';
 import type { BlockedReason } from '../spend/spend-decision.policy';
 import { SpendDecisionRefusedError } from '../spend/spend.errors';
 import { SpendStepRepo, type SpendStepRecord } from '../spend/spend-step.repo';
+import { StepFreezeService } from '../step-routing/step-freeze.service';
 
 /**
  * What a spend decision does to the budget and to the step, for the decision on one person's request and for the decision on the
@@ -30,6 +31,7 @@ export class SpendEffectsService {
     private readonly budgets: BudgetsApi,
     private readonly information: BudgetInformationService,
     private readonly audit: AuditApi,
+    private readonly freeze: StepFreezeService,
   ) {}
 
   /**
@@ -40,6 +42,14 @@ export class SpendEffectsService {
     if (await this.reviews.completedBy(tx, request.id, employeeId)) {
       throw new SpendDecisionRefusedError('REVIEWER_IS_APPROVER');
     }
+  }
+
+  /**
+   * Whether the spend step is of the rule before `QĐ-93` — held by somebody who never held the spending approver role — and so frozen
+   * until the conversion command moves it (`QĐ-93k(2)`); one place, so the decision on one person's request and on the lines of a group agree.
+   */
+  awaitsConversion(tx: DbTx, step: SpendStepRecord): Promise<boolean> {
+    return this.freeze.awaitsConversion(tx, { ...step, routingRow: 9 });
   }
 
   /** Whether Finance has looked at what is out of the ordinary in this request, or there is nobody independent to (`AC-17`). */

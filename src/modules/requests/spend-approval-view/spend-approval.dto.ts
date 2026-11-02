@@ -205,6 +205,8 @@ const resultSchema = z.strictObject({
       /** The approver completed the review of Finance of this request: the two are two people (`SoD-8`). */
       'REVIEWER_IS_APPROVER',
       'STEP_NOT_PENDING',
+      /** The step is of the rule before `QĐ-93` and frozen until the conversion command moves it (`QĐ-93k(2)`). Removed with the rule. */
+      'STEP_AWAITING_CONVERSION',
       'NO_SPEND_STEP',
       'OVERRIDE_REQUIRED',
       'NOT_CHECKABLE',

@@ -227,6 +227,36 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
       expect(await records(id)).toHaveLength(1);
     });
 
+    it('answers 409 only for a substitute-held spend step, never after a normal transfer', async () => {
+      const { u } = await example();
+      const transferred = await h.waitingForApprover(u, plan, { amount: 15 * M });
+      const frozen = await h.waitingForApprover(u, plan, { amount: 15 * M });
+      counter += 1;
+      const next = await h.staff(await h.departmentWithUnit(`P-NX${counter}`), `NX-${counter}`);
+      const substitute = await h.staff(await h.departmentWithUnit(`P-SB${counter}`), `SB-${counter}`);
+      // A request of before QĐ-93: the substitute for a conflict of interest holds the step, and never held the role.
+      await h.ctx.sql.query(
+        `UPDATE access_request_steps SET assignee_employee_id = $2 WHERE request_id = $1 AND kind = 'SPEND_APPROVAL'`,
+        [frozen, substitute.employeeId],
+      );
+
+      try {
+        // The role is handed over: the step the approver held goes to the new one, who decides it with no 409.
+        await h.setRole('SPENDING_APPROVER', next);
+        await approve(transferred, {}, next.account).expect(200);
+        expect(h.codeOf(await approve(frozen, {}, next.account).expect(403))).toBe('SPEND.NOT_THE_ASSIGNEE');
+
+        // The holder of the substitute step is refused with the one code that says it waits for the conversion; nothing is written.
+        const refused = await approve(frozen, {}, substitute.account).expect(409);
+        expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.STEP_AWAITING_CONVERSION');
+        expect(await records(frozen)).toEqual([]);
+        expect(await decided(frozen)).toEqual([]);
+        expect(await h.state(frozen)).toBe('AWAITING_SPEND_DECISION');
+      } finally {
+        await h.setRole('SPENDING_APPROVER', h.boss);
+      }
+    });
+
     it('refuses with a reason, ends the request as refused, and makes nothing after it (AC-4)', async () => {
       const { u } = await example();
       const id = await h.waitingForApprover(u, plan, { amount: 15 * M });

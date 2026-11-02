@@ -17,6 +17,7 @@ import {
   GroupRequestLinesMismatchError,
 } from '../group-request/group-request.errors';
 import { RequestLineRepo } from '../group-request/request-line.repo';
+import { StepFreezeService } from '../step-routing/step-freeze.service';
 
 /** What a decision of the need of a group is made of: the request, the step the person decides, and the lines still waiting on it. */
 export interface GroupNeedDecidable {
@@ -44,6 +45,7 @@ export class GroupNeedPreconditions {
     private readonly requests: AccessRequestRepo,
     private readonly lines: RequestLineRepo,
     private readonly licensing: LicensingApi,
+    private readonly freeze: StepFreezeService,
   ) {}
 
   async require(
@@ -67,6 +69,7 @@ export class GroupNeedPreconditions {
       stepEmployeeIds: own.map((line) => line.employeeId),
       assigneeEmployeeId: step.assigneeEmployeeId,
       stepState: step.state,
+      stepAwaitsConversion: await this.freeze.awaitsConversion(tx, { kind: 'NEED', ...step }),
       termMonths: request.termMonths,
       approves,
       confirmed: (input.termConfirmationReason ?? '').trim() !== '',
