@@ -1,3 +1,5 @@
+import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import { SpendingApproverWaitListener } from '../../../src/modules/budgets/budget/spending-approver-wait.listener';
 import { VersionHistoryViewService } from '../../../src/modules/budgets/version/version-history-view.service';
 import { BudgetNotAHistoryReaderError } from '../../../src/modules/budgets/budget/budget.errors';
 import { BudgetHarness, type HistoryEntryWire, type Pageable, type VersionWire } from '../../support/budget-harness';
@@ -420,6 +422,131 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
         [version.id],
       );
       expect(rows).toEqual([{ decider_role: 'SPENDING_APPROVER' }]);
+    });
+  });
+
+  describe('the Super Admin is told when a sent version waits for a spending approver (D-S16, M7, US-06-11 AC-12)', () => {
+    interface AlertRow {
+      recipient_employee_id: string;
+      params: Record<string, unknown>;
+      event_key: string;
+    }
+    const superAdmin = async () =>
+      (
+        await h.ctx.sql.query<{ employee_id: string }>(
+          `SELECT u.employee_id FROM role_grants g JOIN app_users u ON u.id = g.app_user_id
+            WHERE g.role = 'SUPER_ADMIN' AND g.revoked_at IS NULL`,
+        )
+      ).rows[0].employee_id;
+    const alertsOf = async (versionId: string) =>
+      (
+        await h.ctx.sql.query<AlertRow>(
+          `SELECT recipient_employee_id, params, event_key FROM in_app_notifications
+            WHERE code = 'CONTROLLED_WAIT_ALERT' AND subject_id = $1 ORDER BY created_at, id`,
+          [versionId],
+        )
+      ).rows;
+    const sentVersion = async () => {
+      const w = await waiting();
+      const version = await h.built(w.proposal.id);
+      await h.sendVersion(version.id).expect(200);
+
+      return version;
+    };
+
+    it('tells the Super Admin once when a sent version waits for a spending approver', async () => {
+      const w = await waiting();
+      const version = await h.built(w.proposal.id);
+      await h.clearRole('SPENDING_APPROVER');
+      try {
+        await h.sendVersion(version.id).expect(200);
+
+        const alerts = await alertsOf(version.id);
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0].recipient_employee_id).toBe(await superAdmin());
+        expect(alerts[0].params).toEqual({
+          versionId: version.id,
+          costCenterId: version.costCenter.id,
+          year: version.year,
+          waitingReason: 'NO_SPENDING_APPROVER',
+          configurationHint: 'CONFIGURE_SPENDING_APPROVER',
+        });
+        expect(alerts[0].event_key).toMatch(
+          new RegExp(`^CONTROLLED_WAIT_ALERT:BUDGET_VERSION:${version.id}:sent:\\d+$`),
+        );
+        // Nobody holds the role to be told that a version awaits their decision, and nobody else is told in their place.
+        expect(await h.budgetNoticesOf('BUDGET_VERSION_AWAITING_DECISION', version.id)).toEqual([]);
+      } finally {
+        await h.setRole('SPENDING_APPROVER', boss);
+      }
+    });
+
+    it('says nothing while somebody holds the role, and tells once when the role is taken back with a version still sent', async () => {
+      const version = await sentVersion();
+      expect(await alertsOf(version.id)).toEqual([]);
+
+      await h.clearRole('SPENDING_APPROVER');
+      try {
+        const alerts = await alertsOf(version.id);
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0].event_key).toMatch(new RegExp(`^CONTROLLED_WAIT_ALERT:BUDGET_VERSION:${version.id}:role:`));
+        expect(alerts[0].recipient_employee_id).toBe(await superAdmin());
+      } finally {
+        await h.setRole('SPENDING_APPROVER', boss);
+      }
+    });
+
+    it('writes one notice when the role change is heard twice', async () => {
+      const version = await sentVersion();
+      const listener = h.ctx.app.get(SpendingApproverWaitListener, { strict: false });
+      const runner = h.ctx.app.get(TransactionRunner, { strict: false });
+      const change = {
+        id: 'heard-twice-1',
+        role: 'SPENDING_APPROVER',
+        fromEmployeeId: boss.employeeId,
+        toEmployeeId: null,
+      } as const;
+
+      await runner.run((tx) => listener.onRoleChange(tx, change));
+      await runner.run((tx) => listener.onRoleChange(tx, change));
+
+      const alerts = (await alertsOf(version.id)).filter((alert) => alert.event_key.endsWith(':role:heard-twice-1'));
+      expect(alerts).toHaveLength(1);
+    });
+
+    it('tells again for a new stretch of waiting after the role was given and taken back', async () => {
+      const version = await sentVersion();
+
+      await h.clearRole('SPENDING_APPROVER');
+      await h.setRole('SPENDING_APPROVER', boss);
+      await h.clearRole('SPENDING_APPROVER');
+      try {
+        const keys = (await alertsOf(version.id)).map((alert) => alert.event_key);
+        expect(keys).toHaveLength(2);
+        expect(new Set(keys).size).toBe(2);
+      } finally {
+        await h.setRole('SPENDING_APPROVER', boss);
+      }
+    });
+
+    it('tells once when the spending approver leaves the company while a version is sent', async () => {
+      const departing = await h.staff(await h.departmentWithUnit('P-LVB'), 'LVB-C9');
+      await h.setRole('SPENDING_APPROVER', departing);
+      try {
+        const version = await sentVersion();
+        expect(await alertsOf(version.id)).toEqual([]);
+
+        await h.leaveCompany(departing);
+
+        const alerts = await alertsOf(version.id);
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0].event_key).toMatch(new RegExp(`^CONTROLLED_WAIT_ALERT:BUDGET_VERSION:${version.id}:left:`));
+        // The role is taken back afterwards from a person who had left: the stretch began when they left, no second notice.
+        await h.clearRole('SPENDING_APPROVER');
+        expect(await alertsOf(version.id)).toHaveLength(1);
+      } finally {
+        await h.setRole('SPENDING_APPROVER', boss);
+      }
     });
   });
 });

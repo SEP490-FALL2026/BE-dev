@@ -15,7 +15,6 @@ const h = new BudgetHarness();
  */
 describe('the notices of the budget loops (integration, real PostgreSQL)', () => {
   let boss: Person;
-  let substitute: Person;
   let counter = 0;
 
   beforeAll(async () => {
@@ -24,8 +23,6 @@ describe('the notices of the budget loops (integration, real PostgreSQL)', () =>
     boss = await h.staff(executive, 'EXE-C1');
     await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
-    substitute = await h.staff(await h.departmentWithUnit('P-SBS'), 'SBS-S1');
-    await h.setRole('CONFLICT_SUBSTITUTE', substitute);
   }, 240000);
 
   afterAll(async () => {

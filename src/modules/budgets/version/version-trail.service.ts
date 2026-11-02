@@ -55,7 +55,12 @@ export class VersionTrail {
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     version: VersionRecord,
-    sent: { record: VersionRecord; proposal: Pick<ProposalRecord, 'submittedByEmployeeId'> | null },
+    sent: {
+      record: VersionRecord;
+      proposal: Pick<ProposalRecord, 'submittedByEmployeeId'> | null;
+      /** The spending approver who works, read with the row of the grant locked before the version was. */
+      approver: string | null;
+    },
   ): Promise<void> {
     await this.audit.record(
       tx,
@@ -66,6 +71,6 @@ export class VersionTrail {
         totalMinor: version.totalMinor.toString(),
       }),
     );
-    await this.notifier.versionSent(tx, sent.record, sent.proposal?.submittedByEmployeeId ?? null);
+    await this.notifier.versionSent(tx, sent.record, sent.proposal?.submittedByEmployeeId ?? null, sent.approver);
   }
 }

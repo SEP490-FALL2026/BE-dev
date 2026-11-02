@@ -116,16 +116,48 @@ export class BudgetNotifierService {
     });
   }
 
-  /** Finance sent the version: the person who decides it is told (row 18); sent again after a request to look again, it is told again. */
-  async versionSent(tx: DbTx, version: VersionRecord, proposalSubmittedBy: string | null): Promise<void> {
+  /**
+   * Finance sent the version: the person who decides it is told (row 18); sent again after a request to look again, it is told again.
+   * `approver` is the spending approver who works, as the sending read them with the row of the grant locked (`M6`); when nobody is, the
+   * version waits and the Super Admin is told, once for this stretch of waiting (`D-S16`).
+   */
+  async versionSent(
+    tx: DbTx,
+    version: VersionRecord,
+    proposalSubmittedBy: string | null,
+    approver: string | null,
+  ): Promise<void> {
     if (version.sentAt === null) return;
-    const decider = deciderOf(await this.facts.usableSpendingApproverEmployeeId(tx), proposalSubmittedBy);
+    if (approver === null) await this.versionWaiting(tx, version, `sent:${version.sentAt.getTime()}`);
+    const decider = deciderOf(approver, proposalSubmittedBy);
     await this.tell(tx, decider.employeeId, {
       organizationId: version.organizationId,
       code: 'BUDGET_VERSION_AWAITING_DECISION',
       subject: { type: 'BUDGET_VERSION', id: version.id },
       params: { versionId: version.id, costCenterId: version.costCenterId, year: version.year },
       eventKey: `BUDGET_VERSION_AWAITING_DECISION:${version.id}:${version.sentAt.getTime()}`,
+    });
+  }
+
+  /**
+   * A version that was sent waits for a spending approver nobody holds who works: the Super Admin is told with the alert of the steps that
+   * wait under control (line 27, `D-S16`), once for each stretch of waiting. `source` is what began the stretch — `sent:<ms>`,
+   * `role:<id of the change>` or `left:<id of the change>` — so a change that is heard twice writes one notice, and a role given and taken
+   * back again begins a new stretch with a new notice. The notice names the version and the year, never an amount.
+   */
+  async versionWaiting(tx: DbTx, version: VersionRecord, source: string): Promise<void> {
+    await this.tell(tx, await this.facts.superAdminEmployeeId(tx), {
+      organizationId: version.organizationId,
+      code: 'CONTROLLED_WAIT_ALERT',
+      subject: { type: 'BUDGET_VERSION', id: version.id },
+      params: {
+        versionId: version.id,
+        costCenterId: version.costCenterId,
+        year: version.year,
+        waitingReason: 'NO_SPENDING_APPROVER',
+        configurationHint: 'CONFIGURE_SPENDING_APPROVER',
+      },
+      eventKey: `CONTROLLED_WAIT_ALERT:BUDGET_VERSION:${version.id}:${source}`,
     });
   }
 

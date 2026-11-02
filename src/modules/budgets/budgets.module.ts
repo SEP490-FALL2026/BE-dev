@@ -11,6 +11,7 @@ import { BudgetCostCenterUseReader } from './commitment/budget-cost-center-use.l
 import { BudgetHeadChangeListener } from './proposal/budget-head-change.listener';
 import { BudgetSpendingApproverGrantCheck } from './proposal/spending-approver-grant.listener';
 import { FiscalYearStartLockReader } from './version/fiscal-year-start-lock.listener';
+import { SpendingApproverWaitListener } from './budget/spending-approver-wait.listener';
 import { BudgetFactsRepo } from './budget/budget-facts.repo';
 import { BudgetNotifierService } from './budget/budget-notifier.service';
 import { BudgetProposalsController } from './proposal/budget-proposals.controller';
@@ -116,6 +117,7 @@ import { BudgetYearEndSweeper } from './year-end/year-end.job';
     BudgetHeadChangeListener,
     BudgetSpendingApproverGrantCheck,
     FiscalYearStartLockReader,
+    SpendingApproverWaitListener,
     CommitmentService,
     BudgetsApi,
   ],

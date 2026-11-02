@@ -331,4 +331,92 @@ describe('the proposal and the decision of a renewal (integration, real PostgreS
       expect(rows).toEqual([{ decider_role: 'SPENDING_APPROVER' }]);
     });
   });
+
+  describe('the Super Admin is told when a renewal waits for a spending approver (D-S16, M7, US-11-02 AC-23)', () => {
+    interface AlertRow {
+      recipient_employee_id: string;
+      params: Record<string, unknown>;
+      event_key: string;
+    }
+    const alertsOf = async (renewalId: string) =>
+      (
+        await h.ctx.sql.query<AlertRow>(
+          `SELECT recipient_employee_id, params, event_key FROM in_app_notifications
+            WHERE code = 'CONTROLLED_WAIT_ALERT' AND subject_id = $1 ORDER BY created_at, id`,
+          [renewalId],
+        )
+      ).rows;
+
+    it('tells the Super Admin once when a renewal is proposed while nobody holds the role', async () => {
+      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 21);
+      await h.clearRole('SPENDING_APPROVER');
+      try {
+        const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
+
+        const alerts = await alertsOf(id);
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0].params).toEqual({
+          renewalId: id,
+          subscriptionId,
+          waitingReason: 'NO_SPENDING_APPROVER',
+          configurationHint: 'CONFIGURE_SPENDING_APPROVER',
+        });
+        expect(alerts[0].event_key).toMatch(new RegExp(`^CONTROLLED_WAIT_ALERT:SUBSCRIPTION_RENEWAL:${id}:sent:\\d+$`));
+        // Nobody holds the role to be told that the case is in their queue, and nobody else is told in their place.
+        expect(await h.notices('SUBSCRIPTION_RENEWAL_PROPOSED', id)).toEqual([]);
+      } finally {
+        await h.setRole('SPENDING_APPROVER', h.boss);
+      }
+    });
+
+    it('tells once when the role is taken back with a case still waiting, and not before', async () => {
+      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 22);
+      const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
+      expect(await alertsOf(id)).toEqual([]);
+
+      await h.clearRole('SPENDING_APPROVER');
+      try {
+        const alerts = await alertsOf(id);
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0].event_key).toMatch(new RegExp(`^CONTROLLED_WAIT_ALERT:SUBSCRIPTION_RENEWAL:${id}:role:`));
+      } finally {
+        await h.setRole('SPENDING_APPROVER', h.boss);
+      }
+    });
+
+    it('tells the Super Admin once when the spending approver leaves while a renewal waits', async () => {
+      const departing = await h.staff(await h.departmentWithUnit('P-LVR'), 'LVR-C9');
+      await h.setRole('SPENDING_APPROVER', departing);
+      try {
+        const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 23);
+        const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
+        expect(await alertsOf(id)).toEqual([]);
+
+        await h.leaveCompany(departing);
+
+        const alerts = await alertsOf(id);
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0].event_key).toMatch(new RegExp(`^CONTROLLED_WAIT_ALERT:SUBSCRIPTION_RENEWAL:${id}:left:`));
+        expect(await detail(id)).toMatchObject({ state: 'PROPOSED', waitingReason: 'NO_SPENDING_APPROVER' });
+      } finally {
+        await h.setRole('SPENDING_APPROVER', h.boss);
+      }
+    });
+
+    it('tells again for a new stretch of waiting after the role was given and taken back', async () => {
+      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 24);
+      const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
+
+      await h.clearRole('SPENDING_APPROVER');
+      await h.setRole('SPENDING_APPROVER', h.boss);
+      await h.clearRole('SPENDING_APPROVER');
+      try {
+        const keys = (await alertsOf(id)).map((alert) => alert.event_key);
+        expect(keys).toHaveLength(2);
+        expect(new Set(keys).size).toBe(2);
+      } finally {
+        await h.setRole('SPENDING_APPROVER', h.boss);
+      }
+    });
+  });
 });

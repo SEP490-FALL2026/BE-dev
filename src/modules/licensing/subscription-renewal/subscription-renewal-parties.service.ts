@@ -54,6 +54,23 @@ export class RenewalPartiesService {
     return found?.status === 'ACTIVE' ? holder : null;
   }
 
+  /** The Super Admin of today, whatever the state of their account, or null: who is told that a case waits for an approver (`D-S16`). */
+  async superAdminOf(tx?: DbTx): Promise<string | null> {
+    return (await this.identity.getSuperAdminHolder(tx))?.employeeId ?? null;
+  }
+
+  /** Whether the employee still works for the company. */
+  async employeeWorks(employeeId: string, tx?: DbTx): Promise<boolean> {
+    const [found] = await this.organizationReads.getEmployees([employeeId], tx);
+
+    return found?.status === 'ACTIVE';
+  }
+
+  /** Whether the employee holds the role of the spending approver now (an unlocked read). */
+  async holdsApproverRole(employeeId: string, tx?: DbTx): Promise<boolean> {
+    return (await this.identity.getSpendingApproverEmployeeId(tx)) === employeeId;
+  }
+
   /** Who decides a case proposed by this person now: the spending approver, and nobody in their place. */
   async deciderOf(
     proposerEmployeeId: string,

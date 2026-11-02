@@ -250,6 +250,18 @@ export class BudgetFactsService {
     return this.identity.findUsableFinanceEmployeeId(tx);
   }
 
+  /** The Super Admin of today, whatever the state of their account, or null: who is told that a version waits for an approver (`D-S16`). */
+  async superAdminEmployeeId(tx?: DbTx): Promise<string | null> {
+    return (await this.identity.getSuperAdminHolder(tx))?.employeeId ?? null;
+  }
+
+  /** Whether the employee still works for the company. */
+  async employeeWorks(employeeId: string, tx?: DbTx): Promise<boolean> {
+    const [found] = await this.organizationReads.getEmployees([employeeId], tx);
+
+    return found?.status === 'ACTIVE';
+  }
+
   /** The department of each Cost Center, for the notices that reach the head of a department. */
   async departmentsOf(costCenterIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
     const found =

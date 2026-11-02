@@ -1,7 +1,9 @@
 import { Client } from 'pg';
 import request from 'supertest';
+import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetYearEndService } from '../../src/modules/budgets/year-end/year-end.service';
+import { OrganizationHistoryApi } from '../../src/modules/organization/public/organization-history.api';
 import type { ApiAccount } from './api-accounts';
 import { Department, Person, RequestHarness } from './request-harness';
 
@@ -328,6 +330,19 @@ export class BudgetHarness extends RequestHarness {
        VALUES (gen_random_uuid(), $1, $2, $3, $4::date)`,
       [this.seed.organizationId, department.id, person.employeeId, this.today()],
     );
+  }
+
+  /**
+   * The person leaves the company as the offboarding records it: `TERMINATED`, and the listeners of the organization hear
+   * `EMPLOYEE_LEFT` in the same transaction, with the employee locked as the caller must.
+   */
+  async leaveCompany(person: Person): Promise<void> {
+    const runner = this.ctx.app.get(TransactionRunner, { strict: false });
+    const history = this.ctx.app.get(OrganizationHistoryApi, { strict: false });
+    await runner.run(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM employees WHERE id = ${person.employeeId}::uuid FOR UPDATE`;
+      await history.markEmployeeLeft(tx, person.employeeId, this.today());
+    });
   }
 
   /** The notices of the inbox of the budget loops with this code about this subject, whoever they were given to. */
