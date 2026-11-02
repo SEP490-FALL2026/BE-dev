@@ -139,7 +139,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
     });
 
     it('refuses revoking MANAGER of the person named as successor, and revokes it once the successor is taken back (AC-21)', async () => {
-      const head = await h.activatedAccount([]);
+      const head = await h.activatedAccount(['MANAGER']);
       const heir = await h.activatedAccount(['MANAGER']);
       await h.admin
         .post(`/api/v1/departments/${h.seed.departmentId}/head-assignments`, {

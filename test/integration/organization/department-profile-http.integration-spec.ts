@@ -358,7 +358,7 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
 
     it('stops warning once the department has a head and an IT Admin in charge', async () => {
       const department = await newDepartment({ itAdminEmployeeId: h.it1.employeeId });
-      const member = await enter(department.code);
+      const member = await accountIn(department.code);
 
       await assignHead(department.id, member.employeeId).expect(200);
 

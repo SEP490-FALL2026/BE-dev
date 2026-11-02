@@ -4026,6 +4026,28 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "DEPARTMENT.HEAD_SPENDING_APPROVER_CANNOT_HEAD": {
+                    "summary": "The head cannot be assigned: SPENDING_APPROVER_CANNOT_HEAD.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.HEAD_SPENDING_APPROVER_CANNOT_HEAD",
+                        "message": "The head cannot be assigned: SPENDING_APPROVER_CANNOT_HEAD.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED": {
+                    "summary": "The head cannot be assigned: MANAGER_ROLE_REQUIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED",
+                        "message": "The head cannot be assigned: MANAGER_ROLE_REQUIRED.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
@@ -4638,6 +4660,28 @@
                       "error": {
                         "code": "DEPARTMENT.HEAD_SUPER_ADMIN_CANNOT_HEAD",
                         "message": "The head cannot be assigned: SUPER_ADMIN_CANNOT_HEAD.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.HEAD_SPENDING_APPROVER_CANNOT_HEAD": {
+                    "summary": "The head cannot be assigned: SPENDING_APPROVER_CANNOT_HEAD.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.HEAD_SPENDING_APPROVER_CANNOT_HEAD",
+                        "message": "The head cannot be assigned: SPENDING_APPROVER_CANNOT_HEAD.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED": {
+                    "summary": "The head cannot be assigned: MANAGER_ROLE_REQUIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED",
+                        "message": "The head cannot be assigned: MANAGER_ROLE_REQUIRED.",
                         "requestId": "req_example"
                       }
                     }

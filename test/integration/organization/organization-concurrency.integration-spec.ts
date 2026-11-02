@@ -301,9 +301,19 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
       expect((await createCostCenterFor(id)).status).toBe(201);
       const { code } = (await ctx.sql.query<{ code: string }>('SELECT code FROM departments WHERE id = $1', [id]))
         .rows[0];
-      const member = await enter(entry({ departmentCode: code })).expect(201);
+      const body = entry({ departmentCode: code });
+      const member = await enter(body).expect(201);
+      const employeeId = (member.body as { data: { id: string } }).data.id;
+      // A head holds MANAGER (QĐ-93a, US-03-06 AC-23): the person has an account that holds it before the department names them.
+      await createActivatedAccount(ctx, seed, {
+        code: body.employeeCode,
+        email: body.workEmail,
+        roles: ['MANAGER'],
+        admin: superAdmin,
+        employeeId,
+      });
 
-      return { id, employeeId: (member.body as { data: { id: string } }).data.id };
+      return { id, employeeId };
     };
     const assignHead = (departmentId: string, employeeId: string) =>
       request(server())

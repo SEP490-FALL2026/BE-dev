@@ -281,6 +281,10 @@ export class DepartmentHeadService {
     if (employee.status !== 'ACTIVE') throw new HeadAssignmentError('EMPLOYEE_NOT_ACTIVE');
     const account = await this.employeeAccounts.get().inspectEmployeeAccount(tx, employeeId);
     if (account.roles.includes('SUPER_ADMIN')) throw new HeadAssignmentError('SUPER_ADMIN_CANNOT_HEAD');
+    // The spending approver first: they never hold MANAGER (QĐ-93b), so judged second they would only ever hear that MANAGER is missing.
+    if (account.roles.includes('SPENDING_APPROVER')) throw new HeadAssignmentError('SPENDING_APPROVER_CANNOT_HEAD');
+    if (!account.hasAccount || !account.roles.includes('MANAGER'))
+      throw new HeadAssignmentError('MANAGER_ROLE_REQUIRED');
     const placement = await this.repo.placementOn(tx, employeeId, day);
     if (!placement || placement.departmentId !== departmentId || placement.validTo !== null) {
       throw new HeadAssignmentError('NOT_A_MEMBER_ON_DATE');

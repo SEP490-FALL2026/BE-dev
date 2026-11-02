@@ -55,6 +55,7 @@ describe('DepartmentHeadService', () => {
     emitChange: jest.fn(),
   };
   const departments = { lock: jest.fn(), placementOn: jest.fn() };
+  const inspectAccount = jest.fn();
   const audit = { record: jest.fn() };
   const runner = { run: jest.fn((work: (transaction: unknown) => Promise<unknown>) => work(tx)) };
 
@@ -89,7 +90,7 @@ describe('DepartmentHeadService', () => {
           useFactory: () => {
             const hook = new EmployeeAccountsHook();
             hook.bind({
-              inspectEmployeeAccount: jest.fn().mockResolvedValue({ roles: [] }),
+              inspectEmployeeAccount: inspectAccount,
             } as unknown as EmployeeAccounts);
 
             return hook;
@@ -118,6 +119,8 @@ describe('DepartmentHeadService', () => {
       cancelledPeriodIds: [],
     });
     organization.startHeadPeriod.mockResolvedValue({ periodId: 'period-next' });
+    // The person named has an account that holds MANAGER, as a head or a successor must (US-03-06 AC-23).
+    inspectAccount.mockResolvedValue({ hasAccount: true, usable: true, roles: ['MANAGER'] });
     departments.lock.mockResolvedValue({ id: 'dep-1', status: 'ACTIVE' });
     departments.placementOn.mockResolvedValue({ departmentId: 'dep-1', validTo: null });
   });
@@ -160,6 +163,39 @@ describe('DepartmentHeadService', () => {
       expect((refusal as HeadAssignmentError).problem).toBe('EMPLOYEE_NOT_FOUND');
       expect(departments.lock).toHaveBeenCalledWith(tx, 'dep-1', 'UPDATE');
       expect(organization.getEmployee).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['an account without MANAGER', { hasAccount: true, usable: true, roles: ['EMPLOYEE'] }, 'MANAGER_ROLE_REQUIRED'],
+      ['no account at all', { hasAccount: false, usable: false, roles: [] }, 'MANAGER_ROLE_REQUIRED'],
+      ['the Super Admin', { hasAccount: true, usable: true, roles: ['SUPER_ADMIN'] }, 'SUPER_ADMIN_CANNOT_HEAD'],
+      [
+        'the spending approver, before the MANAGER they never hold',
+        { hasAccount: true, usable: true, roles: ['SPENDING_APPROVER'] },
+        'SPENDING_APPROVER_CANNOT_HEAD',
+      ],
+    ])('refuses %s as a head or a successor, and writes nothing', async (_name, account, problem) => {
+      inspectAccount.mockResolvedValue(account);
+      const heads = await service();
+
+      await expect(
+        heads.assign(superAdmin, 'dep-1', { employeeId: 'emp-next', effectiveFrom: TODAY }),
+      ).rejects.toMatchObject({ problem });
+      await expect(
+        heads.designateSuccessor(superAdmin, 'dep-1', { employeeId: 'emp-next', effectiveFrom: LATER }),
+      ).rejects.toMatchObject({ problem });
+
+      expect(organization.startHeadPeriod).not.toHaveBeenCalled();
+    });
+
+    it('does not read where the person works before it knows they may head at all', async () => {
+      inspectAccount.mockResolvedValue({ hasAccount: true, usable: true, roles: [] });
+      departments.placementOn.mockResolvedValue({ departmentId: 'dep-other', validTo: null });
+
+      await expect(
+        (await service()).assign(superAdmin, 'dep-1', { employeeId: 'emp-next', effectiveFrom: TODAY }),
+      ).rejects.toMatchObject({ problem: 'MANAGER_ROLE_REQUIRED' });
+      expect(departments.placementOn).not.toHaveBeenCalled();
     });
 
     it('records the HR basis it was named on with the change', async () => {

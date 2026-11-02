@@ -1,3 +1,4 @@
+import { clearSpendingApprover, setSpendingApprover } from '../../support/builders/account.builder';
 import { insertEmployeeFixture } from '../../support/http-test-app';
 import { OrganizationHistoryApi } from '../../../src/modules/organization/public/organization-history.api';
 import { HR_BASIS } from '../../support/hr-basis';
@@ -20,6 +21,8 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
     accountIn,
     assignHead,
     assignHeadRaw,
+    grantManager,
+    enter,
     auditOf,
     closePlacements,
   } = h;
@@ -235,6 +238,37 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       ).toEqual([]);
     });
 
+    it('refuses a head without MANAGER, and a person with no account, and creates no period (US-03-06 AC-23)', async () => {
+      const department = await newDepartment();
+      const withoutRole = await accountIn(department.code);
+      const withoutAccount = await enter(department.code);
+
+      const noRole = await assignHeadRaw(department.id, withoutRole.employeeId).expect(422);
+      const noAccount = await assignHeadRaw(department.id, withoutAccount.employeeId).expect(422);
+
+      expect(errorOf(noRole).code).toBe('DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED');
+      expect(errorOf(noAccount).code).toBe('DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED');
+      expect((await getDepartment(department.id)).head).toBeNull();
+      expect(
+        (await h.ctx.sql.query('SELECT 1 FROM department_head_periods WHERE department_id = $1', [department.id])).rows,
+      ).toEqual([]);
+      // The grant is all that was missing: once the Super Admin gives MANAGER the same call goes through.
+      await grantManager(withoutRole.employeeId);
+      await assignHeadRaw(department.id, withoutRole.employeeId).expect(200);
+    });
+
+    it('refuses the spending approver as a head with its own reason, not the missing MANAGER (US-03-06 AC-24)', async () => {
+      const department = await newDepartment();
+      const approver = await accountIn(department.code);
+      await setSpendingApprover(h.ctx, h.admin, approver.employeeId);
+
+      const response = await assignHeadRaw(department.id, approver.employeeId).expect(422);
+
+      expect(errorOf(response).code).toBe('DEPARTMENT.HEAD_SPENDING_APPROVER_CANNOT_HEAD');
+      expect((await getDepartment(department.id)).head).toBeNull();
+      await clearSpendingApprover(h.ctx, h.admin);
+    });
+
     it('refuses a person who has left, a person who does not exist, and a retired department (AC-8)', async () => {
       const department = await newDepartment();
       const left = await insertEmployeeFixture(h.ctx.app, h.seed, {
@@ -336,6 +370,7 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       const next = await accountIn(department.code);
       const from = addDays(today(), 10);
       await assignHead(department.id, head.employeeId).expect(200);
+      await grantManager(next.employeeId);
 
       const named = await designate(department.id, next.employeeId, from).expect(200);
 
@@ -395,6 +430,8 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       const next = await accountIn(department.code);
       const other = await accountIn(department.code);
       const from = addDays(today(), 10);
+      await grantManager(next.employeeId);
+      await grantManager(other.employeeId);
 
       expect(errorOf(await designate(department.id, next.employeeId, from).expect(422)).code).toBe(
         'DEPARTMENT.HEAD_SUCCESSOR_NEEDS_A_HEAD',
@@ -426,6 +463,7 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       const head = await accountIn(department.code);
       const elsewhere = await accountIn('P-OPS');
       await assignHead(department.id, head.employeeId).expect(200);
+      await grantManager(elsewhere.employeeId);
       const from = addDays(today(), 10);
 
       const notMember = await designate(department.id, elsewhere.employeeId, from).expect(422);
@@ -434,6 +472,27 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       expect(errorOf(notMember).code).toBe('DEPARTMENT.HEAD_NOT_A_MEMBER_ON_DATE');
       expect(errorOf(superAdmin).code).toBe('DEPARTMENT.HEAD_SUPER_ADMIN_CANNOT_HEAD');
       expect((await getDepartment(department.id)).successor).toBeNull();
+    });
+
+    it('judges the successor by the same two roles: no MANAGER, no account, or the spending approver (US-03-06 AC-23, AC-24)', async () => {
+      const department = await newDepartment();
+      const head = await accountIn(department.code);
+      const withoutRole = await accountIn(department.code);
+      const withoutAccount = await enter(department.code);
+      const approver = await accountIn(department.code);
+      await assignHead(department.id, head.employeeId).expect(200);
+      await setSpendingApprover(h.ctx, h.admin, approver.employeeId);
+      const from = addDays(today(), 10);
+
+      const noRole = await designate(department.id, withoutRole.employeeId, from).expect(422);
+      const noAccount = await designate(department.id, withoutAccount.employeeId, from).expect(422);
+      const spending = await designate(department.id, approver.employeeId, from).expect(422);
+
+      expect(errorOf(noRole).code).toBe('DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED');
+      expect(errorOf(noAccount).code).toBe('DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED');
+      expect(errorOf(spending).code).toBe('DEPARTMENT.HEAD_SPENDING_APPROVER_CANNOT_HEAD');
+      expect((await getDepartment(department.id)).successor).toBeNull();
+      await clearSpendingApprover(h.ctx, h.admin);
     });
 
     it('is the Super Admin’s alone, takes no HR basis (QĐ-93f), and is 404 for a department that does not exist (F10, F13)', async () => {

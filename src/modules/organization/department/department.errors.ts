@@ -82,6 +82,10 @@ export type HeadAssignmentProblem =
   | 'EMPLOYEE_NOT_ACTIVE'
   | 'NOT_A_MEMBER_ON_DATE'
   | 'SUPER_ADMIN_CANNOT_HEAD'
+  /** The spending approver never heads a department (QĐ-93b, `US-03-06` AC-24); judged before the missing MANAGER, which the approver never holds. */
+  | 'SPENDING_APPROVER_CANNOT_HEAD'
+  /** The person has no account, or the account does not hold MANAGER (QĐ-93a, `US-03-06` AC-23). */
+  | 'MANAGER_ROLE_REQUIRED'
   | 'DATE_IN_PAST'
   | 'HEADS_ANOTHER_DEPARTMENT'
   /** A successor takes over from a day after today. */

@@ -87,7 +87,9 @@ describe('DepartmentHeadService announces the head periods that take effect toda
           useFactory: () => {
             const hook = new EmployeeAccountsHook();
             hook.bind({
-              inspectEmployeeAccount: jest.fn().mockResolvedValue({ roles: [] }),
+              inspectEmployeeAccount: jest
+                .fn()
+                .mockResolvedValue({ hasAccount: true, usable: true, roles: ['MANAGER'] }),
             } as unknown as EmployeeAccounts);
 
             return hook;
