@@ -43,7 +43,7 @@ export class FirstPlacementError extends Error {
   constructor(readonly problem: 'ALREADY_PLACED' | 'EMPLOYEE_INACTIVE' | 'DATE_INVALID') {
     super(
       problem === 'ALREADY_PLACED'
-        ? 'Employee already placed; use a department transfer to change departments.'
+        ? 'Nhân viên đã được xếp phòng; đổi phòng dùng điều chuyển.'
         : problem === 'DATE_INVALID'
           ? 'Effective date must be on or after today and hire date.'
           : 'Employee must be active and not handing over.',

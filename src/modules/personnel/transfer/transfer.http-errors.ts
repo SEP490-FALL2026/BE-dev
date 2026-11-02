@@ -57,7 +57,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
   HEAD_SUCCESSOR_REQUIRED: 'The person heads the department they leave: name who follows, or that nobody does.',
   SUCCESSOR_NOT_A_MEMBER_ON_DATE: 'The person named cannot head the department on that day.',
   PENDING_EVENT_EXISTS: 'The person has another event waiting.',
-  EMPLOYEE_UNPLACED: 'Employee has no department; use first placement.',
+  EMPLOYEE_UNPLACED: 'Nhân viên chưa xếp phòng — dùng xếp phòng lần đầu.',
   PLACEMENT_OVERLAP: 'The placements of the person cannot take this change.',
   CONCURRENT_CHANGE: 'The person was changed by someone else meanwhile; read them again.',
   ALREADY_EFFECTIVE: 'The transfer has taken effect; only a new transfer can change it.',
