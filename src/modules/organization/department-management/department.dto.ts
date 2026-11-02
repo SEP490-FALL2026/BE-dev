@@ -3,7 +3,6 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { COST_CENTER_CODE_MAX_LENGTH, COST_CENTER_CODE_PATTERN } from '../cost-center/cost-center.types';
 import { DEPARTMENT_FUNCTION_MAX_LENGTH, DEPARTMENT_NAME_MAX_LENGTH } from '../department/department.types';
-import { projectSchema } from '../project/project.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /**
@@ -110,8 +109,6 @@ const departmentProfileSchema = departmentSchema.extend({
     }),
   ),
   headHistoryHasMore: z.boolean(),
-  projects: z.array(projectSchema),
-  projectTotal: z.number().int().nonnegative(),
 });
 
 const departmentPageSchema = z.strictObject({ items: z.array(departmentSchema), pagination });

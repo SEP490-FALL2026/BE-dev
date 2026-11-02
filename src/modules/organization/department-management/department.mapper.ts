@@ -1,4 +1,3 @@
-import { toProjectWire } from '../project/project.mapper';
 import { DepartmentProfileView, DepartmentView } from '../department/department.types';
 
 /** The wire model of a department in a list. */
@@ -27,14 +26,12 @@ export function toDepartmentWire(view: DepartmentView) {
   };
 }
 
-/** The wire model of one department's profile: the list model, who headed it and the projects it takes part in. */
+/** The wire model of one department's profile: the list model and who headed it. */
 export function toDepartmentProfileWire(view: DepartmentProfileView) {
   return {
     ...toDepartmentWire(view),
     successor: view.successor,
     headHistory: view.headHistory,
     headHistoryHasMore: view.headHistoryHasMore,
-    projects: view.projects.map(toProjectWire),
-    projectTotal: view.projectTotal,
   };
 }

@@ -4,8 +4,7 @@ Mục đích: dữ liệu tổ chức của một cài đặt — tổ chức, p
 Center, dự án — và việc báo thay đổi tổ chức cho các module phía trên. Story chính: US-02-02 (nhập tay, sửa hồ sơ nhân
 viên), US-03-06 (hồ sơ phòng ban, trưởng phòng, dự án), US-04-09 (danh mục Cost Center), US-01-11 (IT Admin phụ trách).
 Các thao tác ghi tổ chức và hồ sơ của Super Admin không thu căn cứ HR (QĐ-93f): Audit Trail ghi người thực hiện, thời
-điểm, trước/sau; sự kiện nhân sự (module `personnel`) vẫn có căn cứ. Riêng `/projects` còn nhận căn cứ tới khi lát
-`qd93-remove-department-projects` xóa.
+điểm, trước/sau; sự kiện nhân sự (module `personnel`) vẫn có căn cứ.
 
 Tầng: T2 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit, notifications; không import identity-access
 (D5). Được dùng bởi: budgets, catalog, data-import, finance, identity-access, installation, licensing, onboarding,
@@ -47,7 +46,7 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
 ## Bảng sở hữu
 
 - `organizations`, `departments`, `department_head_periods`, `employees`, `employee_placements`, `cost_centers`,
-  `cost_center_department_links`, `cost_center_direction_activations`, `projects`, `project_departments`,
+  `cost_center_department_links`, `cost_center_direction_activations`,
   `organization_change_announcements` ([prisma/models/organization.prisma](../../../prisma/models/organization.prisma)).
 
 ## Extension point
@@ -96,8 +95,6 @@ Từ vựng trạng thái nhân viên (`EmployeeStatus`, `EmployeeWorkState`, `E
   kế nhiệm) → `department-head.service.ts`; `department.dto.ts`, `department.mapper.ts`, `department.http-errors.ts`.
 - `cost-center/` — `cost-centers.controller.ts` (`/cost-centers*`) → `cost-center.service.ts`, `cost-center.policy.ts`,
   `cost-center.http-errors.ts`.
-- `project/` — `projects.controller.ts` (`/projects*`) → `project.service.ts`; `project.mapper.ts` và `project.dto.ts`
-  (schema wire của project, cũng nhúng trong hồ sơ phòng ban); `project.http-errors.ts`.
 - `change-announcement/` — `organization-change.service.ts` (phát thay đổi), `organization-change.job.ts` (sweeper mỗi
   giờ, chỉ trong graph API). `cost-center-direction/` — repo, policy và Nest module của lệnh (`cost-center-direction-cli.module.ts`).
 - Gốc module (dùng chung nhiều capability): `organization-audit-event.mapper.ts`, `organization-context.service.ts`,
@@ -123,3 +120,5 @@ Từ vựng trạng thái nhân viên (`EmployeeStatus`, `EmployeeWorkState`, `E
   `test/integration/organization/`.
 
 Head and successor assignments require a direct `MANAGER` grant and reject `SPENDING_APPROVER`; the account check is made through the identity extension point.
+
+QĐ-93h phase 1 retires the project routes and department profile fields. The old tables remain for rollback until phase 2.

@@ -7,7 +7,7 @@ import { DepartmentForbiddenError, type HeadAssignmentProblem } from './departme
  * departments they answer for (`QĐ-87a`, `QĐ-87b(4)`); a department head reads the one they head (`SoD-2`). Pure: no store, no clock.
  */
 
-/** Changing a department, its head, its successor or its IT Admin in charge, and a project: the Super Admin alone. Throws DepartmentForbiddenError. */
+/** Changing a department, its head, its successor or its IT Admin in charge, the Super Admin alone. Throws DepartmentForbiddenError. */
 export function assertMayChangeOrganization(roles: readonly string[]): void {
   if (!roles.includes('SUPER_ADMIN')) throw new DepartmentForbiddenError();
 }

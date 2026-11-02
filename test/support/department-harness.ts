@@ -3,7 +3,6 @@ import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from './api-accounts';
 import { ensureManagerGrant } from './builders/account.builder';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from './http-test-app';
-import { HR_BASIS } from './hr-basis';
 import { UseFacts, registerUseReaders } from './organization-use-readers';
 
 /** The departments, heads and projects over HTTP: the types of the wire, the calendar and the set-up the department specs share. */
@@ -20,7 +19,6 @@ export interface DepartmentWire {
   memberCount: number;
   warnings: string[];
   headHistory: { employeeCode: string; validFrom: string; validTo: string | null }[];
-  projects: { id: string; name: string; description: string | null; status: string; departments: { code: string }[] }[];
   /** The person named to take over from a day after today; null when nobody is (`QĐ-87` `D-5`). */
   successor: { employeeId: string; employeeCode: string; since: string } | null;
   deactivatedAt: string | null;
@@ -80,24 +78,7 @@ export class DepartmentHarness {
 
   useFacts!: UseFacts;
 
-  /**
-   * A department change cites no HR basis since `QĐ-93f`, so a request goes as the case writes it. A project change still cites
-   * one until `qd93-remove-department-projects` removes the routes: its request carries one unless the case names `hrBasis`
-   * itself (`hrBasis: undefined` leaves it out).
-   */
-  api = () => {
-    const writes = (test: request.Test, path: string): request.Test =>
-      /^\/api\/v1\/projects/.test(path) ? test.send({ hrBasis: HR_BASIS }) : test;
-
-    const agent = request(this.server());
-
-    return {
-      get: (path: string) => agent.get(path),
-      delete: (path: string) => agent.delete(path),
-      post: (path: string) => writes(agent.post(path), path),
-      patch: (path: string) => writes(agent.patch(path), path),
-    };
-  };
+  api = () => request(this.server());
 
   unique = (prefix: string): string => {
     this.counter += 1;

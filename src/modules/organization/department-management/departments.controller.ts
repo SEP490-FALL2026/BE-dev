@@ -132,7 +132,7 @@ export class DepartmentsController {
   @ApiSuccessResponse(DepartmentResponseDto, {
     message: 'DEPARTMENT.FETCHED',
     description:
-      'The profile: Cost Center (null while it has none), IT Admin in charge, head today and before, the successor named to take over, people count, projects, warnings.',
+      'The profile: Cost Center (null while it has none), IT Admin in charge, head today and before, the successor named to take over, people count and warnings.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, ID_INVALID, NOT_FOUND, {
     status: HttpStatus.FORBIDDEN,

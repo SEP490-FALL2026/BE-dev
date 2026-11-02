@@ -1,6 +1,5 @@
 import { BusinessDate } from '../../../core/business-date';
 import { EmployeeStatus, EmployeeWorkState } from '../organization-employee.types';
-import { ProjectRecord } from '../project/project.types';
 import type { CostCenterStatus, DepartmentStatus, HeadPeriodRecord } from '../organization-structure.types';
 
 /**
@@ -61,9 +60,6 @@ export interface DepartmentProfileView extends DepartmentView {
   headHistory: HeadPeriodRecord[];
   /** The department had more head periods than the {@link DEPARTMENT_HEAD_HISTORY_LIMIT} shown. */
   headHistoryHasMore: boolean;
-  projects: ProjectRecord[];
-  /** How many projects the department takes part in; `projects` holds the first of them only. */
-  projectTotal: number;
 }
 
 /** One active department that needs attention, for the IT Admin and the Super Admin (US-03-06 AC-9, AC-15). */
