@@ -23,7 +23,8 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
   - `getApprovalRoleHolders` — ai giữ ba vai trò phê duyệt (định tuyến bước của Request).
   - `findAccountIdOfEmployee`, `findLoginEmailOfEmployee`, `employeeIdsOfAccounts` — ánh xạ tài khoản ↔ nhân viên.
 - `HolderRecoveryApi`, `RoleTransferRecoveryApi` (`public/holder-recovery.api.ts`, `role-transfer-recovery.api.ts`) —
-  khôi phục Super Admin, chỉ lệnh `pnpm ops:recover` (qua `identity-access-recovery-cli.module.ts`).
+  khôi phục và đổi người giữ vai Super Admin (ca có kế hoạch lẫn khẩn cấp), chỉ lệnh `pnpm ops:recover` (qua
+  `identity-access-recovery-cli.module.ts`).
 - `IdentityAccessInspectionApi` — chỉ `pnpm ops:inspect`; `LocalDemoAccountApi` — chỉ `pnpm dev:seed` và
   `pnpm ops:demo-dataset` (qua `DemoAccountsApi` của installation).
 - Type/lỗi: `identity-access.types.ts`, `identity-access.errors.ts`, `recovery.types.ts`, `recovery.errors.ts`.
@@ -60,8 +61,8 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
   phòng).
 - `accounts/` — `app-users/app-users.controller.ts` (`/app-users*`, `/account-candidates`) →
   `account-invitation.service.ts`, `account-status.service.ts`, `account-query.service.ts`,
-  `account-administration.policy.ts`; `super-admin-transfers/` (`POST /super-admin-transfers`); `role-grant.service.ts`,
-  `action-link.service.ts`.
+  `account-administration.policy.ts`; `role-grant.service.ts`, `action-link.service.ts`. Không còn route đổi người giữ vai
+  Super Admin trong ứng dụng (QĐ-93e).
 - `credentials/` — mật khẩu của tài khoản: `credential.service.ts`, `credential.repo.ts`, `password-hasher.service.ts` (Argon2id),
   `password.policy.ts`; không import capability nào, `accounts/`, `auth/` và `recovery/` import nó (tách khỏi `accounts/` để thư
   mục đó dưới trần 25 file sau khi `mappers/`, `dto/`, `policies/` được dời vào).
@@ -74,7 +75,8 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
 
 - Tối đa một grant `SUPER_ADMIN` còn hiệu lực (index `role_grants_one_super_admin`); `SUPER_ADMIN` không đi cùng
   IT_ADMIN hay FINANCE trên một tài khoản, không trao cho trưởng phòng hay người giữ vai trò phê duyệt (trigger).
-- `SUPER_ADMIN` chỉ đổi chủ qua `POST /super-admin-transfers` hoặc `pnpm ops:recover`; route grant/revoke từ chối nó.
+- `SUPER_ADMIN` chỉ đổi chủ bằng `pnpm ops:recover transfer-role`; route grant/revoke từ chối nó. Tài khoản gắn đúng một
+  người: trigger `app_users_employee_immutable` từ chối đổi `employee_id`.
 - Thứ tự khóa: nhân viên → tài khoản (`FOR SHARE`) → ticket khôi phục; băm mật khẩu trước khi mở transaction.
 - Chỉ lưu SHA-256 của refresh token và của token trong link; JWT chỉ nhận HS256 (`algorithms` ghim khi verify).
 - Đăng nhập sai vì lý do gì cũng cùng một câu trả lời (US-01-01 AC-10); không ai tự đổi tài khoản của mình (AC-13).
