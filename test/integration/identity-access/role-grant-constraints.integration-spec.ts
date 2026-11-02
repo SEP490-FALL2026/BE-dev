@@ -5,10 +5,12 @@ import {
   SeededInstallation,
   createHttpTestApp,
   insertAccountFixture,
+  insertEmployeeFixture,
   seedInstallation,
 } from '../../support/http-test-app';
 
 const UNIQUE_VIOLATION = '23505';
+const CHECK_VIOLATION = '23514';
 
 describe('role grant constraints (integration, real PostgreSQL)', () => {
   let ctx: HttpTestApp;
@@ -89,5 +91,43 @@ describe('role grant constraints (integration, real PostgreSQL)', () => {
       [third.appUserId],
     );
     expect(rows[0].n).toBe(3);
+  });
+
+  it('rejects the Super Admin role for a department head, whoever writes the row (the database is the last guard of a role transfer)', async () => {
+    const head = await insertAccountFixture(ctx.app, seed, { code: 'E-5', email: 'five@acme.vn', activated: true });
+    await ctx.sql.query(
+      `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+       VALUES (gen_random_uuid(), $1, $2, $3, now()::date)`,
+      [seed.organizationId, seed.departmentId, head.employeeId],
+    );
+    await ctx.sql.query("UPDATE role_grants SET revoked_at = now() WHERE role = 'SUPER_ADMIN' AND revoked_at IS NULL");
+
+    try {
+      await expect(grant(ctx.sql, head.appUserId, 'SUPER_ADMIN')).rejects.toMatchObject({ code: CHECK_VIOLATION });
+      expect(await superAdminGrants()).toBe(0);
+    } finally {
+      await ctx.sql.query('DELETE FROM department_head_periods WHERE employee_id = $1', [head.employeeId]);
+      await grant(ctx.sql, second.appUserId, 'SUPER_ADMIN');
+    }
+  });
+
+  it('keeps an account attached to the one person it was made for: the employee of an account never changes (US-01-09 AC-16)', async () => {
+    const other = await insertEmployeeFixture(ctx.app, seed, { code: 'E-6', email: 'six@acme.vn' });
+    const employeeOf = async () =>
+      (
+        await ctx.sql.query<{ employee_id: string }>('SELECT employee_id FROM app_users WHERE id = $1', [
+          second.appUserId,
+        ])
+      ).rows[0].employee_id;
+    const original = await employeeOf();
+
+    await expect(
+      ctx.sql.query('UPDATE app_users SET employee_id = $2 WHERE id = $1', [second.appUserId, other.employeeId]),
+    ).rejects.toMatchObject({ code: CHECK_VIOLATION });
+
+    expect(await employeeOf()).toBe(original);
+    // Writing the same person again, as any full-row update does, is not a change.
+    await ctx.sql.query('UPDATE app_users SET employee_id = $2 WHERE id = $1', [second.appUserId, original]);
+    expect(await employeeOf()).toBe(original);
   });
 });

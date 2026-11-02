@@ -490,6 +490,27 @@ describe('recovering the Super Admin role outside the application (integration, 
       expect(invited.appUserId).toBeDefined();
     });
 
+    it('leaves every account with the person it was made for: a transfer and a credential reset move no account to another employee (US-01-09 AC-16)', async () => {
+      await activeSuccessor('E-RS20');
+      const accountsOf = async () => (await h.ctx.sql.query('SELECT id, employee_id FROM app_users ORDER BY id')).rows;
+      const before = await accountsOf();
+
+      expect(
+        await h.recovery.transferRole(context(), {
+          successorEmployeeCode: 'E-RS20',
+          holderEmail: h.seed.superAdmin.email,
+        }),
+      ).toMatchObject({ outcome: 'ROLE_TRANSFERRED' });
+      expect(
+        await h.recovery.resetCredentials(context(), {
+          accountEmail: 'e-rs20@acme.vn',
+          newLoginEmail: 'rs20.new@acme.vn',
+        }),
+      ).toMatchObject({ outcome: 'LINK_SENT' });
+
+      expect(await accountsOf()).toEqual(before);
+    });
+
     it('refuses a successor with no work email to invite', async () => {
       await holderLeaves();
       await insertEmployeeFixture(h.ctx.app, h.seed, { code: 'E-RS9', email: null });
