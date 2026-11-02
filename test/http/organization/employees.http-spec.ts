@@ -60,9 +60,13 @@ describe('POST /api/v1/employees (e2e, no database)', () => {
   });
 
   describe('validation', () => {
+    it('reports an invalid employee code as a row reason', async () => {
+      const response = await post({ ...VALID, employeeCode: '  ' }).expect(422);
+      expect(bodyOf(response).error.code).toBe('EMPLOYEE.ROW_INVALID');
+    });
+
     it.each([
       ['no employee code', { ...VALID, employeeCode: undefined }],
-      ['an empty employee code', { ...VALID, employeeCode: '  ' }],
       ['no full name', { ...VALID, fullName: undefined }],
       ['no employment type', { ...VALID, employmentType: undefined }],
       ['an employment type that is not one', { ...VALID, employmentType: 'BOSS' }],

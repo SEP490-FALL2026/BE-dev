@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { FORBIDDEN_ERROR } from '../../../infrastructure/http/errors/access-errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { EmployeeNotFoundError } from '../public/organization.errors';
 import { DepartmentInactiveError, DepartmentNotFoundError } from '../department/department.errors';
 import { refuse, toOrganizationApiException } from '../organization.http-errors';
 import {
@@ -47,6 +48,12 @@ const example = (error: Error) => errorExampleOf(toEmployeeApiException(error));
 
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const EMPLOYEE_ERROR_EXAMPLES = {
+  EMPLOYEE_NOT_FOUND: example(new EmployeeNotFoundError('<employee-id>')),
+  DEPARTMENT_NOT_FOUND: example(new DepartmentNotFoundError()),
+  DEPARTMENT_INACTIVE: example(new DepartmentInactiveError()),
+  EMPLOYEE_ALREADY_PLACED: example(new FirstPlacementError('ALREADY_PLACED')),
+  EMPLOYEE_INACTIVE: example(new FirstPlacementError('EMPLOYEE_INACTIVE')),
+  EMPLOYEE_DATE_INVALID: example(new FirstPlacementError('DATE_INVALID')),
   EMPLOYEE_ROW_INVALID: example(new EmployeeRowInvalidError([{ field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' }])),
   /** The same code when an official field is corrected: the reasons name the fields that route changes. */
   EMPLOYEE_UPDATE_ROW_INVALID: example(new EmployeeRowInvalidError([{ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' }])),

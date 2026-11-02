@@ -1,7 +1,6 @@
 ﻿import { firstPlacementProblem } from './employee-first-placement.policy';
-import type { BusinessDate } from '../../../core/business-date';
 
-const day = (value: string) => value as BusinessDate;
+const day = (value: string) => value;
 const facts = {
   status: 'ACTIVE' as const,
   workState: 'WORKING' as const,

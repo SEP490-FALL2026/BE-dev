@@ -34,6 +34,34 @@ export class EmployeesController {
   @Post(':id/first-placements')
   @ApiOperation({ operationId: 'employeeFirstPlacement', summary: 'Place an employee for the first time' })
   @ApiSuccessResponse(EmployeeResponseDto, { status: HttpStatus.CREATED, message: 'EMPLOYEE.FIRST_PLACED' })
+  @ApiErrorResponses(
+    UNAUTHENTICATED_RESPONSE,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only SUPER_ADMIN may place employees.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'Employee or department not found.',
+      examples: [EMPLOYEE_ERROR_EXAMPLES.EMPLOYEE_NOT_FOUND, EMPLOYEE_ERROR_EXAMPLES.DEPARTMENT_NOT_FOUND],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'EMPLOYEE.ALREADY_PLACED, EMPLOYEE.EMPLOYEE_INACTIVE or DEPARTMENT.INACTIVE.',
+      examples: [
+        EMPLOYEE_ERROR_EXAMPLES.EMPLOYEE_ALREADY_PLACED,
+        EMPLOYEE_ERROR_EXAMPLES.EMPLOYEE_INACTIVE,
+        EMPLOYEE_ERROR_EXAMPLES.DEPARTMENT_INACTIVE,
+      ],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'Invalid date or body.',
+      examples: [VALIDATION_EXAMPLE, EMPLOYEE_ERROR_EXAMPLES.EMPLOYEE_DATE_INVALID],
+    },
+    GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  )
   async place(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: EmployeeIdParamDto,

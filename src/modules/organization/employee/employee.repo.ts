@@ -341,9 +341,16 @@ export class EmployeeRepo {
     const pattern = term ? `%${escapeLikePattern(term)}%` : null;
     const day = fromDateColumn(onDate);
     const rows = await this.prisma.$queryRaw<
-      { id: string; employee_code: string; full_name: string; work_email: string | null; department: string | null }[]
+      {
+        id: string;
+        employee_code: string;
+        full_name: string;
+        work_email: string | null;
+        department: string | null;
+        unplaced: boolean;
+      }[]
     >`
-      SELECT e.id, e.employee_code, e.full_name, e.work_email, placement.department
+      SELECT e.id, e.employee_code, e.full_name, e.work_email, placement.department, NOT EXISTS (SELECT 1 FROM employee_placements any_p WHERE any_p.employee_id = e.id) AS unplaced
         FROM employees e
         LEFT JOIN LATERAL (
           SELECT d.name AS department
@@ -370,6 +377,7 @@ export class EmployeeRepo {
       fullName: row.full_name,
       workEmail: row.work_email,
       department: row.department,
+      unplaced: row.unplaced,
     }));
   }
 

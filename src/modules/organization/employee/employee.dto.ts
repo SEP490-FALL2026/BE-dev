@@ -29,7 +29,7 @@ const WORK_EMAIL_DESCRIPTION =
  * and a department with none takes people in.
  */
 export const createEmployeeBodySchema = z.strictObject({
-  employeeCode: z.string().trim().min(1).max(50).meta({
+  employeeCode: z.string().trim().meta({
     minLength: 3,
     maxLength: 20,
     pattern: '^[A-Z0-9]+(-[A-Z0-9]+)*$',
@@ -48,7 +48,6 @@ export const createEmployeeBodySchema = z.strictObject({
   hireDate: businessDateSchema('hireDate must be a real date as YYYY-MM-DD.'),
   departmentCode: z
     .string()
-    .max(50)
     .meta({
       minLength: 2,
       maxLength: 20,

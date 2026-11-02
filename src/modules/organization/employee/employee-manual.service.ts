@@ -6,6 +6,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { isDepartmentCodeValid, isEmployeeCodeValid } from '../public/organization-code.policy';
 import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../public/organization.errors';
 import { EmployeeRowInvalidError } from './employee.errors';
 import { assertMayEnterEmployees } from './employee.policy';
@@ -70,6 +71,14 @@ export class EmployeeManualService {
   async create(actor: AuthenticatedPrincipal, input: ManualEmployeeInput, now?: Date): Promise<ManualEmployeeView> {
     assertMayEnterEmployees(actor.roles);
     input = { ...input, employeeCode: input.employeeCode.trim().toUpperCase() };
+    const departmentCode = input.departmentCode?.trim().toUpperCase() ?? '';
+    const codeReasons = [
+      ...(!isEmployeeCodeValid(input.employeeCode) ? [{ field: 'employeeCode', code: 'EMPLOYEE_CODE_INVALID' }] : []),
+      ...(departmentCode && !isDepartmentCodeValid(departmentCode)
+        ? [{ field: 'departmentCode', code: 'DEPARTMENT_CODE_INVALID' }]
+        : []),
+    ];
+    if (codeReasons.length) throw new EmployeeRowInvalidError(codeReasons);
     const organization = await this.context.findOrganization();
     if (!organization) throw new Error('An employee was entered before installation');
     try {

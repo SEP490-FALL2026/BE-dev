@@ -132,6 +132,7 @@ export interface ItAdminInCharge {
 }
 
 export interface EmployeeCandidate {
+  unplaced: boolean;
   id: string;
   employeeCode: string;
   fullName: string;
