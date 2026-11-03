@@ -498,12 +498,12 @@
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "EMPLOYEE.ALREADY_PLACED": {
-                    "summary": "Nhân viên đã được xếp phòng; đổi phòng dùng điều chuyển.",
+                    "summary": "The employee already has a placement; a change of department is a transfer.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "EMPLOYEE.ALREADY_PLACED",
-                        "message": "Nhân viên đã được xếp phòng; đổi phòng dùng điều chuyển.",
+                        "message": "The employee already has a placement; a change of department is a transfer.",
                         "requestId": "req_example"
                       }
                     }
@@ -825,12 +825,12 @@
                     }
                   },
                   "EMPLOYEE.ROW_INVALID": {
-                    "summary": "The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.",
+                    "summary": "The employee row is not valid: see the reasons (a code is uppercase letters or digits joined by single hyphens).",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "EMPLOYEE.ROW_INVALID",
-                        "message": "The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.",
+                        "message": "The employee row is not valid: see the reasons (a code is uppercase letters or digits joined by single hyphens).",
                         "details": { "reasons": [{ "field": "employeeCode", "code": "EMPLOYEE_CODE_TAKEN" }] },
                         "requestId": "req_example"
                       }
@@ -1090,12 +1090,12 @@
                     }
                   },
                   "EMPLOYEE.ROW_INVALID": {
-                    "summary": "The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.",
+                    "summary": "The employee row is not valid: see the reasons (a code is uppercase letters or digits joined by single hyphens).",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "EMPLOYEE.ROW_INVALID",
-                        "message": "The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.",
+                        "message": "The employee row is not valid: see the reasons (a code is uppercase letters or digits joined by single hyphens).",
                         "details": { "reasons": [{ "field": "workEmail", "code": "WORK_EMAIL_TAKEN" }] },
                         "requestId": "req_example"
                       }

@@ -47,6 +47,8 @@ export const BUSINESS_PATTERNS = [
   '^[A-Za-z0-9][A-Za-z0-9._-]*$',
   // An ISO 4217 currency code (finance).
   '^[A-Z]{3}$',
+  // An employee or department code (QĐ-93i): uppercase letters or digits joined by single hyphens.
+  '^[A-Z0-9]+(-[A-Z0-9]+)*$',
 ];
 
 /** Visits every object node of the document with its JSON pointer, so a failure names the exact place. */

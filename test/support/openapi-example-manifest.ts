@@ -160,6 +160,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   documentLink: 'DOCUMENT.LINK_ISSUED',
   employeeCreate: 'EMPLOYEE.CREATED',
   employeeDashboardGet: 'DASHBOARD.EMPLOYEE_RETRIEVED',
+  employeeFirstPlacement: 'EMPLOYEE.FIRST_PLACED',
   employeeImportCancel: 'EMPLOYEE_IMPORT.CANCELLED',
   employeeImportConfirm: 'EMPLOYEE_IMPORT.CONFIRMED',
   employeeImportGet: 'EMPLOYEE_IMPORT.FETCHED',
