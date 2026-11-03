@@ -99,7 +99,7 @@ export class EmployeeImportPreviewService {
     actor: AuthenticatedPrincipal,
     id: string,
     query: { outcome?: EmployeeRowOutcome; page: number; pageSize: number },
-  ): Promise<Page<StoredRow>> {
+  ): Promise<Page<StoredRow & { unplaced: boolean | null }>> {
     assertMayImportEmployees(actor.roles);
     if (!(await this.repo.find(id))) throw new ImportNotFoundError();
     const { items, total } = await this.repo.page(id, {
@@ -108,7 +108,24 @@ export class EmployeeImportPreviewService {
       take: query.pageSize,
     });
 
-    return pageOf(items, total, query.page, query.pageSize);
+    const existingRows = items.filter((row) => row.outcome === 'EXISTS_SAME' || row.outcome === 'EXISTS_DIFFERENT');
+    const lookup = existingRows.length ? await this.rowValidation.lookup(existingRows) : null;
+    const existing = items.map((row) => lookup?.existing.get(clean(row.cells.employee_code).toUpperCase()));
+    const ids = existing.flatMap((person) => (person ? [person.id] : []));
+    const unplaced = ids.length ? await this.organizationReads.unplacedAmong(ids) : new Set<string>();
+    return pageOf(
+      items.map((row, index) => ({
+        ...row,
+        unplaced: existing[index]
+          ? unplaced.has(existing[index].id)
+          : row.outcome === 'VALID'
+            ? !clean(row.cells.department_code)
+            : null,
+      })),
+      total,
+      query.page,
+      query.pageSize,
+    );
   }
 
   /**

@@ -195,6 +195,7 @@ export class EmployeeImportsController {
         items: page.items.map((row) => ({
           line: row.lineNumber,
           outcome: row.outcome,
+          unplaced: row.unplaced,
           cells: row.cells,
           errors: row.errors,
           differences: row.differences,

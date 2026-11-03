@@ -3,18 +3,64 @@
     "totalRows": 1,
     "valid": 1,
     "errors": 0,
-    "newUnplaced": 0
+    "newUnplaced": 0,
+    "rowErrors": []
   },
   "employees-15": {
     "totalRows": 15,
     "valid": 15,
     "errors": 0,
-    "newUnplaced": 3
+    "newUnplaced": 3,
+    "rowErrors": []
   },
   "employees-invalid": {
     "totalRows": 8,
     "valid": 1,
     "errors": 7,
-    "newUnplaced": 0
+    "newUnplaced": 0,
+    "rowErrors": [
+      {
+        "line": 2,
+        "codes": [
+          "EMPLOYEE_CODE_INVALID"
+        ]
+      },
+      {
+        "line": 3,
+        "codes": [
+          "DEPARTMENT_NOT_FOUND"
+        ]
+      },
+      {
+        "line": 4,
+        "codes": [
+          "FULL_NAME_REQUIRED"
+        ]
+      },
+      {
+        "line": 5,
+        "codes": [
+          "WORK_EMAIL_INVALID"
+        ]
+      },
+      {
+        "line": 6,
+        "codes": [
+          "HIRE_DATE_INVALID"
+        ]
+      },
+      {
+        "line": 7,
+        "codes": [
+          "EMPLOYMENT_TYPE_INVALID"
+        ]
+      },
+      {
+        "line": 9,
+        "codes": [
+          "EMPLOYEE_CODE_DUPLICATE_IN_FILE"
+        ]
+      }
+    ]
   }
 }

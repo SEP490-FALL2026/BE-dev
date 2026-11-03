@@ -91138,6 +91138,11 @@
                   "properties": {
                     "line": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
                     "outcome": { "type": "string", "enum": ["VALID", "ERROR", "EXISTS_SAME", "EXISTS_DIFFERENT"] },
+                    "unplaced": {
+                      "description": "Whether the employee has no placement; null if an invalid row does not identify an existing employee.",
+                      "type": "boolean",
+                      "nullable": true
+                    },
                     "cells": { "type": "object", "additionalProperties": { "type": "string" } },
                     "errors": {
                       "type": "array",
@@ -91163,7 +91168,7 @@
                       "nullable": true
                     }
                   },
-                  "required": ["line", "outcome", "cells", "errors", "differences"],
+                  "required": ["line", "outcome", "unplaced", "cells", "errors", "differences"],
                   "additionalProperties": false
                 }
               },

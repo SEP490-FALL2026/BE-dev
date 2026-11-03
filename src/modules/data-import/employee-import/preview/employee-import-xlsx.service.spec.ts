@@ -71,7 +71,13 @@ describe('published employee examples', () => {
       const directory = resolve('docs/examples/employee-import');
       const expected = JSON.parse(await readFile(resolve(directory, 'expected-results.json'), 'utf8')) as Record<
         string,
-        { totalRows: number; valid: number; errors: number; newUnplaced: number }
+        {
+          totalRows: number;
+          valid: number;
+          errors: number;
+          newUnplaced: number;
+          rowErrors: { line: number; codes: string[] }[];
+        }
       >;
       for (const extension of ['csv', 'xlsx']) {
         const fileName = `${name}.${extension}`;
@@ -90,6 +96,9 @@ describe('published employee examples', () => {
           valid: judged.filter((row) => row.outcome === 'VALID').length,
           errors: judged.filter((row) => row.outcome === 'ERROR').length,
           newUnplaced: judged.filter((row) => row.outcome === 'VALID' && row.parsed?.departmentId === null).length,
+          rowErrors: judged.flatMap((row, index) =>
+            row.errors.length ? [{ line: rows[index].lineNumber, codes: row.errors.map((issue) => issue.code) }] : [],
+          ),
         }).toEqual(expected[name]);
       }
     },

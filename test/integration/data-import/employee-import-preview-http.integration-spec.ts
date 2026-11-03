@@ -136,7 +136,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
         .set(asSuper())
         .attach('file', Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]), 'people.xlsx')
         .expect(422);
-      expect(errorOf(binary).code).toBe('IMPORT.FILE_NOT_TEXT');
+      expect(errorOf(binary).code).toBe('IMPORT.FILE_UNREADABLE');
     });
 
     it('refuses a table it cannot read and one with more rows than it takes', async () => {

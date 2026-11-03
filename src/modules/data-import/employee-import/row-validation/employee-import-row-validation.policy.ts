@@ -231,7 +231,11 @@ export class EmployeeRowClassifier {
     if (existing !== undefined) {
       if (errors.length > 0) return { outcome: 'ERROR', errors };
 
-      return this.compare(existing, { ...row, normalizedEmail: email.normalizedEmail });
+      return this.compare(existing, {
+        ...row,
+        departmentCode: cells.department_code === undefined ? null : row.departmentCode,
+        normalizedEmail: email.normalizedEmail,
+      });
     }
 
     const department = row.departmentCode === '' ? undefined : this.lookup.departments.get(row.departmentCode);
@@ -286,7 +290,7 @@ export class EmployeeRowClassifier {
       normalizedEmail: string | null;
       typeText: string;
       hireDate: string;
-      departmentCode: string;
+      departmentCode: string | null;
       jobTitleText: string;
     },
   ): EmployeeRowResult {
@@ -302,7 +306,7 @@ export class EmployeeRowClassifier {
     if (existing.employmentType !== incoming.typeText)
       add('employment_type', existing.employmentType, incoming.typeText);
     if (existing.hireDate !== incoming.hireDate) add('hire_date', existing.hireDate, incoming.hireDate);
-    if ((existing.departmentCode ?? '') !== incoming.departmentCode) {
+    if (incoming.departmentCode !== null && (existing.departmentCode ?? '') !== incoming.departmentCode) {
       add('department_code', existing.departmentCode ?? '', incoming.departmentCode);
     }
     if (jobTitleKey(existing.jobTitleName ?? '') !== jobTitleKey(incoming.jobTitleText)) {

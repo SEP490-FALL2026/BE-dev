@@ -68,6 +68,12 @@ const rowsSchema = z.strictObject({
     z.strictObject({
       line: z.number().int().positive(),
       outcome: z.enum(['VALID', 'ERROR', 'EXISTS_SAME', 'EXISTS_DIFFERENT']),
+      unplaced: z
+        .boolean()
+        .nullable()
+        .describe(
+          'Whether a valid new row has no department or an existing employee has no placement; null for an invalid row.',
+        ),
       cells: z.record(z.string(), z.string()),
       errors: z.array(z.strictObject({ column: z.string(), code: z.string() })),
       differences: z
