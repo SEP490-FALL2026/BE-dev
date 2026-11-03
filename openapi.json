@@ -92945,7 +92945,10 @@
                       "maximum": 9007199254740991,
                       "minimum": 0
                     },
-                    "state": { "type": "string" },
+                    "state": {
+                      "type": "string",
+                      "enum": ["SENT", "APPROVED", "REJECTED", "CHANGES_REQUESTED", "SUPERSEDED", "EXPIRED"]
+                    },
                     "sentAt": { "type": "string", "format": "date-time" }
                   },
                   "required": ["id", "year", "number", "state", "sentAt"],

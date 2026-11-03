@@ -11,6 +11,19 @@ const EXAMPLES_DIR = path.join(ROOT_DIR, 'docs', 'examples', 'budget-attachments
 const FILES_DIR = path.join(EXAMPLES_DIR, 'files');
 const MANIFEST_PATH = path.join(EXAMPLES_DIR, 'manifest.json');
 
+/**
+ * The committed bytes of a sample, as Git left them in this working tree. With `core.autocrlf=true` (Windows) Git may turn
+ * the line feeds of a text-like sample (a CSV, a small PDF) into CRLF on checkout; the repository does not pin the files
+ * (`.gitattributes` keeps the one rule of GATE-EOL), so the check is made on the content: a file that is the sample with
+ * its line feeds converted is the sample. A real difference of bytes still fails.
+ */
+function evenIfLineEndingsWereConverted(disk: Buffer, expected: Uint8Array): Buffer {
+  if (Buffer.compare(disk, Buffer.from(expected)) === 0) return disk;
+  const converted = Buffer.from(disk.toString('latin1').replaceAll('\r\n', '\n'), 'latin1');
+
+  return Buffer.compare(converted, Buffer.from(expected)) === 0 ? converted : disk;
+}
+
 describe('budget attachment sample files (integration)', () => {
   let counter = 0;
 
@@ -46,7 +59,7 @@ describe('budget attachment sample files (integration)', () => {
 
       const filePath = path.join(FILES_DIR, sample.file);
       expect(fs.existsSync(filePath)).toBe(true);
-      const diskBytes = fs.readFileSync(filePath);
+      const diskBytes = evenIfLineEndingsWereConverted(fs.readFileSync(filePath), sample.content);
       const diskSha256 = crypto.createHash('sha256').update(diskBytes).digest('hex');
       expect(diskBytes.length).toBe(sample.sizeBytes);
       expect(diskSha256).toBe(sample.sha256);

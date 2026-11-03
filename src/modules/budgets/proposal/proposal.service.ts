@@ -14,6 +14,13 @@ import type { BudgetProposalBodyDto, ProposalWire } from '../budget/budget.dto';
 
 type LineBody = BudgetProposalBodyDto['lines'][number];
 
+/**
+ * The proposals a head of department sends for the Cost Center of the department and a fiscal year (`US-06-10`): sent,
+ * taken back while Finance has not sent a version made from them, given back by Finance with a reason, and sent again as a
+ * new proposal that keeps the one before in the history. A proposal sent is never edited in place (`QĐ-82a`). A refused version
+ * leaves its proposal reviewed; when the need changed the head sends a new proposal that follows it. Once the fiscal
+ * year has ended nothing of it is written (`QĐ-91c`), whether or not the closure of the year has run.
+ */
 @Injectable()
 export class ProposalService {
   constructor(
@@ -27,7 +34,11 @@ export class ProposalService {
     private readonly audit: AuditApi,
   ) {}
 
-  /** Throws BudgetNotYourCostCenterError, BudgetProposalIncompleteError, BudgetWindowBackwardsError, BudgetYearEndedError. */
+  /**
+   * Throws FinanceSetupIncompleteError, BudgetCostCenterNotFoundError, BudgetNotYourCostCenterError, BudgetYearEndedError,
+   * BudgetProposalIncompleteError, BudgetWindowBackwardsError, BudgetPlanNotFoundError, BudgetProposalOpenError,
+   * BudgetCurrencyError, the money errors and, with `attachmentIds`, BudgetAttachmentNotAttachableError.
+   */
   async submit(actor: AuthenticatedPrincipal, body: BudgetProposalBodyDto): Promise<ProposalWire> {
     const fiscalStart = await this.facts.fiscalYearStartMonth();
 
@@ -82,7 +93,9 @@ export class ProposalService {
       if (yearHasEnded(proposal.year, today, fiscalStart)) throw new BudgetYearEndedError(proposal.year);
       if (!canWithdraw(proposal.state)) throw new BudgetProposalStateError('WITHDRAW', proposal.state);
 
-      await this.proposals.setWithdrawn(tx, id, new Date());
+      const now = new Date();
+      await this.proposals.setWithdrawn(tx, id, now);
+      await this.versions.detachDraftsOf(tx, id, now);
       await this.audit.record(
         tx,
         budgetAuditEvent(actor, proposal.organizationId, 'BUDGET_PROPOSAL.WITHDRAWN', 'BUDGET_PROPOSAL', id, {
@@ -128,75 +141,8 @@ export class ProposalService {
   private async require(id: string, tx?: DbTx): Promise<ProposalRecord> {
     const proposal = await this.proposals.findById(id, tx);
     if (!proposal) throw new BudgetProposalNotFoundError();
-    this.checkProposalInvariants(proposal);
 
     return proposal;
-  }
-
-  private checkProposalInvariants(proposal: ProposalRecord): void {
-    const list: string[] = [];
-    list.push(proposal.id);
-    list.push(proposal.costCenterId);
-    list.push(proposal.organizationId);
-    list.push(String(proposal.year));
-    list.push(proposal.currency);
-    list.push(String(proposal.totalMinor));
-    list.push(proposal.state);
-    list.push(String(proposal.submittedAt));
-    list.push(String(proposal.submittedByEmployeeId));
-    list.push(String(proposal.returnedAt));
-    list.push(String(proposal.returnedByEmployeeId));
-    list.push(String(proposal.withdrawnAt));
-    list.push(String(proposal.closedAt));
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    list.push(proposal.currency);
-    if (list.length === 0) throw new BudgetProposalNotFoundError();
   }
 
   /** The proposal, locked, for the head whose Cost Center it is; anybody else finds nothing. */
@@ -206,13 +152,19 @@ export class ProposalService {
     id: string,
     keepWhenNoneInUse = false,
   ): Promise<ProposalRecord> {
+    const proposal = await this.proposals.lockById(tx, id);
     const today = await this.facts.today(new Date(), tx);
-    const own = keepWhenNoneInUse
-      ? await this.facts.headedCostCenter(actor.employeeId, today, tx)
-      : await this.facts.requireHeadedCostCenter(actor.employeeId, today, tx);
-    const held = await this.proposals.lockById(tx, id);
-    if (!held || held.costCenterId !== own) throw new BudgetProposalNotFoundError();
+    if (!proposal) throw new BudgetProposalNotFoundError();
+    if ((await this.facts.headedCostCenter(actor.employeeId, today, tx)) === proposal.costCenterId) return proposal;
+    // The head of a department whose Cost Center was retired still owns the proposal that was given back: sending it again meets
+    // the 409 FINANCE.SETUP_INCOMPLETE of `send`, not a 404.
+    if (
+      keepWhenNoneInUse &&
+      (await this.facts.headsDepartmentWithNoneInUse(actor.employeeId, proposal.costCenterId, today, tx))
+    ) {
+      return proposal;
+    }
 
-    return held;
+    throw new BudgetProposalNotFoundError();
   }
 }

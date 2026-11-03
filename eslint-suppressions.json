@@ -19,11 +19,6 @@
       "count": 1
     }
   },
-  "src/modules/budgets/proposal/proposal.service.ts": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/modules/budgets/version/line-import.service.ts": {
     "complexity": {
       "count": 1

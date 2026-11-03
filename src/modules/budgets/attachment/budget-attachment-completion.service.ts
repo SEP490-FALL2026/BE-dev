@@ -19,7 +19,12 @@ import {
   BudgetAttachmentUploadPendingError,
 } from './budget-attachment.errors';
 import { toBudgetAttachmentWire } from './budget-attachment.mapper';
-import { formatForContentType, MAX_RECORD_ATTACHMENTS, UPLOAD_ABANDONED_AFTER_MS } from './budget-attachment.policy';
+import {
+  FINAL_SCOPE,
+  formatForContentType,
+  MAX_RECORD_ATTACHMENTS,
+  UPLOAD_ABANDONED_AFTER_MS,
+} from './budget-attachment.policy';
 import { BudgetAttachmentRepo } from './budget-attachment.repo';
 import type { BudgetAttachmentRecord } from './budget-attachment.types';
 
@@ -36,6 +41,12 @@ export class BudgetAttachmentCompletionService {
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStoragePort,
   ) {}
 
+  /**
+   * Looks at what the storage holds for the file: if it is what was declared, those bytes are copied to the key the file
+   * is kept under and the file is kept (a proposal file waits for its head, a version file is attached); if not, the
+   * object is deleted and the file is quarantined. An object that has not arrived is not a refusal: the file keeps
+   * waiting. Same order as `DocumentService.complete`: the database first under the row lock, the upload last.
+   */
   async complete(actor: AuthenticatedPrincipal, attachmentId: string): Promise<BudgetAttachmentWire> {
     const record = await this.attachments.find(attachmentId);
     if (!record || record.uploadedByEmployeeId !== actor.employeeId) {
@@ -43,19 +54,38 @@ export class BudgetAttachmentCompletionService {
     }
 
     this.assertTargetRole(actor, record);
-    await this.assertNotExpired(actor, record);
-
     if (record.status !== 'AWAITING_UPLOAD') {
       throw new BudgetAttachmentNotAwaitingUploadError();
     }
-
-    const finalObjectKey = await this.inspectUpload(actor, record);
-
-    if (record.target === 'PROPOSAL') {
-      await this.completeProposal(actor, record, finalObjectKey);
-    } else {
-      await this.completeVersion(actor, record, finalObjectKey);
+    if (Date.now() - record.createdAt.getTime() >= UPLOAD_ABANDONED_AFTER_MS) {
+      // Given up by this call, or changed first by a simultaneous one: then the row as it is now answers.
+      if (await this.expireUpload(actor, record)) throw new BudgetAttachmentUploadExpiredError();
+      throw await this.answerFromRow(actor, record.id);
     }
+
+    const result = await this.inspect(record);
+    if (result.outcome === 'MISSING') {
+      // Never came, or kept (or given up) by a simultaneous call that deletes it only after its commit.
+      throw await this.answerFromRow(actor, record.id);
+    }
+    if (result.outcome === 'MISMATCH') {
+      // The inspection already deleted the object; the row says so, unless a simultaneous call changed it first.
+      if (await this.quarantine(actor, record)) throw new BudgetAttachmentUploadMismatchError();
+      throw await this.answerFromRow(actor, record.id);
+    }
+
+    const finalObjectKey = result.finalObjectKey;
+    // The database first, the upload last: a commit that fails takes its own copy back and keeps the upload.
+    const commit =
+      record.target === 'PROPOSAL'
+        ? this.completeProposal(actor, record, finalObjectKey)
+        : this.completeVersion(actor, record, finalObjectKey);
+    await commit.catch(async (error: unknown) => {
+      await this.withdrawCopy(record.id, finalObjectKey);
+      throw error;
+    });
+    // Known committed: the upload is no more use; a failed delete leaves it to the bucket's lifecycle rule.
+    await this.deleteQuietly(record.objectKey);
 
     const updated = await this.attachments.find(record.id);
     const people = await this.facts.people([actor.employeeId]);
@@ -73,45 +103,35 @@ export class BudgetAttachmentCompletionService {
     }
   }
 
-  private async assertNotExpired(actor: AuthenticatedPrincipal, record: BudgetAttachmentRecord): Promise<void> {
-    const now = new Date();
-    const isAbandoned =
-      record.status === 'EXPIRED' ||
-      (record.status === 'AWAITING_UPLOAD' && record.createdAt.getTime() + UPLOAD_ABANDONED_AFTER_MS <= now.getTime());
-
-    if (isAbandoned) {
-      if (record.status === 'AWAITING_UPLOAD') {
-        await this.expireUpload(actor, record);
-      }
-      throw new BudgetAttachmentUploadExpiredError();
-    }
-  }
-
-  private async inspectUpload(actor: AuthenticatedPrincipal, record: BudgetAttachmentRecord): Promise<string> {
+  private async inspect(record: BudgetAttachmentRecord) {
     const format = formatForContentType(record.contentType);
     if (!format) {
       throw new BudgetAttachmentUploadMismatchError();
     }
 
-    const result = await this.inspection.inspect({
+    return this.inspection.inspect({
       pendingKey: record.objectKey,
       declared: {
         contentType: record.contentType,
         sizeBytes: record.sizeBytes,
       },
       accepts: (prefix, options) => matchesFormat(format, prefix, options),
-      finalScope: 'documents',
+      finalScope: FINAL_SCOPE,
     });
+  }
 
-    if (result.outcome === 'MISSING') {
-      throw new BudgetAttachmentUploadPendingError();
-    }
-    if (result.outcome === 'MISMATCH') {
-      await this.quarantine(actor, record);
-      throw new BudgetAttachmentUploadMismatchError();
-    }
+  /**
+   * The answer for a file a simultaneous call may have changed, from its row read again: still awaiting its upload
+   * means pending, given up means expired, otherwise done means not awaiting.
+   */
+  private async answerFromRow(actor: AuthenticatedPrincipal, id: string): Promise<Error> {
+    const row = await this.attachments.find(id);
+    if (!row || row.uploadedByEmployeeId !== actor.employeeId) return new BudgetAttachmentNotFoundError();
+    if (row.status === 'AWAITING_UPLOAD') return new BudgetAttachmentUploadPendingError();
 
-    return result.finalObjectKey;
+    return row.status === 'EXPIRED'
+      ? new BudgetAttachmentUploadExpiredError()
+      : new BudgetAttachmentNotAwaitingUploadError();
   }
 
   private async completeProposal(
@@ -121,9 +141,9 @@ export class BudgetAttachmentCompletionService {
   ): Promise<void> {
     await this.runner.run(async (tx) => {
       const locked = await this.attachments.lock(tx, record.id);
-      if (!locked || locked.status !== 'AWAITING_UPLOAD') {
-        throw new BudgetAttachmentNotAwaitingUploadError();
-      }
+      if (!locked) throw new BudgetAttachmentNotFoundError();
+      if (locked.status !== 'AWAITING_UPLOAD') throw new BudgetAttachmentNotAwaitingUploadError();
+
       await this.attachments.markUploaded(tx, record.id, finalObjectKey);
       await this.audit.record(
         tx,
@@ -140,51 +160,43 @@ export class BudgetAttachmentCompletionService {
     finalObjectKey: string,
   ): Promise<void> {
     const fiscalStart = await this.access.begin(actor);
-    try {
-      await this.runner.run(async (tx) => {
-        const version = await this.access.lockEditable(tx, record.versionId!, fiscalStart);
-        const locked = await this.attachments.lock(tx, record.id);
-        if (!locked || locked.status !== 'AWAITING_UPLOAD') {
-          throw new BudgetAttachmentNotAwaitingUploadError();
-        }
-        const attachedCount = await this.attachments.countAttachedByVersion(tx, record.versionId!);
-        if (attachedCount >= MAX_RECORD_ATTACHMENTS) {
-          throw new BudgetAttachmentLimitReachedError(MAX_RECORD_ATTACHMENTS);
-        }
+    await this.runner.run(async (tx) => {
+      const version = await this.access.lockEditable(tx, record.versionId!, fiscalStart);
+      const locked = await this.attachments.lock(tx, record.id);
+      if (!locked) throw new BudgetAttachmentNotFoundError();
+      if (locked.status !== 'AWAITING_UPLOAD') throw new BudgetAttachmentNotAwaitingUploadError();
 
-        const attachedAt = new Date();
-        await this.attachments.markAttachedVersion(tx, record.id, finalObjectKey, attachedAt);
+      const attachedCount = await this.attachments.countAttachedByVersion(tx, record.versionId!);
+      if (attachedCount >= MAX_RECORD_ATTACHMENTS) {
+        throw new BudgetAttachmentLimitReachedError(MAX_RECORD_ATTACHMENTS);
+      }
 
-        await this.history.attachmentAdded(tx, actor, version, {
-          attachmentId: record.id,
-          fileName: record.fileName,
-          contentType: record.contentType,
-          sizeBytes: record.sizeBytes,
-        });
+      const attachedAt = new Date();
+      await this.attachments.markAttachedVersion(tx, record.id, finalObjectKey, attachedAt);
 
-        await this.audit.record(
-          tx,
-          budgetAuditEvent(
-            actor,
-            version.organizationId,
-            'BUDGET_ATTACHMENT.ATTACHED',
-            'BUDGET_ATTACHMENT',
-            record.id,
-            {
-              target: 'VERSION',
-              versionId: version.id,
-            },
-          ),
-        );
+      await this.history.attachmentAdded(tx, actor, version, {
+        attachmentId: record.id,
+        fileName: record.fileName,
+        contentType: record.contentType,
+        sizeBytes: record.sizeBytes,
       });
-    } catch (error) {
-      await this.withdrawCopy(finalObjectKey);
-      throw error;
-    }
+
+      await this.audit.record(
+        tx,
+        budgetAuditEvent(actor, version.organizationId, 'BUDGET_ATTACHMENT.ATTACHED', 'BUDGET_ATTACHMENT', record.id, {
+          target: 'VERSION',
+          versionId: version.id,
+        }),
+      );
+    });
   }
 
-  private async quarantine(actor: AuthenticatedPrincipal, record: BudgetAttachmentRecord): Promise<void> {
-    await this.runner.run(async (tx) => {
+  /** The file quarantined, if it is still awaiting its upload when its row is locked; false when something else got there first. */
+  private async quarantine(actor: AuthenticatedPrincipal, record: BudgetAttachmentRecord): Promise<boolean> {
+    return this.runner.run(async (tx) => {
+      const locked = await this.attachments.lock(tx, record.id);
+      if (!locked || locked.status !== 'AWAITING_UPLOAD') return false;
+
       await this.attachments.markQuarantined(tx, record.id);
       await this.audit.record(
         tx,
@@ -199,11 +211,17 @@ export class BudgetAttachmentCompletionService {
           },
         ),
       );
+
+      return true;
     });
   }
 
-  private async expireUpload(actor: AuthenticatedPrincipal, record: BudgetAttachmentRecord): Promise<void> {
-    await this.runner.run(async (tx) => {
+  /** The file given up, if it is still awaiting its upload when its row is locked; the object goes after the commit. */
+  private async expireUpload(actor: AuthenticatedPrincipal, record: BudgetAttachmentRecord): Promise<boolean> {
+    const done = await this.runner.run(async (tx) => {
+      const locked = await this.attachments.lock(tx, record.id);
+      if (!locked || locked.status !== 'AWAITING_UPLOAD') return false;
+
       await this.attachments.markExpired(tx, record.id);
       await this.audit.record(
         tx,
@@ -211,14 +229,25 @@ export class BudgetAttachmentCompletionService {
           target: record.target,
         }),
       );
+
+      return true;
     });
+    if (done) await this.deleteQuietly(record.objectKey);
+
+    return done;
   }
 
-  private async withdrawCopy(finalObjectKey: string): Promise<void> {
+  /** The copy of a failed commit goes unless the row names it (the answer was lost); unreadable, it stays: never a kept file lost. */
+  private async withdrawCopy(id: string, finalObjectKey: string): Promise<void> {
+    const row = await this.attachments.find(id).catch(() => undefined);
+    if (row !== undefined && row?.finalObjectKey !== finalObjectKey) await this.deleteQuietly(finalObjectKey);
+  }
+
+  private async deleteQuietly(key: string): Promise<void> {
     try {
-      await this.storage.delete(finalObjectKey);
+      await this.storage.delete(key);
     } catch {
-      // Best effort discard of copied object
+      // Best effort: the bucket's lifecycle rule takes what stays.
     }
   }
 }

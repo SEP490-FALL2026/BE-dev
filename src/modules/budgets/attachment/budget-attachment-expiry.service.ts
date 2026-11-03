@@ -3,9 +3,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import { OBJECT_STORAGE, type ObjectStoragePort } from '../../../infrastructure/object-storage/object-storage.port';
 import { describeForOperator } from '../../../infrastructure/observability/operator-error';
 import { AuditApi } from '../../audit/public/audit.api';
-import { expiresAt } from './budget-attachment.policy';
 import { BudgetAttachmentRepo } from './budget-attachment.repo';
-import type { BudgetAttachmentRecord } from './budget-attachment.types';
 
 @Injectable()
 export class BudgetAttachmentExpiryService {
@@ -18,37 +16,44 @@ export class BudgetAttachmentExpiryService {
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStoragePort,
   ) {}
 
-  async expire(now: Date, limit = 50): Promise<{ expired: number }> {
-    const candidates = await this.attachments.findExpiredCandidates(now, limit);
+  /**
+   * Gives up the files whose upload never came (24 hours) or that no proposal took (7 days), at most `limit`: each one in
+   * its own transaction, picked and locked `FOR UPDATE SKIP LOCKED` so a file a proposal send holds is left to it and
+   * the sweep never waits; the object goes after the commit. Safe to run often and from several instances.
+   */
+  async expire(now: Date, limit = 100): Promise<{ expired: number }> {
+    const failed: string[] = [];
     let expiredCount = 0;
 
-    for (const candidate of candidates) {
+    while (expiredCount + failed.length < limit) {
+      const picked = { id: null as string | null };
       try {
-        const expired = await this.expireOne(candidate, now);
-        if (expired) {
-          expiredCount++;
-        }
+        const done = await this.expireNext(now, failed, picked);
+        if (done === null) break;
+        expiredCount += 1;
+        for (const key of done.keys) await this.deleteFromStorage(key);
       } catch (error) {
-        this.logger.error(`Attachment sweep step ${candidate.id} failed: ${describeForOperator(error)}`);
+        this.logger.error(
+          `Attachment sweep step ${picked.id ?? '(none picked)'} failed: ${describeForOperator(error)}`,
+        );
+        // The failed row rolled back and is still a candidate: keep it out of the rest of this pass, or stop.
+        if (picked.id === null) break;
+        failed.push(picked.id);
       }
     }
 
     return { expired: expiredCount };
   }
 
-  private async expireOne(candidate: BudgetAttachmentRecord, now: Date): Promise<boolean> {
-    let deletedKey: string | null = null;
-
-    const didExpire = await this.runner.run(async (tx) => {
-      const locked = await this.attachments.lock(tx, candidate.id);
-      if (!locked) return false;
-      if (locked.status !== 'AWAITING_UPLOAD' && locked.status !== 'UPLOADED') {
-        return false;
-      }
-
-      if (now.getTime() < expiresAt(locked.status, locked.createdAt).getTime()) {
-        return false;
-      }
+  private async expireNext(
+    now: Date,
+    excluded: readonly string[],
+    picked: { id: string | null },
+  ): Promise<{ keys: string[] } | null> {
+    return this.runner.run(async (tx) => {
+      const locked = await this.attachments.lockNextExpired(tx, now, excluded);
+      if (!locked) return null;
+      picked.id = locked.id;
 
       await this.attachments.markExpired(tx, locked.id);
       await this.audit.record(tx, {
@@ -64,15 +69,8 @@ export class BudgetAttachmentExpiryService {
         correlationId: `budget-attachment-expiry:${locked.id}`,
       });
 
-      deletedKey = locked.finalObjectKey ?? locked.objectKey;
-      return true;
+      return { keys: [locked.objectKey, ...(locked.finalObjectKey ? [locked.finalObjectKey] : [])] };
     });
-
-    if (didExpire && deletedKey) {
-      await this.deleteFromStorage(deletedKey);
-    }
-
-    return didExpire;
   }
 
   private async deleteFromStorage(key: string): Promise<void> {

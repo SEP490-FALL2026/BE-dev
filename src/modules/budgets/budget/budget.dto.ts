@@ -337,7 +337,7 @@ export const mineVersionSummarySchema = z.strictObject({
   id: z.uuid(),
   year,
   number: z.number().int().positive(),
-  state: z.string(),
+  state: z.enum(['SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
   sentAt: z.iso.datetime(),
 });
 const importSchema = z.strictObject({

@@ -39,6 +39,8 @@ export function toBudgetAttachmentSummaryWire(
   uploadedBy: EmployeeBrief | null,
   options?: { status?: 'ATTACHED' | 'REMOVED'; removedAt?: string | null },
 ): BudgetAttachmentSummaryWire {
+  // A summary row is attached or removed, so it has been attached: no silent fallback to another time.
+  if (record.attachedAt === null) throw new Error(`Budget attachment ${record.id} is in a summary without attached_at`);
   const status = options?.status ?? (record.status as 'ATTACHED' | 'REMOVED');
   const removedAt = options?.removedAt !== undefined ? options.removedAt : (record.removedAt?.toISOString() ?? null);
 
@@ -49,7 +51,7 @@ export function toBudgetAttachmentSummaryWire(
     sizeBytes: record.sizeBytes,
     status,
     uploadedBy,
-    attachedAt: (record.attachedAt ?? record.createdAt).toISOString(),
+    attachedAt: record.attachedAt.toISOString(),
     removedAt,
   };
 }

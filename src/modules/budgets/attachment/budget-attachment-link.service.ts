@@ -7,11 +7,9 @@ import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.ser
 import { ProposalRepo } from '../budget/proposal.repo';
 import { VersionRepo } from '../budget/version.repo';
 import { BudgetAttachmentNotFoundError } from './budget-attachment.errors';
-import { budgetRecordView } from './budget-attachment.policy';
+import { budgetRecordView, DOWNLOAD_LINK_SECONDS } from './budget-attachment.policy';
 import { BudgetAttachmentRepo } from './budget-attachment.repo';
 import type { BudgetAttachmentRecord } from './budget-attachment.types';
-
-const LINK_EXPIRY_SECONDS = 300;
 
 @Injectable()
 export class BudgetAttachmentLinkService {
@@ -33,14 +31,14 @@ export class BudgetAttachmentLinkService {
 
     await this.assertCanRead(actor, record);
 
-    const expiresAtDate = new Date(Date.now() + LINK_EXPIRY_SECONDS * 1000);
+    const expiresAtDate = new Date(Date.now() + DOWNLOAD_LINK_SECONDS * 1000);
     const expiresAt = expiresAtDate.toISOString();
 
     const url = await this.storage.createDownloadUrl({
       key: record.finalObjectKey,
       fileName: record.fileName,
       contentType: record.contentType,
-      expiresInSeconds: LINK_EXPIRY_SECONDS,
+      expiresInSeconds: DOWNLOAD_LINK_SECONDS,
     });
 
     await this.runner.run(async (tx) => {

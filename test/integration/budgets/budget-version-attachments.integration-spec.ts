@@ -1,4 +1,11 @@
-import { AttachmentDataWire, BudgetAttachmentHarness, SAMPLE_PDF } from '../../support/budget-attachment-harness';
+import { Client } from 'pg';
+import {
+  AttachmentDataWire,
+  BudgetAttachmentHarness,
+  SAMPLE_PDF,
+  SAMPLE_XLSX,
+} from '../../support/budget-attachment-harness';
+import { waitForLockWaiters } from '../../support/lock-wait';
 
 const h = new BudgetAttachmentHarness();
 
@@ -34,7 +41,12 @@ describe('budget version attachments (integration, real PostgreSQL)', () => {
     expect(attachment.status).toBe('AWAITING_UPLOAD');
     expect(attachment.target).toBe('VERSION');
     expect(attachment.versionId).toBe(version.id);
-    expect(upload?.uploadToken).toBeTruthy();
+    // The wire is the link and how to use it: a signed link to the pending prefix, no token, no key.
+    expect(upload?.method).toBe('PUT');
+    expect(upload?.url).toContain('/upload/pending-documents/');
+    expect(upload?.headers['Content-Type']).toBe(SAMPLE_PDF.contentType);
+    expect(upload?.headers['Content-Length']).toBe(String(SAMPLE_PDF.sizeBytes));
+    expect(upload).not.toHaveProperty('uploadToken');
 
     await h.putObject(attachment.id, {
       contentLength: attachment.sizeBytes,
@@ -48,8 +60,10 @@ describe('budget version attachments (integration, real PostgreSQL)', () => {
     expect(completed.removedAt).toBeNull();
 
     const finalKey = await h.finalKeyOf(attachment.id);
-    expect(finalKey).toBeTruthy();
+    expect(finalKey).toMatch(/^budget-documents\/\d{4}\/\d{2}\//);
     expect(await h.storage.head(finalKey!)).not.toBeNull();
+    // After the commit the upload is deleted; only the kept copy remains.
+    expect(h.storage.objects.has(await h.keyOf(attachment.id))).toBe(false);
 
     // Verify version history entry ATTACHMENT_ADDED
     const historyRes = await h.versionHistory(version.id).expect(200);
@@ -191,16 +205,151 @@ describe('budget version attachments (integration, real PostgreSQL)', () => {
   });
 
   it('refuses complete when called by a different employee', async () => {
-    const { version, department } = await waiting();
-    const otherFinance = await h.staff(department, 'FIN-O2', ['FINANCE']);
+    const { version, head } = await waiting();
 
     // Declare with finance
     const declareRes = await h.declareVersionAttachment(version.id, SAMPLE_PDF, h.finance).expect(201);
     const declaredId = h.dataOf<AttachmentDataWire>(declareRes).attachment.id;
     await h.putObject(declaredId, { contentLength: SAMPLE_PDF.sizeBytes, contentType: SAMPLE_PDF.contentType });
 
-    // Complete with other finance
-    const forbiddenRes = await h.completeAttachment(declaredId, otherFinance.account).expect(404);
+    // Complete by somebody else: not the uploader, so there is no such file for them
+    const forbiddenRes = await h.completeAttachment(declaredId, head.account).expect(404);
     expect(h.errorOf(forbiddenRes).code).toBe('BUDGET_ATTACHMENT.NOT_FOUND');
+  });
+
+  it('keeps the canonical type of the file when the client declares it in another case', async () => {
+    const { version } = await waiting();
+
+    const res = await h
+      .declareVersionAttachment(version.id, { ...SAMPLE_PDF, contentType: 'Application/PDF' })
+      .expect(201);
+    const { attachment, upload } = h.dataOf<AttachmentDataWire>(res);
+    expect(attachment.contentType).toBe('application/pdf');
+    expect(upload?.headers['Content-Type']).toBe('application/pdf');
+    expect(h.storage.uploadLinks.at(-1)?.contentType).toBe('application/pdf');
+
+    await h.putObject(attachment.id, { contentLength: SAMPLE_PDF.sizeBytes, contentType: 'application/pdf' });
+    await h.completeAttachment(attachment.id).expect(200);
+  });
+
+  it('gives up an upload older than 24 hours: 409 UPLOAD_EXPIRED once, then NOT_AWAITING_UPLOAD', async () => {
+    const { version } = await waiting();
+    const declared = h.dataOf<AttachmentDataWire>(await h.declareVersionAttachment(version.id, SAMPLE_PDF).expect(201));
+    const key = await h.putObject(declared.attachment.id, {
+      contentLength: SAMPLE_PDF.sizeBytes,
+      contentType: SAMPLE_PDF.contentType,
+    });
+    await h.ageAttachment(declared.attachment.id, 25 * 60 * 60 * 1000);
+
+    const first = await h.completeAttachment(declared.attachment.id).expect(409);
+    expect(h.errorOf(first).code).toBe('BUDGET_ATTACHMENT.UPLOAD_EXPIRED');
+    expect(await h.statusOf(declared.attachment.id)).toBe('EXPIRED');
+    expect(h.storage.objects.has(key)).toBe(false);
+
+    const second = await h.completeAttachment(declared.attachment.id).expect(409);
+    expect(h.errorOf(second).code).toBe('BUDGET_ATTACHMENT.NOT_AWAITING_UPLOAD');
+  });
+
+  it('answers 503 and changes nothing while the storage is down (complete)', async () => {
+    const { version } = await waiting();
+    const declared = h.dataOf<AttachmentDataWire>(await h.declareVersionAttachment(version.id, SAMPLE_PDF).expect(201));
+    await h.putObject(declared.attachment.id, {
+      contentLength: SAMPLE_PDF.sizeBytes,
+      contentType: SAMPLE_PDF.contentType,
+    });
+
+    h.storage.unavailable.add('head');
+    try {
+      const res = await h.completeAttachment(declared.attachment.id).expect(503);
+      expect(h.errorOf(res).code).toBe('SERVICE_UNAVAILABLE');
+    } finally {
+      h.storage.unavailable.delete('head');
+    }
+    expect(await h.statusOf(declared.attachment.id)).toBe('AWAITING_UPLOAD');
+    await h.completeAttachment(declared.attachment.id).expect(200);
+  });
+
+  it('refuses the 21st document of a version (limit) and accepts it again after one is removed', async () => {
+    const { version } = await waiting();
+    const ids: string[] = [];
+    for (let i = 0; i < 20; i += 1) {
+      ids.push(await h.uploaded({ ...SAMPLE_PDF, fileName: `bao-gia-${i}.pdf` }, h.finance, { versionId: version.id }));
+    }
+    const refused = await h.declareVersionAttachment(version.id, SAMPLE_PDF).expect(409);
+    expect(h.errorOf(refused).code).toBe('BUDGET_ATTACHMENT.LIMIT_REACHED');
+
+    await h.removeVersionAttachment(version.id, ids[0]).expect(200);
+    await h.uploaded(SAMPLE_PDF, h.finance, { versionId: version.id });
+  });
+
+  it('keeps import and documents apart: a spreadsheet attached to a version creates no line (US-06-09 AC-24)', async () => {
+    const { version } = await waiting();
+    const lines = async () =>
+      Number(
+        (
+          await h.ctx.sql.query<{ n: string }>(`SELECT count(*) AS n FROM budget_version_lines WHERE version_id = $1`, [
+            version.id,
+          ])
+        ).rows[0].n,
+      );
+    const before = await lines();
+
+    await h.uploaded(SAMPLE_XLSX, h.finance, { versionId: version.id });
+    expect(await lines()).toBe(before);
+
+    const csv = [
+      'cost_center_code,description,amount,window_from,window_to,service_period_months,repeat_cycle',
+      `${version.costCenter.code},Imported one,1000,${h.next}-05-01,${h.next}-05-31,12,ANNUAL`,
+    ].join('\n');
+    await h.importLines(version.id, csv).expect(201);
+    expect(await lines()).toBe(before + 1);
+  });
+
+  /** A second connection discards the file in a transaction that is still open when the complete reaches its row. */
+  const completeRacingADiscard = async (id: string) => {
+    const holder = new Client({ connectionString: h.ctx.database.url });
+    await holder.connect();
+    await holder.query('BEGIN');
+    await holder.query(`SELECT id FROM budget_attachments WHERE id = $1 FOR UPDATE`, [id]);
+    const complete = h.completeAttachment(id).then((response) => response);
+    await waitForLockWaiters(h.ctx.sql, 1);
+    await holder.query(`UPDATE budget_attachments SET status = 'DISCARDED' WHERE id = $1`, [id]);
+    await holder.query('COMMIT');
+    await holder.end();
+
+    return complete;
+  };
+
+  it('answers 409 NOT_AWAITING_UPLOAD, not 500, when a discard wins a race that would have quarantined the file', async () => {
+    const { version } = await waiting();
+    const declared = h.dataOf<AttachmentDataWire>(await h.declareVersionAttachment(version.id, SAMPLE_PDF).expect(201));
+    const id = declared.attachment.id;
+    await h.putObject(id, {
+      contentLength: SAMPLE_PDF.sizeBytes,
+      contentType: SAMPLE_PDF.contentType,
+      content: new Uint8Array([0x00, 0x01, 0x02, 0x03]),
+    });
+
+    const response = await completeRacingADiscard(id);
+    expect(response.status).toBe(409);
+    expect(h.errorOf(response).code).toBe('BUDGET_ATTACHMENT.NOT_AWAITING_UPLOAD');
+    expect(await h.statusOf(id)).toBe('DISCARDED');
+  });
+
+  it('takes its copy back when a discard wins the race for a good upload: no orphan under budget-documents/', async () => {
+    const { version } = await waiting();
+    const declared = h.dataOf<AttachmentDataWire>(await h.declareVersionAttachment(version.id, SAMPLE_PDF).expect(201));
+    const id = declared.attachment.id;
+    await h.putObject(id, { contentLength: SAMPLE_PDF.sizeBytes, contentType: SAMPLE_PDF.contentType });
+
+    const copiedBefore = h.storage.copied.length;
+    const response = await completeRacingADiscard(id);
+    expect(response.status).toBe(409);
+    expect(h.errorOf(response).code).toBe('BUDGET_ATTACHMENT.NOT_AWAITING_UPLOAD');
+    const copies = h.storage.copied.slice(copiedBefore);
+    expect(copies).toHaveLength(1);
+    expect(copies[0].to).toMatch(/^budget-documents\//);
+    expect(h.storage.objects.has(copies[0].to)).toBe(false);
+    expect(await h.finalKeyOf(id)).toBeNull();
   });
 });

@@ -1,3 +1,4 @@
+import { Client } from 'pg';
 import request from 'supertest';
 import { OBJECT_STORAGE } from '../../src/infrastructure/object-storage/object-storage.port';
 import type { ApiAccount } from './api-accounts';
@@ -20,23 +21,59 @@ export interface BudgetAttachmentWire {
   removedBy: { employeeId: string; employeeCode: string; fullName: string } | null;
 }
 
+/** What a declaration answers with: the row, and how to upload (`budgetAttachmentCreate`, no token of any kind). */
 export interface AttachmentDataWire {
   attachment: BudgetAttachmentWire;
-  upload?: { uploadToken: string; objectKey: string; maxSizeBytes: number; expiresAt: string };
+  upload?: {
+    url: string;
+    method: 'PUT';
+    headers: { 'Content-Type': string; 'Content-Length': string };
+    expiresAt: string;
+  };
+}
+
+/** A row of the lists of a record's documents (`budgetAttachmentSummary`). */
+export interface AttachmentSummaryWire {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  status: 'ATTACHED' | 'REMOVED';
+  uploadedBy: { employeeId: string; employeeCode: string; fullName: string } | null;
+  attachedAt: string;
+  removedAt: string | null;
+}
+
+/** A row of "my unattached files" (`budgetUploadSummary`). */
+export interface UploadSummaryWire {
+  id: string;
+  target: 'PROPOSAL' | 'VERSION';
+  status: 'AWAITING_UPLOAD' | 'UPLOADED';
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  versionId: string | null;
+  createdAt: string;
+  expiresAt: string;
 }
 
 export interface AttachmentListDataWire {
-  items: BudgetAttachmentWire[];
+  items: AttachmentSummaryWire[];
+  pagination: { page: number; pageSize: number; totalItems: number; totalPages: number };
+}
+
+export interface UploadListDataWire {
+  items: UploadSummaryWire[];
   pagination: { page: number; pageSize: number; totalItems: number; totalPages: number };
 }
 
 export interface AttachmentLinkDataWire {
   url: string;
-  expiresInSeconds: number;
+  expiresAt: string;
 }
 
 export interface MineVersionsDataWire {
-  items: Array<{ id: string; number: number; state: string }>;
+  items: Array<{ id: string; year: number; number: number; state: string; sentAt: string }>;
   pagination: { page: number; pageSize: number; totalItems: number; totalPages: number };
 }
 
@@ -93,6 +130,46 @@ export class BudgetAttachmentHarness extends BudgetHarness {
 
   listMineVersions = (query = '', account: ApiAccount = this.finance) =>
     request(this.server()).get(`/api/v1/budgets/mine/versions${query}`).set(this.as(account));
+
+  /** A file declared, put in the storage as declared and completed, failing on anything but 201 and 200. */
+  async uploaded(
+    spec: { fileName: string; contentType: string; sizeBytes: number },
+    account: ApiAccount,
+    target: { versionId?: string } = {},
+  ): Promise<string> {
+    const declared =
+      target.versionId === undefined
+        ? await this.declareProposalAttachment(spec, account)
+        : await this.declareVersionAttachment(target.versionId, spec, account);
+    if (declared.status !== 201) throw new Error(`declare: ${declared.status} ${JSON.stringify(declared.body)}`);
+    const id = this.dataOf<AttachmentDataWire>(declared).attachment.id;
+    await this.putObject(id, { contentLength: spec.sizeBytes, contentType: spec.contentType });
+    const completed = await this.completeAttachment(id, account);
+    if (completed.status !== 200) throw new Error(`complete: ${completed.status} ${JSON.stringify(completed.body)}`);
+
+    return id;
+  }
+
+  /**
+   * Makes a declared file look `ms` older than it is: how a test passes the 24 hours or 7 days that nothing else lets it
+   * pass (`created_at` is fixed by the trigger, so it is lifted for this one statement, in one transaction).
+   */
+  async ageAttachment(id: string, ms: number): Promise<void> {
+    const client = new Client({ connectionString: this.ctx.database.url });
+    await client.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('ALTER TABLE budget_attachments DISABLE TRIGGER USER');
+      await client.query(
+        `UPDATE budget_attachments SET created_at = created_at - ($2 * interval '1 millisecond') WHERE id = $1`,
+        [id, ms],
+      );
+      await client.query('ALTER TABLE budget_attachments ENABLE TRIGGER USER');
+      await client.query('COMMIT');
+    } finally {
+      await client.end();
+    }
+  }
 
   async putObject(
     id: string,

@@ -133,6 +133,42 @@ describe('budget attachment routes (HTTP contract, no database)', () => {
     expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
   });
 
+  it.each([
+    ['submit', 'post', '/api/v1/budget-proposals'],
+    ['resubmit', 'post', `/api/v1/budget-proposals/${ID}/resubmission`],
+  ] as const)('turns away %s with 21 or repeated attachmentIds with 422 (limits)', async (_name, method, path) => {
+    const server = app.getHttpServer();
+    const line = {
+      description: 'Figma',
+      amount: { amount: '1000', currency: 'VND' },
+      windowFrom: '2027-01-01',
+      windowTo: '2027-12-31',
+      servicePeriodMonths: 12,
+      repeatCycle: 'ANNUAL',
+    };
+    const base =
+      method === 'post' && path.endsWith('resubmission')
+        ? { lines: [line] }
+        : { costCenterId: ID, year: 2027, lines: [line] };
+    const ids = Array.from({ length: 21 }, (_, i) => `4f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c00${String(i).padStart(2, '0')}`);
+    for (const attachmentIds of [ids, [ids[0], ids[0]]]) {
+      const response = await request(server)
+        [method](path)
+        .set('Authorization', bearer(principal(['MANAGER'])))
+        .send({ ...base, attachmentIds })
+        .expect(422);
+      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    }
+  });
+
+  it('has no route that adds or removes the documents of a proposal (US-06-10 AC-16)', async () => {
+    const server = app.getHttpServer();
+    const as = (req: request.Test) => req.set('Authorization', bearer(principal(['MANAGER'])));
+
+    await as(request(server).post(`/api/v1/budget-proposals/${ID}/attachments`).send({})).expect(404);
+    await as(request(server).delete(`/api/v1/budget-proposals/${ID}/attachments/${ATTACHMENT_ID}`)).expect(404);
+  });
+
   it('has no route that deletes or modifies attachments directly through unsupported HTTP verbs', async () => {
     const server = app.getHttpServer();
     const as = (req: request.Test) => req.set('Authorization', bearer(principal(['FINANCE'])));

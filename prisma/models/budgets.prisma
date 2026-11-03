@@ -403,6 +403,6 @@ model BudgetAttachment {
   @@index([proposalId, attachedAt, id])
   @@index([versionId, status, attachedAt, id])
   @@index([status, createdAt])
-  @@index([uploadedByEmployeeId, status, createdAt])
+  @@index([uploadedByEmployeeId, status, createdAt], map: "budget_attachments_uploaded_by_status_created_at_idx")
   @@map("budget_attachments")
 }

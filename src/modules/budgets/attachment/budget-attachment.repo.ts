@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { PROPOSAL_UNATTACHED_AFTER_MS, UPLOAD_ABANDONED_AFTER_MS } from './budget-attachment.policy';
 import type { BudgetAttachmentRecord, BudgetAttachmentTarget } from './budget-attachment.types';
 
 @Injectable()
@@ -44,23 +45,57 @@ export class BudgetAttachmentRepo {
     return row ? toRecord(row) : null;
   }
 
+  /**
+   * The row locked `FOR UPDATE` for the rest of the transaction, then read through the model (a raw `SELECT *` comes back
+   * with the column names, not the field names); or null. Same pattern as `catalog/contract/document.repo.ts`.
+   */
   async lock(tx: DbTx, id: string): Promise<BudgetAttachmentRecord | null> {
-    const rows = await tx.$queryRaw<Prisma.BudgetAttachmentGetPayload<object>[]>`
-      SELECT * FROM "budget_attachments" WHERE "id" = ${id}::uuid FOR UPDATE
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "budget_attachments" WHERE "id" = ${id}::uuid FOR UPDATE
     `;
-    return rows.length > 0 ? toRecord(rows[0]) : null;
+    if (locked.length === 0) return null;
+
+    return this.find(id, tx);
   }
 
+  /** The rows of `ids` locked in ascending `id` order (one lock order for every writer), then read through the model. */
   async lockManyAsc(tx: DbTx, ids: string[]): Promise<BudgetAttachmentRecord[]> {
     if (ids.length === 0) return [];
-    const sortedIds = [...ids].sort();
-    const rows = await tx.$queryRaw<Prisma.BudgetAttachmentGetPayload<object>[]>`
-      SELECT * FROM "budget_attachments"
-      WHERE "id" IN (${Prisma.join(sortedIds.map((id) => Prisma.sql`${id}::uuid`))})
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "budget_attachments"
+      WHERE "id" IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))})
       ORDER BY "id" ASC
       FOR UPDATE
     `;
+    if (locked.length === 0) return [];
+    const rows = await tx.budgetAttachment.findMany({
+      where: { id: { in: locked.map((row) => row.id) } },
+      orderBy: { id: 'asc' },
+    });
+
     return rows.map(toRecord);
+  }
+
+  /**
+   * The next file the sweeper may give up (an upload that never came for 24 hours, a kept upload nobody sent for 7
+   * days) that no other transaction holds, locked `FOR UPDATE SKIP LOCKED` for the rest of this transaction, or null.
+   * `excluded` are the ones this pass already failed on, so a row that keeps failing is not picked again.
+   */
+  async lockNextExpired(tx: DbTx, now: Date, excluded: readonly string[]): Promise<BudgetAttachmentRecord | null> {
+    const awaitingCutoff = new Date(now.getTime() - UPLOAD_ABANDONED_AFTER_MS);
+    const uploadedCutoff = new Date(now.getTime() - PROPOSAL_UNATTACHED_AFTER_MS);
+    const picked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "budget_attachments"
+      WHERE (("status"::text = 'AWAITING_UPLOAD' AND "created_at" < ${awaitingCutoff})
+          OR ("status"::text = 'UPLOADED' AND "created_at" < ${uploadedCutoff}))
+        AND "id" <> ALL(${[...excluded]}::uuid[])
+      ORDER BY "created_at" ASC, "id" ASC
+      LIMIT 1
+      FOR UPDATE SKIP LOCKED
+    `;
+    if (picked.length === 0) return null;
+
+    return this.find(picked[0].id, tx);
   }
 
   async lockUploader(tx: DbTx, employeeId: string): Promise<void> {
@@ -207,6 +242,7 @@ export class BudgetAttachmentRepo {
     );
   }
 
+  /** The documents of a version as they were at its last send (`D-S24`): attached by `sentAt`, not removed before it. */
   async pageByVersionAsLastSent(
     versionId: string,
     sentAt: Date,
@@ -214,29 +250,20 @@ export class BudgetAttachmentRepo {
   ): Promise<{ items: BudgetAttachmentRecord[]; totalItems: number }> {
     return this.prisma.$transaction(
       async (tx) => {
-        const countRows = await tx.$queryRaw<{ count: bigint }[]>`
-          SELECT count(*)::bigint AS count
-          FROM "budget_attachments" a
-          WHERE a."version_id" = ${versionId}::uuid
-            AND a."status"::text IN ('ATTACHED', 'REMOVED')
-            AND a."attached_at" <= ${sentAt}
-            AND (a."removed_at" IS NULL OR a."removed_at" > ${sentAt})
-        `;
-        const totalItems = Number(countRows[0]?.count ?? 0);
-
-        const rows = await tx.$queryRaw<Prisma.BudgetAttachmentGetPayload<object>[]>`
-          SELECT *
-          FROM "budget_attachments" a
-          WHERE a."version_id" = ${versionId}::uuid
-            AND a."status"::text IN ('ATTACHED', 'REMOVED')
-            AND a."attached_at" <= ${sentAt}
-            AND (a."removed_at" IS NULL OR a."removed_at" > ${sentAt})
-          ORDER BY a."attached_at" ASC, a."id" ASC
-          OFFSET ${pagination.skip}
-          LIMIT ${pagination.take}
-        `;
-
-        return { items: rows.map(toRecord), totalItems };
+        const where = {
+          versionId,
+          status: { in: ['ATTACHED' as const, 'REMOVED' as const] },
+          attachedAt: { lte: sentAt },
+          OR: [{ removedAt: null }, { removedAt: { gt: sentAt } }],
+        };
+        const items = await tx.budgetAttachment.findMany({
+          where,
+          orderBy: [{ attachedAt: 'asc' }, { id: 'asc' }],
+          skip: pagination.skip,
+          take: pagination.take,
+        });
+        const totalItems = await tx.budgetAttachment.count({ where });
+        return { items: items.map(toRecord), totalItems };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
@@ -263,21 +290,6 @@ export class BudgetAttachmentRepo {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
-  }
-
-  async findExpiredCandidates(now: Date, limit: number): Promise<BudgetAttachmentRecord[]> {
-    const awaitingCutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const uploadedCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    const rows = await this.prisma.$queryRaw<Prisma.BudgetAttachmentGetPayload<object>[]>`
-      SELECT * FROM "budget_attachments"
-      WHERE ("status" = 'AWAITING_UPLOAD' AND "created_at" < ${awaitingCutoff})
-         OR ("status" = 'UPLOADED' AND "created_at" < ${uploadedCutoff})
-      ORDER BY "created_at" ASC
-      LIMIT ${limit}
-      FOR UPDATE SKIP LOCKED
-    `;
-    return rows.map(toRecord);
   }
 }
 

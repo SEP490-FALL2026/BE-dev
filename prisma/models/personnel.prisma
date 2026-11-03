@@ -317,8 +317,8 @@ model OffboardingCase {
   organization      Organization            @relation(fields: [organizationId], references: [id])
   notice            PersonnelNotice?        @relation(fields: [noticeId], references: [id], onDelete: Restrict)
   employee          Employee                @relation(fields: [employeeId], references: [id])
-  department                   Department?             @relation("OffboardingCaseDepartment", fields: [departmentId], references: [id])
-  cancelledPlacementDepartment Department?             @relation("OffboardingCaseCancelledPlacementDepartment", fields: [cancelledPlacementDepartmentId], references: [id])
+  department                   Department?             @relation("OffboardingCaseDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
+  cancelledPlacementDepartment Department?             @relation("OffboardingCaseCancelledPlacementDepartment", fields: [cancelledPlacementDepartmentId], references: [id], onDelete: Restrict)
   changes           OffboardingCaseChange[]
   recordedByTicket  SuperAdminEventTicket?  @relation("OffboardingRecordedByTicket", fields: [recordedByTicketId], references: [id], onDelete: Restrict)
   cancelledByTicket SuperAdminEventTicket?  @relation("OffboardingCancelledByTicket", fields: [cancelledByTicketId], references: [id], onDelete: Restrict)
