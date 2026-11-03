@@ -194,9 +194,10 @@ describe('a request for a service account after the installation over PostgreSQL
       );
       const lonely = await h.staff(u.department, 'SA-LONELY');
       await h.ctx.sql.query(`DELETE FROM employee_placements WHERE employee_id = $1`, [lonely.employeeId]);
-      expect(codeOf(await h.submitService(h.serviceForm(paidPlan), lonely.account).expect(409))).toBe(
-        'ACCESS_REQUEST.NO_DEPARTMENT',
-      );
+      // D-S21: a sender with no department is refused as a party of the request (422 REQUEST_PARTY.INELIGIBLE, UNPLACED).
+      const unplaced = await h.submitService(h.serviceForm(paidPlan), lonely.account).expect(422);
+      expect(codeOf(unplaced)).toBe('REQUEST_PARTY.INELIGIBLE');
+      expect((unplaced.body as { error: { details: { reason: string } } }).error.details.reason).toBe('UNPLACED');
       expect(await h.requestRows()).toBe(before);
     });
 

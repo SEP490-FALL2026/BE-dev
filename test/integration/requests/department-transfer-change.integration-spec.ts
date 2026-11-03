@@ -13,7 +13,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
   let internal: string;
   let subscriptionId: string;
   let sequence = 0;
-  const code = (prefix: string) => `${prefix}${(sequence += 1)}`;
+  const code = (prefix: string) => `${prefix}-${(sequence += 1)}`;
   const body = (employeeId: string, extra: object = {}) => ({
     employeeId,
     toDepartmentId: fin.id,

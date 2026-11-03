@@ -16,7 +16,7 @@ describe('long leave data, list and contracts for the leaving flow (integration,
   let counter: QueryCounter;
   let des: Department;
   let sequence = 0;
-  const code = (prefix: string) => `${prefix}${(sequence += 1)}`;
+  const code = (prefix: string) => `${prefix}-${(sequence += 1)}`;
   const sqlState = async (sql: string, params: unknown[] = []): Promise<string | null> => {
     try {
       await h.ctx.sql.query(sql, params);

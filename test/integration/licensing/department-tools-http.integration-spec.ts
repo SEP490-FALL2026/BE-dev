@@ -111,8 +111,8 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     finance = await department('P-FIN');
     headOfDesign = await headAccount(design, 'H-DES');
     headOfFinance = await headAccount(finance, 'H-FIN');
-    for (const code of ['D1', 'D2', 'D3', 'D4', 'D5', 'D6']) await enter(design.code, code);
-    await enter(finance.code, 'F1');
+    for (const code of ['D-1', 'D-2', 'D-3', 'D-4', 'D-5', 'D-6']) await enter(design.code, code);
+    await enter(finance.code, 'F-1');
 
     // Figma and GitHub belong to design, Slack to finance; a person of one department holds a seat on a subscription of the other (F22).
     figmaSubscription = await h.subscription(10, 'K2', design.id);
@@ -123,19 +123,19 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
       account_identifier: `${prefix}${code.toLowerCase()}@acme.vn`,
     });
     await h.written({ subscriptionId: figmaSubscription }, [
-      person('D1'),
-      person('D2'),
-      person('D3'),
-      person('F1'),
-      { ...person('D6'), granted_on: '2025-01-01' },
+      person('D-1'),
+      person('D-2'),
+      person('D-3'),
+      person('F-1'),
+      { ...person('D-6'), granted_on: '2025-01-01' },
     ]);
     await h.written({ subscriptionId: githubSubscription }, [
-      person('D4'),
-      { employee_code: 'D5', account_identifier: 'ci-bot', kind: 'service', reason: 'CI' },
+      person('D-4'),
+      { employee_code: 'D-5', account_identifier: 'ci-bot', kind: 'service', reason: 'CI' },
     ]);
-    await h.written({ subscriptionId: slackSubscription }, [person('F1', 'slack-'), person('D1', 'slack-')]);
+    await h.written({ subscriptionId: slackSubscription }, [person('F-1', 'slack-'), person('D-1', 'slack-')]);
     // Internal software has no subscription, so no owner: the seat of a member of finance on it is read through the member.
-    await h.written({ planId: await h.plan('K5') }, [person('F1', 'portal-')]);
+    await h.written({ planId: await h.plan('K5') }, [person('F-1', 'portal-')]);
   }, 240000);
 
   afterAll(async () => {
@@ -147,12 +147,20 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
 
     expect(result.pagination.totalItems).toBe(7);
     // F1 is a person of finance who holds a seat of the subscription of design: it is design's seat, listed once.
-    expect(result.items.map((item) => item.employeeCode).sort()).toEqual(['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'F1']);
-    expect(result.items.find((item) => item.employeeCode === 'F1')).toMatchObject({
+    expect(result.items.map((item) => item.employeeCode).sort()).toEqual([
+      'D-1',
+      'D-2',
+      'D-3',
+      'D-4',
+      'D-5',
+      'D-6',
+      'F-1',
+    ]);
+    expect(result.items.find((item) => item.employeeCode === 'F-1')).toMatchObject({
       kind: 'PERSONAL',
       holderStatus: 'ACTIVE',
     });
-    expect(result.items.find((item) => item.employeeCode === 'D5')).toMatchObject({
+    expect(result.items.find((item) => item.employeeCode === 'D-5')).toMatchObject({
       kind: 'SERVICE',
       source: 'BASELINE',
       holderStatus: 'ACTIVE',
@@ -173,10 +181,10 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
 
     // The Slack seats of F1 and D1 (a person of design), and the seat of F1 on internal software.
     expect(result.pagination.totalItems).toBe(3);
-    expect(result.items.map((item) => item.employeeCode).sort()).toEqual(['D1', 'F1', 'F1']);
+    expect(result.items.map((item) => item.employeeCode).sort()).toEqual(['D-1', 'F-1', 'F-1']);
     expect(result.items.every((item) => item.kind === 'PERSONAL')).toBe(true);
     // The seat of D1 on Slack is not design's: design lists D1 once, for Figma.
-    expect((await toolsOf(design.id)).items.filter((item) => item.employeeCode === 'D1')).toHaveLength(1);
+    expect((await toolsOf(design.id)).items.filter((item) => item.employeeCode === 'D-1')).toHaveLength(1);
   });
 
   /**
@@ -315,7 +323,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     const result = await toolsOf(design.id);
 
     for (const item of result.items) {
-      if (item.employeeCode === 'D6')
+      if (item.employeeCode === 'D-6')
         expect(item).toMatchObject({ effectiveFrom: '2025-01-01', effectiveFromLabel: null });
       else expect(item.effectiveFromLabel?.startsWith('ghi nhận từ ')).toBe(true);
     }
@@ -342,15 +350,15 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
 
   it('does not list a seat that has ended, and counts the seats of every page in the summary', async () => {
     const before = await toolsOf(design.id);
-    expect(before.items.map((item) => item.employeeCode)).toContain('D6');
+    expect(before.items.map((item) => item.employeeCode)).toContain('D-6');
     await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = '2025-06-01' WHERE employee_id = $1`, [
-      await employeeId('D6'),
+      await employeeId('D-6'),
     ]);
 
     const second = await toolsOf(design.id, { pageSize: 2, page: 2 });
     const all = await toolsOf(design.id);
 
-    expect(all.items.map((item) => item.employeeCode)).not.toContain('D6');
+    expect(all.items.map((item) => item.employeeCode)).not.toContain('D-6');
     expect(second.pagination.totalItems).toBe(6);
     expect(second.items).toHaveLength(2);
     expect(second.summary.reduce((sum, entry) => sum + entry.seats, 0)).toBe(6);

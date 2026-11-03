@@ -289,9 +289,12 @@ describe('requests over HTTP: sending and routing the need step (integration, re
       const lonely = await h.staff(headless, 'HR-E7');
       await h.ctx.sql.query(`DELETE FROM employee_placements WHERE employee_id = $1`, [lonely.employeeId]);
 
-      expect(h.codeOf(await h.submit(h.form(internalPlan), lonely.account).expect(409))).toBe(
-        'ACCESS_REQUEST.NO_DEPARTMENT',
-      );
+      // D-S21: a person with no department is refused as a party of the request (422), not as a conflict of the department.
+      const refused = await h.submit(h.form(internalPlan), lonely.account).expect(422);
+      expect((refused.body as { error: { code: string; details: { reason: string } } }).error).toMatchObject({
+        code: 'REQUEST_PARTY.INELIGIBLE',
+        details: { reason: 'UNPLACED' },
+      });
     });
   });
 

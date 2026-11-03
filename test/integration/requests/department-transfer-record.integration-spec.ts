@@ -28,7 +28,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
   });
 
   let sequence = 0;
-  const code = (prefix: string) => `${prefix}${(sequence += 1)}`;
+  const code = (prefix: string) => `${prefix}-${(sequence += 1)}`;
   const codeOf = (response: request.Response) => h.codeOf(response);
   const body = (employeeId: string, extra: object = {}) => ({
     employeeId,

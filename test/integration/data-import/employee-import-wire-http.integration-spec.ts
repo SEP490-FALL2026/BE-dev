@@ -113,6 +113,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
         existingSame: 0,
         existingDifferent: 0,
         newPeopleByDepartment: [{ departmentCode: department, count: 1 }],
+        newUnplaced: 0,
         departmentsWithoutHead: [{ code: department, name: `Department ${department}` }],
         reviewQueue: { total: 0, items: [] },
         duplicateOf: null,
@@ -165,6 +166,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
               },
               errors: [{ column: 'hire_date', code: 'HIRE_DATE_INVALID' }],
               differences: null,
+              unplaced: null,
             },
           ],
           pagination: { page: 2, pageSize: 1, totalItems: 2, totalPages: 2 },
@@ -173,6 +175,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
       expect(Object.keys((page.body as { data: { items: object[] } }).data.items[0])).toEqual([
         'line',
         'outcome',
+        'unplaced',
         'cells',
         'errors',
         'differences',
@@ -196,6 +199,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
         existingDifferent: 0,
         errors: 1,
         createdByDepartment: [{ departmentCode: department, count: 1 }],
+        newUnplaced: 0,
         departmentsWithoutHead: [{ code: department, name: `Department ${department}` }],
       };
       expect(confirmed.body).toEqual({
@@ -300,8 +304,8 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
         success: false,
         error: {
           code: 'IMPORT.FILE_MISSING_COLUMNS',
-          message: 'The file lacks required columns: employment_type, hire_date, department_code.',
-          details: { missing: ['employment_type', 'hire_date', 'department_code'] },
+          message: 'The file lacks required columns: employment_type, hire_date.',
+          details: { missing: ['employment_type', 'hire_date'] },
           requestId: expect.any(String) as unknown,
         },
       });
