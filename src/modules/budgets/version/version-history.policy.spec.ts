@@ -4,6 +4,8 @@ import {
   HISTORY_CHANGES_MAX,
   HISTORY_CHUNK_BYTES,
   HISTORY_LINES_MAX,
+  attachmentAdded,
+  attachmentRemoved,
   changesOf,
   chunkSnapshots,
   figureChange,
@@ -249,5 +251,67 @@ describe('the fields as the reader gets them', () => {
 
     expect(changesOf(null, { base: '1' })).toEqual([{ field: 'base', before: null, after: '1' }]);
     expect(changesOf({}, wide)).toHaveLength(HISTORY_CHANGES_MAX);
+  });
+});
+
+describe('attachmentAdded and attachmentRemoved history changes', () => {
+  it('formats attachmentAdded with all string values and null before', () => {
+    const entry = attachmentAdded({
+      attachmentId: 'att-1',
+      fileName: 'bao-gia.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 48213,
+    });
+
+    expect(entry.before).toBeNull();
+    expect(entry.after).toEqual({
+      attachmentId: 'att-1',
+      fileName: 'bao-gia.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: '48213',
+    });
+
+    const changes = changesOf(entry.before, entry.after);
+    expect(changes.map((c) => c.field)).toEqual(['fileName', 'contentType', 'sizeBytes', 'attachmentId']);
+    expect(changes.find((c) => c.field === 'fileName')).toEqual({
+      field: 'fileName',
+      before: null,
+      after: 'bao-gia.pdf',
+    });
+    expect(changes.find((c) => c.field === 'sizeBytes')).toEqual({
+      field: 'sizeBytes',
+      before: null,
+      after: '48213',
+    });
+  });
+
+  it('formats attachmentRemoved with string values and state transition', () => {
+    const entry = attachmentRemoved({
+      attachmentId: 'att-1',
+      fileName: 'bao-gia.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 48213,
+    });
+
+    expect(entry.before).toEqual({
+      attachmentId: 'att-1',
+      fileName: 'bao-gia.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: '48213',
+      state: 'ATTACHED',
+    });
+    expect(entry.after).toEqual({
+      attachmentId: 'att-1',
+      fileName: 'bao-gia.pdf',
+      state: 'REMOVED',
+    });
+
+    const changes = changesOf(entry.before, entry.after);
+    expect(changes.map((c) => c.field)).toEqual(['fileName', 'state', 'attachmentId']);
+    expect(changes.find((c) => c.field === 'state')).toEqual({
+      field: 'state',
+      before: 'ATTACHED',
+      after: 'REMOVED',
+    });
   });
 });

@@ -82,6 +82,7 @@ model BudgetProposal {
   successor      BudgetProposal?      @relation("BudgetProposalSuccession")
   lines          BudgetProposalLine[]
   versions       BudgetVersion[]
+  attachments    BudgetAttachment[]
 
   @@index([costCenterId, year, state])
   @@index([state, submittedAt])
@@ -164,6 +165,7 @@ model BudgetVersion {
   lines               BudgetVersionLine[]
   decisions           BudgetVersionDecision[]
   attachedCommitments BudgetCommitment[]          @relation("BudgetCommitmentAttached")
+  attachments         BudgetAttachment[]
 
   @@unique([costCenterId, year, number])
   @@index([costCenterId, year, state])
@@ -330,6 +332,8 @@ enum BudgetVersionHistoryKind {
   LINES_ADDED
   LINES_IMPORTED
   WINDOW_MOVED
+  ATTACHMENT_ADDED
+  ATTACHMENT_REMOVED
 }
 
 // One edit of a version (F66, QĐ-91d), appended in the transaction of the edit and never changed (a trigger): what Finance
@@ -357,4 +361,48 @@ model BudgetVersionHistoryEntry {
 
   @@unique([versionId, seq])
   @@map("budget_version_history")
+}
+
+enum BudgetAttachmentTarget {
+  PROPOSAL
+  VERSION
+}
+
+enum BudgetAttachmentStatus {
+  AWAITING_UPLOAD
+  UPLOADED
+  ATTACHED
+  REMOVED
+  QUARANTINED
+  EXPIRED
+  DISCARDED
+}
+
+model BudgetAttachment {
+  id                   String                 @id @default(uuid()) @db.Uuid
+  organizationId       String                 @map("organization_id") @db.Uuid
+  target               BudgetAttachmentTarget
+  status               BudgetAttachmentStatus @default(AWAITING_UPLOAD)
+  fileName             String                 @map("file_name")
+  contentType          String                 @map("content_type")
+  sizeBytes            Int                    @map("size_bytes")
+  objectKey            String                 @unique @map("object_key")
+  finalObjectKey       String?                @unique @map("final_object_key")
+  uploadedByEmployeeId String                 @map("uploaded_by_employee_id") @db.Uuid
+  proposalId           String?                @map("proposal_id") @db.Uuid
+  versionId            String?                @map("version_id") @db.Uuid
+  attachedAt           DateTime?              @map("attached_at") @db.Timestamptz(3)
+  removedAt            DateTime?              @map("removed_at") @db.Timestamptz(3)
+  removedByEmployeeId  String?                @map("removed_by_employee_id") @db.Uuid
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  proposal     BudgetProposal? @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+  version      BudgetVersion?  @relation(fields: [versionId], references: [id], onDelete: Restrict)
+
+  @@index([proposalId, attachedAt, id])
+  @@index([versionId, status, attachedAt, id])
+  @@index([status, createdAt])
+  @@index([uploadedByEmployeeId, status, createdAt])
+  @@map("budget_attachments")
 }

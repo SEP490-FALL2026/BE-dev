@@ -34,12 +34,12 @@ flowchart BT
   subgraph T7["T7"]
     dashboards["dashboards"]
   end
-  budgets -->|10| audit
+  budgets -->|18| audit
   budgets -->|2| catalog
   budgets -->|3| finance
   budgets -->|5| identity_access
   budgets -->|3| notifications
-  budgets -->|3| operating_parameters
+  budgets -->|4| operating_parameters
   budgets -->|11| organization
   catalog -->|18| audit
   catalog -->|11| finance

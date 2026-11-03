@@ -23,6 +23,7 @@ import {
   BudgetProposalReturnBodyDto,
 } from '../budget/budget.dto';
 import { BUDGET_ERROR_EXAMPLES as EXAMPLES, toBudgetApiException } from '../budget/budget.http-errors';
+import { BUDGET_ATTACHMENT_ERROR_EXAMPLES as ATTACHMENT_EXAMPLES } from '../attachment/budget-attachment.http-errors';
 import { ProposalService } from './proposal.service';
 import { ProposalViewService } from './proposal-view.service';
 
@@ -67,6 +68,7 @@ const SEND_EXAMPLES = [
   EXAMPLES.CURRENCY_NOT_SUPPORTED,
   EXAMPLES.MONEY_SCALE_EXCEEDED,
   EXAMPLES.MONEY_OUT_OF_RANGE,
+  ATTACHMENT_EXAMPLES.NOT_ATTACHABLE,
 ] as const;
 
 /**
@@ -272,7 +274,7 @@ export class BudgetProposalsController {
     @Body() body: ResubmissionBodyDto,
   ) {
     try {
-      return { proposal: await this.proposals.resubmit(actor, params.id, body.lines) };
+      return { proposal: await this.proposals.resubmit(actor, params.id, body.lines, body.attachmentIds) };
     } catch (error) {
       throw toBudgetApiException(error);
     }

@@ -9,7 +9,7 @@ import { ProposalRepo } from '../budget/proposal.repo';
 import { VersionLineRepo } from '../budget/version-line.repo';
 import { VersionRepo } from '../budget/version.repo';
 import { VersionViewService } from '../budget/version-view.service';
-import type { MineWire, TableRowWire, VersionLineWire } from '../budget/budget.dto';
+import type { MineVersionSummaryWire, MineWire, TableRowWire, VersionLineWire } from '../budget/budget.dto';
 
 /**
  * What is read of the budgets themselves (`US-06-09` AC-5, `US-06-10` AC-7). A head of department reads the budget of the
@@ -125,6 +125,28 @@ export class BudgetViewService {
     );
 
     return pageOf(rows, total, query.page, query.pageSize);
+  }
+
+  async mineVersions(
+    actor: AuthenticatedPrincipal,
+    query: { year?: number; page: number; pageSize: number },
+  ): Promise<Page<MineVersionSummaryWire>> {
+    const costCenterId = await this.ownCostCenter(actor);
+    const { items, total } = await this.versions.pageSentOf(costCenterId, {
+      year: query.year,
+      skip: (query.page - 1) * query.pageSize,
+      take: query.pageSize,
+    });
+
+    const wires: MineVersionSummaryWire[] = items.map((item) => ({
+      id: item.id,
+      year: item.year,
+      number: item.number,
+      state: item.state,
+      sentAt: item.sentAt.toISOString(),
+    }));
+
+    return pageOf(wires, total, query.page, query.pageSize);
   }
 
   private async ownCostCenter(actor: AuthenticatedPrincipal): Promise<string> {

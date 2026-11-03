@@ -250,7 +250,7 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
         })
         .map((operation) => operation.key);
 
-      expect(operations).toHaveLength(302);
+      expect(operations).toHaveLength(312);
       expect(missing).toEqual([]);
     });
 
