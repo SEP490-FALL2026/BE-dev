@@ -109,7 +109,7 @@ export class OffboardingController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description: `The person has left (OFFBOARDING_CASE.EMPLOYEE_LEFT) or is handing over already (ALREADY_HANDING_OVER), has a transfer that takes effect before the last working day or another event waiting (PENDING_EVENT_EXISTS), has no placement in force (PLACEMENT_OVERLAP, details.reason NO_OPEN_PLACEMENT), has a first placement that takes effect on or before the last working day (PLACEMENT_OVERLAP, details.reason FIRST_PLACEMENT_PENDING with validFrom: pick an earlier day or record from that day), or ${CONCURRENT}.`,
+      description: `The person has left (OFFBOARDING_CASE.EMPLOYEE_LEFT) or is handing over already (ALREADY_HANDING_OVER), has a transfer that takes effect before the last working day or another event waiting (PENDING_EVENT_EXISTS), has placements but none in force or scheduled (PLACEMENT_OVERLAP, details.reason NO_OPEN_PLACEMENT; a person never placed is recorded on the shortened flow), has a first placement that takes effect on or before the last working day (PLACEMENT_OVERLAP, details.reason FIRST_PLACEMENT_PENDING with validFrom: pick an earlier day or record from that day), or ${CONCURRENT}.`,
       examples: [...PERSON_REFUSALS, ...CONCURRENT_EXAMPLES, E.PLACEMENT_OVERLAP],
     },
     {

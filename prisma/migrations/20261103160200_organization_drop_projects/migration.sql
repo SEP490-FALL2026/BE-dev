@@ -3,7 +3,7 @@
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM "project_departments") OR EXISTS (SELECT 1 FROM "projects") THEN
-    RAISE EXCEPTION 'Cannot drop projects: rows remain in projects or project_departments; remove them in the running release first'
+    RAISE EXCEPTION 'Cannot drop projects: rows remain in projects or project_departments; this drop is for an installation that never used projects'
       USING ERRCODE = 'P0001';
   END IF;
 END $$;

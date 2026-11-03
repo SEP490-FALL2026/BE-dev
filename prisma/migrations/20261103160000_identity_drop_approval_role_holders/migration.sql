@@ -52,7 +52,7 @@ BEGIN
   ) v;
 
   IF problems IS NOT NULL THEN
-    RAISE EXCEPTION 'QĐ-93 approval role drop blocked; run pnpm ops:preflight and fix in the application:%', E'\n' || problems
+    RAISE EXCEPTION 'QĐ-93 approval role drop blocked; deploy the previous release and settle the listed rows in the application first:%', E'\n' || problems
       USING ERRCODE = 'P0001';
   END IF;
 END $$;
