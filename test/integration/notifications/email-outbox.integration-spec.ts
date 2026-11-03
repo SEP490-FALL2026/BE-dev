@@ -134,7 +134,7 @@ describe('email outbox and dispatcher (integration, PostgreSQL + in-process SMTP
 
     expect(received).toHaveLength(1);
     expect(received[0].to).toEqual(['new.user@acme.vn']);
-    expect(received[0].body).toContain('https://app.acme.test/activate-account#token=deliver-me');
+    expect(received[0].body).toContain('https://app.acme.test/activate#token=deliver-me');
     const row = await rowOf(mail.id);
     expect(row).toMatchObject({ status: 'SENT', attempts: 1, payload_ciphertext: null, lease_id: null });
     expect(row.sent_at).toBeInstanceOf(Date);

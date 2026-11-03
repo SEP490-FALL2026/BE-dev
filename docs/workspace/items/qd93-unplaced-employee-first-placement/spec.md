@@ -615,6 +615,12 @@ placement hiệu lực.
   1); kiểm người chịu trách nhiệm khi cấp tài khoản dịch vụ đọc `getRequestUnits` (`provisioning-holder.service.ts`, Task
   C.3); test trưởng phòng `E302` cấp `MANAGER` trước; quy tắc migration không sửa `scripts/verify/merged-migrations.txt`;
   giới hạn 500 dòng của `employee.repo.ts`.
+- 03/11/2026 — lệch tên so với spec, giữ code và ghi lại (rà soát vòng 2 V3-M2, Owner chưa đổi): mã 409 xếp phòng lần đầu
+  cho người đang bàn giao là `EMPLOYEE.EMPLOYEE_LEAVING` (spec: `EMPLOYEE.FIRST_PLACEMENT_EMPLOYEE_LEAVING`) — cùng họ với
+  `EMPLOYEE.ALREADY_PLACED`, `EMPLOYEE.EMPLOYEE_INACTIVE`, `EMPLOYEE.DATE_INVALID` đã có trên `dev` (mã dựng từ `problem` của
+  `FirstPlacementError`, không có tiền tố `FIRST_PLACEMENT_`); FE dùng tên đã xuất ở `openapi.json`. Tên facade đọc người chưa
+  xếp phòng là `OrganizationReadApi.unplacedAmong` (đã dùng ở `request-party`, danh bạ, import); bản trùng tên
+  `getUnplacedEmployeeIds` của spec đã bỏ vì không có nơi gọi. Mô tả 409 của `employeeFirstPlacementCreate` liệt kê đủ bốn mã.
 
 Quyết định kỹ thuật (Owner duyệt 01/11/2026):
 

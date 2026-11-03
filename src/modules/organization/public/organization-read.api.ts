@@ -51,10 +51,6 @@ export class OrganizationReadApi {
     return this.employees.unplacedAmong(employeeIds, tx);
   }
 
-  getUnplacedEmployeeIds(employeeIds: readonly string[], tx?: DbTx): Promise<ReadonlySet<string>> {
-    return this.employees.unplacedAmong(employeeIds, tx);
-  }
-
   async getScheduledFirstPlacement(
     employeeId: string,
     onDate?: BusinessDate,

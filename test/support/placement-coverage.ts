@@ -6,9 +6,10 @@ export interface CoverageViolation {
 }
 
 /**
- * I-2 coverage: the exclusion constraint proves placements never overlap but cannot prove they
- * start at hireDate or later, leave no gaps, or leave an active employee with a placement with
- * exactly one open period. An employee with no placement is valid unplaced (INV-20).
+ * I-2 coverage: the exclusion constraint proves placements never overlap but cannot prove that the first placement
+ * starts at the hire date, at the day the employee was recorded, or not before both (a first placement), that there is no
+ * gap, or that an active employee with a placement has exactly one open period. An employee with no placement is
+ * valid unplaced (INV-20).
  * Run at the end of any test that writes organization data; an empty result means coverage holds.
  */
 const COVERAGE_SQL = `
@@ -18,11 +19,14 @@ WITH ordered AS (
          row_number() OVER (PARTITION BY p.employee_id ORDER BY p.valid_from) AS position
   FROM employee_placements p
 )
-SELECT o.employee_id, 'first placement starts before hire date' AS problem
+SELECT o.employee_id, 'first placement does not start at hire date or at the day the employee was recorded' AS problem
 FROM ordered o
 JOIN employees e ON e.id = o.employee_id
+JOIN organizations og ON og.id = e.organization_id
 WHERE o.position = 1
-  AND o.valid_from < e.hire_date
+  AND o.valid_from <> e.hire_date
+  AND o.valid_from <> (e.created_at AT TIME ZONE og.time_zone)::date
+  AND o.valid_from < GREATEST(e.hire_date, (e.created_at AT TIME ZONE og.time_zone)::date)
 UNION ALL
 SELECT o.employee_id, 'gap or overlap between consecutive placements' AS problem
 FROM ordered o WHERE o.next_from IS NOT NULL AND o.valid_to IS DISTINCT FROM o.next_from
