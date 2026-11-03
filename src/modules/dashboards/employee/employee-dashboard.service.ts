@@ -18,9 +18,9 @@ export interface EmployeeDashboard {
 
 /**
  * The overview of an Employee (`US-12-15` AC-2): the software granted to them (K4 included), the time-limited rights about to end, their
- * requests waiting and their results, and their SaaS error reports, each about the caller only. The rights and reports are counted from
- * the lists that show them ("my software", the reports the person sent); the list of the person's own submitted requests is not delivered
- * yet, so that section says so and shows no number. No cost, no seat count of a subscription and nobody else's data is read.
+ * requests that are not over, and their SaaS error reports, each about the caller only. The rights, requests and reports are counted from
+ * the lists that show them ("my software", "my requests" with the `open` view, the reports the person sent); a Super Admin sends no request, so
+ * for them that section says it is not available and shows no number. No cost, no seat count of a subscription and nobody else's data is read.
  */
 @Injectable()
 export class EmployeeDashboardService {

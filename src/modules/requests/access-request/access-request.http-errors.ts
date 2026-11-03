@@ -171,6 +171,10 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
       employeeIds: ['<employee-id>'],
     }),
   ),
+  /** What the preview answers: it refuses only an employee who is placed in no department; a spending approver gets 200 with `blockedBy`. */
+  PREVIEW_REQUEST_PARTY_UNPLACED: example(
+    new RequestPartyIneligibleError({ reason: 'UNPLACED', party: 'REQUESTER', employeeIds: ['<employee-id>'] }),
+  ),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
   NOT_DRAFT: example(new AccessRequestNotDraftError()),

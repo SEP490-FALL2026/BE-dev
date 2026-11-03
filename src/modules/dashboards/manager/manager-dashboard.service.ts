@@ -31,10 +31,10 @@ export interface ManagerDashboard {
 
 /**
  * The overview of a head (`US-12-15` AC-3), for the one department they head on the business day and no other. The software the
- * department is granted or manages and the open reviews after a transfer are counted from the lists that show them; the queue of
- * requests ready to be submitted for spending, the budget proposals and the lines of the approved version are listed by their own
- * operations, which keep the head to their department. The requests waiting for the head's need decision, the ghost seats (usage) and
- * the actual cost and commitments of the department (finance figures) have no source yet: each says so and never shows zero. Nothing
+ * department is granted or manages, the open reviews after a transfer and the need steps waiting for the head are counted from the lists
+ * that show them; the queue of requests ready to be submitted for spending, the budget proposals and the lines of the approved version
+ * are listed by their own operations, which keep the head to their department. The ghost seats (usage) and the actual cost and
+ * commitments of the department (finance figures) have no source yet: each says so and never shows zero. Nothing
  * here reads a remaining budget, a budget check result, a company total or a measure of usage.
  */
 @Injectable()

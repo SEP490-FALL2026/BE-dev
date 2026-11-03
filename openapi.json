@@ -39729,7 +39729,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), an expected spend date is given for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE), or the caller cannot be party to the request (REQUEST_PARTY.INELIGIBLE).",
+            "description": "The body is invalid (VALIDATION_ERROR), an expected spend date is given for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE), or the caller is placed in no department (REQUEST_PARTY.INELIGIBLE, details.reason UNPLACED). A spending approver is not refused here: the answer is 200 with blockedBy and canSubmit false.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -39764,11 +39764,7 @@
                       "error": {
                         "code": "REQUEST_PARTY.INELIGIBLE",
                         "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
-                        "details": {
-                          "reason": "SPENDING_APPROVER",
-                          "party": "REQUESTER",
-                          "employeeIds": ["<employee-id>"]
-                        },
+                        "details": { "reason": "UNPLACED", "party": "REQUESTER", "employeeIds": ["<employee-id>"] },
                         "requestId": "req_example"
                       }
                     }
@@ -65251,7 +65247,7 @@
             }
           },
           "422": {
-            "description": "The file cannot be used as a whole: missing, unsupported, empty, unreadable, too many rows, or lacking a required column (IMPORT.FILE_*). Department and job title are optional for employees.",
+            "description": "The file cannot be used as a whole: missing, unsupported, empty, unreadable, too many rows, or lacking a required column (IMPORT.FILE_*). Department and job title are optional for employees. A workbook is unreadable (details.reason INVALID_XLSX) when it is not a plain single-disk zip, and is refused with details.reason UNCOMPRESSED_SIZE_EXCEEDED when its entries inflate to more than 20 MB (the real inflated size is checked, not the size the file declares).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -72785,7 +72781,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "The sections of the overview of the signed-in Employee on the business day (asOf), about the caller only: the software rights held (K4 included) and those about to end within seven days, counted as the list of my software rights shows them; the SaaS error reports the caller sent that are still open; and the requests of the caller, which say they are not available yet instead of a number. No cost, seat count or data of another person is answered. Each section names the operation that lists its rows.",
+            "description": "The sections of the overview of the signed-in Employee on the business day (asOf), about the caller only: the software rights held (K4 included) and those about to end within seven days, counted as the list of my software rights shows them; the SaaS error reports the caller sent that are still open; and the requests the caller sent that are not over, counted as meAccessRequestList with view=open counts them (a Super Admin sends none, so that section says it is not available, NO_DATA_SOURCE, instead of a number). No cost, seat count or data of another person is answered. Each section names the operation that lists its rows.",
             "content": {
               "application/json": {
                 "schema": {
@@ -72915,7 +72911,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "The sections of the overview of the head for the department they head on the business day (asOf), and no other department. The seats the department is granted or manages and the open reviews after a transfer are counted; the queue ready for spending submission, the budget proposals and the lines of the approved version name the operation that lists them; the need decisions waiting, the ghost seats and the actual cost and commitments say they are not available yet and are never shown as zero. No remaining budget, budget check result, company total or usage measure is answered.",
+            "description": "The sections of the overview of the head for the department they head on the business day (asOf), and no other department. The seats the department is granted or manages and the open reviews after a transfer are counted; the queue ready for spending submission, the budget proposals and the lines of the approved version name the operation that lists them; the need decisions waiting are counted as needDecisionList counts them; the ghost seats and the actual cost and commitments say they are not available yet and are never shown as zero. No remaining budget, budget check result, company total or usage measure is answered.",
             "content": {
               "application/json": {
                 "schema": {
@@ -95744,7 +95740,7 @@
                     },
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
-                    "description": "The requests of the caller waiting and their results; the list of them is not delivered yet."
+                    "description": "The requests the caller sent that are not over, as meAccessRequestList with view=open counts them; drafts and requests sent on their behalf are not counted. Not available (NO_DATA_SOURCE) for a Super Admin, who sends none. The results are read from the list with view=ended, not from here."
                   },
                   "saasIssues": {
                     "type": "object",
@@ -95853,7 +95849,7 @@
                     },
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
-                    "description": "The requests waiting for the need decision of the caller; the queue is not delivered yet."
+                    "description": "The need steps given to the caller now, as needDecisionList counts them: requests of the caller, steps already decided and steps handed to somebody else are not counted."
                   },
                   "departmentSoftware": {
                     "type": "object",

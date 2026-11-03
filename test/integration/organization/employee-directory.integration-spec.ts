@@ -449,7 +449,10 @@ describe('employee directory read (US-02-02 AC-22, AC-24, AC-25, AC-26, integrat
         [h.seed.organizationId, empId, dep1.id, today],
       );
 
-      const res = await getList(`departmentId=${dep1.id}`).expect(200);
+      // `q` narrows both reads to this one employee, so the answer does not depend on how many rows other tests seeded.
+      const found = await getList('q=NV-VTO-TODAY').expect(200);
+      expect(dataOf<EmployeeListPageWire>(found).items.map((i) => i.id)).toEqual([empId]);
+      const res = await getList(`departmentId=${dep1.id}&q=NV-VTO-TODAY`).expect(200);
       const ids = dataOf<EmployeeListPageWire>(res).items.map((i) => i.id);
       expect(ids).not.toContain(empId);
 
@@ -504,13 +507,13 @@ describe('employee directory read (US-02-02 AC-22, AC-24, AC-25, AC-26, integrat
 
       await h.ctx.sql.query(`UPDATE employees SET work_state = 'ON_LONG_LEAVE' WHERE id = $1`, [empId]);
 
-      const leaveRes = await getList('workState=ON_LONG_LEAVE').expect(200);
+      const leaveRes = await getList('workState=ON_LONG_LEAVE&q=NV-STATE-LEAVE').expect(200);
       const leaveIds = dataOf<EmployeeListPageWire>(leaveRes).items.map((i) => i.id);
-      expect(leaveIds).toContain(empId);
+      expect(leaveIds).toEqual([empId]);
 
-      const workingRes = await getList('workState=WORKING').expect(200);
+      const workingRes = await getList('workState=WORKING&q=NV-STATE-LEAVE').expect(200);
       const workingIds = dataOf<EmployeeListPageWire>(workingRes).items.map((i) => i.id);
-      expect(workingIds).not.toContain(empId);
+      expect(workingIds).toEqual([]);
     });
 
     it('shows department: null and unplaced: false for an employee with only a future placement', async () => {
@@ -585,11 +588,13 @@ describe('employee directory read (US-02-02 AC-22, AC-24, AC-25, AC-26, integrat
     });
 
     it('preserves totalItems on a page beyond the end', async () => {
+      const first = dataOf<EmployeeListPageWire>(await getList('page=1&pageSize=10').expect(200));
       const res = await getList('page=9999&pageSize=10').expect(200);
       const page = dataOf<EmployeeListPageWire>(res);
       expect(page.items).toEqual([]);
       expect(page.pagination.page).toBe(9999);
-      expect(page.pagination.totalItems).toBeGreaterThanOrEqual(4);
+      expect(first.pagination.totalItems).toBeGreaterThanOrEqual(4);
+      expect(page.pagination.totalItems).toBe(first.pagination.totalItems);
     });
 
     it('returns first 50 placements and sets placementsHasMore: true for 51 placements', async () => {

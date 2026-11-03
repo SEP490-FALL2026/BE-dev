@@ -68,11 +68,6 @@ export class NeedDecisionQueueRepo {
    * One page, oldest first (`id` breaks ties, so the order never moves), and the total for the same filter. Both reads share one
    * snapshot, so a step decided meanwhile cannot make the total disagree with the page. Reads only; takes no row lock.
    */
-  /** The count of open need steps waiting for the person. */
-  async countOpenOf(employeeId: string, type?: NeedQueueType): Promise<number> {
-    return this.prisma.accessRequestStep.count({ where: openWhere(employeeId, type) });
-  }
-
   async pageOpenOf(employeeId: string, query: { type?: NeedQueueType; skip: number; take: number }) {
     const where = openWhere(employeeId, query.type);
 
@@ -90,9 +85,14 @@ export class NeedDecisionQueueRepo {
       { isolationLevel: 'RepeatableRead' },
     );
   }
+
+  /** How many need steps wait for the person now: the total of `pageOpenOf` for the same filter, without reading the rows. */
+  async countOpenOf(employeeId: string, type?: NeedQueueType): Promise<number> {
+    return this.prisma.accessRequestStep.count({ where: openWhere(employeeId, type) });
+  }
 }
 
-export function openWhere(employeeId: string, type?: NeedQueueType): Prisma.AccessRequestStepWhereInput {
+function openWhere(employeeId: string, type?: NeedQueueType): Prisma.AccessRequestStepWhereInput {
   return {
     kind: 'NEED',
     state: 'PENDING',

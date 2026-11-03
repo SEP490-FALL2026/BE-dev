@@ -22,7 +22,7 @@ export class RequestsDashboardApi {
    * Super Admin): that list refuses them, so there is no number to show.
    */
   async openRequestsSentBy(actor: { employeeId: string; roles: readonly string[] }): Promise<number | null> {
-    if (!actor.roles || !mayRequest(actor.roles)) return null;
+    if (!mayRequest(actor.roles)) return null;
 
     return this.myRequests.countOf({
       requesterEmployeeId: actor.employeeId,
