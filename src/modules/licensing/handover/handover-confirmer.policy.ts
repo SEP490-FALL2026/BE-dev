@@ -80,7 +80,6 @@ export function requirementOf(
       ? facts.filter((fact) => fact.source !== 'DEPARTURE' && fact.source !== 'ABRUPT_DEPARTURE')
       : facts;
   const asked = filteredFacts
-
     .filter((fact) => requiresConfirmation(fact.source, dataLossOnRemoval))
     .map((fact) => ({ source: fact.source, ...roleOf(fact) }))
     // A return with nobody who sent it (an old record) has nobody to ask.

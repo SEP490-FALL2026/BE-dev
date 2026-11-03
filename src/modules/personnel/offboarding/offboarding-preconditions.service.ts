@@ -215,14 +215,16 @@ export class OffboardingPreconditions {
       pendingTransfer: held.pending && { effectiveOn: held.pending.effectiveOn },
       transferCancellationReason: input.pendingTransferCancellation?.reason,
       namedAsSuccessor: await this.repo.isNamedSuccessorOfPendingTransfer(tx, input.employeeId),
-      successor: seen.leavesAsHead
-        ? await this.guard.judgeSuccessor(tx, {
-            chosen: input.successor,
-            leaverId: input.employeeId,
-            departmentId: seen.before ? seen.before.departmentId : '',
-            day: seen.endsOn,
-          })
-        : null,
+      // Only a person with a placement in force heads a department (an unplaced one never does), so there is a department to judge.
+      successor:
+        seen.leavesAsHead && seen.before
+          ? await this.guard.judgeSuccessor(tx, {
+              chosen: input.successor,
+              leaverId: input.employeeId,
+              departmentId: seen.before.departmentId,
+              day: seen.endsOn,
+            })
+          : null,
     });
     if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
   }

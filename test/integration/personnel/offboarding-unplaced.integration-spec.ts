@@ -1,6 +1,7 @@
 import request from 'supertest';
-import { OffboardingHarness, type CaseWire } from '../../support/offboarding-harness';
-import type { Department } from '../../support/request-harness';
+import { OffboardingHarness, type CaseWire, type RightWire } from '../../support/offboarding-harness';
+import { pretendBusinessToday } from '../../support/pretend-today';
+import type { Department, Person } from '../../support/request-harness';
 
 const h = new OffboardingHarness();
 
@@ -10,12 +11,16 @@ const h = new OffboardingHarness();
  */
 describe('unplaced employee offboarding and first placement (integration, real PostgreSQL)', () => {
   let des: Department;
+  /** A subscription of a plan that loses data when a seat is taken away; made before any department is stopped. */
+  let tool: string;
   let counter = 0;
   const code = (prefix = 'NV-UNP') => `${prefix}-${(counter += 1)}`;
 
   beforeAll(async () => {
     await h.start();
     des = await h.departmentWithUnit('P-DES');
+    tool = await h.subscription(60, 'K2');
+    await h.describePlan(tool, true, 'Xuất dữ liệu trước khi gỡ');
   }, 300000);
 
   afterAll(async () => {
@@ -347,5 +352,172 @@ describe('unplaced employee offboarding and first placement (integration, real P
 
     expect(h.codeOf(response)).toBe('DEPARTMENT_TRANSFER.PLACEMENT_OVERLAP');
     expect((response.body as { error: { details: { reason: string } } }).error.details.reason).toBe('UNPLACED');
+  });
+
+  describe('a person with no placement who holds seats (D-S18) and the day a first placement takes effect (D-S28)', () => {
+    const LOCK = { note: 'Đã khóa tài khoản công ty, phiên và token thiết bị' };
+    let head: Person;
+
+    beforeAll(async () => {
+      head = await h.worker(des, 'H1-UNP');
+      await h.makeHead(des, head);
+    }, 120000);
+
+    /** A person of `des` with an account and a seat of a plan that loses data when taken away, left with no placement at all. */
+    const unplacedWithSeat = async () => {
+      const employeeCode = code('NV-SEAT');
+      const person = await h.worker(des, employeeCode);
+      const assignmentId = await h.seatOf(person, { subscriptionId: tool }, employeeCode);
+      await h.stripPlacements(person.employeeId);
+      expect(await h.placementCount(person.employeeId)).toBe(0);
+
+      return { person, assignmentId };
+    };
+    const rightsOf = async (id: string) =>
+      h.dataOf<{ items: RightWire[] }>(await h.rightsOf(id, '?pageSize=100').expect(200)).items;
+
+    it('8. opens no handover duty anywhere for the seat of a planned leaver: the IT Admin opens the revocation, the task starts at once, the case closes', async () => {
+      const { person, assignmentId } = await unplacedWithSeat();
+
+      const wire = await h.recordedCase(person);
+      expect(wire.department ?? null).toBeNull();
+      expect(wire.heldRights).toBe(1);
+      expect(await h.dutyRows(assignmentId)).toEqual([]);
+
+      expect(await h.workState(person.employeeId)).toBe('ACTIVE/HANDING_OVER');
+      await h.markLeft(wire.id).expect(200);
+      await h.lockAccount(wire.id, LOCK).expect(200);
+      expect(h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200)).accountLock).toMatchObject({ note: LOCK.note });
+      const opened = h.dataOf<CaseWire>(
+        await h.revokeRights(wire.id, { count: 1, reason: 'Thu hồi quyền của người nghỉ không phòng' }).expect(200),
+      );
+      expect(opened.revocations).toEqual({ created: 1, reasonAdded: 0 });
+
+      // openFromTask ran for the task: still no duty (a head would be asked for this plan), no wait on the claim.
+      expect(await h.dutyRows(assignmentId)).toEqual([]);
+      const [right] = await rightsOf(wire.id);
+      expect(right).toMatchObject({ dataLossOnRemoval: true, handover: null });
+      const taskId = right.revocation?.taskId ?? '';
+      await h.claim(taskId).expect(200);
+      await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa tài khoản' }).expect(200);
+      expect(await h.dutyRows(assignmentId)).toEqual([]);
+      const headsDuties = h.dataOf<{ items: unknown[] }>(
+        await h.duties(`?pageSize=100&employeeId=${person.employeeId}`, head.account).expect(200),
+      ).items;
+      expect(headsDuties).toEqual([]);
+
+      const closed = h.dataOf<CaseWire>(await h.closeCase(wire.id).expect(200));
+      expect(closed.closed).toBe(true);
+      expect(await h.workState(person.employeeId)).toBe('TERMINATED/LEFT');
+    });
+
+    it('8b. does the same for an abrupt departure: the person is LEFT at once and the revocation of the seat is not held', async () => {
+      const { person, assignmentId } = await unplacedWithSeat();
+
+      const wire = await h.recordedCase(person, { abrupt: true, lastWorkingDay: h.today() });
+
+      expect(wire).toMatchObject({ state: 'LEFT', abrupt: true });
+      expect(await h.dutyRows(assignmentId)).toEqual([]);
+      await h.revokeRights(wire.id, { count: 1, reason: 'Nghỉ đột ngột', accountLock: LOCK }).expect(200);
+      const [right] = await rightsOf(wire.id);
+      expect(right.revocation?.source).toBe('ABRUPT_DEPARTURE');
+      expect(await h.dutyRows(assignmentId)).toEqual([]);
+      const taskId = right.revocation?.taskId ?? '';
+      await h.claim(taskId).expect(200);
+      await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa tài khoản' }).expect(200);
+      expect(h.dataOf<CaseWire>(await h.closeCase(wire.id).expect(200)).closed).toBe(true);
+    });
+
+    it('9. refuses a last working day equal to validFrom (D-S28), keeps the placement, and from validFrom on records the normal flow with the head confirming', async () => {
+      const employeeCode = code('NV-D28');
+      const emp = await createUnplacedEmployee(employeeCode);
+      const validFrom = h.day(10);
+      await request(h.server())
+        .post(`/api/v1/employees/${emp.id}/first-placements`)
+        .set(h.as(h.sa))
+        .send({ departmentId: des.id, effectiveFrom: validFrom })
+        .expect(201);
+
+      const same = await h.recordCase({ employeeId: emp.id, lastWorkingDay: validFrom, grounds: h.grounds });
+      expect([same.status, h.codeOf(same)]).toEqual([409, 'OFFBOARDING_CASE.PLACEMENT_OVERLAP']);
+      expect(h.detailsOf(same)).toEqual({ reason: 'FIRST_PLACEMENT_PENDING', validFrom });
+      expect(await h.placementCount(emp.id)).toBe(1);
+      expect(await h.caseCount(emp.id)).toBe(0);
+      expect(await h.auditEventsOf('EMPLOYEE.FIRST_PLACEMENT_CANCELLED', emp.id)).toEqual([]);
+
+      // The day the placement takes effect the person is a member: the same call is the normal flow, not the short one.
+      const person: Person = { employeeId: emp.id, account: await h.account(employeeCode, emp.id, []) };
+      const spy = pretendBusinessToday(h.ctx.app, validFrom);
+      try {
+        const assignmentId = await h.seatOf(person, { subscriptionId: tool }, employeeCode);
+        const wire = h.dataOf<CaseWire>(
+          await h.recordCase({ employeeId: emp.id, lastWorkingDay: h.day(20), grounds: h.grounds }).expect(201),
+        );
+
+        expect(wire.department).toMatchObject({ id: des.id });
+        const row = await h.ctx.sql.query<{ department_id: string | null; cancelled_placement_id: string | null }>(
+          'SELECT department_id, cancelled_placement_id FROM offboarding_cases WHERE id = $1',
+          [wire.id],
+        );
+        expect(row.rows[0]).toEqual({ department_id: des.id, cancelled_placement_id: null });
+        expect(await h.auditEventsOf('EMPLOYEE.FIRST_PLACEMENT_CANCELLED', emp.id)).toEqual([]);
+        expect(await h.placementCount(emp.id)).toBe(1);
+        const duties = await h.dutyRows(assignmentId);
+        expect(duties).toHaveLength(1);
+        expect(duties[0]).toMatchObject({ confirmer_role: 'DEPARTMENT_HEAD', department_id: des.id });
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('10. lets an IT Admin who is in charge of no department read the case of a person with no placement, and nothing of a department they do not serve', async () => {
+      const outsider = await h.worker(des, 'IT2-UNP', ['IT_ADMIN']);
+      // Every active department names the first IT Admin, so the second one stands in for none of them.
+      await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $1 WHERE status = 'ACTIVE'`, [
+        h.it1.employeeId,
+      ]);
+      const unplaced = h.dataOf<CaseWire>(
+        await h
+          .recordCase({
+            employeeId: (await createUnplacedEmployee()).id,
+            lastWorkingDay: h.day(10),
+            grounds: h.grounds,
+          })
+          .expect(201),
+      );
+      const placed = await h.recordedCase(await h.worker(des, code('NV-PLC')));
+
+      const placedRead = await h.readCase(placed.id, outsider.account);
+      const unplacedRead = h.dataOf<CaseWire>(await h.readCase(unplaced.id, outsider.account).expect(200));
+      const list = h
+        .dataOf<{ items: { id: string }[] }>(await h.listCases('?pageSize=100', outsider.account).expect(200))
+        .items.map((item) => item.id);
+
+      expect([placedRead.status, h.codeOf(placedRead)]).toEqual([404, 'OFFBOARDING_CASE.NOT_FOUND']);
+      expect(unplacedRead.id).toBe(unplaced.id);
+      expect(list).toContain(unplaced.id);
+      expect(list).not.toContain(placed.id);
+      expect((await h.rightsOf(unplaced.id, '', outsider.account)).status).toBe(200);
+    });
+
+    it('11. tells the Super Admin that an unplaced IT Admin in charge of a department is leaving, with a null department (ROLE_HOLDER_LEAVING)', async () => {
+      const itAdmin = await h.unplacedStaff(code('IT-UNP'), ['IT_ADMIN']);
+      await h.setItAdminInCharge(des, itAdmin);
+
+      const wire = await h.recordedCase(itAdmin);
+
+      expect(wire.department ?? null).toBeNull();
+      const { rows } = await h.ctx.sql.query<{ recipient_employee_id: string; params: Record<string, unknown> }>(
+        `SELECT recipient_employee_id, params FROM in_app_notifications WHERE code = 'ROLE_HOLDER_LEAVING' AND subject_id = $1`,
+        [wire.id],
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].recipient_employee_id).toBe(h.sa.employeeId);
+      expect(rows[0].params).toMatchObject({
+        employeeId: itAdmin.employeeId,
+        departmentId: null,
+        roleFlag: 'IT_ADMIN_IN_CHARGE',
+      });
+    });
   });
 });

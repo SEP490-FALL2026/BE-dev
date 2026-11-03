@@ -107,7 +107,6 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
       const subscriptionId = await h.subscription(10);
       const other = await h.costCenter('UNIT');
       await h.crowd('SVR', 5, [3]);
-      await h.ctx.sql.query('SELECT 1 /* SVR3 created unplaced by crowd */');
       const unit = await h.ownUnit();
       const own = (await h.ctx.sql.query<{ code: string }>(`SELECT code FROM cost_centers WHERE id = $1`, [unit.id]))
         .rows[0].code;

@@ -106,6 +106,12 @@ Từ vựng trạng thái nhân viên (`EmployeeStatus`, `EmployeeWorkState`, `E
 ## Bất biến quan trọng
 
 - Bố trí của một người không chồng ngày: `employee_placements_no_overlap` (EXCLUDE gist).
+- Một người đã có placement thì luôn còn ít nhất một (trigger `employee_placements_keep_one`, `BEFORE DELETE`, khóa nhân viên rồi
+  đếm, `23001`); người chưa xếp phòng là người không có dòng placement nào. Ngoại lệ duy nhất (`D-S17`, `D-S28`): placement cuối có
+  `valid_from` sau hôm nay mà một hồ sơ nghỉ việc chưa hủy nêu trong `cancelled_placement_id` (nghỉ việc trước ngày xếp phòng).
+  Xếp phòng lần đầu: `POST /employees/{id}/first-placements` (`EmployeeFirstPlacementService`); đọc người chưa xếp phòng qua
+  `OrganizationReadApi.unplacedAmong`, lần xếp phòng chưa hiệu lực qua `getScheduledFirstPlacement`; người đang bàn giao bị từ
+  chối `EMPLOYEE.EMPLOYEE_LEAVING`.
 - INV-19: mỗi ngày một phòng có tối đa một trưởng, một người là trưởng tối đa một phòng (EXCLUDE trên
   `department_head_periods`); INV-20: trưởng thuộc phòng suốt kỳ (trigger `department_head_requires_membership`).
 - Thứ tự khóa: các phòng theo id, rồi nhân viên (`OrganizationHistoryApi.lockDepartments`).

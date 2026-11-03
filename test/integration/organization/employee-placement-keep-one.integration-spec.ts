@@ -1,6 +1,7 @@
 import { Client } from 'pg';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { DepartmentHarness } from '../../support/department-harness';
+import { waitForLockWaiters } from '../../support/lock-wait';
 
 describe('employee_placements_keep_one trigger (INV-20) (integration, real PostgreSQL)', () => {
   const h = new DepartmentHarness();
@@ -158,8 +159,8 @@ describe('employee_placements_keep_one trigger (INV-20) (integration, real Postg
       // Client B attempts to delete p2 - will wait on employees row lock
       const clientBPromise = clientB.query('DELETE FROM employee_placements WHERE id = $1', [p2]);
 
-      // Give client B a moment to wait on the lock
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Client B is waiting on the employee row lock of A before A lets it go (a barrier on the lock wait, never a sleep)
+      await waitForLockWaiters(h.ctx.sql, 1);
 
       // Client A commits, releasing the employee lock
       await clientA.query('COMMIT');
@@ -351,6 +352,59 @@ describe('employee_placements_keep_one trigger (INV-20) (integration, real Postg
       );
       expect(Number(count.rows[0].count)).toBe(0);
     });
+
+    it.each([
+      ['today', 0],
+      ['a day in the past', -3],
+    ])(
+      'refuses deletion of the last placement whose valid_from is %s even when an uncancelled case names it (D-S17, D-S28)',
+      async (_label, offset) => {
+        const today = await h.ctx.app.get(OrganizationReadApi).businessToday();
+        const dept = h.dataOf(
+          await h.createDepartment(h.departmentBody({ code: `P-NF${offset === 0 ? 'T' : 'P'}` })).expect(201),
+        );
+        const emp = h.dataOf(
+          await h
+            .api()
+            .post('/api/v1/employees')
+            .set(h.asAdmin())
+            .send({
+              employeeCode: `NV-NF${offset === 0 ? 'T' : 'P'}`,
+              fullName: 'Placement Already In Force',
+              workEmail: `nf${offset === 0 ? 't' : 'p'}@acme.vn`,
+              employmentType: 'STAFF',
+              hireDate: '2026-01-05',
+              departmentCode: null,
+            })
+            .expect(201),
+        );
+        const placementId = (
+          await h.ctx.sql.query<{ id: string }>(
+            `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+             VALUES (gen_random_uuid(), $1, $2, $3, $4::date + $5::int)
+             RETURNING id`,
+            [h.seed.organizationId, emp.id, dept.id, today, offset],
+          )
+        ).rows[0].id;
+        await h.ctx.sql.query(
+          `INSERT INTO offboarding_cases (
+             id, organization_id, employee_id, department_id, prior_work_state,
+             last_working_day, departure_effective_on, handover_due_on, grounds_type, grounds_reference,
+             grounds_issuer, grounds_issued_on, cancelled_placement_id, cancelled_placement_department_id, cancelled_placement_from,
+             recorded_by_app_user_id
+           ) VALUES (
+             gen_random_uuid(), $1, $2, NULL, 'WORKING',
+             $3::date, $3::date + 1, $3::date, 'RESIGNATION', 'REF-NF', 'Issuer', $3::date, $4::uuid, $5::uuid, $3::date + $6::int,
+             $7::uuid
+           )`,
+          [h.seed.organizationId, emp.id, today, placementId, dept.id, offset, h.seed.superAdmin.appUserId],
+        );
+
+        expect(await sqlState(h.ctx.sql, 'DELETE FROM employee_placements WHERE id = $1', [placementId])).toBe('23001');
+        const kept = await h.ctx.sql.query('SELECT id FROM employee_placements WHERE id = $1', [placementId]);
+        expect(kept.rowCount).toBe(1);
+      },
+    );
 
     it('refuses deletion if offboarding case has already been cancelled', async () => {
       const today = await h.ctx.app.get(OrganizationReadApi).businessToday();

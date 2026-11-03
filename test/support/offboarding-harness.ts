@@ -146,6 +146,33 @@ export class OffboardingHarness extends HandoverHarness {
     return person;
   }
 
+  /**
+   * Leaves the person with no placement at all while they hold what they hold (seats, an account): the state a person reaches when
+   * the routes cannot give a seat to an unplaced one. The keep-one trigger and the history guard are the production rules, so they
+   * are off, inside one transaction, for this fixture only.
+   */
+  async stripPlacements(employeeId: string): Promise<void> {
+    await this.ctx.sql.query('BEGIN');
+    try {
+      await this.ctx.sql.query('ALTER TABLE employee_placements DISABLE TRIGGER USER');
+      await this.ctx.sql.query('DELETE FROM employee_placements WHERE employee_id = $1', [employeeId]);
+      await this.ctx.sql.query('ALTER TABLE employee_placements ENABLE TRIGGER USER');
+      await this.ctx.sql.query('COMMIT');
+    } catch (error) {
+      await this.ctx.sql.query('ROLLBACK');
+      throw error;
+    }
+  }
+
+  async placementCount(employeeId: string): Promise<number> {
+    const { rows } = await this.ctx.sql.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM employee_placements WHERE employee_id = $1`,
+      [employeeId],
+    );
+
+    return Number(rows[0].n);
+  }
+
   async caseRow(id: string): Promise<CaseRow> {
     const { rows } = await this.ctx.sql.query<CaseRow>(
       `SELECT id, state::text AS state, abrupt, prior_work_state::text AS prior_work_state,

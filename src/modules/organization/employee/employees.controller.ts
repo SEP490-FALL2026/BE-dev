@@ -48,7 +48,8 @@ export class EmployeesController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description: 'EMPLOYEE.ALREADY_PLACED, EMPLOYEE.EMPLOYEE_INACTIVE or DEPARTMENT.INACTIVE.',
+      description:
+        'EMPLOYEE.ALREADY_PLACED, EMPLOYEE.EMPLOYEE_INACTIVE, EMPLOYEE.EMPLOYEE_LEAVING (the employee is handing over before leaving) or DEPARTMENT.INACTIVE.',
       examples: [
         EMPLOYEE_ERROR_EXAMPLES.EMPLOYEE_ALREADY_PLACED,
         EMPLOYEE_ERROR_EXAMPLES.EMPLOYEE_INACTIVE,
