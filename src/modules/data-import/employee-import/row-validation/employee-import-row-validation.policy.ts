@@ -233,7 +233,7 @@ export class EmployeeRowClassifier {
 
       return this.compare(existing, {
         ...row,
-        departmentCode: cells.department_code === undefined ? null : row.departmentCode,
+        departmentCode: departmentForComparison(cells, row),
         normalizedEmail: email.normalizedEmail,
       });
     }
@@ -306,9 +306,7 @@ export class EmployeeRowClassifier {
     if (existing.employmentType !== incoming.typeText)
       add('employment_type', existing.employmentType, incoming.typeText);
     if (existing.hireDate !== incoming.hireDate) add('hire_date', existing.hireDate, incoming.hireDate);
-    if (incoming.departmentCode !== null && (existing.departmentCode ?? '') !== incoming.departmentCode) {
-      add('department_code', existing.departmentCode ?? '', incoming.departmentCode);
-    }
+    differences.push(...departmentDifferences(existing.departmentCode, incoming.departmentCode));
     if (jobTitleKey(existing.jobTitleName ?? '') !== jobTitleKey(incoming.jobTitleText)) {
       add('job_title', existing.jobTitleName ?? '', incoming.jobTitleText);
     }
@@ -317,6 +315,15 @@ export class EmployeeRowClassifier {
       ? { outcome: 'EXISTS_SAME', errors: [] }
       : { outcome: 'EXISTS_DIFFERENT', errors: [], differences };
   }
+}
+
+function departmentForComparison(cells: EmployeeCells, row: RowText): string | null {
+  return cells.department_code === undefined ? null : row.departmentCode;
+}
+
+function departmentDifferences(current: string | null, incoming: string | null): RowDifference[] {
+  if (incoming === null || (current ?? '') === incoming) return [];
+  return [{ column: 'department_code', current: current ?? '', incoming }];
 }
 
 function safeNormalize(email: string): string | null {
