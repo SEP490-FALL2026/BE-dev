@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { normalizeDisplayName } from '../../../core/display-name';
 import { normalizeEmail } from '../../../core/email';
+import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
@@ -55,6 +56,14 @@ function toEmployeeRecord(row: {
 /** Escapes LIKE metacharacters so a search term matches literally (backslash is PostgreSQL's default escape). */
 function escapeLikePattern(term: string): string {
   return term.replace(/[\\%_]/g, (character) => `\\${character}`);
+}
+
+/**
+ * The single predicate for an employee having no placements (D-S25).
+ * Kept here so both candidate search and the employee directory evaluate the same SQL condition.
+ */
+export function unplacedEmployeeSql(employeeIdColumn = 'e.id'): Prisma.Sql {
+  return Prisma.sql`NOT EXISTS (SELECT 1 FROM employee_placements any_p WHERE any_p.employee_id = ${Prisma.raw(employeeIdColumn)})`;
 }
 
 /** Employees and their placements: the one writer of both tables, the employee locks and every employee read. */
@@ -350,7 +359,7 @@ export class EmployeeRepo {
         unplaced: boolean;
       }[]
     >`
-      SELECT e.id, e.employee_code, e.full_name, e.work_email, placement.department, NOT EXISTS (SELECT 1 FROM employee_placements any_p WHERE any_p.employee_id = e.id) AS unplaced
+      SELECT e.id, e.employee_code, e.full_name, e.work_email, placement.department, ${unplacedEmployeeSql('e.id')} AS unplaced
         FROM employees e
         LEFT JOIN LATERAL (
           SELECT d.name AS department

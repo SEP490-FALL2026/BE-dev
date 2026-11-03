@@ -83,6 +83,7 @@ describe('organization and identity read contracts (integration, real PostgreSQL
       expect(page.pagination.totalItems).toBeGreaterThanOrEqual(5);
       expect(Object.keys(page.items[0]).sort()).toEqual([
         'employeeCode',
+        'employeeId',
         'fullName',
         'hasWorkEmail',
         'memberSince',

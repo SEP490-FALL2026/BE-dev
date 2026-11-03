@@ -897,9 +897,382 @@
         "security": [{ "bearer": [] }],
         "summary": "Enter one employee by hand",
         "tags": ["employees"]
+      },
+      "get": {
+        "operationId": "employeeList",
+        "parameters": [
+          { "name": "q", "required": false, "in": "query", "schema": { "maxLength": 100, "type": "string" } },
+          {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "unplaced",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "workState",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE", "HANDING_OVER", "LEFT"] }
+          },
+          {
+            "name": "employmentType",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] }
+          },
+          {
+            "name": "hasAccount",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of company employees with official status and current department.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/EmployeeListResponseDto" },
+                    { "properties": { "message": { "example": "EMPLOYEE.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin reads the company-wide employee directory.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List company-wide employee directory",
+        "tags": ["employees"]
       }
     },
     "/api/v1/employees/{id}": {
+      "get": {
+        "operationId": "employeeGet",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The official employee profile, placement history and account roles.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/EmployeeDetailResponseDto" },
+                    { "properties": { "message": { "example": "EMPLOYEE.FETCHED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin reads the company-wide employee directory.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The employee does not exist.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "EMPLOYEE.NOT_FOUND": {
+                    "summary": "Employee not found: <employee-id>",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_FOUND",
+                        "message": "Employee not found: <employee-id>",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id is not a UUID (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Get employee profile and placement history",
+        "tags": ["employees"]
+      },
       "patch": {
         "operationId": "employeeUpdateOfficialFields",
         "parameters": [
@@ -71000,6 +71373,192 @@
         "required": ["employeeCode", "fullName", "employmentType", "hireDate"],
         "additionalProperties": false
       },
+      "EmployeeListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "employeeCode": { "type": "string" },
+                    "fullName": { "type": "string" },
+                    "workEmail": { "type": "string", "nullable": true },
+                    "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
+                    "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] },
+                    "workState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE", "HANDING_OVER", "LEFT"] },
+                    "hireDate": { "type": "string" },
+                    "jobTitle": { "type": "string", "nullable": true },
+                    "department": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "unplaced": { "type": "boolean" },
+                    "account": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "status": { "type": "string", "enum": ["ACTIVE", "LOCKED"] },
+                        "activationState": { "type": "string", "enum": ["INVITED", "ACTIVATED"] },
+                        "employeeLeft": { "type": "boolean" }
+                      },
+                      "required": ["id", "status", "activationState", "employeeLeft"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "employeeCode",
+                    "fullName",
+                    "workEmail",
+                    "employmentType",
+                    "status",
+                    "workState",
+                    "hireDate",
+                    "jobTitle",
+                    "department",
+                    "unplaced",
+                    "account"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "EmployeeDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "employeeCode": { "type": "string" },
+              "fullName": { "type": "string" },
+              "workEmail": { "type": "string", "nullable": true },
+              "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
+              "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] },
+              "workState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE", "HANDING_OVER", "LEFT"] },
+              "hireDate": { "type": "string" },
+              "jobTitle": { "type": "string", "nullable": true },
+              "department": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "code": { "type": "string" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "code", "name"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "unplaced": { "type": "boolean" },
+              "account": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "status": { "type": "string", "enum": ["ACTIVE", "LOCKED"] },
+                  "activationState": { "type": "string", "enum": ["INVITED", "ACTIVATED"] },
+                  "employeeLeft": { "type": "boolean" },
+                  "roles": {
+                    "maxItems": 6,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
+                    }
+                  }
+                },
+                "required": ["id", "status", "activationState", "employeeLeft", "roles"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "placements": {
+                "maxItems": 50,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "department": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false
+                    },
+                    "validFrom": { "type": "string" },
+                    "validTo": { "type": "string", "nullable": true }
+                  },
+                  "required": ["department", "validFrom", "validTo"],
+                  "additionalProperties": false
+                }
+              },
+              "placementsHasMore": { "type": "boolean" }
+            },
+            "required": [
+              "id",
+              "employeeCode",
+              "fullName",
+              "workEmail",
+              "employmentType",
+              "status",
+              "workState",
+              "hireDate",
+              "jobTitle",
+              "department",
+              "unplaced",
+              "account",
+              "placements",
+              "placementsHasMore"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "UpdateEmployeeBodyDto": {
         "type": "object",
         "properties": {
@@ -71505,6 +72064,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
+                    "employeeId": { "type": "string", "format": "uuid" },
                     "employeeCode": { "type": "string" },
                     "fullName": { "type": "string" },
                     "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] },
@@ -71512,7 +72072,15 @@
                     "hasWorkEmail": { "type": "boolean" },
                     "memberSince": { "type": "string" }
                   },
-                  "required": ["employeeCode", "fullName", "status", "workState", "hasWorkEmail", "memberSince"],
+                  "required": [
+                    "employeeId",
+                    "employeeCode",
+                    "fullName",
+                    "status",
+                    "workState",
+                    "hasWorkEmail",
+                    "memberSince"
+                  ],
                   "additionalProperties": false
                 }
               },

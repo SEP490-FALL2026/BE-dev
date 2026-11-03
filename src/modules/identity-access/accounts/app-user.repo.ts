@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type {
+  EmployeeAccountDetail,
+  EmployeeAccountSummary,
+} from '../../organization/public/organization.extension-points';
 import {
   AccountListFilter,
   AccountRecord,
@@ -123,6 +127,57 @@ export class AppUserRepo {
     const rows = await this.prisma.appUser.findMany({ select: { employeeId: true } });
 
     return rows.map((row) => row.employeeId);
+  }
+
+  /** Summarizes accounts for given employee IDs in one statement, only reading app_users without roles. */
+  async summarizeAccounts(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, EmployeeAccountSummary>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).appUser.findMany({
+      where: { employeeId: { in: [...employeeIds] } },
+      select: {
+        id: true,
+        employeeId: true,
+        status: true,
+        activationState: true,
+        employeeLeftOn: true,
+      },
+    });
+    const result = new Map<string, EmployeeAccountSummary>();
+    for (const row of rows) {
+      result.set(row.employeeId, {
+        id: row.id,
+        status: row.status,
+        activationState: row.activationState,
+        employeeLeft: row.employeeLeftOn !== null,
+      });
+    }
+    return result;
+  }
+
+  /** Describes the account and its effective roles for one employee in one query, unlocked. */
+  async describeAccount(employeeId: string, tx?: DbTx): Promise<EmployeeAccountDetail | null> {
+    const user = await (tx ?? this.prisma).appUser.findUnique({
+      where: { employeeId },
+      select: {
+        id: true,
+        status: true,
+        activationState: true,
+        employeeLeftOn: true,
+        roleGrants: {
+          where: { revokedAt: null },
+          select: { role: true },
+        },
+      },
+    });
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      status: user.status,
+      activationState: user.activationState,
+      employeeLeft: user.employeeLeftOn !== null,
+      roles: user.roleGrants.map((rg) => rg.role),
+    };
   }
 
   /** How many accounts are in each status and activation state (states with none are absent). */

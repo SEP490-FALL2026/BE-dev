@@ -17,6 +17,9 @@ import { EmployeeMaintenanceService } from './employee/employee-maintenance.serv
 import { EmployeeFirstPlacementService } from './employee/employee-first-placement.service';
 import { EmployeeManualService } from './employee/employee-manual.service';
 import { EmployeesController } from './employee/employees.controller';
+import { EmployeeDirectoryController } from './employee-directory/employee-directory.controller';
+import { EmployeeDirectoryQueryService } from './employee-directory/employee-directory-query.service';
+import { EmployeeDirectoryRepo } from './employee-directory/employee-directory.repo';
 import { OrganizationModule } from './organization.module';
 
 /**
@@ -29,6 +32,7 @@ import { OrganizationModule } from './organization.module';
   imports: [DatabaseModule, AuditModule, OrganizationModule, NotificationsModule],
   controllers: [
     EmployeesController,
+    EmployeeDirectoryController,
     EmployeeMaintenanceController,
     CostCentersController,
     DepartmentsController,
@@ -47,6 +51,8 @@ import { OrganizationModule } from './organization.module';
     DepartmentTechnicalMembersRepo,
     // The hourly telling of the changes dated for a day that has come: in the API graph only, where every listener is registered.
     OrganizationChangeSweeper,
+    EmployeeDirectoryQueryService,
+    EmployeeDirectoryRepo,
   ],
 })
 export class OrganizationHttpModule {}

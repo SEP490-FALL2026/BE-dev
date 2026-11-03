@@ -93,6 +93,9 @@ export const ROUTE_ERROR_CODES_ORGANIZATION: Readonly<
     '409': ['DEPARTMENT.INACTIVE', 'EMPLOYEE.ALREADY_PLACED', 'EMPLOYEE.EMPLOYEE_INACTIVE'],
     '422': ['EMPLOYEE.DATE_INVALID'],
   },
+  employeeGet: {
+    '404': ['EMPLOYEE.NOT_FOUND'],
+  },
   employeeUpdateOfficialFields: {
     '403': ['EMPLOYEE.SELF_CHANGE_FORBIDDEN'],
     '404': ['EMPLOYEE.NOT_FOUND'],

@@ -10,6 +10,8 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/audit-events` | [audit/audit.controller.ts](../../src/modules/audit/audit.controller.ts) → `list` | [AuditQueryService](../../src/modules/audit/audit-query.service.ts) |
 | POST | `/employees/{id}/first-placements` | [organization/employee/employees.controller.ts](../../src/modules/organization/employee/employees.controller.ts) → `place` | [EmployeeFirstPlacementService](../../src/modules/organization/employee/employee-first-placement.service.ts) |
 | POST | `/employees` | [organization/employee/employees.controller.ts](../../src/modules/organization/employee/employees.controller.ts) → `create` | [EmployeeManualService](../../src/modules/organization/employee/employee-manual.service.ts) |
+| GET | `/employees` | [organization/employee-directory/employee-directory.controller.ts](../../src/modules/organization/employee-directory/employee-directory.controller.ts) → `list` | [EmployeeDirectoryQueryService](../../src/modules/organization/employee-directory/employee-directory-query.service.ts) |
+| GET | `/employees/{id}` | [organization/employee-directory/employee-directory.controller.ts](../../src/modules/organization/employee-directory/employee-directory.controller.ts) → `get` | [EmployeeDirectoryQueryService](../../src/modules/organization/employee-directory/employee-directory-query.service.ts) |
 | PATCH | `/employees/{id}` | [organization/employee/employee-maintenance.controller.ts](../../src/modules/organization/employee/employee-maintenance.controller.ts) → `update` | [EmployeeMaintenanceService](../../src/modules/organization/employee/employee-maintenance.service.ts) |
 | GET | `/cost-centers` | [organization/cost-center/cost-centers.controller.ts](../../src/modules/organization/cost-center/cost-centers.controller.ts) → `list` | [CostCenterService](../../src/modules/organization/cost-center/cost-center.service.ts) |
 | POST | `/cost-centers` | [organization/cost-center/cost-centers.controller.ts](../../src/modules/organization/cost-center/cost-centers.controller.ts) → `create` | [CostCenterService](../../src/modules/organization/cost-center/cost-center.service.ts) |
@@ -306,4 +308,4 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/dashboards/it-admin` | [dashboards/it-admin/it-admin-dashboard.controller.ts](../../src/modules/dashboards/it-admin/it-admin-dashboard.controller.ts) → `get` | [ItAdminDashboardService](../../src/modules/dashboards/it-admin/it-admin-dashboard.service.ts) |
 | GET | `/dashboards/super-admin` | [dashboards/super-admin/super-admin-dashboard.controller.ts](../../src/modules/dashboards/super-admin/super-admin-dashboard.controller.ts) → `get` | [SuperAdminDashboardService](../../src/modules/dashboards/super-admin/super-admin-dashboard.service.ts) |
 
-300 operations.
+302 operations.
