@@ -130,7 +130,7 @@ export class EmployeeImportsController {
   @ApiErrorResponses(...COMMON_ERRORS, ...UPLOAD_LIMIT_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The file cannot be used as a whole: missing, unsupported, empty, unreadable, too many rows, or lacking a required column (IMPORT.FILE_*). Department and job title are optional for employees.',
+      'The file cannot be used as a whole: missing, unsupported, empty, unreadable, too many rows, or lacking a required column (IMPORT.FILE_*). Department and job title are optional for employees. A workbook is unreadable (details.reason INVALID_XLSX) when it is not a plain single-disk zip, and is refused with details.reason UNCOMPRESSED_SIZE_EXCEEDED when its entries inflate to more than 20 MB (the real inflated size is checked, not the size the file declares).',
     examples: [
       IMPORT_ERROR_EXAMPLES.FILE_REQUIRED,
       IMPORT_ERROR_EXAMPLES.FILE_FORMAT_UNSUPPORTED,

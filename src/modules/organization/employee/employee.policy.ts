@@ -6,11 +6,6 @@ import { EmployeeForbiddenError, EmployeeSelfChangeForbiddenError } from './empl
  * a head and an employee do not (`US-02-02`). Pure: no store, no clock.
  */
 
-/** Escape literal characters for SQL LIKE / ILIKE patterns with ESCAPE '\\'. */
-export function escapeLikePattern(term: string): string {
-  return term.replace(/([%_\\])/g, '\\$1');
-}
-
 /** Entering a new record, by hand or by file: the Super Admin alone. Throws EmployeeForbiddenError. */
 export function assertMayEnterEmployees(roles: readonly string[]): void {
   if (!roles.includes('SUPER_ADMIN')) throw new EmployeeForbiddenError();

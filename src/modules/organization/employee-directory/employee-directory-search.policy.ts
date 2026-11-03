@@ -1,5 +1,5 @@
 import { normalizeEmail } from '../../../core/email';
-import { searchKey } from '../../../core/search-key';
+import { escapeLikePattern, searchKey } from '../../../core/search-key';
 
 export const VIETNAMESE_ACCENTED_CHARS =
   'áàảãạăắằẳẵặâấầẩẫậÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬéèẻẽẹêếềểễệÉÈẺẼẸÊẾỀỂỄỆíìỉĩịÍÌỈĨỊóòỏõọôốồổỗộơớờởỡợÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢúùủũụưứừửữựÚÙỦŨỤƯỨỪỬỮỰýỳỷỹỵÝỲỶỸỴđĐ';
@@ -8,8 +8,6 @@ export const VIETNAMESE_UNACCENTED_CHARS =
   'aaaaaaaaaaaaaaaaaAAAAAAAAAAAAAAAAAeeeeeeeeeeeEEEEEEEEEEEiiiiiIIIIIoooooooooooooooooOOOOOOOOOOOOOOOOOuuuuuuuuuuuUUUUUUUUUUUyyyyyYYYYYdD';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-import { escapeLikePattern } from '../employee/employee.policy';
 
 /** Folds case and Vietnamese accents including đ/Đ, collapsing whitespaces. */
 export function foldVietnameseName(name: string): string {

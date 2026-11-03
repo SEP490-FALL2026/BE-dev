@@ -10,3 +10,8 @@ export function searchKey(text: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/** Escapes the characters that mean something in a SQL LIKE / ILIKE pattern, for a query written with ESCAPE '\\'. */
+export function escapeLikePattern(term: string): string {
+  return term.replace(/([%_\\])/g, '\\$1');
+}
