@@ -64,6 +64,14 @@ const READ_WORDING: Record<string, { '403'?: string; '422'?: string }> = {
   nonWorkingDateList: {
     '403': 'Only the Super Admin reads the operating parameters, their history and the non-working dates.',
   },
+  employeeList: {
+    '403': 'Only the Super Admin reads the company-wide employee directory.',
+    '422': 'The query is invalid (VALIDATION_ERROR).',
+  },
+  employeeGet: {
+    '403': 'Only the Super Admin reads the company-wide employee directory.',
+    '422': 'The id is not a UUID (VALIDATION_ERROR).',
+  },
   employeeImportGet: { '403': 'Only the Super Admin reads an employee import and its rows.' },
   employeeImportRowList: {
     '403': 'Only the Super Admin reads an employee import and its rows.',

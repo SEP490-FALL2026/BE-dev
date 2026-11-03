@@ -127,6 +127,7 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       expect(page.data).toEqual({
         items: [
           {
+            employeeId: second.employeeId,
             employeeCode: second.code,
             fullName: `Person ${second.code}`,
             status: 'ACTIVE',

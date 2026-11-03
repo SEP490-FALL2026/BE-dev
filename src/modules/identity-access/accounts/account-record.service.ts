@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type {
+  EmployeeAccountDetail,
+  EmployeeAccountSummary,
+} from '../../organization/public/organization.extension-points';
 import {
   AccountListFilter,
   AccountRecord,
@@ -159,6 +163,16 @@ export class AccountRecordService {
   /** Ids of every Employee that already has an account, whatever its state (one per Employee, AC-8). */
   findEmployeeIdsWithAccount(): Promise<string[]> {
     return this.accounts.findEmployeeIdsWithAccount();
+  }
+
+  /** Summarizes accounts for list in one statement on app_users only. */
+  summarizeAccounts(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, EmployeeAccountSummary>> {
+    return this.accounts.summarizeAccounts(employeeIds, tx);
+  }
+
+  /** Describes account and active roles for detail in one statement, unlocked. */
+  describeAccount(employeeId: string, tx?: DbTx): Promise<EmployeeAccountDetail | null> {
+    return this.accounts.describeAccount(employeeId, tx);
   }
 
   /**

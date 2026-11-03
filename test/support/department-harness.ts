@@ -228,8 +228,8 @@ export class DepartmentHarness {
   /** The employees whose placements are not exactly what the invariant I-2 asks for, over everything this file made. */
   placementViolations = () => findPlacementCoverageViolations(this.ctx.sql);
 
-  async start() {
-    this.ctx = await createHttpTestApp();
+  async start(options: Parameters<typeof createHttpTestApp>[0] = {}) {
+    this.ctx = await createHttpTestApp(options);
     this.seed = await seedInstallation(this.ctx.app);
     this.admin = await adminToken(this.ctx, this.seed);
     this.finance = await createActivatedAccount(this.ctx, this.seed, {

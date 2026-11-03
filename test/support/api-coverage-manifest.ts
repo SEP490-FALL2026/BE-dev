@@ -201,6 +201,8 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/employee-imports/{id}/preview-refreshes',
   'POST /api/v1/employee-imports/{id}/confirmations',
   'POST /api/v1/employee-imports/{id}/cancellations',
+  'GET /api/v1/employees',
+  'GET /api/v1/employees/{id}',
   'POST /api/v1/employees',
   'POST /api/v1/employees/{id}/first-placements',
   'PATCH /api/v1/employees/{id}',
