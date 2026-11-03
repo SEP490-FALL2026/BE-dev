@@ -321,6 +321,31 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
       'The open Requests of the person who was transferred, information only (F29); the Request list has the rest.',
     removeWhen: 'Review when UNFINISHED_REQUESTS_MAX changes or the review shows the Requests as a paged subresource.',
   },
+  {
+    key: 'employeeGet#placements',
+    classification: 'bounded',
+    findings: ['LD-14'],
+    owner: 'employee-directory-read',
+    businessMaximum: {
+      maxItems: 50,
+      source:
+        'EMPLOYEE_PLACEMENT_HISTORY_LIMIT in employee-directory.types.ts, the maxItems of the schema in employee-directory.dto.ts: the placement history of the person',
+    },
+    rationale: 'The placement history of the employee; the list is paged.',
+    removeWhen: 'Review when EMPLOYEE_PLACEMENT_HISTORY_LIMIT changes or placement history is paged.',
+  },
+  {
+    key: 'employeeGet#account.roles',
+    classification: 'bounded',
+    findings: ['LD-14'],
+    owner: 'employee-directory-read',
+    businessMaximum: {
+      maxItems: 6,
+      source: `${ROLE_GRANTS}; describeAccount reads the effective direct grants`,
+    },
+    rationale: 'The directly granted roles of the employee account.',
+    removeWhen: 'Review when AppRole changes.',
+  },
 ];
 
 /**

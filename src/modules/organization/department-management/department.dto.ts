@@ -120,6 +120,7 @@ const departmentPageSchema = z.strictObject({ items: z.array(departmentSchema), 
 const memberPageSchema = z.strictObject({
   items: z.array(
     z.strictObject({
+      employeeId: z.uuid(),
       employeeCode: z.string(),
       fullName: z.string(),
       status: z.enum(['ACTIVE', 'TERMINATED']),

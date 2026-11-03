@@ -157,6 +157,7 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       for (const item of items) {
         expect(Object.keys(item).sort()).toEqual([
           'employeeCode',
+          'employeeId',
           'fullName',
           'hasWorkEmail',
           'memberSince',

@@ -41,6 +41,7 @@ export const GENERATED_DATE_TIME_PATTERN = String.raw`^(?:(?:\d\d[2468][048]|\d\
 export const GENERATED_DATE_TIME_WITH_OFFSET_PATTERN = String.raw`^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$`;
 /** The business rules the document keeps: codes, message keys and identifiers (written out, not derived). */
 export const BUSINESS_PATTERNS = [
+  '^[A-Z0-9]+(-[A-Z0-9]+)*$',
   '^[A-Z][A-Z0-9_]{0,99}$',
   String.raw`^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)+$`,
   String.raw`^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)*$`,

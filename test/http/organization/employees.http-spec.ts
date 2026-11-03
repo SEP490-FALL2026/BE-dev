@@ -134,3 +134,80 @@ describe('PATCH /api/v1/employees/{id} (e2e, no database)', () => {
     expect(bodyOf(await patch('/api/v1/employees/not-an-id', CHANGE).expect(422)).error.code).toBe('VALIDATION_ERROR');
   });
 });
+
+describe('GET /api/v1/employees (e2e, no database)', () => {
+  const get = (query = '', caller = SUPER_ADMIN) =>
+    request(app.getHttpServer())
+      .get(`/api/v1/employees${query ? `?${query}` : ''}`)
+      .set('Authorization', bearer(caller));
+
+  it('requires a Bearer token', async () => {
+    const response = await request(app.getHttpServer()).get('/api/v1/employees').expect(401);
+
+    expect(bodyOf(response).error.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it.each([
+    ['the IT Admin', ['IT_ADMIN'], []],
+    ['the finance officer', ['FINANCE'], []],
+    ['an employee', ['EMPLOYEE'], []],
+    ['an account with no role', [], []],
+    ['a department head, whose role is derived', [], ['MANAGER']],
+    ['a spending approver', ['SPENDING_APPROVER'], []],
+  ])('refuses %s with 403', async (_name, direct, derived) => {
+    const response = await get('', principal([...direct, ...derived])).expect(403);
+
+    expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+  });
+
+  describe('validation', () => {
+    it.each([
+      ['page 0', 'page=0'],
+      ['pageSize 0', 'pageSize=0'],
+      ['pageSize 101', 'pageSize=101'],
+      ['an unknown query parameter', 'sort=name'],
+      ['q longer than 100 characters', `q=${'x'.repeat(101)}`],
+      ['departmentId not a UUID', 'departmentId=not-a-uuid'],
+      ['invalid workState', 'workState=UNKNOWN'],
+      ['invalid employmentType', 'employmentType=CHIEF'],
+      ['invalid unplaced flag', 'unplaced=yes'],
+      ['invalid hasAccount flag', 'hasAccount=1'],
+    ])('turns away %s with 422 VALIDATION_ERROR', async (_name, query) => {
+      const response = await get(query).expect(422);
+
+      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+});
+
+describe('GET /api/v1/employees/{id} (e2e, no database)', () => {
+  const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
+
+  const get = (id: string, caller = SUPER_ADMIN) =>
+    request(app.getHttpServer()).get(`/api/v1/employees/${id}`).set('Authorization', bearer(caller));
+
+  it('requires a Bearer token', async () => {
+    const response = await request(app.getHttpServer()).get(`/api/v1/employees/${ID}`).expect(401);
+
+    expect(bodyOf(response).error.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it.each([
+    ['the IT Admin', ['IT_ADMIN'], []],
+    ['the finance officer', ['FINANCE'], []],
+    ['an employee', ['EMPLOYEE'], []],
+    ['an account with no role', [], []],
+    ['a department head, whose role is derived', [], ['MANAGER']],
+    ['a spending approver', ['SPENDING_APPROVER'], []],
+  ])('refuses %s with 403', async (_name, direct, derived) => {
+    const response = await get(ID, principal([...direct, ...derived])).expect(403);
+
+    expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+  });
+
+  it('turns away an id that is not a UUID, 422 VALIDATION_ERROR', async () => {
+    const response = await get('not-an-id').expect(422);
+
+    expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+  });
+});

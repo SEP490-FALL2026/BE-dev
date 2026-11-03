@@ -22,6 +22,9 @@ export class EmployeeAccountsListener implements OnModuleInit {
     this.hook.bind({
       inspectEmployeeAccount: (tx, employeeId) => this.accounts.inspectEmployeeAccount(tx, employeeId),
       findUsableItAdminEmployeeIds: (employeeIds) => this.accounts.findUsableItAdminEmployeeIds(employeeIds),
+      findEmployeeIdsWithAccount: () => this.accounts.findEmployeeIdsWithAccount(),
+      summarizeAccounts: (employeeIds) => this.accounts.summarizeAccounts(employeeIds),
+      describeAccount: (employeeId) => this.accounts.describeAccount(employeeId),
     });
   }
 }

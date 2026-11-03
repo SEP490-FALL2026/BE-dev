@@ -72,6 +72,7 @@ export interface DepartmentWarningItem {
 
 /** What a department head, or the IT Admin, may see of one person in the department. */
 export interface DepartmentMemberRecord {
+  employeeId: string;
   employeeCode: string;
   fullName: string;
   status: EmployeeStatus;

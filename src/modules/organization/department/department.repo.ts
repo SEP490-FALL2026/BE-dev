@@ -336,6 +336,7 @@ export class DepartmentRepo {
   ): Promise<{ items: DepartmentMemberRecord[]; total: number }> {
     const rows = await db.$queryRaw<
       {
+        employee_id: string;
         employee_code: string;
         full_name: string;
         status: EmployeeStatus;
@@ -344,7 +345,7 @@ export class DepartmentRepo {
         valid_from: Date;
       }[]
     >`
-      SELECT e.employee_code, e.full_name, e.status, e.work_state, (e.work_email IS NOT NULL) AS has_work_email, p.valid_from
+      SELECT e.id AS employee_id, e.employee_code, e.full_name, e.status, e.work_state, (e.work_email IS NOT NULL) AS has_work_email, p.valid_from
         FROM employee_placements p JOIN employees e ON e.id = p.employee_id
        WHERE p.department_id = ${departmentId}::uuid
          AND p.valid_from <= ${onDate}::date AND (p.valid_to IS NULL OR p.valid_to > ${onDate}::date)
@@ -356,6 +357,7 @@ export class DepartmentRepo {
 
     return {
       items: rows.map((row) => ({
+        employeeId: row.employee_id,
         employeeCode: row.employee_code,
         fullName: row.full_name,
         status: row.status,

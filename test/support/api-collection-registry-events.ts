@@ -33,6 +33,7 @@ export const boundedNested = (
   item: string,
   reason: string,
   change: 'reclassified' | 'added' = 'reclassified',
+  date: RegistryEvent['date'] = '2026-10-23',
 ): RegistryEvent => ({
   registry: 'nested',
   key,
@@ -42,7 +43,7 @@ export const boundedNested = (
   bound,
   finding,
   item,
-  date: '2026-10-23',
+  date,
   reason,
 });
 
@@ -356,4 +357,22 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
       'The constraints of an operating parameter are typed (int, enum, int-list); the enum shape lists its options, at most ENUM_OPTIONS_MAX (QĐ-93, API-DOC-F07).',
     ownerDecision: 'Owner 01/11/2026',
   },
+  boundedNested(
+    'employeeGet#placements',
+    'EMPLOYEE_PLACEMENT_HISTORY_LIMIT',
+    'LD-14',
+    'employee-directory-read',
+    'The placement history of an employee is cut to at most EMPLOYEE_PLACEMENT_HISTORY_LIMIT items.',
+    'added',
+    '2026-11-03',
+  ),
+  boundedNested(
+    'employeeGet#account.roles',
+    'role_grants_one_effective_per_role',
+    'LD-14',
+    'employee-directory-read',
+    'The directly granted roles of an account are at most the values of AppRole (ROLE_GRANTS).',
+    'added',
+    '2026-11-03',
+  ),
 ];

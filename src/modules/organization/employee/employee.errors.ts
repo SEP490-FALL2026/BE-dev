@@ -34,7 +34,7 @@ export class EmployeeUpdateEmptyError extends Error {
 export class EmployeeRowInvalidError extends Error {
   constructor(readonly reasons: { field: string; code: string }[]) {
     super(
-      'The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.',
+      'The employee row is not valid. Codes use uppercase letters or digits in hyphen-separated groups; employee 3-20 chars, department 2-20.',
     );
     this.name = 'EmployeeRowInvalidError';
   }

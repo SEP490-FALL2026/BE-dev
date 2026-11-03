@@ -98,6 +98,19 @@ export interface EmployeeAccountStanding {
   roles: readonly string[];
 }
 
+/** The summary of an account for the employee directory list (one statement on app_users only). */
+export interface EmployeeAccountSummary {
+  id: string;
+  status: 'ACTIVE' | 'LOCKED';
+  activationState: 'INVITED' | 'ACTIVATED';
+  employeeLeft: boolean;
+}
+
+/** The full account description for the employee directory detail (one statement on app_users + role_grants). */
+export interface EmployeeAccountDetail extends EmployeeAccountSummary {
+  roles: readonly string[];
+}
+
 /** The accounts of the employees, as the department use cases need them (D5: the organization never imports identity-access). */
 export interface EmployeeAccounts {
   /**
@@ -107,6 +120,12 @@ export interface EmployeeAccounts {
   inspectEmployeeAccount(tx: DbTx, employeeId: string): Promise<EmployeeAccountStanding>;
   /** Among these employees, those holding IT_ADMIN on a usable account (an unlocked read, for lists). */
   findUsableItAdminEmployeeIds(employeeIds: readonly string[]): Promise<ReadonlySet<string>>;
+  /** Ids of every Employee that already has an account, whatever its state (one per Employee, AC-8). */
+  findEmployeeIdsWithAccount(): Promise<string[]>;
+  /** Summarizes accounts of these employees in one statement, only app_users without roles. */
+  summarizeAccounts(employeeIds: readonly string[]): Promise<Map<string, EmployeeAccountSummary>>;
+  /** Describes the account and its active direct roles for one employee in one statement, unlocked. */
+  describeAccount(employeeId: string): Promise<EmployeeAccountDetail | null>;
 }
 
 /**
