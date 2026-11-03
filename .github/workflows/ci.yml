@@ -157,7 +157,9 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     # Measured on 2 vCPU: the parallel step alone took 19–21 min, the whole job about 24–27 min (Owner, 30/10/2026).
-    timeout-minutes: 40
+    # After QĐ-93 (309 parallel files, 3 750 tests) the parallel step alone reached 38 min on main and the job was
+    # cancelled at 40 with two files left (run 41570255742, 03/11/2026): room for the in-band steps as well.
+    timeout-minutes: 70
     services:
       postgres: *postgres
     steps:
