@@ -50,6 +50,24 @@ describe('Excel employee files', () => {
       },
     ]);
   });
+  it('skips a blank row in the middle, reads the text of a hyperlink, and takes the optional columns as CSV does', async () => {
+    const bytes = await excel((sheet) => {
+      sheet.addRow(['Employee_Code', 'full_name', 'employment_type', 'hire_date']);
+      sheet.addRow([
+        'NV-0001',
+        { text: { richText: [{ text: 'Linked ' }, { text: 'Name' }] }, hyperlink: 'https://x.example' },
+        'STAFF',
+        '2026-01-05',
+      ]);
+      sheet.addRow([]);
+      sheet.addRow(['NV-0002', 'Second', 'STAFF', '2026-01-06']);
+    });
+    const result = await readUploadedEmployeeFile({ fileName: 'employees.xlsx', bytes });
+    expect(result.rows.map((row) => [row.lineNumber, row.cells.employee_code, row.cells.full_name])).toEqual([
+      [2, 'NV-0001', 'Linked Name'],
+      [4, 'NV-0002', 'Second'],
+    ]);
+  });
   it('rejects empty workbooks and corrupt or unsupported files', async () => {
     const bytes = await excel(() => undefined);
     await expect(readUploadedEmployeeFile({ fileName: 'empty.xlsx', bytes })).rejects.toMatchObject({

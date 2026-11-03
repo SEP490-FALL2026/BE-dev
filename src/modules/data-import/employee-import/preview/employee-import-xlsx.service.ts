@@ -1,10 +1,6 @@
 ﻿import ExcelJS from 'exceljs';
 import { EMPLOYEE_COLUMNS } from '../employee-import-row.types';
-import {
-  ImportFileInvalidError,
-  ImportFileMissingColumnsError,
-  ImportFileUnreadableError,
-} from '../employee-import.errors';
+import { ImportFileInvalidError, ImportFileUnreadableError } from '../employee-import.errors';
 import { employeeTableToRows, MAX_DATA_ROWS, readEmployeeFile } from './employee-import-file.policy';
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -14,7 +10,8 @@ function cellText(value: ExcelJS.CellValue): string {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
   if ('formula' in value || 'sharedFormula' in value) return cellText(value.result ?? null);
-  if ('text' in value) return value.text;
+  // A hyperlink's text may itself be rich text: read it like any other value, never hand an object on.
+  if ('text' in value) return cellText(value.text);
   if ('richText' in value) return value.richText.map((part) => part.text).join('');
   return '';
 }
@@ -56,9 +53,7 @@ function readSheet(sheet: ExcelJS.Worksheet | undefined) {
       cells.push(cellText(row.getCell(col).value));
     rows.push({ line: index, cells });
   }
-  while (rows.length > 1 && rows[rows.length - 1].cells.every((cell) => cell.trim() === '')) rows.pop();
-  const header = rows[0].cells;
-  const missing = EMPLOYEE_COLUMNS.filter((column) => !header.includes(column));
-  if (missing.length) throw new ImportFileMissingColumnsError([...missing]);
-  return employeeTableToRows(rows);
+  // Blank rows are skipped, as the CSV reader skips them; the header goes through the same column mapping as CSV
+  // (aliases, optional work_email, department_code and job_title).
+  return employeeTableToRows(rows.filter((row, index) => index === 0 || row.cells.some((cell) => cell.trim() !== '')));
 }
