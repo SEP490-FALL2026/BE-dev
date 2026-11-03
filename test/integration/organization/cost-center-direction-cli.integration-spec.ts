@@ -364,9 +364,9 @@ describe('ops:cost-center-direction (integration, real CLI and PostgreSQL)', () 
           await holder.query('BEGIN');
           await holder.query('SELECT id FROM cost_centers WHERE id = $1 FOR UPDATE', [costCenter]);
           const one = link(costCenter, first.code);
-          await waitForLockWaiters(sql, 1);
+          await waitForLockWaiters(sql, 1, CLI_COLD_START_MS);
           const two = link(costCenter, second.code);
-          await waitForLockWaiters(sql, 2);
+          await waitForLockWaiters(sql, 2, CLI_COLD_START_MS);
           await holder.query('COMMIT');
 
           const [a, b] = await Promise.all([one, two]);
@@ -401,7 +401,7 @@ describe('ops:cost-center-direction (integration, real CLI and PostgreSQL)', () 
           await holder.query('BEGIN');
           await holder.query('SELECT id FROM departments WHERE id = $1 FOR UPDATE', [department.id]);
           const linking = link(costCenter, department.code);
-          await waitForLockWaiters(sql, 1);
+          await waitForLockWaiters(sql, 1, CLI_COLD_START_MS);
           await holder.query(
             `INSERT INTO cost_centers (id, organization_id, code, name, kind, status, department_id, linked_at)
              VALUES (gen_random_uuid(), $1, $2, 'Created for it', 'UNIT', 'ACTIVE', $3, now())`,
