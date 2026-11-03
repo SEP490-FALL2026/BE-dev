@@ -53,6 +53,7 @@ export class OffboardingHandoverService {
     record: OffboardingRecord,
     facts: { leaverIsHead: boolean; today: BusinessDate },
   ): Promise<void> {
+    if (record.departmentId === null) return;
     await this.licensingHandovers.openHandoverDuties(tx, await this.guard.standIn(tx, actor), {
       leaverEmployeeId: record.employeeId,
       source: record.abrupt ? 'ABRUPT_DEPARTURE' : 'DEPARTURE',

@@ -90,7 +90,7 @@ export class OffboardingViewService {
   async get(actor: AuthenticatedPrincipal, id: string): Promise<OffboardingDetailWire> {
     const { access, departmentIds } = await this.scopeOf(actor);
     const record = await this.repo.find(id);
-    if (!record || (departmentIds && !departmentIds.includes(record.departmentId)))
+    if (!record || (departmentIds && record.departmentId !== null && !departmentIds.includes(record.departmentId)))
       throw new OffboardingRefusedError('NOT_FOUND');
 
     return this.detail.detailOf(record, access);
@@ -104,7 +104,7 @@ export class OffboardingViewService {
   ): Promise<Paged<OffboardingRightWire>> {
     const { departmentIds } = await this.scopeOf(actor);
     const record = await this.repo.find(id);
-    if (!record || (departmentIds && !departmentIds.includes(record.departmentId)))
+    if (!record || (departmentIds && record.departmentId !== null && !departmentIds.includes(record.departmentId)))
       throw new OffboardingRefusedError('NOT_FOUND');
     const today = await this.organizationReads.businessToday();
     const seats =

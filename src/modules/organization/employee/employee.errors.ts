@@ -40,13 +40,15 @@ export class EmployeeRowInvalidError extends Error {
   }
 }
 export class FirstPlacementError extends Error {
-  constructor(readonly problem: 'ALREADY_PLACED' | 'EMPLOYEE_INACTIVE' | 'DATE_INVALID') {
+  constructor(readonly problem: 'ALREADY_PLACED' | 'EMPLOYEE_INACTIVE' | 'EMPLOYEE_LEAVING' | 'DATE_INVALID') {
     super(
       problem === 'ALREADY_PLACED'
         ? 'The employee already has a placement; a change of department is a transfer.'
         : problem === 'DATE_INVALID'
           ? 'Effective date must be on or after today and hire date.'
-          : 'Employee must be active and not handing over.',
+          : problem === 'EMPLOYEE_LEAVING'
+            ? 'The employee is currently handing over and leaving the organization.'
+            : 'Employee must be active and not handing over.',
     );
     this.name = 'FirstPlacementError';
   }

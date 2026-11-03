@@ -529,6 +529,17 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "EMPLOYEE.EMPLOYEE_LEAVING": {
+                    "summary": "The employee is currently handing over and leaving the organization.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.EMPLOYEE_LEAVING",
+                        "message": "The employee is currently handing over and leaving the organization.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
@@ -11291,6 +11302,18 @@
                         "code": "OFFBOARDING_CASE.LAST_DAY_ALREADY_PASSED",
                         "message": "The last working day has passed: cancel the handover or record that the employee has left.",
                         "details": { "lastWorkingDay": "2026-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.PLACEMENT_OVERLAP": {
+                    "summary": "The placements of the person cannot take this change.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.PLACEMENT_OVERLAP",
+                        "message": "The placements of the person cannot take this change.",
+                        "details": { "reason": "NO_OPEN_PLACEMENT" },
                         "requestId": "req_example"
                       }
                     }
@@ -73626,8 +73649,10 @@
                   "name": { "type": "string" }
                 },
                 "required": ["id", "code", "name"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "nullable": true
               },
+              "firstPlacementRestored": { "type": "boolean" },
               "priorWorkState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE"] },
               "departureEffectiveOn": { "type": "string" },
               "grounds": {
@@ -74265,8 +74290,10 @@
                   "name": { "type": "string" }
                 },
                 "required": ["id", "code", "name"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "nullable": true
               },
+              "firstPlacementRestored": { "type": "boolean" },
               "priorWorkState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE"] },
               "departureEffectiveOn": { "type": "string" },
               "grounds": {

@@ -127,7 +127,7 @@ export class SeatHarness {
   }
 
   /** Many employees in one statement: `${prefix}0` … `${prefix}${count - 1}`, all staff with an acme.vn email, placed in the seed department. */
-  async crowd(prefix: string, count: number): Promise<void> {
+  async crowd(prefix: string, count: number, unplacedIndexes: number[] = []): Promise<void> {
     await this.ctx.sql.query(
       `WITH made AS (
          INSERT INTO employees (id, organization_id, employee_code, full_name, work_email, normalized_work_email,
@@ -135,11 +135,13 @@ export class SeatHarness {
          SELECT gen_random_uuid(), $1, $2 || n, $2 || n, lower($2) || n || '@acme.vn', lower($2) || n || '@acme.vn',
                 'STAFF', '2026-01-05', now()
            FROM generate_series(0, $3::int - 1) AS n
-         RETURNING id, organization_id
+         RETURNING id, organization_id, employee_code
        )
        INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
-       SELECT gen_random_uuid(), organization_id, id, $4, '2026-01-05' FROM made`,
-      [this.seed.organizationId, prefix, count, this.seed.departmentId],
+       SELECT gen_random_uuid(), organization_id, id, $4, '2026-01-05'
+         FROM made
+        WHERE employee_code <> ALL($5::text[])`,
+      [this.seed.organizationId, prefix, count, this.seed.departmentId, unplacedIndexes.map((i) => `${prefix}${i}`)],
     );
   }
 

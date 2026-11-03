@@ -204,8 +204,7 @@ describe('organization foundation (integration)', () => {
     const violations = await findPlacementCoverageViolations(sql);
     expect(violations).toEqual([{ employee_id: id, problem: 'gap or overlap between consecutive placements' }]);
 
-    await sql.query(`DELETE FROM employee_placements WHERE employee_id = $1`, [id]);
-    await sql.query(`DELETE FROM employees WHERE id = $1`, [id]);
+    // database is dropped at afterAll
   });
 
   it('stores the title of a person as free text in its display form (T-12, QĐ-87e): no catalogue, and none at all is allowed', async () => {

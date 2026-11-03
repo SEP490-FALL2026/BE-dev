@@ -182,6 +182,66 @@ export class EmployeeRepo {
     });
   }
 
+  async scheduledFirstPlacement(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ placementId: string; departmentId: string; validFrom: BusinessDate } | null> {
+    const client = tx ?? this.prisma;
+    const existing = await client.employeePlacement.findFirst({
+      where: {
+        employeeId,
+        validFrom: { lte: toDateColumn(onDate) },
+      },
+      select: { id: true },
+    });
+    if (existing) return null;
+
+    const future = await client.employeePlacement.findFirst({
+      where: {
+        employeeId,
+        validFrom: { gt: toDateColumn(onDate) },
+      },
+      orderBy: { validFrom: 'asc' },
+      select: { id: true, departmentId: true, validFrom: true },
+    });
+    if (!future) return null;
+
+    return {
+      placementId: future.id,
+      departmentId: future.departmentId,
+      validFrom: fromDateColumn(future.validFrom),
+    };
+  }
+
+  async cancelScheduledFirstPlacement(tx: DbTx, placementId: string): Promise<void> {
+    await tx.employeePlacement.delete({
+      where: { id: placementId },
+    });
+  }
+
+  async restoreFirstPlacement(
+    tx: DbTx,
+    input: {
+      placementId: string;
+      organizationId: string;
+      employeeId: string;
+      departmentId: string;
+      validFrom: BusinessDate;
+    },
+  ): Promise<void> {
+    await tx.employeePlacement.create({
+      data: {
+        id: input.placementId,
+        organizationId: input.organizationId,
+        employeeId: input.employeeId,
+        departmentId: input.departmentId,
+        validFrom: toDateColumn(input.validFrom),
+        validTo: null,
+      },
+    });
+  }
+
   /** Locks the employee row so its status cannot change until commit. */
   async lockEmployee(tx: DbTx, employeeId: string, mode: 'SHARE' | 'UPDATE'): Promise<void> {
     const rows =

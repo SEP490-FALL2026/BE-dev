@@ -167,7 +167,8 @@ model Department {
   transfersFrom           DepartmentTransfer[]          @relation("TransferFromDepartment")
   transfersTo             DepartmentTransfer[]          @relation("TransferToDepartment")
   transferReviews         TransferReview[]
-  offboardingCases        OffboardingCase[]
+  offboardingCases        OffboardingCase[]             @relation("OffboardingCaseDepartment")
+  cancelledOffboardingCases OffboardingCase[]           @relation("OffboardingCaseCancelledPlacementDepartment")
   noticesTargeting        PersonnelNotice[]             @relation("NoticeTargetDepartment")
   noticesSent             PersonnelNotice[]             @relation("NoticeSenderDepartment")
   // The subscriptions the department owns (QĐ-89a) and the assignments that gave existing ones their owner.

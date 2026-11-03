@@ -70,8 +70,17 @@ function roleOf(fact: SourceFact): { role: HandoverRole; fixedEmployeeId: string
  * confirmed once (`QĐ-64a`, `QĐ-66u`): the person who decided or the head wins over the IT Admin, so a seat that is ghost and also
  * reduced is confirmed by the head who chose to take it back and never again by the IT Admin. Null when no reason asks for one.
  */
-export function requirementOf(facts: readonly SourceFact[], dataLossOnRemoval: boolean): Requirement | null {
-  const asked = facts
+export function requirementOf(
+  facts: readonly SourceFact[],
+  dataLossOnRemoval: boolean,
+  context?: { departmentId?: string | null },
+): Requirement | null {
+  const filteredFacts =
+    context?.departmentId === null
+      ? facts.filter((fact) => fact.source !== 'DEPARTURE' && fact.source !== 'ABRUPT_DEPARTURE')
+      : facts;
+  const asked = filteredFacts
+
     .filter((fact) => requiresConfirmation(fact.source, dataLossOnRemoval))
     .map((fact) => ({ source: fact.source, ...roleOf(fact) }))
     // A return with nobody who sent it (an old record) has nobody to ask.

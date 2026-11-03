@@ -87,7 +87,7 @@ export class OffboardingDetailService {
         record.employeeId,
         ...(record.headHandover?.successorEmployeeId ? [record.headHandover.successorEmployeeId] : []),
       ]),
-      this.organizationReads.getDepartmentBrief(record.departmentId),
+      record.departmentId ? this.organizationReads.getDepartmentBrief(record.departmentId) : Promise.resolve(null),
       live ? this.catalog.getApplicationsOwnedBy(record.employeeId, 1) : Promise.resolve({ total: 0 }),
       live ? this.sources.warningsOf(record.employeeId) : Promise.resolve({}),
     ]);

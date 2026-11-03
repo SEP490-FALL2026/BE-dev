@@ -23,7 +23,7 @@ export type PersonnelEventKind =
 interface Common {
   organizationId: string;
   employeeId: string;
-  departmentId: string;
+  departmentId: string | null;
 }
 
 /**
@@ -55,7 +55,9 @@ export class PersonnelNotifier {
     },
   ): Promise<void> {
     const today = await this.organizationReads.businessToday(new Date(), tx);
-    const departments = [...new Set([input.departmentId, ...(input.alsoDepartmentIds ?? [])])];
+    const departments = [
+      ...new Set([input.departmentId, ...(input.alsoDepartmentIds ?? [])].filter((d): d is string => d !== null)),
+    ];
     const heads = await this.organizationReads.getDepartmentHeads(departments, today, tx);
     const recipients = new Set<string>([input.employeeId, ...[...heads.values()].map((head) => head.employeeId)]);
     const occurrence = randomUUID();
@@ -153,12 +155,14 @@ export class PersonnelNotifier {
 
       return;
     }
-    await this.notifications.holdForDepartment(tx, {
-      organizationId: input.organizationId,
-      departmentId: input.departmentId,
-      code: 'TRANSFER_REVIEW_DUE',
-      ...parameters,
-    });
+    if (input.departmentId) {
+      await this.notifications.holdForDepartment(tx, {
+        organizationId: input.organizationId,
+        departmentId: input.departmentId,
+        code: 'TRANSFER_REVIEW_DUE',
+        ...parameters,
+      });
+    }
   }
 
   private async toSuperAdmin(

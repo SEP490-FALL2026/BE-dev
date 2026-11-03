@@ -227,7 +227,9 @@ describe('ops:inspect (integration, real PostgreSQL)', () => {
           );
         } finally {
           await sql.query('DELETE FROM department_head_periods WHERE employee_id = ANY($1::uuid[])', [people]);
+          await sql.query('ALTER TABLE employee_placements DISABLE TRIGGER employee_placements_keep_one');
           await sql.query('DELETE FROM employee_placements WHERE employee_id = ANY($1::uuid[])', [people]);
+          await sql.query('ALTER TABLE employee_placements ENABLE TRIGGER employee_placements_keep_one');
           await sql.query('DELETE FROM role_grants WHERE app_user_id = ANY($1::uuid[])', [users]);
           await sql.query('DELETE FROM app_users WHERE id = ANY($1::uuid[])', [users]);
           await sql.query('DELETE FROM employees WHERE id = ANY($1::uuid[])', [people]);

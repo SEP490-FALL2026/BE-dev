@@ -3,7 +3,7 @@ import type { PreviewWire } from '../../src/modules/requests/request-submission/
 import request from 'supertest';
 import { ApiAccount } from './api-accounts';
 import { declareSubscription } from './builders/catalog.builder';
-import { clearSpendingApprover, setSpendingApprover } from './builders/account.builder';
+import { clearSpendingApprover, insertEmployeeWithoutPlacement, setSpendingApprover } from './builders/account.builder';
 import { assignHead } from './builders/organization.builder';
 import { OwnedSubscriptions } from './owned-subscriptions';
 import { ProvisioningHarness } from './provisioning-harness';
@@ -152,6 +152,15 @@ export class RequestHarness extends ProvisioningHarness {
   /** A person of the department with an activated account holding `roles`; a head or an approver is made one by the calls below. */
   async staff(department: Department, code: string, roles: string[] = []): Promise<Person> {
     const employeeId = await this.member(department.code, code, await this.title());
+
+    return { employeeId, account: await this.account(code, employeeId, roles) };
+  }
+
+  async unplacedStaff(code: string, roles: string[] = []): Promise<Person> {
+    const employeeId = await insertEmployeeWithoutPlacement(this.ctx, this.seed, {
+      code,
+      email: `${code.toLowerCase()}@acme.vn`,
+    });
 
     return { employeeId, account: await this.account(code, employeeId, roles) };
   }

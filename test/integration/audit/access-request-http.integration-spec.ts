@@ -286,8 +286,7 @@ describe('requests over HTTP: sending and routing the need step (integration, re
     });
 
     it('refuses a sender who belongs to no department', async () => {
-      const lonely = await h.staff(headless, 'HR-E7');
-      await h.ctx.sql.query(`DELETE FROM employee_placements WHERE employee_id = $1`, [lonely.employeeId]);
+      const lonely = await h.unplacedStaff('HR-E7');
 
       // D-S21: a person with no department is refused as a party of the request (422), not as a conflict of the department.
       const refused = await h.submit(h.form(internalPlan), lonely.account).expect(422);

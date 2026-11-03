@@ -226,7 +226,7 @@ export class OffboardingController {
     {
       status: HttpStatus.CONFLICT,
       description: `The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), the last working day has passed (LAST_DAY_ALREADY_PASSED), or ${CONCURRENT}.`,
-      examples: [...NOT_UNDER_WAY, E.LAST_DAY_ALREADY_PASSED, ...CONCURRENT_EXAMPLES],
+      examples: [...NOT_UNDER_WAY, E.LAST_DAY_ALREADY_PASSED, E.PLACEMENT_OVERLAP, ...CONCURRENT_EXAMPLES],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -281,8 +281,10 @@ export class OffboardingController {
   ) {
     try {
       const record = await this.changes.cancel(userActor(actor), params.id, { reason: body.reason ?? '' });
-
-      return await this.detail.detailOf(record);
+      const detail = await this.detail.detailOf(record);
+      return record.firstPlacementRestored !== undefined
+        ? { ...detail, firstPlacementRestored: record.firstPlacementRestored }
+        : detail;
     } catch (error) {
       throw toOffboardingApiException(error);
     }

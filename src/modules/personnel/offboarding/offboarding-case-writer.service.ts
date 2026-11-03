@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { PersonnelFileHooks } from '../event-notice/personnel-file-hooks.service';
 import { groundsSnapshot, normalizedGrounds } from '../personnel-grounds.policy';
@@ -42,6 +43,7 @@ export class OffboardingCaseWriter {
     private readonly left: OffboardingLeftService,
     private readonly notifier: PersonnelNotifier,
     private readonly guard: TransferGuardService,
+    private readonly organization: OrganizationApi,
   ) {}
 
   async write(
@@ -51,6 +53,20 @@ export class OffboardingCaseWriter {
     written: DepartureWritten,
   ): Promise<OffboardingRecord> {
     const record = await this.insertCase(tx, actor, input, written);
+    if (written.seen.cancelledPlacement) {
+      await this.organization.cancelScheduledFirstPlacement(tx, written.seen.cancelledPlacement.placementId);
+      await this.audit.firstPlacementCancelled(
+        tx,
+        actor,
+        written.organizationId,
+        input.employeeId,
+        {
+          departmentId: written.seen.cancelledPlacement.departmentId,
+          effectiveFrom: written.seen.cancelledPlacement.validFrom,
+        },
+        record.id,
+      );
+    }
     await this.recordChange(tx, actor, input, { ...written, record });
     await this.announce(tx, actor, input, { ...written, record });
 
@@ -63,25 +79,8 @@ export class OffboardingCaseWriter {
     input: RecordOffboardingInput,
     written: DepartureWritten,
   ): Promise<OffboardingRecord> {
-    const { seen, held, scheduled } = written;
-    const by = actorColumns(actor);
-    const lastWorkingDay = input.lastWorkingDay as BusinessDate;
-    const row = {
-      organizationId: written.organizationId,
-      employeeId: input.employeeId,
-      departmentId: seen.before.departmentId,
-      abrupt: input.abrupt,
-      priorWorkState: held.employee.workState as PriorWorkState,
-      lastWorkingDay,
-      departureEffectiveOn: seen.endsOn,
-      handoverDueOn: input.abrupt ? null : await this.handovers.plannedDueOn(lastWorkingDay),
-      grounds: normalizedGrounds(input.grounds ?? {}),
-      headHandover: scheduled.headHandover,
-      placementClosedId: scheduled.placementClosedId,
-      recordedByAppUserId: by.appUserId,
-      recordedByTicketId: by.ticketId,
-      noticeId: input.noticeId ?? null,
-    };
+    const plannedDue = input.abrupt ? null : await this.handovers.plannedDueOn(input.lastWorkingDay as BusinessDate);
+    const row = this.buildCaseRow(actor, input, written, plannedDue);
     const left = input.abrupt ? { on: written.today, by: (await this.guard.standIn(tx, actor)).appUserId } : undefined;
     try {
       return await this.repo.insert(tx, row, left ? 'LEFT' : 'HANDING_OVER', left);
@@ -90,6 +89,37 @@ export class OffboardingCaseWriter {
         throw new OffboardingRefusedError('ALREADY_HANDING_OVER');
       throw error;
     }
+  }
+
+  private buildCaseRow(
+    actor: PersonnelActor,
+    input: RecordOffboardingInput,
+    written: DepartureWritten,
+    handoverDueOn: BusinessDate | null,
+  ): Parameters<OffboardingRepo['insert']>[1] {
+    const { seen, held, scheduled } = written;
+    const by = actorColumns(actor);
+    const cancelled = seen.cancelledPlacement;
+
+    return {
+      organizationId: written.organizationId,
+      employeeId: input.employeeId,
+      departmentId: seen.before ? seen.before.departmentId : null,
+      abrupt: input.abrupt,
+      priorWorkState: held.employee.workState as PriorWorkState,
+      lastWorkingDay: input.lastWorkingDay as BusinessDate,
+      departureEffectiveOn: seen.endsOn,
+      handoverDueOn,
+      grounds: normalizedGrounds(input.grounds ?? {}),
+      headHandover: scheduled.headHandover,
+      placementClosedId: scheduled.placementClosedId,
+      cancelledPlacementId: cancelled?.placementId ?? null,
+      cancelledPlacementDepartmentId: cancelled?.departmentId ?? null,
+      cancelledPlacementFrom: cancelled?.validFrom ?? null,
+      recordedByAppUserId: by.appUserId,
+      recordedByTicketId: by.ticketId,
+      noticeId: input.noticeId ?? null,
+    };
   }
 
   /** The first change of the case and the audit entries (the employee is told, too). */
@@ -141,7 +171,7 @@ export class OffboardingCaseWriter {
       employeeId: record.employeeId,
       dueOn: record.departureEffectiveOn,
     });
-    await this.handovers.open(tx, actor, record, { leaverIsHead: seen.leavesAsHead, today });
+    if (seen.before) await this.handovers.open(tx, actor, record, { leaverIsHead: seen.leavesAsHead, today });
     if (input.abrupt) {
       await this.left.leaveInTx(tx, actor, record, today, 'RECORDING');
       await this.notifier.abruptDeparture(tx, {
@@ -153,10 +183,12 @@ export class OffboardingCaseWriter {
         lastDayInOffice: addDays(record.departureEffectiveOn, -1),
       });
     }
+    const alsoDepartmentIds = seen.cancelledPlacement ? [seen.cancelledPlacement.departmentId] : undefined;
     await this.notifier.eventRecorded(tx, {
       organizationId,
       employeeId: record.employeeId,
       departmentId: record.departmentId,
+      alsoDepartmentIds,
       eventKind: 'DEPARTURE_RECORDED',
       eventId: record.id,
       subjectType: 'OFFBOARDING_CASE',

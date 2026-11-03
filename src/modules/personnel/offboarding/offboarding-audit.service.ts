@@ -51,6 +51,22 @@ export class OffboardingAuditService {
   }
 
   /** The Super Admin is reminded to lock the company account of a person who has left (`US-03-04` AC-3, `QĐ-77c`). */
+  async firstPlacementCancelled(
+    tx: DbTx,
+    actor: PersonnelActor,
+    organizationId: string,
+    employeeId: string,
+    before: { departmentId: string; effectiveFrom: string },
+    offboardingCaseId: string,
+  ): Promise<void> {
+    await this.audit.record(
+      tx,
+      personnelAuditEvent(actor, organizationId, 'EMPLOYEE.FIRST_PLACEMENT_CANCELLED', 'Employee', employeeId, before, {
+        department: null,
+        offboardingCaseId,
+      }),
+    );
+  }
   async accountLockReminder(tx: DbTx, record: OffboardingRecord): Promise<void> {
     await this.audit.record(
       tx,

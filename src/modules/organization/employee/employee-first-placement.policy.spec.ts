@@ -1,4 +1,4 @@
-﻿import { firstPlacementProblem } from './employee-first-placement.policy';
+import { firstPlacementProblem } from './employee-first-placement.policy';
 
 const day = (value: string) => value;
 const facts = {
@@ -18,7 +18,7 @@ describe('first placement policy', () => {
   });
   it('rejects existing placements and employees handing over or terminated', () => {
     expect(firstPlacementProblem({ ...facts, hasPlacement: true })).toBe('ALREADY_PLACED');
-    expect(firstPlacementProblem({ ...facts, workState: 'HANDING_OVER' })).toBe('EMPLOYEE_INACTIVE');
+    expect(firstPlacementProblem({ ...facts, workState: 'HANDING_OVER' })).toBe('EMPLOYEE_LEAVING');
     expect(firstPlacementProblem({ ...facts, status: 'TERMINATED' })).toBe('EMPLOYEE_INACTIVE');
   });
 });

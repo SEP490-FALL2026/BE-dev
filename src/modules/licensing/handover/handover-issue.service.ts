@@ -50,7 +50,7 @@ export class HandoverIssueService {
   ) {}
 
   async ensure(tx: DbTx, actor: AuthenticatedPrincipal, input: IssueInput): Promise<Issued> {
-    const required = requirementOf(input.facts, input.dataLossOnRemoval);
+    const required = requirementOf(input.facts, input.dataLossOnRemoval, { departmentId: input.departmentId });
     if (!required) return { outcome: 'NOT_REQUIRED' };
 
     await this.ending.lock(tx, input.assignmentId);

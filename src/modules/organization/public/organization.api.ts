@@ -64,6 +64,23 @@ export class OrganizationApi {
     return this.employees.lock(tx, employeeId, 'UPDATE');
   }
 
+  cancelScheduledFirstPlacement(tx: DbTx, placementId: string): Promise<void> {
+    return this.employees.cancelScheduledFirstPlacement(tx, placementId);
+  }
+
+  restoreFirstPlacement(
+    tx: DbTx,
+    input: {
+      placementId: string;
+      organizationId: string;
+      employeeId: string;
+      departmentId: string;
+      validFrom: BusinessDate;
+    },
+  ): Promise<void> {
+    return this.employees.restoreFirstPlacement(tx, input);
+  }
+
   /** Corrects the official fields of an employee whose row the caller holds `FOR UPDATE` (`US-02-02` AC-19). */
   updateEmployeeOfficialFields(tx: DbTx, employeeId: string, patch: OfficialFieldsPatch): Promise<void> {
     return this.employees.updateOfficialFields(tx, employeeId, patch);

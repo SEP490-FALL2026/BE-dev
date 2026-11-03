@@ -13,7 +13,7 @@ export interface RoleDutyCase {
   lastWorkingDay: BusinessDate;
   /** The person headed the department they leave; who follows them: an employee, nobody, or null when they did not head it. */
   headSuccessor: 'EMPLOYEE' | 'NONE' | null;
-  departmentId: string;
+  departmentId: string | null;
   closed: boolean;
   roleFlags: RoleFlag[];
 }
@@ -66,7 +66,7 @@ export class RoleDutiesRepo {
     state: 'HANDING_OVER' | 'LEFT' | 'CANCELLED';
     lastWorkingDay: Date;
     headHandover: unknown;
-    departmentId: string;
+    departmentId: string | null;
     closedAt: Date | null;
     roleFlags: RoleFlag[];
   }): RoleDutyCase {

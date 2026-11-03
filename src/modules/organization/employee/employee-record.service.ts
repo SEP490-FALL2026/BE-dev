@@ -77,6 +77,31 @@ export class EmployeeRecordService {
     return this.repo.insertFirstPlacement(tx, input);
   }
 
+  scheduledFirstPlacement(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ placementId: string; departmentId: string; validFrom: BusinessDate } | null> {
+    return this.repo.scheduledFirstPlacement(employeeId, onDate, tx);
+  }
+
+  cancelScheduledFirstPlacement(tx: DbTx, placementId: string): Promise<void> {
+    return this.repo.cancelScheduledFirstPlacement(tx, placementId);
+  }
+
+  restoreFirstPlacement(
+    tx: DbTx,
+    input: {
+      placementId: string;
+      organizationId: string;
+      employeeId: string;
+      departmentId: string;
+      validFrom: BusinessDate;
+    },
+  ): Promise<void> {
+    return this.repo.restoreFirstPlacement(tx, input);
+  }
+
   lock(tx: DbTx, employeeId: string, mode: 'SHARE' | 'UPDATE'): Promise<void> {
     return this.repo.lockEmployee(tx, employeeId, mode);
   }

@@ -132,7 +132,8 @@ const warningsSchema = z.strictObject({
 });
 
 export const offboardingDetailSchema = offboardingSummarySchema.extend({
-  department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
+  department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
+  firstPlacementRestored: z.boolean().optional(),
   priorWorkState: z.enum(['WORKING', 'ON_LONG_LEAVE']),
   departureEffectiveOn: z.string(),
   /** The basis of the departure. Null in the minimal projection an IT Admin reads. */

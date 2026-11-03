@@ -101,7 +101,11 @@ export class OffboardingFrame {
     const work = async (tx: DbTx): Promise<T> => {
       const today = await this.organizationReads.businessToday(new Date(), tx);
       if (options.lockDepartment) {
-        await this.history.lockDepartments(tx, { updateIds: [seen.departmentId], shareIds: [] });
+        if (seen.departmentId) {
+          await this.history.lockDepartments(tx, { updateIds: [seen.departmentId], shareIds: [] });
+        } else if (seen.cancelledPlacementDepartmentId) {
+          await this.history.lockDepartments(tx, { updateIds: [], shareIds: [seen.cancelledPlacementDepartmentId] });
+        }
       }
       await this.organization.lockEmployeeForUpdate(tx, seen.employeeId);
       const chosen = options.successorEmployeeId ?? null;

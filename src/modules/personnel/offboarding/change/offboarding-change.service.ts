@@ -48,7 +48,12 @@ export class OffboardingChangeService {
   }
 
   /** Cancels a handover under way. Throws OffboardingRefusedError. With `outer` it runs in the transaction of the caller. */
-  cancel(actor: PersonnelActor, id: string, input: { reason: string }, outer?: DbTx): Promise<OffboardingRecord> {
+  cancel(
+    actor: PersonnelActor,
+    id: string,
+    input: { reason: string },
+    outer?: DbTx,
+  ): Promise<OffboardingRecord & { firstPlacementRestored?: boolean }> {
     return this.frame.runEvent(actor, id, { lockDepartment: true, outer }, async (tx, { held, today }) => {
       const refusal = cancelRefusal({ state: held.state, reason: input.reason });
       if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
