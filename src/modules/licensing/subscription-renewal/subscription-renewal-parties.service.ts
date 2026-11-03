@@ -22,8 +22,8 @@ const READER_ROLES = ['IT_ADMIN', 'FINANCE', 'SPENDING_APPROVER'];
 
 /**
  * Who a renewal concerns (`US-11-01`, `US-11-02`, `US-11-05`): the IT Admin in charge of the department that owns the subscription
- * (any usable IT Admin while that department names none), Finance, the Business Owner, the person who decides spending — or the
- * substitute when that person proposed the case — and the Super Admin. A head of department and an employee are never among them.
+ * (any usable IT Admin while that department names none), Finance, the Business Owner, the person who decides spending — and nobody
+ * in their place (`QĐ-93d`(1)) — and the Super Admin. A head of department and an employee are never among them.
  */
 @Injectable()
 export class RenewalPartiesService {
@@ -41,25 +41,54 @@ export class RenewalPartiesService {
     );
   }
 
-  /** Who decides a case proposed by this person now, and as which role. */
-  async deciderOf(proposerEmployeeId: string, tx?: DbTx): Promise<{ employeeId: string | null; role: DeciderRole }> {
-    return renewalDeciderOf(await this.identity.getApprovalRoleHolders(tx), proposerEmployeeId);
+  /**
+   * The spending approver, when they still work: who decides the cases now, and nobody else does (`QĐ-93d`(1)). Null when nobody holds
+   * the role or the holder has left, which is what a case that waits for its decision waits for. With `forShare`, in the transaction
+   * `tx`, the row of the grant is locked until it ends, so a case that starts to wait and a revocation take turns (`M6`).
+   */
+  async usableApproverOf(tx?: DbTx, options?: { forShare?: boolean }): Promise<string | null> {
+    const holder = await this.identity.getSpendingApproverEmployeeId(tx, options);
+    if (holder === null) return null;
+    const [found] = await this.organizationReads.getEmployees([holder], tx);
+
+    return found?.status === 'ACTIVE' ? holder : null;
   }
 
-  /** Whether the caller reads the cases: one of the roles that work them, or the substitute who may have to decide one. */
-  async canRead(actor: AuthenticatedPrincipal): Promise<boolean> {
-    if (actor.roles.some((role) => READER_ROLES.includes(role))) return true;
+  /** The Super Admin of today, whatever the state of their account, or null: who is told that a case waits for an approver (`D-S16`). */
+  async superAdminOf(tx?: DbTx): Promise<string | null> {
+    return (await this.identity.getSuperAdminHolder(tx))?.employeeId ?? null;
+  }
 
-    return (await this.identity.getApprovalRoleHolders()).conflictSubstituteEmployeeId === actor.employeeId;
+  /** Whether the employee still works for the company. */
+  async employeeWorks(employeeId: string, tx?: DbTx): Promise<boolean> {
+    const [found] = await this.organizationReads.getEmployees([employeeId], tx);
+
+    return found?.status === 'ACTIVE';
+  }
+
+  /** Whether the employee holds the role of the spending approver now (an unlocked read). */
+  async holdsApproverRole(employeeId: string, tx?: DbTx): Promise<boolean> {
+    return (await this.identity.getSpendingApproverEmployeeId(tx)) === employeeId;
+  }
+
+  /** Who decides a case proposed by this person now: the spending approver, and nobody in their place. */
+  async deciderOf(
+    proposerEmployeeId: string,
+    tx?: DbTx,
+  ): Promise<{ employeeId: string | null; role: Extract<DeciderRole, 'SPENDING_APPROVER'> }> {
+    return renewalDeciderOf(await this.usableApproverOf(tx), proposerEmployeeId);
+  }
+
+  /** Whether the caller reads the cases: one of the roles that work them; the substitute for a conflict has no part in them any more. */
+  canRead(actor: AuthenticatedPrincipal): boolean {
+    return actor.roles.some((role) => READER_ROLES.includes(role));
   }
 
   /** The people every period shares (Finance, the decider, the Super Admin), read once for a pass. */
   async sharedPeople(): Promise<Pick<RenewalPeople, 'finance' | 'approver' | 'superAdmin'>> {
-    const holders = await this.identity.getApprovalRoleHolders();
-
     return {
       finance: await this.identity.findUsableFinanceEmployeeId(),
-      approver: holders.spendingApproverEmployeeId,
+      approver: await this.identity.getSpendingApproverEmployeeId(),
       superAdmin: await this.identity.findUsableSuperAdminEmployeeId(),
     };
   }

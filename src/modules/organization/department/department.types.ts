@@ -1,6 +1,5 @@
 import { BusinessDate } from '../../../core/business-date';
 import { EmployeeStatus, EmployeeWorkState } from '../organization-employee.types';
-import { ProjectRecord } from '../project/project.types';
 import type { CostCenterStatus, DepartmentStatus, HeadPeriodRecord } from '../organization-structure.types';
 
 /**
@@ -8,6 +7,10 @@ import type { CostCenterStatus, DepartmentStatus, HeadPeriodRecord } from '../or
  * (its finance configuration is incomplete, `QĐ-87d(1)`; Finance creates the Cost Center for it).
  */
 export type DepartmentWarning = 'MISSING_HEAD' | 'MISSING_IT_ADMIN' | 'MISSING_COST_CENTER';
+
+/** The longest name and function a department takes, in characters after the accents are composed (`API-DOC-F05`). */
+export const DEPARTMENT_NAME_MAX_LENGTH = 200;
+export const DEPARTMENT_FUNCTION_MAX_LENGTH = 1000;
 
 /** How many head periods a profile shows, and how many a head change reads back to find the one in force. */
 export const DEPARTMENT_HEAD_HISTORY_LIMIT = 50;
@@ -57,9 +60,6 @@ export interface DepartmentProfileView extends DepartmentView {
   headHistory: HeadPeriodRecord[];
   /** The department had more head periods than the {@link DEPARTMENT_HEAD_HISTORY_LIMIT} shown. */
   headHistoryHasMore: boolean;
-  projects: ProjectRecord[];
-  /** How many projects the department takes part in; `projects` holds the first of them only. */
-  projectTotal: number;
 }
 
 /** One active department that needs attention, for the IT Admin and the Super Admin (US-03-06 AC-9, AC-15). */

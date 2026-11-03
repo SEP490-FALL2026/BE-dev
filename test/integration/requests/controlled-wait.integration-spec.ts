@@ -15,7 +15,8 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
   let counter: QueryCounter;
   let internal: string;
   let paid: string;
-  let fallback: Person;
+  /** A person who holds no role at all: what nobody who is not the holder of a step can decide it as. */
+  let bystander: Person;
   let n = 0;
 
   beforeAll(async () => {
@@ -35,8 +36,7 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
     await h
       .declareTaxProfile((await h.vendorOf(paid)).id, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }])
       .expect(200);
-    fallback = await h.staff(await h.departmentWithUnit('P-FBK'), 'FBK-R0');
-    await h.setRole('FALLBACK_APPROVER', fallback);
+    bystander = await h.staff(await h.departmentWithUnit('P-BYS'), 'BYS-E0');
   }, 240000);
 
   afterAll(async () => {
@@ -68,12 +68,12 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
   };
   const waitsFor = async (stepId: string, account: ApiAccount | string = h.admin) =>
     (await listed(account, { pageSize: 100 })).items.find((item) => item.stepId === stepId);
-  const sentWhileEmpty = async (role: 'SPENDING_APPROVER' | 'FALLBACK_APPROVER', work: () => Promise<void>) => {
+  const sentWhileEmpty = async (role: 'SPENDING_APPROVER', work: () => Promise<void>) => {
     await h.clearRole(role);
     try {
       await work();
     } finally {
-      await h.setRole(role, role === 'SPENDING_APPROVER' ? h.boss : fallback);
+      await h.setRole(role, h.boss);
     }
   };
 
@@ -93,7 +93,7 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
         });
         expect(step.waiting_since).toBeInstanceOf(Date);
         expect(await h.state(id)).toBe('WAITING_CONTROLLED');
-        // The fallback approver is configured and is not given the step (AC-4): it never holds a spend step.
+        // Nobody else is given the step (AC-4): there is no approver of last resort and no substitute.
         expect(await alertsOf(step.id)).toBe(0);
 
         await h.sweep();
@@ -106,9 +106,10 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
             waitingReason: 'NO_SPENDING_APPROVER',
             configurationHint: 'CONFIGURE_SPENDING_APPROVER',
             notify: 'SUPER_ADMIN',
-            itAdminEmployeeId: null,
           },
         });
+        // Nobody but the Super Admin is told, and no IT Admin is looked for (D-S20).
+        expect(alert.after).not.toHaveProperty('itAdminEmployeeId');
         expect(await alertsOf(step.id)).toBe(1);
         expect(await waitsFor(step.id)).toMatchObject({
           requestId: id,
@@ -200,7 +201,7 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
   });
 
   describe('the need step of a head who sends for themselves (AC-8, US-05-03 AC-13)', () => {
-    it('waits for the spending approver and is not given to the fallback approver, then goes to the approver when one is configured', async () => {
+    it('waits for the spending approver and is not given to anybody else, then goes to the approver when one is configured', async () => {
       const unit = await h.departmentWithHead(`P-H${(n += 1)}`);
 
       await sentWhileEmpty('SPENDING_APPROVER', async () => {
@@ -219,8 +220,8 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
           notify: 'SUPER_ADMIN',
         });
         expect(await waitsFor(step.id)).toMatchObject({ stepKind: 'NEED' });
-        // Nobody can decide it: not the head who sent it, not the fallback approver.
-        await h.decide(sent.id, APPROVE, fallback.account).expect(404);
+        // Nobody can decide it: not the head who sent it, not a person who holds no role.
+        await h.decide(sent.id, APPROVE, bystander.account).expect(404);
       });
 
       const sentRows = await h.ctx.sql.query<{ id: string }>(
@@ -233,8 +234,8 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
     });
   });
 
-  describe('a department with neither a head nor a fallback approver (AC-6, AC-7)', () => {
-    it('tells the IT Admin in charge as well as the Super Admin, shows the row to them and to nobody else, and loses it when the requester withdraws', async () => {
+  describe('a department with no head (AC-6, AC-7, D-S20)', () => {
+    it('alerts the Super Admin once when a need step waits with NO_DEPARTMENT_HEAD, shows the row to the IT Admin in charge and to nobody else, and loses it when the requester withdraws', async () => {
       n += 1;
       const headless = await h.departmentWithUnit(`P-HL${n}`);
       const e4 = await h.staff(headless, `HL-E${n}`);
@@ -244,32 +245,51 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
       const itElsewhere = await h.staff(otherDepartment, `IT-OT${n}`, ['IT_ADMIN']);
       await h.setItAdminInCharge(otherDepartment, itElsewhere);
 
-      await sentWhileEmpty('FALLBACK_APPROVER', async () => {
-        const sent = await h.sent(e4, internal);
-        const step = await h.stepOf(sent.id, 'NEED');
-        expect(step).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_FALLBACK_APPROVER' });
-
-        await h.sweep();
-        const [alert] = await h.audit('ACCESS_REQUEST.STEP_WAIT_ALERTED', step.id);
-        expect(alert.after).toMatchObject({
-          configurationHint: 'CONFIGURE_FALLBACK_APPROVER',
-          notify: 'SUPER_ADMIN,IT_ADMIN_IN_CHARGE',
-          itAdminEmployeeId: h.it1.employeeId,
-        });
-        expect(await waitsFor(step.id, h.it1)).toMatchObject({ requestId: sent.id, department: { id: headless.id } });
-        expect(await waitsFor(step.id, itElsewhere.account)).toBeUndefined();
-        expect(await waitsFor(step.id, h.admin)).toBeDefined();
-        await request(h.server()).get('/api/v1/controlled-waits').set(h.as(h.finance)).expect(403);
-        await request(h.server()).get('/api/v1/controlled-waits').set(h.as(h.employee)).expect(403);
-
-        // The requester withdraws while it waits: the request ends, the step is closed and leaves the queue, nobody is told again.
-        await h.withdrawRequest(sent.id, {}, e4.account).expect(200);
-        expect(await h.state(sent.id)).toBe('WITHDRAWN');
-        expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({ state: 'CLOSED', waiting_since: null });
-        expect(await waitsFor(step.id)).toBeUndefined();
-        await h.sweep();
-        expect(await alertsOf(step.id)).toBe(1);
+      const sent = await h.sent(e4, internal);
+      const step = await h.stepOf(sent.id, 'NEED');
+      // Nobody takes the step in place of a head: it waits on row 4, with the request under control.
+      expect(step).toMatchObject({
+        state: 'WAITING',
+        assignee_employee_id: null,
+        routing_row: 4,
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
       });
+      expect(await h.state(sent.id)).toBe('WAITING_CONTROLLED');
+
+      await h.sweep();
+      const [alert] = await h.audit('ACCESS_REQUEST.STEP_WAIT_ALERTED', step.id);
+      expect(alert.after).toMatchObject({
+        stepKind: 'NEED',
+        waitingReason: 'NO_DEPARTMENT_HEAD',
+        configurationHint: 'ASSIGN_DEPARTMENT_HEAD',
+        notify: 'SUPER_ADMIN',
+      });
+      // The Super Admin is the one told: the audit event names nobody else, and the IT Admin in charge is not looked for.
+      expect(alert.after).not.toHaveProperty('itAdminEmployeeId');
+      expect(await alertsOf(step.id)).toBe(1);
+      await h.sweep();
+      await h.sweep();
+      expect(await alertsOf(step.id)).toBe(1);
+      expect(await h.audit('ACCESS_REQUEST.STEP_WAIT_ALERTED', step.id)).toHaveLength(1);
+
+      expect(await waitsFor(step.id, h.admin)).toMatchObject({
+        requestId: sent.id,
+        waitingReason: 'NO_DEPARTMENT_HEAD',
+        configurationHint: 'ASSIGN_DEPARTMENT_HEAD',
+        department: { id: headless.id },
+      });
+      expect(await waitsFor(step.id, h.it1)).toMatchObject({ requestId: sent.id, department: { id: headless.id } });
+      expect(await waitsFor(step.id, itElsewhere.account)).toBeUndefined();
+      await request(h.server()).get('/api/v1/controlled-waits').set(h.as(h.finance)).expect(403);
+      await request(h.server()).get('/api/v1/controlled-waits').set(h.as(h.employee)).expect(403);
+
+      // The requester withdraws while it waits: the request ends, the step is closed and leaves the queue, nobody is told again.
+      await h.withdrawRequest(sent.id, {}, e4.account).expect(200);
+      expect(await h.state(sent.id)).toBe('WITHDRAWN');
+      expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({ state: 'CLOSED', waiting_since: null });
+      expect(await waitsFor(step.id)).toBeUndefined();
+      await h.sweep();
+      expect(await alertsOf(step.id)).toBe(1);
     });
   });
 
@@ -280,37 +300,35 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
       const sent = await h.sent(unit.member, internal);
       expect((await h.stepOf(sent.id, 'NEED')).assignee_employee_id).toBe(unit.head.employeeId);
 
-      await sentWhileEmpty('FALLBACK_APPROVER', async () => {
-        await h.vacateHead(unit.department.id).expect(200);
+      await h.vacateHead(unit.department.id).expect(200);
 
-        const step = await h.stepOf(sent.id, 'NEED');
-        expect(step).toMatchObject({
-          state: 'WAITING',
-          assignee_employee_id: null,
-          waiting_reason: 'NO_FALLBACK_APPROVER',
-        });
-        expect(await h.state(sent.id)).toBe('WAITING_CONTROLLED');
-        const [waiting] = await h.audit('ACCESS_REQUEST.STEP_WAITING', step.id);
-        expect(waiting).toMatchObject({
-          before: { assigneeEmployeeId: unit.head.employeeId },
-          after: { trigger: 'HEAD_CHANGED', waitingReason: 'NO_FALLBACK_APPROVER', requestState: 'WAITING_CONTROLLED' },
-        });
-        // The alert is raised with the change, not by the next pass of the worker.
-        expect(await alertsOf(step.id)).toBe(1);
-        expect(await h.audit('ACCESS_REQUEST.STEP_WAIT_ALERTED', step.id)).toHaveLength(1);
-        // Nobody decides it meanwhile: the head who went no longer sees it.
-        await h.decide(sent.id, APPROVE, unit.head.account).expect(404);
-
-        await h.makeHead(unit.department, successor);
-        expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({
-          state: 'PENDING',
-          assignee_employee_id: successor.employeeId,
-          waiting_reason: null,
-          waiting_since: null,
-        });
-        expect(await h.state(sent.id)).toBe('PENDING');
-        expect(await h.audit('ACCESS_REQUEST.STEP_ASSIGNED_FROM_WAIT', step.id)).toHaveLength(1);
+      const step = await h.stepOf(sent.id, 'NEED');
+      expect(step).toMatchObject({
+        state: 'WAITING',
+        assignee_employee_id: null,
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
       });
+      expect(await h.state(sent.id)).toBe('WAITING_CONTROLLED');
+      const [waiting] = await h.audit('ACCESS_REQUEST.STEP_WAITING', step.id);
+      expect(waiting).toMatchObject({
+        before: { assigneeEmployeeId: unit.head.employeeId },
+        after: { trigger: 'HEAD_CHANGED', waitingReason: 'NO_DEPARTMENT_HEAD', requestState: 'WAITING_CONTROLLED' },
+      });
+      // The alert is raised with the change, not by the next pass of the worker.
+      expect(await alertsOf(step.id)).toBe(1);
+      expect(await h.audit('ACCESS_REQUEST.STEP_WAIT_ALERTED', step.id)).toHaveLength(1);
+      // Nobody decides it meanwhile: the head who went no longer sees it.
+      await h.decide(sent.id, APPROVE, unit.head.account).expect(404);
+
+      await h.makeHead(unit.department, successor);
+      expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({
+        state: 'PENDING',
+        assignee_employee_id: successor.employeeId,
+        waiting_reason: null,
+        waiting_since: null,
+      });
+      expect(await h.state(sent.id)).toBe('PENDING');
+      expect(await h.audit('ACCESS_REQUEST.STEP_ASSIGNED_FROM_WAIT', step.id)).toHaveLength(1);
     });
   });
 
@@ -384,24 +402,22 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
     it('lists the steps that wait, the longest first, with a stable order, in pages that add up, and shows no amount', async () => {
       n += 1;
       const headless = await h.departmentWithUnit(`P-Q${n}`);
-      await sentWhileEmpty('FALLBACK_APPROVER', async () => {
-        for (let index = 0; index < 4; index += 1) await h.sent(await h.staff(headless, `Q-E${n}-${index}`), internal);
-        const all = await listed(h.admin, { pageSize: 100 });
-        const expected = (
-          await h.ctx.sql.query<{ id: string }>(
-            `SELECT id FROM access_request_steps WHERE state = 'WAITING' ORDER BY waiting_since, id`,
-          )
-        ).rows.map((row) => row.id);
+      for (let index = 0; index < 4; index += 1) await h.sent(await h.staff(headless, `Q-E${n}-${index}`), internal);
+      const all = await listed(h.admin, { pageSize: 100 });
+      const expected = (
+        await h.ctx.sql.query<{ id: string }>(
+          `SELECT id FROM access_request_steps WHERE state = 'WAITING' ORDER BY waiting_since, id`,
+        )
+      ).rows.map((row) => row.id);
 
-        expect(all.items.map((item) => item.stepId)).toEqual(expected);
-        expect(all.pagination.totalItems).toBe(expected.length);
-        const pages: string[] = [];
-        for (let page = 1; page <= Math.ceil(expected.length / 2); page += 1) {
-          pages.push(...(await listed(h.admin, { page, pageSize: 2 })).items.map((item) => item.stepId));
-        }
-        expect(pages).toEqual(expected);
-        expect(JSON.stringify(all)).not.toMatch(/amount|currency|budget|check/i);
-      });
+      expect(all.items.map((item) => item.stepId)).toEqual(expected);
+      expect(all.pagination.totalItems).toBe(expected.length);
+      const pages: string[] = [];
+      for (let page = 1; page <= Math.ceil(expected.length / 2); page += 1) {
+        pages.push(...(await listed(h.admin, { page, pageSize: 2 })).items.map((item) => item.stepId));
+      }
+      expect(pages).toEqual(expected);
+      expect(JSON.stringify(all)).not.toMatch(/amount|currency|budget|check/i);
     });
 
     it('refuses a page that is out of bounds, and answers a page past the end with no rows', async () => {
@@ -420,25 +436,23 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
       n += 1;
       const headless = await h.departmentWithUnit(`P-N${n}`);
       const read = () => counter.run(() => listed(h.admin, { pageSize: 100 }));
-      await sentWhileEmpty('FALLBACK_APPROVER', async () => {
-        await h.sent(await h.staff(headless, `N-E${n}-0`), internal);
-        const few = await read();
-        for (let index = 1; index < 6; index += 1) await h.sent(await h.staff(headless, `N-E${n}-${index}`), internal);
-        const many = await read();
+      await h.sent(await h.staff(headless, `N-E${n}-0`), internal);
+      const few = await read();
+      for (let index = 1; index < 6; index += 1) await h.sent(await h.staff(headless, `N-E${n}-${index}`), internal);
+      const many = await read();
 
-        expect(many.result.items.length).toBeGreaterThan(few.result.items.length);
-        expect(dataStatements(many.statements)).toHaveLength(dataStatements(few.statements).length);
-        const tables = new Set(dataStatements(many.statements).flatMap(tablesOf));
-        for (const forbidden of [
-          'budget_commitments',
-          'request_budget_checks',
-          'request_budget_check_years',
-          'spend_decisions',
-        ]) {
-          expect(tables.has(forbidden)).toBe(false);
-        }
-        expect(tables.has('access_request_steps')).toBe(true);
-      });
+      expect(many.result.items.length).toBeGreaterThan(few.result.items.length);
+      expect(dataStatements(many.statements)).toHaveLength(dataStatements(few.statements).length);
+      const tables = new Set(dataStatements(many.statements).flatMap(tablesOf));
+      for (const forbidden of [
+        'budget_commitments',
+        'request_budget_checks',
+        'request_budget_check_years',
+        'spend_decisions',
+      ]) {
+        expect(tables.has(forbidden)).toBe(false);
+      }
+      expect(tables.has('access_request_steps')).toBe(true);
     });
   });
 });

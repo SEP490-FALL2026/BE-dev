@@ -22,6 +22,10 @@ export interface SuccessorFacts {
     memberOfOldDepartmentOnDay: boolean;
     stillWorking: boolean;
     holdsSuperAdmin: boolean;
+    /** The account of the person holds a MANAGER grant that is in force; false when they have no account (QĐ-93a). */
+    holdsManager: boolean;
+    /** The account of the person holds the SPENDING_APPROVER grant, who never heads a department (QĐ-93b). */
+    holdsSpendingApprover: boolean;
     /** Their own transfer waits: they would leave the department the head is handed to. */
     hasPendingTransfer: boolean;
   } | null;
@@ -76,6 +80,9 @@ export function successorRefusal(successor: SuccessorFacts): TransferRefusal | n
   if (candidate.hasPendingTransfer) return refuse('HAS_PENDING_TRANSFER');
   if (!candidate.stillWorking) return refuse('EMPLOYEE_NOT_ACTIVE');
   if (candidate.holdsSuperAdmin) return refuse('SUPER_ADMIN_CANNOT_HEAD');
+  // The spending approver first: they never hold MANAGER (QĐ-93b), so judged second they would only hear that MANAGER is missing.
+  if (candidate.holdsSpendingApprover) return refuse('SPENDING_APPROVER_CANNOT_HEAD');
+  if (!candidate.holdsManager) return refuse('MANAGER_ROLE_REQUIRED');
 
   return null;
 }

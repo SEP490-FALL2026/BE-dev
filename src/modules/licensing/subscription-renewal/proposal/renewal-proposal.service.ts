@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
+import { TransactionRunner, type DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
 import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
@@ -53,6 +53,9 @@ export class RenewalProposalService {
     if (!milestone) throw new RenewalError('CONTRACT_DATA_INCOMPLETE');
 
     return this.runner.run(async (tx) => {
+      // The row of the grant of the spending approver first, `FOR SHARE`: a revocation that is being made and this proposal take turns,
+      // so the case is told as waiting exactly once (`M6`, `M7`).
+      const approver = await this.parties.usableApproverOf(tx, { forShare: true });
       const organization = await this.organizationReads.getOrganization(tx);
       if (!organization) throw new Error('A renewal was proposed before installation');
       const created = await this.repo.insert(tx, {
@@ -87,17 +90,38 @@ export class RenewalProposalService {
           },
         ),
       );
-      const decider = await this.parties.deciderOf(actor.employeeId, tx);
-      await this.notifier.tell(tx, {
-        organizationId: organization.id,
-        recipients: decider.employeeId ? [decider.employeeId] : [],
-        code: 'SUBSCRIPTION_RENEWAL_PROPOSED',
-        subject: { type: 'SUBSCRIPTION_RENEWAL', id: created.id },
-        params: { renewalId: created.id, subscriptionId: created.subscriptionId, choice: created.proposedChoice },
-        eventKey: `subscription-renewal-proposed:${created.id}`,
-      });
+      await this.tellProposed(tx, created, actor.employeeId, approver);
 
       return created;
+    });
+  }
+
+  /**
+   * The case is in the queue of the decider, who is told; when nobody who works holds the role (`approver` is null, as read with the row
+   * of the grant locked) it waits instead, and the Super Admin is told once for this stretch of waiting (`D-S16`).
+   */
+  private async tellProposed(
+    tx: DbTx,
+    created: RenewalRecord,
+    proposerEmployeeId: string,
+    approver: string | null,
+  ): Promise<void> {
+    if (approver === null) {
+      await this.notifier.waitingForSpendingApprover(
+        tx,
+        created,
+        await this.parties.superAdminOf(tx),
+        `sent:${created.proposedAt.getTime()}`,
+      );
+    }
+    const decider = await this.parties.deciderOf(proposerEmployeeId, tx);
+    await this.notifier.tell(tx, {
+      organizationId: created.organizationId,
+      recipients: decider.employeeId ? [decider.employeeId] : [],
+      code: 'SUBSCRIPTION_RENEWAL_PROPOSED',
+      subject: { type: 'SUBSCRIPTION_RENEWAL', id: created.id },
+      params: { renewalId: created.id, subscriptionId: created.subscriptionId, choice: created.proposedChoice },
+      eventKey: `subscription-renewal-proposed:${created.id}`,
     });
   }
 }

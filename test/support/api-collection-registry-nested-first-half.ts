@@ -22,10 +22,10 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     owner: 'us-01-audit-trail-query',
     businessMaximum: {
       maxItems: 6,
-      source: `resolveEffectiveRoles in effective-roles.policy.ts: a set of the direct roles (${ROLE_GRANTS}) and MANAGER, SPENDING_APPROVER; AuditRepo.insert is the only writer and every caller passes actor.roles or none`,
+      source: `authorizingRoles in effective-roles.policy.ts: a subset of the direct roles (${ROLE_GRANTS}); AuditRepo.insert is the only writer and every caller passes actor.roles or none`,
     },
     rationale: 'The roles the actor held when the event was written.',
-    removeWhen: 'Review when AppRole, the derived roles of resolveEffectiveRoles or an audit writer changes.',
+    removeWhen: 'Review when AppRole, authorizingRoles or an audit writer changes.',
   },
   {
     key: 'departmentList#warnings',
@@ -66,55 +66,6 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     removeWhen: 'Review when DEPARTMENT_HEAD_HISTORY_LIMIT changes.',
   },
   {
-    key: 'departmentGet#projects',
-    classification: 'bounded',
-    findings: ['LD-12'],
-    owner: 'organization-identity-read-contracts',
-    businessMaximum: {
-      maxItems: 20,
-      source:
-        'PROFILE_PROJECT_LIMIT in project.types.ts (take of ProjectRepo.forDepartment); projectTotal counts them all',
-    },
-    rationale: 'The first projects the department takes part in; the rest are read from the paginated project list.',
-    removeWhen: 'Review when PROFILE_PROJECT_LIMIT changes.',
-  },
-  {
-    key: 'projectGet#departments',
-    classification: 'bounded',
-    findings: [],
-    owner: 'organization-identity-read-contracts',
-    businessMaximum: {
-      maxItems: 100,
-      source: 'departmentIds .max(100) in project.dto.ts on create and update; ProjectRepo replaces the set',
-    },
-    rationale: 'The departments one project names (the detail route GET /projects/{id}, added with LD-12).',
-    removeWhen: 'Review when the departmentIds limit or the project write path changes.',
-  },
-  {
-    key: 'departmentGet#projects.departments',
-    classification: 'bounded',
-    findings: [],
-    owner: 'g2-department-profile',
-    businessMaximum: {
-      maxItems: 100,
-      source: 'departmentIds .max(100) in project.dto.ts on create and update; ProjectRepo replaces the set',
-    },
-    rationale: 'The departments one project names.',
-    removeWhen: 'Review when the departmentIds limit or the project write path changes.',
-  },
-  {
-    key: 'projectList#departments',
-    classification: 'bounded',
-    findings: [],
-    owner: 'g2-department-profile',
-    businessMaximum: {
-      maxItems: 100,
-      source: 'departmentIds .max(100) in project.dto.ts on create and update; ProjectRepo replaces the set',
-    },
-    rationale: 'The departments one project names.',
-    removeWhen: 'Review when the departmentIds limit or the project write path changes.',
-  },
-  {
     key: 'operatingParameterList#value',
     classification: 'bounded',
     findings: [],
@@ -138,6 +89,19 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     },
     rationale: 'A default is a list only for an int-list definition.',
     removeWhen: 'Review when an int-list definition or its default changes.',
+  },
+  {
+    key: 'operatingParameterList#constraints.options',
+    classification: 'bounded',
+    findings: ['LD-17'],
+    owner: 'qd93-parameter-labels-dashboard-queues',
+    businessMaximum: {
+      maxItems: 10,
+      source: 'ENUM_OPTIONS_MAX in parameter-definitions.policy.ts, checked by its unit spec',
+    },
+    rationale:
+      'The choices of an enum parameter (two for each rule schedule); the constraints of the other shapes hold no array.',
+    removeWhen: 'Review when ENUM_OPTIONS_MAX changes or a parameter of the enum shape is added.',
   },
   {
     key: 'operatingParameterHistory#value',

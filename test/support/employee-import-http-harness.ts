@@ -2,7 +2,6 @@ import { findPlacementCoverageViolations } from './placement-coverage';
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from './api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from './http-test-app';
-import { HR_BASIS } from './hr-basis';
 import { registerUseReaders } from './organization-use-readers';
 
 /** The people import over HTTP: the file header, the calendar and the set-up the import specs share. */
@@ -107,7 +106,7 @@ export class EmployeeImportHttpHarness {
     const created = await request(this.server())
       .post('/api/v1/departments')
       .set(this.asSuper())
-      .send({ code, name: `Department ${code}`, hrBasis: HR_BASIS })
+      .send({ code, name: `Department ${code}` })
       .expect(201);
     const centerCode = this.unique('CCI-');
     await request(this.server())
@@ -128,11 +127,7 @@ export class EmployeeImportHttpHarness {
   retireDepartment = async (code: string): Promise<void> => {
     const id = (await this.ctx.sql.query<{ id: string }>('SELECT id FROM departments WHERE code = $1', [code])).rows[0]
       .id;
-    await request(this.server())
-      .post(`/api/v1/departments/${id}/deactivate`)
-      .set(this.asSuper())
-      .send({ hrBasis: HR_BASIS })
-      .expect(200);
+    await request(this.server()).post(`/api/v1/departments/${id}/deactivate`).set(this.asSuper()).expect(200);
   };
 
   personRow = (overrides: Partial<Record<string, string>> = {}): string => {
@@ -170,11 +165,7 @@ export class EmployeeImportHttpHarness {
     id: string,
     body: { previewVersion: number; idempotencyKey: string; acknowledgeDuplicateFile?: boolean; hrBasis?: unknown },
     headers = this.asSuper(),
-  ) =>
-    request(this.server())
-      .post(`/api/v1/employee-imports/${id}/confirmations`)
-      .set(headers)
-      .send({ hrBasis: HR_BASIS, ...body });
+  ) => request(this.server()).post(`/api/v1/employee-imports/${id}/confirmations`).set(headers).send(body);
 
   rowsOf = async (id: string, outcome?: string): Promise<RowWire[]> =>
     (

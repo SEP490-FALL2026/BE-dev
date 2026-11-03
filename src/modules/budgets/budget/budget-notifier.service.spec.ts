@@ -9,6 +9,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { BudgetNotifierService } from './budget-notifier.service';
 import { BudgetFactsService } from './budget-facts.service';
 import type { ProposalRecord } from './proposal.repo';
+import type { VersionRecord } from './version.repo';
 
 const tx = { name: 'tx' } as unknown as DbTx;
 const TODAY = '2026-10-28';
@@ -33,6 +34,7 @@ describe('the notices of the budget loops that may be kept for a department with
       currentHeadOf: jest.fn(),
       currentHeadOfLocked: jest.fn(),
       financeEmployeeId: jest.fn(),
+      superAdminEmployeeId: jest.fn(),
     };
     const notifications = { notifyInApp: jest.fn(), holdForDepartment: jest.fn() };
 
@@ -54,6 +56,59 @@ describe('the notices of the budget loops that may be kept for a department with
       support.financeEmployeeId.mockResolvedValue('finance');
       support.currentHeadOfLocked.mockResolvedValue(null);
       support.currentHeadOf.mockResolvedValue(null);
+      support.superAdminEmployeeId.mockResolvedValue('super-admin');
+    });
+
+    const version = {
+      id: 'version-1',
+      organizationId: 'org-1',
+      costCenterId: 'cc-1',
+      year: 2027,
+      sentAt: new Date('2026-10-28T03:00:00Z'),
+    } as unknown as VersionRecord;
+
+    it('tells the Super Admin, once for the stretch, that a version waits for a spending approver, with ids and the year only', async () => {
+      await (await notifier()).versionWaiting(tx, version, 'role:change-1');
+
+      expect(notifications.notifyInApp).toHaveBeenCalledTimes(1);
+      expect(notifications.notifyInApp).toHaveBeenCalledWith(tx, {
+        organizationId: 'org-1',
+        recipientEmployeeId: 'super-admin',
+        code: 'CONTROLLED_WAIT_ALERT',
+        subject: { type: 'BUDGET_VERSION', id: 'version-1' },
+        params: {
+          versionId: 'version-1',
+          costCenterId: 'cc-1',
+          year: 2027,
+          waitingReason: 'NO_SPENDING_APPROVER',
+          configurationHint: 'CONFIGURE_SPENDING_APPROVER',
+        },
+        eventKey: 'CONTROLLED_WAIT_ALERT:BUDGET_VERSION:version-1:role:change-1',
+      });
+    });
+
+    it('tells the Super Admin of a version sent while nobody who works holds the role, and nobody else', async () => {
+      await (await notifier()).versionSent(tx, version, 'finance', null);
+
+      expect(notifications.notifyInApp).toHaveBeenCalledTimes(1);
+      expect(notifications.notifyInApp).toHaveBeenCalledWith(
+        tx,
+        expect.objectContaining({
+          recipientEmployeeId: 'super-admin',
+          code: 'CONTROLLED_WAIT_ALERT',
+          eventKey: `CONTROLLED_WAIT_ALERT:BUDGET_VERSION:version-1:sent:${version.sentAt?.getTime()}`,
+        }),
+      );
+    });
+
+    it('tells the spending approver, and no alert, of a version sent while somebody holds the role', async () => {
+      await (await notifier()).versionSent(tx, version, 'finance', 'approver');
+
+      expect(notifications.notifyInApp).toHaveBeenCalledTimes(1);
+      expect(notifications.notifyInApp).toHaveBeenCalledWith(
+        tx,
+        expect.objectContaining({ recipientEmployeeId: 'approver', code: 'BUDGET_VERSION_AWAITING_DECISION' }),
+      );
     });
 
     it('keeps the work of a returned proposal for the first head, reading the head under the department lock only', async () => {

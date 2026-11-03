@@ -134,7 +134,6 @@ export class LeaveHarness extends TransferHarness {
       sessionId: randomUUID(),
       employeeId: this.sa.employeeId,
       directRoles: ['SUPER_ADMIN'],
-      derivedRoles: [],
       roles: ['SUPER_ADMIN'],
     },
   });

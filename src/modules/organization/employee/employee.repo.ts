@@ -110,14 +110,15 @@ export class EmployeeRepo {
         },
         select: { id: true },
       });
-      await tx.employeePlacement.create({
-        data: {
-          organizationId: input.organizationId,
-          employeeId: employee.id,
-          departmentId: input.departmentId,
-          validFrom: toDateColumn(input.memberSince ?? input.hireDate),
-        },
-      });
+      if (input.departmentId !== null)
+        await tx.employeePlacement.create({
+          data: {
+            organizationId: input.organizationId,
+            employeeId: employee.id,
+            departmentId: input.departmentId,
+            validFrom: toDateColumn(input.memberSince ?? input.hireDate),
+          },
+        });
 
       return employee;
     } catch (error) {
@@ -152,6 +153,28 @@ export class EmployeeRepo {
       if (isCheckViolation(error, 'on every open seat')) throw new EmployeeOpenSeatNeedsEndError();
       throw error;
     }
+  }
+
+  async unplacedAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    const rows = await (tx ?? this.prisma).employee.findMany({
+      where: { id: { in: [...employeeIds] }, placements: { none: {} } },
+      select: { id: true },
+    });
+    return new Set(rows.map((row) => row.id));
+  }
+
+  async insertFirstPlacement(
+    tx: DbTx,
+    input: { organizationId: string; employeeId: string; departmentId: string; effectiveFrom: BusinessDate },
+  ): Promise<void> {
+    await tx.employeePlacement.create({
+      data: {
+        organizationId: input.organizationId,
+        employeeId: input.employeeId,
+        departmentId: input.departmentId,
+        validFrom: toDateColumn(input.effectiveFrom),
+      },
+    });
   }
 
   /** Locks the employee row so its status cannot change until commit. */
@@ -318,9 +341,16 @@ export class EmployeeRepo {
     const pattern = term ? `%${escapeLikePattern(term)}%` : null;
     const day = fromDateColumn(onDate);
     const rows = await this.prisma.$queryRaw<
-      { id: string; employee_code: string; full_name: string; work_email: string | null; department: string | null }[]
+      {
+        id: string;
+        employee_code: string;
+        full_name: string;
+        work_email: string | null;
+        department: string | null;
+        unplaced: boolean;
+      }[]
     >`
-      SELECT e.id, e.employee_code, e.full_name, e.work_email, placement.department
+      SELECT e.id, e.employee_code, e.full_name, e.work_email, placement.department, NOT EXISTS (SELECT 1 FROM employee_placements any_p WHERE any_p.employee_id = e.id) AS unplaced
         FROM employees e
         LEFT JOIN LATERAL (
           SELECT d.name AS department
@@ -347,6 +377,7 @@ export class EmployeeRepo {
       fullName: row.full_name,
       workEmail: row.work_email,
       department: row.department,
+      unplaced: row.unplaced,
     }));
   }
 
@@ -359,6 +390,7 @@ export class EmployeeRepo {
         employeeCode: true,
         fullName: true,
         jobTitle: true,
+        _count: { select: { placements: true } },
         placements: {
           where: { validFrom: { lte: onDate }, OR: [{ validTo: null }, { validTo: { gt: onDate } }] },
           select: { department: { select: { code: true, name: true } } },
@@ -374,6 +406,7 @@ export class EmployeeRepo {
       employeeCode: employee.employeeCode,
       fullName: employee.fullName,
       department: placement?.department ?? null,
+      unplaced: employee._count.placements === 0,
       jobTitle: employee.jobTitle,
     };
   }

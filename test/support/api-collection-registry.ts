@@ -122,7 +122,7 @@ export const INITIAL_EXCEPTION_KEYS: readonly string[] = [
 ];
 
 export const ROLE_GRANTS =
-  'AppRole has 4 values and the unique index role_grants_one_effective_per_role allows one effective grant per role';
+  'AppRole has 6 values and the unique index role_grants_one_effective_per_role allows one effective grant per role';
 
 /**
  * Prompt 09B (23/10/2026, LD-R2-RV-02): every nested array of the mounted contract with its classification. Frozen: this

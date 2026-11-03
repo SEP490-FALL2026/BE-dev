@@ -47,9 +47,9 @@ describe('closing the seat baseline tells who holds a seat of another department
     design = await h.department('P-DES');
     finance = await h.department('P-FIN');
     for (const [code, department] of [
-      ['D1', design],
-      ['D2', design],
-      ['F1', finance],
+      ['D-1', design],
+      ['D-2', design],
+      ['F-1', finance],
     ] as const) {
       people[code] = await h.member(department.code, code, 'Staff');
     }
@@ -59,8 +59,8 @@ describe('closing the seat baseline tells who holds a seat of another department
     const figma = await h.subscription(10, 'K2', design.id);
     const slack = await h.subscription(10, 'K2', finance.id);
     // Figma is design's: two of its own people and a person of finance; Slack is finance's: its own person and a person of design.
-    await h.written({ subscriptionId: figma }, [seat('D1', 'figma'), seat('D2', 'figma'), seat('F1', 'figma')]);
-    await h.written({ subscriptionId: slack }, [seat('F1', 'slack'), seat('D1', 'slack')]);
+    await h.written({ subscriptionId: figma }, [seat('D-1', 'figma'), seat('D-2', 'figma'), seat('F-1', 'figma')]);
+    await h.written({ subscriptionId: slack }, [seat('F-1', 'slack'), seat('D-1', 'slack')]);
   }, 300000);
 
   afterAll(async () => {
@@ -93,15 +93,15 @@ describe('closing the seat baseline tells who holds a seat of another department
     // D2 holds the seat of its own department's subscription: not asked. D1 holds one seat of Slack (finance's), F1 one of Figma (design's).
     expect(event.holders).toHaveLength(2);
     const byPerson = new Map(event.holders.map((holder) => [holder.employeeId, holder]));
-    expect(byPerson.get(people.D1)).toMatchObject({
+    expect(byPerson.get(people['D-1'])).toMatchObject({
       employeeDepartmentId: design.id,
       assignments: [{ owningDepartmentId: finance.id }],
     });
-    expect(byPerson.get(people.F1)).toMatchObject({
+    expect(byPerson.get(people['F-1'])).toMatchObject({
       employeeDepartmentId: finance.id,
       assignments: [{ owningDepartmentId: design.id }],
     });
-    expect(byPerson.has(people.D2)).toBe(false);
+    expect(byPerson.has(people['D-2'])).toBe(false);
     expect(event.holders.map((holder) => holder.employeeId)).toEqual(
       [...event.holders.map((holder) => holder.employeeId)].sort(),
     );

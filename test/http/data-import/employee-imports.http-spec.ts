@@ -3,9 +3,16 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
-import { HR_BASIS } from '../../support/hr-basis';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
+
+/** What a confirmation carried before `QĐ-93f`: it takes no HR basis any more, so a body that still carries one is refused. */
+const HR_BASIS_BODY = {
+  type: 'LABOR_CONTRACT',
+  reference: 'HD-2026-001',
+  issuer: 'HR Department',
+  issuedOn: '2026-10-01',
+};
 
 type Call = (server: App) => request.Test;
 
@@ -25,7 +32,7 @@ const ROUTES: Array<[string, Call]> = [
     (server) =>
       request(server)
         .post(`/api/v1/employee-imports/${ID}/confirmations`)
-        .send({ previewVersion: 1, idempotencyKey: 'a-key-of-8', hrBasis: HR_BASIS }),
+        .send({ previewVersion: 1, idempotencyKey: 'a-key-of-8' }),
   ],
   [
     'POST /employee-imports/{id}/cancellations',
@@ -60,7 +67,7 @@ describe('people import routes (e2e, no database)', () => {
   ])('refuses %s with 403 on every route (US-02-02 AC-12)', async (_name, direct, derived) => {
     for (const [route, call] of ROUTES) {
       const response = await call(app.getHttpServer())
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
       expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
     }
@@ -68,6 +75,15 @@ describe('people import routes (e2e, no database)', () => {
 
   describe('validation', () => {
     const asIt = () => ({ Authorization: bearer(principal(['SUPER_ADMIN'])) });
+
+    it('refuses legacy Excel files with the format error', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/employee-imports')
+        .set(asIt())
+        .attach('file', Buffer.from('old'), 'people.xls')
+        .expect(422);
+      expect(bodyOf(response).error.code).toBe('IMPORT.FILE_FORMAT_UNSUPPORTED');
+    });
 
     it('turns away an upload with no file, 422 IMPORT.FILE_REQUIRED', async () => {
       const response = await request(app.getHttpServer()).post('/api/v1/employee-imports').set(asIt()).expect(422);
@@ -144,19 +160,14 @@ describe('people import routes (e2e, no database)', () => {
     });
 
     it.each([
-      ['no version', { idempotencyKey: 'a-key-of-8', hrBasis: HR_BASIS }],
-      ['a version of zero', { previewVersion: 0, idempotencyKey: 'a-key-of-8', hrBasis: HR_BASIS }],
-      ['no key', { previewVersion: 1, hrBasis: HR_BASIS }],
-      ['a key that is too short', { previewVersion: 1, idempotencyKey: 'short', hrBasis: HR_BASIS }],
-      ['an unknown field', { previewVersion: 1, idempotencyKey: 'a-key-of-8', hrBasis: HR_BASIS, force: true }],
-      ['no HR basis', { previewVersion: 1, idempotencyKey: 'a-key-of-8' }],
+      ['no version', { idempotencyKey: 'a-key-of-8' }],
+      ['a version of zero', { previewVersion: 0, idempotencyKey: 'a-key-of-8' }],
+      ['no key', { previewVersion: 1 }],
+      ['a key that is too short', { previewVersion: 1, idempotencyKey: 'short' }],
+      ['an unknown field', { previewVersion: 1, idempotencyKey: 'a-key-of-8', force: true }],
       [
-        'an HR basis without a type',
-        { previewVersion: 1, idempotencyKey: 'a-key-of-8', hrBasis: { ...HR_BASIS, type: '' } },
-      ],
-      [
-        'an HR basis without an issuer',
-        { previewVersion: 1, idempotencyKey: 'a-key-of-8', hrBasis: { ...HR_BASIS, issuer: undefined } },
+        'an HR basis, which no confirmation takes since QĐ-93f',
+        { previewVersion: 1, idempotencyKey: 'a-key-of-8', hrBasis: HR_BASIS_BODY },
       ],
     ])('turns away a confirmation with %s, 422 VALIDATION_ERROR', async (_name, body) => {
       const response = await request(app.getHttpServer())

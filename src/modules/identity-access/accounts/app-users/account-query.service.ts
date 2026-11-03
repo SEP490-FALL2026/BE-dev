@@ -78,11 +78,21 @@ export class AccountQueryService {
   }
 
   async listAccounts(
-    filter: Omit<AccountListFilter, 'skip' | 'take'> & { page: number; pageSize: number },
+    filter: Omit<AccountListFilter, 'skip' | 'take' | 'employeeIds'> & {
+      page: number;
+      pageSize: number;
+      departmentId?: string;
+      memberOn?: string;
+    },
   ): Promise<AccountPage> {
-    const { page, pageSize, ...criteria } = filter;
+    const { page, pageSize, departmentId, memberOn, ...criteria } = filter;
+    const employeeIds =
+      departmentId === undefined
+        ? undefined
+        : ((await this.organizationReads.getDepartmentMemberIds(departmentId, memberOn)) ?? []);
     const { items, total } = await this.accounts.listAccountRecords({
       ...criteria,
+      ...(employeeIds === undefined ? {} : { employeeIds }),
       skip: (page - 1) * pageSize,
       take: pageSize,
     });

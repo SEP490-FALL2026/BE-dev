@@ -157,8 +157,7 @@ describe('ops:inspect (integration, real PostgreSQL)', () => {
           'Change announcements: complete',
           'Super Admin: 1 holder, ACTIVE, ACTIVATED, b***@a***.vn',
           'Accounts: 1 (ACTIVE_ACTIVATED 1, ACTIVE_INVITED 0, LOCKED_ACTIVATED 0, LOCKED_INVITED 0)',
-          'Direct roles: SUPER_ADMIN 1, IT_ADMIN 0, FINANCE 0, EMPLOYEE 0',
-          'Approval roles: SPENDING_APPROVER 0, CONFLICT_SUBSTITUTE 0, FALLBACK_APPROVER 0',
+          'Direct roles: SUPER_ADMIN 1, IT_ADMIN 0, FINANCE 0, EMPLOYEE 0, MANAGER 0, SPENDING_APPROVER 0',
           'Departments: 1 active, 1 without a current head, 1 without a usable IT Admin',
           '',
         ]);
@@ -175,6 +174,66 @@ describe('ops:inspect (integration, real PostgreSQL)', () => {
         expect(await fingerprint()).toEqual(before);
       },
       CLI_COLD_START_MS * 3,
+    );
+
+    it(
+      'counts a head and a spending approver among direct roles',
+      async () => {
+        const org = (await sql.query<{ id: string }>('SELECT id FROM organizations')).rows[0].id;
+        const department = (await sql.query<{ id: string }>('SELECT id FROM departments LIMIT 1')).rows[0].id;
+        const people: string[] = [];
+        const users: string[] = [];
+        try {
+          for (const [code, role] of [
+            ['INS-H', 'MANAGER'],
+            ['INS-A', 'SPENDING_APPROVER'],
+          ] as const) {
+            const employee = (
+              await sql.query<{ id: string }>(
+                `INSERT INTO employees (id, organization_id, employee_code, full_name, employment_type, hire_date, updated_at)
+             VALUES (gen_random_uuid(), $1, $2, $2, 'STAFF', '2024-01-01', now()) RETURNING id`,
+                [org, code],
+              )
+            ).rows[0].id;
+            people.push(employee);
+            const user = (
+              await sql.query<{ id: string }>(
+                `INSERT INTO app_users (id, organization_id, employee_id, login_email, normalized_login_email, updated_at)
+             VALUES (gen_random_uuid(), $1, $2, $3, $3, now()) RETURNING id`,
+                [org, employee, `${code.toLowerCase()}@example.test`],
+              )
+            ).rows[0].id;
+            users.push(user);
+            await sql.query(
+              `INSERT INTO role_grants (id, organization_id, app_user_id, role) VALUES (gen_random_uuid(), $1, $2, $3::"AppRole")`,
+              [org, user, role],
+            );
+          }
+          await sql.query(
+            `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+             VALUES (gen_random_uuid(), $1, $2, $3, current_date)`,
+            [org, people[0], department],
+          );
+          await sql.query(
+            `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+          VALUES (gen_random_uuid(), $1, $2, $3, current_date)`,
+            [org, department, people[0]],
+          );
+          const result = await inspect();
+          expect(result.code).toBe(2);
+          expect(result.stdout).toContain('CHANGE_ANNOUNCEMENTS_MISSING');
+          expect(result.stdout).toContain(
+            'Direct roles: SUPER_ADMIN 1, IT_ADMIN 0, FINANCE 0, EMPLOYEE 0, MANAGER 1, SPENDING_APPROVER 1',
+          );
+        } finally {
+          await sql.query('DELETE FROM department_head_periods WHERE employee_id = ANY($1::uuid[])', [people]);
+          await sql.query('DELETE FROM employee_placements WHERE employee_id = ANY($1::uuid[])', [people]);
+          await sql.query('DELETE FROM role_grants WHERE app_user_id = ANY($1::uuid[])', [users]);
+          await sql.query('DELETE FROM app_users WHERE id = ANY($1::uuid[])', [users]);
+          await sql.query('DELETE FROM employees WHERE id = ANY($1::uuid[])', [people]);
+        }
+      },
+      CLI_COLD_START_MS,
     );
 
     it(

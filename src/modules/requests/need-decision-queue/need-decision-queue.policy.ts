@@ -3,10 +3,11 @@ import { LONG_TERM_MONTHS, type DeciderRole } from '../access-request/need-decis
 
 /**
  * The rows of the routing table that give the need step to a person: the head (1), the spending approver for a head who sent for
- * themselves (2), the fallback approver (3, 4), the head who sent for others (5) and the head who decides the lines of a group an
- * Employee sent (9). Row 8 gives the step to nobody, so its step waits and is never in a queue.
+ * themselves (2), the head who sent for others (5) and the head who decides the lines of a group an Employee sent (9). Row 8 gives
+ * the step to nobody, so its step waits and is never in a queue; neither is a step on row 3 or 4, which the approver of last resort
+ * held under the rule before `QĐ-93`: it is frozen until the conversion command rewrites it (`QĐ-93k(2)`).
  */
-export const HELD_ROUTING_ROWS = [1, 2, 3, 4, 5, 9] as const;
+export const HELD_ROUTING_ROWS = [1, 2, 5, 9] as const;
 
 /** The longest excerpt of the reason a row of the queue shows; the whole reason is read on the request. */
 export const REASON_EXCERPT_LENGTH = 200;

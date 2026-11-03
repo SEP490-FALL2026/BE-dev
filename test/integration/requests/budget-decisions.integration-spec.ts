@@ -7,16 +7,14 @@ const h = new BudgetHarness();
 
 describe('budgets over HTTP: the decision of the spending approver (integration, real PostgreSQL)', () => {
   let boss: Person;
-  let financePerson: Person;
   let counter = 0;
 
   beforeAll(async () => {
     await h.start();
     const executive = await h.departmentWithUnit('P-EXE');
     boss = await h.staff(executive, 'EXE-C1');
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
-    financePerson = { employeeId: h.finance.employeeId, account: h.finance };
   }, 240000);
 
   afterAll(async () => {
@@ -394,19 +392,6 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
   });
 
   describe('who decides (AC-7, AC-8; SoD-8)', () => {
-    it('is not the person who built and sent the version, even when they hold the role', async () => {
-      const { version } = await sent();
-      await h.setRole('SPENDING_APPROVER', financePerson);
-      try {
-        const response = await h.decideVersion(version.id, { decision: 'APPROVE' }, financePerson.account).expect(403);
-
-        expect(h.codeOf(response)).toBe('BUDGET.OWN_VERSION');
-        expect(await stateOf(version.id)).toBe('SENT');
-      } finally {
-        await h.setRole('SPENDING_APPROVER', boss);
-      }
-    });
-
     it.each([
       ['the head of the department', (head: Person) => head.account],
       ['the IT Admin', () => h.it1],

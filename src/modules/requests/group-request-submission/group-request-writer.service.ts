@@ -20,7 +20,6 @@ export interface GroupWritten {
     planId: string;
     businessReason: string;
     termMonths: number;
-    projectLabel?: string;
     termConfirmation?: { reason: string };
   };
   draftId: string | null;
@@ -59,7 +58,6 @@ export class GroupRequestWriter {
       costCenterId: unit.costCenter?.id ?? null,
       businessReason: body.businessReason,
       termMonths: body.termMonths,
-      projectLabel: body.projectLabel ?? null,
       pricing: judged.pricing,
       policy,
       createdByAppUserId: actor.appUserId,

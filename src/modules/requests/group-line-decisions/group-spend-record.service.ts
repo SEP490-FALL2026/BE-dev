@@ -1,14 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { spendLineState, stepRefusalReason, type LineVerdict } from '../group-request/group-line-decision.policy';
 import { GroupResolutionService } from '../group-request/group-resolution.service';
 import { LineDecisionRepo } from '../group-request/line-decision.repo';
 import { RequestLineRepo } from '../group-request/request-line.repo';
 import { SpendDecisionRepo } from '../spend/spend-decision.repo';
-import { spendDeciderRoleOf } from '../spend/spend-decision.policy';
 import type { SpendStepRecord } from '../spend/spend-step.repo';
 import { GroupSpendHold } from './group-spend-hold.service';
 import { GroupSpendReport } from './group-spend-report.service';
@@ -33,7 +31,6 @@ export class GroupSpendRecordService {
     private readonly lineDecisions: LineDecisionRepo,
     private readonly lines: RequestLineRepo,
     private readonly resolution: GroupResolutionService,
-    private readonly identity: IdentityAccessApi,
     private readonly holds: GroupSpendHold,
     private readonly reports: GroupSpendReport,
   ) {}
@@ -48,8 +45,8 @@ export class GroupSpendRecordService {
     const { step, verdicts, now } = input;
     const approved = verdicts.filter((verdict) => verdict.decision === 'APPROVE');
     const outcome = approved.length > 0 ? ('APPROVED' as const) : ('REJECTED' as const);
-    const holders = await this.identity.getApprovalRoleHolders(tx);
-    const deciderRole = spendDeciderRoleOf(holders, actor.employeeId);
+    // Nobody decides in the place of the spending approver (`QĐ-93c`): the role is theirs.
+    const deciderRole = 'SPENDING_APPROVER' as const;
 
     await this.decisions.record(tx, {
       organizationId: request.organizationId,

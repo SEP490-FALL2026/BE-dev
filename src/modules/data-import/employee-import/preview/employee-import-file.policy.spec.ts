@@ -79,7 +79,7 @@ describe('readEmployeeFile (US-02-01, US-02-02 AC-2)', () => {
       Buffer.from('work_email\nx@acme.vn\n'),
       {
         constructor: ImportFileMissingColumnsError,
-        missing: ['employee_code', 'full_name', 'employment_type', 'hire_date', 'department_code'],
+        missing: ['employee_code', 'full_name', 'employment_type', 'hire_date'],
       },
     ],
     [

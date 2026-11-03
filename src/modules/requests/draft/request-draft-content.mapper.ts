@@ -3,7 +3,7 @@ import { groupBodySchema } from '../group-request/group-request.dto';
 import { serviceAccountSubmitSchema } from '../service-account-request/service-account-request.dto';
 import { submitBodySchema } from '../access-request/access-request.dto';
 import type { DraftSaveBody } from './request-draft.dto';
-import { draftPolicyJson, type DraftPolicy } from '../request-draft/request-draft-policy.json';
+import { draftPolicyJson, RETIRED_DRAFT_BODY_KEYS, type DraftPolicy } from '../request-draft/request-draft-policy.json';
 import { beneficiaryCountOf } from '../request-draft/request-draft.policy';
 import type { DraftRow } from '../request-draft/request-draft.repo';
 
@@ -26,6 +26,7 @@ export function toContentJson(body: DraftSaveBody): DraftPolicy['draft'] {
 /** What the draft was saved with, read again through the schema of the operation that sends it; a draft that does not parse is corrupt. */
 export function contentOf(row: Pick<DraftRow, 'id' | 'policy'>): DraftContent {
   const { kind, ...body } = draftPolicyJson.decode(row.policy).draft;
+  for (const key of RETIRED_DRAFT_BODY_KEYS) delete body[key];
   switch (kind) {
     case 'INDIVIDUAL':
       return { kind, body: submitBodySchema.parse(body) };

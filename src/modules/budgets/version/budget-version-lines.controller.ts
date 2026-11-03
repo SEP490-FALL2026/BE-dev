@@ -80,7 +80,7 @@ const FINANCE_ONLY = {
   description: FINANCE_ONLY_DESCRIPTION,
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
-/** The reading routes have no role guard: the service lets Finance, the spending approver and the substitute read. */
+/** The reading routes have no role guard: the service lets Finance and the spending approver read. */
 const READERS_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: VERSION_READERS_DESCRIPTION,

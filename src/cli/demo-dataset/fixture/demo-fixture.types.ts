@@ -110,10 +110,10 @@ export interface DemoFixture {
   emailDomain: string;
   /** Every amount of the fixture is in this currency, which must be the reporting currency of the installation. */
   currency: string;
-  basis: { type: string; reference: string; issuer: string; issuedOn: string };
   departments: DemoDepartment[];
   people: DemoPerson[];
-  approvalRoles: { SPENDING_APPROVER: string; CONFLICT_SUBSTITUTE: string; FALLBACK_APPROVER: string };
+  /** The one approval role left, the spending approver (a role grant, `QĐ-93b`); the substitute and the fallback approver are gone (`QĐ-93c`). */
+  approvalRoles: { SPENDING_APPROVER: string };
   applications: DemoApplication[];
   subscriptions: DemoSubscription[];
   /** A Finance-declared tax profile for the vendor of one application. */
@@ -122,7 +122,8 @@ export interface DemoFixture {
     group: 'T2';
     lines: { taxType: string; ratePercent: string; deductible: boolean }[];
   };
-  budget: DemoBudget;
+  /** The budgets of the year, one per department that has one; a department left out has none (R9 counts on it). */
+  budgets: DemoBudget[];
   requests: DemoRequestScenario[];
   /** A draft that is saved and never sent. */
   draft: { requester: string; plan: string; termMonths: number };

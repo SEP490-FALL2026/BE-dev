@@ -13,8 +13,6 @@ const none: RoleFacts = {
   superAdmin: false,
   finance: false,
   spendingApprover: false,
-  substituteApprover: false,
-  fallbackApprover: false,
   itAdminDepartments: 0,
   headsDepartment: false,
   workspaces: 0,
@@ -39,13 +37,26 @@ describe('the roles a person who leaves holds (US-03-04 AC-11, AC-27, AC-28)', (
     [{ superAdmin: true }, ['SUPER_ADMIN_HOLDER']],
     [{ finance: true }, ['FINANCE']],
     [{ spendingApprover: true }, ['SPENDING_APPROVER']],
-    [{ substituteApprover: true }, ['SUBSTITUTE_APPROVER']],
-    [{ fallbackApprover: true }, ['FALLBACK_APPROVER']],
     [{ itAdminDepartments: 2 }, ['IT_ADMIN_IN_CHARGE']],
     [{ headsDepartment: true }, ['DEPARTMENT_HEAD']],
     [{ workspaces: 1 }, ['WORKSPACE_OWNER']],
   ] as [Partial<RoleFacts>, string[]][])('names the role of %j', (facts, expected) => {
     expect(flagsOf({ ...none, ...facts })).toEqual(expected);
+  });
+
+  it('never makes a flag of the substitute or the fallback approver, which are gone (QĐ-93c)', () => {
+    const every: RoleFacts = {
+      superAdmin: true,
+      finance: true,
+      spendingApprover: true,
+      itAdminDepartments: 1,
+      headsDepartment: true,
+      workspaces: 1,
+    };
+
+    expect(flagsOf(every)).not.toContain('SUBSTITUTE_APPROVER');
+    expect(flagsOf(every)).not.toContain('FALLBACK_APPROVER');
+    expect(flagMap(flagsOf(every))).toMatchObject({ SUBSTITUTE_APPROVER: false, FALLBACK_APPROVER: false });
   });
 
   it('lists several roles in the order of the wire', () => {

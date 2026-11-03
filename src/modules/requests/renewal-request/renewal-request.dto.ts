@@ -1,7 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { PROJECT_LABEL_MAX_LENGTH, REASON_MAX_LENGTH, requestSchema } from '../access-request/access-request.dto';
+import { REASON_MAX_LENGTH, requestSchema } from '../access-request/access-request.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 const reason = z.string().trim().min(1).max(REASON_MAX_LENGTH);
@@ -16,7 +16,6 @@ export const renewalSubmitSchema = z.strictObject({
   assignmentId: z.uuid(),
   newExpectedEndDate: businessDate,
   businessReason: reason,
-  projectLabel: z.string().trim().min(1).max(PROJECT_LABEL_MAX_LENGTH).optional(),
   /** The day the money is expected to go out (paid software only); it fixes the budget year. Today when left out. */
   expectedSpendOn: businessDate.optional(),
   termConfirmation: z.strictObject({ reason }).optional(),

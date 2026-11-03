@@ -42,7 +42,8 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 - Đăng ký vào organization: `organization.department-use-readers`, `organization.cost-center-use-readers` ←
   `access-request/open-request/*-open-requests.listener.ts`; `organization.change-listeners` ←
   `reassignment/organization-change.listener.ts`. Vào identity-access: `identity-access.approval-role-change-listeners`
-  ← `reassignment/approval-role.listener.ts` (hai listener chuyển bước nằm trong `RequestsWorkFacadeModule`).
+  ← `reassignment/approval-role.listener.ts` (hai listener chuyển bước nằm trong `RequestsWorkFacadeModule`). Chỉ còn
+  một vai phê duyệt, `SPENDING_APPROVER` (grant): không approver dự phòng, không người thay thế (QĐ-93c).
 - Đăng ký vào budgets: `budgets.change-listeners` ← `finance-review/spend-budget.listener.ts`;
   `budgets.commitment-release-guard` ← `spend/commitment-release.listener.ts`.
 
@@ -173,7 +174,14 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 - Nhánh, chuỗi bước và SLA cố định lúc gửi; phòng ban và Unit Cost Center là cái hiệu lực vào ngày gửi (US-05-02
   AC-3, AC-7; chú thích `prisma/models/requests.prisma`). Quyết định theo dòng không bao giờ sửa hay xóa (INV-05).
 - Bước nhu cầu không bao giờ giao cho chính người xin (`SoD-4`, `INV-08`); không ai chọn tay người giữ bước
-  (`access-request/routing.policy.ts`).
+  (`access-request/routing.policy.ts`). Bước nhu cầu chỉ giao cho trưởng phòng hoặc Người duyệt chi (dòng 1, 2, 5, 9); phòng
+  chưa có trưởng phòng thì bước **chờ có kiểm soát** `NO_DEPARTMENT_HEAD` (dòng 4, Super Admin nhận cảnh báo) và được giao khi
+  Super Admin gán trưởng phòng, tuổi bước không đặt lại (`REWAIT`/`ASSIGN` ở `step-routing/reassignment.policy.ts`).
+- Bước chi chỉ giao cho Người duyệt chi (`step-routing/spend-routing.policy.ts`): không ai thay khi họ là bên của Request
+  (Request đó không tồn tại: hợp đồng D-S21, `REQUEST_PARTY.INELIGIBLE` 422) hay vắng; chưa có người giữ vai thì chờ
+  `NO_SPENDING_APPROVER`. Mở bước chi khóa dòng grant `FOR SHARE` trước khi đọc (M6). Bước cũ do approver dự phòng/người thay thế
+  giữ đứng yên (`STEP_AWAITING_CONVERSION` 409): không có lệnh chuyển đổi (DB mới, Owner 03/11/2026), nên DB cũ cần kế hoạch riêng trước
+  bản này; Phase B gỡ nhánh đóng băng cùng bảng `approval_role_holders`.
 - Thứ tự khóa: task grant (`LicensingApi.lockGrantOfRequest`) rồi request (`request-end/request-end.service.ts`); hàng request
   rồi khóa năm ngân sách (`budgets/budget/budget-year-lock.repo.ts`).
 - Mọi kết thúc request phát `requests.outcome` trong cùng transaction; listener ném lỗi thì kết thúc bị hoàn tác.

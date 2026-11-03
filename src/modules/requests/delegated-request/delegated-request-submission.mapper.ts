@@ -15,7 +15,7 @@ export interface DelegatedSubmission {
   /** The sending confirms the need (everyone but the head's own share, which the approver confirms, `AC-8`). */
   delegated: boolean;
   item: DelegatedBodyDto['items'][number];
-  body: Pick<DelegatedBodyDto, 'businessReason' | 'termMonths' | 'projectLabel' | 'expectedEndDate'>;
+  body: Pick<DelegatedBodyDto, 'businessReason' | 'termMonths' | 'expectedEndDate'>;
   batchId: string;
   now: Date;
   assessed: Pick<Assessment, 'unit' | 'policy' | 'pricing' | 'routing'>;
@@ -67,7 +67,6 @@ export function delegatedRequestOf(facts: DelegatedSubmission): NewAccessRequest
     costCenterId: unit.costCenter?.id ?? null,
     businessReason: body.businessReason,
     termMonths: body.termMonths,
-    projectLabel: body.projectLabel ?? null,
     pricing,
     policy,
     delegatedBatchId: facts.batchId,

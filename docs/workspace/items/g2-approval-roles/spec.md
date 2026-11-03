@@ -1,5 +1,7 @@
 # Spec: lát G2 — cấu hình Người duyệt chi, người thay thế khi xung đột và approver dự phòng
 
+> Parts concerning direct roles and `/me` are superseded by [QĐ-93 direct roles](../qd93-direct-manager-spending-approver-roles/spec.md). Parts concerning the conflict substitute, the fallback approver and `/approval-roles` are superseded by [QĐ-93c](../qd93-remove-fallback-substitute-approvers/spec.md).
+
 - Phụ trách: AI theo giao việc Owner (triển khai 16/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc Owner (16/10/2026). Hạng mục `g2-spending-approver-config` của bảng phủ G2.
 - Thiết kế: ready. Triển khai: **verified** local 16/10/2026 (cây làm việc chưa commit trên `e833092`; xem [plan](plan.md)). Owner review: chưa review.

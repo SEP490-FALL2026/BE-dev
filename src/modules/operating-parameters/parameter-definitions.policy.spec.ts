@@ -1,5 +1,8 @@
 import {
+  ENUM_OPTIONS_MAX,
+  GROUP_LABELS,
   PARAMETER_DEFINITIONS,
+  PARAMETER_GROUPS,
   defaultValues,
   definitionOf,
   validateParameterValue,
@@ -103,5 +106,171 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(definitionOf('APPROVAL_SLA_WORKING_DAYS')?.unit).toBe('working days');
     expect(definitionOf('TIME_ZONE')).toBeUndefined();
     expect(validateParameterValue('TIME_ZONE', 'UTC', defaultValues())).toEqual({ ok: false, reason: 'UNKNOWN_KEY' });
+  });
+});
+
+const EXPECTED_KEYS = [
+  'APPROVAL_SLA_WORKING_DAYS',
+  'BACKLOG_ALERT_THRESHOLD',
+  'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
+  'FISCAL_YEAR_START_MONTH',
+  'FORECAST_ERROR_THRESHOLD_PERCENT',
+  'TRANSFER_REVIEW_WORKING_DAYS',
+  'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
+  'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
+  'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
+  'PROVISIONING_RETRY_COUNT',
+  'SAAS_ISSUE_RESPONSE_WORKING_DAYS',
+  'SAAS_ISSUE_REOPEN_WORKING_DAYS',
+  'INVITATION_REMINDER_DAYS',
+  'INVITATION_WITHDRAW_DAYS',
+  'DOCUMENT_MAX_SIZE_MB',
+  'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
+  'ACTIVITY_WINDOW_MINUTES',
+  'DETECTION_THRESHOLD_DAYS',
+  'RULE_SCHEDULE_G1_G2',
+  'RULE_SCHEDULE_G3_G4',
+];
+
+describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
+  it('pins the twenty keys, ordered by group and, inside a group, as the spec table lists them', () => {
+    expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
+  });
+
+  it('gives every parameter a Vietnamese label (not empty, at most 80, not its key, never repeated), a group and a unit label', () => {
+    const labels = PARAMETER_DEFINITIONS.map((definition) => definition.label);
+
+    for (const definition of PARAMETER_DEFINITIONS) {
+      expect(definition.label.trim()).not.toBe('');
+      expect(definition.label.length).toBeLessThanOrEqual(80);
+      expect(definition.label).not.toBe(definition.key);
+      expect(PARAMETER_GROUPS).toContain(definition.group);
+      expect(definition.unitLabel.trim()).not.toBe('');
+    }
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it('names every group, in the display order, and keeps the parameters of a group together', () => {
+    expect(PARAMETER_GROUPS).toEqual([
+      'WORKFLOW',
+      'BUDGET',
+      'PERSONNEL',
+      'PROVISIONING',
+      'ACCOUNT',
+      'DOCUMENT',
+      'SUBSCRIPTION',
+      'USAGE',
+    ]);
+    expect(GROUP_LABELS).toEqual({
+      WORKFLOW: 'Phê duyệt và quy trình',
+      BUDGET: 'Ngân sách và chi phí',
+      PERSONNEL: 'Nhân sự và bàn giao',
+      PROVISIONING: 'Cấp phát và báo lỗi SaaS',
+      ACCOUNT: 'Tài khoản',
+      DOCUMENT: 'Tài liệu',
+      SUBSCRIPTION: 'Thuê bao và gia hạn',
+      USAGE: 'Sử dụng và lãng phí',
+    });
+    const runs = PARAMETER_DEFINITIONS.map((definition) => definition.group).filter(
+      (group, index, all) => index === 0 || group !== all[index - 1],
+    );
+
+    expect(runs).toEqual([...PARAMETER_GROUPS]);
+  });
+
+  it('gives the label, group and unit label the spec table fixes to each parameter', () => {
+    const table = PARAMETER_DEFINITIONS.map((definition) => [
+      definition.key,
+      definition.label,
+      definition.group,
+      definition.unit,
+      definition.unitLabel,
+    ]);
+
+    expect(table).toEqual([
+      ['APPROVAL_SLA_WORKING_DAYS', 'Hạn xử lý một bước phê duyệt', 'WORKFLOW', 'working days', 'ngày làm việc'],
+      ['BACKLOG_ALERT_THRESHOLD', 'Ngưỡng tồn đọng bước phê duyệt', 'WORKFLOW', 'steps', 'bước'],
+      ['SPEND_SUBMISSION_WAIT_WORKING_DAYS', 'Hạn chờ trình duyệt chi', 'WORKFLOW', 'working days', 'ngày làm việc'],
+      ['FISCAL_YEAR_START_MONTH', 'Tháng bắt đầu năm tài chính', 'BUDGET', 'month of the year', 'tháng trong năm'],
+      ['FORECAST_ERROR_THRESHOLD_PERCENT', 'Ngưỡng sai số dự báo chi phí', 'BUDGET', 'percent', '%'],
+      [
+        'TRANSFER_REVIEW_WORKING_DAYS',
+        'Hạn rà soát quyền sau điều chuyển',
+        'PERSONNEL',
+        'working days',
+        'ngày làm việc',
+      ],
+      [
+        'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
+        'Hạn xử lý thông báo biến động nhân sự',
+        'PERSONNEL',
+        'working days',
+        'ngày làm việc',
+      ],
+      [
+        'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
+        'Thời gian giữ công cụ khi nghỉ đột xuất',
+        'PERSONNEL',
+        'working days',
+        'ngày làm việc',
+      ],
+      [
+        'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
+        'Hạn ngắn xác nhận bàn giao dữ liệu',
+        'PERSONNEL',
+        'working days',
+        'ngày làm việc',
+      ],
+      ['PROVISIONING_RETRY_COUNT', 'Số lần thử lại cấp/thu hồi', 'PROVISIONING', 'attempts', 'lần'],
+      [
+        'SAAS_ISSUE_RESPONSE_WORKING_DAYS',
+        'Hạn tiếp nhận báo lỗi SaaS',
+        'PROVISIONING',
+        'working days',
+        'ngày làm việc',
+      ],
+      ['SAAS_ISSUE_REOPEN_WORKING_DAYS', 'Hạn mở lại báo lỗi SaaS', 'PROVISIONING', 'working days', 'ngày làm việc'],
+      ['INVITATION_REMINDER_DAYS', 'Nhắc lời mời chưa kích hoạt sau', 'ACCOUNT', 'days', 'ngày'],
+      ['INVITATION_WITHDRAW_DAYS', 'Thu hồi lời mời chưa kích hoạt sau', 'ACCOUNT', 'days', 'ngày'],
+      ['DOCUMENT_MAX_SIZE_MB', 'Dung lượng tối đa của tệp tài liệu', 'DOCUMENT', 'MB', 'MB'],
+      ['RENEWAL_ALERT_DAYS_BEFORE_DEADLINE', 'Cảnh báo trước hạn báo hủy thuê bao', 'SUBSCRIPTION', 'days', 'ngày'],
+      ['ACTIVITY_WINDOW_MINUTES', 'Số phút tính là một ngày có hoạt động', 'USAGE', 'minutes per day', 'phút mỗi ngày'],
+      ['DETECTION_THRESHOLD_DAYS', 'Ngưỡng ngày không dùng của ghế', 'USAGE', 'days', 'ngày'],
+      ['RULE_SCHEDULE_G1_G2', 'Lịch chạy luật lãng phí (dữ liệu nội bộ)', 'USAGE', 'schedule', 'lịch'],
+      ['RULE_SCHEDULE_G3_G4', 'Lịch chạy luật lãng phí (dữ liệu usage)', 'USAGE', 'schedule', 'lịch'],
+    ]);
+  });
+
+  it('labels every option of an enum parameter, no more and no fewer, within the bound the registry records', () => {
+    const enums = PARAMETER_DEFINITIONS.filter((definition) => definition.shape.kind === 'enum');
+
+    expect(enums.map((definition) => definition.key)).toEqual(['RULE_SCHEDULE_G1_G2', 'RULE_SCHEDULE_G3_G4']);
+    expect(ENUM_OPTIONS_MAX).toBe(10);
+    for (const definition of enums) {
+      if (definition.shape.kind !== 'enum') continue;
+      expect(Object.keys(definition.shape.optionLabels).sort()).toEqual([...definition.shape.options].sort());
+      expect(definition.shape.options.length).toBeLessThanOrEqual(ENUM_OPTIONS_MAX);
+      expect(definition.shape.optionLabels).toEqual({ DAILY: 'Hằng ngày', WEEKLY: 'Hằng tuần' });
+    }
+  });
+
+  it('describes the notice review as the Super Admin task and the transfer review as every right a person holds (API-DOC-F07)', () => {
+    expect(definitionOf('PERSONNEL_NOTICE_REVIEW_WORKING_DAYS')?.description).toBe(
+      'How long the Super Admin has to verify and record, or reject, the notice of a department head about a change coming for one of their people.',
+    );
+    expect(definitionOf('TRANSFER_REVIEW_WORKING_DAYS')?.description).toBe(
+      'How long the new head of a department has to review every right a transferred person holds, paid or internal, counted in working days from the day the transfer takes effect.',
+    );
+    for (const definition of PARAMETER_DEFINITIONS) {
+      expect(definition.description).not.toMatch(
+        /IT Admin has to verify|standard set|fallback|substitute|conflict approver/i,
+      );
+    }
+  });
+
+  it('leaves the description of the document size parameter as it is (another item changes it)', () => {
+    expect(definitionOf('DOCUMENT_MAX_SIZE_MB')?.description).toBe(
+      'The largest file kept for a contract or a purchase document; a larger file is refused.',
+    );
   });
 });

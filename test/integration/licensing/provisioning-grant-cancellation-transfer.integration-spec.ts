@@ -24,7 +24,6 @@ describe('cancelling the grant of a request for a beneficiary who was transferre
     sessionId: 'test',
     employeeId: h.it1.employeeId,
     directRoles: ['IT_ADMIN'],
-    derivedRoles: [],
     roles: ['IT_ADMIN'],
   });
   const cancel = (requestId: string, cause: GrantCancelCause, evidence?: string) =>

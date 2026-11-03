@@ -32,24 +32,17 @@ export const FAKE_CLOCK: Parameters<typeof jest.useFakeTimers>[0] = {
   doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'],
 };
 export const TODAY = '2026-10-19';
-/** The Super Admin: the only role that enters new employee records (`QĐ-82i`), with the HR basis of the entry. */
+/** The Super Admin: the only role that enters new employee records (`QĐ-82i`), with no HR basis to give (`QĐ-93f`). */
 export const ACTOR: AuthenticatedPrincipal = {
   subject: 'u-sa',
   appUserId: 'u-sa',
   sessionId: 'session-1',
   employeeId: 'e-sa',
   directRoles: ['SUPER_ADMIN'],
-  derivedRoles: [],
   roles: ['SUPER_ADMIN'],
 };
 export const OWN_EMPLOYEE_CODE = 'E-SA';
 export const OWN_WORK_EMAIL = 'Sa+admin@Acme.vn';
-export const HR_BASIS = {
-  type: 'LABOR_CONTRACT',
-  reference: 'HD-2026-001',
-  issuer: 'HR Department',
-  issuedOn: '2026-10-01',
-} as const;
 
 export interface Department {
   id: string;
@@ -221,6 +214,9 @@ export function harness(start: Directory = directory()) {
       calls.push('org.getOrganization');
       return Promise.resolve(organization);
     },
+    unplacedAmong() {
+      return Promise.resolve(new Set<string>());
+    },
     lookupForEmployeeImport(names: Parameters<OrganizationReadApi['lookupForEmployeeImport']>[0], tx?: DbTx) {
       calls.push(`org.lookupForEmployeeImport(${where(tx)})`);
       lookups.push(clone(names));
@@ -371,12 +367,9 @@ export type ImportHarness = ReturnType<typeof harness>;
 export const upload = (h: ImportHarness, text: string | Buffer, fileName = 'people.csv') =>
   h.preview.upload(ACTOR, { fileName, bytes: typeof text === 'string' ? Buffer.from(text, 'utf8') : text });
 
-export const confirmBody = (
-  overrides: Partial<{ previewVersion: number; idempotencyKey: string; hrBasis: typeof HR_BASIS }> = {},
-) => ({
+export const confirmBody = (overrides: Partial<{ previewVersion: number; idempotencyKey: string }> = {}) => ({
   previewVersion: 1,
   idempotencyKey: 'key-00000001',
   acknowledgeDuplicateFile: false,
-  hrBasis: HR_BASIS,
   ...overrides,
 });

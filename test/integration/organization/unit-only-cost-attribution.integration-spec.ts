@@ -10,7 +10,6 @@ import {
 } from '../../support/disposable-database';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { AssignmentWire, SeatHarness } from '../../support/seat-baseline-harness';
-import { HR_BASIS } from '../../support/hr-basis';
 
 const MIGRATIONS = join(process.cwd(), 'prisma', 'migrations');
 const UNIT_ONLY = '_cost_centers_unit_only';
@@ -192,7 +191,7 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
         await request(h.server())
           .post('/api/v1/departments')
           .set({ Authorization: `Bearer ${h.admin}` })
-          .send({ code, name: `Department ${code}`, hrBasis: HR_BASIS })
+          .send({ code, name: `Department ${code}` })
           .then(created),
       );
       await h.costCenterFor(made.id);
@@ -205,7 +204,6 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
           .post('/api/v1/employees')
           .set({ Authorization: `Bearer ${h.admin}` })
           .send({
-            hrBasis: HR_BASIS,
             employeeCode: code,
             fullName: `Person ${code}`,
             workEmail: `${code.toLowerCase()}@acme.vn`,
@@ -227,8 +225,7 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
     const deactivate = (id: string) =>
       request(h.server())
         .post(`/api/v1/departments/${id}/deactivate`)
-        .set({ Authorization: `Bearer ${h.admin}` })
-        .send({ hrBasis: HR_BASIS });
+        .set({ Authorization: `Bearer ${h.admin}` });
 
     it('keeps a service account in the department that owns it: the person who takes over must be in that department', async () => {
       today('2026-12-01');

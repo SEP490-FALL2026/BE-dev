@@ -202,6 +202,13 @@ export class VersionRepo {
     return rows.map(toRecord);
   }
 
+  /** Every version that was sent and waits for a decision, in the order of their ids (what a stretch of waiting for the approver tells). */
+  async sentOnes(tx: DbTx): Promise<VersionRecord[]> {
+    const rows = await tx.budgetVersion.findMany({ where: { state: 'SENT' }, orderBy: { id: 'asc' } });
+
+    return rows.map(toRecord);
+  }
+
   /** The ids of every version the Cost Center has for the year, whatever their state. */
   async idsOf(tx: DbTx, costCenterId: string, year: number): Promise<string[]> {
     const rows = await tx.budgetVersion.findMany({ where: { costCenterId, year }, select: { id: true } });

@@ -3,11 +3,9 @@ import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestAlreadyHoldsAccessError,
-  AccessRequestNoDepartmentError,
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
@@ -16,6 +14,7 @@ import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { RequestFactsService, type RequestSettings } from '../access-request/request-facts.service';
+import { RequestSenderService } from './request-sender.service';
 import { RequestDraftRepo } from '../request-draft/request-draft.repo';
 import type { SubmitBodyDto } from '../access-request/access-request.dto';
 import {
@@ -51,7 +50,7 @@ export class AccessRequestService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly repo: AccessRequestRepo,
-    private readonly organizationReads: OrganizationReadApi,
+    private readonly sender: RequestSenderService,
     private readonly assessment: RequestFactsService,
     private readonly audit: AuditApi,
     private readonly drafts: RequestDraftRepo,
@@ -82,10 +81,9 @@ export class AccessRequestService {
     // The Super Admin sends no request, on any route that sends one, the renewal that is sent late included.
     if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     if (options.draftId) await this.lockDraft(tx, actor, options.draftId);
-    // The person sending is relied on until commit: they cannot be removed from the company between the check and the write.
-    await this.organizationReads.lockEmployeeForShare(tx, actor.employeeId);
-    const employee = await this.organizationReads.getEmployee(actor.employeeId, tx);
-    if (!employee) throw new AccessRequestNoDepartmentError();
+    // The person sending is relied on until commit (they cannot be removed from the company between the check and the write), and is
+    // judged as a party of a Request before any department is read (`D-S21`).
+    const employee = await this.sender.lockEligible(tx, actor);
 
     const now = new Date();
     const assessed = await this.assessment.assess(tx, {

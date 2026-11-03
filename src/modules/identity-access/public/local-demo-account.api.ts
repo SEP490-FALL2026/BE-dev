@@ -13,7 +13,7 @@ const DEMO_ACCOUNT_ROLES: ReadonlySet<string> = new Set<DemoAccountRole>(['IT_AD
  * Demo accounts for `pnpm dev:seed` (after its local guards) and `pnpm ops:demo-dataset` (the shared demo dataset,
  * after it proved its target installation). Declared only in IdentityAccessLocalSeedFacadeModule, which nothing but those
  * two command graphs loads. One activated account per demo employee with exactly one direct role, never SUPER_ADMIN and
- * never a derived role (operational-commands rule 6). The login email counts as asserted by the person who ran the
+ * additional fixture-declared direct roles only (operational-commands rule 6). The login email counts as asserted by the person who ran the
  * command, as for the installation's Super Admin: the demo mailbox does not exist, so there is no invitation.
  */
 @Injectable()
@@ -27,7 +27,13 @@ export class LocalDemoAccountApi {
   /** Whether the account can be created, is already as the fixture wants it, or conflicts with existing data. */
   async describeDemoAccount(
     tx: DbTx,
-    input: { organizationId: string; employeeId: string | null; loginEmail: string; role: DemoAccountRole },
+    input: {
+      organizationId: string;
+      employeeId: string | null;
+      loginEmail: string;
+      role: DemoAccountRole;
+      allowedExtraRoles?: readonly ('MANAGER' | 'SPENDING_APPROVER')[];
+    },
   ): Promise<DemoAccountState> {
     const loginEmail = normalizeEmail(input.loginEmail);
     const accountId =
@@ -40,8 +46,10 @@ export class LocalDemoAccountApi {
         account.status === 'ACTIVE' &&
         account.activationState === 'ACTIVATED' &&
         normalizeEmail(account.loginEmail) === loginEmail &&
-        roles.length === 1 &&
-        roles[0] === input.role;
+        roles.includes(input.role) &&
+        roles.every(
+          (role) => role === input.role || input.allowedExtraRoles?.includes(role as 'MANAGER' | 'SPENDING_APPROVER'),
+        );
 
       return asWanted ? { state: 'present' } : { state: 'conflict', reason: 'ACCOUNT_DIFFERS' };
     }

@@ -5,6 +5,7 @@ import {
   type AccessTokenVerifierPort,
   type AuthenticatedPrincipal,
 } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
+import { AccountStatusService } from '../../../src/modules/identity-access/accounts/app-users/account-status.service';
 import { AccountRecordService } from '../../../src/modules/identity-access/accounts/account-record.service';
 import { CredentialService } from '../../../src/modules/identity-access/credentials/credential.service';
 import { RoleGrantService } from '../../../src/modules/identity-access/accounts/role-grant.service';
@@ -103,4 +104,61 @@ export async function buildActivatedAccount(
   });
 
   return { ...made, email: spec.email, accessToken: await signIn(ctx, spec.email, password) };
+}
+
+/*
+ * The one place a suite gives a person `MANAGER` or `SPENDING_APPROVER` as a precondition, or reads who holds the second
+ * (QĐ-93b). Both are role grants (QĐ-93a), given through the service of the route (`POST /app-users/{id}/role-grants`) so every
+ * rule of the grant holds for a fixture too. No spec reaches for the role tables itself.
+ */
+
+/**
+ * The person is a `MANAGER` before a spec makes them a head or a successor: the Super Admin grants the role through the service of the
+ * route, unless they hold it already. The person needs an account (the department screen refuses anybody without one, `US-03-06` AC-23).
+ */
+export async function ensureManagerGrant(ctx: HttpTestApp, adminToken: string, employeeId: string): Promise<void> {
+  const actor = await principalOf(ctx, adminToken);
+  const appUserId = await appUserOf(ctx, employeeId);
+  const held = await ctx.app.get(RoleGrantService, { strict: false }).effectiveRoles(appUserId);
+  if (held.includes('MANAGER')) return;
+  await ctx.app.get(AccountStatusService, { strict: false }).grantRole(actor, appUserId, 'MANAGER');
+}
+
+async function appUserOf(ctx: HttpTestApp, employeeId: string): Promise<string> {
+  const { rows } = await ctx.sql.query<{ id: string }>('SELECT id FROM app_users WHERE employee_id = $1', [employeeId]);
+  if (rows.length !== 1) throw new Error(`The employee ${employeeId} has no account to hold a role.`);
+
+  return rows[0].id;
+}
+
+/**
+ * The Super Admin names the one spending approver, through the service of the route (T2.2: no HTTP): whoever holds the role is
+ * revoked first (the one holder the grant allows), then the new person is granted it.
+ */
+export async function setSpendingApprover(ctx: HttpTestApp, adminToken: string, employeeId: string): Promise<void> {
+  const actor = await principalOf(ctx, adminToken);
+  const status = ctx.app.get(AccountStatusService, { strict: false });
+  const current = await spendingApproverEmployeeId(ctx);
+  if (current === employeeId) return;
+  if (current !== null) await status.revokeRole(actor, await appUserOf(ctx, current), 'SPENDING_APPROVER');
+  await status.grantRole(actor, await appUserOf(ctx, employeeId), 'SPENDING_APPROVER');
+}
+
+/** Nobody is the spending approver any more: the Super Admin revokes the role, through the service of the route. */
+export async function clearSpendingApprover(ctx: HttpTestApp, adminToken: string): Promise<void> {
+  const current = await spendingApproverEmployeeId(ctx);
+  if (current === null) return;
+  await ctx.app
+    .get(AccountStatusService, { strict: false })
+    .revokeRole(await principalOf(ctx, adminToken), await appUserOf(ctx, current), 'SPENDING_APPROVER');
+}
+
+/** The employee who is the spending approver now; null when nobody is. */
+export async function spendingApproverEmployeeId(ctx: HttpTestApp): Promise<string | null> {
+  const { rows } = await ctx.sql.query<{ employee_id: string }>(
+    `SELECT u.employee_id FROM role_grants g JOIN app_users u ON u.id = g.app_user_id
+      WHERE g.role = 'SPENDING_APPROVER' AND g.revoked_at IS NULL`,
+  );
+
+  return rows[0]?.employee_id ?? null;
 }

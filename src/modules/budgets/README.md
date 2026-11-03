@@ -33,6 +33,9 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
   Phát từ `version-decision.service.ts`, `version-line.service.ts`, `year-end.service.ts`.
 - Mở `CommitmentReleaseGuardHook` (`budgets.commitment-release-guard`, Hook) — requests
   `spend/commitment-release.listener.ts`. Chưa bind thì nhả phần dư thất bại thay vì cho qua.
+- Đăng ký vào `identity-access.approval-role-change-listeners` và `organization.change-listeners` —
+  `budget/spending-approver-wait.listener.ts`: Super Admin nhận một `CONTROLLED_WAIT_ALERT` (`subject` `BUDGET_VERSION`) mỗi
+  đoạn chờ — khi gửi lúc chưa có người giữ vai, khi vai bị thu hồi, khi người giữ vai nghỉ việc (QĐ-93c, D-S16).
 - Đăng ký vào: `organization.change-listeners` (`budgets.head-change`) —
   `proposal/budget-head-change.listener.ts`; `organization.cost-center-use-readers` (`budgets.commitments`) —
   `commitment/budget-cost-center-use.listener.ts`; `operating-parameters.lock-readers` (`budgets.fiscal-year-start`) —
@@ -68,8 +71,9 @@ import lõi (`pnpm arch:capabilities --module budgets`: năm cạnh, không vòn
 - Một request giữ tối đa một commitment mỗi năm (`@@unique([requestId, year])`, `BudgetCommitmentExistsError`).
 - Proposal đã gửi không sửa tại chỗ; quyết định version là bản ghi không đổi và không quyết định sau khi năm tài
   chính đã hết (`BUDGET.YEAR_ENDED`, `version-decision.service.ts`).
-- Chỉ Finance dựng version; người quyết định là spending approver hoặc người thay khi approver gửi proposal đó
-  (`budget.policy.ts`, US-06-08 AC-11).
+- Chỉ Finance dựng version; chỉ spending approver quyết định, không ai thay (QĐ-93c, US-06-11 AC-12): chưa ai giữ vai thì
+  phiên bản chờ với `waitingReason` `NO_SPENDING_APPROVER`; phiên bản của đề xuất do chính approver gửi (dữ liệu cũ) không ai
+  quyết, 403 `BUDGET.CONFLICT_OF_INTEREST` (`budget.policy.ts`). Gửi phiên bản đọc grant `FOR SHARE` (M6).
 - `BudgetChangeListeners` chạy trong transaction của thay đổi, listener ném lỗi thì thay đổi bị rollback;
   `LOCK_WAITING` phát trước khi lấy khóa năm.
 

@@ -12,7 +12,6 @@ const actor = (roles: readonly string[]): AuthenticatedPrincipal => ({
   sessionId: 's1',
   employeeId: 'sa-1',
   directRoles: roles,
-  derivedRoles: [],
   roles,
 });
 
@@ -58,7 +57,7 @@ describe('SuperAdminDashboardService', () => {
       departmentsWithoutItAdmin: { state: 'COUNTED', count: 3, sourceOperationId: 'departmentWarningList' },
       personnelNotices: { state: 'COUNTED', count: 6, sourceOperationId: 'personnelNoticeList' },
       congestion: { state: 'AT_SOURCE', sourceOperationId: 'stepCongestionList' },
-      approverConfiguration: { state: 'AT_SOURCE', sourceOperationId: 'approvalRoleList' },
+      approverConfiguration: { state: 'AT_SOURCE', sourceOperationId: 'appUserList' },
       superAdminRole: { state: 'AT_SOURCE', sourceOperationId: 'superAdminWatchGet' },
       accountCandidates: { state: 'AT_SOURCE', sourceOperationId: 'accountCandidatesList' },
       backgroundJobs: { state: 'NOT_AVAILABLE', count: null, reason: 'NO_DATA_SOURCE' },

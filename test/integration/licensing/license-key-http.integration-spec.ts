@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount } from '../../support/api-accounts';
-import { HR_BASIS } from '../../support/hr-basis';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
+import { ensureManagerGrant } from '../../support/builders/account.builder';
 
 const h = new ProvisioningHarness();
 
@@ -75,11 +75,12 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     const department = await h.department('P-DES');
     const headId = await h.member('P-DES', 'E-HEAD', designer);
     head = await h.account('E-HEAD', headId, []);
+    await ensureManagerGrant(h.ctx, h.admin, headId);
     await request(h.server())
       .post(`/api/v1/departments/${department.id}/head-assignments`)
       // The head of a department is named by the Super Admin (QĐ-87).
       .set({ Authorization: `Bearer ${h.admin}` })
-      .send({ employeeId: headId, effectiveFrom: h.today(), hrBasis: HR_BASIS })
+      .send({ employeeId: headId, effectiveFrom: h.today() })
       .expect(200);
     superAdmin = { ...h.it1, accessToken: h.admin };
   }, 300000);

@@ -63,6 +63,8 @@ export class TransferPreconditions {
     const person = await this.organizationReads.getEmployee(input.employeeId, tx);
     const refused = subjectRefusal(person);
     if (refused) throw new TransferRefusedError(refused);
+    if ((await this.organizationReads.unplacedAmong([input.employeeId], tx)).has(input.employeeId))
+      throw new TransferRefusedError('EMPLOYEE_UNPLACED');
     const before = await this.history.getPlacementInForce(tx, input.employeeId, today);
     if (!before) throw new TransferRefusedError('PLACEMENT_OVERLAP');
     const toDepartmentId = input.toDepartmentId ?? before.departmentId;

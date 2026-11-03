@@ -6,6 +6,7 @@ const count = z.number().int().nonnegative();
 
 /** What the preview of a people file said about the file as a whole. */
 const schema = z.object({
+  newUnplaced: count.default(0),
   totalRows: count,
   valid: count,
   errors: count,

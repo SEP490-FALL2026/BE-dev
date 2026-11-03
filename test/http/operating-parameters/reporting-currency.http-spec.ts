@@ -36,7 +36,7 @@ describe('reporting currency routes (e2e, no database)', () => {
       (s: App) => request(s).put('/api/v1/reporting-currency').send({ currency: 'USD' }),
     ]) {
       const response = await call(app.getHttpServer())
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
       expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
     }

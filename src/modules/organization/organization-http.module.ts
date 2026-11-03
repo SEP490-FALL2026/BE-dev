@@ -14,12 +14,10 @@ import { DepartmentService } from './department-management/department.service';
 import { DepartmentsController } from './department-management/departments.controller';
 import { EmployeeMaintenanceController } from './employee/employee-maintenance.controller';
 import { EmployeeMaintenanceService } from './employee/employee-maintenance.service';
+import { EmployeeFirstPlacementService } from './employee/employee-first-placement.service';
 import { EmployeeManualService } from './employee/employee-manual.service';
 import { EmployeesController } from './employee/employees.controller';
 import { OrganizationModule } from './organization.module';
-import { ProjectRepo } from './project/project.repo';
-import { ProjectService } from './project/project.service';
-import { ProjectsController } from './project/projects.controller';
 
 /**
  * The HTTP side of the organization module, mounted by the API only. It is a module of its own, not part of
@@ -35,10 +33,10 @@ import { ProjectsController } from './project/projects.controller';
     CostCentersController,
     DepartmentsController,
     DepartmentHeadsController,
-    ProjectsController,
   ],
   providers: [
     EmployeeManualService,
+    EmployeeFirstPlacementService,
     EmployeeMaintenanceService,
     CostCenterService,
     DepartmentQueryService,
@@ -47,8 +45,6 @@ import { ProjectsController } from './project/projects.controller';
     // Hands the notices kept for a department with no head to the head whose period starts, added to the change listeners.
     HeldNoticeHandoverListener,
     DepartmentTechnicalMembersRepo,
-    ProjectService,
-    ProjectRepo,
     // The hourly telling of the changes dated for a day that has come: in the API graph only, where every listener is registered.
     OrganizationChangeSweeper,
   ],

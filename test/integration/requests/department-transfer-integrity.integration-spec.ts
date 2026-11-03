@@ -13,7 +13,7 @@ describe('the history of a person and the list of transfers (integration, real P
   let des: Department;
   let fin: Department;
   let sequence = 0;
-  const code = (prefix: string) => `${prefix}${(sequence += 1)}`;
+  const code = (prefix: string) => `${prefix}-${(sequence += 1)}`;
   const body = (employeeId: string, extra: object = {}) => ({
     employeeId,
     toDepartmentId: fin.id,

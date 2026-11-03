@@ -41,6 +41,7 @@ import { ProposalsController } from './proposal-review/proposals.controller';
 import { AccessRequestQueryService } from './request-view/access-request-query.service';
 import { AccessRequestRepo } from './access-request/access-request.repo';
 import { AccessRequestService } from './request-intake/access-request.service';
+import { RequestSenderService } from './request-intake/request-sender.service';
 import { AccessRequestsController } from './request-submission/access-requests.controller';
 import { NeedDecisionController } from './need-decision/need-decision.controller';
 import { NeedDecisionQueueController } from './need-decision-queue/need-decision-queue.controller';
@@ -50,6 +51,7 @@ import { SimilarSeatsController } from './need-decision/similar-seats.controller
 import { WithdrawalController } from './withdraw/withdrawal.controller';
 import { NeedDecisionEffects } from './need-decision/need-decision-effects.service';
 import { NeedDecisionService } from './need-decision/need-decision.service';
+import { StepFreezeService } from './step-routing/step-freeze.service';
 import { NeedSpendService } from './assessment/need-spend.service';
 import { WithdrawalPreconditions } from './withdraw/withdrawal-preconditions.service';
 import { WithdrawalWriter } from './withdraw/withdrawal-writer.service';
@@ -146,6 +148,7 @@ import { RenewalApplyService } from './renewal-apply/renewal-apply.service';
 import { RenewalHoldReader } from './renewal-request/renewal-hold.listener';
 import { RenewalRequestRepo } from './renewal-apply/renewal-request.repo';
 import { RenewalRequestTrail } from './renewal-request/renewal-request-trail.service';
+import { RenewalSeatFactsService } from './renewal-request/renewal-seat-facts.service';
 import { RenewalRequestWriter } from './renewal-request/renewal-request-writer.service';
 import { RenewalRequestService } from './renewal-request/renewal-request.service';
 import { RenewalRequestsController } from './renewal-request/renewal-requests.controller';
@@ -226,6 +229,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     RequestFactsService,
     RequestPreviewService,
     AccessRequestService,
+    RequestSenderService,
     RequestDraftService,
     RequestDraftSubmitService,
     // The listeners of the outcome of a request, the extension point this module opens, and the service that tells them.
@@ -246,6 +250,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     AccessRequestQueryService,
     NeedDecisionEffects,
     NeedDecisionService,
+    StepFreezeService,
     NeedSpendService,
     RequestEndService,
     WithdrawalPreconditions,
@@ -318,6 +323,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     ReturnRevocationHook,
     RenewalRequestRepo,
     RenewalRequestWriter,
+    RenewalSeatFactsService,
     RenewalRequestService,
     RenewalApplyService,
     RenewalRequestTrail,

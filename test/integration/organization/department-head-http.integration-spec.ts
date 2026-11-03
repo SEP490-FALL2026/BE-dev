@@ -1,9 +1,10 @@
+import { clearSpendingApprover, setSpendingApprover } from '../../support/builders/account.builder';
 import { insertEmployeeFixture } from '../../support/http-test-app';
 import { OrganizationHistoryApi } from '../../../src/modules/organization/public/organization-history.api';
 import { HR_BASIS } from '../../support/hr-basis';
 import { DepartmentHarness, today, addDays } from '../../support/department-harness';
 
-describe('department profiles, heads and the derived MANAGER role over HTTP (integration, real PostgreSQL): the head, the successor and the notices handed to the first head', () => {
+describe('department profiles, heads and the MANAGER role over HTTP (integration, real PostgreSQL): the head, the successor and the notices handed to the first head', () => {
   const h = new DepartmentHarness();
   const {
     asFinance,
@@ -19,6 +20,9 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     getDepartment,
     accountIn,
     assignHead,
+    assignHeadRaw,
+    grantManager,
+    enter,
     auditOf,
     closePlacements,
   } = h;
@@ -28,6 +32,39 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
   }, 120000);
 
   afterEach(() => h.afterEach());
+
+  /** The people of a department and its head began days ago: a change for today then ends their period instead of cancelling it. */
+  const backdateHeadPeriods = async (departmentId: string) => {
+    await h.ctx.sql.query('UPDATE employee_placements SET valid_from = valid_from - 10 WHERE department_id = $1', [
+      departmentId,
+    ]);
+    await h.ctx.sql.query(
+      'UPDATE department_head_periods SET valid_from = valid_from - 4 WHERE department_id = $1 AND valid_to IS NULL',
+      [departmentId],
+    );
+  };
+
+  /** Puts the members back as they were recorded, so the coverage check at the end of the file still holds. */
+  const putMembersBack = async (departmentId: string) => {
+    await h.ctx.sql.query('DELETE FROM department_head_periods WHERE department_id = $1', [departmentId]);
+    await h.ctx.sql.query('UPDATE employee_placements SET valid_from = valid_from + 10 WHERE department_id = $1', [
+      departmentId,
+    ]);
+  };
+
+  /** The head changes of a department the transaction of the route told, by kind (`organization_change_announcements`). */
+  const announcedHeadChanges = async (departmentId: string): Promise<Record<string, number>> => {
+    const rows = await h.ctx.sql.query<{ kind: string; n: number }>(
+      `SELECT a.kind::text AS kind, count(*)::int AS n
+         FROM organization_change_announcements a
+         JOIN department_head_periods p ON p.id = a.subject_id
+        WHERE p.department_id = $1 AND a.kind IN ('HEAD_PERIOD_START', 'HEAD_PERIOD_END')
+        GROUP BY a.kind`,
+      [departmentId],
+    );
+
+    return Object.fromEntries(rows.rows.map((row) => [row.kind, row.n]));
+  };
 
   afterAll(async () => {
     await h.stop();
@@ -51,6 +88,60 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         before: { head: null },
         after: { head: member.code, effectiveFrom: today() },
       });
+    });
+
+    it('takes no HR basis: the audit has no hrBasis, and the head period of today is announced in the same transaction (QĐ-93f, US-03-06 AC-22)', async () => {
+      const department = await newDepartment();
+      const first = await accountIn(department.code);
+      const second = await accountIn(department.code);
+
+      await assignHead(department.id, first.employeeId).expect(200);
+      await assignHead(department.id, second.employeeId).expect(200);
+
+      const audit = (await auditOf(department.id)).filter((event) => event.action === 'DEPARTMENT.HEAD_ASSIGNED');
+      expect(audit).toHaveLength(2);
+      for (const event of audit) {
+        expect(event.after).not.toHaveProperty('hrBasis');
+      }
+      expect(audit[1]).toEqual({
+        action: 'DEPARTMENT.HEAD_ASSIGNED',
+        before: { head: first.code },
+        after: {
+          head: second.code,
+          effectiveFrom: today(),
+          endedPeriods: 0,
+          cancelledPeriods: [`${first.code}@${today()}`],
+        },
+      });
+      expect(await announcedHeadChanges(department.id)).toEqual({ HEAD_PERIOD_START: 1 });
+    });
+
+    it('announces the end of the head they replace in the same transaction when that head began before today (QĐ-93f, US-03-06 AC-22)', async () => {
+      const department = await newDepartment();
+      const first = await accountIn(department.code);
+      const second = await accountIn(department.code);
+      await assignHead(department.id, first.employeeId).expect(200);
+      await backdateHeadPeriods(department.id);
+
+      await assignHead(department.id, second.employeeId).expect(200);
+
+      expect((await auditOf(department.id)).at(-1)).toEqual({
+        action: 'DEPARTMENT.HEAD_ASSIGNED',
+        before: { head: first.code },
+        after: { head: second.code, effectiveFrom: today(), endedPeriods: 1, cancelledPeriods: [] },
+      });
+      expect(await announcedHeadChanges(department.id)).toEqual({ HEAD_PERIOD_START: 2, HEAD_PERIOD_END: 1 });
+      await putMembersBack(department.id);
+    });
+
+    it('turns away an HR basis, which no head assignment takes any more: 422 and nobody is named (QĐ-93f)', async () => {
+      const department = await newDepartment();
+      const member = await accountIn(department.code);
+
+      const response = await assignHead(department.id, member.employeeId).send({ hrBasis: HR_BASIS }).expect(422);
+
+      expect(errorOf(response).code).toBe('VALIDATION_ERROR');
+      expect((await getDepartment(department.id)).head).toBeNull();
     });
 
     it('ends the head before the day the next one begins: one head on each day, no overlap (AC-5)', async () => {
@@ -135,7 +226,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
     });
 
     it('refuses the Super Admin as a head and leaves the department as it was (AC-7)', async () => {
-      const response = await assignHead(h.seed.departmentId, h.seed.superAdmin.employeeId).expect(422);
+      const response = await assignHeadRaw(h.seed.departmentId, h.seed.superAdmin.employeeId).expect(422);
 
       expect(errorOf(response).code).toBe('DEPARTMENT.HEAD_SUPER_ADMIN_CANNOT_HEAD');
       expect(
@@ -145,6 +236,37 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
           ])
         ).rows,
       ).toEqual([]);
+    });
+
+    it('refuses a head without MANAGER, and a person with no account, and creates no period (US-03-06 AC-23)', async () => {
+      const department = await newDepartment();
+      const withoutRole = await accountIn(department.code);
+      const withoutAccount = await enter(department.code);
+
+      const noRole = await assignHeadRaw(department.id, withoutRole.employeeId).expect(422);
+      const noAccount = await assignHeadRaw(department.id, withoutAccount.employeeId).expect(422);
+
+      expect(errorOf(noRole).code).toBe('DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED');
+      expect(errorOf(noAccount).code).toBe('DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED');
+      expect((await getDepartment(department.id)).head).toBeNull();
+      expect(
+        (await h.ctx.sql.query('SELECT 1 FROM department_head_periods WHERE department_id = $1', [department.id])).rows,
+      ).toEqual([]);
+      // The grant is all that was missing: once the Super Admin gives MANAGER the same call goes through.
+      await grantManager(withoutRole.employeeId);
+      await assignHeadRaw(department.id, withoutRole.employeeId).expect(200);
+    });
+
+    it('refuses the spending approver as a head with its own reason, not the missing MANAGER (US-03-06 AC-24)', async () => {
+      const department = await newDepartment();
+      const approver = await accountIn(department.code);
+      await setSpendingApprover(h.ctx, h.admin, approver.employeeId);
+
+      const response = await assignHeadRaw(department.id, approver.employeeId).expect(422);
+
+      expect(errorOf(response).code).toBe('DEPARTMENT.HEAD_SPENDING_APPROVER_CANNOT_HEAD');
+      expect((await getDepartment(department.id)).head).toBeNull();
+      await clearSpendingApprover(h.ctx, h.admin);
     });
 
     it('refuses a person who has left, a person who does not exist, and a retired department (AC-8)', async () => {
@@ -197,6 +319,28 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect(dataOf(nobody).warnings).toContain('MISSING_HEAD');
     });
 
+    it('takes no HR basis: the audit has no hrBasis, and a vacancy from today announces the end of the head period (QĐ-93f, US-03-06 AC-22)', async () => {
+      const department = await newDepartment();
+      const head = await accountIn(department.code);
+      await assignHead(department.id, head.employeeId).expect(200);
+      await backdateHeadPeriods(department.id);
+
+      await api()
+        .post(`/api/v1/departments/${department.id}/head-vacancies`)
+        .set(asAdmin())
+        .send({ effectiveFrom: today() })
+        .expect(200);
+
+      const vacated = (await auditOf(department.id)).at(-1);
+      expect(vacated).toEqual({
+        action: 'DEPARTMENT.HEAD_VACATED',
+        before: { head: head.code },
+        after: { head: null, effectiveFrom: today(), cancelledPeriods: [] },
+      });
+      expect(await announcedHeadChanges(department.id)).toEqual({ HEAD_PERIOD_START: 1, HEAD_PERIOD_END: 1 });
+      await putMembersBack(department.id);
+    });
+
     it('answers a vacancy that ends nothing with the profile and records nothing', async () => {
       const department = await newDepartment();
       const events = (await auditOf(department.id)).length;
@@ -226,6 +370,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const next = await accountIn(department.code);
       const from = addDays(today(), 10);
       await assignHead(department.id, head.employeeId).expect(200);
+      await grantManager(next.employeeId);
 
       const named = await designate(department.id, next.employeeId, from).expect(200);
 
@@ -243,7 +388,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect((await auditOf(department.id)).at(-1)).toEqual({
         action: 'DEPARTMENT.SUCCESSOR_DESIGNATED',
         before: { head: head.code, successor: null },
-        after: { head: head.code, successor: next.code, effectiveFrom: from, hrBasis: HR_BASIS },
+        after: { head: head.code, successor: next.code, effectiveFrom: from },
       });
 
       const cleared = await clear(department.id).expect(200);
@@ -256,7 +401,7 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect((await auditOf(department.id)).at(-1)).toEqual({
         action: 'DEPARTMENT.SUCCESSOR_CLEARED',
         before: { successor: next.code, effectiveFrom: from },
-        after: { successor: null, head: head.code, hrBasis: HR_BASIS },
+        after: { successor: null, head: head.code },
       });
       // Nobody is named any more: clearing again changes and records nothing.
       const count = (await auditOf(department.id)).length;
@@ -285,6 +430,8 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const next = await accountIn(department.code);
       const other = await accountIn(department.code);
       const from = addDays(today(), 10);
+      await grantManager(next.employeeId);
+      await grantManager(other.employeeId);
 
       expect(errorOf(await designate(department.id, next.employeeId, from).expect(422)).code).toBe(
         'DEPARTMENT.HEAD_SUCCESSOR_NEEDS_A_HEAD',
@@ -299,11 +446,24 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       );
     });
 
+    it('refuses a successor for a retired department with 409 DEPARTMENT.INACTIVE and records nothing (API-DOC-F05)', async () => {
+      const department = await newDepartment();
+      const outsider = await insertEmployeeFixture(h.ctx.app, h.seed, { code: unique('E-OK'), email: null });
+      await api().post(`/api/v1/departments/${department.id}/deactivate`).set(asAdmin()).expect(200);
+      const events = (await auditOf(department.id)).length;
+
+      const response = await designate(department.id, outsider.employeeId, addDays(today(), 10)).expect(409);
+
+      expect(errorOf(response).code).toBe('DEPARTMENT.INACTIVE');
+      expect(await auditOf(department.id)).toHaveLength(events);
+    });
+
     it('judges the successor like any head: a member that day, working, and not the Super Admin', async () => {
       const department = await newDepartment();
       const head = await accountIn(department.code);
       const elsewhere = await accountIn('P-OPS');
       await assignHead(department.id, head.employeeId).expect(200);
+      await grantManager(elsewhere.employeeId);
       const from = addDays(today(), 10);
 
       const notMember = await designate(department.id, elsewhere.employeeId, from).expect(422);
@@ -314,7 +474,28 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       expect((await getDepartment(department.id)).successor).toBeNull();
     });
 
-    it('is the Super Admin’s alone, with an HR basis, and 404 for a department that does not exist (F10, F13)', async () => {
+    it('judges the successor by the same two roles: no MANAGER, no account, or the spending approver (US-03-06 AC-23, AC-24)', async () => {
+      const department = await newDepartment();
+      const head = await accountIn(department.code);
+      const withoutRole = await accountIn(department.code);
+      const withoutAccount = await enter(department.code);
+      const approver = await accountIn(department.code);
+      await assignHead(department.id, head.employeeId).expect(200);
+      await setSpendingApprover(h.ctx, h.admin, approver.employeeId);
+      const from = addDays(today(), 10);
+
+      const noRole = await designate(department.id, withoutRole.employeeId, from).expect(422);
+      const noAccount = await designate(department.id, withoutAccount.employeeId, from).expect(422);
+      const spending = await designate(department.id, approver.employeeId, from).expect(422);
+
+      expect(errorOf(noRole).code).toBe('DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED');
+      expect(errorOf(noAccount).code).toBe('DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED');
+      expect(errorOf(spending).code).toBe('DEPARTMENT.HEAD_SPENDING_APPROVER_CANNOT_HEAD');
+      expect((await getDepartment(department.id)).successor).toBeNull();
+      await clearSpendingApprover(h.ctx, h.admin);
+    });
+
+    it('is the Super Admin’s alone, takes no HR basis (QĐ-93f), and is 404 for a department that does not exist (F10, F13)', async () => {
       const department = await newDepartment();
       const head = await accountIn(department.code);
       const next = await accountIn(department.code);
@@ -325,7 +506,8 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
         await designate(department.id, next.employeeId, from, headers).expect(403);
         await clear(department.id, headers).expect(403);
       }
-      await designate(department.id, next.employeeId, from).send({ hrBasis: undefined }).expect(422);
+      await designate(department.id, next.employeeId, from).send({ hrBasis: HR_BASIS }).expect(422);
+      await clear(department.id).send({ hrBasis: HR_BASIS }).expect(422);
       await designate('3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11', next.employeeId, from).expect(404);
       await clear('3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11').expect(404);
       expect((await getDepartment(department.id)).successor).toBeNull();

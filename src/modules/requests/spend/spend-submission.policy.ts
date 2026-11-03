@@ -1,4 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
+import type { DeciderRole as ReadDeciderRole } from '../access-request/access-request.types';
 
 /**
  * The rules of sending a request that costs money on to be decided as spend (`US-06-14`, `US-05-04` AC-12 to AC-16), as pure
@@ -42,22 +43,15 @@ export function submissionStop(request: {
   return request.hasPlanLine || request.offPlan ? null : 'PLAN_LINE_REQUIRED';
 }
 
-export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER' | 'FALLBACK_APPROVER' | 'CONFLICT_SUBSTITUTE';
-
 /**
  * Where a request goes once its need is approved and it costs money: the queue of the head, who sends it on, or straight to
- * the check when nobody can send it (`US-06-14` AC-8). Nobody can when the need was decided by the fallback approver, who has
- * no queue, or by the spending approver, whether as the head of the department or in the head's place: they would send it to
- * themselves.
+ * the check when nobody can send it (`US-06-14` AC-8). Nobody can when the need was decided by the spending approver, in the place
+ * of the head who sent the request (row 2): they would send it to themselves. A department with no head never gets here, since its
+ * need step waits (`QĐ-93c`); a request whose need the head decided stays in the queue of the department, even if the head leaves
+ * meanwhile (`US-06-14` AC-8).
  */
-export function entryFor(input: {
-  deciderRole: DeciderRole;
-  deciderEmployeeId: string;
-  spendingApproverEmployeeId: string | null;
-}): 'HEAD_QUEUE' | 'DIRECT' {
-  if (input.deciderRole !== 'MANAGER') return 'DIRECT';
-
-  return input.deciderEmployeeId === input.spendingApproverEmployeeId ? 'DIRECT' : 'HEAD_QUEUE';
+export function entryFor(input: { deciderRole: ReadDeciderRole }): 'HEAD_QUEUE' | 'DIRECT' {
+  return input.deciderRole === 'MANAGER' ? 'HEAD_QUEUE' : 'DIRECT';
 }
 
 export type SupplementRefusal =

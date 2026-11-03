@@ -6,7 +6,6 @@ import { TransactionRunner } from '../../../src/infrastructure/database/transact
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { findPlacementCoverageViolations } from '../../support/placement-coverage';
-import { HR_BASIS } from '../../support/hr-basis';
 import { registerUseReaders } from '../../support/organization-use-readers';
 import { waitForLockWaiters } from '../../support/lock-wait';
 
@@ -80,7 +79,6 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
       hireDate: '2026-10-01',
       departmentCode: 'P-OPS',
       jobTitle: 'Administrator',
-      hrBasis: HR_BASIS,
       ...overrides,
     };
   };
@@ -201,7 +199,7 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
     return request(server())
       .post('/api/v1/departments')
       .set({ Authorization: `Bearer ${superAdmin}` })
-      .send({ code: `P-LM${counter}`, name: `Lock Department ${counter}`, hrBasis: HR_BASIS })
+      .send({ code: `P-LM${counter}`, name: `Lock Department ${counter}` })
       .then((response) => response);
   };
 
@@ -303,15 +301,25 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
       expect((await createCostCenterFor(id)).status).toBe(201);
       const { code } = (await ctx.sql.query<{ code: string }>('SELECT code FROM departments WHERE id = $1', [id]))
         .rows[0];
-      const member = await enter(entry({ departmentCode: code })).expect(201);
+      const body = entry({ departmentCode: code });
+      const member = await enter(body).expect(201);
+      const employeeId = (member.body as { data: { id: string } }).data.id;
+      // A head holds MANAGER (QĐ-93a, US-03-06 AC-23): the person has an account that holds it before the department names them.
+      await createActivatedAccount(ctx, seed, {
+        code: body.employeeCode,
+        email: body.workEmail,
+        roles: ['MANAGER'],
+        admin: superAdmin,
+        employeeId,
+      });
 
-      return { id, employeeId: (member.body as { data: { id: string } }).data.id };
+      return { id, employeeId };
     };
     const assignHead = (departmentId: string, employeeId: string) =>
       request(server())
         .post(`/api/v1/departments/${departmentId}/head-assignments`)
         .set(asSuperAdminWriter())
-        .send({ employeeId, effectiveFrom: '2099-01-01', hrBasis: HR_BASIS })
+        .send({ employeeId, effectiveFrom: '2099-01-01' })
         .then((response) => response);
 
     it('a manual entry takes its department FOR SHARE: it passes a FOR SHARE holder, waits for FOR NO KEY UPDATE', async () => {
@@ -344,12 +352,11 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
         request(server())
           .patch(`/api/v1/departments/${department.id}`)
           .set(asSuperAdminWriter())
-          .send({ name: unique('Renamed While Held'), hrBasis: HR_BASIS })
+          .send({ name: unique('Renamed While Held') })
           .then((response) => response),
         request(server())
           .post(`/api/v1/departments/${empty.id}/deactivate`)
           .set(asSuperAdminWriter())
-          .send({ hrBasis: HR_BASIS })
           .then((response) => response),
         assignHead(department.id, department.employeeId),
       ];

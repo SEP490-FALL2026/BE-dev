@@ -241,7 +241,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
       const wired = await h.recordedCase(u.leaver);
       const small = await counter.run(() => h.openRequestsOf(wired.id, '?pageSize=100').expect(200));
       const smallTasks = await counter.run(() => h.openGrantTasksOf(wired.id, '?pageSize=100').expect(200));
-      for (let i = 0; i < 4; i += 1) await h.sent(u.leaver, plan, { termMonths: 1, projectLabel: `P${i}` });
+      for (let i = 0; i < 4; i += 1) await h.sent(u.leaver, plan, { termMonths: 1 });
 
       const big = await counter.run(() => h.openRequestsOf(wired.id, '?pageSize=100').expect(200));
 

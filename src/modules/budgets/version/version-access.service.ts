@@ -30,6 +30,14 @@ export class VersionAccessService {
     return this.facts.fiscalYearStartMonth();
   }
 
+  /**
+   * The spending approver who works, with the row of the grant locked `FOR SHARE` until the transaction ends: what a sending reads before
+   * it locks a proposal or a version, so that a revocation that is being made and the sending take turns (`M6`).
+   */
+  usableApproverLocked(tx: DbTx): Promise<string | null> {
+    return this.facts.usableSpendingApproverEmployeeId(tx, { forShare: true });
+  }
+
   /** The version as it is in the transaction. Throws BudgetVersionNotFoundError. */
   async requireIn(tx: DbTx, id: string): Promise<VersionRecord> {
     const version = await this.versions.findById(id, tx);

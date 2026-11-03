@@ -9,8 +9,7 @@ describe('requests over HTTP: the preview before sending (integration, real Post
   let headless: Department;
   let head: Person; // head of design
   let designer: Person;
-  let boss: Person; // head of executive and the spending approver
-  let fallback: Person; // the fallback approver, a member of the department with no head
+  let boss: Person; // the spending approver, a member of executive (QĐ-93b)
   let newcomer: Person; // a member of the department with no head
   let internalPlan: string;
   let paidPlan: string; // 1 000 000 VND per seat per month, billed monthly
@@ -24,12 +23,10 @@ describe('requests over HTTP: the preview before sending (integration, real Post
     head = await h.staff(design, 'DES-H1');
     designer = await h.staff(design, 'DES-E1');
     boss = await h.staff(executive, 'EXE-C1');
-    fallback = await h.staff(headless, 'HR-R0');
     newcomer = await h.staff(headless, 'HR-E4');
     await h.makeHead(design, head);
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
-    await h.setRole('FALLBACK_APPROVER', fallback);
     internalPlan = await h.plan('K5');
     paidPlan = await h.planOf(await h.subscription(10));
     unpricedPlan = await h.plan('K2');
@@ -86,11 +83,11 @@ describe('requests over HTTP: the preview before sending (integration, real Post
           'plan',
           'branch',
           'termMonths',
-          'projectLabel',
           'department',
           'costCenter',
           'requirements',
           'existingAccess',
+          'blockedBy',
           'canSubmit',
           'expectedSpendOn',
           'budgetYear',
@@ -167,30 +164,37 @@ describe('requests over HTTP: the preview before sending (integration, real Post
   });
 
   describe('the routing table (AC-5)', () => {
-    it.each([
-      ['a head asking for themselves: the spending approver', () => head, () => boss, 'HEAD_ASKS_FOR_SELF'],
-      [
-        'the spending approver who heads a department: the fallback approver',
-        () => boss,
-        () => fallback,
-        'HEAD_IS_THE_APPROVER',
-      ],
-      [
-        'a member of a department with no head: the fallback approver, saying so',
-        () => newcomer,
-        () => fallback,
-        'DEPARTMENT_HAS_NO_HEAD',
-      ],
-    ])('%s', async (_name, who, holder, explanation) => {
-      const preview = await h.previewed(who(), paidPlan);
-      const sent = await h.sent(who(), paidPlan);
+    it('a head asking for themselves: the spending approver', async () => {
+      const preview = await h.previewed(head, paidPlan);
+      const sent = await h.sent(head, paidPlan);
 
       expect(preview.chain[0]).toMatchObject({
         kind: 'NEED',
-        assignee: { employeeId: holder().employeeId },
-        explanation,
+        assignee: { employeeId: boss.employeeId },
+        explanation: 'HEAD_ASKS_FOR_SELF',
       });
-      expect(sent.needStep.assignee?.employeeId).toBe(holder().employeeId);
+      expect(sent.needStep.assignee?.employeeId).toBe(boss.employeeId);
+    });
+
+    it('a member of a department with no head: waits for the head, naming nobody and saying why', async () => {
+      const preview = await h.previewed(newcomer, paidPlan);
+      const sent = await h.sent(newcomer, paidPlan);
+
+      expect(preview.chain[0]).toMatchObject({
+        kind: 'NEED',
+        role: 'MANAGER',
+        assignee: null,
+        explanation: 'WAITS_FOR_DEPARTMENT_HEAD',
+        waitingReason: 'NO_DEPARTMENT_HEAD',
+      });
+      // The chain shown is the chain made (AC-11): nobody takes the step in place of a head.
+      expect(sent.needStep).toMatchObject({
+        state: 'WAITING',
+        assignee: null,
+        routingRow: 4,
+        waitingReason: 'NO_DEPARTMENT_HEAD',
+      });
+      expect(JSON.stringify(preview)).not.toMatch(/FALLBACK|DEPARTMENT_HAS_NO_HEAD|HEAD_IS_THE_APPROVER/);
     });
   });
 
@@ -231,11 +235,11 @@ describe('requests over HTTP: the preview before sending (integration, real Post
 
   describe('the Cost Center (AC-7)', () => {
     it('is the Unit of the department of the day, read only: neither a form field nor a project changes it', async () => {
-      const preview = await h.previewed(designer, paidPlan, { projectLabel: 'Brand 2027' });
-      const other = await h.previewed(designer, paidPlan, { projectLabel: 'Another project' });
+      const preview = await h.previewed(designer, paidPlan);
+      const other = await h.previewed(designer, paidPlan);
 
       expect(preview.costCenter?.id).toBe(design.unitId);
-      expect(preview.projectLabel).toBe('Brand 2027');
+      expect(preview).not.toHaveProperty('projectLabel');
       expect(other.costCenter).toEqual(preview.costCenter);
       expect(other.chain).toEqual(preview.chain);
       expect(
@@ -418,6 +422,24 @@ describe('requests over HTTP: the preview before sending (integration, real Post
       ]) {
         expect(h.codeOf(await h.previewRequest(body, designer.account).expect(422))).toBe('VALIDATION_ERROR');
       }
+    });
+  });
+
+  describe('the spending approver is no party of a request (US-05-01 AC-16, D-S21)', () => {
+    it('says who is refused and why, with the rest of the preview as for anybody, and cannot be sent', async () => {
+      const preview = await h.previewed(boss, paidPlan);
+
+      expect(preview.blockedBy).toEqual({
+        reason: 'SPENDING_APPROVER',
+        party: 'REQUESTER',
+        employeeIds: [boss.employeeId],
+      });
+      expect(preview).toMatchObject({ canSubmit: false, branch: 'PAID_IN_CATALOG', department: { id: executive.id } });
+      expect((await h.previewed(boss, internalPlan)).blockedBy).toMatchObject({ reason: 'SPENDING_APPROVER' });
+    });
+
+    it('names nobody for a person who may send, whose preview is not blocked', async () => {
+      expect((await h.previewed(designer, paidPlan)).blockedBy).toBeNull();
     });
   });
 });

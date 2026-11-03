@@ -150,7 +150,6 @@ describe('the inbox alert that a right is about to end (integration, real Postgr
       sessionId: randomUUID(),
       employeeId: h.it1.employeeId,
       directRoles: ['IT_ADMIN'],
-      derivedRoles: [],
       roles: ['IT_ADMIN'],
     };
     const renewed = await h.ctx.app.get(TransactionRunner).run((tx) =>

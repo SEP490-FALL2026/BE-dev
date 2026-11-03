@@ -1,5 +1,7 @@
 # Spec: Khởi tạo tổ chức, đăng nhập và phiên (lát 1a)
 
+> Parts concerning direct roles and `/me` are superseded by [QĐ-93 direct roles](../qd93-direct-manager-spending-approver-roles/spec.md).
+
 - Phụ trách: BE Dev A (theo roadmap). Thiết kế ban đầu bởi: Owner. Peer review: review toàn bộ spec/code là tùy chọn theo [quy trình](../../README.md); review **giá trị kỹ thuật `US-01-10`** (thời hạn lời mời/phiên, chính sách mật khẩu, giới hạn tần suất) **bắt buộc theo nguồn — `pending`**, xem _Sẵn sàng bàn giao_.
 - Thiết kế: ready (đã implement). Triển khai: `verified` local tại `d60d306`; refactor module sau đó ở `ab0c43a`. Owner review cuối: chưa có; chưa `accepted`/`released`.
 - Nguồn: [snapshot `S-2026-10-12b`](../../sources.md) — US v0.15 (bổ sung `QĐ-67`) `US-01-01`, `US-01-06`, `US-01-10` (`EP-01`); BRD v3.36 `FR-8.1`, `FR-8.3`, `FR-8.6`→`FR-8.11`, `FR-9.8`, 7.2; quyết định `QĐ-41a`, `QĐ-44`, `QĐ-46a`, `QĐ-47a`, `QĐ-47c`, `QĐ-47d`, `QĐ-52d`, `QĐ-67a`, `QĐ-67b`.

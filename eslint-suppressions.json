@@ -57,11 +57,6 @@
       "count": 1
     }
   },
-  "src/modules/data-import/employee-import/row-validation/employee-import-row-validation.policy.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/data-import/seat-baseline-import/seat-baseline-imports.controller.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -80,14 +75,6 @@
   "src/modules/identity-access/accounts/invitation-redemption.service.ts": {
     "complexity": {
       "count": 1
-    }
-  },
-  "src/modules/identity-access/approval-roles/approval-role.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
     }
   },
   "src/modules/identity-access/auth/session.service.ts": {
@@ -330,9 +317,6 @@
     }
   },
   "src/modules/requests/assessment/proposal.service.ts": {
-    "complexity": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 2
     }

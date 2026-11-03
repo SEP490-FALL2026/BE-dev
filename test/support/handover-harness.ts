@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { HR_BASIS } from './hr-basis';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { HandoverOverdueService } from '../../src/modules/licensing/handover/handover-overdue.service';
@@ -16,6 +15,7 @@ import type {
   RevocationDecision,
 } from '../../src/modules/licensing/public/licensing.types';
 import type { ApiAccount } from './api-accounts';
+import { ensureManagerGrant } from './builders/account.builder';
 import { assignmentIdOf, importSeats } from './builders/seat.builder';
 import type { Person } from './request-harness';
 import { TransferHarness } from './transfer-harness';
@@ -90,7 +90,6 @@ export class HandoverHarness extends TransferHarness {
       sessionId: randomUUID(),
       employeeId: account.employeeId,
       directRoles: roles,
-      derivedRoles: [],
       roles,
     };
   }
@@ -235,10 +234,11 @@ export class HandoverHarness extends TransferHarness {
 
   /** Makes the person the head of the department from the day (the route of the Super Admin accepts a day to come). */
   async makeHeadFrom(department: { id: string }, person: Person, day: string): Promise<void> {
+    await ensureManagerGrant(this.ctx, this.admin, person.employeeId);
     await request(this.server())
       .post(`/api/v1/departments/${department.id}/head-assignments`)
       .set({ Authorization: `Bearer ${this.admin}` })
-      .send({ employeeId: person.employeeId, effectiveFrom: day, hrBasis: HR_BASIS })
+      .send({ employeeId: person.employeeId, effectiveFrom: day })
       .expect(200);
   }
 }

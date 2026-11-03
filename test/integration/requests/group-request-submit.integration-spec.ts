@@ -395,6 +395,103 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
     });
   });
 
+  describe('the spending approver is no party of a group (US-05-17 AC-18, US-05-02 AC-13, US-03-02 AC-15)', () => {
+    /** The spending approver is a person of this department for the length of a test, and the installation's approver again after. */
+    const withApproverIn = async (
+      u: Unit,
+      test: (approver: Awaited<ReturnType<GroupHarness['colleague']>>) => Promise<void>,
+    ) => {
+      const approver = await h.colleague(u);
+      await h.setRole('SPENDING_APPROVER', approver);
+      try {
+        await test(approver);
+      } finally {
+        await h.setRole('SPENDING_APPROVER', h.boss);
+      }
+    };
+
+    it('refuses the candidate list to the spending approver with REQUEST_PARTY.INELIGIBLE', async () => {
+      const refused = await h.candidates(h.boss.account).expect(422);
+
+      expect(h.codeOf(refused)).toBe('REQUEST_PARTY.INELIGIBLE');
+      expect(h.detailsOf(refused)).toEqual({
+        reason: 'SPENDING_APPROVER',
+        party: 'REQUESTER',
+        employeeIds: [h.boss.employeeId],
+      });
+    });
+
+    it('leaves the spending approver out of the candidates before the page is cut, so the total is right', async () => {
+      const u = await unit();
+      await h.colleagues(u, 2);
+      const page = async () =>
+        h.dataOf<{ items: Array<{ employeeId: string }>; pagination: { totalItems: number } }>(
+          await h.candidates(u.head.account, { pageSize: 2 }).expect(200),
+        ).pagination.totalItems;
+      const before = await page();
+
+      await withApproverIn(u, async (approver) => {
+        const listed = h.dataOf<{ items: Array<{ employeeId: string }>; pagination: { totalItems: number } }>(
+          await h.candidates(u.head.account, { q: approver.code.toLowerCase() }).expect(200),
+        );
+
+        expect(listed.items).toEqual([]);
+        expect(listed.pagination.totalItems).toBe(0);
+        // A person of the department was added and nobody is listed more: the approver is not counted.
+        expect(await page()).toBe(before);
+      });
+    });
+
+    it('gives the line of the spending approver a reason of its own, in the check and in the sending, and leaves the other lines as they were', async () => {
+      const u = await unit();
+      const [e1] = await h.colleagues(u, 1);
+      const other = await unit();
+      const [outsider] = await h.colleagues(other, 1);
+      const rows = await h.requestRows();
+      await withApproverIn(u, async (approver) => {
+        const body = h.groupBody(paid, [e1, approver, outsider]);
+
+        const checked = h.dataOf<CheckWire>(await h.checkGroup(body, u.head.account).expect(200));
+        const refused = await h.submitGroup(body, u.head.account).expect(422);
+
+        expect(checked.lines.map((line) => [line.employeeId, line.ok, line.reason])).toEqual([
+          [e1.employeeId, true, null],
+          [approver.employeeId, false, 'SPENDING_APPROVER'],
+          [outsider.employeeId, false, 'OUTSIDE_DEPARTMENT'],
+        ]);
+        expect(refused.body as Refused).toMatchObject({
+          error: {
+            code: 'GROUP_REQUEST.LINES_REFUSED',
+            details: {
+              lines: [
+                { employeeId: approver.employeeId, reason: 'SPENDING_APPROVER' },
+                { employeeId: outsider.employeeId, reason: 'OUTSIDE_DEPARTMENT' },
+              ],
+            },
+          },
+        });
+      });
+      expect(await h.requestRows()).toBe(rows);
+    });
+
+    it('refuses the group the spending approver sends, in the check and in the sending, with the answer of every other route', async () => {
+      const [e1] = await h.colleagues(await unit(), 1);
+      const rows = await h.requestRows();
+      const body = h.groupBody(paid, [e1]);
+
+      for (const refused of [await h.checkGroup(body, h.boss.account), await h.submitGroup(body, h.boss.account)]) {
+        expect(refused.status).toBe(422);
+        expect(h.codeOf(refused)).toBe('REQUEST_PARTY.INELIGIBLE');
+        expect(h.detailsOf(refused)).toEqual({
+          reason: 'SPENDING_APPROVER',
+          party: 'REQUESTER',
+          employeeIds: [h.boss.employeeId],
+        });
+      }
+      expect(await h.requestRows()).toBe(rows);
+    });
+  });
+
   describe('the plan of a group is read from the plan, whatever it is called (AC-14)', () => {
     it('takes a plan of the kind of grant that gives each person an account, renamed or not', async () => {
       const u = await unit();

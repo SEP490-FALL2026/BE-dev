@@ -11,6 +11,12 @@ export type DeciderRefusal =
   | 'OWN_REQUEST'
   /** Only the person the step is given to decides it; Finance, the head, the IT Admin, an Employee do not (`AC-8`). */
   | 'NOT_THE_ASSIGNEE'
+  /**
+   * The step is held by a person who never held the spending approver role (the substitute of a conflict of interest, under the
+   * rule before `QĐ-93`): frozen until the conversion command moves it (`QĐ-93k(2)`). A spending approver whose step was handed over by
+   * a transfer or a revocation is not in this case: they have a grant, so the step is not legacy.
+   */
+  | 'STEP_AWAITING_CONVERSION'
   | 'STEP_NOT_PENDING';
 
 export function checkSpendDecider(facts: {
@@ -19,6 +25,8 @@ export function checkSpendDecider(facts: {
   beneficiaryEmployeeIds: readonly string[];
   assigneeEmployeeId: string | null;
   stepState: string;
+  /** `isLegacyStep` of the step, read with the history of the grant of its holder. */
+  stepAwaitsConversion: boolean;
 }): DeciderRefusal | null {
   if (
     facts.actorEmployeeId === facts.requesterEmployeeId ||
@@ -29,6 +37,7 @@ export function checkSpendDecider(facts: {
   if (facts.assigneeEmployeeId === null || facts.assigneeEmployeeId !== facts.actorEmployeeId) {
     return 'NOT_THE_ASSIGNEE';
   }
+  if (facts.stepAwaitsConversion) return 'STEP_AWAITING_CONVERSION';
 
   return facts.stepState === 'PENDING' ? null : 'STEP_NOT_PENDING';
 }
@@ -81,21 +90,12 @@ export function judgeApproval(
   return same ? { kind: 'OK', overriddenYears: needed } : { kind: 'OVERRIDE_MISMATCH', years: needed };
 }
 
-/** The role the person decides in: the substitute when the approver is a party, as the roles stood when the decision was made. */
-export const spendDeciderRoleOf = (
-  holders: { conflictSubstituteEmployeeId: string | null },
-  actorEmployeeId: string,
-): 'CONFLICT_SUBSTITUTE' | 'SPENDING_APPROVER' =>
-  holders.conflictSubstituteEmployeeId === actorEmployeeId ? 'CONFLICT_SUBSTITUTE' : 'SPENDING_APPROVER';
-
 /**
- * What the decision of the spend step is written as (`US-06-01` AC-2, AC-4, AC-5): the role the person decided in (the substitute when the
- * approver is a party, as the roles stood), the state the request goes to, and the audit entry. An approval goes to be carried out, a
- * refusal ends the request.
+ * What the decision of the spend step is written as (`US-06-01` AC-2, AC-4, AC-5): the role the person decided in — always the spending
+ * approver, nobody decides in their place any more (`QĐ-93c`) — the state the request goes to, and the audit entry. An approval goes to
+ * be carried out, a refusal ends the request.
  */
 export function spendDecisionRecordOf(
-  holders: { conflictSubstituteEmployeeId: string | null },
-  actorEmployeeId: string,
   of: {
     request: { id: string };
     step: { id: string; samePersonAsSpend: boolean; noIndependentReview: boolean };
@@ -107,12 +107,12 @@ export function spendDecisionRecordOf(
     override: { reason: string; years: readonly number[] } | null;
   },
 ): {
-  deciderRole: 'CONFLICT_SUBSTITUTE' | 'SPENDING_APPROVER';
+  deciderRole: 'SPENDING_APPROVER';
   requestState: 'AWAITING_EXECUTION' | 'REJECTED';
   action: string;
   detail: { [key: string]: string | boolean | null };
 } {
-  const deciderRole = spendDeciderRoleOf(holders, actorEmployeeId);
+  const deciderRole = 'SPENDING_APPROVER';
   const approved = decided.decision === 'APPROVED';
   const requestState = approved ? 'AWAITING_EXECUTION' : 'REJECTED';
 

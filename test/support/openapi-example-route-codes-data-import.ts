@@ -32,6 +32,7 @@ export const ROUTE_ERROR_CODES_DATA_IMPORT: Readonly<
   employeeImportUpload: {
     '422': [
       'IMPORT.FILE_EMPTY',
+      'IMPORT.FILE_FORMAT_UNSUPPORTED',
       'IMPORT.FILE_MISSING_COLUMNS',
       'IMPORT.FILE_NOT_TEXT',
       'IMPORT.FILE_REQUIRED',

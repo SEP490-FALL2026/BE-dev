@@ -28,8 +28,7 @@ export interface PlacementFacts {
 
 export type PlacementSubject = 'DEPARTMENT' | 'JOB_TITLE';
 
-export type PlacementReasonCode =
-  'DEPARTMENT_REQUIRED' | 'DEPARTMENT_NOT_FOUND' | 'DEPARTMENT_INACTIVE' | 'JOB_TITLE_TOO_LONG';
+export type PlacementReasonCode = 'DEPARTMENT_NOT_FOUND' | 'DEPARTMENT_INACTIVE' | 'JOB_TITLE_TOO_LONG';
 
 export interface PlacementReason {
   subject: PlacementSubject;
@@ -45,9 +44,10 @@ export function placementReasons(facts: PlacementFacts): PlacementReason[] {
   const { department, jobTitle } = facts;
 
   if (department) {
-    if (!department.named) reasons.push({ subject: 'DEPARTMENT', code: 'DEPARTMENT_REQUIRED' });
-    else if (department.found === null) reasons.push({ subject: 'DEPARTMENT', code: 'DEPARTMENT_NOT_FOUND' });
-    else if (!department.found.active) reasons.push({ subject: 'DEPARTMENT', code: 'DEPARTMENT_INACTIVE' });
+    if (department.named && department.found === null)
+      reasons.push({ subject: 'DEPARTMENT', code: 'DEPARTMENT_NOT_FOUND' });
+    else if (department.named && department.found !== null && !department.found.active)
+      reasons.push({ subject: 'DEPARTMENT', code: 'DEPARTMENT_INACTIVE' });
   }
 
   if (jobTitle?.tooLong) reasons.push({ subject: 'JOB_TITLE', code: 'JOB_TITLE_TOO_LONG' });

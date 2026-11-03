@@ -16,7 +16,6 @@ import { buildActivatedAccount } from './builders/account.builder';
 import { createDepartment, enterEmployee } from './builders/organization.builder';
 import { StandInGrantRequestGateHook } from './grant-gate-stand-in';
 import { SeatHarness } from './seat-baseline-harness';
-import { HR_BASIS } from './hr-basis';
 
 /** What the module of requests will answer, as the test decides: the request by id, and what it may be granted for. */
 export class FakeGrantGate implements GrantRequestGate {
@@ -154,7 +153,6 @@ export class ProvisioningHarness extends SeatHarness {
     const department = await createDepartment(this.ctx, this.admin, {
       code,
       name: `Department ${code}`,
-      hrBasis: HR_BASIS,
       ...(itAdminEmployeeId ? { itAdminEmployeeId } : {}),
     });
     await this.costCenterFor(department.id);
@@ -166,7 +164,6 @@ export class ProvisioningHarness extends SeatHarness {
   async member(departmentCode: string, code: string, jobTitle: string): Promise<string> {
     return (
       await enterEmployee(this.ctx, this.admin, {
-        hrBasis: HR_BASIS,
         employeeCode: code,
         fullName: `Person ${code}`,
         workEmail: `${code.toLowerCase()}@acme.vn`,

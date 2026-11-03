@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate, businessDateAt } from '../../../core/business-date';
 import { normalizeDisplayName } from '../../../core/display-name';
 import { InvalidEmailError, normalizeEmail } from '../../../core/email';
-import type { HrBasis } from '../public/hr-basis.types';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { isDepartmentCodeValid, isEmployeeCodeValid } from '../public/organization-code.policy';
 import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../public/organization.errors';
 import { EmployeeRowInvalidError } from './employee.errors';
 import { assertMayEnterEmployees } from './employee.policy';
@@ -27,8 +27,6 @@ export interface ManualEmployeeInput {
   departmentCode?: string | null;
   /** Free text (`QĐ-87e`): its display form is stored on the person. */
   jobTitle?: string | null;
-  /** The HR document the record is entered on (`US-02-02` AC-16). */
-  hrBasis: HrBasis;
 }
 
 export interface ManualEmployeeView {
@@ -42,14 +40,15 @@ export interface ManualEmployeeView {
   /** A person just entered works. */
   workState: 'WORKING';
   /** The day the person became a member of the department: the day they were recorded, not the hire date. */
-  memberSince: BusinessDate;
-  department: { id: string; code: string; name: string };
+  memberSince: BusinessDate | null;
+  department: { id: string; code: string; name: string } | null;
+  unplaced: boolean;
   jobTitle: string | null;
 }
 
 /**
  * Entering one person by hand (`US-02-02` AC-14, `QĐ-67d`, `QĐ-82i`): the Employee and its single placement, in one
- * transaction, on the HR document the caller cites, and nothing else but the in-app notices a new record owes (AC-17): the head of
+ * transaction, with no HR document to cite (`QĐ-93f`), and nothing else but the in-app notices a new record owes (AC-17): the head of
  * the department and the IT Admin in charge are told, in the same transaction. It creates no account, role, invitation or mail; giving the
  * person a login is a separate step. Whoever enters is never the person entered (AC-18). The Super Admin alone enters people:
  * `employee.policy.ts` says so before anything is read.
@@ -71,6 +70,15 @@ export class EmployeeManualService {
    */
   async create(actor: AuthenticatedPrincipal, input: ManualEmployeeInput, now?: Date): Promise<ManualEmployeeView> {
     assertMayEnterEmployees(actor.roles);
+    input = { ...input, employeeCode: input.employeeCode.trim().toUpperCase() };
+    const departmentCode = input.departmentCode?.trim().toUpperCase() ?? '';
+    const codeReasons = [
+      ...(!isEmployeeCodeValid(input.employeeCode) ? [{ field: 'employeeCode', code: 'EMPLOYEE_CODE_INVALID' }] : []),
+      ...(departmentCode && !isDepartmentCodeValid(departmentCode)
+        ? [{ field: 'departmentCode', code: 'DEPARTMENT_CODE_INVALID' }]
+        : []),
+    ];
+    if (codeReasons.length) throw new EmployeeRowInvalidError(codeReasons);
     const organization = await this.context.findOrganization();
     if (!organization) throw new Error('An employee was entered before installation');
     try {
@@ -80,7 +88,7 @@ export class EmployeeManualService {
         // test fixed the clock.
         const memberSince = businessDateAt(now ?? (await this.employees.recordingInstant(tx)), organization.timeZone);
         // Lock order: the department, then the employee rows that get written.
-        const departmentCode = input.departmentCode?.trim() ?? '';
+        const departmentCode = input.departmentCode?.trim().toUpperCase() ?? '';
         const department = departmentCode
           ? await this.departments.lockForEntry(tx, organization.id, departmentCode)
           : null;
@@ -94,7 +102,7 @@ export class EmployeeManualService {
           own?.workEmail != null && normalizedEmail !== null && this.normalize(own.workEmail) === normalizedEmail;
 
         const reasons = validateEmployeeRow(
-          { departmentCode, jobTitle },
+          { employeeCode: input.employeeCode, departmentCode, jobTitle },
           {
             department,
             employeeCodeTaken: await this.employees.isCodeTaken(tx, organization.id, input.employeeCode),
@@ -104,7 +112,7 @@ export class EmployeeManualService {
             ownEmail,
           },
         );
-        if (reasons.length > 0 || !department) throw new EmployeeRowInvalidError(reasons);
+        if (reasons.length > 0) throw new EmployeeRowInvalidError(reasons);
 
         const { id } = await this.employees.createWithPlacement(tx, {
           organizationId: organization.id,
@@ -114,7 +122,7 @@ export class EmployeeManualService {
           employmentType: input.employmentType,
           hireDate: input.hireDate,
           memberSince,
-          departmentId: department.id,
+          departmentId: department?.id ?? null,
           jobTitle,
         });
         await this.audit.record(
@@ -125,18 +133,19 @@ export class EmployeeManualService {
             workEmail,
             employmentType: input.employmentType,
             hireDate: input.hireDate,
-            department: department.code,
+            department: department?.code ?? null,
             jobTitle,
             memberSince,
-            hrBasis: { ...input.hrBasis },
           }),
         );
-        const notices = await this.employees.profileNotices(tx, {
-          kind: 'CREATED',
-          organizationId: organization.id,
-          employeeId: id,
-          onDate: memberSince,
-        });
+        const notices = department
+          ? await this.employees.profileNotices(tx, {
+              kind: 'CREATED',
+              organizationId: organization.id,
+              employeeId: id,
+              onDate: memberSince,
+            })
+          : [];
         for (const notice of notices) await this.notifications.notifyInApp(tx, notice);
 
         return {
@@ -148,8 +157,9 @@ export class EmployeeManualService {
           hireDate: input.hireDate,
           status: 'ACTIVE' as const,
           workState: 'WORKING' as const,
-          memberSince,
-          department: { id: department.id, code: department.code, name: department.name },
+          memberSince: department ? memberSince : null,
+          department: department ? { id: department.id, code: department.code, name: department.name } : null,
+          unplaced: department === null,
           jobTitle,
         };
       });

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { DeciderRole as ReadDeciderRole } from '../access-request/access-request.types';
 import type { LineStage } from '../access-request/group-request.types';
 
 export interface NewLineDecision {
@@ -11,11 +12,13 @@ export interface NewLineDecision {
   decision: 'APPROVED' | 'REJECTED';
   reason: string | null;
   decidedByEmployeeId: string;
-  deciderRole: 'MANAGER' | 'SPENDING_APPROVER' | 'FALLBACK_APPROVER' | 'CONFLICT_SUBSTITUTE';
+  /** What a decision is written with now (`QĐ-93c`): the head or the spending approver, nobody in their place. */
+  deciderRole: 'MANAGER' | 'SPENDING_APPROVER';
   decidedAt: Date;
 }
 
-export type LineDecisionRecord = NewLineDecision;
+/** A decision as it is read: the fallback approver and the substitute for a conflict appear in the history of before `QĐ-93`. */
+export type LineDecisionRecord = Omit<NewLineDecision, 'deciderRole'> & { deciderRole: ReadDeciderRole };
 
 /** The one writer of `access_request_line_decisions` (`US-05-17` AC-4, AC-9): what was decided for a person at a stage, never changed. */
 @Injectable()

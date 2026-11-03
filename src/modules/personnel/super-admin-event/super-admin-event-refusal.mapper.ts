@@ -13,14 +13,21 @@ import { SuperAdminEventRefusedError } from '../public/super-admin-event.errors'
  * `DEPARTMENT_TRANSFER.NO_CHANGE`), so the operator reads the same word as the application would answer. A refusal that arrives as the
  * answer of a notice recorder is already that answer. Null for anything else, which is not a refusal but a failure.
  */
+/** The reason a business refusal gives, when it is a word of the enumeration: capitals and underscores, nothing a person wrote. */
+function reasonOf(details: unknown): string | undefined {
+  const reason = (details as { reason?: unknown } | null | undefined)?.reason;
+
+  return typeof reason === 'string' && /^[A-Z][A-Z_]*$/.test(reason) ? reason : undefined;
+}
+
 export function refusalOf(error: unknown): SuperAdminEventRefusedError | null {
   if (error instanceof SuperAdminEventRefusedError) return error;
   if (error instanceof PersonnelAccessRefusedError) return new SuperAdminEventRefusedError('SUBJECT_NOT_SUPER_ADMIN');
   if (error instanceof TransferRefusedError)
-    return new SuperAdminEventRefusedError(`DEPARTMENT_TRANSFER.${error.code}`);
+    return new SuperAdminEventRefusedError(`DEPARTMENT_TRANSFER.${error.code}`, reasonOf(error.details));
   if (error instanceof LeaveRefusedError) return new SuperAdminEventRefusedError(`LONG_LEAVE.${error.code}`);
   if (error instanceof OffboardingRefusedError)
-    return new SuperAdminEventRefusedError(`OFFBOARDING_CASE.${error.code}`);
+    return new SuperAdminEventRefusedError(`OFFBOARDING_CASE.${error.code}`, reasonOf(error.details));
   if (error instanceof NoticeRefusedError) return new SuperAdminEventRefusedError(`PERSONNEL_NOTICE.${error.code}`);
   // A race the database refused after the check of the correction of the record: the same words as the check.
   if (error instanceof EmployeeEmailTakenError) return new SuperAdminEventRefusedError('PROFILE.WORK_EMAIL_TAKEN');
@@ -28,9 +35,11 @@ export function refusalOf(error: unknown): SuperAdminEventRefusedError | null {
     return new SuperAdminEventRefusedError('PROFILE.OPEN_ASSIGNMENT_NEEDS_EXPECTED_END');
   }
   if (error instanceof ApiException) {
-    const code = (error.getResponse() as { code?: unknown }).code;
+    const answer = error.getResponse() as { code?: unknown; details?: unknown };
 
-    return typeof code === 'string' ? new SuperAdminEventRefusedError(code) : null;
+    return typeof answer.code === 'string'
+      ? new SuperAdminEventRefusedError(answer.code, reasonOf(answer.details))
+      : null;
   }
 
   return null;

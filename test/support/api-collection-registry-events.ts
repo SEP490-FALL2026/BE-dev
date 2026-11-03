@@ -46,12 +46,46 @@ export const boundedNested = (
   reason,
 });
 
+/** QĐ-93h removes the project capability and its profile arrays. */
+export const removedByDecision = (key: string, from: NestedClassification): RegistryEvent => ({
+  registry: 'nested',
+  key,
+  change: 'closed',
+  from,
+  finding: 'QĐ-93h',
+  item: 'qd93-remove-department-projects',
+  date: '2026-11-02',
+  reason: 'The project capability and the profile fields were retired by the Owner decision.',
+});
+
 /**
  * Every difference between INITIAL_EXCEPTION_KEYS / INITIAL_NESTED_ARRAYS and COLLECTION_EXCEPTIONS / NESTED_ARRAYS,
  * one event each (P28-07). The gate fails on a difference without an event (a silent rewrite) and on an event without
  * its difference. Prompt 10 (23/10/2026, commit 4cc9a47) closed these with the remediation items of the G0-G4 review.
  */
 export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
+  // QĐ-93a, D-S19 (Owner 01/11/2026): `GET /me` returns `roles` as one array of the granted roles; the object { direct, derived, effective } goes.
+  ...['meGet#roles.direct', 'meGet#roles.derived', 'meGet#roles.effective'].map((key): RegistryEvent => ({
+    registry: 'nested',
+    key,
+    change: 'closed',
+    from: 'bounded',
+    finding: 'LD-17',
+    item: 'qd93-direct-manager-spending-approver-roles',
+    date: '2026-11-02',
+    reason: '`roles` of `GET /me` is one array of the granted roles; no role is derived any more (QĐ-93a, D-S19).',
+  })),
+  {
+    registry: 'nested',
+    key: 'meGet#roles',
+    change: 'added',
+    to: 'bounded',
+    bound: 'role_grants_one_effective_per_role',
+    finding: 'LD-17',
+    item: 'qd93-direct-manager-spending-approver-roles',
+    date: '2026-11-02',
+    reason: 'The granted roles of the caller as one array, at most one effective grant per role (QĐ-93a, D-S19).',
+  },
   removedOperation('exceptions', 'standardToolsetList#detail-reuse', 'F04', 'standardToolsetList is removed (QĐ-87h).'),
   removedOperation(
     'exceptions',
@@ -231,14 +265,6 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     reason: 'The application summary no longer carries the domains; applicationGet#domains keeps them.',
   },
   boundedNested(
-    'projectGet#departments',
-    'departmentIds .max(100)',
-    'LD-12',
-    'organization-identity-read-contracts',
-    'The new detail route GET /projects/{id} that the item spec names returns the departments of one project.',
-    'added',
-  ),
-  boundedNested(
     'applicationRetirementGet#retirement.blockers.assignmentsByPlan',
     'RETIREMENT_LIST_LIMIT',
     'LD-06',
@@ -246,13 +272,24 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     'Added with the capped retirement blockers: the plans holding the most seats, since the seats themselves are cut.',
     'added',
   ),
-  boundedNested(
-    'departmentGet#projects',
-    'PROFILE_PROJECT_LIMIT',
-    'LD-12',
-    'organization-identity-read-contracts',
-    'The profile embeds the first projects with projectTotal; the rest are read from the paginated project list.',
-  ),
+  // QĐ-93c: the configuration of the substitute and the fallback approver is retired; approvalRoleList goes with it.
+  ...[
+    { registry: 'exceptions' as const, key: 'approvalRoleList#bounded' },
+    { registry: 'nested' as const, key: 'approvalRoleList#history', from: 'bounded' as const },
+  ].map(({ registry, key, from }): RegistryEvent => ({
+    registry,
+    key,
+    change: 'closed',
+    ...(from === undefined ? {} : { from }),
+    finding: 'QĐ-93c',
+    item: 'qd93-remove-fallback-substitute-approvers',
+    date: '2026-11-03',
+    reason:
+      'approvalRoleList is removed: the substitute and the fallback approver are gone, the spending approver is a role grant.',
+  })),
+  removedByDecision('departmentGet#projects', 'unbounded'),
+  removedByDecision('departmentGet#projects.departments', 'bounded'),
+  removedByDecision('projectList#departments', 'bounded'),
   boundedNested(
     'applicationGet#similarApplications',
     'SIMILAR_APPLICATION_LIMIT',
@@ -306,4 +343,17 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     'The review of a transfer lists the open Requests of the person beside the tools (F29), at most UNFINISHED_REQUESTS_MAX.',
     'added',
   ),
+  {
+    registry: 'nested',
+    key: 'operatingParameterList#constraints.options',
+    change: 'added',
+    to: 'bounded',
+    bound: 'ENUM_OPTIONS_MAX',
+    finding: 'LD-17',
+    item: 'qd93-parameter-labels-dashboard-queues',
+    date: '2026-11-02',
+    reason:
+      'The constraints of an operating parameter are typed (int, enum, int-list); the enum shape lists its options, at most ENUM_OPTIONS_MAX (QĐ-93, API-DOC-F07).',
+    ownerDecision: 'Owner 01/11/2026',
+  },
 ];

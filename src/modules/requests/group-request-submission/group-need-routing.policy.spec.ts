@@ -12,7 +12,6 @@ const facts = (patch: Partial<RoutingFacts> = {}): RoutingFacts => ({
   requesterEmployeeId: 'sender',
   departmentHeadEmployeeId: 'head',
   spendingApproverEmployeeId: 'approver',
-  fallbackApproverEmployeeId: 'fallback',
   chainHasSpendStep: true,
   ...patch,
 });
@@ -57,13 +56,17 @@ describe('the steps the people of a group go to (US-05-03 AC-8, AC-14, US-05-17 
       ]);
     });
 
-    it('gives the line of the head to the fallback approver when the head is the spending approver', () => {
+    it('lets the line of a head who is also the spending approver wait, and gives it to nobody (QĐ-93b: data from before)', () => {
       const [, own] = plan(
         { sender: 'head', head: 'head', lines: ['e1', 'head'] },
         { spendingApproverEmployeeId: 'head' },
       );
 
-      expect([own.step.assigneeEmployeeId, own.step.routingRow]).toEqual(['fallback', 3]);
+      expect([own.step.state, own.step.assigneeEmployeeId, own.step.waitingReason]).toEqual([
+        'WAITING',
+        null,
+        'NO_SPENDING_APPROVER',
+      ]);
     });
 
     it('lets the line of the head wait under control when nobody can decide it, and keeps the others confirmed', () => {
@@ -106,29 +109,35 @@ describe('the steps the people of a group go to (US-05-03 AC-8, AC-14, US-05-17 
       ]);
     });
 
-    it('gives the people to the fallback approver when the department has no head, and waits when there is none either', () => {
+    it('a group line of a department without head waits', () => {
       const noHead = { departmentHeadEmployeeId: null };
 
+      // Nobody takes the step in place of the head (`QĐ-93c`): the people wait together under control, on row 4.
       expect(shape(plan({ sender: 'e1', head: null, lines: ['e1', 'e2'] }, noHead))).toEqual([
-        { lines: ['e1', 'e2'], state: 'PENDING', assignee: 'fallback', row: 4, reason: null, confirmed: false },
-      ]);
-      expect(
-        shape(plan({ sender: 'e1', head: null, lines: ['e1'] }, { ...noHead, fallbackApproverEmployeeId: null })),
-      ).toEqual([
-        { lines: ['e1'], state: 'WAITING', assignee: null, row: 8, reason: 'NO_FALLBACK_APPROVER', confirmed: false },
-      ]);
-    });
-
-    it('never gives the people to a fallback approver who is one of them: the step waits', () => {
-      const planned = plan({ sender: 'e1', head: null, lines: ['e1', 'fallback'] }, { departmentHeadEmployeeId: null });
-
-      expect(shape(planned)).toEqual([
         {
-          lines: ['e1', 'fallback'],
+          lines: ['e1', 'e2'],
           state: 'WAITING',
           assignee: null,
-          row: 8,
-          reason: 'FALLBACK_IS_REQUESTER',
+          row: 4,
+          reason: 'NO_DEPARTMENT_HEAD',
+          confirmed: false,
+        },
+      ]);
+      // Not even a person who holds the spending approver role, or who is named among the people, is given it.
+      expect(
+        shape(
+          plan(
+            { sender: 'e1', head: null, lines: ['e1', 'approver'] },
+            { ...noHead, spendingApproverEmployeeId: 'approver' },
+          ),
+        ),
+      ).toEqual([
+        {
+          lines: ['e1', 'approver'],
+          state: 'WAITING',
+          assignee: null,
+          row: 4,
+          reason: 'NO_DEPARTMENT_HEAD',
           confirmed: false,
         },
       ]);

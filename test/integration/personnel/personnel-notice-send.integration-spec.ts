@@ -376,13 +376,15 @@ describe('the notices of the department heads (integration, real PostgreSQL)', (
   it('reads a page in a fixed number of statements whatever its size (collection)', async () => {
     const page = (account: Person['account']) => counter.run(() => h.listNotices('?pageSize=100', account));
     const small = await page(h.sa);
+    // A head is a MANAGER heading a department today: that one check is a statement of its own, whatever the page size (QĐ-93a).
+    const headSmall = await page(h1.account);
     for (let n = 0; n < 6; n += 1) await h.sentNotice(departure(await h.worker(des, code())), h1.account);
     const large = await page(h.sa);
     const headPage = await page(h1.account);
 
     expect(large.result.status).toBe(200);
     expect(dataStatements(large.statements).length).toBe(dataStatements(small.statements).length);
-    expect(dataStatements(headPage.statements).length).toBe(dataStatements(small.statements).length);
+    expect(dataStatements(headPage.statements).length).toBe(dataStatements(headSmall.statements).length);
     expect(dataStatements(large.statements).join('\n')).not.toMatch(/reject_reason|\bnote\b/);
     const items = h.dataOf<{ items: NoticeWire[] }>(large.result).items;
     expect(items.length).toBeGreaterThanOrEqual(7);

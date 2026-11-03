@@ -11,11 +11,9 @@ export interface AuthenticatedPrincipal {
   appUserId: string;
   sessionId: string;
   employeeId: string;
-  /** Roles granted directly and still in force. */
+  /** Roles granted directly and still in force: the array `/me` returns (US-01-01 AC-17). No role is derived from data (QĐ-93a). */
   directRoles: readonly string[];
-  /** Roles inferred from data (department head, spending approver). */
-  derivedRoles: readonly string[];
-  /** Direct plus derived: what authorization checks. */
+  /** What authorization checks: `directRoles`, but without MANAGER when the person heads no department today (US-01-02 AC-3). */
   roles: readonly string[];
 }
 

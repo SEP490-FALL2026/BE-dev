@@ -73,6 +73,7 @@ const example = (error: Error) => errorExampleOf(toImportApiException(error));
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
 export const IMPORT_ERROR_EXAMPLES = {
   FILE_REQUIRED: example(new ImportFileInvalidError('FILE_REQUIRED')),
+  FILE_FORMAT_UNSUPPORTED: example(new ImportFileInvalidError('FILE_FORMAT_UNSUPPORTED')),
   FILE_EMPTY: example(new ImportFileInvalidError('FILE_EMPTY')),
   FILE_NOT_TEXT: example(new ImportFileInvalidError('FILE_NOT_TEXT')),
   FILE_TOO_MANY_ROWS: example(new ImportFileInvalidError('FILE_TOO_MANY_ROWS', { maxRows: 1000 })),
@@ -94,6 +95,7 @@ export const IMPORT_ERROR_EXAMPLES = {
   ALREADY_CONFIRMED: example(
     new ImportAlreadyConfirmedError({
       created: 1,
+      newUnplaced: 0,
       existingSame: 0,
       existingDifferent: 0,
       errors: 0,

@@ -87,13 +87,6 @@ export function yearOf(ctx: DemoRunContext): { year: number; lastDay: string } {
   return { year, lastDay: `${year}-12-31` };
 }
 
-/** The basis of every Super Admin write: the fixture's, dated no later than today. */
-export function basis(ctx: DemoRunContext): { type: string; reference: string; issuer: string; issuedOn: string } {
-  const issuedOn = ctx.fixture.basis.issuedOn <= ctx.today ? ctx.fixture.basis.issuedOn : ctx.today;
-
-  return { ...ctx.fixture.basis, issuedOn };
-}
-
 /** The outcome of a step over several items: the first conflict wins, then written, then planned, else present. */
 export function summarize(results: readonly { status: StepOutcome['status']; label: string }[]): StepOutcome {
   const named = (status: StepOutcome['status']) =>

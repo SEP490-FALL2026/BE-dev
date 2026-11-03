@@ -28,10 +28,12 @@ export function bearer(principal: AuthenticatedPrincipal): string {
   return `Bearer ${PREFIX}${Buffer.from(JSON.stringify(principal)).toString('base64url')}`;
 }
 
-/** A principal with the given direct and derived roles; ids default to fixed values. */
+/**
+ * A principal that holds `roles`, which the guards check as they are (a MANAGER here is a head today, as the verifier makes one);
+ * ids default to fixed values.
+ */
 export function principal(
-  directRoles: readonly string[],
-  derivedRoles: readonly string[] = [],
+  roles: readonly string[],
   ids: Partial<Pick<AuthenticatedPrincipal, 'subject' | 'appUserId' | 'sessionId' | 'employeeId'>> = {},
 ): AuthenticatedPrincipal {
   return {
@@ -40,9 +42,8 @@ export function principal(
     sessionId: 's1',
     employeeId: 'e1',
     ...ids,
-    directRoles,
-    derivedRoles,
-    roles: [...directRoles, ...derivedRoles],
+    directRoles: roles,
+    roles,
   };
 }
 

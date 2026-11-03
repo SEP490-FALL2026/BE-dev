@@ -16,8 +16,9 @@ export function checkAsk(facts: {
   stepState: string;
   hasOpenQuestion: boolean;
 }): AskRefusal | null {
-  const holder = checkSpendDecider(facts);
-  if (holder) return holder;
+  // Asking Finance is not one of the four decisions the freeze refuses: a frozen step does not stop the question.
+  const holder = checkSpendDecider({ ...facts, stepAwaitsConversion: false });
+  if (holder !== null && holder !== 'STEP_AWAITING_CONVERSION') return holder;
 
   return facts.hasOpenQuestion ? 'ALREADY_OPEN' : null;
 }

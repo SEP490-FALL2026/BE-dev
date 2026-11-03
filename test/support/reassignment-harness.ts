@@ -9,7 +9,7 @@ import {
   type SweepResult,
 } from '../../src/modules/requests/public/step-redetermination-sweep.api';
 import type { ApiAccount } from './api-accounts';
-import { HR_BASIS } from './hr-basis';
+import { spendingApproverEmployeeId } from './builders/account.builder';
 import { SpendHarness } from './spend-harness';
 
 /** A step as the database keeps it, with the moments the deadline and the wait are measured from. */
@@ -103,7 +103,7 @@ export class ReassignmentHarness extends SpendHarness {
     request(this.server())
       .post(`/api/v1/departments/${departmentId}/head-vacancies`)
       .set({ Authorization: `Bearer ${this.admin}` })
-      .send({ effectiveFrom: this.today(), hrBasis: HR_BASIS });
+      .send({ effectiveFrom: this.today() });
 
   /** A sweep of the worker that has not run the pass of the day yet, which is what the first sweep of a worker does. */
   freshSweep(): StepRedeterminationSweepApi {
@@ -141,6 +141,7 @@ export class ReassignmentHarness extends SpendHarness {
 
   /** Who holds the approval role now, by employee id; null when nobody does. */
   async getApprovalRoleHolder(role: string): Promise<string | null> {
+    if (role === 'SPENDING_APPROVER') return spendingApproverEmployeeId(this.ctx);
     const { rows } = await this.ctx.sql.query<{ employee_id: string }>(
       `SELECT employee_id FROM approval_role_holders WHERE role = $1::"ApprovalRole" AND held_until IS NULL`,
       [role],

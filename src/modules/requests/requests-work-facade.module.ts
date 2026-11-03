@@ -13,6 +13,8 @@ import { ControlledWaitQueryService } from './reassignment/controlled-wait-query
 import { ControlledWaitRepo } from './reassignment/controlled-wait.repo';
 import { RequestsApprovalRoleListener } from './reassignment/approval-role.listener';
 import { RequestsOrganizationChangeListener } from './reassignment/organization-change.listener';
+import { RequestsSpendingApproverGrantCheck } from './reassignment/spending-approver-grant.listener';
+import { SpendingApproverWorkRepo } from './reassignment/spending-approver-work.repo';
 import { StepReassignmentRepo } from './step-routing/step-reassignment.repo';
 import { StepReassignmentService } from './reassignment/step-reassignment.service';
 import { StepTargetService } from './step-routing/step-target.service';
@@ -68,6 +70,8 @@ import { StepSlaService } from './sla/step-sla.service';
     StepReassignmentService,
     RequestsOrganizationChangeListener,
     RequestsApprovalRoleListener,
+    SpendingApproverWorkRepo,
+    RequestsSpendingApproverGrantCheck,
     StepRedeterminationSweepApi,
     RequestStatusRepo,
     StatusCursorRepo,

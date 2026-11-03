@@ -1,5 +1,7 @@
 # Spec: xác định lại người được giao khi dữ liệu tổ chức đổi và chờ có kiểm soát
 
+> The waiting reasons and hints of the two removed roles (`NO_FALLBACK_APPROVER`, `NO_CONFLICT_SUBSTITUTE`, `CONFIGURE_*`) are superseded by [QĐ-93c](../qd93-remove-fallback-substitute-approvers/spec.md).
+
 - Phụ trách: AI theo giao việc của người dùng (23/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc của người dùng (23/10/2026) — khung từ bản đồ phân rã G5.
 - Thiết kế: `ready`. Owner review: chưa review.

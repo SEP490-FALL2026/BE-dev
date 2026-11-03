@@ -58,7 +58,7 @@ describe('GET /api/v1/audit-events (e2e)', () => {
       ['a department head and the spending approver, whose roles are derived', [], ['MANAGER', 'SPENDING_APPROVER']],
       ['an IT administrator who is also a department head', ['IT_ADMIN'], ['MANAGER']],
     ])('answers %s with 403 and reads nothing', async (_name, direct, derived) => {
-      const response = await get('', principal(direct, derived)).expect(403);
+      const response = await get('', principal([...direct, ...derived])).expect(403);
 
       expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
       expect(findPage).not.toHaveBeenCalled();

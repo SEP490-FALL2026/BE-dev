@@ -74,7 +74,7 @@ describe('service account handover routes (e2e, no database)', () => {
   ])('refuses %s on every route only the IT Admin may call with 403 (AC-9)', async (_name, direct, derived) => {
     for (const [route, call] of IT_ADMIN_ONLY) {
       const response = await call(app.getHttpServer())
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
       expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
     }

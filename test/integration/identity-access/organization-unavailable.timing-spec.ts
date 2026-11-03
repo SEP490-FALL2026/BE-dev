@@ -3,7 +3,6 @@ import { bodyOf } from '../../support/api-body';
 import { adminToken } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
 import { PgRelay } from '../../support/pg-relay';
-import { HR_BASIS } from '../../support/hr-basis';
 
 const QUERY_TIMEOUT_MS = 2000;
 const SLACK_MS = 1500;
@@ -77,7 +76,6 @@ describe('manual entry when the database stops answering mid-transaction (integr
       .post('/api/v1/employees')
       .set({ Authorization: `Bearer ${superAdmin}` })
       .send({
-        hrBasis: HR_BASIS,
         employeeCode: 'E-STALL',
         fullName: 'Stalled Person',
         workEmail: 'stalled@acme.vn',
@@ -102,7 +100,6 @@ describe('manual entry when the database stops answering mid-transaction (integr
       .post('/api/v1/employees')
       .set({ Authorization: `Bearer ${superAdmin}` })
       .send({
-        hrBasis: HR_BASIS,
         employeeCode: 'E-AFTER',
         fullName: 'After The Stall',
         workEmail: 'after@acme.vn',

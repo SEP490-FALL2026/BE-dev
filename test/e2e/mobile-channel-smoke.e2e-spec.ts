@@ -66,10 +66,10 @@ describe('mobile channel: sign in, list, act, inbox, sign out (e2e)', () => {
   it('signs the employee in, and /me gives the roles the web would give', async () => {
     employeeSession = await signIn(employee);
 
-    const me = h.dataOf<{ roles: { effective: string[] }; selfServiceOnly: boolean }>(
+    const me = h.dataOf<{ roles: string[]; selfServiceOnly: boolean }>(
       await get('/api/v1/me', employeeSession).expect(200),
     );
-    expect(me).toMatchObject({ roles: { effective: ['EMPLOYEE'] }, selfServiceOnly: false });
+    expect(me).toMatchObject({ roles: ['EMPLOYEE'], selfServiceOnly: false });
   });
 
   it('lists the software and the drafts of the employee (none yet), finds the plan in the catalog, previews the request and sends it: it is the one the web would make', async () => {

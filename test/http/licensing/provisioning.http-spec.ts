@@ -54,7 +54,7 @@ describe('provisioning queue routes (e2e, no database)', () => {
     ['an account with no role', [], []],
   ])('refuses %s every route of the queue with 403 (SoD-5)', async (_name, direct, derived) => {
     const server = app.getHttpServer();
-    const as = (req: request.Test) => req.set('Authorization', bearer(principal(direct, derived)));
+    const as = (req: request.Test) => req.set('Authorization', bearer(principal([...direct, ...derived])));
 
     for (const response of [
       await as(request(server).get(BASE)),

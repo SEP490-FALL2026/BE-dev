@@ -20,6 +20,8 @@ enum AppRole {
   IT_ADMIN
   FINANCE
   EMPLOYEE
+  MANAGER
+  SPENDING_APPROVER
 }
 
 enum SessionRevokedReason {
@@ -68,7 +70,8 @@ model PasswordCredential {
   @@map("password_credentials")
 }
 
-// Direct role grants with history. MANAGER and the spending approver are derived, never stored here.
+// Direct role grants with history, all six roles (QĐ-93a). MANAGER only counts while the holder heads a department today;
+// SPENDING_APPROVER is held by at most one person (role_grants_one_spending_approver).
 model RoleGrant {
   id             String    @id @default(uuid()) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid

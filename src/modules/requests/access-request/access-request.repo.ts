@@ -49,7 +49,6 @@ export class AccessRequestRepo {
       costCenterId: input.costCenterId,
       businessReason: input.businessReason,
       termMonths: input.termMonths,
-      projectLabel: input.projectLabel,
       delegatedBatchId: input.delegatedBatchId ?? null,
       expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
       ...pricingColumns(input.pricing),

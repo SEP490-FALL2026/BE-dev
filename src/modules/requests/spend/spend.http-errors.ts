@@ -55,7 +55,11 @@ export function toSpendApiException(error: unknown): unknown {
     const status = forbidden ? HttpStatus.FORBIDDEN : invalid ? HttpStatus.UNPROCESSABLE_ENTITY : HttpStatus.CONFLICT;
 
     return new ApiException(status, {
-      code: `SPEND.${error.reason}`,
+      // One code for the frozen step on every route that decides one, the need step's and the spend step's (`QĐ-93k(2)`).
+      code:
+        error.reason === 'STEP_AWAITING_CONVERSION'
+          ? 'ACCESS_REQUEST.STEP_AWAITING_CONVERSION'
+          : `SPEND.${error.reason}`,
       message: error.message,
       ...(error.years.length > 0 ? { details: { years: [...error.years] } } : {}),
     });
@@ -119,6 +123,7 @@ export const SPEND_ERROR_EXAMPLES = {
   NOT_IN_QUEUE: example(new SpendNotInQueueError('<request-id>')),
   BATCH_NOT_FOUND: example(new SpendBatchNotFoundError()),
   NOT_THE_ASSIGNEE: example(new SpendDecisionRefusedError('NOT_THE_ASSIGNEE')),
+  STEP_AWAITING_CONVERSION: example(new SpendDecisionRefusedError('STEP_AWAITING_CONVERSION')),
   OWN_REQUEST: example(new SpendDecisionRefusedError('OWN_REQUEST')),
   NO_SPEND_STEP: example(new SpendDecisionRefusedError('NO_SPEND_STEP')),
   NOT_CHECKABLE: example(new SpendDecisionRefusedError('NOT_CHECKABLE')),

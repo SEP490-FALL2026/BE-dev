@@ -124,7 +124,7 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
     outsider = await h.staff(elsewhere, 'MKT-E1');
     const boss = await h.staff(executive, 'EXE-C1');
     await h.makeHead(design, head);
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     approver = boss;
 
@@ -298,8 +298,12 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
         const response = await call(path, lonely).expect(409);
         expect({ path, code: h.codeOf(response) }).toEqual({ path, code: 'REQUESTABLE_SOFTWARE.NO_DEPARTMENT' });
       }
-      const preview = await h.previewRequest({ planId: saas.planId, termMonths: 6 }, lonely.account).expect(409);
-      expect(h.codeOf(preview)).toBe('ACCESS_REQUEST.NO_DEPARTMENT');
+      // D-S21: the preview refuses them as a party of the request (422), not as a conflict of the department.
+      const preview = await h.previewRequest({ planId: saas.planId, termMonths: 6 }, lonely.account).expect(422);
+      expect((preview.body as { error: { code: string; details: { reason: string } } }).error).toMatchObject({
+        code: 'REQUEST_PARTY.INELIGIBLE',
+        details: { reason: 'UNPLACED' },
+      });
     });
   });
 

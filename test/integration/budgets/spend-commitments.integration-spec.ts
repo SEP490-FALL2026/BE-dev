@@ -357,7 +357,7 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
           .expect(201),
       ).version;
       await h.sendVersion(revision.id).expect(200);
-      await h.decideVersion(revision.id, { decision: 'APPROVE' }, await h.deciderOf(u)).expect(200);
+      await h.decideVersion(revision.id, { decision: 'APPROVE' }, h.deciderOf()).expect(200);
 
       const years = h.dataOf<{ items: Array<{ budget: { amount: string } }> }>(
         await h.checkYears(id, h.finance).expect(200),

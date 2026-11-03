@@ -74,6 +74,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // The audited exchange-rate use case the finance HTTP module serves; the raw ledger is not exported.
   'FinanceModule: ExchangeRateService',
   'IdentityAccessFacadeModule: IdentityAccessApi',
+  // D-S21 (qd93-remove-fallback-substitute-approvers): who can never ask for or be given access through a Request, one facade for every route that makes one.
+  'IdentityAccessFacadeModule: RequestPartyEligibilityApi',
   // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the handover
   // duties of a departure, the open grant tasks of a person, the service account duties, and (G4, ADR-0013) the seat baseline the import reads and writes through.
   'LicensingModule: LicensingApi',
@@ -100,6 +102,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // G5 (FR-3.16): where the approval roles and the role of Finance announce that they changed hands, so the account
   // services of the API emit into the one extension point the facade holds and requests listens to.
   'IdentityAccessFacadeModule: ApprovalRoleChangeListeners',
+  // QĐ-93d(3): where the grant of SPENDING_APPROVER asks the modules above it for the open work of a person; requests, budgets and
+  // licensing add a check each from a `*.listener.ts`, so the one point the facade holds is injected by them.
+  'IdentityAccessFacadeModule: SpendingApproverGrantChecks',
   'IdentityAccessFacadeModule: RoleGrantService',
   // H6.1: the read-only account contract of `ops:inspect`, declared only in the inspection graph.
   'IdentityAccessInspectionFacadeModule: IdentityAccessInspectionApi',
@@ -229,13 +234,11 @@ function businessModuleNames(): ReadonlySet<string> {
 const DECLARED_FOR_API_AND_RECOVERY = [
   'ActionLinkRevocation',
   'ApprovalRoleFactsService',
-  'ApprovalRoleRepo',
+  'Symbol(APPROVAL_ROLE_HOLDINGS)',
   'RecoveryRepo',
   'SessionRecordService',
   'SessionRepo',
-  'SuccessorEligibility',
   'Symbol(ACCOUNT_SESSIONS)',
-  'Symbol(APPROVAL_ROLE_HOLDINGS)',
 ];
 
 /** GATE.2: the one file that declares the session port shared by accounts and recovery (implemented by auth). */

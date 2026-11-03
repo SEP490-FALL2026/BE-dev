@@ -136,6 +136,16 @@ describe('the approvers on the phone: need step, spend step and the request a he
     const held = await h.ctx.sql.query(`SELECT 1 FROM budget_commitments WHERE request_id = $1`, [paid]);
     expect(held.rowCount).toBe(1);
     expect((await inboxAbout(employee.account, paid)).map((item) => item.code)).toContain('REQUEST_SPEND_APPROVED');
+    // The decider role of each step is the role that decided it: the head for the need, the spending approver alone for the spend; no substitute is ever recorded (QĐ-93c).
+    const roles = await h.ctx.sql.query<{ kind: string; decider_role: string }>(
+      `SELECT s.kind::text, r.decider_role::text FROM approval_records r JOIN access_request_steps s ON s.id = r.step_id
+        WHERE r.request_id = $1 ORDER BY r.decided_at`,
+      [paid],
+    );
+    expect(roles.rows).toEqual([
+      { kind: 'NEED', decider_role: 'MANAGER' },
+      { kind: 'SPEND_APPROVAL', decider_role: 'SPENDING_APPROVER' },
+    ]);
   });
 
   it('the head sends a request for themselves; the approver decides its need, then its spend, in two decisions', async () => {

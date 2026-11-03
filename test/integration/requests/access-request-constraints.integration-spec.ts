@@ -68,11 +68,13 @@ describe('requests (integration, PostgreSQL constraints)', () => {
         ? '::"AccessRequestState"'
         : column === 'policy' || column === 'payment_schedule'
           ? '::jsonb'
-          : column === 'pricing_status'
-            ? '::"AccessRequestPricingStatus"'
-            : column === 'billing_cycle'
-              ? '::"BillingCycle"'
-              : '';
+          : column === 'cancel_cause'
+            ? '::"AccessRequestCancelCause"'
+            : column === 'pricing_status'
+              ? '::"AccessRequestPricingStatus"'
+              : column === 'billing_cycle'
+                ? '::"BillingCycle"'
+                : '';
 
   const insertStep = (requestId: string, over: Record<string, unknown> = {}) => {
     const row = {
@@ -416,6 +418,93 @@ describe('requests (integration, PostgreSQL constraints)', () => {
       expect(await insertBeneficiary(id, person.employeeId, 0)).toBe(CHECK);
       expect(await insertBeneficiary(id, person.employeeId, 1)).toBeNull();
       expect(await insertBeneficiary(id, other.employeeId, 1)).toBe(UNIQUE);
+    });
+  });
+
+  describe('a cancellation that no employee made (QĐ-93k(1): the conversion command closes, OD-6)', () => {
+    const cancelled = (cause: string, closer: string | null) => ({
+      state: 'CANCELLED',
+      cancelled_at: new Date(),
+      cancelled_by_employee_id: closer,
+      cancel_cause: cause,
+    });
+
+    /** A request for a group with one line awaiting its need, committed; the line is then ended by the statement under test. */
+    const groupLine = async (): Promise<{ requestId: string }> => {
+      const requestId = randomUUID();
+      const stepId = randomUUID();
+      // The check that every person of a group has a line is deferred to the end of the transaction.
+      await h.ctx.sql.query('BEGIN');
+      await h.ctx.sql.query(
+        `INSERT INTO access_requests
+           (id, organization_id, type, branch, state, plan_id, requester_employee_id, department_id, cost_center_id,
+            business_reason, term_months, policy, created_by_app_user_id, pricing_status, price_missing_reason,
+            expected_spend_on, budget_year)
+         VALUES ($1, $2, 'GROUP_GRANT', 'PAID_IN_CATALOG', 'PENDING', $3, $4, $5, $6, 'Design', 6,
+                 '{"version":1}'::jsonb, $7, 'MISSING', 'NO_PRICED_SUBSCRIPTION', '2026-10-24', 2026)`,
+        [requestId, h.seed.organizationId, planId, person.employeeId, department.id, department.unitId, randomUUID()],
+      );
+      await h.ctx.sql.query(
+        `INSERT INTO access_request_steps (id, request_id, kind, sequence, state, assignee_employee_id, routing_row, sla_working_days, assigned_at)
+         VALUES ($1, $2, 'NEED', 1, 'PENDING', $3, 9, 2, now())`,
+        [stepId, requestId, person.employeeId],
+      );
+      await h.ctx.sql.query(
+        `INSERT INTO access_request_beneficiaries (request_id, employee_id, position) VALUES ($1, $2, 1)`,
+        [requestId, person.employeeId],
+      );
+      await h.ctx.sql.query(
+        `INSERT INTO access_request_lines (request_id, employee_id, state, need_step_id)
+         VALUES ($1, $2, 'AWAITING_NEED', $3)`,
+        [requestId, person.employeeId, stepId],
+      );
+      await h.ctx.sql.query('COMMIT');
+
+      return { requestId };
+    };
+    const cancelLine = (requestId: string, cause: string, closer: string | null) =>
+      sqlState(
+        `UPDATE access_request_lines
+            SET state = 'CANCELLED', ended_at = now(), ended_by_employee_id = $2, cancel_cause = $3::"AccessRequestCancelCause"
+          WHERE request_id = $1`,
+        [requestId, closer, cause],
+      );
+
+    it('allows a cancellation with no employee only for SPENDING_APPROVER_PARTY, on requests and lines', async () => {
+      // A request: the new cause with nobody who closed it is taken; no other cause and no other state is.
+      expect((await insertRequest(cancelled('SPENDING_APPROVER_PARTY', null))).state).toBeNull();
+      expect((await insertRequest(cancelled('SPENDING_APPROVER_PARTY', person.employeeId))).state).toBeNull();
+      expect((await insertRequest(cancelled('BENEFICIARY_LEFT', null))).state).toBe(CHECK);
+      expect((await insertRequest(cancelled('BENEFICIARY_TRANSFERRED', null))).state).toBe(CHECK);
+      expect((await insertRequest(cancelled('BENEFICIARY_LEFT', person.employeeId))).state).toBeNull();
+      // A request that is not cancelled still carries none of the cancellation columns, whatever the cause.
+      expect(
+        (
+          await insertRequest({
+            cancel_cause: 'SPENDING_APPROVER_PARTY',
+            cancelled_at: null,
+            cancelled_by_employee_id: null,
+          })
+        ).state,
+      ).toBe(CHECK);
+      // A cancelled request still says when and why.
+      expect((await insertRequest({ ...cancelled('SPENDING_APPROVER_PARTY', null), cancelled_at: null })).state).toBe(
+        CHECK,
+      );
+
+      // A line of a group: the same rule.
+      const closeWithNobody = await groupLine();
+      expect(await cancelLine(closeWithNobody.requestId, 'SPENDING_APPROVER_PARTY', null)).toBeNull();
+      const otherCause = await groupLine();
+      expect(await cancelLine(otherCause.requestId, 'BENEFICIARY_LEFT', null)).toBe(CHECK);
+      expect(await cancelLine(otherCause.requestId, 'BENEFICIARY_LEFT', person.employeeId)).toBeNull();
+      const otherState = await groupLine();
+      expect(
+        await sqlState(
+          `UPDATE access_request_lines SET state = 'WITHDRAWN', ended_at = now(), ended_by_employee_id = NULL WHERE request_id = $1`,
+          [otherState.requestId],
+        ),
+      ).toBe(CHECK);
     });
   });
 

@@ -72,9 +72,10 @@ export class DelegatedRequestsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is invalid (VALIDATION_ERROR), a person is outside the department (DELEGATED_REQUEST.OUTSIDE_DEPARTMENT), has no work email (DELEGATED_REQUEST.EMAIL_REQUIRED), is a contractor, freelancer or intern without the day the access ends (DELEGATED_REQUEST.END_DATE_REQUIRED, DELEGATED_REQUEST.END_DATE_TOO_EARLY), a long term is not confirmed (DELEGATED_REQUEST.TERM_CONFIRMATION_REQUIRED).',
+        'The form is invalid (VALIDATION_ERROR), a person is outside the department (DELEGATED_REQUEST.OUTSIDE_DEPARTMENT), has no work email (DELEGATED_REQUEST.EMAIL_REQUIRED), is a contractor, freelancer or intern without the day the access ends (DELEGATED_REQUEST.END_DATE_REQUIRED, DELEGATED_REQUEST.END_DATE_TOO_EARLY), a long term is not confirmed (DELEGATED_REQUEST.TERM_CONFIRMATION_REQUIRED), or the head or one of the people is the spending approver (REQUEST_PARTY.INELIGIBLE: nothing is sent for anybody).',
       examples: [
         VALIDATION_EXAMPLE,
+        EXAMPLES.REQUEST_PARTY_INELIGIBLE,
         EXAMPLES.OUTSIDE_DEPARTMENT,
         EXAMPLES.EMAIL_REQUIRED,
         EXAMPLES.END_DATE_REQUIRED,

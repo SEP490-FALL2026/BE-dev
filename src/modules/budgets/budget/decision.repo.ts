@@ -17,8 +17,8 @@ export interface DecisionRecord {
 export interface NewDecision extends DecisionRecord {
   organizationId: string;
   versionId: string;
-  /** Who decided: the approver, or the substitute when the approver was a party (`US-06-08` AC-11). */
-  deciderRole: 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE';
+  /** Who decided: the spending approver, and nobody in their place (`QĐ-93d`(1)); the substitute is only read from the history. */
+  deciderRole: 'SPENDING_APPROVER';
 }
 
 /** The one writer of `budget_version_decisions`: the record of a decision, which is written once and never changed. */

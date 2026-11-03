@@ -22,7 +22,7 @@ export interface InstallationResult {
  * data in one transaction: the organization, ONE first department with no Cost Center, head or IT Admin in charge, the
  * Super Admin's employee in that department (no job title) and the activated Super Admin account. It creates no Cost Center
  * (Finance creates one for a department that exists, `QĐ-87d`(1)), no job title and no IT employee. Every Audit Trail event
- * it writes carries `installationException: true`: the one set of records written without an HR basis (`QĐ-87b`(1)). A
+ * it writes carries `installationException: true`: the one set of records written outside HTTP, by the installation command (`QĐ-87b`(1)). A
  * second run finds the organization and changes nothing. It never edits an existing account: recovery is a separate,
  * approved procedure (FR-8.10(d)).
  */

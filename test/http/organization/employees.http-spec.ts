@@ -3,9 +3,16 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
-import { HR_BASIS } from '../../support/hr-basis';
 
 const SUPER_ADMIN = principal(['SUPER_ADMIN']);
+
+/** What a form sent before `QĐ-93f`: no employee write takes an HR basis any more, so a body that still carries one is refused. */
+const HR_BASIS_BODY = {
+  type: 'LABOR_CONTRACT',
+  reference: 'HD-2026-001',
+  issuer: 'HR Department',
+  issuedOn: '2026-10-01',
+};
 
 const VALID = {
   employeeCode: 'E-100',
@@ -15,7 +22,6 @@ const VALID = {
   hireDate: '2026-10-01',
   departmentCode: 'P-OPS',
   jobTitle: 'Administrator',
-  hrBasis: HR_BASIS,
 };
 
 let app: INestApplication<App>;
@@ -48,15 +54,19 @@ describe('POST /api/v1/employees (e2e, no database)', () => {
     ['an account with no role', [], []],
     ['a department head, whose role is derived', [], ['MANAGER']],
   ])('refuses %s with 403', async (_name, direct, derived) => {
-    const response = await post(VALID, principal(direct, derived)).expect(403);
+    const response = await post(VALID, principal([...direct, ...derived])).expect(403);
 
     expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
   });
 
   describe('validation', () => {
+    it('reports an invalid employee code as a row reason', async () => {
+      const response = await post({ ...VALID, employeeCode: '  ' }).expect(422);
+      expect(bodyOf(response).error.code).toBe('EMPLOYEE.ROW_INVALID');
+    });
+
     it.each([
       ['no employee code', { ...VALID, employeeCode: undefined }],
-      ['an empty employee code', { ...VALID, employeeCode: '  ' }],
       ['no full name', { ...VALID, fullName: undefined }],
       ['no employment type', { ...VALID, employmentType: undefined }],
       ['an employment type that is not one', { ...VALID, employmentType: 'BOSS' }],
@@ -66,12 +76,7 @@ describe('POST /api/v1/employees (e2e, no database)', () => {
       ['a work email that is not an email', { ...VALID, workEmail: 'not an email' }],
       ['a work email whose name is only a tag, which cannot be normalized', { ...VALID, workEmail: '+x@acme.vn' }],
       ['an unknown field', { ...VALID, roles: ['SUPER_ADMIN'] }],
-      ['no HR basis', { ...VALID, hrBasis: undefined }],
-      ['an HR basis without a type', { ...VALID, hrBasis: { ...HR_BASIS, type: undefined } }],
-      ['an HR basis without a reference', { ...VALID, hrBasis: { ...HR_BASIS, reference: '' } }],
-      ['an HR basis without an issuer', { ...VALID, hrBasis: { ...HR_BASIS, issuer: undefined } }],
-      ['an HR basis whose date is not a date', { ...VALID, hrBasis: { ...HR_BASIS, issuedOn: '2026-13-01' } }],
-      ['an HR basis with a field it does not have', { ...VALID, hrBasis: { ...HR_BASIS, file: 'x' } }],
+      ['an HR basis, which no employee write takes since QĐ-93f', { ...VALID, hrBasis: HR_BASIS_BODY }],
       ['a cost center sent by the client', { ...VALID, costCenterId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11' }],
       ['a catalogue entry for the title, which is free text now (QĐ-87e)', { ...VALID, jobTitleId: 'X' }],
       ['a job title that is not text', { ...VALID, jobTitle: 42 }],
@@ -86,7 +91,7 @@ describe('POST /api/v1/employees (e2e, no database)', () => {
 
 describe('PATCH /api/v1/employees/{id} (e2e, no database)', () => {
   const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
-  const CHANGE = { fullName: 'Nguyễn Văn A', hrBasis: HR_BASIS };
+  const CHANGE = { fullName: 'Nguyễn Văn A' };
 
   const patch = (path: string, body: unknown, caller = SUPER_ADMIN) =>
     request(app.getHttpServer())
@@ -107,14 +112,13 @@ describe('PATCH /api/v1/employees/{id} (e2e, no database)', () => {
     ['an account with no role', [], []],
     ['a department head, whose role is derived', [], ['MANAGER']],
   ])('refuses %s with 403', async (_name, direct, derived) => {
-    const response = await patch(`/api/v1/employees/${ID}`, CHANGE, principal(direct, derived)).expect(403);
+    const response = await patch(`/api/v1/employees/${ID}`, CHANGE, principal([...direct, ...derived])).expect(403);
 
     expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
   });
 
   it.each([
-    ['no HR basis', { fullName: 'A' }],
-    ['an HR basis without an issuer', { fullName: 'A', hrBasis: { ...HR_BASIS, issuer: undefined } }],
+    ['an HR basis, which no employee write takes since QĐ-93f', { ...CHANGE, hrBasis: HR_BASIS_BODY }],
     ['a field that is not an official one', { ...CHANGE, departmentCode: 'P-OPS' }],
     ['a status', { ...CHANGE, status: 'TERMINATED' }],
     ['a hire date that is not a date', { ...CHANGE, hireDate: '2026-02-30' }],

@@ -30,7 +30,6 @@ export interface NewDraft {
   departmentId: string;
   businessReason: string;
   termMonths: number;
-  projectLabel: string | null;
   /** The content the draft is sent from (`policy.draft`). */
   content: DraftPolicy['draft'];
   createdByAppUserId: string;
@@ -87,7 +86,6 @@ export class RequestDraftRepo {
         costCenterId: null,
         businessReason: input.businessReason,
         termMonths: input.termMonths,
-        projectLabel: input.projectLabel,
         policy: draftPolicyJson.encode({ draft: input.content }),
         createdByAppUserId: input.createdByAppUserId,
         submittedAt: null,

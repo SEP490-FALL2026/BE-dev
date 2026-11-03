@@ -77,7 +77,7 @@ describe('personnel notice routes (e2e, no database)', () => {
       for (const [route, who, call] of ROUTES) {
         if (!refusedOn.includes(who)) continue;
         const response = await call(app.getHttpServer())
-          .set('Authorization', bearer(principal(direct, derived)))
+          .set('Authorization', bearer(principal([...direct, ...derived])))
           .expect(403);
         expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
       }
@@ -85,7 +85,7 @@ describe('personnel notice routes (e2e, no database)', () => {
   });
 
   describe('validation before any work', () => {
-    const asHead = () => ({ Authorization: bearer(principal([], ['MANAGER'])) });
+    const asHead = () => ({ Authorization: bearer(principal(['MANAGER'])) });
     const asSuperAdmin = () => ({ Authorization: bearer(principal(['SUPER_ADMIN'])) });
 
     it.each([

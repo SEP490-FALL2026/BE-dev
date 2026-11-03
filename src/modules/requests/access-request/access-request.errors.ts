@@ -55,6 +55,8 @@ export class AccessRequestDecisionRefusedError extends Error {
     readonly reason:
       | 'OWN_REQUEST'
       | 'NOT_THE_ASSIGNEE'
+      /** The step is of the rule before `QĐ-93`: frozen until the conversion command moves it (`QĐ-93k(2)`). Removed with the rule. */
+      | 'STEP_AWAITING_CONVERSION'
       | 'STEP_NOT_PENDING'
       | 'TERM_CONFIRMATION_REQUIRED'
       /** A head approving a request that costs money chooses a line of the plan or "outside the plan" (`US-05-04` AC-12). */

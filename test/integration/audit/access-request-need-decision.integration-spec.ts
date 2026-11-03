@@ -11,8 +11,8 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
   let head: Person; // head of design
   let designer: Person;
   let otherHead: Person; // head of engineering
-  let boss: Person; // head of executive and the spending approver
-  let fallback: Person; // the fallback approver, a member of the department with no head
+  let boss: Person; // the spending approver, a member of executive (QĐ-93b)
+  let waiter: Person; // a member of the department with no head: what they ask for waits for a head
   let internalPlan: string;
   let paidPlan: string;
 
@@ -26,12 +26,11 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
     designer = await h.staff(design, 'DES-E1');
     otherHead = await h.staff(engineering, 'ENG-H2');
     boss = await h.staff(executive, 'EXE-C1');
-    fallback = await h.staff(headless, 'HR-R0');
+    waiter = await h.staff(headless, 'HR-E1');
     await h.makeHead(design, head);
     await h.makeHead(engineering, otherHead);
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
-    await h.setRole('FALLBACK_APPROVER', fallback);
     internalPlan = await h.plan('K5');
     paidPlan = await h.plan('K2');
   }, 240000);
@@ -158,25 +157,12 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
       });
     });
 
-    it('lets the fallback approver decide when the spending approver is the head who asked, in that role', async () => {
-      const sent = await h.sent(boss, internalPlan);
-
-      const after = await decided(sent.id, approve, fallback.account);
-
-      expect(after.needDecision).toMatchObject({
-        decidedBy: { employeeId: fallback.employeeId },
-        deciderRole: 'FALLBACK_APPROVER',
-      });
-    });
-
-    it('leaves a request that waits for somebody undecided', async () => {
-      const sent = await h.sent(fallback, internalPlan);
+    it('leaves a request that waits for a head undecided, for the person who asked and for everybody else (QĐ-93c)', async () => {
+      const sent = await h.sent(waiter, internalPlan);
 
       expect(sent.state).toBe('WAITING_CONTROLLED');
       expect(h.codeOf(await h.decide(sent.id, approve, h.it1).expect(403))).toBe('ACCESS_REQUEST.NOT_THE_ASSIGNEE');
-      expect(h.codeOf(await h.decide(sent.id, approve, fallback.account).expect(403))).toBe(
-        'ACCESS_REQUEST.OWN_REQUEST',
-      );
+      expect(h.codeOf(await h.decide(sent.id, approve, waiter.account).expect(403))).toBe('ACCESS_REQUEST.OWN_REQUEST');
     });
 
     it('decides a step once: the second decision finds it decided and writes no second record', async () => {

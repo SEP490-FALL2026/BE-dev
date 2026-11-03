@@ -12,8 +12,7 @@ describe('requests over HTTP: sending and routing the need step (integration, re
   let headless: Department;
   let head: Person; // head of design
   let designer: Person; // member of design
-  let boss: Person; // head of executive and the spending approver
-  let fallback: Person; // the fallback approver, a member of the department that has no head
+  let boss: Person; // the spending approver, a member of executive (QĐ-93b)
   let clerk: Person; // member of the department that has no head
   let internalPlan: string;
   let paidPlan: string;
@@ -27,12 +26,10 @@ describe('requests over HTTP: sending and routing the need step (integration, re
     head = await h.staff(design, 'DES-H1');
     designer = await h.staff(design, 'DES-E1');
     boss = await h.staff(executive, 'EXE-C1');
-    fallback = await h.staff(headless, 'HR-R0');
     clerk = await h.staff(headless, 'HR-E4');
     await h.makeHead(design, head);
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
-    await h.setRole('FALLBACK_APPROVER', fallback);
     internalPlan = await h.plan('K5');
     paidPlan = await h.plan('K2');
   }, 240000);
@@ -48,7 +45,7 @@ describe('requests over HTTP: sending and routing the need step (integration, re
 
   describe('the routing table of US-05-03', () => {
     it('row 1: gives the need step to the head of the department of the sender, charged to its Unit (AC-1, AC-7)', async () => {
-      const sent = await h.sent(designer, internalPlan, { projectLabel: 'Rebrand' });
+      const sent = await h.sent(designer, internalPlan);
 
       expect(sent).toMatchObject({
         state: 'PENDING',
@@ -57,7 +54,6 @@ describe('requests over HTTP: sending and routing the need step (integration, re
         costCenter: { id: design.unitId },
         requester: { employeeId: designer.employeeId },
         beneficiary: { employeeId: designer.employeeId },
-        projectLabel: 'Rebrand',
         needStep: { state: 'PENDING', routingRow: 1, assignee: { employeeId: head.employeeId }, waitingReason: null },
       });
     });
@@ -93,32 +89,29 @@ describe('requests over HTTP: sending and routing the need step (integration, re
       expect(sent.needStep.assignee?.employeeId).not.toBe(head.employeeId);
     });
 
-    it('row 3: a head who is the spending approver sends: the fallback approver holds the step (AC-3)', async () => {
-      const sent = await h.sent(boss, paidPlan);
-
-      expect(sent.needStep).toMatchObject({ routingRow: 3, assignee: { employeeId: fallback.employeeId } });
-    });
-
-    it('row 4: a department that has no head gives the step to the fallback approver (AC-4)', async () => {
+    it('row 4: a department that has no head gives the step to nobody: the request waits for a head (AC-4)', async () => {
       const sent = await h.sent(clerk, internalPlan);
-
-      expect(sent.needStep).toMatchObject({ routingRow: 4, assignee: { employeeId: fallback.employeeId } });
-    });
-
-    it('row 8: the fallback approver who sends from a department with no head is not given their own step; the request waits (AC-5)', async () => {
-      const sent = await h.sent(fallback, internalPlan);
 
       expect(sent.state).toBe('WAITING_CONTROLLED');
       expect(sent.needStep).toMatchObject({
         state: 'WAITING',
-        routingRow: 8,
+        routingRow: 4,
         assignee: null,
         assignedAt: null,
-        waitingReason: 'FALLBACK_IS_REQUESTER',
+        waitingReason: 'NO_DEPARTMENT_HEAD',
       });
     });
 
-    it('row 2 with no spending approver: the request waits and is not handed to the fallback approver (AC-13, QĐ-66k)', async () => {
+    it('row 4 again: whoever sends from a department with no head waits for a head, and nobody takes the step in its place (AC-5)', async () => {
+      const second = await h.staff(headless, 'HR-E5');
+
+      const sent = await h.sent(second, internalPlan);
+
+      expect(sent.needStep).toMatchObject({ state: 'WAITING', routingRow: 4, assignee: null });
+      expect(sent.needStep.waitingReason).toBe('NO_DEPARTMENT_HEAD');
+    });
+
+    it('row 2 with no spending approver: the request waits and is handed to nobody else (AC-13, QĐ-66k)', async () => {
       await h.clearRole('SPENDING_APPROVER');
       try {
         const sent = await h.sent(head, paidPlan);
@@ -130,7 +123,7 @@ describe('requests over HTTP: sending and routing the need step (integration, re
       }
     });
 
-    it('treats a head who has left the company as no head, so the fallback approver holds the step', async () => {
+    it('treats a head who has left the company as no head, so the step waits for a head', async () => {
       const leaving = await h.departmentWithUnit('P-LEAVE');
       const leaver = await h.staff(leaving, 'LV-H3');
       const colleague = await h.staff(leaving, 'LV-E5');
@@ -139,7 +132,8 @@ describe('requests over HTTP: sending and routing the need step (integration, re
 
       const sent = await h.sent(colleague, internalPlan);
 
-      expect(sent.needStep).toMatchObject({ routingRow: 4, assignee: { employeeId: fallback.employeeId } });
+      expect(sent.needStep).toMatchObject({ state: 'WAITING', routingRow: 4, assignee: null });
+      expect(sent.needStep.waitingReason).toBe('NO_DEPARTMENT_HEAD');
     });
 
     it('never gives the step to someone who only administers, and one person holds it (AC-10, AC-11)', async () => {
@@ -149,9 +143,9 @@ describe('requests over HTTP: sending and routing the need step (integration, re
           await h.submit(h.form(internalPlan), account).expect(201),
         );
         expect(wire.request.needStep.assignee?.employeeId).not.toBe(account.employeeId);
-        expect([head.employeeId, boss.employeeId, fallback.employeeId]).toContain(
-          wire.request.needStep.assignee?.employeeId ?? '',
-        );
+        // The need step goes to the head or the spending approver, or waits for one: never to a role that only administers.
+        const assignee = wire.request.needStep.assignee?.employeeId ?? null;
+        if (assignee !== null) expect([head.employeeId, boss.employeeId]).toContain(assignee);
       }
     });
   });
@@ -166,10 +160,9 @@ describe('requests over HTTP: sending and routing the need step (integration, re
     });
 
     it('flags the same person holding the need step and the spend step only when there is a spend step (AC-9)', async () => {
-      const member = await h.staff(executive, 'EXE-E6');
-
-      const paid = await h.sent(member, paidPlan);
-      const internal = await h.sent(member, internalPlan);
+      // A head's request goes to the spending approver for the need (row 2), who also holds the spend step.
+      const paid = await h.sent(head, paidPlan);
+      const internal = await h.sent(head, internalPlan);
 
       expect(paid.needStep).toMatchObject({ assignee: { employeeId: boss.employeeId }, samePersonAsSpend: true });
       expect(internal.needStep).toMatchObject({ assignee: { employeeId: boss.employeeId }, samePersonAsSpend: false });
@@ -296,9 +289,12 @@ describe('requests over HTTP: sending and routing the need step (integration, re
       const lonely = await h.staff(headless, 'HR-E7');
       await h.ctx.sql.query(`DELETE FROM employee_placements WHERE employee_id = $1`, [lonely.employeeId]);
 
-      expect(h.codeOf(await h.submit(h.form(internalPlan), lonely.account).expect(409))).toBe(
-        'ACCESS_REQUEST.NO_DEPARTMENT',
-      );
+      // D-S21: a person with no department is refused as a party of the request (422), not as a conflict of the department.
+      const refused = await h.submit(h.form(internalPlan), lonely.account).expect(422);
+      expect((refused.body as { error: { code: string; details: { reason: string } } }).error).toMatchObject({
+        code: 'REQUEST_PARTY.INELIGIBLE',
+        details: { reason: 'UNPLACED' },
+      });
     });
   });
 
@@ -326,15 +322,15 @@ describe('requests over HTTP: sending and routing the need step (integration, re
     });
 
     it('records a waiting step with the reason and nobody assigned', async () => {
-      const sent = await h.sent(fallback, internalPlan);
+      const sent = await h.sent(clerk, internalPlan);
 
       const [routed] = await h.auditEvents('ACCESS_REQUEST_STEP', sent.needStep.id);
 
       expect(routed.after).toMatchObject({
         outcome: 'WAITING',
-        routingRow: 8,
+        routingRow: 4,
         assigneeEmployeeId: null,
-        waitingReason: 'FALLBACK_IS_REQUESTER',
+        waitingReason: 'NO_DEPARTMENT_HEAD',
       });
     });
   });

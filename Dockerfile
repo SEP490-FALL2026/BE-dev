@@ -33,7 +33,7 @@ WORKDIR /app
 # brings a previous image back only when its label declares every representation the database holds rows of
 # (`ops:preflight --recovery-target`). Equal to DATA_REPRESENTATIONS of
 # src/modules/installation/public/recovery-target.policy.ts (recovery-target.policy.spec.ts). Only this stage's labels reach the image.
-LABEL io.github.baophipham.slm.data-reads="access-request-null-cost-center"
+LABEL io.github.baophipham.slm.data-reads="access-request-null-cost-center access-request-cancel-spending-approver-party access-request-step-qd93-waiting-reason"
 ENV NODE_ENV=production
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*

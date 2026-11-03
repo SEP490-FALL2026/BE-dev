@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import {
   AccessRequestApplicationRetiredError,
@@ -110,6 +111,9 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
+  REQUEST_PARTY_INELIGIBLE: example(
+    new RequestPartyIneligibleError({ reason: 'SPENDING_APPROVER', party: 'REQUESTER', employeeIds: [PERSON] }),
+  ),
   SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
   NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),
   PLAN_NOT_ELIGIBLE: example(new GroupRequestPlanNotEligibleError('KIND_NOT_MULTI_SEAT')),
@@ -126,6 +130,8 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   NEED_OWN_REQUEST: example(new AccessRequestDecisionRefusedError('OWN_REQUEST')),
   NEED_NOT_THE_ASSIGNEE: example(new AccessRequestDecisionRefusedError('NOT_THE_ASSIGNEE')),
   NEED_STEP_NOT_PENDING: example(new AccessRequestDecisionRefusedError('STEP_NOT_PENDING')),
+  STEP_AWAITING_CONVERSION: example(new AccessRequestDecisionRefusedError('STEP_AWAITING_CONVERSION')),
+  SPEND_STEP_AWAITING_CONVERSION: example(new SpendDecisionRefusedError('STEP_AWAITING_CONVERSION')),
   NEED_TERM_CONFIRMATION_REQUIRED: example(new AccessRequestDecisionRefusedError('TERM_CONFIRMATION_REQUIRED')),
   PLAN_LINE_REQUIRED: example(new AccessRequestDecisionRefusedError('PLAN_LINE_REQUIRED')),
   SPEND_NOT_APPLICABLE: example(new AccessRequestDecisionRefusedError('SPEND_NOT_APPLICABLE')),

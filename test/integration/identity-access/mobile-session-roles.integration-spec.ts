@@ -28,7 +28,8 @@ const adminPost = (path: string, body?: object) =>
 interface MeData {
   appUserId: string;
   selfServiceOnly: boolean;
-  roles: { direct: string[]; derived: string[]; effective: string[] };
+  roles: string[];
+  managerScope: { departmentId: string; departmentCode: string; departmentName: string } | null;
 }
 const meOf = async (token: string, label: Label = MOBILE): Promise<MeData> =>
   h.dataOf<MeData>(await me(token, label).expect(200));
@@ -81,7 +82,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
         expect((signedIn.body as { message: string }).message).toBe('AUTH.LOGGED_IN');
 
         const roles = (await meOf(data.accessToken, label)).roles;
-        expect(roles).toEqual({ direct: ['EMPLOYEE'], derived: [], effective: ['EMPLOYEE'] });
+        expect(roles).toEqual(['EMPLOYEE']);
 
         const refreshed = await request(h.server())
           .post('/api/v1/auth/refresh')
@@ -269,7 +270,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       // The locked session stays ended: the unlock does not bring the old token back.
       await me(token).expect(401);
       const again = h.dataOf<{ accessToken: string }>(await login(employee.account.email, passwordOf()).expect(200));
-      expect((await meOf(again.accessToken)).roles.effective).toEqual(['EMPLOYEE']);
+      expect((await meOf(again.accessToken)).roles).toEqual(['EMPLOYEE']);
     });
 
     it('refuses the next operation of an employee who has left, without waiting for the token to expire', async () => {
@@ -290,13 +291,17 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       const member = await person(['EMPLOYEE']);
       const sent = await h.sent(member, await h.plan('K5'));
       const token = head.account.accessToken;
-      expect((await meOf(token)).roles).toEqual({ direct: [], derived: ['MANAGER'], effective: ['MANAGER'] });
+      // The head holds MANAGER as a grant (the fixture gives it before naming the head) and heads this department today.
+      expect(await meOf(token)).toMatchObject({
+        roles: ['MANAGER'],
+        managerScope: { departmentId: department.id },
+      });
       await get('/api/v1/spend-queue', token).expect(200);
 
       await h.vacateHead(department.id).expect(200);
 
-      expect((await meOf(token)).roles).toEqual({ direct: [], derived: [], effective: [] });
-      expect((await meOf(token)).selfServiceOnly).toBe(true);
+      // The grant stays and the scope goes: MANAGER without a department authorizes nothing as a MANAGER (US-01-02 AC-3).
+      expect(await meOf(token)).toMatchObject({ roles: ['MANAGER'], managerScope: null, selfServiceOnly: false });
       await get('/api/v1/spend-queue', token).expect(403);
       // The step is no longer the ex-head's: the request is answered as one the caller has no part in, and nothing moved.
       const decided = await h.decide(sent.id, { decision: 'APPROVE' }, head.account).expect(404);
@@ -310,15 +315,15 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       const it2 = await person(['IT_ADMIN']);
       const token = it2.account.accessToken;
       await get('/api/v1/provisioning-tasks', token).expect(200);
-      expect((await meOf(token)).roles.effective).toEqual(['IT_ADMIN']);
+      expect((await meOf(token)).roles).toEqual(['IT_ADMIN']);
 
       await h.grantRoleTo(it2.account.appUserId, 'EMPLOYEE').expect(201);
-      expect((await meOf(token)).roles.effective).toEqual(['EMPLOYEE', 'IT_ADMIN']);
+      expect((await meOf(token)).roles).toEqual(['EMPLOYEE', 'IT_ADMIN']);
 
       await h.revokeRoleFrom(it2.account.appUserId, 'IT_ADMIN').expect(200);
       await get('/api/v1/provisioning-tasks', token).expect(403);
       const afterwards = await meOf(token);
-      expect(afterwards.roles.effective).toEqual(['EMPLOYEE']);
+      expect(afterwards.roles).toEqual(['EMPLOYEE']);
       expect(afterwards.selfServiceOnly).toBe(false);
 
       await h.revokeRoleFrom(it2.account.appUserId, 'EMPLOYEE').expect(200);
@@ -337,17 +342,13 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       const itWithEmployee = await accountMadeThroughTheApi(['IT_ADMIN', 'EMPLOYEE']);
       const noRole = await accountMadeThroughTheApi([]);
 
-      expect((await meOf(superAdmin.accessToken)).roles).toEqual({
-        direct: ['SUPER_ADMIN'],
-        derived: [],
-        effective: ['SUPER_ADMIN'],
-      });
-      expect((await meOf(h.finance.accessToken)).roles.effective).toEqual(['FINANCE']);
-      expect((await meOf(itOnly.accessToken)).roles.effective).toEqual(['IT_ADMIN']);
+      expect((await meOf(superAdmin.accessToken)).roles).toEqual(['SUPER_ADMIN']);
+      expect((await meOf(h.finance.accessToken)).roles).toEqual(['FINANCE']);
+      expect((await meOf(itOnly.accessToken)).roles).toEqual(['IT_ADMIN']);
       // Roles add up and are not inherited: the IT Admin who also holds EMPLOYEE has exactly those two.
-      expect((await meOf(itWithEmployee.accessToken)).roles.effective).toEqual(['EMPLOYEE', 'IT_ADMIN']);
+      expect((await meOf(itWithEmployee.accessToken)).roles).toEqual(['EMPLOYEE', 'IT_ADMIN']);
       const none = await meOf(noRole.accessToken);
-      expect(none.roles).toEqual({ direct: [], derived: [], effective: [] });
+      expect(none.roles).toEqual([]);
       expect(none.selfServiceOnly).toBe(true);
     });
 
@@ -418,18 +419,14 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
   });
 
   describe('the roles that unlock the approver tasks follow the data as well (US-16-04 AC-6; US-01-03 AC-2)', () => {
-    it('shows the spending approver the derived role while they hold it and drops it at the next call when the holding ends', async () => {
+    it('shows the spending approver the granted role while they hold it and drops it at the next call when the grant ends', async () => {
       const token = h.boss.account.accessToken;
-      // The approver heads their own department here, so the two derived roles show together and none is a grant.
-      expect((await meOf(token)).roles).toEqual({
-        direct: [],
-        derived: ['MANAGER', 'SPENDING_APPROVER'],
-        effective: ['MANAGER', 'SPENDING_APPROVER'],
-      });
+      // The approver heads no department (QĐ-93b) and holds the role as a grant (QĐ-93a); nothing derives it.
+      expect(await meOf(token)).toMatchObject({ roles: ['SPENDING_APPROVER'], managerScope: null });
 
       await h.clearRole('SPENDING_APPROVER');
 
-      expect((await meOf(token)).roles).toEqual({ direct: [], derived: ['MANAGER'], effective: ['MANAGER'] });
+      expect((await meOf(token)).roles).toEqual([]);
     });
   });
 

@@ -74,7 +74,6 @@ describe('InstallationInspectionApi', () => {
           superAdmin: { holders: 1, status: 'ACTIVE', activationState: 'ACTIVATED', loginEmail: 'bao@acme.vn' },
           accountsByState: { ACTIVE_ACTIVATED: 1, ACTIVE_INVITED: 0, LOCKED_ACTIVATED: 0, LOCKED_INVITED: 0 },
           directRoles: { SUPER_ADMIN: 1, IT_ADMIN: 1, FINANCE: 0, EMPLOYEE: 0 },
-          approvalRoles: { SPENDING_APPROVER: 0, CONFLICT_SUBSTITUTE: 0, FALLBACK_APPROVER: 0 },
         });
       }),
       usableItAdminEmployeeIds: jest.fn((ids: readonly string[], client?: DbTx) => {

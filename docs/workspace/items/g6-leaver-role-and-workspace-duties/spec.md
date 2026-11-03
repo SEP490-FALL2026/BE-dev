@@ -1,5 +1,7 @@
 # Spec: người giữ vai và owner workspace rời đi: cảnh báo không chặn, giám sát Super Admin
 
+> The duty flags `SUBSTITUTE_APPROVER` and `FALLBACK_APPROVER` are superseded by [QĐ-93c](../qd93-remove-fallback-substitute-approvers/spec.md): only `SPENDING_APPROVER` is raised now; the old flags stay readable on old records.
+
 - Phụ trách: AI theo giao việc của người dùng (24/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc của người dùng (24/10/2026).
 - Thiết kế: `ready`. Owner review: chưa review.

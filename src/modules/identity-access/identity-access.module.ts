@@ -10,22 +10,18 @@ import { OrganizationModule } from '../organization/organization.module';
 import { AccountInvitationService } from './accounts/app-users/account-invitation.service';
 import { AccountQueryService } from './accounts/app-users/account-query.service';
 import { AccountStatusService } from './accounts/app-users/account-status.service';
-import { APPROVAL_ROLE_HOLDINGS } from './accounts/account.types';
+import { SpendingApproverBlockersService } from './accounts/app-users/spending-approver-blockers.service';
+import { SpendingApproverGrantService } from './accounts/app-users/spending-approver-grant.service';
 import { ACCOUNT_SESSIONS } from './accounts/account-sessions.types';
+import { APPROVAL_ROLE_HOLDINGS } from './accounts/account.types';
 import { ActionLinkRevocation } from './accounts/action-link-revocation.service';
 import { AppUsersController } from './accounts/app-users/app-users.controller';
 import { InvitationMailService } from './accounts/app-users/invitation-mail.service';
 import { InvitationRedemptionService } from './accounts/invitation-redemption.service';
-import { SuccessorEligibility } from './accounts/successor-eligibility.service';
 import { JwtAccessTokenVerifier } from './access/jwt-access-token-verifier.service';
 import { MeController } from './access/me.controller';
 import { MeService } from './access/me.service';
 import { ApprovalRoleFactsService } from './approval-roles/approval-role-facts.service';
-import { ApprovalRoleRepo } from './approval-roles/approval-role.repo';
-import { ApprovalRolesController } from './approval-roles/approval-roles.controller';
-import { ApprovalRoleService } from './approval-roles/approval-role.service';
-import { SuperAdminTransferService } from './accounts/super-admin-transfers/super-admin-transfer.service';
-import { SuperAdminTransfersController } from './accounts/super-admin-transfers/super-admin-transfers.controller';
 import { AuthController } from './auth/auth.controller';
 import { CredentialChangeService } from './auth/credential-change.service';
 import { LoginService } from './auth/login.service';
@@ -70,26 +66,17 @@ import { RecoveryRepo } from './recovery/recovery.repo';
       }),
     }),
   ],
-  controllers: [
-    AuthController,
-    MeController,
-    AppUsersController,
-    ApprovalRolesController,
-    SuperAdminTransfersController,
-  ],
+  controllers: [AuthController, MeController, AppUsersController],
   providers: [
-    ApprovalRoleRepo,
     ApprovalRoleFactsService,
-    { provide: APPROVAL_ROLE_HOLDINGS, useExisting: ApprovalRoleFactsService },
-    ApprovalRoleService,
-    SuccessorEligibility,
-    SuperAdminTransferService,
     AccountQueryService,
     ActionLinkRevocation,
     InvitationMailService,
     AccountInvitationService,
     InvitationRedemptionService,
     AccountStatusService,
+    SpendingApproverBlockersService,
+    SpendingApproverGrantService,
     CredentialChangeService,
     LoginService,
     LoginThrottle,
@@ -104,6 +91,7 @@ import { RecoveryRepo } from './recovery/recovery.repo';
     SessionTokenService,
     SessionRecordService,
     { provide: ACCOUNT_SESSIONS, useExisting: SessionRecordService },
+    { provide: APPROVAL_ROLE_HOLDINGS, useExisting: ApprovalRoleFactsService },
     SessionRepo,
     MeService,
     TokenService,

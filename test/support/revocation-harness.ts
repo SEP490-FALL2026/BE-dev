@@ -58,7 +58,6 @@ export class RevocationHarness extends ProvisioningHarness {
       sessionId: randomUUID(),
       employeeId: account.employeeId,
       directRoles: roles,
-      derivedRoles: [],
       roles,
     };
   }

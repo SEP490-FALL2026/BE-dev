@@ -2,7 +2,6 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import {
-  PROJECT_LABEL_MAX_LENGTH,
   REASON_MAX_LENGTH,
   TERM_MONTHS_MAX,
   employeeRef,
@@ -38,7 +37,6 @@ export const proposalBodySchema = z.strictObject({
   dataDescription: text(REASON_MAX_LENGTH),
   expectedUsers: z.number().int().min(1).max(1_000_000),
   termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
-  projectLabel: text(PROJECT_LABEL_MAX_LENGTH).optional(),
   expectedSpendOn: businessDate.optional(),
 });
 

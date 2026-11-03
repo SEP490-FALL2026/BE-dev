@@ -28,7 +28,7 @@ describe('a write path of G5 runs as the runtime role: a budget proposal sent, b
   it('writes the proposal, the version, the decision and the notices without any right beyond data', async () => {
     const executive = await h.departmentWithUnit('P-RR-EXE');
     const boss = await h.staff(executive, 'RR-BOSS');
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     const unit = await h.departmentWithHead('P-RR-D1');
     const proposal = await h.budgetProposed(unit.head, unit.department.unitId);

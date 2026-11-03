@@ -22,7 +22,6 @@ const WRITE_ONLY_WORDING = new RegExp(
   [
     'changes department data',
     'HR basis',
-    'PROJECT\\.INVALID',
     'COST_CENTER\\.(?:KIND|NAME|DEPARTMENT)',
     'maintains the Cost Center',
     'among them an HR basis',
@@ -44,29 +43,17 @@ const READ_WORDING: Record<string, { '403'?: string; '422'?: string }> = {
     '403': 'Only Finance reads the people in a cost center (the IT Admin and the Super Admin do not).',
     '422': 'The id or the query is invalid (VALIDATION_ERROR).',
   },
-  projectList: {
-    '403': 'Only the Super Admin lists and reads the projects described on department profiles; the IT Admin does not.',
-    '422': 'The query is invalid (VALIDATION_ERROR).',
-  },
-  projectGet: {
-    '403': 'Only the Super Admin lists and reads the projects described on department profiles; the IT Admin does not.',
-    '422': 'The id is not a UUID (VALIDATION_ERROR).',
-  },
   budgetVersionList: {
-    '403':
-      'Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.',
+    '403': 'Only Finance and the spending approver read the versions of a budget.',
   },
   budgetVersionGet: {
-    '403':
-      'Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.',
+    '403': 'Only Finance and the spending approver read the versions of a budget.',
   },
   budgetVersionLineList: {
-    '403':
-      'Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.',
+    '403': 'Only Finance and the spending approver read the versions of a budget.',
   },
   budgetVersionLineChangeList: {
-    '403':
-      'Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.',
+    '403': 'Only Finance and the spending approver read the versions of a budget.',
   },
   operatingParameterList: {
     '403': 'Only the Super Admin reads the operating parameters, their history and the non-working dates.',
@@ -77,7 +64,6 @@ const READ_WORDING: Record<string, { '403'?: string; '422'?: string }> = {
   nonWorkingDateList: {
     '403': 'Only the Super Admin reads the operating parameters, their history and the non-working dates.',
   },
-  approvalRoleList: { '403': 'Only the Super Admin reads the approval roles and their holders.' },
   employeeImportGet: { '403': 'Only the Super Admin reads an employee import and its rows.' },
   employeeImportRowList: {
     '403': 'Only the Super Admin reads an employee import and its rows.',

@@ -3,6 +3,14 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
 import type { BillingCycleCode, MissingPriceReason, PaymentPeriod } from './pricing.policy';
 import type { WaitingReason } from './routing.policy';
+
+/**
+ * What a need step this release did not write can still wait for: the approver of last resort is gone (`QĐ-93c`), but a step of before
+ * keeps its reason until the conversion command rewaits it (`QĐ-93k(2)`). Read only; nothing writes these.
+ */
+export type LegacyNeedWaitingReason = 'NO_FALLBACK_APPROVER' | 'FALLBACK_IS_REQUESTER';
+/** A reason a need step is read with: the ones this release writes and the legacy ones. */
+export type ReadableNeedWaitingReason = WaitingReason | LegacyNeedWaitingReason;
 import type { LineRecord, ReadableCancelCause } from './group-request.types';
 
 /** The shapes the repository of requests reads and writes; the repository re-exports them, so importers do not change. */
@@ -91,7 +99,6 @@ export interface NewAccessRequest {
   costCenterId: string | null;
   businessReason: string;
   termMonths: number;
-  projectLabel: string | null;
   pricing: PricingRecord;
   policy: RequestPolicy;
   delegatedBatchId?: string | null;
@@ -121,7 +128,7 @@ export interface NeedStepRecord {
   state: NeedStepState;
   assigneeEmployeeId: string | null;
   routingRow: number;
-  waitingReason: WaitingReason | null;
+  waitingReason: ReadableNeedWaitingReason | null;
   samePersonAsSpend: boolean;
   slaWorkingDays: number;
   createdAt: Date;
@@ -161,10 +168,13 @@ export interface WithdrawalRecord {
   withdrawnAt: Date | null;
 }
 
-/** The closing of a request whose beneficiary left: who closed it, when, why and the note they gave (`US-03-04` AC-25). */
+/**
+ * The closing of a request whose beneficiary left: who closed it, when, why and the note they gave (`US-03-04` AC-25). Nobody
+ * (`null`) when the conversion command closed it for the spending approver (`SPENDING_APPROVER_PARTY`, OD-6).
+ */
 export interface CancellationRecord {
   cancelledAt: Date;
-  cancelledByEmployeeId: string;
+  cancelledByEmployeeId: string | null;
   cause: ReadableCancelCause;
   note: string | null;
 }
@@ -182,7 +192,6 @@ export interface AccessRequestRecord {
   costCenterId: string | null;
   businessReason: string;
   termMonths: number;
-  projectLabel: string | null;
   pricing: PricingRecord;
   /** The line of the plan of the budget it is attached to; null when it is attached to none. */
   planLine: { versionId: string; position: number; confirmed: boolean } | null;

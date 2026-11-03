@@ -5,13 +5,11 @@ import { routeNeedStep, type RoutingFacts } from '../access-request/routing.poli
 const REQUESTER = 'e1';
 const HEAD = 'h1';
 const APPROVER = 'c1';
-const FALLBACK = 'r0';
 
 const facts = (over: Partial<RoutingFacts> = {}): RoutingFacts => ({
   requesterEmployeeId: REQUESTER,
   departmentHeadEmployeeId: HEAD,
   spendingApproverEmployeeId: APPROVER,
-  fallbackApproverEmployeeId: FALLBACK,
   chainHasSpendStep: true,
   ...over,
 });
@@ -67,31 +65,31 @@ describe('the chain shown before a request is sent (US-05-01)', () => {
         APPROVER,
         'HEAD_ASKS_FOR_SELF',
       ],
-      [
-        'the head who is the approver asking for themselves: the fallback approver',
-        { requesterEmployeeId: HEAD, spendingApproverEmployeeId: HEAD },
-        FALLBACK,
-        'HEAD_IS_THE_APPROVER',
-      ],
-      [
-        'a department with no head: the fallback approver, saying so',
-        { departmentHeadEmployeeId: null },
-        FALLBACK,
-        'DEPARTMENT_HAS_NO_HEAD',
-      ],
     ])('%s', (_name, over, assignee, explanation) => {
       const [need] = chainOf(paid, over);
 
       expect(need).toMatchObject({ kind: 'NEED', assigneeEmployeeId: assignee, explanation, waitingReason: null });
     });
 
-    it('names nobody and says why when nobody valid can hold it', () => {
-      const [need] = chainOf(paid, { departmentHeadEmployeeId: null, fallbackApproverEmployeeId: null });
+    it('waits for the head, naming nobody and saying why, when the department has none (row 4)', () => {
+      const [need] = chainOf(paid, { departmentHeadEmployeeId: null });
+
+      expect(need).toMatchObject({
+        kind: 'NEED',
+        role: 'MANAGER',
+        assigneeEmployeeId: null,
+        explanation: 'WAITS_FOR_DEPARTMENT_HEAD',
+        waitingReason: 'NO_DEPARTMENT_HEAD',
+      });
+    });
+
+    it('names nobody and says why when the head asks for themselves and no spending approver can decide it', () => {
+      const [need] = chainOf(paid, { requesterEmployeeId: HEAD, spendingApproverEmployeeId: null });
 
       expect(need).toMatchObject({
         assigneeEmployeeId: null,
         explanation: 'WAITING_FOR_AN_APPROVER',
-        waitingReason: 'NO_FALLBACK_APPROVER',
+        waitingReason: 'NO_SPENDING_APPROVER',
       });
     });
   });
@@ -102,7 +100,7 @@ describe('the chain shown before a request is sent (US-05-01)', () => {
     expect(steps[1]).toMatchObject({
       kind: 'SPEND_SUBMISSION',
       assigneeEmployeeId: null,
-      explanation: 'DEPARTMENT_HAS_NO_HEAD',
+      explanation: 'WAITS_FOR_DEPARTMENT_HEAD',
     });
     expect(steps[2]).toMatchObject({
       kind: 'SPEND_APPROVAL',

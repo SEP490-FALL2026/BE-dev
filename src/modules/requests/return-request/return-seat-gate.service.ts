@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { RequestPartyEligibilityApi } from '../../identity-access/public/request-party-eligibility.api';
 import {
   AssignmentNotFoundError,
   AssignmentNotOpenError,
@@ -20,15 +21,27 @@ export class ReturnSeatGate {
   constructor(
     private readonly licensingRenewals: LicensingRenewalApi,
     private readonly licensing: LicensingApi,
+    private readonly requestParties: RequestPartyEligibilityApi,
   ) {}
 
-  async factsOf(tx: DbTx, assignmentId: string): Promise<AssignmentFacts> {
+  /**
+   * The seat, and its people judged as parties of a Request: the sender and the holder cannot be the spending approver (`D-S21`).
+   * Throws ReturnRequestRefusedError (the seat is not there) and RequestPartyIneligibleError.
+   */
+  async factsOf(tx: DbTx, senderEmployeeId: string, assignmentId: string): Promise<AssignmentFacts> {
+    let facts: AssignmentFacts;
     try {
-      return await this.licensingRenewals.getAssignmentFacts(tx, assignmentId);
+      facts = await this.licensingRenewals.getAssignmentFacts(tx, assignmentId);
     } catch (error) {
       if (error instanceof AssignmentNotFoundError) throw new ReturnRequestRefusedError('ASSIGNMENT_NOT_FOUND');
       throw error;
     }
+    await this.requestParties.assertEligible(tx, {
+      requesterEmployeeId: senderEmployeeId,
+      beneficiaryEmployeeIds: [facts.employeeId],
+    });
+
+    return facts;
   }
 
   hasPendingRenewal(assignmentId: string, tx: DbTx): Promise<boolean> {

@@ -113,7 +113,8 @@ export class ReturnRequestService {
 
   /** The seat, who may return it, and the plan and the origin it is judged against. Throws ReturnRequestRefusedError. */
   private async requireReturnable(tx: DbTx, actor: AuthenticatedPrincipal, body: ReturnBodyDto, today: string) {
-    const facts = await this.seat.factsOf(tx, body.assignmentId);
+    // The sender and the holder of the seat cannot be the spending approver (`D-S21`): judged before any department is read.
+    const facts = await this.seat.factsOf(tx, actor.employeeId, body.assignmentId);
     const holderUnit = (await this.organizationReads.getOwningUnits([facts.employeeId], today, tx)).get(
       facts.employeeId,
     );

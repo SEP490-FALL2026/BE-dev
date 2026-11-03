@@ -15,7 +15,7 @@ import { EmployeeImportRepo, LatestImport, StoredRow } from '../employee-import.
 import { ImportSummary, ImportView } from '../employee-import.types';
 import { clean } from '../row-validation/employee-import-row-validation.policy';
 import { EmployeeImportRowValidationService } from '../row-validation/employee-import-row-validation.service';
-import { readEmployeeFile } from './employee-import-file.policy';
+import { readUploadedEmployeeFile } from './employee-import-xlsx.service';
 import { reviewQueueOf } from './employee-import-review-queue.service';
 
 /** A preview that is not confirmed goes stale on its own after this long. */
@@ -46,10 +46,13 @@ export class EmployeeImportPreviewService {
     return this.repo.findLatestKept((await this.requireOrganization()).id);
   }
 
-  async upload(actor: AuthenticatedPrincipal, file: { fileName: string; bytes: Buffer }): Promise<ImportView> {
+  async upload(
+    actor: AuthenticatedPrincipal,
+    file: { fileName: string; mimeType?: string; bytes: Buffer },
+  ): Promise<ImportView> {
     assertMayImportEmployees(actor.roles);
     const organization = await this.requireOrganization();
-    const { rows, ignored } = readEmployeeFile(file.bytes);
+    const { rows, ignored } = await readUploadedEmployeeFile(file);
     const contentHash = createHash('sha256').update(file.bytes).digest('hex');
     const evaluated = await this.rowValidation.judge(rows, await this.rowValidation.ownRecord(actor.employeeId));
     const duplicate = await this.repo.findCompletedWithContent(organization.id, contentHash);
@@ -96,7 +99,7 @@ export class EmployeeImportPreviewService {
     actor: AuthenticatedPrincipal,
     id: string,
     query: { outcome?: EmployeeRowOutcome; page: number; pageSize: number },
-  ): Promise<Page<StoredRow>> {
+  ): Promise<Page<StoredRow & { unplaced: boolean | null }>> {
     assertMayImportEmployees(actor.roles);
     if (!(await this.repo.find(id))) throw new ImportNotFoundError();
     const { items, total } = await this.repo.page(id, {
@@ -105,7 +108,24 @@ export class EmployeeImportPreviewService {
       take: query.pageSize,
     });
 
-    return pageOf(items, total, query.page, query.pageSize);
+    const existingRows = items.filter((row) => row.outcome === 'EXISTS_SAME' || row.outcome === 'EXISTS_DIFFERENT');
+    const lookup = existingRows.length ? await this.rowValidation.lookup(existingRows) : null;
+    const existing = items.map((row) => lookup?.existing.get(clean(row.cells.employee_code).toUpperCase()));
+    const ids = existing.flatMap((person) => (person ? [person.id] : []));
+    const unplaced = ids.length ? await this.organizationReads.unplacedAmong(ids) : new Set<string>();
+    return pageOf(
+      items.map((row, index) => ({
+        ...row,
+        unplaced: existing[index]
+          ? unplaced.has(existing[index].id)
+          : row.outcome === 'VALID'
+            ? !clean(row.cells.department_code)
+            : null,
+      })),
+      total,
+      query.page,
+      query.pageSize,
+    );
   }
 
   /**
@@ -166,14 +186,20 @@ export class EmployeeImportPreviewService {
   ): Promise<ImportSummary> {
     const lookup = await this.rowValidation.lookup(rows);
     const byDepartment = new Map<string, number>();
+    let newUnplaced = 0;
     for (const row of rows) {
       if (row.outcome !== 'VALID') continue;
-      const code = clean(row.cells.department_code);
+      const code = clean(row.cells.department_code).toUpperCase();
+      if (!code) {
+        newUnplaced++;
+        continue;
+      }
       byDepartment.set(code, (byDepartment.get(code) ?? 0) + 1);
     }
 
     return {
       totalRows: rows.length,
+      newUnplaced,
       ...outcomeCounts(rows),
       newPeopleByDepartment: [...byDepartment].map(([departmentCode, count]) => ({ departmentCode, count })),
       departmentsWithoutHead: await this.rowValidation.departmentsWithoutHead(lookup, [...byDepartment.keys()]),

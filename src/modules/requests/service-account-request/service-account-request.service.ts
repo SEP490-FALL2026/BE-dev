@@ -3,16 +3,15 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { LicensingSeatBaselineApi } from '../../licensing/public/licensing-seat-baseline.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
-  AccessRequestNoDepartmentError,
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
 } from '../access-request/access-request.errors';
 import { hasSpendStep, mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
+import { RequestSenderService } from '../request-intake/request-sender.service';
 import { RequestDraftRepo } from '../request-draft/request-draft.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { RequestFactsService } from '../access-request/request-facts.service';
@@ -37,7 +36,7 @@ export class ServiceAccountRequestService {
     private readonly runner: TransactionRunner,
     private readonly requests: AccessRequestRepo,
     private readonly details: ServiceAccountRequestRepo,
-    private readonly organizationReads: OrganizationReadApi,
+    private readonly sender: RequestSenderService,
     private readonly assessment: RequestFactsService,
     private readonly licensingBaseline: LicensingSeatBaselineApi,
     private readonly audit: AuditApi,
@@ -65,10 +64,9 @@ export class ServiceAccountRequestService {
         if (verdict === 'NOT_FOUND') throw new AccessRequestNotFoundError();
         if (verdict === 'NOT_DRAFT') throw new AccessRequestNotDraftError();
       }
-      // The sender is relied on until commit: they cannot leave the company between the check and the write.
-      await this.organizationReads.lockEmployeeForShare(tx, actor.employeeId);
-      const employee = await this.organizationReads.getEmployee(actor.employeeId, tx);
-      if (!employee) throw new AccessRequestNoDepartmentError();
+      // The sender is relied on until commit (they cannot leave the company between the check and the write), and is judged as a party
+      // of a Request before any department is read (`D-S21`).
+      const employee = await this.sender.lockEligible(tx, actor);
 
       const now = new Date();
       const assessed = await this.assessment.assess(tx, {
@@ -105,7 +103,6 @@ export class ServiceAccountRequestService {
         costCenterId: unit.costCenter?.id ?? null,
         businessReason: body.businessReason,
         termMonths: body.termMonths,
-        projectLabel: body.projectLabel ?? null,
         pricing,
         policy,
         createdByAppUserId: actor.appUserId,

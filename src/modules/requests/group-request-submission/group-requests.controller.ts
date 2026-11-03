@@ -68,8 +68,13 @@ export class GroupRequestsController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The body is invalid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE, GROUP_REQUEST_ERROR_EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE],
+      description:
+        'The body is invalid (VALIDATION_ERROR), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        GROUP_REQUEST_ERROR_EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE,
+        GROUP_REQUEST_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE,
+      ],
     },
   )
   async check(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: GroupBodyDto) {
@@ -132,7 +137,7 @@ export class GroupRequestsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE); too many people are named (GROUP_REQUEST.TOO_MANY_LINES) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); a head sends a term over twelve months without confirming it (GROUP_REQUEST.TERM_CONFIRMATION_REQUIRED). Nothing is written.',
+        'The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE); too many people are named (GROUP_REQUEST.TOO_MANY_LINES) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); a head sends a term over twelve months without confirming it (GROUP_REQUEST.TERM_CONFIRMATION_REQUIRED); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER. Nothing is written.',
       examples: [
         VALIDATION_EXAMPLE,
         GROUP_REQUEST_ERROR_EXAMPLES.PLAN_NOT_ELIGIBLE,
@@ -141,6 +146,7 @@ export class GroupRequestsController {
         GROUP_REQUEST_ERROR_EXAMPLES.LINES_REFUSED,
         GROUP_REQUEST_ERROR_EXAMPLES.TERM_CONFIRMATION_REQUIRED,
         GROUP_REQUEST_ERROR_EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE,
+        GROUP_REQUEST_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE,
       ],
     },
   )
@@ -171,8 +177,9 @@ export class GroupRequestsController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The query is invalid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
+      description:
+        'The query is invalid (VALIDATION_ERROR), or the caller is the spending approver and so sends no group (REQUEST_PARTY.INELIGIBLE).',
+      examples: [VALIDATION_EXAMPLE, GROUP_REQUEST_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE],
     },
   )
   async candidateList(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: GroupCandidatesQueryDto) {

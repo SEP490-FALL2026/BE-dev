@@ -36,7 +36,7 @@ export class VersionDecisionWriter {
     judged: JudgedDecision,
     body: DecisionBodyDto,
   ): Promise<VersionRecord> {
-    const { version, siblings, approverIsParty, today } = judged;
+    const { version, siblings, today } = judged;
     const id = version.id;
     const outcome = decisionOutcomeOf(body.decision);
     const now = new Date();
@@ -49,7 +49,7 @@ export class VersionDecisionWriter {
       versionId: id,
       decision: outcome.decision,
       decidedByEmployeeId: actor.employeeId,
-      deciderRole: approverIsParty ? 'CONFLICT_SUBSTITUTE' : 'SPENDING_APPROVER',
+      deciderRole: 'SPENDING_APPROVER',
       reason: body.reason ?? null,
       totalMinor: version.totalMinor,
       previousTotalMinor: previous?.totalMinor ?? null,

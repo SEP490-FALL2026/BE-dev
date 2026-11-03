@@ -1,6 +1,8 @@
+import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import { SpendingApproverWaitListener } from '../../../src/modules/budgets/budget/spending-approver-wait.listener';
 import { VersionHistoryViewService } from '../../../src/modules/budgets/version/version-history-view.service';
 import { BudgetNotAHistoryReaderError } from '../../../src/modules/budgets/budget/budget.errors';
-import { BudgetHarness, type HistoryEntryWire, type Pageable } from '../../support/budget-harness';
+import { BudgetHarness, type HistoryEntryWire, type Pageable, type VersionWire } from '../../support/budget-harness';
 import type { Person } from '../../support/request-harness';
 
 const h = new BudgetHarness();
@@ -12,19 +14,16 @@ const h = new BudgetHarness();
  */
 describe('the history of the edits of a version (integration, real PostgreSQL)', () => {
   let boss: Person;
-  let substitute: Person;
-  let executiveUnitId: string;
+  let bystander: Person;
   let counter = 0;
 
   beforeAll(async () => {
     await h.start();
     const executive = await h.departmentWithUnit('P-EXE');
-    executiveUnitId = executive.unitId;
     boss = await h.staff(executive, 'EXE-C1');
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
-    substitute = await h.staff(await h.departmentWithUnit('P-SBS'), 'SBS-S1');
-    await h.setRole('CONFLICT_SUBSTITUTE', substitute);
+    bystander = await h.staff(await h.departmentWithUnit('P-SBS'), 'SBS-S1');
   }, 240000);
 
   afterAll(async () => {
@@ -295,25 +294,12 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
       const approver = await h.versionHistory(s.version.id, boss.account);
       const head = await h.versionHistory(s.version.id, s.head.account);
       const itAdmin = await h.versionHistory(s.version.id, h.it1);
-      const other = await h.versionHistory(s.version.id, substitute.account);
+      const other = await h.versionHistory(s.version.id, bystander.account);
 
       expect([finance.status, approver.status, head.status, itAdmin.status, other.status]).toEqual([
         200, 200, 403, 403, 403,
       ]);
       expect(h.codeOf(head)).toBe('AUTHORIZATION.FORBIDDEN');
-    });
-
-    it('is read by the substitute, and not by the approver, when the approver sent the proposal behind the version', async () => {
-      const own = h.dataOf<{ proposal: { id: string } }>(
-        await h.submitProposal(h.proposalBody(executiveUnitId), boss.account).expect(201),
-      ).proposal;
-      const version = await h.built(own.id);
-      await h.updateVersion(version.id, { reserve: h.money(10_000_000) }).expect(200);
-
-      const approver = await h.versionHistory(version.id, boss.account);
-      const standIn = await h.versionHistory(version.id, substitute.account);
-
-      expect([approver.status, standIn.status]).toEqual([403, 200]);
     });
 
     it('answers 404 for a version that is not there, to Finance and to the approver; and refuses a caller that holds no role in the service itself', async () => {
@@ -370,6 +356,210 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
       expect(entry.by.id).toBe(h.finance.employeeId);
       expect(typeof entry.by.name).toBe('string');
       expect(JSON.stringify(entry)).not.toMatch(/correlation|session|roles|FINANCE/i);
+    });
+  });
+
+  describe('who decides a version (US-06-11 AC-12, QĐ-93d(1))', () => {
+    const wireOf = async (id: string) =>
+      h.dataOf<{ version: VersionWire }>(await h.versionOf(id, h.finance).expect(200)).version;
+
+    it('a version waits for the spending approver and nobody else may decide', async () => {
+      const w = await waiting();
+      const version = await h.built(w.proposal.id);
+      await h.clearRole('SPENDING_APPROVER');
+      try {
+        await h.sendVersion(version.id).expect(200);
+
+        expect(await wireOf(version.id)).toMatchObject({ state: 'SENT', waitingReason: 'NO_SPENDING_APPROVER' });
+        // Nobody takes the place of the approver: not Finance, the head, an IT Admin, nor the person who held the old role of the substitute.
+        for (const account of [h.finance, w.head.account, h.it1, bystander.account]) {
+          await h.decideVersion(version.id, { decision: 'APPROVE' }, account).expect(403);
+        }
+        expect(await wireOf(version.id)).toMatchObject({ state: 'SENT' });
+      } finally {
+        await h.setRole('SPENDING_APPROVER', boss);
+      }
+
+      expect(await wireOf(version.id)).toMatchObject({ state: 'SENT', waitingReason: null });
+      await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account).expect(200);
+      expect(await wireOf(version.id)).toMatchObject({ state: 'APPROVED', waitingReason: null });
+    });
+
+    it('is decided by the spending approver, and by nobody else, when somebody else proposed the budget', async () => {
+      const w = await waiting();
+      const version = await h.built(w.proposal.id);
+      await h.sendVersion(version.id).expect(200);
+
+      await h.decideVersion(version.id, { decision: 'APPROVE' }, bystander.account).expect(403);
+      await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account).expect(200);
+    });
+
+    it('is decided by nobody when the approver sent the proposal behind it (data of before QĐ-93): the approver is refused as the party, no substitute decides', async () => {
+      const w = await waiting();
+      const version = await h.built(w.proposal.id);
+      await h.sendVersion(version.id).expect(200);
+      const submitter = (
+        await h.ctx.sql.query<{ id: string }>(
+          `SELECT submitted_by_employee_id AS id FROM budget_proposals WHERE id = $1`,
+          [w.proposal.id],
+        )
+      ).rows[0].id;
+      await h.ctx.sql.query(`UPDATE budget_proposals SET submitted_by_employee_id = $2 WHERE id = $1`, [
+        w.proposal.id,
+        boss.employeeId,
+      ]);
+      try {
+        const own = await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account).expect(403);
+        await h.decideVersion(version.id, { decision: 'APPROVE' }, bystander.account).expect(403);
+
+        expect(h.codeOf(own)).toBe('BUDGET.CONFLICT_OF_INTEREST');
+        expect(await wireOf(version.id)).toMatchObject({ state: 'SENT' });
+      } finally {
+        // An open proposal sent by the approver keeps them from being granted the role again (QD-93d(3)): give it back.
+        await h.ctx.sql.query(`UPDATE budget_proposals SET submitted_by_employee_id = $2 WHERE id = $1`, [
+          w.proposal.id,
+          submitter,
+        ]);
+      }
+    });
+
+    it('writes only the spending approver as the role of a decision', async () => {
+      const w = await waiting();
+      const version = await h.built(w.proposal.id);
+      await h.sendVersion(version.id).expect(200);
+
+      await h.decideVersion(version.id, { decision: 'REJECT', reason: 'No' }, boss.account).expect(200);
+
+      const { rows } = await h.ctx.sql.query<{ decider_role: string }>(
+        `SELECT decider_role FROM budget_version_decisions WHERE version_id = $1`,
+        [version.id],
+      );
+      expect(rows).toEqual([{ decider_role: 'SPENDING_APPROVER' }]);
+    });
+  });
+
+  describe('the Super Admin is told when a sent version waits for a spending approver (D-S16, M7, US-06-11 AC-12)', () => {
+    interface AlertRow {
+      recipient_employee_id: string;
+      params: Record<string, unknown>;
+      event_key: string;
+    }
+    const superAdmin = async () =>
+      (
+        await h.ctx.sql.query<{ employee_id: string }>(
+          `SELECT u.employee_id FROM role_grants g JOIN app_users u ON u.id = g.app_user_id
+            WHERE g.role = 'SUPER_ADMIN' AND g.revoked_at IS NULL`,
+        )
+      ).rows[0].employee_id;
+    const alertsOf = async (versionId: string) =>
+      (
+        await h.ctx.sql.query<AlertRow>(
+          `SELECT recipient_employee_id, params, event_key FROM in_app_notifications
+            WHERE code = 'CONTROLLED_WAIT_ALERT' AND subject_id = $1 ORDER BY created_at, id`,
+          [versionId],
+        )
+      ).rows;
+    const sentVersion = async () => {
+      const w = await waiting();
+      const version = await h.built(w.proposal.id);
+      await h.sendVersion(version.id).expect(200);
+
+      return version;
+    };
+
+    it('tells the Super Admin once when a sent version waits for a spending approver', async () => {
+      const w = await waiting();
+      const version = await h.built(w.proposal.id);
+      await h.clearRole('SPENDING_APPROVER');
+      try {
+        await h.sendVersion(version.id).expect(200);
+
+        const alerts = await alertsOf(version.id);
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0].recipient_employee_id).toBe(await superAdmin());
+        expect(alerts[0].params).toEqual({
+          versionId: version.id,
+          costCenterId: version.costCenter.id,
+          year: version.year,
+          waitingReason: 'NO_SPENDING_APPROVER',
+          configurationHint: 'CONFIGURE_SPENDING_APPROVER',
+        });
+        expect(alerts[0].event_key).toMatch(
+          new RegExp(`^CONTROLLED_WAIT_ALERT:BUDGET_VERSION:${version.id}:sent:\\d+$`),
+        );
+        // Nobody holds the role to be told that a version awaits their decision, and nobody else is told in their place.
+        expect(await h.budgetNoticesOf('BUDGET_VERSION_AWAITING_DECISION', version.id)).toEqual([]);
+      } finally {
+        await h.setRole('SPENDING_APPROVER', boss);
+      }
+    });
+
+    it('says nothing while somebody holds the role, and tells once when the role is taken back with a version still sent', async () => {
+      const version = await sentVersion();
+      expect(await alertsOf(version.id)).toEqual([]);
+
+      await h.clearRole('SPENDING_APPROVER');
+      try {
+        const alerts = await alertsOf(version.id);
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0].event_key).toMatch(new RegExp(`^CONTROLLED_WAIT_ALERT:BUDGET_VERSION:${version.id}:role:`));
+        expect(alerts[0].recipient_employee_id).toBe(await superAdmin());
+      } finally {
+        await h.setRole('SPENDING_APPROVER', boss);
+      }
+    });
+
+    it('writes one notice when the role change is heard twice', async () => {
+      const version = await sentVersion();
+      const listener = h.ctx.app.get(SpendingApproverWaitListener, { strict: false });
+      const runner = h.ctx.app.get(TransactionRunner, { strict: false });
+      const change = {
+        id: 'heard-twice-1',
+        role: 'SPENDING_APPROVER',
+        fromEmployeeId: boss.employeeId,
+        toEmployeeId: null,
+      } as const;
+
+      await runner.run((tx) => listener.onRoleChange(tx, change));
+      await runner.run((tx) => listener.onRoleChange(tx, change));
+
+      const alerts = (await alertsOf(version.id)).filter((alert) => alert.event_key.endsWith(':role:heard-twice-1'));
+      expect(alerts).toHaveLength(1);
+    });
+
+    it('tells again for a new stretch of waiting after the role was given and taken back', async () => {
+      const version = await sentVersion();
+
+      await h.clearRole('SPENDING_APPROVER');
+      await h.setRole('SPENDING_APPROVER', boss);
+      await h.clearRole('SPENDING_APPROVER');
+      try {
+        const keys = (await alertsOf(version.id)).map((alert) => alert.event_key);
+        expect(keys).toHaveLength(2);
+        expect(new Set(keys).size).toBe(2);
+      } finally {
+        await h.setRole('SPENDING_APPROVER', boss);
+      }
+    });
+
+    it('tells once when the spending approver leaves the company while a version is sent', async () => {
+      const departing = await h.staff(await h.departmentWithUnit('P-LVB'), 'LVB-C9');
+      await h.setRole('SPENDING_APPROVER', departing);
+      try {
+        const version = await sentVersion();
+        expect(await alertsOf(version.id)).toEqual([]);
+
+        await h.leaveCompany(departing);
+
+        const alerts = await alertsOf(version.id);
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0].event_key).toMatch(new RegExp(`^CONTROLLED_WAIT_ALERT:BUDGET_VERSION:${version.id}:left:`));
+        // The role is taken back afterwards from a person who had left: the stretch began when they left, no second notice.
+        await h.clearRole('SPENDING_APPROVER');
+        expect(await alertsOf(version.id)).toHaveLength(1);
+      } finally {
+        await h.setRole('SPENDING_APPROVER', boss);
+      }
     });
   });
 });

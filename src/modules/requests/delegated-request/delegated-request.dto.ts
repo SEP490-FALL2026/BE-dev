@@ -1,7 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { PROJECT_LABEL_MAX_LENGTH, REASON_MAX_LENGTH, requestSchema } from '../access-request/access-request.dto';
+import { REASON_MAX_LENGTH, requestSchema } from '../access-request/access-request.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** The most requests one sending may make: every person for every tool. A bound against a typo, not a rule of the BRD. */
@@ -37,7 +37,6 @@ export const delegatedBodySchema = z
       .meta({ description: 'Each tool is named once: no two items carry the same planId.' }),
     businessReason: reason,
     termMonths: z.number().int().min(1).max(120),
-    projectLabel: z.string().trim().min(1).max(PROJECT_LABEL_MAX_LENGTH).optional(),
     /** The day the access of a contractor, freelancer or intern ends; every request of the sending carries it (`AC-10`). */
     expectedEndDate: businessDate.optional(),
     /** A term over twelve months is confirmed in so many words (`OI-07a`). */

@@ -27,6 +27,14 @@ export const DATA_REPRESENTATIONS = {
   // `QĐ-87g(2)`: a sent internal free request of a department that has no Cost Center keeps no Cost Center. The
   // compatibility image `fba4dfe` types the column as required, so it fails on the row (impact matrix 3.11).
   'access-request-null-cost-center': 'a sent request that has no Cost Center (internal free software, F91)',
+  // `QĐ-93k(1)`: the conversion command closes a request, or a line, of the spending approver with the cause
+  // `SPENDING_APPROVER_PARTY` and nobody who closed it (OD-6). A Prisma client of a release before it does not know the enum value.
+  'access-request-cancel-spending-approver-party':
+    'a request or a line closed because the spending approver is one of its parties (no employee closed it)',
+  // `QĐ-93d(1)`: a need step of a department with no head waits as `NO_DEPARTMENT_HEAD`, and a step of the earlier rule can wait
+  // as `SPENDING_APPROVER_IS_PARTY`; the response schema of a release before it lists neither, so a read of the step fails (500).
+  'access-request-step-qd93-waiting-reason':
+    'a step, or an alert of a wait, that waits as NO_DEPARTMENT_HEAD or SPENDING_APPROVER_IS_PARTY',
 } as const;
 
 export type DataRepresentation = keyof typeof DATA_REPRESENTATIONS;

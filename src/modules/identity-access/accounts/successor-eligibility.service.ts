@@ -13,10 +13,12 @@ export type SuccessorProblem =
   | 'EMAIL_NOT_VERIFIED'
   | 'WORK_ROLE_HELD'
   | 'APPROVAL_ROLE_HELD'
-  | 'HEADS_DEPARTMENT';
+  | 'HEADS_DEPARTMENT'
+  | 'MANAGER_HELD';
 
 /** How a login email was confirmed, for the ones that prove the person owns it (QĐ-46; BOOTSTRAP_ASSERTED is only a claim). */
 const ACCEPTED_EMAIL_VERIFICATION = new Set(['INVITATION_REDEEMED', 'RECOVERY_VERIFIED']);
+const hasWorkRole = (roles: readonly string[]): boolean => roles.includes('IT_ADMIN') || roles.includes('FINANCE');
 
 /**
  * Whether an account can receive the Super Admin role (`US-01-09` AC-3, AC-12): working, activated with a verified
@@ -49,9 +51,10 @@ export class SuccessorEligibility {
     if (verification === null || !ACCEPTED_EMAIL_VERIFICATION.has(verification)) return 'EMAIL_NOT_VERIFIED';
 
     const roles = await this.grants.effectiveRoles(successorAppUserId, tx);
-    if (roles.includes('IT_ADMIN') || roles.includes('FINANCE')) return 'WORK_ROLE_HELD';
+    if (hasWorkRole(roles)) return 'WORK_ROLE_HELD';
     if ((await this.approvalRoles.rolesHeldBy(tx, successor.employeeId)).length > 0) return 'APPROVAL_ROLE_HELD';
     if (await this.organizationReads.isDepartmentHead(successor.employeeId, tx)) return 'HEADS_DEPARTMENT';
+    if (roles.includes('MANAGER')) return 'MANAGER_HELD';
 
     return null;
   }

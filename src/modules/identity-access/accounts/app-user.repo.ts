@@ -90,6 +90,18 @@ export class AppUserRepo {
     return rows.length === 1;
   }
 
+  /**
+   * Takes the row lock `FOR SHARE` of the accounts of these people, in the order of their ids (so two callers never wait on each
+   * other), and returns the ids of the accounts it locked. A person with no account locks nothing. Read state in a statement of its own.
+   */
+  async lockAppUsersOfEmployees(tx: DbTx, employeeIds: readonly string[]): Promise<string[]> {
+    if (employeeIds.length === 0) return [];
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM app_users WHERE employee_id = ANY(${[...employeeIds]}::uuid[]) ORDER BY id FOR SHARE`;
+
+    return rows.map((row) => row.id);
+  }
+
   async readAccount(tx: DbTx, appUserId: string): Promise<AccountSnapshot | null> {
     const row = await tx.appUser.findUnique({ where: { id: appUserId }, select: ACCOUNT_SELECT });
 
@@ -253,6 +265,7 @@ export class AppUserRepo {
 
   async listAccountRecords(filter: AccountListFilter): Promise<{ items: AccountRecord[]; total: number }> {
     const where = {
+      ...(filter.employeeIds === undefined ? {} : { employeeId: { in: filter.employeeIds } }),
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.activationState ? { activationState: filter.activationState } : {}),
       ...(filter.role ? { roleGrants: { some: { role: filter.role, revokedAt: null } } } : {}),

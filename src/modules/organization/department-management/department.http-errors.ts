@@ -5,6 +5,7 @@ import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examp
 import { refuse, toOrganizationApiException } from '../organization.http-errors';
 import {
   DepartmentCodeTakenError,
+  DepartmentCodeInvalidError,
   DepartmentForbiddenError,
   DepartmentInUseError,
   DepartmentInactiveError,
@@ -36,6 +37,9 @@ export function toDepartmentApiException(error: unknown): unknown {
   }
   if (error instanceof DepartmentOutOfScopeError) {
     return refuse(HttpStatus.FORBIDDEN, 'DEPARTMENT.OUT_OF_SCOPE', error.message);
+  }
+  if (error instanceof DepartmentCodeInvalidError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.CODE_INVALID', error.message);
   }
   if (error instanceof DepartmentCodeTakenError) {
     return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.CODE_TAKEN', error.message);
@@ -84,10 +88,12 @@ const example = (error: Error) => errorExampleOf(toDepartmentApiException(error)
 export const DEPARTMENT_ERROR_EXAMPLES = {
   DEPARTMENT_NOT_FOUND: example(new DepartmentNotFoundError()),
   DEPARTMENT_OUT_OF_SCOPE: example(new DepartmentOutOfScopeError()),
+  DEPARTMENT_CODE_INVALID: example(new DepartmentCodeInvalidError()),
   DEPARTMENT_CODE_TAKEN: example(new DepartmentCodeTakenError('D01')),
   DEPARTMENT_NAME_INVALID: example(new DepartmentNameInvalidError()),
   DEPARTMENT_IT_ADMIN_INVALID: example(new DepartmentItAdminInvalidError()),
   DEPARTMENT_UPDATE_EMPTY: example(new DepartmentUpdateEmptyError()),
+  DEPARTMENT_INACTIVE: example(new DepartmentInactiveError()),
   DEPARTMENT_IN_USE: example(
     new DepartmentInUseError({
       members: { items: [{ employeeCode: 'E001', fullName: '<full-name>' }], total: 1 },
@@ -100,6 +106,8 @@ export const DEPARTMENT_ERROR_EXAMPLES = {
   DEPARTMENT_HEAD_EMPLOYEE_NOT_FOUND: example(new HeadAssignmentError('EMPLOYEE_NOT_FOUND')),
   DEPARTMENT_HEAD_EMPLOYEE_NOT_ACTIVE: example(new HeadAssignmentError('EMPLOYEE_NOT_ACTIVE')),
   DEPARTMENT_HEAD_SUPER_ADMIN_CANNOT_HEAD: example(new HeadAssignmentError('SUPER_ADMIN_CANNOT_HEAD')),
+  DEPARTMENT_HEAD_MANAGER_ROLE_REQUIRED: example(new HeadAssignmentError('MANAGER_ROLE_REQUIRED')),
+  DEPARTMENT_HEAD_SPENDING_APPROVER_CANNOT_HEAD: example(new HeadAssignmentError('SPENDING_APPROVER_CANNOT_HEAD')),
   DEPARTMENT_HEAD_NOT_A_MEMBER_ON_DATE: example(new HeadAssignmentError('NOT_A_MEMBER_ON_DATE')),
   DEPARTMENT_HEAD_HEADS_ANOTHER_DEPARTMENT: example(new HeadAssignmentError('HEADS_ANOTHER_DEPARTMENT')),
   DEPARTMENT_HEAD_SUCCESSOR_DATE_NOT_FUTURE: example(new HeadAssignmentError('SUCCESSOR_DATE_NOT_FUTURE')),
@@ -113,7 +121,7 @@ export const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABL
 
 export const SUPER_ADMIN_ONLY = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Only the Super Admin changes department data, on an HR basis. The IT Admin does not.',
+  description: 'Only the Super Admin changes department data. The IT Admin does not.',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 /** The reads of the departments: the Super Admin reads all, the IT Admin the departments they are in charge of or stand in for. */
@@ -124,7 +132,13 @@ export const READ_ROLES_ONLY = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 export const VALIDATION_ERROR_DESCRIPTION =
-  'The request is invalid (VALIDATION_ERROR, among them an HR basis that lacks a part) or a rule of the department refuses it; details name the reason.';
+  'The request is invalid (VALIDATION_ERROR, among them a name or a function over its limit or a field the route does not take) or a rule of the department refuses it; details name the reason.';
+/** The department is retired: it takes no change to its profile, no head and no successor. */
+export const DEPARTMENT_INACTIVE_RESPONSE = {
+  status: HttpStatus.CONFLICT,
+  description: 'The department is retired (DEPARTMENT.INACTIVE).',
+  examples: [DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_INACTIVE],
+} as const;
 /** The routes where no rule of the department applies: only the request itself can be invalid. */
 export const VALIDATION_ERROR = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,

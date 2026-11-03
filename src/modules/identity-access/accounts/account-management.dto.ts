@@ -1,21 +1,15 @@
 import { z } from 'zod';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 /**
- * Every role name a client may send. MANAGER and SPENDING_APPROVER are accepted only so the
- * service can refuse them with a specific reason (they are derived, never granted).
+ * The six roles an account can hold (QĐ-93a): one list for the roles a client sends, filters by and reads back — the same as the
+ * `AppRole` of `identity-access.types.ts`. MANAGER only has an effect while its holder heads a department; SPENDING_APPROVER is
+ * held by at most one account.
  */
-export const requestedRoleSchema = z.enum([
-  'SUPER_ADMIN',
-  'IT_ADMIN',
-  'FINANCE',
-  'EMPLOYEE',
-  'MANAGER',
-  'SPENDING_APPROVER',
-]);
-
-const appRoleSchema = z.enum(['SUPER_ADMIN', 'IT_ADMIN', 'FINANCE', 'EMPLOYEE']);
+export const appRoleSchema = z.enum(['SUPER_ADMIN', 'IT_ADMIN', 'FINANCE', 'EMPLOYEE', 'MANAGER', 'SPENDING_APPROVER']);
+export const requestedRoleSchema = appRoleSchema;
 
 export const createAppUserBodySchema = z.strictObject({
   employeeId: z.uuid(),
@@ -33,17 +27,24 @@ export const accountStatusChangeBodySchema = z.strictObject({
 export const appUserIdParamSchema = z.strictObject({ id: z.uuid() });
 export const appUserRoleParamSchema = z.strictObject({ id: z.uuid(), role: requestedRoleSchema });
 
-export const listAppUsersQuerySchema = z.strictObject({
-  page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(20),
-  status: z.enum(['ACTIVE', 'LOCKED']).optional(),
-  activationState: z.enum(['INVITED', 'ACTIVATED']).optional(),
-  role: appRoleSchema.optional(),
-  employeeLeft: z
-    .enum(['true', 'false'])
-    .transform((value) => value === 'true')
-    .optional(),
-});
+export const listAppUsersQuerySchema = z
+  .strictObject({
+    page: z.coerce.number().int().positive().default(1),
+    pageSize: z.coerce.number().int().positive().max(100).default(20),
+    status: z.enum(['ACTIVE', 'LOCKED']).optional(),
+    activationState: z.enum(['INVITED', 'ACTIVATED']).optional(),
+    role: appRoleSchema.optional(),
+    departmentId: z.uuid().optional(),
+    memberOn: businessDate.optional(),
+    employeeLeft: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .optional(),
+  })
+  .refine((query) => query.memberOn === undefined || query.departmentId !== undefined, {
+    path: ['memberOn'],
+    message: 'departmentId is required with memberOn',
+  });
 
 export const accountCandidatesQuerySchema = z.strictObject({ search: z.string().trim().max(100).optional() });
 
@@ -102,6 +103,7 @@ const candidatesSchema = z.strictObject({
       fullName: z.string(),
       workEmail: z.string().nullable(),
       department: z.string().nullable(),
+      unplaced: z.boolean(),
     }),
   ),
 });

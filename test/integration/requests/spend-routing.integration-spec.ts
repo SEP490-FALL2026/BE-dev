@@ -1,4 +1,3 @@
-import type { Person } from '../../support/request-harness';
 import { SpendHarness, Unit } from '../../support/spend-harness';
 
 const h = new SpendHarness();
@@ -7,7 +6,6 @@ const M = 1_000_000;
 describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-05-03 AC-9)', () => {
   let plan: string;
   let design: Unit;
-  let substitute: Person;
 
   beforeAll(async () => {
     await h.start();
@@ -18,9 +16,6 @@ describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-
       .expect(200);
     design = await h.departmentWithHead('P-DES');
     await h.budgetFor(design, { total: 100 * M });
-    const legal = await h.departmentWithUnit('P-LEG');
-    substitute = await h.staff(legal, 'LEG-S1');
-    await h.setRole('CONFLICT_SUBSTITUTE', substitute);
   }, 240000);
 
   afterAll(async () => {
@@ -31,6 +26,29 @@ describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-
     const id = await h.paidRequest(design, plan, { amount: 10 * M });
 
     return id;
+  };
+
+  /**
+   * The approver becomes the person the request is for, as the premise of the two cases that route around a conflict needs; the returned
+   * function puts the person back, because the grant of the role is refused while the approver is a party of an open request (rule 10,
+   * QĐ-93d(3)) and the cases that follow give the role back to the approver.
+   */
+  const approverIsTheBeneficiary = async (id: string): Promise<() => Promise<void>> => {
+    const { rows } = await h.ctx.sql.query<{ employee_id: string }>(
+      `SELECT employee_id FROM access_request_beneficiaries WHERE request_id = $1`,
+      [id],
+    );
+    await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
+      id,
+      h.boss.employeeId,
+    ]);
+
+    return async () => {
+      await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
+        id,
+        rows[0].employee_id,
+      ]);
+    };
   };
 
   it('is the spending approver, for the step that follows a check that is in order', async () => {
@@ -47,29 +65,9 @@ describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-
     ]);
   });
 
-  it('is the substitute when the approver is the one the request is for, and the approver does not read it (FR-3.15)', async () => {
+  it('waits for the spending approver, and no substitute is given the step, when the approver is the one the request is for (data of before QĐ-93, SoD-7)', async () => {
     const id = await ready();
-    await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
-      id,
-      h.boss.employeeId,
-    ]);
-
-    await h.route(id, design.head.account);
-
-    expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([
-      expect.objectContaining({ state: 'PENDING', assignee_employee_id: substitute.employeeId }),
-    ]);
-    await h.checkOf(id, substitute.account).expect(200);
-    await h.checkOf(id, h.boss.account).expect(404);
-  });
-
-  it('waits under control when the approver is in conflict and there is no substitute, and decides nothing', async () => {
-    const id = await ready();
-    await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
-      id,
-      h.boss.employeeId,
-    ]);
-    await h.clearRole('CONFLICT_SUBSTITUTE');
+    const restore = await approverIsTheBeneficiary(id);
 
     try {
       await h.route(id, design.head.account);
@@ -78,12 +76,34 @@ describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-
         expect.objectContaining({
           state: 'WAITING',
           assignee_employee_id: null,
-          waiting_reason: 'NO_CONFLICT_SUBSTITUTE',
+          waiting_reason: 'SPENDING_APPROVER_IS_PARTY',
         }),
       ]);
       expect(await h.state(id)).toBe('WAITING_CONTROLLED');
+      // Nobody is given the step in their place, and the approver does not read a request they are a party of.
+      await h.checkOf(id, h.bystander.account).expect(404);
+      await h.checkOf(id, h.boss.account).expect(404);
     } finally {
-      await h.setRole('CONFLICT_SUBSTITUTE', substitute);
+      await restore();
+    }
+  });
+
+  it('writes no substitute and no conflict of interest in the Audit Trail of a check of a request the approver is a party of', async () => {
+    const id = await ready();
+    const restore = await approverIsTheBeneficiary(id);
+
+    try {
+      await h.route(id, design.head.account);
+
+      const events = await h.ctx.sql.query<{ after: Record<string, unknown> }>(
+        `SELECT after FROM audit_events WHERE resource_id = $1 AND action = 'ACCESS_REQUEST.BUDGET_CHECKED'`,
+        [id],
+      );
+      expect(events.rows).toHaveLength(1);
+      expect(events.rows[0].after).toMatchObject({ opened: 'SPEND_APPROVAL', state: 'WAITING_CONTROLLED' });
+      expect(events.rows[0].after).not.toHaveProperty('conflictOfInterest');
+    } finally {
+      await restore();
     }
   });
 
@@ -111,22 +131,14 @@ describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-
     }
   });
 
-  it('is made at once, with both steps flagged, when the head who approved the need is the spending approver (US-06-14 AC-8, US-05-03 AC-9)', async () => {
-    const executive = await h.ctx.sql.query<{ id: string; code: string; cost_center_id: string }>(
-      `SELECT d.id, d.code, c.id AS cost_center_id FROM departments d
-       JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
-    );
-    const unit: Unit = {
-      department: { id: executive.rows[0].id, code: 'P-EXE', unitId: executive.rows[0].cost_center_id },
-      head: h.boss,
-      member: await h.staff(
-        { id: executive.rows[0].id, code: 'P-EXE', unitId: executive.rows[0].cost_center_id },
-        'EXE-E1',
-      ),
-    };
+  it('is made at once, with both steps flagged, when the spending approver approved the need of a head (US-06-14 AC-8, US-05-03 AC-9)', async () => {
+    const unit = await h.departmentWithHead('P-RT9');
     await h.budgetFor(unit, { total: 100 * M });
-    // The head is the approver: nobody sends it on, so the check ran when the need was approved.
-    const id = await h.paidRequest(unit, plan, { amount: 10 * M });
+    // A head's own request goes to the spending approver (row 2): nobody sends it on, so the check ran when the need was approved.
+    const sent = await h.sent(unit.head, plan, { termMonths: 1 });
+    await h.decide(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    await h.setPayments(sent.id, { amount: 10 * M });
+    const id = sent.id;
 
     expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([
       expect.objectContaining({ assignee_employee_id: h.boss.employeeId, same_person_as_spend: true }),
@@ -156,5 +168,6 @@ describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-
       opened: 'SPEND_APPROVAL',
       state: 'AWAITING_SPEND_DECISION',
     });
+    expect(events.rows[0].after).not.toHaveProperty('conflictOfInterest');
   });
 });

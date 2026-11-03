@@ -15,6 +15,7 @@ import {
   AccessRequestSuperAdminCannotRequestError,
 } from '../access-request/access-request.errors';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 import {
   AssessmentIncompleteError,
@@ -88,6 +89,13 @@ const quote = (reason: ConstructorParameters<typeof AssessmentQuoteRefusedError>
 export const ASSESSMENT_ERROR_EXAMPLES = {
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  REQUEST_PARTY_INELIGIBLE: example(
+    new RequestPartyIneligibleError({
+      reason: 'SPENDING_APPROVER',
+      party: 'REQUESTER',
+      employeeIds: ['<employee-id>'],
+    }),
+  ),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),

@@ -1,8 +1,3 @@
-import { ApprovalRoleService } from '../../../src/modules/identity-access/approval-roles/approval-role.service';
-import {
-  ApprovalRoleParamDto,
-  SetApprovalRoleBodyDto,
-} from '../../../src/modules/identity-access/approval-roles/approval-role.dto';
 import { CostCenterService } from '../../../src/modules/organization/cost-center/cost-center.service';
 import { CreateCostCenterBodyDto } from '../../../src/modules/organization/cost-center/cost-center.dto';
 import { DepartmentHeadService } from '../../../src/modules/organization/department-management/department-head.service';
@@ -14,7 +9,7 @@ import {
 import { EmployeeManualService } from '../../../src/modules/organization/employee/employee-manual.service';
 import { CreateEmployeeBodyDto } from '../../../src/modules/organization/employee/employee.dto';
 import type { HttpTestApp } from '../http-test-app';
-import { principalOf, sent } from './account.builder';
+import { ensureManagerGrant, principalOf, sent } from './account.builder';
 
 /*
  * T2.2 (spec "Integration: dựng fixture không qua HTTP"): the organization a suite only needs as a precondition, made by the
@@ -45,7 +40,6 @@ export async function createDepartment(
     name: parsed.name,
     functionDescription: parsed.function,
     itAdminEmployeeId: parsed.itAdminEmployeeId,
-    hrBasis: parsed.hrBasis,
   });
 
   return { id, code: parsed.code };
@@ -70,23 +64,12 @@ export async function assignHead(
   ctx: HttpTestApp,
   adminToken: string,
   departmentId: string,
-  body: object,
+  body: { employeeId: string; effectiveFrom?: string },
 ): Promise<void> {
+  // The head is a MANAGER first (US-03-06 AC-23); the seam grants it once the application stops deriving the role.
+  await ensureManagerGrant(ctx, adminToken, body.employeeId);
   const actor = await principalOf(ctx, adminToken);
   await ctx.app
     .get(DepartmentHeadService, { strict: false })
     .assign(actor, departmentId, AssignHeadBodyDto.create(sent(body)));
-}
-
-/** The Super Admin names the holder of an approval role (`PUT /approval-roles/{role}`). */
-export async function setApprovalRole(
-  ctx: HttpTestApp,
-  adminToken: string,
-  role: string,
-  employeeId: string,
-): Promise<void> {
-  const actor = await principalOf(ctx, adminToken);
-  await ctx.app
-    .get(ApprovalRoleService, { strict: false })
-    .set(actor, ApprovalRoleParamDto.create({ role }).role, SetApprovalRoleBodyDto.create({ employeeId }).employeeId);
 }

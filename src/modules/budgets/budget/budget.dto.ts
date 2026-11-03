@@ -234,6 +234,8 @@ const versionSchema = z.strictObject({
   reason: z.string().nullable(),
   /** The current budget this revision replaces, as it is: what the approver compares the total with. */
   previousTotal: moneyView.nullable(),
+  /** Set while the version was sent and nobody who works holds the role of the spending approver: nobody else decides it (`QĐ-93d`(1)). */
+  waitingReason: z.enum(['NO_SPENDING_APPROVER']).nullable(),
   /** The latest decision of the spending approver on it. */
   decision: z
     .strictObject({

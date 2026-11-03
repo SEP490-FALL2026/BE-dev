@@ -10,7 +10,7 @@ const h = new LeaveHarness();
 describe('the return from a long leave (integration, real PostgreSQL)', () => {
   let des: Department;
   let sequence = 0;
-  const code = (prefix: string) => `${prefix}${(sequence += 1)}`;
+  const code = (prefix: string) => `${prefix}-${(sequence += 1)}`;
   /** A person on leave since `startedOn`, due back on `approvedReturnOn`. */
   const onLeave = async (
     startedOn: string,

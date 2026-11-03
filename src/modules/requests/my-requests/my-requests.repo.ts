@@ -3,8 +3,7 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { requestPolicyJson } from '../access-request/access-request.json';
 import { hasSpendStep } from '../access-request/access-request.policy';
-import type { NeedStepState } from '../access-request/access-request.types';
-import type { WaitingReason } from '../access-request/routing.policy';
+import type { NeedStepState, ReadableNeedWaitingReason } from '../access-request/access-request.types';
 import { needStepOf } from './my-requests.policy';
 import type { MyRequestFilter, MyRequestRow, SentState } from './my-requests.types';
 
@@ -56,7 +55,7 @@ function toRow(row: Row): MyRequestRow {
     needStep: {
       state: step.state as NeedStepState,
       assigneeEmployeeId: step.assigneeEmployeeId,
-      waitingReason: step.waitingReason as WaitingReason | null,
+      waitingReason: step.waitingReason as ReadableNeedWaitingReason | null,
     },
     withdrawal: row.withdrawalRequestedAt === null ? null : { withdrawnAt: row.withdrawnAt },
   };

@@ -115,7 +115,8 @@ export interface WithdrawalView {
 }
 
 export interface CancellationView {
-  cancelledBy: EmployeeRefView;
+  /** Null when the conversion command closed the request for the spending approver (`SPENDING_APPROVER_PARTY`, OD-6). */
+  cancelledBy: EmployeeRefView | null;
   cancelledAt: Date;
   cause: ReadableCancelCause;
   note: string | null;
@@ -208,7 +209,6 @@ export class AccessRequestQueryService {
       lineCount: record.beneficiaryEmployeeIds.length,
       businessReason: record.businessReason,
       termMonths: record.termMonths,
-      projectLabel: record.projectLabel,
       offPlan: record.offPlan,
       delegatedBatchId: record.delegatedBatchId,
       expectedEndDate: record.expectedEndDate,
@@ -236,7 +236,10 @@ export class AccessRequestQueryService {
         record.cancellation === null
           ? null
           : {
-              cancelledBy: person(record.cancellation.cancelledByEmployeeId),
+              cancelledBy:
+                record.cancellation.cancelledByEmployeeId === null
+                  ? null
+                  : person(record.cancellation.cancelledByEmployeeId),
               cancelledAt: record.cancellation.cancelledAt,
               cause: record.cancellation.cause,
               note: record.cancellation.note,

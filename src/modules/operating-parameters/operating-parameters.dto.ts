@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../infrastructure/http/dto/zod-dto';
 import { businessDate } from '../../infrastructure/http/dto/business-date.dto';
+import { ENUM_OPTIONS_MAX, PARAMETER_GROUPS } from './parameter-definitions.policy';
 
 const parameterValue = z.union([z.number(), z.string(), z.array(z.number())]);
 
@@ -9,14 +10,37 @@ export const parameterKeyParamSchema = z.strictObject({ key: z.string().regex(/^
 /** The value is only typed here; whether it is in the parameter's domain is judged by the parameter's own rule. */
 export const setParameterBodySchema = z.strictObject({ value: z.unknown() });
 
+/** The domain a value must stay in, by the shape of the parameter; `kind` tells which one. */
+const constraintsSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('int'), min: z.number().int(), max: z.number().int() }),
+  z.strictObject({
+    kind: z.literal('enum'),
+    options: z.array(z.string()).min(1).max(ENUM_OPTIONS_MAX),
+    optionLabels: z
+      .record(z.string(), z.string())
+      .meta({ description: 'The Vietnamese label of each option, by option.' }),
+  }),
+  z.strictObject({
+    kind: z.literal('int-list'),
+    min: z.number().int(),
+    max: z.number().int(),
+    length: z.strictObject({ min: z.number().int(), max: z.number().int() }),
+    order: z.enum(['ascending', 'descending']),
+  }),
+]);
+
 const parameterSchema = z.strictObject({
   key: z.string(),
+  label: z.string().meta({ description: 'What the screen shows for the parameter, in Vietnamese.' }),
+  group: z.enum(PARAMETER_GROUPS),
+  groupLabel: z.string().meta({ description: 'The name of the group, in Vietnamese.' }),
   value: parameterValue,
   default: parameterValue,
   isDefault: z.boolean(),
   unit: z.string(),
+  unitLabel: z.string().meta({ description: 'The unit, in Vietnamese.' }),
   description: z.string(),
-  constraints: z.record(z.string(), z.unknown()),
+  constraints: constraintsSchema,
   changedAt: z.iso.datetime().nullable(),
 });
 

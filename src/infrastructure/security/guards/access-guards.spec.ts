@@ -53,7 +53,6 @@ const principal = (roles: string[]): AuthenticatedPrincipal => ({
   sessionId: 's1',
   employeeId: 'e1',
   directRoles: roles,
-  derivedRoles: [],
   roles,
 });
 

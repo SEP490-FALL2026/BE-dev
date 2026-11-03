@@ -1,10 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { NotificationsApi } from '../../../src/modules/notifications/public/notifications.api';
-import { HR_BASIS } from '../../support/hr-basis';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
+
+/** What a correction carried before `QĐ-93f`: it takes no HR basis any more, so a body that still carries one is refused. */
+const HR_BASIS_BODY = {
+  type: 'LABOR_CONTRACT',
+  reference: 'HD-2026-001',
+  issuer: 'HR Department',
+  issuedOn: '2026-10-01',
+};
 
 interface MaintainedWire {
   id: string;
@@ -18,7 +25,7 @@ interface MaintainedWire {
 }
 
 /**
- * US-02-02 AC-19 (QĐ-82m INF-20, QĐ-87a): the Super Admin corrects the official fields of a record that exists, on an HR basis, and
+ * US-02-02 AC-19 (QĐ-82m INF-20, QĐ-87a): the Super Admin corrects the official fields of a record that exists, with no HR basis to give (QĐ-93f), and
  * never their own (QĐ-87c, F19); the IT Admin does not (F11).
  */
 describe('correcting the official fields of an employee over HTTP (integration, real PostgreSQL)', () => {
@@ -38,7 +45,6 @@ describe('correcting the official fields of an employee over HTTP (integration, 
   const superAdmin = () => ({ Authorization: `Bearer ${h.admin}` });
   const patch = (id: string, body: object, headers: Record<string, string> = superAdmin()) =>
     request(h.server()).patch(`/api/v1/employees/${id}`).set(headers).send(body);
-  const withBasis = (body: object) => ({ ...body, hrBasis: HR_BASIS });
   const dataOf = (response: request.Response) => (response.body as { data: MaintainedWire }).data;
   const codeOf = (response: request.Response) => (response.body as { error: { code: string } }).error.code;
   const reasonsOf = (response: request.Response) =>
@@ -74,10 +80,10 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       )
     ).rows;
 
-  it('lets the Super Admin change the name, and records who, the values before and after, and the HR basis (AC-19)', async () => {
+  it('lets the Super Admin change the name, and records who, the values before and after, and no HR basis (AC-19, QĐ-93f)', async () => {
     const id = await h.person('MNT1');
 
-    const response = await patch(id, withBasis({ fullName: 'Nguyễn Văn A' })).expect(200);
+    const response = await patch(id, { fullName: 'Nguyễn Văn A' }).expect(200);
 
     expect((response.body as { message: string }).message).toBe('EMPLOYEE.UPDATED');
     expect(dataOf(response)).toMatchObject({ id, employeeCode: 'MNT1', fullName: 'Nguyễn Văn A', status: 'ACTIVE' });
@@ -87,18 +93,18 @@ describe('correcting the official fields of an employee over HTTP (integration, 
         actor_app_user_id: h.seed.superAdmin.appUserId,
         actor_roles: ['SUPER_ADMIN'],
         before: { employeeCode: 'MNT1', fullName: 'Person MNT1' },
-        after: { fullName: 'Nguyễn Văn A', hrBasis: HR_BASIS },
+        after: { fullName: 'Nguyễn Văn A' },
       },
     ]);
   });
 
-  describe('the job title: optional free text, corrected with an HR basis (QĐ-87e, F11)', () => {
+  describe('the job title: optional free text, corrected with no HR basis (QĐ-87e, F11, QĐ-93f)', () => {
     it('is set, changed and cleared as typed, with the display form stored and before and after in the audit', async () => {
       const id = await h.person('MNT-T1');
 
-      const set = await patch(id, withBasis({ jobTitle: '  Chief   Happiness  Officer ' })).expect(200);
-      const changed = await patch(id, withBasis({ jobTitle: 'Head of Joy' })).expect(200);
-      const cleared = await patch(id, withBasis({ jobTitle: null })).expect(200);
+      const set = await patch(id, { jobTitle: '  Chief   Happiness  Officer ' }).expect(200);
+      const changed = await patch(id, { jobTitle: 'Head of Joy' }).expect(200);
+      const cleared = await patch(id, { jobTitle: null }).expect(200);
 
       expect(dataOf(set).jobTitle).toBe('Chief Happiness Officer');
       expect(dataOf(changed).jobTitle).toBe('Head of Joy');
@@ -115,7 +121,7 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       const id = await h.person('MNT-T2');
       const before = await rowOf(id);
 
-      const response = await patch(id, withBasis({ jobTitle: 'x'.repeat(256) })).expect(422);
+      const response = await patch(id, { jobTitle: 'x'.repeat(256) }).expect(422);
 
       expect(codeOf(response)).toBe('EMPLOYEE.ROW_INVALID');
       expect(reasonsOf(response)).toEqual([{ field: 'jobTitle', code: 'JOB_TITLE_TOO_LONG' }]);
@@ -133,7 +139,7 @@ describe('correcting the official fields of an employee over HTTP (integration, 
         ).rows[0].n;
       const placements = await count();
 
-      await patch(id, withBasis({ jobTitle: 'Brand new title' })).expect(200);
+      await patch(id, { jobTitle: 'Brand new title' }).expect(200);
 
       expect(await count()).toBe(placements);
       expect((await h.ctx.sql.query(`SELECT 1 FROM department_transfers WHERE employee_id = $1`, [id])).rows).toEqual(
@@ -161,7 +167,7 @@ describe('correcting the official fields of an employee over HTTP (integration, 
         [h.seed.organizationId, h.seed.departmentId, head],
       );
 
-      await patch(subject, withBasis({ fullName: 'Renamed Person' })).expect(200);
+      await patch(subject, { fullName: 'Renamed Person' }).expect(200);
 
       const notices = await noticesFor([subject, head]);
       expect(notices.map((notice) => notice.recipient_employee_id).sort()).toEqual([head, subject].sort());
@@ -173,8 +179,8 @@ describe('correcting the official fields of an employee over HTTP (integration, 
     it('tells nobody when nothing changed, and nothing is left behind when the correction is refused', async () => {
       const subject = await h.person('MNT-N3');
 
-      await patch(subject, withBasis({ fullName: 'Person MNT-N3' })).expect(200);
-      await patch(subject, withBasis({ jobTitle: 'x'.repeat(256) })).expect(422);
+      await patch(subject, { fullName: 'Person MNT-N3' }).expect(200);
+      await patch(subject, { jobTitle: 'x'.repeat(256) }).expect(422);
 
       expect(await noticesFor([subject])).toEqual([]);
     });
@@ -213,7 +219,7 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       });
       let status: number;
       try {
-        status = (await patch(subject, withBasis({ fullName: 'Rolled Back Name' }))).status;
+        status = (await patch(subject, { fullName: 'Rolled Back Name' })).status;
       } finally {
         failing.mockRestore();
       }
@@ -229,26 +235,20 @@ describe('correcting the official fields of an employee over HTTP (integration, 
   it('changes nothing and writes no audit event when the values are the ones the record already has', async () => {
     const id = await h.person('MNT3');
 
-    await patch(id, withBasis({ fullName: 'Person MNT3', employmentType: 'STAFF' })).expect(200);
+    await patch(id, { fullName: 'Person MNT3', employmentType: 'STAFF' }).expect(200);
 
     expect(await auditOf(id)).toEqual([]);
   });
 
-  describe('the HR basis is required', () => {
-    it.each([
-      ['no HR basis', undefined],
-      ['no type', { ...HR_BASIS, type: undefined }],
-      ['no reference', { ...HR_BASIS, reference: '' }],
-      ['no issuer', { ...HR_BASIS, issuer: undefined }],
-      ['no date of issue', { ...HR_BASIS, issuedOn: undefined }],
-    ])('refuses %s, names what is missing, and writes nothing', async (_name, hrBasis) => {
+  describe('no HR basis is taken (QĐ-93f)', () => {
+    it('refuses a body that still carries one, naming it, and writes nothing', async () => {
       const id = await h.person(`MNT-B${randomUUID().slice(0, 6)}`);
       const before = await rowOf(id);
 
-      const response = await patch(id, { fullName: 'Changed', hrBasis }).expect(422);
+      const response = await patch(id, { fullName: 'Changed', hrBasis: HR_BASIS_BODY }).expect(422);
 
       expect(codeOf(response)).toBe('VALIDATION_ERROR');
-      expect(JSON.stringify(response.body)).toMatch(/hrBasis|type|reference|issuer|issuedOn/);
+      expect(JSON.stringify(response.body)).toContain('unrecognized_keys');
       expect(await rowOf(id)).toEqual(before);
       expect(await auditOf(id)).toEqual([]);
     });
@@ -260,9 +260,7 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       const before = await rowOf(id);
 
       for (const headers of [h.as(h.it1), h.as(h.finance), h.as(h.employee)]) {
-        expect(codeOf(await patch(id, withBasis({ fullName: 'Nope' }), headers).expect(403))).toBe(
-          'AUTHORIZATION.FORBIDDEN',
-        );
+        expect(codeOf(await patch(id, { fullName: 'Nope' }, headers).expect(403))).toBe('AUTHORIZATION.FORBIDDEN');
       }
 
       expect(await rowOf(id)).toEqual(before);
@@ -278,7 +276,7 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       const id = await h.person('MNT5');
       const before = await rowOf(id);
 
-      const response = await patch(id, withBasis({ fullName: 'Changed', ...extra })).expect(422);
+      const response = await patch(id, { fullName: 'Changed', ...extra }).expect(422);
 
       expect(codeOf(response)).toBe('VALIDATION_ERROR');
       expect(await rowOf(id)).toEqual(before);
@@ -287,14 +285,12 @@ describe('correcting the official fields of an employee over HTTP (integration, 
     it('refuses a request that names no official field', async () => {
       const id = await h.person('MNT6');
 
-      expect(codeOf(await patch(id, withBasis({})).expect(422))).toBe('EMPLOYEE.UPDATE_EMPTY');
+      expect(codeOf(await patch(id, {}).expect(422))).toBe('EMPLOYEE.UPDATE_EMPTY');
     });
 
     it('answers 404 for a person who does not exist and 422 for an id that is not one', async () => {
-      expect(codeOf(await patch(randomUUID(), withBasis({ fullName: 'Nobody' })).expect(404))).toBe(
-        'EMPLOYEE.NOT_FOUND',
-      );
-      expect(codeOf(await patch('not-an-id', withBasis({ fullName: 'Nobody' })).expect(422))).toBe('VALIDATION_ERROR');
+      expect(codeOf(await patch(randomUUID(), { fullName: 'Nobody' }).expect(404))).toBe('EMPLOYEE.NOT_FOUND');
+      expect(codeOf(await patch('not-an-id', { fullName: 'Nobody' }).expect(422))).toBe('VALIDATION_ERROR');
     });
   });
 
@@ -303,8 +299,8 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       const first = await h.person('MNT7');
       const second = await h.person('MNT8');
 
-      const taken = await patch(second, withBasis({ workEmail: '  MNT7+Alias@ACME.vn ' })).expect(422);
-      const retyped = await patch(first, withBasis({ workEmail: 'Mnt7@Acme.vn' })).expect(200);
+      const taken = await patch(second, { workEmail: '  MNT7+Alias@ACME.vn ' }).expect(422);
+      const retyped = await patch(first, { workEmail: 'Mnt7@Acme.vn' }).expect(200);
 
       expect(codeOf(taken)).toBe('EMPLOYEE.ROW_INVALID');
       expect(reasonsOf(taken)).toEqual([{ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' }]);
@@ -316,8 +312,8 @@ describe('correcting the official fields of an employee over HTTP (integration, 
     it('may be removed, and a bad address is refused as a malformed request', async () => {
       const id = await h.person('MNT9');
 
-      expect(dataOf(await patch(id, withBasis({ workEmail: null })).expect(200)).workEmail).toBeNull();
-      expect(codeOf(await patch(id, withBasis({ workEmail: 'not an email' })).expect(422))).toBe('VALIDATION_ERROR');
+      expect(dataOf(await patch(id, { workEmail: null }).expect(200)).workEmail).toBeNull();
+      expect(codeOf(await patch(id, { workEmail: 'not an email' }).expect(422))).toBe('VALIDATION_ERROR');
     });
 
     it('does not change the login email of the account the person has (FR-8.6)', async () => {
@@ -327,7 +323,7 @@ describe('correcting the official fields of an employee over HTTP (integration, 
         ])
       ).rows[0].login_email;
 
-      await patch(h.finance.employeeId, withBasis({ workEmail: 'finance.new@acme.vn' })).expect(200);
+      await patch(h.finance.employeeId, { workEmail: 'finance.new@acme.vn' }).expect(200);
 
       const after = (
         await h.ctx.sql.query<{ login_email: string }>(`SELECT login_email FROM app_users WHERE id = $1`, [
@@ -345,9 +341,9 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       await h.ctx.sql.query(`UPDATE employees SET hire_date = '2099-01-01' WHERE id = $1`, [future]);
       const past = await h.person('MNT11');
 
-      const changed = await patch(future, withBasis({ hireDate: '2099-06-01' })).expect(200);
-      const intoPast = await patch(future, withBasis({ hireDate: '2000-01-01' })).expect(422);
-      const passed = await patch(past, withBasis({ hireDate: '2099-06-01' })).expect(422);
+      const changed = await patch(future, { hireDate: '2099-06-01' }).expect(200);
+      const intoPast = await patch(future, { hireDate: '2000-01-01' }).expect(422);
+      const passed = await patch(past, { hireDate: '2099-06-01' }).expect(422);
 
       expect(dataOf(changed).hireDate).toBe('2099-06-01');
       expect(reasonsOf(intoPast)).toEqual([{ field: 'hireDate', code: 'HIRE_DATE_IN_PAST' }]);
@@ -362,7 +358,7 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       const own = h.seed.superAdmin.employeeId;
       const before = await rowOf(own);
 
-      const refused = await patch(own, withBasis({ fullName: 'Self Edit' })).expect(403);
+      const refused = await patch(own, { fullName: 'Self Edit' }).expect(403);
 
       expect(codeOf(refused)).toBe('EMPLOYEE.SELF_CHANGE_FORBIDDEN');
       const message = (refused.body as { error: { message: string } }).error.message;
@@ -371,13 +367,13 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       expect(await rowOf(own)).toEqual(before);
       expect(await auditOf(own)).toEqual([]);
       // Even a body that would be refused for another reason is answered by the role first, not by the row.
-      expect(codeOf(await patch(own, withBasis({ jobTitle: 'x'.repeat(256) })).expect(403))).toBe(
+      expect(codeOf(await patch(own, { jobTitle: 'x'.repeat(256) }).expect(403))).toBe(
         'EMPLOYEE.SELF_CHANGE_FORBIDDEN',
       );
     });
 
     it('lets the Super Admin correct anybody else, an IT Admin included, whatever the department says', async () => {
-      await patch(h.it1.employeeId, withBasis({ fullName: 'Edited By The Super Admin' })).expect(200);
+      await patch(h.it1.employeeId, { fullName: 'Edited By The Super Admin' }).expect(200);
 
       expect((await rowOf(h.it1.employeeId)).full_name).toBe('Edited By The Super Admin');
       expect((await auditOf(h.it1.employeeId)).at(-1)).toMatchObject({

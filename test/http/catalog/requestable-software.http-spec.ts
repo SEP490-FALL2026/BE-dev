@@ -120,7 +120,7 @@ describe('the software a person may request (HTTP contract, no database)', () =>
   const get = (path: string, employeeId = WITH_COST_CENTER, direct: string[] = [], derived: string[] = []) =>
     request(app.getHttpServer())
       .get(path)
-      .set('Authorization', bearer(principal(direct, derived, { employeeId })));
+      .set('Authorization', bearer(principal([...direct, ...derived], { employeeId })));
 
   it.each(ROUTES)('%s without a token is 401', async (path) => {
     const response = await request(app.getHttpServer()).get(path).expect(401);

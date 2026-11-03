@@ -100,8 +100,9 @@ export class RequestDraftsController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The body is invalid for its kind (VALIDATION_ERROR). Nothing is saved.',
-      examples: [VALIDATION_EXAMPLE],
+      description:
+        'The body is invalid for its kind (VALIDATION_ERROR), or the sender, or a person of a group draft, is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is saved.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.REQUEST_PARTY_INELIGIBLE],
     },
   )
   async save(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DraftSaveBodyDto) {
@@ -166,8 +167,8 @@ export class RequestDraftsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The id is invalid (VALIDATION_ERROR), or an expected spend date is saved for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE). Nothing changes.',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE],
+        'The id is invalid (VALIDATION_ERROR), an expected spend date is saved for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing changes.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE, EXAMPLES.REQUEST_PARTY_INELIGIBLE],
     },
   )
   async submit(

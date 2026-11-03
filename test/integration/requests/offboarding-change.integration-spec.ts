@@ -112,8 +112,8 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
       const department = await h.departmentWithUnit(code('P'));
       const head = await h.worker(department, code('E'));
       await h.makeHead(department, head);
-      const next = await h.worker(department, code('H'));
-      const other = await h.worker(department, code('H'));
+      const next = await h.worker(department, code('H'), ['MANAGER']);
+      const other = await h.worker(department, code('H'), ['MANAGER']);
 
       return { department, head, next, other };
     };
@@ -139,6 +139,23 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
         expect.objectContaining({ employee_id: head.employeeId, valid_to: h.day(23) }),
         expect.objectContaining({ employee_id: other.employeeId, valid_from: h.day(23), valid_to: null }),
       ]);
+    });
+
+    it('refuses a new successor without MANAGER when the day changes, and saves nothing (US-03-04 AC-8)', async () => {
+      const { department, head, next } = await headedDepartment();
+      const withoutRole = await h.worker(department, code('N'));
+      const wire = await h.recordedCase(head, { successor: { kind: 'EMPLOYEE', employeeId: next.employeeId } });
+      const periods = await h.headPeriods(department.id);
+
+      const response = await h.changeLastDay(wire.id, {
+        lastWorkingDay: h.day(22),
+        reason: 'Đổi người kế nhiệm',
+        successor: { kind: 'EMPLOYEE', employeeId: withoutRole.employeeId },
+      });
+
+      expect([response.status, h.codeOf(response)]).toEqual([422, 'OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE']);
+      expect(h.detailsOf(response)).toEqual({ reason: 'MANAGER_ROLE_REQUIRED' });
+      expect(await h.headPeriods(department.id)).toEqual(periods);
     });
 
     it('refuses the whole command when the successor cannot take the department on the new day, and saves nothing', async () => {
@@ -189,7 +206,7 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
       const department = await h.departmentWithUnit(code('P'));
       const head = await h.worker(department, code('E'));
       await h.makeHead(department, head);
-      const next = await h.worker(department, code('H'));
+      const next = await h.worker(department, code('H'), ['MANAGER']);
       const wire = await h.recordedCase(head, { successor: { kind: 'EMPLOYEE', employeeId: next.employeeId } });
 
       const none = await h.cancelCase(wire.id, {});

@@ -13,29 +13,24 @@ export interface RequestPeople {
 const isParty = (people: RequestPeople, employeeId: string): boolean =>
   people.requesterEmployeeId === employeeId || people.beneficiaryEmployeeIds.includes(employeeId);
 
-export type WaitingSpendReason = 'NO_SPENDING_APPROVER' | 'NO_CONFLICT_SUBSTITUTE';
+/**
+ * `SPENDING_APPROVER_IS_PARTY` is a reason of the transition: only a Request made before the spending approver stopped being a party
+ * of any Request (`D-S21`) can meet it, and the conversion command closes those. It is never given to the approver (`SoD-7`).
+ */
+export type WaitingSpendReason = 'NO_SPENDING_APPROVER' | 'SPENDING_APPROVER_IS_PARTY';
 
 export type SpendAssignment =
-  | { outcome: 'ASSIGNED'; assigneeEmployeeId: string; substituted: boolean }
-  | { outcome: 'WAITING'; reason: WaitingSpendReason };
+  { outcome: 'ASSIGNED'; assigneeEmployeeId: string } | { outcome: 'WAITING'; reason: WaitingSpendReason };
 
 /**
- * The spending approver holds the spend step. When they are the one who asked or one the request is for, the substitute for a
- * conflict of interest holds it instead (`US-06-14` AC-7); with no substitute that can decide it, it waits.
+ * The spending approver holds the spend step, and nobody else does (`QĐ-93c`): with no approver who works it waits, and so it does
+ * when the approver is the one who asked or one the request is for, which a Request sent now never is; no substitute takes it over.
  */
-export function routeSpendStep(
-  people: RequestPeople,
-  holders: { spendingApproverEmployeeId: string | null; conflictSubstituteEmployeeId: string | null },
-): SpendAssignment {
-  const approver = holders.spendingApproverEmployeeId;
-  if (approver === null) return { outcome: 'WAITING', reason: 'NO_SPENDING_APPROVER' };
-  if (!isParty(people, approver)) return { outcome: 'ASSIGNED', assigneeEmployeeId: approver, substituted: false };
+export function routeSpendStep(people: RequestPeople, spendingApproverEmployeeId: string | null): SpendAssignment {
+  if (spendingApproverEmployeeId === null) return { outcome: 'WAITING', reason: 'NO_SPENDING_APPROVER' };
+  if (isParty(people, spendingApproverEmployeeId)) return { outcome: 'WAITING', reason: 'SPENDING_APPROVER_IS_PARTY' };
 
-  const substitute = holders.conflictSubstituteEmployeeId;
-  if (substitute === null || isParty(people, substitute))
-    return { outcome: 'WAITING', reason: 'NO_CONFLICT_SUBSTITUTE' };
-
-  return { outcome: 'ASSIGNED', assigneeEmployeeId: substitute, substituted: true };
+  return { outcome: 'ASSIGNED', assigneeEmployeeId: spendingApproverEmployeeId };
 }
 
 export const NO_FINANCE_REVIEWER = 'NO_FINANCE_REVIEWER';

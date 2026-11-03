@@ -38,7 +38,7 @@ describe('ending the review of Finance (e2e, no database)', () => {
   ])('refuses %s with 403', async (_name, direct, derived) => {
     const response = await request(app.getHttpServer())
       .post(URL)
-      .set('Authorization', bearer(principal(direct, derived)))
+      .set('Authorization', bearer(principal([...direct, ...derived])))
       .send(OPINION)
       .expect(403);
 

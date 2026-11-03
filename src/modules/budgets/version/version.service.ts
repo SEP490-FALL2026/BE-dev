@@ -62,7 +62,10 @@ export class VersionService {
     const fiscalStart = await this.access.begin(actor);
 
     return this.runner.run(async (tx) => {
-      // The proposal row first, then the version row, then the year: the order every writer of this context takes them in.
+      // The row of the grant of the spending approver first, `FOR SHARE`: a revocation that is being made and this sending take turns, so
+      // the version is told as waiting exactly once (`M6`, `M7`). Then the proposal row, the version row and the year: the order every
+      // writer of this context takes them in.
+      const approver = await this.access.usableApproverLocked(tx);
       const known = await this.versions.findById(id, tx);
       if (!known) throw new BudgetVersionNotFoundError();
       const proposal = known.proposalId ? await this.proposals.lockById(tx, known.proposalId) : null;
@@ -76,7 +79,7 @@ export class VersionService {
 
       await this.versions.setSent(tx, id, actor.employeeId, new Date());
       const sent = await this.access.requireIn(tx, id);
-      await this.trail.sent(tx, actor, version, { record: sent, proposal });
+      await this.trail.sent(tx, actor, version, { record: sent, proposal, approver });
 
       return this.views.wire(sent);
     });

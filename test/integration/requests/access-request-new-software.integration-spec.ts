@@ -6,11 +6,11 @@ const h = new RequestHarness();
 describe('requests over HTTP: software that is not in the catalog (integration, real PostgreSQL)', () => {
   let design: Department;
   let executive: Department;
-  let headless: Department;
+  let noItInCharge: Department; // has a head, and nobody who works is in charge of it for IT
   let head: Person; // head of design
   let designer: Person;
-  let boss: Person; // head of executive and the spending approver
-  let fallback: Person;
+  let boss: Person; // the spending approver, a member of executive (QĐ-93b)
+  let noItHead: Person; // head of the department nobody is in charge of for IT
   let itInCharge: Person; // the IT Admin in charge of design
   let otherIt: Person; // another IT Admin, acting for them
   let itPerson: Person;
@@ -21,18 +21,18 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
     await h.start();
     design = await h.departmentWithUnit('P-DES');
     executive = await h.departmentWithUnit('P-EXE');
-    headless = await h.departmentWithUnit('P-HR');
+    noItInCharge = await h.departmentWithUnit('P-HR');
     head = await h.staff(design, 'DES-H1');
     designer = await h.staff(design, 'DES-E1');
     boss = await h.staff(executive, 'EXE-C1');
-    fallback = await h.staff(headless, 'HR-R0');
-    otherIt = await h.staff(headless, 'HR-IT2', ['IT_ADMIN']);
+    noItHead = await h.staff(noItInCharge, 'HR-H1');
+    otherIt = await h.staff(noItInCharge, 'HR-IT2', ['IT_ADMIN']);
     itInCharge = { employeeId: h.it1.employeeId, account: h.it1 };
     itPerson = await h.staff(design, 'DES-IT3', ['IT_ADMIN']);
     await h.makeHead(design, head);
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
-    await h.setRole('FALLBACK_APPROVER', fallback);
+    await h.makeHead(noItInCharge, noItHead);
     await h.setItAdminInCharge(design, itInCharge);
   }, 240000);
 
@@ -152,8 +152,8 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
     });
 
     it('waits for any IT Admin when the department has none in charge who still works', async () => {
-      const proposed = await h.proposed(await h.staff(headless, `HR-P${(counter += 1)}`));
-      await h.decide(proposed.id, { decision: 'APPROVE' }, fallback.account).expect(200);
+      const proposed = await h.proposed(await h.staff(noItInCharge, `HR-P${(counter += 1)}`));
+      await h.decide(proposed.id, { decision: 'APPROVE' }, noItHead.account).expect(200);
 
       const steps = await stepsOf(proposed.id);
 

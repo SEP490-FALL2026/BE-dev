@@ -14,11 +14,17 @@ import {
   LoginEmailInvalidError,
   LoginEmailRequiredError,
   LoginEmailTakenError,
+  ManagerStillHeadingError,
   RoleAlreadyGrantedError,
   RoleCombinationForbiddenError,
   RoleNotGrantedError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
+  SpendingApproverAccountNotUsableError,
+  SpendingApproverAlreadyAssignedError,
+  SpendingApproverEmployeeNotActiveError,
+  SpendingApproverHasOpenWorkError,
+  SpendingApproverHeadsDepartmentError,
   SuperAdminHolderNotLockableError,
 } from '../account.errors';
 import { AccountInvitationService } from './account-invitation.service';
@@ -72,7 +78,10 @@ async function answerOf(route: Route, error: Error) {
   return { status: exception.getStatus(), body: exception.getResponse() };
 }
 
-const refused = (status: HttpStatus, code: string, message: string) => ({ status, body: { code, message } });
+const refused = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>) => ({
+  status,
+  body: { code, message, ...(details ? { details } : {}) },
+});
 
 describe('AppUsersController — error answers (status, code, message)', () => {
   it.each<[string, () => Error, { status: HttpStatus; body: object }]>([
@@ -88,9 +97,65 @@ describe('AppUsersController — error answers (status, code, message)', () => {
       refused(409, 'APP_USER.SELF_CHANGE_FORBIDDEN', 'You cannot change your own account.'),
     ],
     [
-      'a derived role',
-      () => new RoleRequestRefusedError('ROLE_DERIVED'),
-      refused(422, 'APP_USER.ROLE_DERIVED', 'The role cannot be granted by hand: ROLE_DERIVED.'),
+      'a second spending approver',
+      () => new SpendingApproverAlreadyAssignedError(),
+      refused(
+        409,
+        'APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED',
+        'Another account already holds the SPENDING_APPROVER role.',
+      ),
+    ],
+    [
+      'a spending approver who is a head, with the periods',
+      () =>
+        new SpendingApproverHeadsDepartmentError([
+          { departmentId: id, departmentCode: 'P-ENG', validFrom: '2026-10-01', validTo: null, timing: 'CURRENT' },
+        ]),
+      refused(
+        409,
+        'APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT',
+        'The employee heads a department, will head one from a later day, or is named as a successor, so cannot be the spending approver.',
+        {
+          headPeriods: [
+            { departmentId: id, departmentCode: 'P-ENG', validFrom: '2026-10-01', validTo: null, timing: 'CURRENT' },
+          ],
+        },
+      ),
+    ],
+    [
+      'a spending approver with open work, listed and marked as cut or not',
+      () =>
+        new SpendingApproverHasOpenWorkError(
+          [{ kind: 'REQUEST', id, label: 'Access request that is not over', partyRole: 'REQUESTER' }],
+          true,
+        ),
+      refused(
+        409,
+        'APP_USER.SPENDING_APPROVER_HAS_OPEN_WORK',
+        'The employee is a party of work that is still open, so cannot be the spending approver yet.',
+        {
+          blockers: [{ kind: 'REQUEST', id, label: 'Access request that is not over', partyRole: 'REQUESTER' }],
+          truncated: true,
+        },
+      ),
+    ],
+    [
+      'a spending approver whose employee is not working',
+      () => new SpendingApproverEmployeeNotActiveError(),
+      refused(
+        422,
+        'APP_USER.SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE',
+        'The employee has left, is on long leave or is handing over, so cannot be the spending approver.',
+      ),
+    ],
+    [
+      'a spending approver whose account is not usable',
+      () => new SpendingApproverAccountNotUsableError(),
+      refused(
+        422,
+        'APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE',
+        'The account is locked or not activated, so cannot be the spending approver.',
+      ),
     ],
     [
       'the Super Admin role',
@@ -98,7 +163,7 @@ describe('AppUsersController — error answers (status, code, message)', () => {
       refused(
         422,
         'APP_USER.SUPER_ADMIN_TRANSFER_ONLY',
-        'The role cannot be granted by hand: SUPER_ADMIN_TRANSFER_ONLY.',
+        'The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.',
       ),
     ],
     [
@@ -152,12 +217,30 @@ describe('AppUsersController — error answers (status, code, message)', () => {
       refused(404, 'APP_USER.ROLE_NOT_GRANTED', 'The account does not hold this role.'),
     ],
     [
-      'a forbidden combination',
-      () => new RoleCombinationForbiddenError(),
+      'a forbidden combination, with the roles in the way',
+      () => new RoleCombinationForbiddenError(['IT_ADMIN', 'MANAGER']),
       refused(
         409,
         'APP_USER.ROLE_COMBINATION_FORBIDDEN',
         'This role cannot be combined with the roles the account holds.',
+        { conflictingRoles: ['IT_ADMIN', 'MANAGER'] },
+      ),
+    ],
+    [
+      'a MANAGER role that still heads a department, with the periods',
+      () =>
+        new ManagerStillHeadingError([
+          { departmentId: id, departmentCode: 'P-ENG', validFrom: '2026-10-01', validTo: null, timing: 'CURRENT' },
+        ]),
+      refused(
+        409,
+        'APP_USER.MANAGER_STILL_HEADING',
+        'The account heads a department, will head one from a later day, or is named as a successor: end or take back that period before revoking MANAGER.',
+        {
+          headPeriods: [
+            { departmentId: id, departmentCode: 'P-ENG', validFrom: '2026-10-01', validTo: null, timing: 'CURRENT' },
+          ],
+        },
       ),
     ],
     [

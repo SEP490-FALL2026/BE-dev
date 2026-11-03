@@ -112,3 +112,5 @@ Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-grap
 - Codec của cột JSON (`.json.ts`): `personnel-head-handover.json.ts` (`head_handover` của `department_transfers` và `offboarding_cases`) và
   `personnel-change-detail.json.ts` (`detail` của `offboarding_case_changes`) nằm ở gốc module, spec cạnh file (`*.json.spec.ts`); lý do chỗ đặt ở
   [module structure](../../../docs/rules/module-structure.md).
+
+A successor named in a transfer or departure must hold `MANAGER` and must not hold `SPENDING_APPROVER`; the same refusal reaches notices and the controlled CLI.

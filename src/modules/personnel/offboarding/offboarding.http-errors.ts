@@ -33,6 +33,7 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   ALREADY_RECORDED: HttpStatus.CONFLICT,
   REVOCATION_NOT_SUPPORTED: HttpStatus.CONFLICT,
   CASE_NOT_CLOSEABLE: HttpStatus.CONFLICT,
+  EMPLOYEE_UNPLACED: HttpStatus.CONFLICT,
   PLACEMENT_OVERLAP: HttpStatus.CONFLICT,
   CONCURRENT_CHANGE: HttpStatus.CONFLICT,
 };
@@ -65,6 +66,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
   ALREADY_RECORDED: 'The lock of the company account was recorded already.',
   REVOCATION_NOT_SUPPORTED: 'The kind of provisioning of the seat has no revocation yet.',
   CASE_NOT_CLOSEABLE: 'Something still keeps the case open.',
+  EMPLOYEE_UNPLACED: 'Xếp phòng trước khi ghi nghỉ việc.',
   PLACEMENT_OVERLAP: 'The placements of the person cannot take this change.',
   CONCURRENT_CHANGE: 'The person was changed by someone else meanwhile; read the case again.',
 };

@@ -98,7 +98,7 @@ describe('BEH.1 characterization: import classifier and manual-entry validator o
   describe('where the two agree: the department and job title reasons, codes and order', () => {
     it.each<[string, Fixture, string[]]>([
       ['everything usable', { department: 'ok', jobTitle: 'ok' }, []],
-      ['a blank department (whitespace only)', { department: 'blank', jobTitle: 'ok' }, ['DEPARTMENT_REQUIRED']],
+      ['a blank department (whitespace only)', { department: 'blank', jobTitle: 'ok' }, []],
       ['an unknown department', { department: 'unknown', jobTitle: 'ok' }, ['DEPARTMENT_NOT_FOUND']],
       ['a retired department', { department: 'inactive', jobTitle: 'ok' }, ['DEPARTMENT_INACTIVE']],
       ['a blank job title: optional free text, no reason (QĐ-87e)', { department: 'ok', jobTitle: 'blank' }, []],

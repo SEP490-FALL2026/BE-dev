@@ -24,7 +24,6 @@ interface Route {
   path: string;
   service: unknown;
   role: string;
-  derived: boolean;
   message: string;
   answer: Record<string, unknown>;
 }
@@ -35,7 +34,6 @@ const ROUTES: Route[] = [
     path: '/api/v1/dashboards/employee',
     service: EmployeeDashboardService,
     role: 'EMPLOYEE',
-    derived: false,
     message: 'DASHBOARD.EMPLOYEE_RETRIEVED',
     answer: {
       asOf: '2026-10-23',
@@ -47,7 +45,6 @@ const ROUTES: Route[] = [
     path: '/api/v1/dashboards/manager',
     service: ManagerDashboardService,
     role: 'MANAGER',
-    derived: true,
     message: 'DASHBOARD.MANAGER_RETRIEVED',
     answer: {
       asOf: '2026-10-23',
@@ -69,7 +66,6 @@ const ROUTES: Route[] = [
     path: '/api/v1/dashboards/it-admin',
     service: ItAdminDashboardService,
     role: 'IT_ADMIN',
-    derived: false,
     message: 'DASHBOARD.IT_ADMIN_RETRIEVED',
     answer: {
       asOf: '2026-10-23',
@@ -92,7 +88,6 @@ const ROUTES: Route[] = [
     path: '/api/v1/dashboards/super-admin',
     service: SuperAdminDashboardService,
     role: 'SUPER_ADMIN',
-    derived: false,
     message: 'DASHBOARD.SUPER_ADMIN_RETRIEVED',
     answer: {
       asOf: '2026-10-23',
@@ -110,8 +105,7 @@ const ROUTES: Route[] = [
   },
 ];
 const ALL_ROLES = ['EMPLOYEE', 'MANAGER', 'IT_ADMIN', 'SUPER_ADMIN', 'FINANCE', 'SPENDING_APPROVER'];
-const DERIVED = new Set(['MANAGER', 'SPENDING_APPROVER']);
-const holder = (role: string) => (DERIVED.has(role) ? principal([], [role]) : principal([role]));
+const holder = (role: string) => principal([role]);
 
 /**
  * `US-12-15` AC-2, AC-3, AC-4, AC-7: the contract of the four role overviews, with their services replaced, so what is proved here is
@@ -161,9 +155,7 @@ describe('role overview routes (e2e, no database)', () => {
     );
 
     it('answers the sections for the role under its own message, read for the caller', async () => {
-      const caller = route.derived
-        ? principal([], [route.role], { employeeId: 'e-77' })
-        : principal([route.role], [], { employeeId: 'e-77' });
+      const caller = principal([route.role], { employeeId: 'e-77' });
       const response = await request(app.getHttpServer())
         .get(route.path)
         .set('Authorization', bearer(caller))
@@ -208,7 +200,7 @@ describe('role overview routes (e2e, no database)', () => {
 
   // A person with several roles reads each overview of a role they hold, and only those.
   it('lets a person who is an IT Admin, an Employee and a head read those three overviews and not the Super Admin one', async () => {
-    const caller = bearer(principal(['IT_ADMIN', 'EMPLOYEE'], ['MANAGER']));
+    const caller = bearer(principal(['IT_ADMIN', 'EMPLOYEE', 'MANAGER']));
 
     for (const path of ['/employee', '/manager', '/it-admin']) {
       await request(app.getHttpServer()).get(`/api/v1/dashboards${path}`).set('Authorization', caller).expect(200);

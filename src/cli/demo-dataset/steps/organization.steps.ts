@@ -1,5 +1,5 @@
 import type { DemoAccountSpec } from '../../../modules/installation/public/demo-accounts.types';
-import { basis, emailOf, listAll, summarize } from '../demo-step-kit';
+import { emailOf, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoDepartment, DemoPerson } from '../fixture/demo-fixture.types';
 
@@ -51,7 +51,6 @@ async function oneDepartment(
     code: department.code,
     name: department.name,
     function: department.function,
-    hrBasis: basis(ctx),
   });
   ctx.ids.departments.set(department.code, created.id);
 
@@ -80,7 +79,6 @@ async function employees(ctx: DemoRunContext): Promise<StepOutcome> {
       employmentType: person.employmentType,
       hireDate: HIRE_DATE,
       departmentCode: person.department,
-      hrBasis: basis(ctx),
     });
     ctx.ids.employees.set(person.code, created.id);
     results.push({ status: 'done', label: person.code });
@@ -119,7 +117,15 @@ async function placedAsWanted(
 function accountSpecs(ctx: DemoRunContext): DemoAccountSpec[] {
   return ctx.fixture.people
     .filter((person) => person.account !== null)
-    .map((person) => ({ employeeCode: person.code, loginEmail: emailOf(ctx, person.code), role: person.account! }));
+    .map((person) => ({
+      employeeCode: person.code,
+      loginEmail: emailOf(ctx, person.code),
+      role: person.account!,
+      allowedExtraRoles: [
+        ...(ctx.fixture.departments.some((department) => department.head === person.code) ? ['MANAGER' as const] : []),
+        ...(ctx.fixture.approvalRoles.SPENDING_APPROVER === person.code ? ['SPENDING_APPROVER' as const] : []),
+      ],
+    }));
 }
 
 async function accounts(ctx: DemoRunContext): Promise<StepOutcome> {
@@ -158,7 +164,6 @@ async function itAdmins(ctx: DemoRunContext): Promise<StepOutcome> {
     else {
       await ctx.api.call(ctx.superAdminEmail, 'PATCH', `/departments/${profile.id}`, {
         itAdminEmployeeId: ctx.ids.employees.get(department.itAdmin!),
-        hrBasis: basis(ctx),
       });
       results.push({ status: 'done', label });
     }
@@ -176,10 +181,14 @@ async function heads(ctx: DemoRunContext): Promise<StepOutcome> {
     else if (profile.head) results.push({ status: 'conflict', label: `${label}: đã có ${profile.head.employeeCode}` });
     else if (ctx.mode === 'plan') results.push({ status: 'planned', label });
     else {
+      const accountId = ctx.ids.appUsers.get(department.head!);
+      if (!accountId) throw new Error(`The head ${department.head} has no account`);
+      const account = await ctx.api.call<{ roles: string[] }>(ctx.superAdminEmail, 'GET', `/app-users/${accountId}`);
+      if (!account.roles.includes('MANAGER'))
+        await ctx.api.call(ctx.superAdminEmail, 'POST', `/app-users/${accountId}/role-grants`, { role: 'MANAGER' });
       await ctx.api.call(ctx.superAdminEmail, 'POST', `/departments/${profile.id}/head-assignments`, {
         employeeId: ctx.ids.employees.get(department.head!),
         effectiveFrom: ctx.today,
-        hrBasis: basis(ctx),
       });
       results.push({ status: 'done', label });
     }
@@ -188,29 +197,28 @@ async function heads(ctx: DemoRunContext): Promise<StepOutcome> {
   return summarize(results);
 }
 
-/** A role somebody outside the dataset holds stays theirs: the dataset never takes an approval role from a real holder. */
-async function approvalRoles(ctx: DemoRunContext): Promise<StepOutcome> {
-  const current = await ctx.api.call<{ items: { role: string; holder: { employeeCode: string } | null }[] }>(
+async function spendingApprover(ctx: DemoRunContext, code: string): Promise<Result> {
+  const role = 'SPENDING_APPROVER';
+  const label = `${role} \u2190 ${code}`;
+  const accountId = ctx.ids.appUsers.get(code);
+  if (!accountId) return { status: 'conflict', label: `${code}: no account` };
+  const account = await ctx.api.call<{ roles: string[] }>(ctx.superAdminEmail, 'GET', `/app-users/${accountId}`);
+  if (account.roles.includes(role)) return { status: 'present', label };
+  const accounts = await listAll<{ id: string; roles: string[]; employee: { employeeCode: string } | null }>(
+    ctx,
     ctx.superAdminEmail,
-    'GET',
-    '/approval-roles',
+    '/app-users',
   );
-  const results: Result[] = [];
-  for (const [role, code] of Object.entries(ctx.fixture.approvalRoles)) {
-    const holder = current.items.find((item) => item.role === role)?.holder ?? null;
-    const label = `${role} ← ${code}`;
-    if (holder?.employeeCode === code) results.push({ status: 'present', label });
-    else if (holder) results.push({ status: 'conflict', label: `${label}: đang do ${holder.employeeCode} giữ` });
-    else if (ctx.mode === 'plan') results.push({ status: 'planned', label });
-    else {
-      await ctx.api.call(ctx.superAdminEmail, 'PUT', `/approval-roles/${role}`, {
-        employeeId: ctx.ids.employees.get(code),
-      });
-      results.push({ status: 'done', label });
-    }
-  }
+  const holder = accounts.find((item) => item.roles.includes(role));
+  if (holder) return { status: 'conflict', label: `${label}: held by ${holder.employee?.employeeCode ?? holder.id}` };
+  if (ctx.mode === 'plan') return { status: 'planned', label };
+  await ctx.api.call(ctx.superAdminEmail, 'POST', `/app-users/${accountId}/role-grants`, { role });
+  return { status: 'done', label };
+}
 
-  return summarize(results);
+/** The one approval role left: a role somebody outside the dataset holds stays theirs, the dataset never takes it from a real holder. */
+async function approvalRoles(ctx: DemoRunContext): Promise<StepOutcome> {
+  return summarize([await spendingApprover(ctx, ctx.fixture.approvalRoles.SPENDING_APPROVER)]);
 }
 
 export const ORGANIZATION_STEPS: readonly DemoStep[] = [
@@ -218,6 +226,6 @@ export const ORGANIZATION_STEPS: readonly DemoStep[] = [
   { key: 'org.employees', title: 'Nhân viên (Super Admin)', needs: ['org.departments'], run: employees },
   { key: 'org.accounts', title: 'Tài khoản demo (lệnh vận hành)', needs: ['org.employees'], run: accounts },
   { key: 'org.it-admins', title: 'IT Admin phụ trách phòng (Super Admin)', needs: ['org.accounts'], run: itAdmins },
-  { key: 'org.heads', title: 'Trưởng phòng (Super Admin)', needs: ['org.employees'], run: heads },
-  { key: 'org.approval-roles', title: 'Vai trò phê duyệt (Super Admin)', needs: ['org.accounts'], run: approvalRoles },
+  { key: 'org.heads', title: 'Trưởng phòng (Super Admin)', needs: ['org.accounts'], run: heads },
+  { key: 'org.approval-roles', title: 'Người duyệt chi (Super Admin)', needs: ['org.accounts'], run: approvalRoles },
 ];

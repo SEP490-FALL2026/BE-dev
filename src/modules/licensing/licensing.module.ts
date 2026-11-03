@@ -17,6 +17,7 @@ import { ServiceAccountDutiesController } from './assignment/service-account-dut
 import { ServiceAccountDutyRepo } from './assignment/service-account-duty/service-account-duty.repo';
 import { ServiceAccountDutyService } from './assignment/service-account-duty/service-account-duty.service';
 import { ServiceAccountDutySweeper } from './assignment/service-account-duty/service-account-duty.job';
+import { ServiceAccountSpendingApproverGrantCheck } from './assignment/service-account-duty/spending-approver-grant.listener';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
 import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
@@ -116,6 +117,7 @@ import { RenewalDecisionTrail } from './subscription-renewal/decision/renewal-de
 import { RenewalDecisionService } from './subscription-renewal/decision/renewal-decision.service';
 import { RenewalOutcomeService } from './subscription-renewal/outcome/renewal-outcome.service';
 import { RenewalProposalService } from './subscription-renewal/proposal/renewal-proposal.service';
+import { RenewalSpendingApproverWaitListener } from './subscription-renewal/spending-approver-wait.listener';
 import { RenewalNotifier } from './subscription-renewal/subscription-renewal-notifier.service';
 import { RenewalPartiesService } from './subscription-renewal/subscription-renewal-parties.service';
 import { RenewalRankingService } from './subscription-renewal/subscription-renewal-ranking.service';
@@ -177,6 +179,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     ServiceAccountDutyRepo,
     ServiceAccountDutyService,
     ServiceAccountDutySweeper,
+    ServiceAccountSpendingApproverGrantCheck,
     AssignmentListService,
     DepartmentToolsService,
     SeatBaselineRepo,
@@ -236,6 +239,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     RenewalPartiesService,
     RenewalRankingService,
     RenewalNotifier,
+    RenewalSpendingApproverWaitListener,
     RenewalProposalService,
     RenewalDecisionTrail,
     RenewalDecisionService,

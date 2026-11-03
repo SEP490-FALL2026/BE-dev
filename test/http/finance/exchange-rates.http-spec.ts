@@ -44,7 +44,7 @@ describe('currency and exchange rate routes (e2e, no database)', () => {
       ['the spending approver, whose role is derived', [], ['SPENDING_APPROVER']],
     ])('refuses %s with 403', async (_name, direct, derived) => {
       const response = await WRITE_ROUTE[1](app.getHttpServer())
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
 
       expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
@@ -60,7 +60,7 @@ describe('currency and exchange rate routes (e2e, no database)', () => {
     ])('refuses %s with 403 on both read routes', async (_name, direct, derived) => {
       for (const [route, call] of READ_ROUTES) {
         const response = await call(app.getHttpServer())
-          .set('Authorization', bearer(principal(direct, derived)))
+          .set('Authorization', bearer(principal([...direct, ...derived])))
           .expect(403);
         expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
       }
