@@ -90,6 +90,11 @@ export class MyRequestsRepo {
     return { rows: rows.map(toRow), total };
   }
 
+  /** The count of the requests the person sent for the same filter. */
+  async countOf(filter: Omit<MyRequestFilter, 'skip' | 'take'>): Promise<number> {
+    return this.prisma.accessRequest.count({ where: whereOf(filter) });
+  }
+
   /** What the person who proposed software that is not in the catalog called it, by request. */
   async proposalNames(requestIds: readonly string[]): Promise<Map<string, string>> {
     if (requestIds.length === 0) return new Map();
@@ -102,7 +107,7 @@ export class MyRequestsRepo {
   }
 }
 
-function whereOf(filter: MyRequestFilter): Prisma.AccessRequestWhereInput {
+function whereOf(filter: Omit<MyRequestFilter, 'skip' | 'take'>): Prisma.AccessRequestWhereInput {
   const sentAt: Prisma.DateTimeNullableFilter = {
     ...(filter.from === undefined ? {} : { gte: filter.from }),
     ...(filter.to === undefined ? {} : { lt: filter.to }),

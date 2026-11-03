@@ -1,6 +1,7 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { RequestsDashboardApi } from '../../requests/public/requests-dashboard.api';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
 import { EmployeeDashboardService } from './employee-dashboard.service';
 
@@ -13,20 +14,21 @@ const actor = (roles: readonly string[]): AuthenticatedPrincipal => ({
   roles,
 });
 
-function serviceWith() {
+function serviceWith(openRequests: number | null = 2) {
   const employeeFacts = jest.fn().mockResolvedValue({ currentRights: 4, expiringRights: 1, openSaasIssues: 0 });
+  const openRequestsSentBy = jest.fn().mockResolvedValue(openRequests);
   const service = new EmployeeDashboardService(
     { businessToday: () => Promise.resolve('2026-10-23') } as unknown as OrganizationReadApi,
     { employeeFacts } as unknown as LicensingDashboardApi,
+    { openRequestsSentBy } as unknown as RequestsDashboardApi,
   );
 
-  return { service, employeeFacts };
+  return { service, employeeFacts, openRequestsSentBy };
 }
 
 describe('EmployeeDashboardService', () => {
-  // US-12-15 AC-2: the software, the rights about to end and the reports of the caller; the requests have no list yet.
-  it('counts the rights and reports of the caller and says the requests are not available', async () => {
-    const { service, employeeFacts } = serviceWith();
+  it('counts the rights, requests and reports of the caller', async () => {
+    const { service, employeeFacts, openRequestsSentBy } = serviceWith(2);
 
     await expect(service.overview(actor(['EMPLOYEE']))).resolves.toEqual({
       asOf: '2026-10-23',
@@ -34,15 +36,28 @@ describe('EmployeeDashboardService', () => {
         softwareRights: { state: 'COUNTED', count: 4, sourceOperationId: 'meSoftwareRightList', reason: null },
         expiringRights: { state: 'COUNTED', count: 1, sourceOperationId: 'meSoftwareRightList', reason: null },
         requests: {
-          state: 'NOT_AVAILABLE',
-          count: null,
-          sourceOperationId: null,
-          reason: 'REQUEST_QUEUE_NOT_DELIVERED',
+          state: 'COUNTED',
+          count: 2,
+          sourceOperationId: 'meAccessRequestList',
+          reason: null,
         },
         saasIssues: { state: 'COUNTED', count: 0, sourceOperationId: 'saasIssueList', reason: null },
       },
     });
     expect(employeeFacts).toHaveBeenCalledWith('e-1', '2026-10-23');
+    expect(openRequestsSentBy).toHaveBeenCalledWith(actor(['EMPLOYEE']));
+  });
+
+  it('answers NO_DATA_SOURCE when caller cannot send requests (Super Admin)', async () => {
+    const { service } = serviceWith(null);
+
+    const overview = await service.overview(actor(['SUPER_ADMIN', 'EMPLOYEE']));
+    expect(overview.sections.requests).toEqual({
+      state: 'NOT_AVAILABLE',
+      count: null,
+      sourceOperationId: null,
+      reason: 'NO_DATA_SOURCE',
+    });
   });
 
   it('refuses a caller without the Employee role before reading anything', async () => {

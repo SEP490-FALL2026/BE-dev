@@ -12,7 +12,6 @@ export type SectionState = (typeof SECTION_STATES)[number];
 
 /** Why a section has no data yet: the source that would hold it is not delivered, or nothing records it. */
 export const MISSING_SOURCE_REASONS = [
-  'REQUEST_QUEUE_NOT_DELIVERED',
   'FINANCE_FIGURES_NOT_DELIVERED',
   'USAGE_DATA_NOT_DELIVERED',
   'DEVICE_REGISTRY_NOT_DELIVERED',

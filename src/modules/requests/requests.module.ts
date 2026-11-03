@@ -1,3 +1,4 @@
+import { RequestsDashboardApi } from './public/requests-dashboard.api';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
@@ -360,7 +361,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     MyRequestsRepo,
     MyRequestsFactsRepo,
     MyRequestsService,
+    RequestsDashboardApi,
   ],
-  exports: [RequestsApi, RequestOutcomeListeners],
+  exports: [RequestsApi, RequestOutcomeListeners, RequestsDashboardApi],
 })
 export class RequestsModule {}

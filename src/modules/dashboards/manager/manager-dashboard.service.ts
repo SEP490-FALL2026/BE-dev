@@ -4,6 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
+import { RequestsDashboardApi } from '../../requests/public/requests-dashboard.api';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
 import {
   assertHoldsRole,
@@ -42,6 +43,7 @@ export class ManagerDashboardService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly licensing: LicensingDashboardApi,
     private readonly personnel: PersonnelDashboardApi,
+    private readonly requests: RequestsDashboardApi,
   ) {}
 
   /** Throws DashboardRefusedError for a caller without the head role or who heads no department on the business day. */
@@ -53,13 +55,16 @@ export class ManagerDashboardService {
     const department = await this.organizationReads.getDepartmentBrief(headed.departmentId);
     const software = await this.licensing.departmentFacts(headed.departmentId, today);
     if (!department || !software) throw new DashboardRefusedError();
-    const reviews = await this.personnel.openTransferReviews(department.id);
+    const [reviews, needApprovals] = await Promise.all([
+      this.personnel.openTransferReviews(department.id),
+      this.requests.needDecisionsHeldBy(actor.employeeId),
+    ]);
 
     return {
       asOf: today,
       department: { id: department.id, code: department.code, name: department.name },
       sections: {
-        needApprovals: notAvailable('REQUEST_QUEUE_NOT_DELIVERED'),
+        needApprovals: counted(needApprovals, 'needDecisionList'),
         departmentSoftware: counted(software.seatsInUse, 'departmentToolsInUse'),
         transferReviews: counted(reviews, 'transferReviewList'),
         ghostSeats: notAvailable('USAGE_DATA_NOT_DELIVERED'),

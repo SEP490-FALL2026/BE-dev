@@ -3,6 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { RequestsDashboardApi } from '../../requests/public/requests-dashboard.api';
 import { assertHoldsRole, counted, notAvailable, type DashboardSection } from '../section/dashboard-section.policy';
 
 export interface EmployeeDashboard {
@@ -26,20 +27,24 @@ export class EmployeeDashboardService {
   constructor(
     private readonly organizationReads: OrganizationReadApi,
     private readonly licensing: LicensingDashboardApi,
+    private readonly requests: RequestsDashboardApi,
   ) {}
 
   /** Throws DashboardRefusedError for a caller without the Employee role. */
   async overview(actor: AuthenticatedPrincipal): Promise<EmployeeDashboard> {
     assertHoldsRole(actor.roles, 'EMPLOYEE');
     const today = await this.organizationReads.businessToday();
-    const facts = await this.licensing.employeeFacts(actor.employeeId, today);
+    const [facts, openRequests] = await Promise.all([
+      this.licensing.employeeFacts(actor.employeeId, today),
+      this.requests.openRequestsSentBy(actor),
+    ]);
 
     return {
       asOf: today,
       sections: {
         softwareRights: counted(facts.currentRights, 'meSoftwareRightList'),
         expiringRights: counted(facts.expiringRights, 'meSoftwareRightList'),
-        requests: notAvailable('REQUEST_QUEUE_NOT_DELIVERED'),
+        requests: openRequests === null ? notAvailable('NO_DATA_SOURCE') : counted(openRequests, 'meAccessRequestList'),
         saasIssues: counted(facts.openSaasIssues, 'saasIssueList'),
       },
     };

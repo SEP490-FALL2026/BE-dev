@@ -50,6 +50,7 @@ flowchart BT
   dashboards -->|4| licensing
   dashboards -->|5| organization
   dashboards -->|4| personnel
+  dashboards -->|3| requests
   data_import -->|6| audit
   data_import -->|1| catalog
   data_import -->|9| licensing
@@ -100,4 +101,4 @@ flowchart BT
   requests -->|78| organization
 ```
 
-64 module edges.
+65 module edges.
