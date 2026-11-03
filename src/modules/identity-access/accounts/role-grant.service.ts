@@ -79,11 +79,6 @@ export class RoleGrantService {
     return this.grants.spendingApproverEmployeeId(client, options);
   }
 
-  /** Which of these employees has ever held a SPENDING_APPROVER grant, revoked or not (an unlocked read, `QĐ-93k(2)`). */
-  everHeldSpendingApproverAmong(tx: DbTx, employeeIds: readonly string[]): Promise<Set<string>> {
-    return this.grants.everHeldSpendingApproverAmong(tx, employeeIds);
-  }
-
   /** True when any account in the organization holds an effective FINANCE grant, whatever its state (QĐ-67e). */
   financeIsHeld(tx: DbTx, organizationId: string): Promise<boolean> {
     return this.grants.financeIsHeld(tx, organizationId);

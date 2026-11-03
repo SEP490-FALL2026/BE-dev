@@ -37,7 +37,7 @@ const ROUTES: Route[] = [
     message: 'DASHBOARD.EMPLOYEE_RETRIEVED',
     answer: {
       asOf: '2026-10-23',
-      sections: { softwareRights: COUNTED, expiringRights: COUNTED, requests: MISSING, saasIssues: COUNTED },
+      sections: { softwareRights: COUNTED, expiringRights: COUNTED, requests: COUNTED, saasIssues: COUNTED },
     },
   },
   {
@@ -50,7 +50,7 @@ const ROUTES: Route[] = [
       asOf: '2026-10-23',
       department: { id: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11', code: 'P-DES', name: 'Design' },
       sections: {
-        needApprovals: MISSING,
+        needApprovals: COUNTED,
         departmentSoftware: COUNTED,
         transferReviews: COUNTED,
         ghostSeats: MISSING,

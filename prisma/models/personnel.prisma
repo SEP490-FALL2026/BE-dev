@@ -277,7 +277,10 @@ model OffboardingCase {
   id                     String                @id @default(uuid(7)) @db.Uuid
   organizationId         String                @map("organization_id") @db.Uuid
   employeeId             String                @map("employee_id") @db.Uuid
-  departmentId           String                @map("department_id") @db.Uuid
+  departmentId           String?               @map("department_id") @db.Uuid
+  cancelledPlacementId   String?               @map("cancelled_placement_id") @db.Uuid
+  cancelledPlacementDepartmentId String?       @map("cancelled_placement_department_id") @db.Uuid
+  cancelledPlacementFrom DateTime?             @map("cancelled_placement_from") @db.Date
   state                  OffboardingState      @default(HANDING_OVER)
   abrupt                 Boolean               @default(false)
   priorWorkState         EmployeeWorkState     @map("prior_work_state")
@@ -314,7 +317,8 @@ model OffboardingCase {
   organization      Organization            @relation(fields: [organizationId], references: [id])
   notice            PersonnelNotice?        @relation(fields: [noticeId], references: [id], onDelete: Restrict)
   employee          Employee                @relation(fields: [employeeId], references: [id])
-  department        Department              @relation(fields: [departmentId], references: [id])
+  department                   Department?             @relation("OffboardingCaseDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
+  cancelledPlacementDepartment Department?             @relation("OffboardingCaseCancelledPlacementDepartment", fields: [cancelledPlacementDepartmentId], references: [id], onDelete: Restrict)
   changes           OffboardingCaseChange[]
   recordedByTicket  SuperAdminEventTicket?  @relation("OffboardingRecordedByTicket", fields: [recordedByTicketId], references: [id], onDelete: Restrict)
   cancelledByTicket SuperAdminEventTicket?  @relation("OffboardingCancelledByTicket", fields: [cancelledByTicketId], references: [id], onDelete: Restrict)
@@ -323,6 +327,7 @@ model OffboardingCase {
   @@index([employeeId])
   @@index([state, lastWorkingDay, id])
   @@index([organizationId])
+  @@index([cancelledPlacementDepartmentId])
   @@index([roleFlags], type: Gin)
   @@map("offboarding_cases")
 }

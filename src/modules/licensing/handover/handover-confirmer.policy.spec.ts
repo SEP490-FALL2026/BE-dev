@@ -85,6 +85,8 @@ describe('the table of who confirms a handover (US-07-09)', () => {
 
   it('a departure of the person and a later reason of the IT Admin stay with the head', () => {
     expect(requirementOf([fact('DEPARTURE'), fact('SUBSCRIPTION_CANCELLATION')], false)?.role).toBe('DEPARTMENT_HEAD');
+    expect(requirementOf([fact('DEPARTURE')], true, { departmentId: null })).toBeNull();
+    expect(requirementOf([fact('ABRUPT_DEPARTURE')], true, { departmentId: null })).toBeNull();
   });
 
   it('only a departure may say the data was handed over or not needed, every other source says it was handled', () => {

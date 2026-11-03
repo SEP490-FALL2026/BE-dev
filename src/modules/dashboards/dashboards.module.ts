@@ -3,6 +3,7 @@ import { IdentityAccessFacadeModule } from '../identity-access/identity-access-f
 import { LicensingModule } from '../licensing/licensing.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { PersonnelModule } from '../personnel/personnel.module';
+import { RequestsModule } from '../requests/requests.module';
 import { EmployeeDashboardController } from './employee/employee-dashboard.controller';
 import { EmployeeDashboardService } from './employee/employee-dashboard.service';
 import { ItAdminDashboardController } from './it-admin/it-admin-dashboard.controller';
@@ -18,7 +19,7 @@ import { SuperAdminDashboardService } from './super-admin/super-admin-dashboard.
  * its data has no source yet. Only the API mounts it.
  */
 @Module({
-  imports: [OrganizationModule, IdentityAccessFacadeModule, LicensingModule, PersonnelModule],
+  imports: [OrganizationModule, IdentityAccessFacadeModule, LicensingModule, PersonnelModule, RequestsModule],
   controllers: [
     EmployeeDashboardController,
     ManagerDashboardController,

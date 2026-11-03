@@ -39,6 +39,9 @@ export function toRecord(row: CaseRow): OffboardingRecord {
     },
     headHandover: offboardingHeadHandoverJson.decode(row.headHandover),
     placementClosedId: row.placementClosedId,
+    cancelledPlacementId: row.cancelledPlacementId,
+    cancelledPlacementDepartmentId: row.cancelledPlacementDepartmentId,
+    cancelledPlacementFrom: date(row.cancelledPlacementFrom),
     leftOn: date(row.leftOn),
     leftAt: row.leftAt,
     leftByAppUserId: row.leftByAppUserId,
@@ -60,7 +63,7 @@ export function toRecord(row: CaseRow): OffboardingRecord {
 export interface NewOffboarding {
   organizationId: string;
   employeeId: string;
-  departmentId: string;
+  departmentId: string | null;
   abrupt: boolean;
   priorWorkState: PriorWorkState;
   lastWorkingDay: BusinessDate;
@@ -68,7 +71,11 @@ export interface NewOffboarding {
   handoverDueOn: BusinessDate | null;
   grounds: Grounds;
   headHandover: HeadHandoverFacts | null;
-  placementClosedId: string;
+  placementClosedId: string | null;
+  cancelledPlacementId?: string | null;
+  cancelledPlacementDepartmentId?: string | null;
+  cancelledPlacementFrom?: BusinessDate | null;
+
   recordedByAppUserId: string | null;
   recordedByTicketId: string | null;
   noticeId?: string | null;
@@ -94,7 +101,7 @@ export class OffboardingRepo {
         id: randomUUID(),
         organizationId: input.organizationId,
         employeeId: input.employeeId,
-        departmentId: input.departmentId,
+        departmentId: input.departmentId ?? null,
         state,
         abrupt: input.abrupt,
         priorWorkState: input.priorWorkState,
@@ -106,7 +113,10 @@ export class OffboardingRepo {
         groundsIssuer: input.grounds.issuer,
         groundsIssuedOn: toDateColumn(input.grounds.issuedOn),
         headHandover: offboardingHeadHandoverJson.encode(input.headHandover),
-        placementClosedId: input.placementClosedId,
+        placementClosedId: input.placementClosedId ?? null,
+        cancelledPlacementId: input.cancelledPlacementId ?? null,
+        cancelledPlacementDepartmentId: input.cancelledPlacementDepartmentId ?? null,
+        cancelledPlacementFrom: input.cancelledPlacementFrom ? toDateColumn(input.cancelledPlacementFrom) : null,
         ...(left ? { leftOn: toDateColumn(left.on), leftAt: new Date(), leftByAppUserId: left.by } : {}),
         recordedByAppUserId: input.recordedByAppUserId,
         recordedByTicketId: input.recordedByTicketId,
@@ -159,7 +169,10 @@ export class OffboardingRepo {
       departureEffectiveOn: BusinessDate;
       handoverDueOn: BusinessDate;
       headHandover: HeadHandoverFacts | null;
-      placementClosedId: string;
+      placementClosedId: string | null;
+      cancelledPlacementId?: string | null;
+      cancelledPlacementDepartmentId?: string | null;
+      cancelledPlacementFrom?: BusinessDate | null;
     },
   ): Promise<OffboardingRecord> {
     const row = await tx.offboardingCase.update({

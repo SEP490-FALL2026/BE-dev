@@ -5,7 +5,7 @@ Mục đích: trang tổng quan vận hành theo vai khi đăng nhập — Emplo
 [a10-operational-dashboards](../../../docs/workspace/items/a10-operational-dashboards/spec.md)).
 
 Tầng: T7 ([tiers.cjs](../../../scripts/arch/tiers.cjs)) — đọc qua facade của personnel (T6) nên đứng trên mọi tầng nghiệp vụ.
-Phụ thuộc: organization, identity-access, licensing, personnel ([module-graph](../../../docs/generated/module-graph.md)). Được
+Phụ thuộc: organization, identity-access, licensing, personnel, requests ([module-graph](../../../docs/generated/module-graph.md)). Được
 dùng bởi: không module nào; chỉ `app/app.module.ts` mount `DashboardsModule`.
 
 ## Public API (`public/`)
@@ -31,9 +31,9 @@ dùng bởi: không module nào; chỉ `app/app.module.ts` mount `DashboardsModu
   trạng thái `COUNTED`/`AT_SOURCE`/`NOT_AVAILABLE` và lý do thiếu nguồn), `dashboard-section.dto.ts` (schema chung bốn trường),
   `dashboard-section.errors.ts` (`DashboardRefusedError`), `dashboard-section.http-errors.ts` (403 như guard, 503).
 - `employee/` — `GET /dashboards/employee` (`EMPLOYEE`): quyền đang giữ, quyền sắp hết, báo lỗi SaaS của mình; Request của tôi
-  `NOT_AVAILABLE`.
+  `COUNTED` (hoặc `NOT_AVAILABLE` `NO_DATA_SOURCE` cho Super Admin).
 - `manager/` — `GET /dashboards/manager` (`MANAGER`, phòng đang làm trưởng): ghế phòng, review sau điều chuyển; hàng đợi trình
-  chi, đề xuất ngân sách, dòng phiên bản đã duyệt `AT_SOURCE`; chờ quyết nhu cầu, ghost seat, thực chi + cam kết `NOT_AVAILABLE`.
+  chi, đề xuất ngân sách, dòng phiên bản đã duyệt `AT_SOURCE`; chờ quyết nhu cầu `COUNTED`; ghost seat, thực chi + cam kết `NOT_AVAILABLE`.
 - `it-admin/` — `GET /dashboards/it-admin` (`IT_ADMIN`, phạm vi phụ trách): task cấp/thu hồi, báo lỗi SaaS, ca nghỉ việc đang bàn
   giao, key trong kho; thuê bao sắp tới hạn báo hủy, điều khoản cần rà soát `AT_SOURCE`; sai lệch, máy chưa xác nhận
   `NOT_AVAILABLE`.

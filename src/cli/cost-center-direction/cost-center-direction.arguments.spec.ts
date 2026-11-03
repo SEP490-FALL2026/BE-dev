@@ -89,4 +89,13 @@ describe('ops:cost-center-direction arguments (F01, spec L.11)', () => {
       expect(() => parseDirectionArguments([...link, option, 'x'])).toThrow(/no password, token or code/);
     }
   });
+
+  it('uppercases and trims the department code', () => {
+    const copy = [...link];
+    copy[copy.indexOf('--department') + 1] = '  eng  ';
+
+    expect(parseDirectionArguments(copy)).toMatchObject({
+      command: { departmentCode: 'ENG' },
+    });
+  });
 });

@@ -18,16 +18,17 @@ import type { RecordOffboardingInput } from './offboarding.types';
 
 /** What the person was when the departure was asked for, read before the locks so they can be taken in the order of the protocol. */
 export interface DepartureSeen {
-  before: PlacementInForce;
+  before: PlacementInForce | null;
   endsOn: BusinessDate;
   leavesAsHead: boolean;
   waiting: TransferRecord | null;
+  cancelledPlacement?: { placementId: string; departmentId: string; validFrom: BusinessDate } | null;
 }
 
 /** What the person is under the locks: the employee, the placement in force, and the transfer that waits. */
 export interface DepartureHeld {
   employee: EmployeeRecord;
-  current: PlacementInForce;
+  current: PlacementInForce | null;
   pending: TransferRecord | null;
 }
 
@@ -69,20 +70,51 @@ export class OffboardingPreconditions {
     const person = await this.organizationReads.getEmployee(input.employeeId, tx);
     const refused = subjectRefusal(person, input.lastWorkingDay);
     if (refused) throw new OffboardingRefusedError(refused);
-    if ((await this.organizationReads.unplacedAmong([input.employeeId], tx)).has(input.employeeId))
-      throw new OffboardingRefusedError('EMPLOYEE_UNPLACED');
-    const before = await this.history.getPlacementInForce(tx, input.employeeId, today);
-    if (!before) throw new OffboardingRefusedError('PLACEMENT_OVERLAP', { reason: 'NO_OPEN_PLACEMENT' });
-    const endsOn = departureEffectiveOn({
-      lastWorkingDay: input.lastWorkingDay as BusinessDate,
-      abrupt: input.abrupt,
-      today,
-      placementFrom: before.validFrom,
-    });
-    const leavesAsHead = await this.headsOnLastDay(input.employeeId, before.departmentId, endsOn);
-    const waiting = await this.transfers.peekPendingOf(tx, input.employeeId);
 
-    return { before, endsOn, leavesAsHead, waiting };
+    const before = await this.history.getPlacementInForce(tx, input.employeeId, today);
+    if (before) {
+      const endsOn = departureEffectiveOn({
+        lastWorkingDay: input.lastWorkingDay as BusinessDate,
+        abrupt: input.abrupt,
+        today,
+        placementFrom: before.validFrom,
+      });
+      const leavesAsHead = await this.headsOnLastDay(input.employeeId, before.departmentId, endsOn);
+      const waiting = await this.transfers.peekPendingOf(tx, input.employeeId);
+
+      return { before, endsOn, leavesAsHead, waiting, cancelledPlacement: null };
+    }
+
+    const isUnplaced = (await this.organizationReads.unplacedAmong([input.employeeId], tx)).has(input.employeeId);
+    if (isUnplaced) {
+      const endsOn = departureEffectiveOn({
+        lastWorkingDay: input.lastWorkingDay as BusinessDate,
+        abrupt: input.abrupt,
+        today,
+        placementFrom: null,
+      });
+      return { before: null, endsOn, leavesAsHead: false, waiting: null, cancelledPlacement: null };
+    }
+
+    const scheduled = await this.organizationReads.getScheduledFirstPlacement(input.employeeId, today, tx);
+    if (scheduled) {
+      const effectiveLastDay = (input.abrupt ? today : input.lastWorkingDay) as BusinessDate;
+      if (effectiveLastDay < scheduled.validFrom) {
+        const endsOn = departureEffectiveOn({
+          lastWorkingDay: input.lastWorkingDay as BusinessDate,
+          abrupt: input.abrupt,
+          today,
+          placementFrom: null,
+        });
+        return { before: null, endsOn, leavesAsHead: false, waiting: null, cancelledPlacement: scheduled };
+      }
+      throw new OffboardingRefusedError('PLACEMENT_OVERLAP', {
+        reason: 'FIRST_PLACEMENT_PENDING',
+        validFrom: scheduled.validFrom,
+      });
+    }
+
+    throw new OffboardingRefusedError('PLACEMENT_OVERLAP', { reason: 'NO_OPEN_PLACEMENT' });
   }
 
   private async headsOnLastDay(employeeId: string, departmentId: string, endsOn: BusinessDate): Promise<boolean> {
@@ -98,10 +130,17 @@ export class OffboardingPreconditions {
     input: RecordOffboardingInput,
     seen: DepartureSeen,
   ): Promise<void> {
-    await this.history.lockDepartments(tx, {
-      updateIds: seen.leavesAsHead ? [seen.before.departmentId] : [],
-      shareIds: [seen.before.departmentId, ...(seen.waiting ? [seen.waiting.toDepartmentId] : [])],
-    });
+    if (seen.cancelledPlacement) {
+      await this.history.lockDepartments(tx, {
+        updateIds: [],
+        shareIds: [seen.cancelledPlacement.departmentId],
+      });
+    } else if (seen.before) {
+      await this.history.lockDepartments(tx, {
+        updateIds: seen.leavesAsHead ? [seen.before.departmentId] : [],
+        shareIds: [seen.before.departmentId, ...(seen.waiting ? [seen.waiting.toDepartmentId] : [])],
+      });
+    }
     await this.organization.lockEmployeeForUpdate(tx, input.employeeId);
     if (seen.leavesAsHead && input.successor?.kind === 'EMPLOYEE') {
       await this.lockSuccessor(tx, input.successor.employeeId);
@@ -117,16 +156,45 @@ export class OffboardingPreconditions {
     today: BusinessDate,
   ): Promise<DepartureHeld> {
     const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
+    if (!employee) throw new OffboardingRefusedError('CONCURRENT_CHANGE');
+
     const current = await this.history.getPlacementInForce(tx, input.employeeId, today);
-    if (!employee || !placementHeld(current, seen.before.placementId)) {
+    if (seen.before) {
+      if (!placementHeld(current, seen.before.placementId)) {
+        throw new OffboardingRefusedError('CONCURRENT_CHANGE');
+      }
+      const heads = await this.headsOnLastDay(input.employeeId, seen.before.departmentId, seen.endsOn);
+      if (heads !== seen.leavesAsHead) throw new OffboardingRefusedError('CONCURRENT_CHANGE');
+      const pending = await this.transfers.pendingOf(tx, input.employeeId, today);
+      if (pending?.id !== seen.waiting?.id) throw new OffboardingRefusedError('CONCURRENT_CHANGE');
+
+      return { employee, current, pending };
+    }
+
+    await this.verifyUnplacedAfterLocks(tx, input.employeeId, current, seen, today);
+
+    return { employee, current: null, pending: null };
+  }
+
+  private async verifyUnplacedAfterLocks(
+    tx: DbTx,
+    employeeId: string,
+    current: PlacementInForce | null,
+    seen: DepartureSeen,
+    today: BusinessDate,
+  ): Promise<void> {
+    if (current !== null) {
       throw new OffboardingRefusedError('CONCURRENT_CHANGE');
     }
-    const heads = await this.headsOnLastDay(input.employeeId, seen.before.departmentId, seen.endsOn);
-    if (heads !== seen.leavesAsHead) throw new OffboardingRefusedError('CONCURRENT_CHANGE');
-    const pending = await this.transfers.pendingOf(tx, input.employeeId, today);
-    if (pending?.id !== seen.waiting?.id) throw new OffboardingRefusedError('CONCURRENT_CHANGE');
-
-    return { employee, current, pending };
+    if (seen.cancelledPlacement) {
+      const scheduled = await this.organizationReads.getScheduledFirstPlacement(employeeId, today, tx);
+      if (!scheduled || scheduled.placementId !== seen.cancelledPlacement.placementId) {
+        throw new OffboardingRefusedError('CONCURRENT_CHANGE');
+      }
+    } else {
+      const isUnplaced = (await this.organizationReads.unplacedAmong([employeeId], tx)).has(employeeId);
+      if (!isUnplaced) throw new OffboardingRefusedError('CONCURRENT_CHANGE');
+    }
   }
 
   private async requireRecordable(
@@ -139,7 +207,7 @@ export class OffboardingPreconditions {
     const refusal = recordRefusal({
       today,
       hireDate: held.employee.hireDate,
-      placementFrom: held.current.validFrom,
+      placementFrom: held.current ? held.current.validFrom : null,
       lastWorkingDay: input.lastWorkingDay,
       abrupt: input.abrupt,
       employee: { status: held.employee.status, workState: held.employee.workState },
@@ -147,14 +215,16 @@ export class OffboardingPreconditions {
       pendingTransfer: held.pending && { effectiveOn: held.pending.effectiveOn },
       transferCancellationReason: input.pendingTransferCancellation?.reason,
       namedAsSuccessor: await this.repo.isNamedSuccessorOfPendingTransfer(tx, input.employeeId),
-      successor: seen.leavesAsHead
-        ? await this.guard.judgeSuccessor(tx, {
-            chosen: input.successor,
-            leaverId: input.employeeId,
-            departmentId: seen.before.departmentId,
-            day: seen.endsOn,
-          })
-        : null,
+      // Only a person with a placement in force heads a department (an unplaced one never does), so there is a department to judge.
+      successor:
+        seen.leavesAsHead && seen.before
+          ? await this.guard.judgeSuccessor(tx, {
+              chosen: input.successor,
+              leaverId: input.employeeId,
+              departmentId: seen.before.departmentId,
+              day: seen.endsOn,
+            })
+          : null,
     });
     if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
   }

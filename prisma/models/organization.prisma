@@ -13,10 +13,6 @@ enum DepartmentStatus {
   INACTIVE
 }
 
-enum ProjectStatus {
-  RUNNING
-  FINISHED
-}
 
 enum EmploymentType {
   STAFF
@@ -60,7 +56,6 @@ model Organization {
   costCenters                        CostCenter[]
   departments                        Department[]
   employees                          Employee[]
-  projects                           Project[] @ignore
   // Owned by finance: the rates entered for the reporting currency.
   exchangeRates                      ExchangeRate[]
   vendorProposals                    VendorDictionaryProposal[]
@@ -98,6 +93,7 @@ model Organization {
   seatBaselineState                  SeatBaselineState?
   superAdminEventTickets             SuperAdminEventTicket[]
   budgetVersionHistory               BudgetVersionHistoryEntry[]
+  budgetAttachments                  BudgetAttachment[]
   heldDepartmentNotifications        HeldDepartmentNotification[]
   changeAnnouncements                OrganizationChangeAnnouncement[]
   departmentTransfers                DepartmentTransfer[]
@@ -156,7 +152,6 @@ model Department {
   itAdmin                 Employee?                     @relation("DepartmentItAdmin", fields: [itAdminEmployeeId], references: [id], onDelete: Restrict)
   placements              EmployeePlacement[]
   headPeriods             DepartmentHeadPeriod[]
-  projects                ProjectDepartment[] @ignore
   // The service accounts the department owns (QĐ-86c); the migration keeps each charged to this department's Cost Center.
   ownedServiceAssignments LicenseAssignment[]           @relation("AssignmentOwningDepartment")
   returnRequests          ReturnRequest[]
@@ -167,7 +162,8 @@ model Department {
   transfersFrom           DepartmentTransfer[]          @relation("TransferFromDepartment")
   transfersTo             DepartmentTransfer[]          @relation("TransferToDepartment")
   transferReviews         TransferReview[]
-  offboardingCases        OffboardingCase[]
+  offboardingCases        OffboardingCase[]             @relation("OffboardingCaseDepartment")
+  cancelledOffboardingCases OffboardingCase[]           @relation("OffboardingCaseCancelledPlacementDepartment")
   noticesTargeting        PersonnelNotice[]             @relation("NoticeTargetDepartment")
   noticesSent             PersonnelNotice[]             @relation("NoticeSenderDepartment")
   // The subscriptions the department owns (QĐ-89a) and the assignments that gave existing ones their owner.
@@ -200,35 +196,6 @@ model DepartmentHeadPeriod {
   @@map("department_head_periods")
 }
 
-// A project is a description kept on department profiles (US-03-06 AC-14): no members, no budget, no approval step.
-model Project {
-  id             String        @id @default(uuid()) @db.Uuid
-  organizationId String        @map("organization_id") @db.Uuid
-  name           String
-  description    String?
-  status         ProjectStatus @default(RUNNING)
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  organization Organization        @relation(fields: [organizationId], references: [id])
-  departments  ProjectDepartment[]
-
-  @@ignore
-  @@map("projects")
-}
-
-model ProjectDepartment {
-  projectId    String @map("project_id") @db.Uuid
-  departmentId String @map("department_id") @db.Uuid
-
-  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  department Department @relation(fields: [departmentId], references: [id])
-
-  @@id([projectId, departmentId])
-  @@index([departmentId])
-  @@ignore
-  @@map("project_departments")
-}
 
 // The record of a link made by procedure (`pnpm ops:cost-center-direction link`, QĐ-87d(1)): the basis Finance approved
 // for putting a Cost Center the previous release made into its department. Added to, never changed.
@@ -289,7 +256,6 @@ model Employee {
   appUser                         AppUser?
   itAdminOf                       Department[]                        @relation("DepartmentItAdmin")
   headPeriods                     DepartmentHeadPeriod[]
-  approvalRoles                   ApprovalRoleHolder[]
   ownedApplications               Application[]
   workspacePrimaryOwnerOf         PlanWorkspaceProfile[]              @relation("WorkspacePrimaryOwner")
   workspaceEmergencyHolderOf      PlanWorkspaceProfile[]              @relation("WorkspaceEmergencyHolder")

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '../../../generated/prisma/client';
+import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { VersionStateName } from './budget.policy';
@@ -278,6 +278,57 @@ export class VersionRepo {
     ]);
 
     return { items: rows.map(toRecord), total };
+  }
+
+  async pageSentOf(
+    costCenterId: string,
+    options: { year?: number; skip: number; take: number },
+  ): Promise<{
+    items: {
+      id: string;
+      year: number;
+      number: number;
+      state: 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED';
+      sentAt: Date;
+    }[];
+    total: number;
+  }> {
+    const where: Prisma.BudgetVersionWhereInput = {
+      costCenterId,
+      sentAt: { not: null },
+      ...(options.year ? { year: options.year } : {}),
+    };
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.budgetVersion.findMany({
+          where,
+          select: {
+            id: true,
+            year: true,
+            number: true,
+            state: true,
+            sentAt: true,
+          },
+          orderBy: [{ year: 'desc' }, { number: 'desc' }, { id: 'asc' }],
+          skip: options.skip,
+          take: options.take,
+        });
+        const total = await tx.budgetVersion.count({ where });
+
+        return {
+          items: rows.map((r) => ({
+            id: r.id,
+            year: r.year,
+            number: r.number,
+            state: r.state as 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED',
+            sentAt: r.sentAt!,
+          })),
+          total,
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
   async patch(tx: DbTx, id: string, patch: VersionPatch): Promise<void> {

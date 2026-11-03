@@ -36,14 +36,16 @@ export class OffboardingEndings {
     if (held.employee.workState === 'ON_LONG_LEAVE') {
       await this.leaves.endForDeparture(tx, actor, input.employeeId, today);
     }
-    const scheduled = await this.periods.schedule(tx, {
-      organizationId: facts.organizationId,
-      employeeId: input.employeeId,
-      departmentId: seen.before.departmentId,
-      endsOn: seen.endsOn,
-      leavesAsHead: seen.leavesAsHead,
-      successor: input.successor,
-    });
+    const scheduled = seen.before
+      ? await this.periods.schedule(tx, {
+          organizationId: facts.organizationId,
+          employeeId: input.employeeId,
+          departmentId: seen.before.departmentId,
+          endsOn: seen.endsOn,
+          leavesAsHead: seen.leavesAsHead,
+          successor: input.successor,
+        })
+      : { placementClosedId: null, headHandover: null };
     if (!input.abrupt) await this.history.setEmployeeWorkState(tx, input.employeeId, 'HANDING_OVER');
 
     return scheduled;

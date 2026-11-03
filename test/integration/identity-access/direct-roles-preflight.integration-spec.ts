@@ -60,8 +60,13 @@ describe('ops:preflight, the conversion of MANAGER and SPENDING_APPROVER (integr
     await addDepartment(sql, world, 'P-EXE');
   }, DEPLOY_TIMEOUT_MS + 60000);
 
+  /**
+   * Once the whole history is applied the world is not cleared any more: `approval_role_holders` is gone and a placement cannot be
+   * deleted (an employee keeps one); the database is dropped with the file.
+   */
+  let wholeHistoryApplied = false;
   afterEach(async () => {
-    await clearPeople(sql, world);
+    if (!wholeHistoryApplied) await clearPeople(sql, world);
   });
 
   afterAll(async () => {
@@ -241,6 +246,7 @@ describe('ops:preflight, the conversion of MANAGER and SPENDING_APPROVER (integr
     async () => {
       const deployed = await deployMigrations(database);
       if (deployed.code !== 0) throw new Error(`Deploying the conversion failed: ${deployed.stdout}`);
+      wholeHistoryApplied = true;
       const head = await addPerson(sql, world, { code: 'E-H8', department: 'P-ENG' });
       await addHeadPeriod(sql, world, { department: 'P-ENG', employeeId: head.employeeId });
 

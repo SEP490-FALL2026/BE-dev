@@ -18,6 +18,8 @@ import {
   MineLinesQueryDto,
   MineQueryDto,
   MineResponseDto,
+  MineVersionPageResponseDto,
+  MineVersionsQueryDto,
 } from '../budget/budget.dto';
 import { BudgetViewService } from './budget-view.service';
 import { BUDGET_ERROR_EXAMPLES as EXAMPLES, toBudgetApiException } from '../budget/budget.http-errors';
@@ -73,6 +75,22 @@ export class BudgetsController {
   async mineLines(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineLinesQueryDto) {
     try {
       return await this.budgets.mineLines(actor, query.year, query);
+    } catch (error) {
+      throw toBudgetApiException(error);
+    }
+  }
+
+  @Get('mine/versions')
+  @RequireRoles('MANAGER')
+  @ApiOperation({ operationId: 'budgetMineVersionList', summary: 'List sent versions for the cost center' })
+  @ApiSuccessResponse(MineVersionPageResponseDto, {
+    message: 'BUDGET.VERSIONS_LISTED',
+    description: 'The sent versions of the Cost Center the caller heads today, newest first, without amounts.',
+  })
+  @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, INVALID)
+  async mineVersions(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineVersionsQueryDto) {
+    try {
+      return await this.budgets.mineVersions(actor, query);
     } catch (error) {
       throw toBudgetApiException(error);
     }

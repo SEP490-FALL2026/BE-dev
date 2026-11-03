@@ -94,7 +94,9 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   claim, hoàn tất, báo lỗi; `ProvisioningDecisionService`), `revocation-completion/`
   (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`.
 - `handover/` — xác nhận bàn giao dữ liệu trước khi thu hồi (US-03-09, US-07-09); `handover-duties.controller.ts`;
-  `HandoverService`, `HandoverConfirmationService`; `handover-duty.job.ts` nhắc quá hạn mỗi giờ.
+  `HandoverService`, `HandoverConfirmationService`; `handover-duty.job.ts` nhắc quá hạn mỗi giờ. Người nghỉ việc không phòng
+  (`departmentId` null, `D-S18`): `requirementOf` bỏ nguồn `DEPARTURE`/`ABRUPT_DEPARTURE`, nên không có nghĩa vụ trưởng phòng ở
+  `open` lẫn `openFromTask` và tác vụ thu hồi không bị giữ; nguồn khác (IT, trả về) giữ nguyên.
 - `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts`.
 - `license-key/` — kho key của mua đứt K4 (US-04-12); `license-keys.controller.ts`; `LicenseKeyService`.
 - `my-software/` — "Phần mềm của tôi" (US-12-15 AC-2, US-16-01 AC-1): `my-software.controller.ts`

@@ -91,9 +91,11 @@ describe('a row of the queue of the need steps', () => {
     expect(needQueueItemOf(row({ routingRow }), lookups()).deciderRole).toBe(role);
   });
 
-  it('never names a decider role for a legacy row 3 or 4: the queue does not carry such a step', () => {
-    for (const routingRow of [3, 4]) {
-      expect(() => needQueueItemOf(row({ routingRow }), lookups())).toThrow('legacy');
+  it('names no decider role for a row that gives the step to nobody (3, 4, 8): the queue does not carry such a step', () => {
+    for (const routingRow of [3, 4, 8]) {
+      expect(() => needQueueItemOf(row({ routingRow }), lookups())).toThrow(
+        `The routing row ${routingRow} gives the step to nobody`,
+      );
     }
   });
 

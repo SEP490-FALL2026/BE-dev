@@ -20,14 +20,7 @@ export const controlledWaitSchema = z.strictObject({
   stepKind: z.enum(['NEED', 'FINANCE_REVIEW', 'SPEND_APPROVAL', 'IT_ASSESSMENT']),
   waitingReason: z.enum(WAITING_REASON_CODES),
   configurationHint: z
-    .enum([
-      'CONFIGURE_SPENDING_APPROVER',
-      'CONFIGURE_FALLBACK_APPROVER',
-      'CONFIGURE_CONFLICT_SUBSTITUTE',
-      'GRANT_FINANCE_ROLE',
-      'ASSIGN_DEPARTMENT_HEAD',
-      'NAME_IT_ADMIN_IN_CHARGE',
-    ])
+    .enum(['CONFIGURE_SPENDING_APPROVER', 'GRANT_FINANCE_ROLE', 'ASSIGN_DEPARTMENT_HEAD', 'NAME_IT_ADMIN_IN_CHARGE'])
     .nullable(),
   waitingSince: z.iso.datetime(),
   /** When the people who can put it right were told of this stretch of waiting; null until the pass that tells them. */

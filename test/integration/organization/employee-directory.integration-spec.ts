@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { createActivatedAccount } from '../../support/api-accounts';
-import { DepartmentHarness } from '../../support/department-harness';
+import { DepartmentHarness, addDays } from '../../support/department-harness';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { PgRelay } from '../../support/pg-relay';
 import { dataStatements, QueryCounter } from '../../support/query-count';
 
@@ -424,6 +425,208 @@ describe('employee directory read (US-02-02 AC-22, AC-24, AC-25, AC-26, integrat
     it('returns 404 EMPLOYEE.NOT_FOUND for non-existent employee id', async () => {
       const res = await getDetail(randomUUID()).expect(404);
       expect(errorOf(res).code).toBe('EMPLOYEE.NOT_FOUND');
+    });
+
+    it('excludes placement with valid_to = today from current department', async () => {
+      const today = await h.ctx.app.get(OrganizationReadApi).businessToday();
+      const empRes = await h
+        .api()
+        .post('/api/v1/employees')
+        .set(h.asAdmin())
+        .send({
+          employeeCode: 'NV-VTO-TODAY',
+          fullName: 'Valid To Today',
+          workEmail: 'vto.today@acme.vn',
+          employmentType: 'STAFF',
+          hireDate: '2024-01-01',
+        })
+        .expect(201);
+      const empId = dataOf<{ id: string }>(empRes).id;
+
+      await h.ctx.sql.query(
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from, valid_to)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2024-01-01', $4)`,
+        [h.seed.organizationId, empId, dep1.id, today],
+      );
+
+      // `q` narrows both reads to this one employee, so the answer does not depend on how many rows other tests seeded.
+      const found = await getList('q=NV-VTO-TODAY').expect(200);
+      expect(dataOf<EmployeeListPageWire>(found).items.map((i) => i.id)).toEqual([empId]);
+      const res = await getList(`departmentId=${dep1.id}&q=NV-VTO-TODAY`).expect(200);
+      const ids = dataOf<EmployeeListPageWire>(res).items.map((i) => i.id);
+      expect(ids).not.toContain(empId);
+
+      const detail = dataOf<EmployeeDetailWire>(await getDetail(empId).expect(200));
+      expect(detail.department).toBeNull();
+    });
+
+    it('includes placement with valid_from = today in current department', async () => {
+      const today = await h.ctx.app.get(OrganizationReadApi).businessToday();
+      const empRes = await h
+        .api()
+        .post('/api/v1/employees')
+        .set(h.asAdmin())
+        .send({
+          employeeCode: 'NV-VFROM-TODAY',
+          fullName: 'Valid From Today',
+          workEmail: 'vfrom.today@acme.vn',
+          employmentType: 'STAFF',
+          hireDate: today,
+        })
+        .expect(201);
+      const empId = dataOf<{ id: string }>(empRes).id;
+
+      await h.ctx.sql.query(
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from, valid_to)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, NULL)`,
+        [h.seed.organizationId, empId, dep1.id, today],
+      );
+
+      const res = await getList(`departmentId=${dep1.id}`).expect(200);
+      const ids = dataOf<EmployeeListPageWire>(res).items.map((i) => i.id);
+      expect(ids).toContain(empId);
+
+      const detail = dataOf<EmployeeDetailWire>(await getDetail(empId).expect(200));
+      expect(detail.department?.id).toBe(dep1.id);
+    });
+
+    it('filters by workState correctly including non-working states', async () => {
+      const empRes = await h
+        .api()
+        .post('/api/v1/employees')
+        .set(h.asAdmin())
+        .send({
+          employeeCode: 'NV-STATE-LEAVE',
+          fullName: 'Long Leave Worker',
+          workEmail: 'leave.worker@acme.vn',
+          employmentType: 'STAFF',
+          hireDate: '2025-01-01',
+        })
+        .expect(201);
+      const empId = dataOf<{ id: string }>(empRes).id;
+
+      await h.ctx.sql.query(`UPDATE employees SET work_state = 'ON_LONG_LEAVE' WHERE id = $1`, [empId]);
+
+      const leaveRes = await getList('workState=ON_LONG_LEAVE&q=NV-STATE-LEAVE').expect(200);
+      const leaveIds = dataOf<EmployeeListPageWire>(leaveRes).items.map((i) => i.id);
+      expect(leaveIds).toEqual([empId]);
+
+      const workingRes = await getList('workState=WORKING&q=NV-STATE-LEAVE').expect(200);
+      const workingIds = dataOf<EmployeeListPageWire>(workingRes).items.map((i) => i.id);
+      expect(workingIds).toEqual([]);
+    });
+
+    it('shows department: null and unplaced: false for an employee with only a future placement', async () => {
+      const today = await h.ctx.app.get(OrganizationReadApi).businessToday();
+      const tomorrow = addDays(today, 1);
+      const empRes = await h
+        .api()
+        .post('/api/v1/employees')
+        .set(h.asAdmin())
+        .send({
+          employeeCode: 'NV-FUTURE-PLACE',
+          fullName: 'Future Placement Emp',
+          workEmail: 'future.place@acme.vn',
+          employmentType: 'STAFF',
+          hireDate: today,
+        })
+        .expect(201);
+      const empId = dataOf<{ id: string }>(empRes).id;
+
+      await h
+        .api()
+        .post(`/api/v1/employees/${empId}/first-placements`)
+        .set(h.asAdmin())
+        .send({
+          departmentId: dep1.id,
+          effectiveFrom: tomorrow,
+        })
+        .expect(201);
+
+      const listRes = await getList('q=NV-FUTURE-PLACE').expect(200);
+      const listData = dataOf<EmployeeListPageWire>(listRes).items.find((i) => i.id === empId);
+      expect(listData).toBeDefined();
+      expect(listData?.department).toBeNull();
+      expect(listData?.unplaced).toBe(false);
+
+      const detail = dataOf<EmployeeDetailWire>(await getDetail(empId).expect(200));
+      expect(detail.department).toBeNull();
+      expect(detail.unplaced).toBe(false);
+      expect(detail.placements).toHaveLength(1);
+      expect(detail.placements[0]?.validFrom).toBe(tomorrow);
+    });
+
+    it('normalizes email search with +tag', async () => {
+      const empRes = await h
+        .api()
+        .post('/api/v1/employees')
+        .set(h.asAdmin())
+        .send({
+          employeeCode: 'NV-TAG-EMAIL',
+          fullName: 'Tagged Email Worker',
+          workEmail: 'alex+newsletter@acme.vn',
+          employmentType: 'STAFF',
+          hireDate: '2025-01-01',
+        })
+        .expect(201);
+      const empId = dataOf<{ id: string }>(empRes).id;
+
+      const res = await getList(`q=${encodeURIComponent('alex+newsletter@acme.vn')}`).expect(200);
+      const ids = dataOf<EmployeeListPageWire>(res).items.map((i) => i.id);
+      expect(ids).toContain(empId);
+    });
+
+    it('accepts uppercase UUID in q search and path param', async () => {
+      const upperUuid = emp1.id.toUpperCase();
+      const searchRes = await getList(`q=${upperUuid}`).expect(200);
+      const items = dataOf<EmployeeListPageWire>(searchRes).items;
+      expect(items).toHaveLength(1);
+      expect(items[0]?.id).toBe(emp1.id);
+
+      const detailRes = await getDetail(upperUuid).expect(200);
+      expect(dataOf<EmployeeDetailWire>(detailRes).id).toBe(emp1.id);
+    });
+
+    it('preserves totalItems on a page beyond the end', async () => {
+      const first = dataOf<EmployeeListPageWire>(await getList('page=1&pageSize=10').expect(200));
+      const res = await getList('page=9999&pageSize=10').expect(200);
+      const page = dataOf<EmployeeListPageWire>(res);
+      expect(page.items).toEqual([]);
+      expect(page.pagination.page).toBe(9999);
+      expect(first.pagination.totalItems).toBeGreaterThanOrEqual(4);
+      expect(page.pagination.totalItems).toBe(first.pagination.totalItems);
+    });
+
+    it('returns first 50 placements and sets placementsHasMore: true for 51 placements', async () => {
+      const empRes = await h
+        .api()
+        .post('/api/v1/employees')
+        .set(h.asAdmin())
+        .send({
+          employeeCode: 'NV-MANY-PLACES',
+          fullName: 'Many Placements Emp',
+          workEmail: 'many.places@acme.vn',
+          employmentType: 'STAFF',
+          hireDate: '2020-01-01',
+        })
+        .expect(201);
+      const empId = dataOf<{ id: string }>(empRes).id;
+
+      // Seed 51 placements
+      const baseYear = 1970;
+      await h.ctx.sql.query(
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from, valid_to)
+         SELECT gen_random_uuid(), $1, $2, $3,
+                to_date(($4 + n)::text || '-01-01', 'YYYY-MM-DD'),
+                to_date(($4 + n)::text || '-06-01', 'YYYY-MM-DD')
+           FROM generate_series(1, 51) AS n`,
+        [h.seed.organizationId, empId, dep1.id, baseYear],
+      );
+
+      const res = await getDetail(empId).expect(200);
+      const detail = dataOf<EmployeeDetailWire>(res);
+      expect(detail.placements).toHaveLength(50);
+      expect(detail.placementsHasMore).toBe(true);
     });
   });
 

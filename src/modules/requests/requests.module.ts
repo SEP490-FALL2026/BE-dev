@@ -1,3 +1,4 @@
+import { RequestsDashboardApi } from './public/requests-dashboard.api';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
@@ -51,7 +52,6 @@ import { SimilarSeatsController } from './need-decision/similar-seats.controller
 import { WithdrawalController } from './withdraw/withdrawal.controller';
 import { NeedDecisionEffects } from './need-decision/need-decision-effects.service';
 import { NeedDecisionService } from './need-decision/need-decision.service';
-import { StepFreezeService } from './step-routing/step-freeze.service';
 import { NeedSpendService } from './assessment/need-spend.service';
 import { WithdrawalPreconditions } from './withdraw/withdrawal-preconditions.service';
 import { WithdrawalWriter } from './withdraw/withdrawal-writer.service';
@@ -250,7 +250,6 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     AccessRequestQueryService,
     NeedDecisionEffects,
     NeedDecisionService,
-    StepFreezeService,
     NeedSpendService,
     RequestEndService,
     WithdrawalPreconditions,
@@ -360,7 +359,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     MyRequestsRepo,
     MyRequestsFactsRepo,
     MyRequestsService,
+    RequestsDashboardApi,
   ],
-  exports: [RequestsApi, RequestOutcomeListeners],
+  exports: [RequestsApi, RequestOutcomeListeners, RequestsDashboardApi],
 })
 export class RequestsModule {}

@@ -39,7 +39,7 @@ const FINANCE_TABLES = [
   'cost_centers',
 ];
 const FINANCE_COLUMNS =
-  /amount_minor|amount_currency|payment_schedule|unit_price_minor|binding_total_minor|override_reason|business_reason|project_label|off_plan|cost_center_id|plan_line_|opinion/;
+  /amount_minor|amount_currency|payment_schedule|unit_price_minor|binding_total_minor|override_reason|business_reason|off_plan|cost_center_id|plan_line_|opinion/;
 
 /**
  * "My requests" over real PostgreSQL: the order, the pages, the narrowing, the number of statements that does not grow with the rows,

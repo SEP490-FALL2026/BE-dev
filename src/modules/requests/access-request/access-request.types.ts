@@ -4,13 +4,7 @@ import type { AccessRequestBranchCode, RequestPolicy } from './access-request.po
 import type { BillingCycleCode, MissingPriceReason, PaymentPeriod } from './pricing.policy';
 import type { WaitingReason } from './routing.policy';
 
-/**
- * What a need step this release did not write can still wait for: the approver of last resort is gone (`QĐ-93c`), but a step of before
- * keeps its reason until the conversion command rewaits it (`QĐ-93k(2)`). Read only; nothing writes these.
- */
-export type LegacyNeedWaitingReason = 'NO_FALLBACK_APPROVER' | 'FALLBACK_IS_REQUESTER';
-/** A reason a need step is read with: the ones this release writes and the legacy ones. */
-export type ReadableNeedWaitingReason = WaitingReason | LegacyNeedWaitingReason;
+export type ReadableNeedWaitingReason = WaitingReason;
 import type { LineRecord, ReadableCancelCause } from './group-request.types';
 
 /** The shapes the repository of requests reads and writes; the repository re-exports them, so importers do not change. */

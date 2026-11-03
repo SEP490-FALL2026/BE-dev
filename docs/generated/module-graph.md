@@ -34,12 +34,12 @@ flowchart BT
   subgraph T7["T7"]
     dashboards["dashboards"]
   end
-  budgets -->|10| audit
+  budgets -->|18| audit
   budgets -->|2| catalog
   budgets -->|3| finance
   budgets -->|5| identity_access
   budgets -->|3| notifications
-  budgets -->|3| operating_parameters
+  budgets -->|4| operating_parameters
   budgets -->|11| organization
   catalog -->|18| audit
   catalog -->|11| finance
@@ -50,6 +50,7 @@ flowchart BT
   dashboards -->|4| licensing
   dashboards -->|5| organization
   dashboards -->|4| personnel
+  dashboards -->|3| requests
   data_import -->|6| audit
   data_import -->|1| catalog
   data_import -->|9| licensing
@@ -87,17 +88,17 @@ flowchart BT
   personnel -->|29| licensing
   personnel -->|5| notifications
   personnel -->|4| operating_parameters
-  personnel -->|81| organization
+  personnel -->|84| organization
   personnel -->|5| requests
   requests -->|60| audit
   requests -->|16| budgets
   requests -->|24| catalog
   requests -->|7| finance
-  requests -->|32| identity_access
+  requests -->|30| identity_access
   requests -->|40| licensing
   requests -->|7| notifications
   requests -->|10| operating_parameters
   requests -->|78| organization
 ```
 
-64 module edges.
+65 module edges.

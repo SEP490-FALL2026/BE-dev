@@ -11,12 +11,6 @@ export type DeciderRefusal =
   | 'OWN_REQUEST'
   /** Only the person the step is given to decides it; Finance, the head, the IT Admin, an Employee do not (`AC-8`). */
   | 'NOT_THE_ASSIGNEE'
-  /**
-   * The step is held by a person who never held the spending approver role (the substitute of a conflict of interest, under the
-   * rule before `QĐ-93`): frozen until the conversion command moves it (`QĐ-93k(2)`). A spending approver whose step was handed over by
-   * a transfer or a revocation is not in this case: they have a grant, so the step is not legacy.
-   */
-  | 'STEP_AWAITING_CONVERSION'
   | 'STEP_NOT_PENDING';
 
 export function checkSpendDecider(facts: {
@@ -25,8 +19,6 @@ export function checkSpendDecider(facts: {
   beneficiaryEmployeeIds: readonly string[];
   assigneeEmployeeId: string | null;
   stepState: string;
-  /** `isLegacyStep` of the step, read with the history of the grant of its holder. */
-  stepAwaitsConversion: boolean;
 }): DeciderRefusal | null {
   if (
     facts.actorEmployeeId === facts.requesterEmployeeId ||
@@ -37,8 +29,6 @@ export function checkSpendDecider(facts: {
   if (facts.assigneeEmployeeId === null || facts.assigneeEmployeeId !== facts.actorEmployeeId) {
     return 'NOT_THE_ASSIGNEE';
   }
-  if (facts.stepAwaitsConversion) return 'STEP_AWAITING_CONVERSION';
-
   return facts.stepState === 'PENDING' ? null : 'STEP_NOT_PENDING';
 }
 

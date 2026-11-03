@@ -47,7 +47,6 @@ describe('requests (integration, PostgreSQL constraints)', () => {
       cost_center_id: department.unitId,
       business_reason: 'Design the new brand',
       term_months: 6,
-      project_label: null,
       policy: JSON.stringify({ version: 1 }),
       created_by_app_user_id: randomUUID(),
       ...over,
@@ -106,7 +105,6 @@ describe('requests (integration, PostgreSQL constraints)', () => {
     it.each([
       ['a term of zero months', { term_months: 0 }],
       ['a blank reason', { business_reason: '   ' }],
-      ['a blank project label', { project_label: '  ' }],
       ['a policy that is not an object', { policy: JSON.stringify(['NEED']) }],
     ])('refuses %s', async (_name, over) => {
       expect((await insertRequest(over)).state).toBe(CHECK);

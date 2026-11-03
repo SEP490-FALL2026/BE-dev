@@ -821,3 +821,5 @@ http `platform/openapi-presentation`, `platform/openapi-read-wording`, `requests
   nhánh hạng mục; dòng test _B (vòng 2)_ thu hồi `C2` (người đang giữ sau khi chuyển vai) trước khi gán cho `S`; Task 9
   sửa số operation (− 2, 299 theo thứ tự merge) và bỏ `identity-access/super-admin-transfer-http` khỏi danh sách chạy lại
   (tệp bị xóa ở `qd93-remove-in-app-super-admin-transfer`, W1).
+
+> **Lệch có chủ đích khi triển khai Phase B (audit 03/11/2026):** guard của migration `20261103160000` chặn theo (i), (ii), (iii) nhưng (ii) KHÔNG coi `SPENDING_APPROVER_IS_PARTY` là lý do cũ (đây là lý do hiện hành do `spend-routing` ghi; REWAIT đổi nó khi bối cảnh đổi), và KHÔNG chặn chỉ vì còn dòng `approval_role_holders` (không còn đường nào trong ứng dụng đóng được các dòng đó; DB mới, Owner 03/11/2026). Task 12 (preflight Phase B) bỏ — DB mới.

@@ -53,6 +53,7 @@ export const EMPLOYEE_ERROR_EXAMPLES = {
   DEPARTMENT_INACTIVE: example(new DepartmentInactiveError()),
   EMPLOYEE_ALREADY_PLACED: example(new FirstPlacementError('ALREADY_PLACED')),
   EMPLOYEE_INACTIVE: example(new FirstPlacementError('EMPLOYEE_INACTIVE')),
+  EMPLOYEE_LEAVING: example(new FirstPlacementError('EMPLOYEE_LEAVING')),
   EMPLOYEE_DATE_INVALID: example(new FirstPlacementError('DATE_INVALID')),
   EMPLOYEE_ROW_INVALID: example(new EmployeeRowInvalidError([{ field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' }])),
   /** The same code when an official field is corrected: the reasons name the fields that route changes. */

@@ -117,7 +117,7 @@ export function parseDirectionArguments(argv: readonly string[]): ParsedDirectio
     mode,
     command: {
       costCenterId,
-      departmentCode: text(values, 'department'),
+      departmentCode: text(values, 'department').toUpperCase(),
       basis: text(values, 'basis'),
       ...common,
     },

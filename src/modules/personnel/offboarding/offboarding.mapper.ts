@@ -99,11 +99,13 @@ export function toDetail(
       employees,
       facts,
     ),
-    department: {
-      id: record.departmentId,
-      code: department?.code ?? UNKNOWN,
-      name: department?.name ?? UNKNOWN,
-    },
+    department: record.departmentId
+      ? {
+          id: record.departmentId,
+          code: department?.code ?? UNKNOWN,
+          name: department?.name ?? UNKNOWN,
+        }
+      : null,
     priorWorkState: record.priorWorkState,
     departureEffectiveOn: record.departureEffectiveOn,
     grounds: full ? { ...record.grounds } : null,

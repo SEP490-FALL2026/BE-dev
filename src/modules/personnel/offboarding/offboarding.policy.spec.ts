@@ -47,6 +47,12 @@ describe('the days of a departure', () => {
     expect(departureEffectiveOn({ ...base, lastWorkingDay: '2026-10-24', abrupt: true })).toBe('2026-10-25');
     expect(departureEffectiveOn({ ...base, lastWorkingDay: '2026-10-20', abrupt: true })).toBe('2026-10-24');
     expect(
+      departureEffectiveOn({ today: '2026-10-24', placementFrom: null, lastWorkingDay: '2026-11-03', abrupt: false }),
+    ).toBe('2026-11-04');
+    expect(
+      departureEffectiveOn({ today: '2026-10-24', placementFrom: null, lastWorkingDay: '2026-10-20', abrupt: true }),
+    ).toBe('2026-10-24');
+    expect(
       departureEffectiveOn({
         today: '2026-10-24',
         placementFrom: '2026-10-24',

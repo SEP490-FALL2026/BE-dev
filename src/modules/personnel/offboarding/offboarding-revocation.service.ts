@@ -147,7 +147,7 @@ export class OffboardingRevocationService {
           referenceId: held.id,
           note: reason,
         },
-        context: { departmentId: held.departmentId },
+        context: { ...(held.departmentId ? { departmentId: held.departmentId } : {}) },
       });
     } catch (error) {
       if (error instanceof RevocationRefusedError)

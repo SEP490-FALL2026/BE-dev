@@ -99,12 +99,8 @@ export class GroupLinesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), it is held under the earlier rule of approvers of last resort and waits for the conversion command to move it (ACCESS_REQUEST.STEP_AWAITING_CONVERSION, transitional), or a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched.',
-      examples: [
-        GROUP_REQUEST_ERROR_EXAMPLES.NEED_STEP_NOT_PENDING,
-        GROUP_REQUEST_ERROR_EXAMPLES.STEP_AWAITING_CONVERSION,
-        GROUP_REQUEST_ERROR_EXAMPLES.LINE_HOLDS_ACCESS,
-      ],
+        'The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), or a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched.',
+      examples: [GROUP_REQUEST_ERROR_EXAMPLES.NEED_STEP_NOT_PENDING, GROUP_REQUEST_ERROR_EXAMPLES.LINE_HOLDS_ACCESS],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -168,10 +164,9 @@ export class GroupLinesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the step is held under the earlier rule of approvers of last resort and waits for the conversion command to move it (ACCESS_REQUEST.STEP_AWAITING_CONVERSION, transitional), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).',
+        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).',
       examples: [
         GROUP_REQUEST_ERROR_EXAMPLES.NO_SPEND_STEP,
-        GROUP_REQUEST_ERROR_EXAMPLES.SPEND_STEP_AWAITING_CONVERSION,
         GROUP_REQUEST_ERROR_EXAMPLES.REVIEWER_IS_APPROVER,
         GROUP_REQUEST_ERROR_EXAMPLES.NOT_CHECKABLE,
         GROUP_REQUEST_ERROR_EXAMPLES.RECHECKED_NEEDS_FINANCE_REVIEW,

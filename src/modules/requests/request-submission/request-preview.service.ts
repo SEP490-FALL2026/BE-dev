@@ -27,7 +27,7 @@ export class RequestPreviewService {
     private readonly requestParties: RequestPartyEligibilityApi,
   ) {}
 
-  /** Throws AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError and AccessRequestSpendDateNotAllowedError. */
+  /** Throws RequestPartyIneligibleError (only `UNPLACED`), AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError and AccessRequestSpendDateNotAllowedError. */
   async preview(actor: AuthenticatedPrincipal, body: PreviewBodyDto): Promise<PreviewWire> {
     const { assessed, vendorId, blockedBy } = await this.read(actor, body);
     const { unit, target, policy, pricing, routing } = assessed;

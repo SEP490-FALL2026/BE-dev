@@ -154,8 +154,7 @@ const approvalDetailSchema = z.strictObject({
   step: z.strictObject({
     id: z.uuid(),
     state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED']),
-    /** `SPENDING_APPROVER_IS_PARTY` is a reason of the transition and `NO_CONFLICT_SUBSTITUTE` is historical: both disappear with the conversion. */
-    waitingReason: z.enum(['NO_SPENDING_APPROVER', 'SPENDING_APPROVER_IS_PARTY', 'NO_CONFLICT_SUBSTITUTE']).nullable(),
+    waitingReason: z.enum(['NO_SPENDING_APPROVER', 'SPENDING_APPROVER_IS_PARTY']).nullable(),
     assignee: employeeRef.nullable(),
     openedAt: z.iso.datetime(),
     decidedAt: z.iso.datetime().nullable(),
@@ -206,8 +205,6 @@ const resultSchema = z.strictObject({
       /** The approver completed the review of Finance of this request: the two are two people (`SoD-8`). */
       'REVIEWER_IS_APPROVER',
       'STEP_NOT_PENDING',
-      /** The step is of the rule before `QĐ-93` and frozen until the conversion command moves it (`QĐ-93k(2)`). Removed with the rule. */
-      'STEP_AWAITING_CONVERSION',
       'NO_SPEND_STEP',
       'OVERRIDE_REQUIRED',
       'NOT_CHECKABLE',

@@ -5,12 +5,13 @@ Mục đích: request xin quyền dùng phần mềm và các bước quyết đ
 chuyển bước khi tổ chức đổi (ADR-0015). Story chính: US-05-01 → US-05-04, US-05-06, US-05-08 → US-05-15, US-05-17,
 US-05-18, US-05-20, US-05-21, US-06-01 → US-06-03, US-06-12 → US-06-14; US-03-02 (gửi thay), US-03-04 (nghỉ việc).
 Tầng: T5 (`scripts/arch/tiers.cjs`). Phụ thuộc: budgets, licensing, catalog, organization, identity-access, finance,
-operating-parameters, audit, notifications. Được dùng bởi: personnel; gốc `src/app/app.module.ts`,
+operating-parameters, audit, notifications. Được dùng bởi: personnel, dashboards; gốc `src/app/app.module.ts`,
 `src/worker/worker.module.ts`, `src/worker/request-work.job.ts`. Nest module: `requests.module.ts` (API, mọi
 controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùng chung: chuyển bước, SLA, trạng thái).
 
 ## Public API (`public/`)
 
+- `RequestsDashboardApi` ([public/requests-dashboard.api.ts](public/requests-dashboard.api.ts)) — `openRequestsSentBy` (số yêu cầu đang chờ mình gửi, null cho Super Admin), `needDecisionsHeldBy` (số bước nhu cầu đang chờ mình quyết); dashboards gọi (US-12-15 AC-2, AC-3).
 - `RequestsApi` ([public/requests.api.ts](public/requests.api.ts)) — `listOpenOfBeneficiary`: request còn mở của một
   người, hiện cạnh hồ sơ nghỉ việc (US-03-04 AC-24); personnel gọi.
 - Worker gọi (`src/worker/request-work.job.ts`): `StepRedeterminationSweepApi.sweep` — lưới an toàn chuyển bước
@@ -180,8 +181,9 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 - Bước chi chỉ giao cho Người duyệt chi (`step-routing/spend-routing.policy.ts`): không ai thay khi họ là bên của Request
   (Request đó không tồn tại: hợp đồng D-S21, `REQUEST_PARTY.INELIGIBLE` 422) hay vắng; chưa có người giữ vai thì chờ
   `NO_SPENDING_APPROVER`. Mở bước chi khóa dòng grant `FOR SHARE` trước khi đọc (M6). Bước cũ do approver dự phòng/người thay thế
-  giữ đứng yên (`STEP_AWAITING_CONVERSION` 409): không có lệnh chuyển đổi (DB mới, Owner 03/11/2026), nên DB cũ cần kế hoạch riêng trước
-  bản này; Phase B gỡ nhánh đóng băng cùng bảng `approval_role_holders`.
+  giữ không còn là trường hợp riêng: không đóng băng, không `STEP_AWAITING_CONVERSION`; migration gỡ `approval_role_holders` dừng
+  `P0001` và nêu dòng nếu DB còn dữ liệu cũ (Request có Người duyệt chi là bên, bước dòng 3/4 hay lý do chờ cũ, bước chi do người
+  chưa từng có grant giữ). Bước chờ đổi lý do (`REWAIT`) chỉ ghi `waiting_reason`, giữ `waiting_since`.
 - Thứ tự khóa: task grant (`LicensingApi.lockGrantOfRequest`) rồi request (`request-end/request-end.service.ts`); hàng request
   rồi khóa năm ngân sách (`budgets/budget/budget-year-lock.repo.ts`).
 - Mọi kết thúc request phát `requests.outcome` trong cùng transaction; listener ném lỗi thì kết thúc bị hoàn tác.

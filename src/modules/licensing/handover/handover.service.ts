@@ -117,11 +117,12 @@ export class HandoverService {
       .map((reason) => ({ source: reason.source, decidedByEmployeeId: reason.decidedByEmployeeId }));
     const [plan] = await this.catalog.getPlanRevocationInfo([task.planId], tx);
     if (!plan) throw new SeatTargetNotFoundError('PLAN');
-    const required = requirementOf(asked, plan.dataLossOnRemoval);
-    if (!required) return;
 
     const today = await this.facts.today(now, tx);
     const departmentId = context.departmentId ?? (await this.facts.departmentOf(task.employeeId, today, tx));
+
+    const required = requirementOf(asked, plan.dataLossOnRemoval, { departmentId });
+    if (!required) return;
     // The person who leaves heads the department: a successor is looked for from tomorrow, never the person themselves.
     const leaverIsHead =
       DEPARTING.has(required.source) &&

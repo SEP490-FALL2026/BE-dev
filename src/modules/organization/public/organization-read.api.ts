@@ -51,6 +51,14 @@ export class OrganizationReadApi {
     return this.employees.unplacedAmong(employeeIds, tx);
   }
 
+  async getScheduledFirstPlacement(
+    employeeId: string,
+    onDate?: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ placementId: string; departmentId: string; validFrom: BusinessDate } | null> {
+    return this.employees.scheduledFirstPlacement(employeeId, onDate ?? (await this.businessToday(new Date(), tx)), tx);
+  }
+
   /** Today in the organization's own calendar (`now` is a parameter for tests; `tx` reads the zone in the caller's transaction). */
   businessToday(now: Date = new Date(), tx?: DbTx): Promise<BusinessDate> {
     return this.context.businessToday(now, tx);

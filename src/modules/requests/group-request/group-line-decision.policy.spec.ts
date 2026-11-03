@@ -20,7 +20,6 @@ const facts: LineDeciderFacts = {
   stepEmployeeIds: ['e1', 'e2', 'e3'],
   assigneeEmployeeId: 'h1',
   stepState: 'PENDING',
-  stepAwaitsConversion: false,
   termMonths: 6,
   approves: true,
   confirmed: false,
@@ -40,7 +39,6 @@ describe('who decides the lines of a step (US-05-17 AC-3, AC-16, US-05-04 AC-14)
     ['a person of the lines of the step', { actorEmployeeId: 'e2', assigneeEmployeeId: 'e2' }, 'OWN_REQUEST'],
     ['somebody the step is not given to', { actorEmployeeId: 'x1' }, 'NOT_THE_ASSIGNEE'],
     ['anybody while the step waits for a holder', { assigneeEmployeeId: null }, 'NOT_THE_ASSIGNEE'],
-    ['a legacy step, frozen until the conversion', { stepAwaitsConversion: true }, 'STEP_AWAITING_CONVERSION'],
     ['a step that was decided', { stepState: 'APPROVED' as const }, 'STEP_NOT_PENDING'],
     ['a long term nobody confirmed', { termMonths: 13 }, 'TERM_CONFIRMATION_REQUIRED'],
   ])('refuses %s', (_name, change, refusal) => {

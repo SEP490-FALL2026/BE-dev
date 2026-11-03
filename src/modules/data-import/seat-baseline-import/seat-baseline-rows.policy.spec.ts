@@ -1,4 +1,4 @@
-import { mapSeatColumns } from './seat-baseline-rows.policy';
+import { lookupNamesOf, mapSeatColumns } from './seat-baseline-rows.policy';
 import { TODAY, codesOf, judgeOne } from '../../../../test/support/seat-baseline-facts';
 
 describe('mapSeatColumns', () => {
@@ -53,6 +53,24 @@ describe('judgeSeatRows: the person and the account', () => {
     expect(codesOf(judgeOne({ employee_code: 'LEFT', account_identifier: 'l@congty.vn' }))).toEqual([
       'EMPLOYEE_NOT_ACTIVE',
     ]);
+  });
+
+  it('accepts lowercase employee_code and matches the uppercase employee in facts', () => {
+    const result = judgeOne({ employee_code: 'e1', account_identifier: 'e1@congty.vn' });
+    expect(result.outcome).toBe('VALID');
+    expect(result.parsed?.employeeId).toBe('e1');
+  });
+
+  it('looks the people up by the uppercase code, whatever case and spacing the file used', () => {
+    // The lookup reads the employees with a case-sensitive IN: a lowercase code would find nobody in production.
+    expect(
+      lookupNamesOf([
+        { cells: { employee_code: ' nv-1 ' } },
+        { cells: { employee_code: 'NV-1', cost_center_code: 'CC-1' } },
+        { cells: { employee_code: 'Nv-2' } },
+        { cells: { employee_code: '  ' } },
+      ]),
+    ).toEqual({ employeeCodes: ['NV-1', 'NV-2'], costCenterCodes: ['CC-1'] });
   });
 
   it('asks for an account identifier, and refuses one with a space and one that looks like a secret (AC-9)', () => {

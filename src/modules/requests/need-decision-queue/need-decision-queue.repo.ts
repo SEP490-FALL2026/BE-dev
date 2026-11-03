@@ -69,14 +69,7 @@ export class NeedDecisionQueueRepo {
    * snapshot, so a step decided meanwhile cannot make the total disagree with the page. Reads only; takes no row lock.
    */
   async pageOpenOf(employeeId: string, query: { type?: NeedQueueType; skip: number; take: number }) {
-    const where: Prisma.AccessRequestStepWhereInput = {
-      kind: 'NEED',
-      state: 'PENDING',
-      assigneeEmployeeId: employeeId,
-      routingRow: { in: [...HELD_ROUTING_ROWS] },
-      ...notOwn(employeeId),
-      ...(query.type ? { AND: [{ request: { type: query.type } }] } : {}),
-    };
+    const where = openWhere(employeeId, query.type);
 
     return this.prisma.$transaction(
       async (tx) => ({
@@ -92,4 +85,20 @@ export class NeedDecisionQueueRepo {
       { isolationLevel: 'RepeatableRead' },
     );
   }
+
+  /** How many need steps wait for the person now: the total of `pageOpenOf` for the same filter, without reading the rows. */
+  async countOpenOf(employeeId: string, type?: NeedQueueType): Promise<number> {
+    return this.prisma.accessRequestStep.count({ where: openWhere(employeeId, type) });
+  }
+}
+
+function openWhere(employeeId: string, type?: NeedQueueType): Prisma.AccessRequestStepWhereInput {
+  return {
+    kind: 'NEED',
+    state: 'PENDING',
+    assigneeEmployeeId: employeeId,
+    routingRow: { in: [...HELD_ROUTING_ROWS] },
+    ...notOwn(employeeId),
+    ...(type ? { AND: [{ request: { type } }] } : {}),
+  };
 }

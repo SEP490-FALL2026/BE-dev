@@ -1,4 +1,4 @@
-import { searchKey } from './search-key';
+import { escapeLikePattern, searchKey } from './search-key';
 
 describe('searchKey', () => {
   it.each([
@@ -14,5 +14,12 @@ describe('searchKey', () => {
 
   it('gives a composed and a decomposed accent the same key', () => {
     expect(searchKey('é')).toBe(searchKey('é'));
+  });
+});
+
+describe('escapeLikePattern', () => {
+  it('escapes %, _ and the backslash so they match literally', () => {
+    expect(escapeLikePattern('50%_off\\now')).toBe('50\\%\\_off\\\\now');
+    expect(escapeLikePattern('plain')).toBe('plain');
   });
 });

@@ -116,8 +116,8 @@ export class AccessRequestsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), or an expected spend date is given for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE],
+        'The body is invalid (VALIDATION_ERROR), an expected spend date is given for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE), or the caller is placed in no department (REQUEST_PARTY.INELIGIBLE, details.reason UNPLACED). A spending approver is not refused here: the answer is 200 with blockedBy and canSubmit false.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE, EXAMPLES.PREVIEW_REQUEST_PARTY_UNPLACED],
     },
   )
   async preview(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: PreviewBodyDto) {

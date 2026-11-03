@@ -98,7 +98,7 @@ export class OffboardingController {
     status: HttpStatus.CREATED,
     message: 'OFFBOARDING_CASE.RECORDED',
     description:
-      'The handover was recorded with the last working day and the basis, or the departure was recorded as having happened (an abrupt one is left at once). The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given, and the head of the department is asked to confirm the handover of every tool. No seat is taken away and no task is made.',
+      'The handover was recorded with the last working day and the basis, or the departure was recorded as having happened (an abrupt one is left at once). The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given, and the head of the department is asked to confirm the handover of every tool. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -109,7 +109,7 @@ export class OffboardingController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description: `The person has left (OFFBOARDING_CASE.EMPLOYEE_LEFT) or is handing over already (ALREADY_HANDING_OVER), has a transfer that takes effect before the last working day or another event waiting (PENDING_EVENT_EXISTS), or ${CONCURRENT}.`,
+      description: `The person has left (OFFBOARDING_CASE.EMPLOYEE_LEFT) or is handing over already (ALREADY_HANDING_OVER), has a transfer that takes effect before the last working day or another event waiting (PENDING_EVENT_EXISTS), has placements but none in force or scheduled (PLACEMENT_OVERLAP, details.reason NO_OPEN_PLACEMENT; a person never placed is recorded on the shortened flow), has a first placement that takes effect on or before the last working day (PLACEMENT_OVERLAP, details.reason FIRST_PLACEMENT_PENDING with validFrom: pick an earlier day or record from that day), or ${CONCURRENT}.`,
       examples: [...PERSON_REFUSALS, ...CONCURRENT_EXAMPLES, E.PLACEMENT_OVERLAP],
     },
     {
@@ -225,8 +225,8 @@ export class OffboardingController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: `The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), the last working day has passed (LAST_DAY_ALREADY_PASSED), or ${CONCURRENT}.`,
-      examples: [...NOT_UNDER_WAY, E.LAST_DAY_ALREADY_PASSED, ...CONCURRENT_EXAMPLES],
+      description: `The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), the last working day has passed (LAST_DAY_ALREADY_PASSED), the case cancelled a first placement and the new day is on or after the day it would take effect (PLACEMENT_OVERLAP, details.reason FIRST_PLACEMENT_PENDING with validFrom), or ${CONCURRENT}.`,
+      examples: [...NOT_UNDER_WAY, E.LAST_DAY_ALREADY_PASSED, E.PLACEMENT_OVERLAP, ...CONCURRENT_EXAMPLES],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -258,7 +258,7 @@ export class OffboardingController {
   @ApiSuccessResponse(OffboardingDetailResponseDto, {
     message: 'OFFBOARDING_CASE.CANCELLED',
     description:
-      'The handover was cancelled: the person keeps the department and, if they headed it, the head, the confirmations that waited are cancelled, and they are back to what they were doing (a long leave still ahead included). No task is made or taken away.',
+      'The handover was cancelled: the person keeps the department and, if they headed it, the head, the confirmations that waited are cancelled, and they are back to what they were doing (a long leave still ahead included). A first placement the case had cancelled is put back when its department is still active, and firstPlacementRestored says whether it was. No task is made or taken away.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -281,8 +281,10 @@ export class OffboardingController {
   ) {
     try {
       const record = await this.changes.cancel(userActor(actor), params.id, { reason: body.reason ?? '' });
-
-      return await this.detail.detailOf(record);
+      const detail = await this.detail.detailOf(record);
+      return record.firstPlacementRestored !== undefined
+        ? { ...detail, firstPlacementRestored: record.firstPlacementRestored }
+        : detail;
     } catch (error) {
       throw toOffboardingApiException(error);
     }

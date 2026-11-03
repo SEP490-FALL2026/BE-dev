@@ -1,13 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { OperatorAuditActor } from '../../licensing/public/licensing-handover.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ControlledWaitAlertService } from './controlled-wait-alert.service';
 import {
   decideReassignment,
-  isLegacyStep,
   requestStateFor,
   touchesHeldStep,
   type OpenStep,
@@ -61,7 +59,6 @@ export class StepReassignmentService {
     private readonly targets: StepTargetService,
     private readonly alerts: ControlledWaitAlertService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly identity: IdentityAccessApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -123,34 +120,12 @@ export class StepReassignmentService {
 
     const facts = await this.targets.gatherToday(tx, now);
     const gone = await this.holdersWhoLeft(tx, requests);
-    const grantees = await this.spendingApproverGrantees(tx, requests);
     for (const request of requests) {
       result.requests += 1;
-      await this.reconcileOne(tx, request, trigger, correlationId, now, facts, { gone, grantees, operator }, result);
+      await this.reconcileOne(tx, request, trigger, correlationId, now, facts, { gone, operator }, result);
     }
 
     return result;
-  }
-
-  /**
-   * Who, among the holders of the pending spend steps just locked, has ever had a `SPENDING_APPROVER` grant: one unlocked read for
-   * the whole pass (the pattern of `holdersWhoLeft`). The history of a grant only grows, and a grant made at the same time can only
-   * turn a step of the old rule into one that is not (its holder is then a valid spending approver), which the next pass reads.
-   */
-  private async spendingApproverGrantees(tx: DbTx, requests: readonly ReassignableRequest[]): Promise<Set<string>> {
-    const holders = [
-      ...new Set(
-        requests.flatMap((request) =>
-          request.steps.flatMap((step) =>
-            step.kind === 'SPEND_APPROVAL' && step.state === 'PENDING' && step.assigneeEmployeeId !== null
-              ? [step.assigneeEmployeeId]
-              : [],
-          ),
-        ),
-      ),
-    ];
-
-    return this.identity.everHeldSpendingApproverAmong(tx, holders);
   }
 
   private async holdersWhoLeft(tx: DbTx, requests: readonly ReassignableRequest[]): Promise<Set<string>> {
@@ -179,10 +154,10 @@ export class StepReassignmentService {
     correlationId: string,
     now: Date,
     facts: TodayFacts,
-    context: { gone: ReadonlySet<string>; grantees: ReadonlySet<string>; operator?: OperatorAuditActor },
+    context: { gone: ReadonlySet<string>; operator?: OperatorAuditActor },
     result: ReconcileResult,
   ): Promise<void> {
-    const { gone, grantees, operator } = context;
+    const { gone, operator } = context;
     const steps = request.steps.map((step) => ({ ...step }));
     let state = request.state;
     let holdersChanged = false;
@@ -195,10 +170,7 @@ export class StepReassignmentService {
         holderEmployeeId: step.assigneeEmployeeId,
         holderGone: step.assigneeEmployeeId !== null && gone.has(step.assigneeEmployeeId),
         waitingReason: step.waitingReason,
-        legacy: isLegacyStep(step, grantees),
       };
-      // A step of the old rule is not decided again, and so not alerted again, until the conversion moves it.
-      if (open.legacy !== (trigger.kind === 'QD93_CONVERSION')) continue;
       if (open.state === 'PENDING' && !touchesHeldStep(open, trigger)) continue;
 
       const decision = decideReassignment(open, trigger, await this.targets.targetOf(tx, request, step, facts));

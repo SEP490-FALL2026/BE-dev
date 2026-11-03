@@ -135,12 +135,11 @@ describe('installation command use case (integration, real PostgreSQL)', () => {
       SELECT (SELECT count(*)::int FROM cost_centers) AS cost_centers,
              (SELECT count(*)::int FROM department_head_periods) AS head_periods,
              (SELECT count(*)::int FROM departments WHERE it_admin_employee_id IS NOT NULL) AS with_it_admin,
-             (SELECT count(*)::int FROM approval_role_holders) AS approval_holders,
              (SELECT job_title FROM employees WHERE employee_code = 'E001') AS job_title,
              (SELECT d.code FROM employee_placements p JOIN departments d ON d.id = p.department_id) AS department`);
 
     expect(facts.rows).toEqual([
-      { cost_centers: 0, head_periods: 0, with_it_admin: 0, approval_holders: 0, job_title: null, department: 'P-ENG' },
+      { cost_centers: 0, head_periods: 0, with_it_admin: 0, job_title: null, department: 'P-ENG' },
     ]);
   });
 

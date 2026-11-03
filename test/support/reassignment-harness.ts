@@ -139,15 +139,9 @@ export class ReassignmentHarness extends SpendHarness {
     return rows;
   }
 
-  /** Who holds the approval role now, by employee id; null when nobody does. */
-  async getApprovalRoleHolder(role: string): Promise<string | null> {
-    if (role === 'SPENDING_APPROVER') return spendingApproverEmployeeId(this.ctx);
-    const { rows } = await this.ctx.sql.query<{ employee_id: string }>(
-      `SELECT employee_id FROM approval_role_holders WHERE role = $1::"ApprovalRole" AND held_until IS NULL`,
-      [role],
-    );
-
-    return rows[0]?.employee_id ?? null;
+  /** Who is the spending approver now, by employee id; null when nobody is: the holder of the grant that is in force. */
+  async getSpendingApproverEmployeeId(): Promise<string | null> {
+    return spendingApproverEmployeeId(this.ctx);
   }
 
   async requestRow(requestId: string): Promise<{ state: string; policy: unknown; department_id: string }> {

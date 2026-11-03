@@ -33,8 +33,22 @@ export const proposalBodySchema = z.strictObject({
   costCenterId: z.uuid(),
   year,
   lines: z.array(lineBody).min(1).max(LINES_MAX),
+  attachmentIds: z
+    .array(z.uuid())
+    .max(20)
+    .refine((ids) => new Set(ids).size === ids.length, { message: 'A document is named once.' })
+    .meta({ uniqueItems: true })
+    .optional(),
 });
-export const resubmissionBodySchema = z.strictObject({ lines: z.array(lineBody).min(1).max(LINES_MAX) });
+export const resubmissionBodySchema = z.strictObject({
+  lines: z.array(lineBody).min(1).max(LINES_MAX),
+  attachmentIds: z
+    .array(z.uuid())
+    .max(20)
+    .refine((ids) => new Set(ids).size === ids.length, { message: 'A document is named once.' })
+    .meta({ uniqueItems: true })
+    .optional(),
+});
 export const returnBodySchema = z.strictObject({ reason: text(REASON_MAX) });
 /**
  * The decision of the spending approver on a version (`US-06-11`): approve, refuse, or ask Finance to look again. A refusal
@@ -136,7 +150,7 @@ export const windowBodySchema = z
   })
   .meta({ description: 'Give at least one of windowFrom, windowTo and amount.' });
 
-const pageQuery = {
+export const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 };
@@ -153,6 +167,10 @@ export const versionListQuerySchema = z.strictObject({
 export const pageQuerySchema = z.strictObject(pageQuery);
 export const mineQuerySchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2200) });
 export const mineLinesQuerySchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2200), ...pageQuery });
+export const mineVersionsQuerySchema = z.strictObject({
+  year: z.coerce.number().int().min(2000).max(2200).optional(),
+  ...pageQuery,
+});
 export const budgetsQuerySchema = z.strictObject({
   year: z.coerce.number().int().min(2000).max(2200).optional(),
   ...pageQuery,
@@ -160,7 +178,7 @@ export const budgetsQuerySchema = z.strictObject({
 export const idParamSchema = z.strictObject({ id: z.uuid() });
 export const lineParamSchema = z.strictObject({ id: z.uuid(), position: z.coerce.number().int().positive() });
 
-const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() });
+export const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 const costCenterRef = z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() });
 const pagination = z.strictObject({
   page: z.number().int().positive(),
@@ -315,6 +333,13 @@ const tableRowSchema = z.strictObject({
   remaining: moneyView,
   overCommitted: z.boolean(),
 });
+export const mineVersionSummarySchema = z.strictObject({
+  id: z.uuid(),
+  year,
+  number: z.number().int().positive(),
+  state: z.enum(['SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
+  sentAt: z.iso.datetime(),
+});
 const importSchema = z.strictObject({
   added: z.number().int().nonnegative(),
   rejected: z.number().int().nonnegative(),
@@ -336,6 +361,7 @@ export class VersionListQueryDto extends createZodDto(versionListQuerySchema) {}
 export class PageQueryDto extends createZodDto(pageQuerySchema) {}
 export class MineQueryDto extends createZodDto(mineQuerySchema) {}
 export class MineLinesQueryDto extends createZodDto(mineLinesQuerySchema) {}
+export class MineVersionsQueryDto extends createZodDto(mineVersionsQuerySchema) {}
 export class BudgetsQueryDto extends createZodDto(budgetsQuerySchema) {}
 export class IdParamDto extends createZodDto(idParamSchema) {}
 export class LineParamDto extends createZodDto(lineParamSchema) {}
@@ -354,6 +380,7 @@ export class LineResponseDto extends createZodDto(successEnvelopeSchema(z.strict
 export class LineChangePageResponseDto extends createZodDto(page(lineChangeSchema)) {}
 export class MineResponseDto extends createZodDto(successEnvelopeSchema(z.strictObject({ budget: mineSchema }))) {}
 export class MineLinePageResponseDto extends createZodDto(page(versionLineSchema)) {}
+export class MineVersionPageResponseDto extends createZodDto(page(mineVersionSummarySchema)) {}
 export class BudgetTablePageResponseDto extends createZodDto(page(tableRowSchema)) {}
 export class BudgetLineImportResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ result: importSchema })),
@@ -367,5 +394,6 @@ export type VersionWire = z.infer<typeof versionSchema>;
 export type VersionLineWire = z.infer<typeof versionLineSchema>;
 export type LineChangeWire = z.infer<typeof lineChangeSchema>;
 export type MineWire = z.infer<typeof mineSchema>;
+export type MineVersionSummaryWire = z.infer<typeof mineVersionSummarySchema>;
 export type TableRowWire = z.infer<typeof tableRowSchema>;
 export type ImportWire = z.infer<typeof importSchema>;

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { normalizeDisplayName } from '../../../core/display-name';
 import { normalizeEmail } from '../../../core/email';
+import { escapeLikePattern } from '../../../core/search-key';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
@@ -51,11 +52,6 @@ function toEmployeeRecord(row: {
     hireDate: fromDateColumn(row.hireDate),
     jobTitle: row.jobTitle,
   };
-}
-
-/** Escapes LIKE metacharacters so a search term matches literally (backslash is PostgreSQL's default escape). */
-function escapeLikePattern(term: string): string {
-  return term.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
 /**
@@ -182,6 +178,66 @@ export class EmployeeRepo {
         employeeId: input.employeeId,
         departmentId: input.departmentId,
         validFrom: toDateColumn(input.effectiveFrom),
+      },
+    });
+  }
+
+  async scheduledFirstPlacement(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ placementId: string; departmentId: string; validFrom: BusinessDate } | null> {
+    const client = tx ?? this.prisma;
+    const existing = await client.employeePlacement.findFirst({
+      where: {
+        employeeId,
+        validFrom: { lte: toDateColumn(onDate) },
+      },
+      select: { id: true },
+    });
+    if (existing) return null;
+
+    const future = await client.employeePlacement.findFirst({
+      where: {
+        employeeId,
+        validFrom: { gt: toDateColumn(onDate) },
+      },
+      orderBy: { validFrom: 'asc' },
+      select: { id: true, departmentId: true, validFrom: true },
+    });
+    if (!future) return null;
+
+    return {
+      placementId: future.id,
+      departmentId: future.departmentId,
+      validFrom: fromDateColumn(future.validFrom),
+    };
+  }
+
+  async cancelScheduledFirstPlacement(tx: DbTx, placementId: string): Promise<void> {
+    await tx.employeePlacement.delete({
+      where: { id: placementId },
+    });
+  }
+
+  async restoreFirstPlacement(
+    tx: DbTx,
+    input: {
+      placementId: string;
+      organizationId: string;
+      employeeId: string;
+      departmentId: string;
+      validFrom: BusinessDate;
+    },
+  ): Promise<void> {
+    await tx.employeePlacement.create({
+      data: {
+        id: input.placementId,
+        organizationId: input.organizationId,
+        employeeId: input.employeeId,
+        departmentId: input.departmentId,
+        validFrom: toDateColumn(input.validFrom),
+        validTo: null,
       },
     });
   }

@@ -19,14 +19,6 @@ export interface EmployeeListRow {
   unplaced: boolean;
 }
 
-export interface EmployeePlacementRow {
-  department_id: string;
-  department_code: string;
-  department_name: string;
-  valid_from: Date;
-  valid_to: Date | null;
-}
-
 export interface EmployeePlacementHistoryRecord {
   department: {
     id: string;

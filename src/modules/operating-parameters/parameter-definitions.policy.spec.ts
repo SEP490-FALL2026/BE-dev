@@ -270,7 +270,7 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
 
   it('leaves the description of the document size parameter as it is (another item changes it)', () => {
     expect(definitionOf('DOCUMENT_MAX_SIZE_MB')?.description).toBe(
-      'The largest file kept for a contract or a purchase document; a larger file is refused.',
+      'The largest file the system keeps: a contract or purchase document, or a document of an annual budget proposal or version; a larger file is refused.',
     );
   });
 });

@@ -16,7 +16,15 @@ const historyChangeSchema = z.strictObject({
 });
 const historyEntrySchema = z.strictObject({
   seq: z.number().int().positive(),
-  kind: z.enum(['FIGURES_UPDATED', 'LINE_UPDATED', 'LINES_ADDED', 'LINES_IMPORTED', 'WINDOW_MOVED']),
+  kind: z.enum([
+    'FIGURES_UPDATED',
+    'LINE_UPDATED',
+    'LINES_ADDED',
+    'LINES_IMPORTED',
+    'WINDOW_MOVED',
+    'ATTACHMENT_ADDED',
+    'ATTACHMENT_REMOVED',
+  ]),
   versionState: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
   position: z.number().int().positive().nullable(),
   lines: z

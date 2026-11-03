@@ -106,10 +106,7 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
     it('refuses a service row without a reason, with an unknown Cost Center, with one that is not the owning Unit, or without a department', async () => {
       const subscriptionId = await h.subscription(10);
       const other = await h.costCenter('UNIT');
-      await h.crowd('SVR', 5);
-      await h.ctx.sql.query(
-        `DELETE FROM employee_placements WHERE employee_id = (SELECT id FROM employees WHERE employee_code = 'SVR3')`,
-      );
+      await h.crowd('SVR', 5, [3]);
       const unit = await h.ownUnit();
       const own = (await h.ctx.sql.query<{ code: string }>(`SELECT code FROM cost_centers WHERE id = $1`, [unit.id]))
         .rows[0].code;

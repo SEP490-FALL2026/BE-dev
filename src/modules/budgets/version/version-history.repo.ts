@@ -9,7 +9,14 @@ import {
   type HistoryBefore,
 } from './version-history-snapshot.json';
 
-export type HistoryKind = 'FIGURES_UPDATED' | 'LINE_UPDATED' | 'LINES_ADDED' | 'LINES_IMPORTED' | 'WINDOW_MOVED';
+export type HistoryKind =
+  | 'FIGURES_UPDATED'
+  | 'LINE_UPDATED'
+  | 'LINES_ADDED'
+  | 'LINES_IMPORTED'
+  | 'WINDOW_MOVED'
+  | 'ATTACHMENT_ADDED'
+  | 'ATTACHMENT_REMOVED';
 
 export interface HistoryEntryRecord {
   seq: number;

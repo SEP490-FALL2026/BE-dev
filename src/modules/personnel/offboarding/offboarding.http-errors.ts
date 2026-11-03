@@ -33,7 +33,6 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   ALREADY_RECORDED: HttpStatus.CONFLICT,
   REVOCATION_NOT_SUPPORTED: HttpStatus.CONFLICT,
   CASE_NOT_CLOSEABLE: HttpStatus.CONFLICT,
-  EMPLOYEE_UNPLACED: HttpStatus.CONFLICT,
   PLACEMENT_OVERLAP: HttpStatus.CONFLICT,
   CONCURRENT_CHANGE: HttpStatus.CONFLICT,
 };
@@ -66,7 +65,6 @@ const MESSAGES: Readonly<Record<string, string>> = {
   ALREADY_RECORDED: 'The lock of the company account was recorded already.',
   REVOCATION_NOT_SUPPORTED: 'The kind of provisioning of the seat has no revocation yet.',
   CASE_NOT_CLOSEABLE: 'Something still keeps the case open.',
-  EMPLOYEE_UNPLACED: 'Xếp phòng trước khi ghi nghỉ việc.',
   PLACEMENT_OVERLAP: 'The placements of the person cannot take this change.',
   CONCURRENT_CHANGE: 'The person was changed by someone else meanwhile; read the case again.',
 };
@@ -144,6 +142,9 @@ export const OFFBOARDING_ERROR_EXAMPLES = {
       blockers: ['ACCOUNT_LOCK_NOT_RECORDED', 'PERSONAL_RIGHTS_OPEN'],
     }),
   ),
-  PLACEMENT_OVERLAP: example(new OffboardingRefusedError('PLACEMENT_OVERLAP', { reason: 'NO_OPEN_PLACEMENT' })),
+  // One example per code in a response: the reason a caller has to act on (`D-S28`); `NO_OPEN_PLACEMENT` is in the descriptions.
+  PLACEMENT_OVERLAP: example(
+    new OffboardingRefusedError('PLACEMENT_OVERLAP', { reason: 'FIRST_PLACEMENT_PENDING', validFrom: '2026-01-01' }),
+  ),
   CONCURRENT_CHANGE: example(new OffboardingRefusedError('CONCURRENT_CHANGE')),
 } as const;

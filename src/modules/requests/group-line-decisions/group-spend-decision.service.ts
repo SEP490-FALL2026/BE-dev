@@ -65,7 +65,6 @@ export class GroupSpendDecisionService {
         beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
         assigneeEmployeeId: step.assigneeEmployeeId,
         stepState: step.state,
-        stepAwaitsConversion: await this.effects.awaitsConversion(tx, step),
       });
       if (refusal) throw new SpendDecisionRefusedError(refusal);
       // The person who completed the review of Finance of this request does not decide its spend step (`SoD-8`).

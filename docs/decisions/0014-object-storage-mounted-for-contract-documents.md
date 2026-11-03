@@ -52,6 +52,12 @@ versioning của bucket. Không phải Owner review hay chấp nhận; đổi sa
    `PreconditionFailed` và không sao chép, tải về trả đúng `Content-Disposition`/`Content-Type`. Chưa kiểm chứng: trình duyệt PUT
    bằng liên kết ký sẵn qua CORS tới MinIO/S3 thật (`SEC-09` — việc thủ công), lifecycle rule của bucket.
 
+### Bổ sung 03/11/2026 — tệp của hồ sơ ngân sách (`QĐ-93j`, `US-06-09`, `US-06-10`)
+
+10. `ObjectStorageModule` được nạp thêm bởi `BudgetsModule` để lưu tài liệu đính kèm đề xuất (`BudgetProposal`) và phiên bản ngân sách (`BudgetVersion`). Đồ thị module: `RecordSuperAdminEventCliModule` nạp `CatalogModule` và `BudgetsModule` gián tiếp qua `PersonnelModule` → `RequestsModule`, nhưng chỉ tiến trình API sử dụng kho đối tượng để ký liên kết và thao tác với tệp; worker và các lệnh CLI khác không dùng kho.
+11. Việc kiểm tra và sao chép an toàn tệp tải lên dùng chung lớp bổ trợ `UploadInspection`: đọc `head` (kiểm tra `contentLength`, `contentType`), đọc tiền tố tối đa 512 byte kèm `IfMatch` ETag (kiểm tra định dạng PDF, XLSX, DOCX, CSV, PNG, JPEG), rồi sao chép sang khóa cuối `documents/…` kèm `CopySourceIfMatch` trước khi xóa khóa tạm `pending-documents/…`.
+12. Tệp chưa gắn quá hạn (`AWAITING_UPLOAD` quá 24 giờ, `UPLOADED` quá 7 ngày) được quét dọn mỗi giờ bởi `BudgetAttachmentExpirySweeper` trong tiến trình API (lần đầu sau 5 phút), đánh dấu `EXPIRED`, ghi sự kiện Audit với tác nhân `SYSTEM` và xóa đối tượng trong kho sau khi commit transaction.
+
 ## Hệ quả
 
 - `module-graph.spec.ts` (H6.4) đổi từ "không đồ thị nào mount kho" thành "chỉ `AppModule` mount kho, không đồ thị nào

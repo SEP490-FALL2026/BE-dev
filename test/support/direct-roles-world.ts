@@ -142,8 +142,36 @@ export async function clearPeople(sql: Client, world: RolesWorld): Promise<void>
   const owned = [world.organizationId];
   await sql.query(`DELETE FROM role_grants WHERE organization_id = $1`, owned);
   await sql.query(`DELETE FROM department_head_periods WHERE organization_id = $1`, owned);
-  await sql.query(`DELETE FROM approval_role_holders WHERE organization_id = $1`, owned);
+  // The table is dropped by a later migration (QĐ-93 removal of the approval roles): present only on the history before it.
+  if (
+    (await sql.query<{ t: string | null }>(`SELECT to_regclass('approval_role_holders')::text AS t`)).rows[0].t !== null
+  ) {
+    await sql.query(`DELETE FROM approval_role_holders WHERE organization_id = $1`, owned);
+  }
   await sql.query(`DELETE FROM app_users WHERE organization_id = $1`, owned);
-  await sql.query(`DELETE FROM employee_placements WHERE organization_id = $1`, owned);
+  await deleteAllPlacements(sql, world);
   await sql.query(`DELETE FROM employees WHERE organization_id = $1`, owned);
+}
+
+/**
+ * Removes every placement of the world's organization for test cleanup. The keep-one trigger (`INV-20`) refuses to delete
+ * the last placement of an employee, so inside one transaction the trigger is switched off (when the history applied has
+ * it) and on again; the trigger itself is production code and stays as it is.
+ */
+async function deleteAllPlacements(sql: Client, world: RolesWorld): Promise<void> {
+  const present = await sql.query(
+    `SELECT 1 FROM pg_trigger WHERE tgname = 'employee_placements_keep_one' AND tgrelid = 'employee_placements'::regclass`,
+  );
+  await sql.query('BEGIN');
+  try {
+    if (present.rowCount)
+      await sql.query(`ALTER TABLE employee_placements DISABLE TRIGGER employee_placements_keep_one`);
+    await sql.query(`DELETE FROM employee_placements WHERE organization_id = $1`, [world.organizationId]);
+    if (present.rowCount)
+      await sql.query(`ALTER TABLE employee_placements ENABLE TRIGGER employee_placements_keep_one`);
+    await sql.query('COMMIT');
+  } catch (error) {
+    await sql.query('ROLLBACK');
+    throw error;
+  }
 }

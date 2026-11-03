@@ -240,7 +240,8 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     default: 10,
     unit: 'MB',
     unitLabel: 'MB',
-    description: 'The largest file kept for a contract or a purchase document; a larger file is refused.',
+    description:
+      'The largest file the system keeps: a contract or purchase document, or a document of an annual budget proposal or version; a larger file is refused.',
     source: 'US-04-04 AC-10',
   },
   {

@@ -175,6 +175,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'RequestsWorkFacadeModule: RequestDraftRepo',
   // G6 (US-03-04): the facade the personnel context reads the open requests of a person who leaves through.
   'RequestsModule: RequestsApi',
+  // G8 (US-12-15): the counts of requests the role overviews read.
+  'RequestsModule: RequestsDashboardApi',
   // F43: the extension point the personnel context adds its listener of the outcome of a request to (public/requests.extension-points.ts).
   'RequestsModule: RequestOutcomeListeners',
   // The two entry services of `pnpm ops:recover` (Q6; E7): the holder's own account, and the role transfer.

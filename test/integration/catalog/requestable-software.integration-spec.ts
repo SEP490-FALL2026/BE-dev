@@ -286,8 +286,7 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
     });
 
     it('offers nothing to a person who belongs to no department, as the preview refuses them', async () => {
-      const lonely = await h.staff(design, 'DES-LONELY');
-      await h.ctx.sql.query(`DELETE FROM employee_placements WHERE employee_id = $1`, [lonely.employeeId]);
+      const lonely = await h.unplacedStaff('DES-LONELY');
 
       for (const path of [
         '/api/v1/requestable-applications',

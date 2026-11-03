@@ -204,8 +204,63 @@ describe('organization foundation (integration)', () => {
     const violations = await findPlacementCoverageViolations(sql);
     expect(violations).toEqual([{ employee_id: id, problem: 'gap or overlap between consecutive placements' }]);
 
-    await sql.query(`DELETE FROM employee_placements WHERE employee_id = $1`, [id]);
-    await sql.query(`DELETE FROM employees WHERE id = $1`, [id]);
+    // database is dropped at afterAll
+  });
+
+  // Task A.2 (INV-20): what the coverage query says of the employees of these cases; the gap above stays in the database.
+  const problemsOf = async (employeeId: string) =>
+    (await findPlacementCoverageViolations(sql))
+      .filter((row) => row.employee_id === employeeId)
+      .map((row) => row.problem);
+
+  it('coverage query accepts an employee who has no placement (unplaced, INV-20)', async () => {
+    const { rows } = await sql.query<{ id: string }>(
+      `INSERT INTO employees (id, organization_id, employee_code, full_name, employment_type, hire_date, status, work_state, updated_at)
+       VALUES (gen_random_uuid(), $1, 'E-COV1', 'Person E-COV1', 'STAFF', '2026-01-05', 'ACTIVE', 'WORKING', now())
+       RETURNING id`,
+      [organizationId],
+    );
+
+    await expect(problemsOf(rows[0].id)).resolves.toEqual([]);
+  });
+
+  it('coverage query detects an active employee with two open placements', async () => {
+    const { id } = await hire('E-COV2', 'e-cov2@acme.vn', '2026-01-05');
+    // The exclusion constraint refuses two open placements, so it is dropped inside a transaction that is rolled back.
+    await sql.query('BEGIN');
+    try {
+      await sql.query(`ALTER TABLE employee_placements DROP CONSTRAINT employee_placements_no_overlap`);
+      await sql.query(
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2026-02-01')`,
+        [organizationId, id, departmentId],
+      );
+
+      await expect(problemsOf(id)).resolves.toEqual([
+        'gap or overlap between consecutive placements',
+        'active employee with a placement must have exactly one open placement',
+      ]);
+    } finally {
+      await sql.query('ROLLBACK');
+    }
+
+    await expect(problemsOf(id)).resolves.toEqual([]);
+  });
+
+  it('coverage query detects a first placement before the hire date or between it and the day recorded, and accepts one not before both', async () => {
+    const { id } = await hire('E-COV3', 'e-cov3@acme.vn', '2026-06-10');
+    const problem = 'first placement does not start at hire date or at the day the employee was recorded';
+    await sql.query(`UPDATE employee_placements SET valid_from = '2026-06-09' WHERE employee_id = $1`, [id]);
+    await expect(problemsOf(id)).resolves.toEqual([problem]);
+    // After the hire date but before the day the employee was recorded (today): neither of the two days, and before both.
+    await sql.query(`UPDATE employee_placements SET valid_from = '2026-08-01' WHERE employee_id = $1`, [id]);
+    await expect(problemsOf(id)).resolves.toEqual([problem]);
+
+    // A first placement on the hire date, and one later than both days (a recorded employee placed in the future), are valid.
+    await sql.query(`UPDATE employee_placements SET valid_from = '2026-06-10' WHERE employee_id = $1`, [id]);
+    await expect(problemsOf(id)).resolves.toEqual([]);
+    await sql.query(`UPDATE employee_placements SET valid_from = '2999-01-01' WHERE employee_id = $1`, [id]);
+    await expect(problemsOf(id)).resolves.toEqual([]);
   });
 
   it('stores the title of a person as free text in its display form (T-12, QĐ-87e): no catalogue, and none at all is allowed', async () => {

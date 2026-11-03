@@ -65,6 +65,11 @@ const FIELD_ORDER: readonly string[] = [
   'quoteValidUntil',
   'financeComment',
   'adjustmentReason',
+  'fileName',
+  'contentType',
+  'sizeBytes',
+  'state',
+  'attachmentId',
 ];
 
 const text = (value: number | null): string | null => (value === null ? null : String(value));
@@ -218,4 +223,43 @@ export function changesOf(
     .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
     .slice(0, HISTORY_CHANGES_MAX)
     .map((field) => ({ field, before: value(before, field), after: value(after, field) }));
+}
+
+export function attachmentAdded(facts: {
+  attachmentId: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+}): { before: null; after: HistoryValues } {
+  return {
+    before: null,
+    after: {
+      attachmentId: facts.attachmentId,
+      fileName: facts.fileName,
+      contentType: facts.contentType,
+      sizeBytes: String(facts.sizeBytes),
+    },
+  };
+}
+
+export function attachmentRemoved(facts: {
+  attachmentId: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+}): { before: HistoryValues; after: HistoryValues } {
+  return {
+    before: {
+      attachmentId: facts.attachmentId,
+      fileName: facts.fileName,
+      contentType: facts.contentType,
+      sizeBytes: String(facts.sizeBytes),
+      state: 'ATTACHED',
+    },
+    after: {
+      attachmentId: facts.attachmentId,
+      fileName: facts.fileName,
+      state: 'REMOVED',
+    },
+  };
 }

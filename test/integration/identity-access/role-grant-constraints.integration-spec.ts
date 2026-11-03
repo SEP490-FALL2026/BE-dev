@@ -288,29 +288,6 @@ describe('role grant constraints (integration, real PostgreSQL)', () => {
       }
     });
 
-    it('refuses the Super Admin role for someone who holds an approval role, until the holding ends (the other half of the exclusions)', async () => {
-      const holder = await fresh();
-      for (const role of ['CONFLICT_SUBSTITUTE', 'FALLBACK_APPROVER']) {
-        await ctx.sql.query(
-          `INSERT INTO approval_role_holders (id, organization_id, role, employee_id, held_from)
-           VALUES (gen_random_uuid(), $1, $2::"ApprovalRole", $3, now() - interval '1 day')`,
-          [seed.organizationId, role, holder.employeeId],
-        );
-        await withoutSuperAdmin(async () => {
-          const refused = await refusal(grant(ctx.sql, holder.appUserId, 'SUPER_ADMIN'));
-          expect(refused.code).toBe(CHECK_VIOLATION);
-          expect(refused.message).toContain('holds an approval role');
-          await ctx.sql.query(
-            `UPDATE approval_role_holders SET held_until = GREATEST(now(), held_from)
-              WHERE employee_id = $1 AND role = $2::"ApprovalRole" AND held_until IS NULL`,
-            [holder.employeeId, role],
-          );
-          await grant(ctx.sql, holder.appUserId, 'SUPER_ADMIN');
-          await revokeAll(holder.appUserId);
-        });
-      }
-    });
-
     it('gives the holder of the Super Admin role neither MANAGER nor SPENDING_APPROVER (US-01-03 AC-2)', async () => {
       const holder = await superAdminHolder();
 

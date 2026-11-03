@@ -51,6 +51,27 @@ export function principalOf(ctx: HttpTestApp, accessToken: string): Promise<Auth
   return ctx.app.get<symbol, AccessTokenVerifierPort>(ACCESS_TOKEN_VERIFIER, { strict: false }).verify(accessToken);
 }
 
+/** An employee with no placement at all (unplaced, `INV-20`), inserted directly: the manual-entry route is not what the suite proves. */
+export async function insertEmployeeWithoutPlacement(
+  ctx: HttpTestApp,
+  seed: SeededInstallation,
+  spec: { code: string; email?: string | null; fullName?: string; hireDate?: string },
+): Promise<string> {
+  const result = await ctx.sql.query<{ id: string }>(
+    `INSERT INTO employees (id, organization_id, employee_code, full_name, work_email, employment_type, hire_date, status, work_state, updated_at)
+     VALUES (gen_random_uuid(), $1, $2, $3, $4, 'STAFF', $5::date, 'ACTIVE', 'WORKING', now())
+     RETURNING id`,
+    [
+      seed.organizationId,
+      spec.code,
+      spec.fullName ?? `Person ${spec.code}`,
+      spec.email ?? null,
+      spec.hireDate ?? '2026-01-05',
+    ],
+  );
+  return result.rows[0].id;
+}
+
 /** An activated account holding exactly `spec.roles`, for a new employee or one that exists, signed in. */
 export async function buildActivatedAccount(
   ctx: HttpTestApp,

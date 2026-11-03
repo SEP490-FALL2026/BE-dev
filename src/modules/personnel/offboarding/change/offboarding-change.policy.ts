@@ -7,7 +7,7 @@ export function changeFactsOf(
   read: {
     today: BusinessDate;
     hireDate: BusinessDate;
-    placementFrom: BusinessDate;
+    placementFrom: BusinessDate | null;
     newLastWorkingDay: BusinessDate;
     reason: string;
   },

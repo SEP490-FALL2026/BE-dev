@@ -128,6 +128,7 @@
   one per recipient), the late flag is a conditional update written once, and the deadline event has `ON CONFLICT DO NOTHING`; a failed
   pass only logs. It only tells and flags late: it never renews, cancels, decides or records an outcome, never changes a subscription or
   a seat, and a decision taken after the deadline is never voided. Run one by hand with `SubscriptionRenewalSweepService.sweep(now)`.
+  The API also runs `BudgetAttachmentExpirySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each unattached document upload whose deadline has passed (`AWAITING_UPLOAD` older than 24 hours, `UPLOADED` older than 7 days) it marks the attachment `EXPIRED`, writes the audit event `BUDGET_ATTACHMENT.EXPIRED` with actor `SYSTEM`, and deletes the abandoned storage object(s) after commit; each file is picked and locked `FOR UPDATE SKIP LOCKED` inside its own transaction (a file a proposal send holds is skipped, never waited for; at most 100 per pass), attached, removed and discarded records are left untouched, and a failed pass only logs. Run one by hand with `BudgetAttachmentExpiryService.expire(now)`.
   The record of a departure has no job of its own: `EMPLOYEE_LEFT` is told once in the transaction that sets the employee `TERMINATED` (the
   unique `(kind, subject_id)` of the announcements makes a second telling a no-op), and a person who has left is refused by the sign-in and
   the access guard from their next action because they read the status of the employee, not a flag of the account. The reminder to the

@@ -43,7 +43,11 @@ describe('the migration of MANAGER and SPENDING_APPROVER to granted roles (integ
 
     return { database, sql };
   };
-  const applied = async (database: DisposableDatabase) => deployMigrations(database);
+  /**
+   * The history up to the migration under test and no further: the later migration that drops `approval_role_holders` (and stops
+   * on the rows seeded here) is tested on its own.
+   */
+  const applied = async (database: DisposableDatabase) => deployMigrations(database, { through: MIGRATION });
   const grantsOf = async (sql: Client, role: string) =>
     (
       await sql.query<{ employee_code: string; organization_id: string; granted_by: string | null }>(

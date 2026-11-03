@@ -1,4 +1,4 @@
-﻿import ExcelJS from 'exceljs';
+import ExcelJS from 'exceljs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { EmployeeRowClassifier } from '../row-validation/employee-import-row-validation.policy';
@@ -79,6 +79,36 @@ describe('Excel employee files', () => {
     await expect(
       readUploadedEmployeeFile({ fileName: 'old.xls', bytes: Buffer.from('not zip') }),
     ).rejects.toMatchObject({ problem: 'FILE_FORMAT_UNSUPPORTED' });
+  });
+
+  it('rejects zip files whose uncompressed size exceeds 20 MB', async () => {
+    const localHeader = Buffer.alloc(30 + 4);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(4, 26);
+    localHeader.write('test', 30);
+
+    const cdHeader = Buffer.alloc(46 + 4);
+    cdHeader.writeUInt32LE(0x02014b50, 0);
+    cdHeader.writeUInt16LE(20, 4);
+    cdHeader.writeUInt16LE(20, 6);
+    cdHeader.writeUInt32LE(25 * 1024 * 1024, 24); // 25 MB uncompressed
+    cdHeader.writeUInt16LE(4, 28);
+    cdHeader.write('test', 46);
+
+    const eocd = Buffer.alloc(22);
+    eocd.writeUInt32LE(0x06054b50, 0);
+    eocd.writeUInt16LE(1, 8);
+    eocd.writeUInt16LE(1, 10);
+    eocd.writeUInt32LE(cdHeader.length, 12);
+    eocd.writeUInt32LE(localHeader.length, 16);
+
+    const bombBytes = Buffer.concat([localHeader, cdHeader, eocd]);
+
+    await expect(readUploadedEmployeeFile({ fileName: 'bomb.xlsx', bytes: bombBytes })).rejects.toMatchObject({
+      name: 'ImportFileUnreadableError',
+      reason: 'UNCOMPRESSED_SIZE_EXCEEDED',
+    });
   });
 });
 
