@@ -168,40 +168,28 @@ describe('a transfer redetermines the need step of internal requests only (F28)'
       }
     });
 
-    it('keeps a substitute-held spend step frozen through a revoke and a transfer, and answers 409 only for it, never after a normal transfer', async () => {
-      const { id, next } = await withSpendStep();
+    it('treats a spend step held by somebody who never held the role like any other: no freeze, so it follows its holder who leaves', async () => {
+      const { id } = await withSpendStep();
       counter += 1;
       const substitute = await h.staff(await h.departmentWithUnit(`P-SB${counter}`), `SB-${counter}`);
-      // A request of before: the substitute for a conflict of interest holds the spend step, and never held the role.
+      // A step of the rule before QĐ-93 (the migration of the removal refuses a database that still has one): the substitute for a
+      // conflict of interest holds it and never held the role. It is moved like every step: nothing keeps it still.
       const step = await h.stepOf(id, 'SPEND_APPROVAL');
       await h.ctx.sql.query(`UPDATE access_request_steps SET assignee_employee_id = $2 WHERE id = $1`, [
         step.id,
         substitute.employeeId,
       ]);
-      const frozen = await h.stepOf(id, 'SPEND_APPROVAL');
-      const events = (await h.audit('ACCESS_REQUEST.STEP_REDETERMINED', step.id)).length;
 
-      try {
-        await h.clearRole('SPENDING_APPROVER');
-        await h.setRole('SPENDING_APPROVER', next);
-        await h.sweep();
-        // Neither the revoke nor the transfer nor a sweep moves it, and nothing is written for it.
-        expect(await h.stepOf(id, 'SPEND_APPROVAL')).toEqual(frozen);
-        expect(await h.audit('ACCESS_REQUEST.STEP_REDETERMINED', step.id)).toHaveLength(events);
-        expect(await h.audit('ACCESS_REQUEST.STEP_WAITING', step.id)).toHaveLength(0);
-        // Its holder may not decide it: frozen until the conversion, and the answer says so.
-        expect(h.codeOf(await h.decideSpend(id, APPROVE, substitute.account).expect(409))).toBe(
-          'ACCESS_REQUEST.STEP_AWAITING_CONVERSION',
-        );
-        // The spending approver who holds the role now is not the holder of the step: they are refused as anybody else is.
-        expect(h.codeOf(await h.decideSpend(id, APPROVE, next.account).expect(403))).toBe('SPEND.NOT_THE_ASSIGNEE');
+      await h.leave(substitute.employeeId);
+      await h.sweep();
 
-        // The substitute is given the role: they are a valid spending approver from then on and the step is no longer legacy.
-        await h.setRole('SPENDING_APPROVER', substitute);
-        await h.decideSpend(id, APPROVE, substitute.account).expect(200);
-      } finally {
-        await h.setRole('SPENDING_APPROVER', h.boss);
-      }
+      expect(await h.stepOf(id, 'SPEND_APPROVAL')).toMatchObject({
+        state: 'PENDING',
+        assignee_employee_id: h.boss.employeeId,
+        created_at: step.created_at,
+      });
+      expect(await h.audit('ACCESS_REQUEST.STEP_REDETERMINED', step.id)).toHaveLength(1);
+      await h.decideSpend(id, APPROVE, h.boss.account).expect(200);
     });
   });
 });

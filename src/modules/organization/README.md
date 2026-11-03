@@ -121,4 +121,4 @@ Từ vựng trạng thái nhân viên (`EmployeeStatus`, `EmployeeWorkState`, `E
 
 Head and successor assignments require a direct `MANAGER` grant and reject `SPENDING_APPROVER`; the account check is made through the identity extension point.
 
-QĐ-93h phase 1 retires the project routes and department profile fields. The old tables remain for rollback until phase 2.
+QĐ-93h retires the project routes and department profile fields, and phase 2 drops the tables `projects` and `project_departments` (the migration stops with `P0001` while a row remains). The way back is the previous image, see `docs/guides/containers.md`.

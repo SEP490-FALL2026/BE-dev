@@ -579,6 +579,24 @@ SHA-256, the UTC time, the revision (the BE SHA and the last migration applied b
 protected location, never a public URL or the content. A rehearsal keeps its dump outside every repository, readable by the person
 running it only, and deletes it when the resources are cleaned up. `git ls-files '*.dump' '*.backup' '*.sql.gz'` stays empty.
 
+## Releasing the removal of the approval roles and of the department projects (QĐ-93c, QĐ-93h phase 2)
+
+Three migrations drop what earlier releases stopped using: `…_identity_drop_approval_role_holders` (the table, its trigger and
+function, the `ApprovalRole` type; the Super Admin / department head exclusion stays), `…_requests_drop_project_label` (the column
+`access_requests.project_label`) and `…_organization_drop_projects` (the tables `projects` and `project_departments` and the
+`ProjectStatus` type). They cannot be undone (no `down`, `DB-05`).
+
+- **Deploy condition.** The release that carries them (N+1) is deployed only while the running image is the release that no longer
+  reads or writes those objects (N: the approval-role routes and the project routes and fields are gone) or a later one. An image
+  older than N still reads them and fails on the schema N+1 leaves.
+- **Way back.** The image N: it does not read the dropped objects, so its schema stays valid for it. `--recovery-target` does not
+  check these objects, because no image that is a way back reads them.
+- **Each migration refuses before it writes.** It raises `P0001` and names every row, so a deploy that was run without a look still
+  stops with the data untouched: `…_identity_drop_approval_role_holders` for the three kinds above; `…_requests_drop_project_label`
+  for a request that was sent and still carries a label (the label of a draft is not kept, and its copy in the draft JSON is
+  removed); `…_organization_drop_projects` for any row of `projects` or `project_departments`. The Super Admin fixes or removes the
+  rows in the running release, and the deploy is run again. Nothing is deleted by a migration.
+
 ## Backup before production migrations
 
 `DB-05`, added 22/10/2026 by `delivery-gate-hardening`. The deploy (`scripts/ops/deploy-release.sh`, run by
@@ -625,8 +643,11 @@ read-only (PostgreSQL refuses any write, `25006`). `--json` gives the same repor
 the two roles goes onto a new VPS with an empty database, created by CI/CD and then seeded (Owner 03/11/2026), so there is no
 fallback- or substitute-held step, no request of a spending approver and no old waiting reason to carry over: nothing runs
 between `migrate` and the start of `api`, and `pnpm ops:approval-role-conversion` does not exist. Steps of the old rule would
-only appear on a database that ran an older release; the code still reads and freezes them (`STEP_AWAITING_CONVERSION`), and
-that database needs its own plan before this release.
+only appear on a database that ran an older release. The code no longer reads or freezes them: the migration
+`…_identity_drop_approval_role_holders` stops with `P0001` and lists every such row (a request of which the spending approver is a
+party, a step on an old routing row or with an old waiting reason, a spend step held by somebody who never had the grant), and the
+Super Admin puts them right in the running release before the deploy is run again (see _Releasing the removal of the approval
+roles and of the department projects_).
 
 **The preflight is a read-only check, not a repair.** It changes nothing, and no command in this repository invents a
 department or `Unit`, rewrites immutable placement or allocation history, or recreates a database (`P29-RV-01`).

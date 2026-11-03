@@ -11,8 +11,7 @@ export type ReassignableStepKind = 'NEED' | 'FINANCE_REVIEW' | 'SPEND_APPROVAL' 
 /**
  * The events that make a step be looked at again. Closed: the four of `FR-3.16` (the department of the requester, the head of a
  * department, a holder who has left, an approval role changing hands), the day a change takes effect, and the retry of a step
- * that waits. There is no event for an absence, a leave or a backlog. `QD93_CONVERSION` is raised only by the conversion command
- * (`pnpm ops:approval-role-conversion`), never by the sweep or a listener, and moves only a step of the old rule (`isLegacyStep`).
+ * that waits. There is no event for an absence, a leave or a backlog.
  */
 export const REASSIGNMENT_TRIGGERS = [
   'DEPARTMENT_CHANGED',
@@ -49,13 +48,13 @@ export type StepTarget =
 export type ReassignmentDecision =
   | { action: 'KEEP' }
   | { action: 'ASSIGN'; assigneeEmployeeId: string; routingRow: number | null }
-  | { action: 'WAIT'; reason: WaitingReasonCode };
+  | { action: 'WAIT'; reason: WaitingReasonCode }
+  /** A step that waits goes on waiting, for another reason: only the reason is written, the stretch and the deadline stay. */
+  | { action: 'REWAIT'; reason: WaitingReasonCode };
 
 /**
- * Every reason a step can be read waiting for. `NO_FALLBACK_APPROVER`, `FALLBACK_IS_REQUESTER` and `NO_CONFLICT_SUBSTITUTE` are
- * read only (`QĐ-93c`): nothing writes them any more, and a step that still has one is a step of the old rule until the
- * conversion command rewaits it. `SPENDING_APPROVER_IS_PARTY` is a transitional reason (a request of before the spending approver
- * stopped being a party). The column is text: no migration.
+ * Every reason a step can be read waiting for. `SPENDING_APPROVER_IS_PARTY` is a current reason: the spend routing writes it when
+ * the spending approver is a party of the request (`QĐ-93d(2)`). The column is text: no migration.
  */
 export const WAITING_REASON_CODES = [
   'NO_SPENDING_APPROVER',
@@ -93,13 +92,11 @@ export function touchesHeldStep(step: OpenStep, trigger: ReassignmentTrigger): b
 }
 
 /**
- * Keep, give, wait or wait again. A step of the old rule stays still for every event but the conversion, and the conversion moves
- * nothing else (`QĐ-93k(2)`). A step that waits is tried again on every event: nobody holds it, so there is no holder to protect
- * and `FR-3.12` gives it as soon as somebody valid exists; when the table still names nobody but for another reason than the step
- * waits for, only the reason is written (`REWAIT`). A step somebody holds is looked at only when the event may touch it; then it
- * stays with the holder when the table still names them and the step is not of the old rule (the deadline is never reset by a
- * holder who stays), goes to the person the table names otherwise — a step of the old rule that the table still gives to its holder
- * is given again, to write its row — and waits when the table names nobody.
+ * Keep, give, wait or wait again. A step that waits is tried again on every event: nobody holds it, so there is no holder to
+ * protect and `FR-3.12` gives it as soon as somebody valid exists; when the table still names nobody but for another reason than
+ * the step waits for, only the reason is written (`REWAIT`). A step somebody holds is looked at only when the event may touch it;
+ * then it stays with the holder when the table still names them (the deadline is never reset by a holder who stays), goes to the
+ * person the table names otherwise, and waits when the table names nobody.
  */
 export function decideReassignment(
   step: OpenStep,
@@ -107,9 +104,11 @@ export function decideReassignment(
   target: StepTarget,
 ): ReassignmentDecision {
   if (step.state === 'WAITING') {
-    return target.assigneeEmployeeId === null
-      ? { action: 'KEEP' }
-      : { action: 'ASSIGN', assigneeEmployeeId: target.assigneeEmployeeId, routingRow: target.routingRow };
+    if (target.assigneeEmployeeId !== null) {
+      return { action: 'ASSIGN', assigneeEmployeeId: target.assigneeEmployeeId, routingRow: target.routingRow };
+    }
+
+    return target.reason === step.waitingReason ? { action: 'KEEP' } : { action: 'REWAIT', reason: target.reason };
   }
   if (!touchesHeldStep(step, trigger)) return { action: 'KEEP' };
   if (target.assigneeEmployeeId === null) return { action: 'WAIT', reason: target.reason };
@@ -122,8 +121,6 @@ export function decideReassignment(
 
 /**
  * What the Super Admin or the IT Admin does to end a wait: the configuration that is missing, by the reason the step waits.
- * `CONFIGURE_FALLBACK_APPROVER` and `CONFIGURE_CONFLICT_SUBSTITUTE` are historical (an alert written before `QĐ-93c`): nothing
- * produces them any more.
  */
 export type ConfigurationHint =
   'CONFIGURE_SPENDING_APPROVER' | 'GRANT_FINANCE_ROLE' | 'ASSIGN_DEPARTMENT_HEAD' | 'NAME_IT_ADMIN_IN_CHARGE';

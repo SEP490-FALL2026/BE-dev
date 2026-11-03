@@ -72,10 +72,8 @@ export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER';
 
 /**
  * The role a person decided in, from the row of the routing table that gave them the step (`US-05-03`): the roles can
- * change after the request is sent, so the record keeps the role as it stood. A row that gives the step to nobody (8)
- * has no decider, and throws. A legacy row (3: the head who is the approver, 4: no head — the approver of last resort held
- * it) has none either, but is not an error: it returns `null`, for the step is frozen until the conversion command rewrites
- * its row (`QĐ-93k(2)`) and nobody decides it (`STEP_AWAITING_CONVERSION`).
+ * change after the request is sent, so the record keeps the role as it stood. A row that gives the step to nobody (3, 4, 8) has
+ * no decider, and throws: no step is held on such a row (the queue lists only the rows of `HELD_ROUTING_ROWS`).
  */
 export function deciderRoleOf(routingRow: number): DeciderRole {
   switch (routingRow) {

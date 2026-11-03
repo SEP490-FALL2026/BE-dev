@@ -23,8 +23,8 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
     `listRoleHoldersAmong` — ai đang giữ vai trò nào.
   - `getSpendingApproverEmployeeId(tx?, { forShare? })` — ai giữ vai Người duyệt chi (grant còn hiệu lực); với `forShare` khóa
     dòng grant tới hết transaction để mở bước chi và thu hồi vai lần lượt (M6). `lockSpendingApproverAmong` — khóa tài khoản
-    `FOR SHARE` rồi nói ai trong danh sách giữ vai. `everHeldSpendingApproverAmong` — ai từng có grant `SPENDING_APPROVER` (chỉ để
-    nhận ra bước chi cũ đóng băng; gỡ ở Phase B). Không còn `getApprovalRoleHolders`, không còn route `/approval-roles`.
+    `FOR SHARE` rồi nói ai trong danh sách giữ vai. Không còn `getApprovalRoleHolders`, `everHeldSpendingApproverAmong`, không còn
+    route `/approval-roles`.
   - `findAccountIdOfEmployee`, `findLoginEmailOfEmployee`, `employeeIdsOfAccounts` — ánh xạ tài khoản ↔ nhân viên.
 - `RequestPartyEligibilityApi` (`public/request-party-eligibility.api.ts`) — hợp đồng chung D-S21: Người duyệt chi không bao giờ là
   bên của Request (người gửi, người được cấp, người chịu trách nhiệm); `assertEligible` (khóa rồi phán, ném
@@ -40,8 +40,8 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
 ## Bảng sở hữu
 
 - `app_users`, `password_credentials`, `role_grants`, `auth_sessions`, `refresh_tokens`, `login_throttles`,
-  `account_action_tokens`, `recovery_tickets`; `approval_role_holders` còn trong schema nhưng không ai ghi hay đọc (chỉ
-  `migration-preflight.repo.ts` đếm; bảng gỡ ở Phase B, QĐ-93c)
+  `account_action_tokens`, `recovery_tickets`; bảng `approval_role_holders` đã gỡ (migration `…_identity_drop_approval_role_holders`,
+  QĐ-93c; chỉ `migration-preflight.repo.ts` còn đọc nó, khi có, cho DB cũ)
   ([prisma/models/identity-access.prisma](../../../prisma/models/identity-access.prisma)).
 
 ## Extension point

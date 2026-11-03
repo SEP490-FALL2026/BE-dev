@@ -30,9 +30,6 @@ describe('MANAGER and SPENDING_APPROVER when two writers meet (integration, real
       `UPDATE role_grants SET revoked_at = GREATEST(now(), granted_at) WHERE role = 'SPENDING_APPROVER' AND revoked_at IS NULL`,
     );
     await h.ctx.sql.query('DELETE FROM department_head_periods');
-    await h.ctx.sql.query(
-      `UPDATE approval_role_holders SET held_until = GREATEST(now(), held_from) WHERE held_until IS NULL`,
-    );
     await h.afterEach();
   });
 

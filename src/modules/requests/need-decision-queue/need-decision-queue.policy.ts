@@ -4,8 +4,8 @@ import { LONG_TERM_MONTHS, type DeciderRole } from '../access-request/need-decis
 /**
  * The rows of the routing table that give the need step to a person: the head (1), the spending approver for a head who sent for
  * themselves (2), the head who sent for others (5) and the head who decides the lines of a group an Employee sent (9). Row 8 gives
- * the step to nobody, so its step waits and is never in a queue; neither is a step on row 3 or 4, which the approver of last resort
- * held under the rule before `QĐ-93`: it is frozen until the conversion command rewrites it (`QĐ-93k(2)`).
+ * the step to nobody, so its step waits and is never in a queue; rows 3 and 4 (the approver of last resort, `QĐ-93c`) are not written
+ * any more, and the migration that drops the old roles refuses a database that still has a pending step on one.
  */
 export const HELD_ROUTING_ROWS = [1, 2, 5, 9] as const;
 

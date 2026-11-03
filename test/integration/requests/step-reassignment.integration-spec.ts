@@ -338,6 +338,64 @@ describe('who holds a step when the organization or a role changes, over Postgre
       });
       expect(await h.state(sent.id)).toBe('WAITING_CONTROLLED');
     });
+
+    it('rewaits a step that waits for another reason than the table gives now: only the reason changes, the stretch, the age and the row stay (spec B1)', async () => {
+      counter += 1;
+      const headless = await h.departmentWithUnit(`P-RW${counter}`);
+      const requester = await h.staff(headless, `RW-E${counter}`);
+      const sent = await h.sent(requester, internal);
+      const step = await h.stepOf(sent.id, 'NEED');
+      // The step waits for the spending approver, as a step of a head who sent it did; now the department has no head: the table
+      // names nobody again, but for another reason.
+      await h.ctx.sql.query(`UPDATE access_request_steps SET waiting_reason = 'NO_SPENDING_APPROVER' WHERE id = $1`, [
+        step.id,
+      ]);
+      const stale = await h.stepOf(sent.id, 'NEED');
+      expect(stale).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_SPENDING_APPROVER' });
+
+      await h.sweep();
+
+      const rewaited = await h.stepOf(sent.id, 'NEED');
+      expect(rewaited).toMatchObject({
+        state: 'WAITING',
+        assignee_employee_id: null,
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
+      });
+      expect(rewaited.waiting_since).toEqual(stale.waiting_since);
+      expect(rewaited.created_at).toEqual(stale.created_at);
+      expect(rewaited.routing_row).toBe(stale.routing_row);
+      const [event] = await h.audit('ACCESS_REQUEST.STEP_WAITING_REASON_CHANGED', step.id);
+      expect(event).toMatchObject({
+        before: { waitingReason: 'NO_SPENDING_APPROVER' },
+        after: {
+          trigger: 'WAITING_RETRY',
+          waitingReason: 'NO_DEPARTMENT_HEAD',
+          stepCreatedAt: stale.created_at.toISOString(),
+        },
+      });
+      // One alert for the stretch, whatever the reason (unique per step and stretch), and the queue reads the new reason and hint.
+      const alerts = await h.ctx.sql.query(`SELECT 1 FROM controlled_wait_alerts WHERE step_id = $1`, [step.id]);
+      expect(alerts.rowCount).toBe(1);
+      const queue = await request(h.server())
+        .get('/api/v1/controlled-waits')
+        .query({ pageSize: 100 })
+        .set({ Authorization: `Bearer ${h.admin}` })
+        .expect(200);
+      const wire = h
+        .dataOf<{ items: { stepId: string }[] }>(queue)
+        .items.find((item: { stepId: string }) => item.stepId === step.id);
+      expect(wire).toMatchObject({ waitingReason: 'NO_DEPARTMENT_HEAD', configurationHint: 'ASSIGN_DEPARTMENT_HEAD' });
+
+      // Run again on the same data: nothing is written, and no second alert for the same stretch.
+      const events = await auditCount();
+      await h.sweep();
+      expect(await h.stepOf(sent.id, 'NEED')).toEqual(rewaited);
+      expect(await auditCount()).toBe(events);
+      expect((await h.audit('ACCESS_REQUEST.STEP_WAITING_REASON_CHANGED', step.id)).length).toBe(1);
+      expect(
+        (await h.ctx.sql.query(`SELECT 1 FROM controlled_wait_alerts WHERE step_id = $1`, [step.id])).rowCount,
+      ).toBe(1);
+    });
   });
 
   describe('a holder leaves the company (AC-3)', () => {
@@ -588,7 +646,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
       }
 
       expect(await h.stepOf(id, 'SPEND_APPROVAL')).toEqual(before);
-      expect((await h.getApprovalRoleHolder('SPENDING_APPROVER')) ?? null).toBe(h.boss.employeeId);
+      expect((await h.getSpendingApproverEmployeeId()) ?? null).toBe(h.boss.employeeId);
     });
 
     it('moves a step once when two changes reach the same request at the same time, without waiting in a circle', async () => {
