@@ -9,7 +9,7 @@ import {
 describe('the rows of the routing table that put a step in a queue', () => {
   it('are the ones that give the step to a person, never row 8, which gives it to nobody', () => {
     expect([...HELD_ROUTING_ROWS]).toEqual([1, 2, 5, 9]);
-    // Row 8 gives the step to nobody; rows 3 and 4 are a legacy step, frozen until the conversion, and never in a queue.
+    // Row 8 gives the step to nobody; rows 3 and 4 are not written any more, and none is ever in a queue.
     for (const row of [3, 4, 8]) expect(HELD_ROUTING_ROWS).not.toContain(row);
   });
 });

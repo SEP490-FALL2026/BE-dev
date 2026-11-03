@@ -204,13 +204,12 @@ describe('dev:seed (integration, real PostgreSQL)', () => {
       ]);
     });
 
-    it('keeps the Super Admin, grants no derived role and creates no head period or approval holder', async () => {
+    it('keeps the Super Admin, grants no derived role (no MANAGER, no SPENDING_APPROVER) and creates no head period', async () => {
       const facts = await sql.query(
         `
         SELECT (SELECT count(*)::int FROM role_grants WHERE role = 'SUPER_ADMIN' AND revoked_at IS NULL) AS super_admins,
                (SELECT c.hash FROM password_credentials c WHERE c.app_user_id = $1) AS super_admin_hash,
                (SELECT count(*)::int FROM department_head_periods) AS head_periods,
-               (SELECT count(*)::int FROM approval_role_holders) AS approval_holders,
                (SELECT array_agg(DISTINCT role::text ORDER BY role::text) FROM role_grants) AS roles`,
         [superAdmin.id],
       );
@@ -220,7 +219,6 @@ describe('dev:seed (integration, real PostgreSQL)', () => {
           super_admins: 1,
           super_admin_hash: superAdmin.hash,
           head_periods: 0,
-          approval_holders: 0,
           roles: ['EMPLOYEE', 'FINANCE', 'IT_ADMIN', 'SUPER_ADMIN'],
         },
       ]);

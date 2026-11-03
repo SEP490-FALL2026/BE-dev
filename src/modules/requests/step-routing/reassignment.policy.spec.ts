@@ -46,11 +46,10 @@ const goesTo = (assigneeEmployeeId: string, routingRow: number | null = 1): Step
   routingRow,
 });
 const nobody: StepTarget = { assigneeEmployeeId: null, reason: 'NO_DEPARTMENT_HEAD' };
-/** The triggers the sweep and the listeners raise; the conversion command raises the other one and moves only a step of the old rule. */
 const EVERYDAY_TRIGGERS = REASSIGNMENT_TRIGGERS;
 
 describe('which steps an event may touch (FR-3.16, US-05-12)', () => {
-  it('is a closed list of events: the four of FR-3.16, the day a change takes effect, the retry of a waiting step, and the conversion', () => {
+  it('is a closed list of events: the four of FR-3.16, the day a change takes effect and the retry of a waiting step', () => {
     expect([...REASSIGNMENT_TRIGGERS].sort()).toEqual(
       [
         'DEPARTMENT_CHANGED',
@@ -149,12 +148,21 @@ describe('keep, give or wait', () => {
     }
   });
 
-  it('keeps waiting when the table still gives nobody', () => {
+  it('rewaits with the new reason and keeps the stretch', () => {
+    // The step waits for another reason than the table gives now: only the reason is written, the stretch (and so the deadline)
+    // goes on — the decision carries no holder, no row and no time.
     for (const trigger of EVERYDAY_TRIGGERS) {
       expect(decideReassignment(waiting('NEED', 'NO_SPENDING_APPROVER'), on(trigger), nobody)).toEqual({
-        action: 'KEEP',
+        action: 'REWAIT',
+        reason: 'NO_DEPARTMENT_HEAD',
       });
     }
+    expect(
+      decideReassignment(waiting('SPEND_APPROVAL', 'SPENDING_APPROVER_IS_PARTY'), on('WAITING_RETRY'), {
+        assigneeEmployeeId: null,
+        reason: 'NO_SPENDING_APPROVER',
+      }),
+    ).toEqual({ action: 'REWAIT', reason: 'NO_SPENDING_APPROVER' });
   });
 
   it('takes a step from a holder who has left, to the one the table names or to a wait', () => {
@@ -179,7 +187,6 @@ describe('what a waiting step needs to be put right (US-05-11)', () => {
     ['NO_SPENDING_APPROVER', 'CONFIGURE_SPENDING_APPROVER'],
     ['NO_DEPARTMENT_HEAD', 'ASSIGN_DEPARTMENT_HEAD'],
     ['SPENDING_APPROVER_IS_PARTY', 'CONFIGURE_SPENDING_APPROVER'],
-    // The old reasons are still read, and none asks for a configuration that is gone (QĐ-93c).
     ['NO_FINANCE_REVIEWER', 'GRANT_FINANCE_ROLE'],
     ['NO_IT_ADMIN_IN_CHARGE', 'NAME_IT_ADMIN_IN_CHARGE'],
   ] as const)('%s asks for %s', (reason, hint) => {

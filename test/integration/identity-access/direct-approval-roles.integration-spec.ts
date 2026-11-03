@@ -199,12 +199,10 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
     const setEmployee = (employeeId: string, set: string) =>
       h.ctx.sql.query(`UPDATE employees SET ${set} WHERE id = $1`, [employeeId]);
     const holder = async () => h.ctx.app.get(IdentityAccessApi).getSpendingApproverEmployeeId();
-    const tableRows = async () =>
-      (
-        await h.ctx.sql.query<{ employee_id: string }>(
-          "SELECT employee_id FROM approval_role_holders WHERE role = 'SPENDING_APPROVER' AND held_until IS NULL",
-        )
-      ).rows;
+    /** The table of the approval roles is gone (the removal migration): the grant is the only place the holder is read from. */
+    const approvalRoleTable = async () =>
+      (await h.ctx.sql.query<{ tbl: string | null }>(`SELECT to_regclass('public.approval_role_holders') AS tbl`))
+        .rows[0].tbl;
     const clearApprover = () =>
       h.ctx.sql.query(
         "UPDATE role_grants SET revoked_at = now() WHERE role = 'SPENDING_APPROVER' AND revoked_at IS NULL",
@@ -212,13 +210,10 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
 
     afterEach(async () => {
       await clearApprover();
-      await h.ctx.sql.query(
-        'UPDATE approval_role_holders SET held_until = GREATEST(now(), held_from) WHERE held_until IS NULL',
-      );
       await clearHeads();
     });
 
-    it('grants SPENDING_APPROVER and reads the holder from the role grant, not from the approval-role table', async () => {
+    it('grants SPENDING_APPROVER and reads the holder from the role grant: the approval-role table is gone', async () => {
       const user = await h.activatedAccount([]);
 
       const response = await grant(user.appUserId, 'SPENDING_APPROVER').expect(201);
@@ -226,7 +221,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
       expect(bodyOf(response).message).toBe('ROLE.GRANTED');
       expect(await rolesOf(user.appUserId)).toEqual(['SPENDING_APPROVER']);
       expect(await holder()).toBe(user.employeeId);
-      expect(await tableRows()).toEqual([]);
+      expect(await approvalRoleTable()).toBeNull();
       expect(await auditOf('ROLE.GRANTED', user.appUserId)).toHaveLength(1);
     });
 

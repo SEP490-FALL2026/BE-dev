@@ -360,7 +360,7 @@ model AccessRequestStep {
   state               AccessRequestStepState
   assigneeEmployeeId  String?                @map("assignee_employee_id") @db.Uuid
   routingRow          Int                    @map("routing_row")
-  // Why nobody holds a waiting step (NO_SPENDING_APPROVER, NO_FALLBACK_APPROVER, FALLBACK_IS_REQUESTER); null when held.
+  // Why nobody holds a waiting step (NO_SPENDING_APPROVER, NO_DEPARTMENT_HEAD, SPENDING_APPROVER_IS_PARTY, NO_FINANCE_REVIEWER, NO_IT_ADMIN_IN_CHARGE); null when held.
   waitingReason       String?                @map("waiting_reason")
   // The same person holds this step and the spend step of the same request: both are flagged (US-05-03 AC-9).
   samePersonAsSpend   Boolean                @default(false) @map("same_person_as_spend")

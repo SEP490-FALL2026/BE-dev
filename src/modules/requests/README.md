@@ -181,8 +181,9 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 - Bước chi chỉ giao cho Người duyệt chi (`step-routing/spend-routing.policy.ts`): không ai thay khi họ là bên của Request
   (Request đó không tồn tại: hợp đồng D-S21, `REQUEST_PARTY.INELIGIBLE` 422) hay vắng; chưa có người giữ vai thì chờ
   `NO_SPENDING_APPROVER`. Mở bước chi khóa dòng grant `FOR SHARE` trước khi đọc (M6). Bước cũ do approver dự phòng/người thay thế
-  giữ đứng yên (`STEP_AWAITING_CONVERSION` 409): không có lệnh chuyển đổi (DB mới, Owner 03/11/2026), nên DB cũ cần kế hoạch riêng trước
-  bản này; Phase B gỡ nhánh đóng băng cùng bảng `approval_role_holders`.
+  giữ không còn là trường hợp riêng: không đóng băng, không `STEP_AWAITING_CONVERSION`; migration gỡ `approval_role_holders` dừng
+  `P0001` và nêu dòng nếu DB còn dữ liệu cũ (Request có Người duyệt chi là bên, bước dòng 3/4 hay lý do chờ cũ, bước chi do người
+  chưa từng có grant giữ). Bước chờ đổi lý do (`REWAIT`) chỉ ghi `waiting_reason`, giữ `waiting_since`.
 - Thứ tự khóa: task grant (`LicensingApi.lockGrantOfRequest`) rồi request (`request-end/request-end.service.ts`); hàng request
   rồi khóa năm ngân sách (`budgets/budget/budget-year-lock.repo.ts`).
 - Mọi kết thúc request phát `requests.outcome` trong cùng transaction; listener ném lỗi thì kết thúc bị hoàn tác.

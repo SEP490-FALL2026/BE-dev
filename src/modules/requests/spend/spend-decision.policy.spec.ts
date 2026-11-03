@@ -45,8 +45,7 @@ describe('who decides the spend step (US-06-01 AC-8, US-16-03)', () => {
   });
 
   it('lets the new holder decide a spend step handed over by a role transfer', () => {
-    // The step moved from the old spending approver to `c1` in the transaction of the transfer: the holder has a grant, so the step is
-    // not legacy (the caller reads `everHeldSpendingApproverAmong` of the holder) and the decision is not refused.
+    // The step moved from the old spending approver to `c1` in the transaction of the transfer: the holder decides and is not refused.
     expect(checkSpendDecider({ ...facts, assigneeEmployeeId: 'c1' })).toBeNull();
   });
 

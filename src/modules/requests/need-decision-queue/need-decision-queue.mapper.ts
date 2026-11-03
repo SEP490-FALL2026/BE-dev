@@ -44,8 +44,6 @@ function pricingOf(request: NeedQueueRow['request'], units: ReadonlyMap<string, 
 export function needQueueItemOf(row: NeedQueueRow, lookups: NeedQueueLookups): NeedQueueItemWire {
   const { request } = row;
   const deciderRole = deciderRoleOf(row.routingRow);
-  // The repo reads only the rows of `HELD_ROUTING_ROWS`: a legacy step (row 3 or 4) is frozen and never listed.
-  if (deciderRole === null) throw new Error(`The step ${row.id} is a legacy step: it is not a row of the queue.`);
   const isGroup = request.type === 'GROUP_GRANT';
   const plan = lookups.plans.find((candidate) => candidate.planId === request.planId);
   const beneficiaryId = request.beneficiaries[0]?.employeeId;

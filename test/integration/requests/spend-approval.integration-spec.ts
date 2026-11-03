@@ -227,31 +227,29 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
       expect(await records(id)).toHaveLength(1);
     });
 
-    it('answers 409 only for a substitute-held spend step, never after a normal transfer', async () => {
+    it('never answers 409 for a spend step after a transfer of the role: the new holder decides, anybody else is refused as not the assignee', async () => {
       const { u } = await example();
       const transferred = await h.waitingForApprover(u, plan, { amount: 15 * M });
-      const frozen = await h.waitingForApprover(u, plan, { amount: 15 * M });
+      const other = await h.waitingForApprover(u, plan, { amount: 15 * M });
       counter += 1;
       const next = await h.staff(await h.departmentWithUnit(`P-NX${counter}`), `NX-${counter}`);
       const substitute = await h.staff(await h.departmentWithUnit(`P-SB${counter}`), `SB-${counter}`);
-      // A request of before QĐ-93: the substitute for a conflict of interest holds the step, and never held the role.
+      // A step of the rule before QĐ-93 (the migration of the removal refuses a database that still has one): the substitute holds
+      // it and never held the role. Nothing freezes it any more (`STEP_AWAITING_CONVERSION` is gone), so it is refused as a step
+      // of somebody else is, with the code of every refusal of a person who does not hold the step.
       await h.ctx.sql.query(
         `UPDATE access_request_steps SET assignee_employee_id = $2 WHERE request_id = $1 AND kind = 'SPEND_APPROVAL'`,
-        [frozen, substitute.employeeId],
+        [other, substitute.employeeId],
       );
 
       try {
         // The role is handed over: the step the approver held goes to the new one, who decides it with no 409.
         await h.setRole('SPENDING_APPROVER', next);
         await approve(transferred, {}, next.account).expect(200);
-        expect(h.codeOf(await approve(frozen, {}, next.account).expect(403))).toBe('SPEND.NOT_THE_ASSIGNEE');
-
-        // The holder of the substitute step is refused with the one code that says it waits for the conversion; nothing is written.
-        const refused = await approve(frozen, {}, substitute.account).expect(409);
-        expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.STEP_AWAITING_CONVERSION');
-        expect(await records(frozen)).toEqual([]);
-        expect(await decided(frozen)).toEqual([]);
-        expect(await h.state(frozen)).toBe('AWAITING_SPEND_DECISION');
+        expect(h.codeOf(await approve(other, {}, next.account).expect(403))).toBe('SPEND.NOT_THE_ASSIGNEE');
+        expect(await records(other)).toEqual([]);
+        expect(await decided(other)).toEqual([]);
+        expect(await h.state(other)).toBe('AWAITING_SPEND_DECISION');
       } finally {
         await h.setRole('SPENDING_APPROVER', h.boss);
       }

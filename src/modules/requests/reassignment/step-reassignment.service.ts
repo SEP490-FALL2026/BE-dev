@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { OperatorAuditActor } from '../../licensing/public/licensing-handover.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ControlledWaitAlertService } from './controlled-wait-alert.service';
@@ -33,6 +32,8 @@ export interface ReconcileResult {
   madeToWait: number;
   /** Steps that waited and are now held. */
   assignedFromWait: number;
+  /** Steps that went on waiting, for another reason (`QĐ-93k(2)`). */
+  rewaited: number;
   /** Alerts raised for a stretch of waiting that had none. */
   alerted: number;
 }
@@ -58,7 +59,6 @@ export class StepReassignmentService {
     private readonly targets: StepTargetService,
     private readonly alerts: ControlledWaitAlertService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly identity: IdentityAccessApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -112,6 +112,7 @@ export class StepReassignmentService {
       redetermined: 0,
       madeToWait: 0,
       assignedFromWait: 0,
+      rewaited: 0,
       alerted: 0,
     };
     const requests = await this.repo.lockWithOpenSteps(tx, requestIds);
@@ -177,6 +178,36 @@ export class StepReassignmentService {
         if (open.state === 'WAITING') result.alerted += await this.alert(tx, request, step, correlationId);
         continue;
       }
+      if (decision.action === 'REWAIT') {
+        const previousReason = step.waitingReason;
+        await this.repo.rewait(tx, step.id, decision.reason);
+        step.waitingReason = decision.reason;
+        await this.audit.record(
+          tx,
+          reassignmentAuditEvent(
+            request.organizationId,
+            'ACCESS_REQUEST.STEP_WAITING_REASON_CHANGED',
+            'ACCESS_REQUEST_STEP',
+            step.id,
+            {
+              requestId: request.id,
+              stepKind: step.kind,
+              trigger: trigger.kind,
+              source: correlationId,
+              waitingReason: decision.reason,
+              // The stretch of waiting goes on: the deadline and the alert of the stretch do not start again.
+              stepCreatedAt: step.createdAt.toISOString(),
+            },
+            correlationId,
+            { waitingReason: previousReason },
+            operator,
+          ),
+        );
+        result.rewaited += 1;
+        result.alerted += await this.alert(tx, request, step, correlationId);
+        continue;
+      }
+
       const previous = step.assigneeEmployeeId;
       const previousReason = step.waitingReason;
       if (decision.action === 'ASSIGN') {

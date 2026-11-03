@@ -1,29 +1,58 @@
--- Guard: halt if blocking data remains
+-- QĐ-93 Phase B (`qd93-remove-fallback-substitute-approvers`, Task 13): drops the table of the approval roles, the trigger and the
+-- function that guarded it, and the `ApprovalRole` type, and removes the half of the Super Admin exclusion trigger that read it.
+--
+-- Never fixes anything of its own accord: when the data still needs what is being dropped, it stops and lists every such row (the
+-- three kinds of the spec, (i) to (iii)); the Super Admin puts them right in the application and deploys again. The rows of
+-- `approval_role_holders` themselves do not stop it: nothing in the application can write or close them any more, and the history
+-- of who held a role stays in the Audit Trail (`APPROVAL_ROLE.CHANGED`, OD-5).
 DO $$
+DECLARE
+  problems text;
 BEGIN
-  IF EXISTS (SELECT 1 FROM "approval_role_holders") THEN
-    RAISE EXCEPTION 'Cannot drop approval_role_holders: rows remain in approval_role_holders'
-      USING ERRCODE = 'P0001';
-  END IF;
+  SELECT string_agg(v.line, E'\n' ORDER BY v.line) INTO problems FROM (
+    -- (i) an open Request of which the spending approver is a party: the requester, a beneficiary, a live line, or the person
+    --     responsible for the service account. The substitute that decided it is gone, so nobody could.
+    SELECT 'SPENDING_APPROVER_IS_PARTY ' || e."employee_code" || ' request ' || r."id"::text AS line
+      FROM "role_grants" g
+      JOIN "app_users" u ON u."id" = g."app_user_id"
+      JOIN "employees" e ON e."id" = u."employee_id"
+      JOIN "access_requests" r ON r."organization_id" = g."organization_id"
+     WHERE g."role" = 'SPENDING_APPROVER' AND g."revoked_at" IS NULL
+       AND r."state" NOT IN ('REJECTED', 'IT_REJECTED', 'COMPLETED', 'FAILED', 'WITHDRAWN', 'CANCELLED', 'DRAFT')
+       AND (r."requester_employee_id" = e."id"
+            OR EXISTS (SELECT 1 FROM "access_request_beneficiaries" b
+                        WHERE b."request_id" = r."id" AND b."employee_id" = e."id")
+            OR EXISTS (SELECT 1 FROM "access_request_lines" l
+                        WHERE l."request_id" = r."id" AND l."employee_id" = e."id"
+                          AND l."state" NOT IN ('NEED_REJECTED', 'SPEND_REJECTED', 'COMPLETED', 'FAILED', 'WITHDRAWN',
+                                                'DROPPED', 'CANCELLED'))
+            OR EXISTS (SELECT 1 FROM "access_request_service_accounts" a
+                        WHERE a."request_id" = r."id" AND a."responsible_employee_id" = e."id"))
+    UNION ALL
+    -- (ii) a step of the old routing: a need step pending on row 3 or 4 (the approver of last resort held it), or a step that
+    --      waits for a reason that only the old rule gave. A waiting step on row 4 for NO_DEPARTMENT_HEAD is of today's rule and
+    --      does not stop it; SPENDING_APPROVER_IS_PARTY is a reason of today's rule too (the spend routing still writes it).
+    SELECT 'LEGACY_NEED_ROW_' || s."routing_row"::text || ' request ' || s."request_id"::text
+      FROM "access_request_steps" s
+     WHERE s."kind" = 'NEED' AND s."state" = 'PENDING' AND s."routing_row" IN (3, 4)
+    UNION ALL
+    SELECT 'LEGACY_WAITING_' || s."waiting_reason" || ' request ' || s."request_id"::text
+      FROM "access_request_steps" s
+     WHERE s."state" = 'WAITING'
+       AND s."waiting_reason" IN ('NO_FALLBACK_APPROVER', 'FALLBACK_IS_REQUESTER', 'NO_CONFLICT_SUBSTITUTE')
+    UNION ALL
+    -- (iii) a pending spend step whose holder never had a SPENDING_APPROVER grant (revoked or not): the substitute of the old rule.
+    SELECT 'SPEND_STEP_HELD_BY_NON_APPROVER ' || COALESCE(e."employee_code", '-') || ' request ' || s."request_id"::text
+      FROM "access_request_steps" s
+      LEFT JOIN "employees" e ON e."id" = s."assignee_employee_id"
+     WHERE s."kind" = 'SPEND_APPROVAL' AND s."state" = 'PENDING'
+       AND NOT EXISTS (SELECT 1 FROM "role_grants" g
+                         JOIN "app_users" u ON u."id" = g."app_user_id"
+                        WHERE g."role" = 'SPENDING_APPROVER' AND u."employee_id" = s."assignee_employee_id")
+  ) v;
 
-  IF EXISTS (
-    SELECT 1 FROM "access_request_steps"
-    WHERE "waiting_reason" IN (
-      'NO_FALLBACK_APPROVER',
-      'FALLBACK_IS_REQUESTER',
-      'NO_CONFLICT_SUBSTITUTE',
-      'SPENDING_APPROVER_IS_PARTY'
-    )
-  ) THEN
-    RAISE EXCEPTION 'Cannot drop approval_role_holders: steps with legacy waiting_reasons remain'
-      USING ERRCODE = 'P0001';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1 FROM "access_request_steps"
-    WHERE "kind" = 'NEED' AND "state" = 'PENDING' AND "routing_row" IN (3, 4)
-  ) THEN
-    RAISE EXCEPTION 'Cannot drop approval_role_holders: steps on legacy routing rows remain'
+  IF problems IS NOT NULL THEN
+    RAISE EXCEPTION 'QĐ-93 approval role drop blocked; run pnpm ops:preflight and fix in the application:%', E'\n' || problems
       USING ERRCODE = 'P0001';
   END IF;
 END $$;
