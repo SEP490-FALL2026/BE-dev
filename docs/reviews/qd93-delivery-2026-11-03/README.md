@@ -13,10 +13,10 @@ giao cho các phiên AI, nhật ký và báo cáo triển khai, kết quả revi
   - Bản tối giản của format mã, nhân viên chưa xếp phòng kèm xếp phòng lần đầu, và import `.xlsx` (merge `42138a99`).
   - Các sửa của audit.
   - Dữ liệu demo có thêm phòng `DS1-MKT` và `DS1-SAL`.
+  - Danh bạ nhân viên cho Super Admin (Gemini, merge `0c84a9bc`, sửa audit `3e3cf282`).
 - Chưa có trong bản giao:
   - Ghi nghỉ việc cho người chưa xếp phòng: tạm trả 409.
   - Tải tệp lên cho ngân sách.
-  - Danh bạ nhân viên.
   - Dashboard đếm thật.
   - Phase B / phase 2 (gỡ bảng).
 - Log test thô (vài MB) không đưa vào repo. Bản trên máy Owner: `NOTE MD/qd93-logs/`.
