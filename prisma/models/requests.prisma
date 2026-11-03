@@ -154,7 +154,6 @@ model AccessRequest {
   termMonths            Int                        @map("term_months")
   // Context only: it changes neither the Cost Center nor the chain (US-05-02 AC-7).
   // Retired in QD-93h phase 1; dropped in phase 2.
-  projectLabel          String?                    @map("project_label") @ignore
   pricingStatus         AccessRequestPricingStatus @default(NOT_APPLICABLE) @map("pricing_status")
   // Why the price is missing (NO_PRICED_SUBSCRIPTION, CYCLE_UNKNOWN, AMOUNT_TOO_LARGE); null when it is not.
   priceMissingReason    String?                    @map("price_missing_reason")

@@ -85,12 +85,9 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
       SELECT (SELECT bootstrap_completed_at IS NOT NULL FROM organizations) AS bootstrapped,
              (SELECT count(*)::int FROM cost_centers) AS cost_centers,
              (SELECT count(*)::int FROM department_head_periods) AS head_periods,
-             (SELECT count(*)::int FROM departments WHERE it_admin_employee_id IS NOT NULL) AS with_it_admin,
-             (SELECT count(*)::int FROM approval_role_holders) AS approval_holders`);
+             (SELECT count(*)::int FROM departments WHERE it_admin_employee_id IS NOT NULL) AS with_it_admin`);
 
-    expect(facts.rows).toEqual([
-      { bootstrapped: true, cost_centers: 0, head_periods: 0, with_it_admin: 0, approval_holders: 0 },
-    ]);
+    expect(facts.rows).toEqual([{ bootstrapped: true, cost_centers: 0, head_periods: 0, with_it_admin: 0 }]);
   });
 
   it('applies every committed migration folder, each finished and none rolled back', async () => {

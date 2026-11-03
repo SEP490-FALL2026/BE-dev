@@ -44,20 +44,10 @@ describe('who decides the spend step (US-06-01 AC-8, US-16-03)', () => {
     expect(checkSpendDecider({ ...facts, actorEmployeeId: 'e1', assigneeEmployeeId: 'e1' })).toBe('OWN_REQUEST');
   });
 
-  it('refuses a decision on a legacy step: held by a substitute who never held the role, frozen until the conversion', () => {
-    expect(checkSpendDecider({ ...facts, stepAwaitsConversion: true })).toBe('STEP_AWAITING_CONVERSION');
-    // After OWN_REQUEST and NOT_THE_ASSIGNEE, before STEP_NOT_PENDING.
-    expect(checkSpendDecider({ ...facts, stepAwaitsConversion: true, requesterEmployeeId: 'c1' })).toBe('OWN_REQUEST');
-    expect(checkSpendDecider({ ...facts, stepAwaitsConversion: true, actorEmployeeId: 'f1' })).toBe('NOT_THE_ASSIGNEE');
-    expect(checkSpendDecider({ ...facts, stepAwaitsConversion: true, stepState: 'CLOSED' })).toBe(
-      'STEP_AWAITING_CONVERSION',
-    );
-  });
-
   it('lets the new holder decide a spend step handed over by a role transfer', () => {
     // The step moved from the old spending approver to `c1` in the transaction of the transfer: the holder has a grant, so the step is
     // not legacy (the caller reads `everHeldSpendingApproverAmong` of the holder) and the decision is not refused.
-    expect(checkSpendDecider({ ...facts, assigneeEmployeeId: 'c1', stepAwaitsConversion: false })).toBeNull();
+    expect(checkSpendDecider({ ...facts, assigneeEmployeeId: 'c1' })).toBeNull();
   });
 
   it('is only a step that is pending', () => {

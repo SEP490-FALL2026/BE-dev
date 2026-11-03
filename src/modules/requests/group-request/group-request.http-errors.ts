@@ -130,8 +130,6 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   NEED_OWN_REQUEST: example(new AccessRequestDecisionRefusedError('OWN_REQUEST')),
   NEED_NOT_THE_ASSIGNEE: example(new AccessRequestDecisionRefusedError('NOT_THE_ASSIGNEE')),
   NEED_STEP_NOT_PENDING: example(new AccessRequestDecisionRefusedError('STEP_NOT_PENDING')),
-  STEP_AWAITING_CONVERSION: example(new AccessRequestDecisionRefusedError('STEP_AWAITING_CONVERSION')),
-  SPEND_STEP_AWAITING_CONVERSION: example(new SpendDecisionRefusedError('STEP_AWAITING_CONVERSION')),
   NEED_TERM_CONFIRMATION_REQUIRED: example(new AccessRequestDecisionRefusedError('TERM_CONFIRMATION_REQUIRED')),
   PLAN_LINE_REQUIRED: example(new AccessRequestDecisionRefusedError('PLAN_LINE_REQUIRED')),
   SPEND_NOT_APPLICABLE: example(new AccessRequestDecisionRefusedError('SPEND_NOT_APPLICABLE')),

@@ -72,8 +72,8 @@ export class NeedDecisionController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The step is not pending: it is decided, or waits for somebody to hold it (ACCESS_REQUEST.STEP_NOT_PENDING); or it is held under the earlier rule of approvers of last resort and waits for the conversion command to move it (ACCESS_REQUEST.STEP_AWAITING_CONVERSION, transitional).',
-      examples: [EXAMPLES.STEP_NOT_PENDING, EXAMPLES.STEP_AWAITING_CONVERSION, EXAMPLES.GROUP_USES_LINES],
+        'The step is not pending: it is decided, or waits for somebody to hold it (ACCESS_REQUEST.STEP_NOT_PENDING).',
+      examples: [EXAMPLES.STEP_NOT_PENDING, EXAMPLES.GROUP_USES_LINES],
     },
     INVALID_DECISION,
   )

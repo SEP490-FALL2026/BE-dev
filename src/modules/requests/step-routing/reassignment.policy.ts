@@ -21,7 +21,6 @@ export const REASSIGNMENT_TRIGGERS = [
   'ROLE_HOLDER_CHANGED',
   'EFFECTIVE_DATE_REACHED',
   'WAITING_RETRY',
-  'QD93_CONVERSION',
 ] as const;
 export type ReassignmentTriggerKind = (typeof REASSIGNMENT_TRIGGERS)[number];
 
@@ -41,11 +40,6 @@ export interface OpenStep {
   holderGone: boolean;
   /** Why the step waits now; null while somebody holds it. */
   waitingReason: string | null;
-  /**
-   * The step is of the rule before `QĐ-93` (`isLegacyStep`): it stays still, whatever happens, until the conversion command
-   * moves it (`QĐ-93k(2)`).
-   */
-  legacy: boolean;
 }
 
 /** Who the routing table gives the step on today's data: a person, or nobody and why. */
@@ -55,9 +49,7 @@ export type StepTarget =
 export type ReassignmentDecision =
   | { action: 'KEEP' }
   | { action: 'ASSIGN'; assigneeEmployeeId: string; routingRow: number | null }
-  | { action: 'WAIT'; reason: WaitingReasonCode }
-  /** A step that waits goes on waiting, for another reason: only the reason is written, the stretch and the deadline stay. */
-  | { action: 'REWAIT'; reason: WaitingReasonCode };
+  | { action: 'WAIT'; reason: WaitingReasonCode };
 
 /**
  * Every reason a step can be read waiting for. `NO_FALLBACK_APPROVER`, `FALLBACK_IS_REQUESTER` and `NO_CONFLICT_SUBSTITUTE` are
@@ -71,49 +63,8 @@ export const WAITING_REASON_CODES = [
   'SPENDING_APPROVER_IS_PARTY',
   'NO_FINANCE_REVIEWER',
   'NO_IT_ADMIN_IN_CHARGE',
-  'NO_FALLBACK_APPROVER',
-  'FALLBACK_IS_REQUESTER',
-  'NO_CONFLICT_SUBSTITUTE',
 ] as const;
 export type WaitingReasonCode = (typeof WAITING_REASON_CODES)[number];
-
-/** The reasons a step waited for under the rule before `QĐ-93`: a step that has one is frozen until the conversion. */
-const LEGACY_WAITING_REASONS: ReadonlySet<string> = new Set([
-  'NO_FALLBACK_APPROVER',
-  'FALLBACK_IS_REQUESTER',
-  'NO_CONFLICT_SUBSTITUTE',
-  'SPENDING_APPROVER_IS_PARTY',
-]);
-
-/** What `isLegacyStep` reads of a step. */
-export interface LegacyCandidate {
-  kind: ReassignableStepKind;
-  state: string;
-  routingRow: number;
-  assigneeEmployeeId: string | null;
-  waitingReason: string | null;
-}
-
-/**
- * A step of the rule before `QĐ-93`: a need step that is pending on row 3 or 4 (the approver of last resort holds it); a step that
- * waits for one of the old reasons; a spend step that is pending with a holder who has **never** had a `SPENDING_APPROVER` grant,
- * revoked or not — the substitute for a conflict of interest. `spendingApproverGrantees` is who, among the holders of the pending
- * spend steps, has ever held that grant (`IdentityAccessApi.everHeldSpendingApproverAmong`).
- *
- * The dividing fact is the history of the grant and not who holds it now: revoking or transferring the role changes the second and
- * never the first, so a spend step of a former spending approver is not legacy and is handed over or made to wait as before
- * (`US-01-03` AC-3, `US-05-11` AC-10).
- */
-export function isLegacyStep(step: LegacyCandidate, spendingApproverGrantees: ReadonlySet<string>): boolean {
-  if (step.state === 'WAITING') return step.waitingReason !== null && LEGACY_WAITING_REASONS.has(step.waitingReason);
-  if (step.state !== 'PENDING') return false;
-  if (step.kind === 'NEED') return step.routingRow === 3 || step.routingRow === 4;
-  if (step.kind === 'SPEND_APPROVAL') {
-    return step.assigneeEmployeeId !== null && !spendingApproverGrantees.has(step.assigneeEmployeeId);
-  }
-
-  return false;
-}
 
 /**
  * Whether the event may take a step that somebody holds. The need step follows the department of the requester, the head of
@@ -124,8 +75,6 @@ export function isLegacyStep(step: LegacyCandidate, spendingApproverGrantees: Re
  */
 export function touchesHeldStep(step: OpenStep, trigger: ReassignmentTrigger): boolean {
   switch (trigger.kind) {
-    case 'QD93_CONVERSION':
-      return step.legacy;
     case 'DEPARTMENT_CHANGED':
     case 'HEAD_CHANGED':
     case 'EFFECTIVE_DATE_REACHED':
@@ -157,17 +106,14 @@ export function decideReassignment(
   trigger: ReassignmentTrigger,
   target: StepTarget,
 ): ReassignmentDecision {
-  if (step.legacy !== (trigger.kind === 'QD93_CONVERSION')) return { action: 'KEEP' };
   if (step.state === 'WAITING') {
-    if (target.assigneeEmployeeId !== null) {
-      return { action: 'ASSIGN', assigneeEmployeeId: target.assigneeEmployeeId, routingRow: target.routingRow };
-    }
-
-    return target.reason === step.waitingReason ? { action: 'KEEP' } : { action: 'REWAIT', reason: target.reason };
+    return target.assigneeEmployeeId === null
+      ? { action: 'KEEP' }
+      : { action: 'ASSIGN', assigneeEmployeeId: target.assigneeEmployeeId, routingRow: target.routingRow };
   }
   if (!touchesHeldStep(step, trigger)) return { action: 'KEEP' };
   if (target.assigneeEmployeeId === null) return { action: 'WAIT', reason: target.reason };
-  if (target.assigneeEmployeeId === step.holderEmployeeId && !step.holderGone && !step.legacy) {
+  if (target.assigneeEmployeeId === step.holderEmployeeId && !step.holderGone) {
     return { action: 'KEEP' };
   }
 
@@ -180,23 +126,12 @@ export function decideReassignment(
  * produces them any more.
  */
 export type ConfigurationHint =
-  | 'CONFIGURE_SPENDING_APPROVER'
-  | 'CONFIGURE_FALLBACK_APPROVER'
-  | 'CONFIGURE_CONFLICT_SUBSTITUTE'
-  | 'GRANT_FINANCE_ROLE'
-  | 'ASSIGN_DEPARTMENT_HEAD'
-  | 'NAME_IT_ADMIN_IN_CHARGE';
+  'CONFIGURE_SPENDING_APPROVER' | 'GRANT_FINANCE_ROLE' | 'ASSIGN_DEPARTMENT_HEAD' | 'NAME_IT_ADMIN_IN_CHARGE';
 
 const HINTS: Record<WaitingReasonCode, ConfigurationHint> = {
   NO_SPENDING_APPROVER: 'CONFIGURE_SPENDING_APPROVER',
   NO_DEPARTMENT_HEAD: 'ASSIGN_DEPARTMENT_HEAD',
-  // Transitional: the spending approver gets a grant (`QĐ-93d(1)`), the one thing a request of before is waiting for.
   SPENDING_APPROVER_IS_PARTY: 'CONFIGURE_SPENDING_APPROVER',
-  // Read only (`QĐ-93c`): a step of the old rule is not asked to configure what is gone — the department needs a head, the
-  // spending approver a grant.
-  NO_FALLBACK_APPROVER: 'ASSIGN_DEPARTMENT_HEAD',
-  FALLBACK_IS_REQUESTER: 'ASSIGN_DEPARTMENT_HEAD',
-  NO_CONFLICT_SUBSTITUTE: 'CONFIGURE_SPENDING_APPROVER',
   NO_FINANCE_REVIEWER: 'GRANT_FINANCE_ROLE',
   NO_IT_ADMIN_IN_CHARGE: 'NAME_IT_ADMIN_IN_CHARGE',
 };

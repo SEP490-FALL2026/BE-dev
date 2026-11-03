@@ -94,7 +94,7 @@ flowchart BT
   requests -->|16| budgets
   requests -->|24| catalog
   requests -->|7| finance
-  requests -->|32| identity_access
+  requests -->|31| identity_access
   requests -->|40| licensing
   requests -->|7| notifications
   requests -->|10| operating_parameters

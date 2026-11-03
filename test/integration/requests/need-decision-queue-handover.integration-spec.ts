@@ -94,28 +94,6 @@ describe('the queue of the need steps when the person who holds a step changes (
     expect(await records(r1.id)).toEqual([]);
   });
 
-  it('never lists a legacy step held on row 3 or 4, and refuses its holder at the decision until the conversion', async () => {
-    const u = await unit();
-    const r1 = await h.sent(u.member, internal, { termMonths: 1 });
-    const step = await h.stepOf(r1.id, 'NEED');
-    // A request of before: the approver of last resort held the step of a department whose head is back or never left.
-    await h.ctx.sql.query(`UPDATE access_request_steps SET assignee_employee_id = $2, routing_row = 4 WHERE id = $1`, [
-      step.id,
-      bystander.employeeId,
-    ]);
-
-    // The step is held, and it is not in the queue of its holder (the screen would name a role no decision is written in).
-    expect(await idsOf(bystander.account)).not.toContain(r1.id);
-    expect(await idsOf(u.head.account)).not.toContain(r1.id);
-    const refused = await decide(r1.id, { decision: 'APPROVE' }, bystander.account).expect(409);
-    expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.STEP_AWAITING_CONVERSION');
-    expect(await records(r1.id)).toEqual([]);
-    expect(await h.stepOf(r1.id, 'NEED')).toMatchObject({
-      state: 'PENDING',
-      assignee_employee_id: bystander.employeeId,
-    });
-  });
-
   it('hands a step to the new head when the Super Admin names one, with the step keeping its age', async () => {
     const u = await unit();
     const r1 = await h.sent(u.member, internal, { termMonths: 1 });

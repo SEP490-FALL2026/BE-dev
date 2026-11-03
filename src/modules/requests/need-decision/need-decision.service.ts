@@ -19,7 +19,6 @@ import {
 } from '../access-request/need-decision.policy';
 import { RequestFactsService } from '../access-request/request-facts.service';
 import { NeedSpendService } from '../assessment/need-spend.service';
-import { StepFreezeService } from '../step-routing/step-freeze.service';
 import { NeedDecisionEffects } from './need-decision-effects.service';
 
 /**
@@ -42,7 +41,6 @@ export class NeedDecisionService {
     private readonly settings: RequestFactsService,
     private readonly spendChoice: NeedSpendService,
     private readonly effects: NeedDecisionEffects,
-    private readonly freeze: StepFreezeService,
   ) {}
 
   async decide(actor: AuthenticatedPrincipal, requestId: string, input: DecisionInput): Promise<AccessRequestRecord> {
@@ -87,8 +85,6 @@ export class NeedDecisionService {
         beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
         assigneeEmployeeId: needStep.assigneeEmployeeId,
         stepState: needStep.state,
-        // A step of the rule before `QĐ-93` is frozen until the conversion command moves it (`QĐ-93k(2)`).
-        stepAwaitsConversion: await this.freeze.awaitsConversion(tx, { kind: 'NEED', ...needStep }),
         // A renewal is long when the right would run on over twelve months in all, not when its own term is.
         termMonths: request.renewal?.consecutiveMonths ?? request.termMonths,
       },

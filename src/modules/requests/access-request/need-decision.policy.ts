@@ -16,8 +16,6 @@ export interface DecisionFacts {
   /** Who holds the need step; null while it waits for somebody. */
   assigneeEmployeeId: string | null;
   stepState: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
-  /** The step is of the rule before `QĐ-93` (`isLegacyStep`): frozen until the conversion command moves it (`QĐ-93k(2)`). */
-  stepAwaitsConversion: boolean;
   termMonths: number;
 }
 
@@ -35,13 +33,7 @@ export interface DecisionInput {
   spend?: SpendInput;
 }
 
-export type DecisionRefusal =
-  | 'OWN_REQUEST'
-  | 'NOT_THE_ASSIGNEE'
-  /** A legacy step: the person holds it, and nobody decides it until the conversion command rewrites it. */
-  | 'STEP_AWAITING_CONVERSION'
-  | 'STEP_NOT_PENDING'
-  | 'TERM_CONFIRMATION_REQUIRED';
+export type DecisionRefusal = 'OWN_REQUEST' | 'NOT_THE_ASSIGNEE' | 'STEP_NOT_PENDING' | 'TERM_CONFIRMATION_REQUIRED';
 
 /** The first reason the person may not decide the step, in the order a caller should learn it, or null when they may. */
 export function checkNeedDecision(facts: DecisionFacts, input: DecisionInput): DecisionRefusal | null {
@@ -53,7 +45,6 @@ export function checkNeedDecision(facts: DecisionFacts, input: DecisionInput): D
   }
   if (facts.assigneeEmployeeId === null || facts.actorEmployeeId !== facts.assigneeEmployeeId)
     return 'NOT_THE_ASSIGNEE';
-  if (facts.stepAwaitsConversion) return 'STEP_AWAITING_CONVERSION';
   if (facts.stepState !== 'PENDING') return 'STEP_NOT_PENDING';
   const confirmed = (input.termConfirmationReason ?? '').trim() !== '';
   if (input.decision === 'APPROVE' && facts.termMonths > LONG_TERM_MONTHS && !confirmed) {
@@ -86,7 +77,7 @@ export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER';
  * it) has none either, but is not an error: it returns `null`, for the step is frozen until the conversion command rewrites
  * its row (`QĐ-93k(2)`) and nobody decides it (`STEP_AWAITING_CONVERSION`).
  */
-export function deciderRoleOf(routingRow: number): DeciderRole | null {
+export function deciderRoleOf(routingRow: number): DeciderRole {
   switch (routingRow) {
     // The head (1), the head who sent for others (5) or who decides the lines of a group an Employee sent (9).
     case 1:
@@ -95,9 +86,6 @@ export function deciderRoleOf(routingRow: number): DeciderRole | null {
       return 'MANAGER';
     case 2:
       return 'SPENDING_APPROVER';
-    case 3:
-    case 4:
-      return null;
     default:
       throw new Error(`The routing row ${routingRow} gives the step to nobody, so nobody decides in it.`);
   }
