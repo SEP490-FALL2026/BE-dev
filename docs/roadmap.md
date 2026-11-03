@@ -311,6 +311,8 @@ Bản giao 03/11/2026 là nhánh `fix/qd93-final`. Nó gồm `qd93-remove-hr-bas
 import `.xlsx`. Bản tối giản (Codex, merge `42138a99`) làm theo [câu lệnh tối giản](reviews/qd93-delivery-2026-11-03/prompts/codex-lean-3-tasks-prompt.md), không theo
 plan đầy đủ của hai hạng mục đó. Trạng thái ở bảng trên chưa cập nhật theo bản giao. Owner cập nhật khi merge.
 
+**Cập nhật 03/11/2026 tối (đợt 2):** các việc chức năng trong bảng đã được làm. Đã làm: nghỉ việc của nhân viên chưa xếp phòng; đính kèm tệp ngân sách; dashboard đếm thật; gỡ bảng cũ (Phase B và phase 2); các điểm nhỏ của bản tối giản. Gemini làm trên nhánh `feat/qd93-remaining`. Claude audit, sửa và chạy toàn bộ test trên nhánh `fix/qd93-remaining-audit`. Hồ sơ ở [round2-remaining](reviews/qd93-delivery-2026-11-03/round2-remaining/r2-findings.md). Còn mở: hai lỗ hổng thư viện, tài liệu FE, sơ đồ Docs, và vài ca test của spec đính kèm (race gửi phiên bản, 503 khi khai báo).
+
 Spec, plan và test có sẵn cho từng việc dưới đây. Plan nào viết trước bản tối giản thì phải đối chiếu lại tên file
 và route với code đã merge trước khi làm.
 

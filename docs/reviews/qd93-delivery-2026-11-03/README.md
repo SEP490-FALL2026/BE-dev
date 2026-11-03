@@ -40,3 +40,36 @@ giao cho các phiên AI, nhật ký và báo cáo triển khai, kết quả revi
 
 Bài học: một danh sách lỗi có hạn giao cần bản sửa nhỏ nhất và làm trực tiếp, không cần spec dài và TDD cho từng task.
 Trước khi để máy chạy qua đêm, phải tắt chế độ ngủ của máy.
+
+## Đợt 2: việc còn lại (Gemini, audit 03/11/2026 tối)
+
+- **Câu lệnh:** [gemini-qd93-remaining-prompt.md](prompts/gemini-qd93-remaining-prompt.md) và
+  [gemini-qd93-remaining-addendum.md](prompts/gemini-qd93-remaining-addendum.md).
+- **Báo cáo của Gemini:** [gemini-qd93-remaining-report.md](implementation/gemini-qd93-remaining-report.md). Báo cáo này
+  **không đáng tin**: nó mô tả route, bảng, tên migration và cả virus scan không có trong code, và ghi "toàn bộ xanh"
+  dù integration chưa chạy được.
+- **Audit:** [round2-remaining/](round2-remaining/).
+  - 6 review độc lập, mỗi việc một reviewer, riêng đính kèm có 2 (business và security).
+  - [r2-findings.md](round2-remaining/r2-findings.md) là sổ finding, ghi cả quyết định cho từng dòng.
+  - Brief cho reviewer và fixer, cùng bản re-review sau khi sửa.
+- **Kết quả audit:** 4 Blocker:
+  - đính kèm đọc sai tên cột từ SQL thô, nên trưởng phòng không gửi được tệp;
+  - lỗi `NOT_ATTACHABLE` trả 500 thay vì 422;
+  - các suite giữ lại vẫn dùng bảng đã drop;
+  - một unit test bị gãy.
+
+  Ngoài ra còn nhiều lỗi High: guard bỏ sót điều kiện của spec, REWAIT bị gỡ nhầm, test sai hoặc bị sửa lén.
+
+  4 fixer sửa song song, mỗi người một worktree, rồi merge vào nhánh `fix/qd93-remaining-audit`. Re-review không còn
+  Blocker, High hay Medium.
+
+- **Test cuối:**
+  - `test:http` 62/62, unit 4 610, gates 327, scripts 272;
+  - e2e 11/11, timing 7/7, serial 11/11;
+  - integration 321/321 file (1 file bỏ qua có chủ đích), sau khi chạy lại các file lỗi do Docker Desktop sập hoặc máy
+    quá tải.
+- **Lệch spec có chủ đích:**
+  - không thêm dòng `-text` vào `.gitattributes` (GATE-EOL=A); test tệp mẫu không phụ thuộc kiểu xuống dòng;
+  - giữ tên mã `EMPLOYEE.EMPLOYEE_LEAVING`;
+  - guard Phase B không chặn chỉ vì còn dòng `approval_role_holders`, và không coi `SPENDING_APPROVER_IS_PARTY` là lý do
+    cũ.
