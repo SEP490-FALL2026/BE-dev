@@ -37,6 +37,10 @@ export const UPLOAD_ABANDONED_AFTER_MS = 24 * 60 * 60 * 1000;
 export const PROPOSAL_UNATTACHED_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 export const DOWNLOAD_LINK_SECONDS = 300;
 
+/** Where an upload waits (the bucket's lifecycle rule clears it) and where the bytes that were looked at are kept. */
+export const PENDING_SCOPE = 'pending-documents';
+export const FINAL_SCOPE = 'budget-documents';
+
 export function expiresAt(status: 'AWAITING_UPLOAD' | 'UPLOADED', createdAt: Date): Date {
   return status === 'AWAITING_UPLOAD'
     ? new Date(createdAt.getTime() + UPLOAD_ABANDONED_AFTER_MS)
@@ -62,12 +66,16 @@ function hasControlCharacters(value: string): boolean {
   return false;
 }
 
+/**
+ * Throws the refusal for a name, size or type that is not allowed; otherwise returns the trimmed name and the canonical
+ * MIME type of its extension, which is what is stored and signed (a client's `Application/PDF` is kept as `application/pdf`).
+ */
 export function assertFileAllowed(input: {
   fileName: string;
   contentType: string;
   sizeBytes: number;
   maxBytes: number;
-}): void {
+}): { fileName: string; contentType: string } {
   const trimmedName = input.fileName.trim();
   if (
     trimmedName.length < 1 ||
@@ -96,6 +104,8 @@ export function assertFileAllowed(input: {
   if (input.contentType.toLowerCase() !== expectedMime) {
     throw new BudgetAttachmentTypeNotAllowedError(ALLOWED_EXTENSIONS);
   }
+
+  return { fileName: trimmedName, contentType: expectedMime };
 }
 
 export const VALID_TRANSITIONS: Record<BudgetAttachmentStatus, readonly BudgetAttachmentStatus[]> = {

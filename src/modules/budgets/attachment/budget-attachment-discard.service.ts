@@ -8,7 +8,6 @@ import type { BudgetAttachmentWire } from './budget-attachment.dto';
 import { BudgetAttachmentNotDiscardableError, BudgetAttachmentNotFoundError } from './budget-attachment.errors';
 import { toBudgetAttachmentWire } from './budget-attachment.mapper';
 import { BudgetAttachmentRepo } from './budget-attachment.repo';
-import type { BudgetAttachmentRecord } from './budget-attachment.types';
 
 @Injectable()
 export class BudgetAttachmentDiscardService {
@@ -30,9 +29,7 @@ export class BudgetAttachmentDiscardService {
       throw new BudgetAttachmentNotDiscardableError(record.status);
     }
 
-    let lockedRecord: BudgetAttachmentRecord | null = null;
-
-    await this.runner.run(async (tx) => {
+    const discarded = await this.runner.run(async (tx) => {
       const locked = await this.attachments.lock(tx, record.id);
       if (!locked || locked.uploadedByEmployeeId !== actor.employeeId) {
         throw new BudgetAttachmentNotFoundError();
@@ -42,7 +39,6 @@ export class BudgetAttachmentDiscardService {
         throw new BudgetAttachmentNotDiscardableError(locked.status);
       }
 
-      lockedRecord = locked;
       await this.attachments.markDiscarded(tx, locked.id);
       await this.audit.record(
         tx,
@@ -56,13 +52,13 @@ export class BudgetAttachmentDiscardService {
           { status: locked.status },
         ),
       );
+
+      return locked;
     });
 
-    if (lockedRecord) {
-      const toDelete =
-        (lockedRecord as BudgetAttachmentRecord).finalObjectKey ?? (lockedRecord as BudgetAttachmentRecord).objectKey;
-      await this.deleteFromStorage(toDelete);
-    }
+    // After the commit: the upload and the kept copy (if the upload was already looked at) are no more use.
+    await this.deleteFromStorage(discarded.objectKey);
+    if (discarded.finalObjectKey) await this.deleteFromStorage(discarded.finalObjectKey);
 
     const updated = await this.attachments.find(record.id);
     const people = await this.facts.people([actor.employeeId]);

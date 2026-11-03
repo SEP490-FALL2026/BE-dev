@@ -14,6 +14,7 @@ import {
   assertFileAllowed,
   MAX_RECORD_ATTACHMENTS,
   MAX_USER_UNATTACHED_ATTACHMENTS,
+  PENDING_SCOPE,
   UPLOAD_LINK_SECONDS,
 } from './budget-attachment.policy';
 import { BudgetAttachmentRepo } from './budget-attachment.repo';
@@ -42,6 +43,7 @@ export class BudgetAttachmentDeclarationService {
     private readonly parameters: OperatingParametersApi,
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStoragePort,
     private readonly audit: AuditApi,
+    private readonly keys: ObjectKeyFactory,
   ) {}
 
   async declareVersion(
@@ -51,9 +53,9 @@ export class BudgetAttachmentDeclarationService {
   ): Promise<DeclareAttachmentResult> {
     const fiscalStart = await this.access.begin(actor);
     const maxBytes = Number(await this.parameters.getValue('DOCUMENT_MAX_SIZE_MB')) * 1024 * 1024;
-    assertFileAllowed({ ...input, maxBytes });
+    const file = assertFileAllowed({ ...input, maxBytes });
 
-    const objectKey = new ObjectKeyFactory().create('pending-documents');
+    const objectKey = this.keys.create(PENDING_SCOPE);
 
     const created = await this.runner.run(async (tx) => {
       const version = await this.access.lockEditable(tx, versionId, fiscalStart);
@@ -70,8 +72,8 @@ export class BudgetAttachmentDeclarationService {
       const inserted = await this.attachments.insert(tx, {
         organizationId: version.organizationId,
         target: 'VERSION',
-        fileName: input.fileName.trim(),
-        contentType: input.contentType,
+        fileName: file.fileName,
+        contentType: file.contentType,
         sizeBytes: input.sizeBytes,
         objectKey,
         uploadedByEmployeeId: actor.employeeId,
@@ -99,7 +101,7 @@ export class BudgetAttachmentDeclarationService {
       return inserted;
     });
 
-    return this.buildResult(actor, created, input);
+    return this.buildResult(actor, created);
   }
 
   async declareProposal(
@@ -111,9 +113,9 @@ export class BudgetAttachmentDeclarationService {
     const organizationId = await this.facts.organizationId();
 
     const maxBytes = Number(await this.parameters.getValue('DOCUMENT_MAX_SIZE_MB')) * 1024 * 1024;
-    assertFileAllowed({ ...input, maxBytes });
+    const file = assertFileAllowed({ ...input, maxBytes });
 
-    const objectKey = new ObjectKeyFactory().create('pending-documents');
+    const objectKey = this.keys.create(PENDING_SCOPE);
 
     const created = await this.runner.run(async (tx) => {
       await this.attachments.lockUploader(tx, actor.employeeId);
@@ -125,8 +127,8 @@ export class BudgetAttachmentDeclarationService {
       const inserted = await this.attachments.insert(tx, {
         organizationId,
         target: 'PROPOSAL',
-        fileName: input.fileName.trim(),
-        contentType: input.contentType,
+        fileName: file.fileName,
+        contentType: file.contentType,
         sizeBytes: input.sizeBytes,
         objectKey,
         uploadedByEmployeeId: actor.employeeId,
@@ -145,18 +147,17 @@ export class BudgetAttachmentDeclarationService {
       return inserted;
     });
 
-    return this.buildResult(actor, created, input);
+    return this.buildResult(actor, created);
   }
 
   private async buildResult(
     actor: AuthenticatedPrincipal,
     record: BudgetAttachmentRecord,
-    input: CreateBudgetAttachmentDto,
   ): Promise<DeclareAttachmentResult> {
     const url = await this.storage.createUploadUrl({
       key: record.objectKey,
-      contentType: input.contentType,
-      contentLength: input.sizeBytes,
+      contentType: record.contentType,
+      contentLength: record.sizeBytes,
       expiresInSeconds: UPLOAD_LINK_SECONDS,
     });
 
@@ -169,8 +170,8 @@ export class BudgetAttachmentDeclarationService {
         url,
         method: 'PUT',
         headers: {
-          'Content-Type': input.contentType,
-          'Content-Length': String(input.sizeBytes),
+          'Content-Type': record.contentType,
+          'Content-Length': String(record.sizeBytes),
         },
         expiresAt: new Date(Date.now() + UPLOAD_LINK_SECONDS * 1000).toISOString(),
       },
