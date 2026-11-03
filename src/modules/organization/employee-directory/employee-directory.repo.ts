@@ -56,8 +56,8 @@ function buildListWhere(filter: EmployeeDirectoryFilter, today: BusinessDate): P
       conditions.push(Prisma.sql`e.id = ${search.exactId}::uuid`);
     } else {
       conditions.push(Prisma.sql`(
-        upper(e.employee_code) LIKE ${search.codePattern} ESCAPE '\'
-        OR (e.normalized_work_email IS NOT NULL AND e.normalized_work_email LIKE ${search.emailPattern} ESCAPE '\')
+        upper(e.employee_code) LIKE ${search.codePattern} ESCAPE '\\'
+        OR (e.normalized_work_email IS NOT NULL AND e.normalized_work_email LIKE ${search.emailPattern} ESCAPE '\\')
         OR lower(regexp_replace(translate(normalize(e.full_name, NFC), ${VIETNAMESE_ACCENTED_CHARS}, ${VIETNAMESE_UNACCENTED_CHARS}), '\\s+', ' ', 'g')) LIKE ${search.namePattern} ESCAPE '\\'
       )`);
     }

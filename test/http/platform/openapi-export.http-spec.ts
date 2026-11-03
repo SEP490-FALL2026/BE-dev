@@ -66,7 +66,7 @@ describe('OpenAPI export (spawned process)', () => {
       .filter((line) => line !== '' && !line.startsWith('#'));
 
     // Exactly one narrow rule: no repository-wide `* text=auto eol=lf`, no renormalization of unrelated files.
-    expect(rules).toEqual(['openapi.json text eol=lf', 'docs/examples/employee-import/*.xlsx binary']);
+    expect(rules).toEqual(['openapi.json text eol=lf']);
   });
 
   it(

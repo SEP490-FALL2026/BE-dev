@@ -166,6 +166,7 @@ export class AppUserRepo {
         roleGrants: {
           where: { revokedAt: null },
           select: { role: true },
+          orderBy: { role: 'asc' },
         },
       },
     });

@@ -243,6 +243,35 @@ describe('employee directory read (US-02-02 AC-22, AC-24, AC-25, AC-26, integrat
       expect(dataOf<EmployeeListPageWire>(resFull).items.some((i) => i.id === emp1.id)).toBe(true);
     });
 
+    it('takes _ in an email search literally: the decoy where _ would match any letter is not found', async () => {
+      const post = (employeeCode: string, workEmail: string) =>
+        h
+          .api()
+          .post('/api/v1/employees')
+          .set(h.asAdmin())
+          .send({
+            employeeCode,
+            workEmail,
+            fullName: 'Wildcard Probe',
+            employmentType: 'STAFF',
+            hireDate: '2025-01-01',
+          })
+          .expect(201);
+      const literal = dataOf<{ id: string }>(await post('NV-WILD-1', 'wild_card.dir@acme.vn'));
+      await post('NV-WILD-2', 'wildxcard.dir@acme.vn');
+
+      const page = dataOf<EmployeeListPageWire>(await getList('q=wild_card.dir').expect(200));
+
+      expect(page.items.map((item) => item.id)).toEqual([literal.id]);
+    });
+
+    it('answers an empty page, not an error, for a department and unplaced=true together', async () => {
+      const page = dataOf<EmployeeListPageWire>(await getList(`departmentId=${dep1.id}&unplaced=true`).expect(200));
+
+      expect(page.items).toEqual([]);
+      expect(page.pagination.totalItems).toBe(0);
+    });
+
     it('escapes SQL LIKE wildcards % and _ so they match literally', async () => {
       // Special%User_Test has literal % and _
       const matchLiteral = await getList('q=%User_').expect(200);
