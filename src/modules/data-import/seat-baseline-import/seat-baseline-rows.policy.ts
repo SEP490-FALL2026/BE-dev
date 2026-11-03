@@ -89,7 +89,7 @@ export function lookupNamesOf(rows: readonly { cells: SeatCells }[]): {
   const employees = new Set<string>();
   const costCenters = new Set<string>();
   for (const { cells } of rows) {
-    if (cell(cells, 'employee_code')) employees.add(cell(cells, 'employee_code'));
+    if (cell(cells, 'employee_code')) employees.add(cell(cells, 'employee_code').toUpperCase());
     if (cell(cells, 'cost_center_code')) costCenters.add(cell(cells, 'cost_center_code'));
   }
 
@@ -278,7 +278,7 @@ function judgeCharge(
  */
 function judgeAlone(cells: SeatCells, facts: SeatFacts): { errors: SeatRowErrorCode[]; parsed: ParsedSeatRow | null } {
   const { kind, errors: kindErrors } = judgeKind(cell(cells, 'kind').toLowerCase());
-  const employee = facts.employees.get(cell(cells, 'employee_code'));
+  const employee = facts.employees.get(cell(cells, 'employee_code').toUpperCase());
   const identifier = cell(cells, 'account_identifier');
   const grantedOn = cell(cells, 'granted_on');
   const start = judgeStart(grantedOn, facts.recordedOn);

@@ -1,10 +1,10 @@
 import {
-  escapeLikePattern,
   foldVietnameseName,
   parseSearchTerm,
   VIETNAMESE_ACCENTED_CHARS,
   VIETNAMESE_UNACCENTED_CHARS,
 } from './employee-directory-search.policy';
+import { escapeLikePattern } from '../employee/employee.policy';
 
 describe('employee-directory-search.policy', () => {
   it('returns null for undefined, empty or whitespace strings', () => {

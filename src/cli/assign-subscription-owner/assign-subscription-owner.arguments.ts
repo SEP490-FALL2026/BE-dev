@@ -73,7 +73,7 @@ export function parseAssignmentArguments(argv: readonly string[]): ParsedAssignm
     help: false,
     command: {
       subscriptionId,
-      departmentCode: text('department'),
+      departmentCode: text('department').toUpperCase(),
       basis,
       operator: text('operator'),
       environment: environment as AssignmentCommand['environment'],

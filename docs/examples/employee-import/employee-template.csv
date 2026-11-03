@@ -1,2 +1,2 @@
 employee_code,full_name,work_email,employment_type,hire_date,department_code,job_title
-NV-0001,Example Employee,example.employee@example.test,STAFF,2026-01-05,DS1-ENG,Engineer
+NV-9001,Example Employee,nv9001.employee@example.test,STAFF,2026-01-05,DS1-ENG,Engineer

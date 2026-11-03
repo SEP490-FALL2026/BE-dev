@@ -15,7 +15,8 @@ export const createDepartmentBodySchema = z.strictObject({
     minLength: 2,
     maxLength: 20,
     pattern: '^[A-Z0-9]+(-[A-Z0-9]+)*$',
-    description: '2 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. P-ENG.',
+    description:
+      '2 to 20 ASCII letters or digits in hyphen-separated groups; lowercase is accepted and converted to uppercase, e.g. p-eng becomes P-ENG.',
   }),
   name: z.string().normalize('NFC').trim().max(DEPARTMENT_NAME_MAX_LENGTH),
   function: z.string().normalize('NFC').trim().max(DEPARTMENT_FUNCTION_MAX_LENGTH).nullish(),

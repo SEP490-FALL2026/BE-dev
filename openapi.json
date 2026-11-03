@@ -39706,7 +39706,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), or an expected spend date is given for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE).",
+            "description": "The body is invalid (VALIDATION_ERROR), an expected spend date is given for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE), or the caller cannot be party to the request (REQUEST_PARTY.INELIGIBLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -39730,6 +39730,22 @@
                       "error": {
                         "code": "ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE",
                         "message": "A request for internal software has no expected spend date: nothing is paid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REQUEST_PARTY.INELIGIBLE": {
+                    "summary": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_PARTY.INELIGIBLE",
+                        "message": "The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.",
+                        "details": {
+                          "reason": "SPENDING_APPROVER",
+                          "party": "REQUESTER",
+                          "employeeIds": ["<employee-id>"]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -71344,7 +71360,7 @@
             "minLength": 3,
             "maxLength": 20,
             "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$",
-            "description": "3 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. NV-0001."
+            "description": "3 to 20 ASCII letters or digits in hyphen-separated groups; lowercase is accepted and converted to uppercase, e.g. nv-0001 becomes NV-0001."
           },
           "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
           "workEmail": {
@@ -71365,7 +71381,7 @@
             "minLength": 2,
             "maxLength": 20,
             "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$",
-            "description": "2 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. P-ENG.",
+            "description": "2 to 20 ASCII letters or digits in hyphen-separated groups; lowercase is accepted and converted to uppercase, e.g. p-eng becomes P-ENG; null or omitted for unplaced.",
             "nullable": true
           },
           "jobTitle": { "type": "string", "maxLength": 1000, "nullable": true }
@@ -71921,7 +71937,7 @@
             "minLength": 2,
             "maxLength": 20,
             "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$",
-            "description": "2 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. P-ENG."
+            "description": "2 to 20 ASCII letters or digits in hyphen-separated groups; lowercase is accepted and converted to uppercase, e.g. p-eng becomes P-ENG."
           },
           "name": { "type": "string", "maxLength": 200 },
           "function": { "type": "string", "maxLength": 1000, "nullable": true },

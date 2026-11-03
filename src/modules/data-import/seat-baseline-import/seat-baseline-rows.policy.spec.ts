@@ -55,6 +55,12 @@ describe('judgeSeatRows: the person and the account', () => {
     ]);
   });
 
+  it('accepts lowercase employee_code and matches the uppercase employee in facts', () => {
+    const result = judgeOne({ employee_code: 'e1', account_identifier: 'e1@congty.vn' });
+    expect(result.outcome).toBe('VALID');
+    expect(result.parsed?.employeeId).toBe('e1');
+  });
+
   it('asks for an account identifier, and refuses one with a space and one that looks like a secret (AC-9)', () => {
     expect(codesOf(judgeOne({ employee_code: 'E1', account_identifier: '' }))).toEqual(['ACCOUNT_IDENTIFIER_MISSING']);
     expect(codesOf(judgeOne({ employee_code: 'E1', account_identifier: 'e 1@congty.vn' }))).toEqual([

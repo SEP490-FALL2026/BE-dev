@@ -66,7 +66,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
   ALREADY_RECORDED: 'The lock of the company account was recorded already.',
   REVOCATION_NOT_SUPPORTED: 'The kind of provisioning of the seat has no revocation yet.',
   CASE_NOT_CLOSEABLE: 'Something still keeps the case open.',
-  EMPLOYEE_UNPLACED: 'Xếp phòng trước khi ghi nghỉ việc.',
+  EMPLOYEE_UNPLACED: 'The employee is unplaced: assign a department before recording offboarding.',
   PLACEMENT_OVERLAP: 'The placements of the person cannot take this change.',
   CONCURRENT_CHANGE: 'The person was changed by someone else meanwhile; read the case again.',
 };

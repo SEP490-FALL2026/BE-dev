@@ -9,10 +9,7 @@ export const VIETNAMESE_UNACCENTED_CHARS =
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Escapes LIKE metacharacters so a search term matches literally (backslash is PostgreSQL's default escape). */
-export function escapeLikePattern(term: string): string {
-  return term.replace(/[\\%_]/g, (character) => `\\${character}`);
-}
+import { escapeLikePattern } from '../employee/employee.policy';
 
 /** Folds case and Vietnamese accents including đ/Đ, collapsing whitespaces. */
 export function foldVietnameseName(name: string): string {

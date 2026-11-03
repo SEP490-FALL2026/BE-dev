@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { normalizeDisplayName } from '../../../core/display-name';
 import { normalizeEmail } from '../../../core/email';
+import { escapeLikePattern } from './employee.policy';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
@@ -51,11 +52,6 @@ function toEmployeeRecord(row: {
     hireDate: fromDateColumn(row.hireDate),
     jobTitle: row.jobTitle,
   };
-}
-
-/** Escapes LIKE metacharacters so a search term matches literally (backslash is PostgreSQL's default escape). */
-function escapeLikePattern(term: string): string {
-  return term.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
 /**
