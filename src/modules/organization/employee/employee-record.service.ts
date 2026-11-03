@@ -66,6 +66,17 @@ export class EmployeeRecordService {
     return this.repo.createEmployeeWithPlacement(tx, input);
   }
 
+  unplacedAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.repo.unplacedAmong(employeeIds, tx);
+  }
+
+  insertFirstPlacement(
+    tx: DbTx,
+    input: { organizationId: string; employeeId: string; departmentId: string; effectiveFrom: BusinessDate },
+  ): Promise<void> {
+    return this.repo.insertFirstPlacement(tx, input);
+  }
+
   lock(tx: DbTx, employeeId: string, mode: 'SHARE' | 'UPDATE'): Promise<void> {
     return this.repo.lockEmployee(tx, employeeId, mode);
   }

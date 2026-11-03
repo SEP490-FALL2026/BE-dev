@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
 import { RequestPartyEligibilityApi } from '../../identity-access/public/request-party-eligibility.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNoDepartmentError } from '../access-request/access-request.errors';
@@ -83,13 +84,13 @@ export class RequestPreviewService {
   private async read(actor: AuthenticatedPrincipal, body: PreviewBodyDto) {
     const settings = await this.assessment.settings();
 
-    return this.runner.run(async (tx) => ({
-      // Who can never be a party of a request is judged before the department is read, and says so without refusing (`D-S21`).
-      blockedBy: await this.requestParties.blockOf(
+    return this.runner.run(async (tx) => {
+      const blockedBy = await this.requestParties.blockOf(
         { requesterEmployeeId: actor.employeeId, beneficiaryEmployeeIds: [actor.employeeId] },
         tx,
-      ),
-      assessed: await this.assessment.assess(tx, {
+      );
+      if (blockedBy?.reason === 'UNPLACED') throw new RequestPartyIneligibleError(blockedBy);
+      const assessed = await this.assessment.assess(tx, {
         employeeId: actor.employeeId,
         planId: body.planId,
         termMonths: body.termMonths,
@@ -97,8 +98,8 @@ export class RequestPreviewService {
         now: new Date(),
         settings,
         lockDepartment: false,
-      }),
-      vendorId: await this.catalog.getPlanVendorId(body.planId, tx),
-    }));
+      });
+      return { blockedBy, assessed, vendorId: await this.catalog.getPlanVendorId(body.planId, tx) };
+    });
   }
 }

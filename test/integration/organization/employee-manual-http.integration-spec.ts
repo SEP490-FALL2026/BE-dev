@@ -145,6 +145,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
           'jobTitle',
           'memberSince',
           'status',
+          'unplaced',
           'workEmail',
           'workState',
         ].sort(),
@@ -229,10 +230,15 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
     });
   });
 
+  it.each([undefined, null, '', '  '])('creates an unplaced employee for department %j', async (departmentCode) => {
+    const response = await enter(row({ departmentCode })).expect(201);
+    const person = (response.body as { data: { id: string; department: unknown; unplaced: boolean } }).data;
+    expect(person).toMatchObject({ department: null, unplaced: true });
+    await ctx.sql.query('DELETE FROM employees WHERE id = $1', [person.id]);
+  });
+
   describe('a refused entry: every reason of T-16 with its field, and nothing written', () => {
     it.each([
-      ['no department', { departmentCode: undefined }, [{ field: 'departmentCode', code: 'DEPARTMENT_REQUIRED' }]],
-      ['a blank department', { departmentCode: '  ' }, [{ field: 'departmentCode', code: 'DEPARTMENT_REQUIRED' }]],
       [
         'a department that does not exist',
         { departmentCode: 'P-NOPE' },

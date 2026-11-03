@@ -101,7 +101,7 @@ export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     businessMaximum: { maxItems: 20, source: 'CANDIDATE_LIMIT in account-query.service.ts' },
     rationale: 'A picker that searches by name and returns the first matches.',
     removeWhen: 'Review when CANDIDATE_LIMIT changes or the picker needs paging.',
-    itemProperties: ['department', 'employeeCode', 'fullName', 'id', 'workEmail'],
+    itemProperties: ['department', 'employeeCode', 'fullName', 'id', 'unplaced', 'workEmail'],
   },
   {
     operationId: 'vendorProposalList',

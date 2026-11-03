@@ -118,19 +118,11 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
 
   describe('why a whole file is refused (US-02-02 AC-2)', () => {
     it.each([
-      [
-        'no department column',
-        'employee_code,full_name,work_email,employment_type,hire_date,job_title',
-        ['department_code'],
-      ],
-      ['no department and no email column', 'employee_code,full_name,employment_type,hire_date', ['department_code']],
-    ])('refuses a file with %s, naming what is missing, and keeps nothing', async (_name, header, missing) => {
-      const imports = await count('employee_imports');
-
-      const response = await upload(`${header}\nE-X,Name,,STAFF,2026-09-01\n`).expect(422);
-
-      expect(errorOf(response)).toMatchObject({ code: 'IMPORT.FILE_MISSING_COLUMNS', details: { missing } });
-      expect(await count('employee_imports')).toBe(imports);
+      ['without department', 'employee_code,full_name,work_email,employment_type,hire_date,job_title'],
+      ['without department or email', 'employee_code,full_name,employment_type,hire_date'],
+    ])('accepts a file %s', async (_name, header) => {
+      const response = await upload(`${header}\nE-X,Name,STAFF,2026-09-01\n`).expect(201);
+      expect(importOf(response).summary.totalRows).toBe(1);
     });
 
     it('refuses a file with no file, one that is empty, one with only a header, and one that is not text', async () => {
@@ -144,7 +136,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
         .set(asSuper())
         .attach('file', Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]), 'people.xlsx')
         .expect(422);
-      expect(errorOf(binary).code).toBe('IMPORT.FILE_NOT_TEXT');
+      expect(errorOf(binary).code).toBe('IMPORT.FILE_UNREADABLE');
     });
 
     it('refuses a table it cannot read and one with more rows than it takes', async () => {
@@ -198,7 +190,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
       );
 
       expect((await rowsOf(data.id)).map((row) => row.errors)).toEqual([
-        [{ column: 'department_code', code: 'DEPARTMENT_REQUIRED' }],
+        [],
         [{ column: 'department_code', code: 'DEPARTMENT_NOT_FOUND' }],
         [{ column: 'department_code', code: 'DEPARTMENT_INACTIVE' }],
       ]);

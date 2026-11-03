@@ -57,11 +57,6 @@
       "count": 1
     }
   },
-  "src/modules/data-import/employee-import/row-validation/employee-import-row-validation.policy.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/data-import/seat-baseline-import/seat-baseline-imports.controller.ts": {
     "max-lines-per-function": {
       "count": 1

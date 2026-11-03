@@ -13,6 +13,7 @@ export interface MeView {
     employeeCode: string;
     fullName: string;
     department: { code: string; name: string } | null;
+    unplaced: boolean;
     jobTitle: string | null;
   };
   /** The roles granted to the account and still in force (US-01-01 AC-17). */

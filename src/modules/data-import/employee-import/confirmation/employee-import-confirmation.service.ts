@@ -98,13 +98,16 @@ export class EmployeeImportConfirmationService {
 
       const { existingSame, existingDifferent, errors } = outcomeCounts(fresh);
       const result: ImportResult = {
+        newUnplaced: createdByDepartment.get('') ?? 0,
         created: [...createdByDepartment.values()].reduce((sum, count) => sum + count, 0),
         existingSame,
         existingDifferent,
         errors,
-        createdByDepartment: [...createdByDepartment].map(([departmentCode, count]) => ({ departmentCode, count })),
+        createdByDepartment: [...createdByDepartment]
+          .filter(([code]) => code !== '')
+          .map(([departmentCode, count]) => ({ departmentCode, count })),
         departmentsWithoutHead: await this.rowValidation.departmentsWithoutHead(before, [
-          ...createdByDepartment.keys(),
+          ...[...createdByDepartment.keys()].filter(Boolean),
         ]),
       };
       await this.repo.markCompleted(tx, id, { result, confirmKey: input.idempotencyKey, now: new Date() });
@@ -170,12 +173,14 @@ export class EmployeeImportConfirmationService {
             jobTitle: row.parsed.jobTitleName,
           }),
         );
-        const notices = await this.organizationReads.getProfileNotices(tx, {
-          kind: 'CREATED',
-          organizationId,
-          employeeId,
-          onDate: today,
-        });
+        const notices = row.parsed.departmentId
+          ? await this.organizationReads.getProfileNotices(tx, {
+              kind: 'CREATED',
+              organizationId,
+              employeeId,
+              onDate: today,
+            })
+          : [];
         for (const notice of notices) await this.notifications.notifyInApp(tx, notice);
       } catch (error) {
         // Someone entered the same code or email between the judgement and the write: the preview is stale.

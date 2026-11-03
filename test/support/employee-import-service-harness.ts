@@ -214,6 +214,9 @@ export function harness(start: Directory = directory()) {
       calls.push('org.getOrganization');
       return Promise.resolve(organization);
     },
+    unplacedAmong() {
+      return Promise.resolve(new Set<string>());
+    },
     lookupForEmployeeImport(names: Parameters<OrganizationReadApi['lookupForEmployeeImport']>[0], tx?: DbTx) {
       calls.push(`org.lookupForEmployeeImport(${where(tx)})`);
       lookups.push(clone(names));

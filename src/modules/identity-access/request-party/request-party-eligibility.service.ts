@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccountRecordService } from '../accounts/account-record.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
 import { RequestPartyIneligibleError } from '../public/request-party.errors';
@@ -17,6 +18,7 @@ export class RequestPartyEligibilityService {
   constructor(
     private readonly accounts: AccountRecordService,
     private readonly grants: RoleGrantService,
+    private readonly organization: OrganizationReadApi,
   ) {}
 
   async assertEligible(tx: DbTx, parties: RequestParties): Promise<void> {
@@ -26,7 +28,7 @@ export class RequestPartyEligibilityService {
   }
 
   blockOf(parties: RequestParties, tx?: DbTx): Promise<RequestPartyBlock | null> {
-    return this.unlockedFacts(tx).then((facts) => requestPartyBlock(parties, facts));
+    return this.unlockedFacts(peopleOf(parties), tx).then((facts) => requestPartyBlock(parties, facts));
   }
 
   async ineligibleAmong(
@@ -37,7 +39,7 @@ export class RequestPartyEligibilityService {
     const facts =
       options?.lockForShare && tx !== undefined
         ? await this.lockedFacts(tx, employeeIds)
-        : await this.unlockedFacts(tx);
+        : await this.unlockedFacts(employeeIds, tx);
 
     return ineligibleReasons(employeeIds, facts);
   }
@@ -48,13 +50,13 @@ export class RequestPartyEligibilityService {
       [...new Set(employeeIds)].sort(),
     );
 
-    return { spendingApproverEmployeeId, unplacedEmployeeIds: new Set() };
+    return { spendingApproverEmployeeId, unplacedEmployeeIds: await this.organization.unplacedAmong(employeeIds, tx) };
   }
 
-  private async unlockedFacts(tx?: DbTx): Promise<RequestPartyFacts> {
+  private async unlockedFacts(employeeIds: readonly string[], tx?: DbTx): Promise<RequestPartyFacts> {
     return {
       spendingApproverEmployeeId: await this.grants.spendingApproverEmployeeId(tx),
-      unplacedEmployeeIds: new Set(),
+      unplacedEmployeeIds: await this.organization.unplacedAmong(employeeIds, tx),
     };
   }
 }

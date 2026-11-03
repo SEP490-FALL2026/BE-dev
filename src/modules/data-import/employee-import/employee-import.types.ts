@@ -4,6 +4,7 @@ export type ImportStatus = 'PREVIEW' | 'COMPLETED' | 'CANCELLED';
 export interface ImportSummary {
   totalRows: number;
   valid: number;
+  newUnplaced: number;
   errors: number;
   existingSame: number;
   existingDifferent: number;
@@ -23,6 +24,7 @@ export interface ImportSummary {
 /** What a confirmation wrote. */
 export interface ImportResult {
   created: number;
+  newUnplaced: number;
   existingSame: number;
   existingDifferent: number;
   errors: number;

@@ -41,7 +41,7 @@ const lookup = (overrides: Partial<EmployeeImportLookup> = {}): EmployeeImportLo
 });
 
 const row = (overrides: Record<string, string> = {}) => ({
-  employee_code: 'E1',
+  employee_code: 'E01',
   full_name: 'Nguyễn Văn A',
   work_email: 'a@acme.vn',
   employment_type: 'STAFF',
@@ -79,7 +79,7 @@ describe('mapEmployeeColumns (US-02-02 AC-2)', () => {
   it('names the columns that are missing: without a department the whole file is unusable, and the job title is optional (QĐ-87e)', () => {
     const mapped = mapEmployeeColumns(['employee_code', 'full_name', 'employment_type', 'hire_date', 'work_email']);
 
-    expect(mapped.missing).toEqual(['department_code']);
+    expect(mapped.missing).toEqual([]);
   });
 
   it('lets the work email and the job title columns be absent, and lists the columns it does not know instead of using them', () => {
@@ -124,7 +124,7 @@ describe('EmployeeRowClassifier', () => {
       outcome: 'VALID',
       errors: [],
       parsed: {
-        employeeCode: 'E1',
+        employeeCode: 'E01',
         fullName: 'Nguyễn Văn A',
         workEmail: 'a@acme.vn',
         employmentType: 'STAFF',
@@ -169,7 +169,6 @@ describe('EmployeeRowClassifier', () => {
     ['hire_date', '2026-02-30', 'HIRE_DATE_INVALID'],
     ['hire_date', '', 'HIRE_DATE_INVALID'],
     ['work_email', 'not-an-email', 'WORK_EMAIL_INVALID'],
-    ['department_code', '', 'DEPARTMENT_REQUIRED'],
     ['department_code', 'P-XYZ', 'DEPARTMENT_NOT_FOUND'],
     ['department_code', 'P-OLD', 'DEPARTMENT_INACTIVE'],
     ['job_title', 'x'.repeat(256), 'JOB_TITLE_TOO_LONG'],
@@ -187,7 +186,6 @@ describe('EmployeeRowClassifier', () => {
 
     expect(result.errors).toEqual([
       { column: 'hire_date', code: 'HIRE_DATE_INVALID' },
-      { column: 'department_code', code: 'DEPARTMENT_REQUIRED' },
       { column: 'job_title', code: 'JOB_TITLE_TOO_LONG' },
     ]);
   });
@@ -215,14 +213,14 @@ describe('EmployeeRowClassifier', () => {
 
     classifier.classify(row());
     const sameCode = classifier.classify(row({ work_email: 'other@acme.vn' }));
-    const sameEmail = classifier.classify(row({ employee_code: 'E2', work_email: 'A+figma@ACME.vn' }));
+    const sameEmail = classifier.classify(row({ employee_code: 'E02', work_email: 'A+figma@ACME.vn' }));
 
     expect(sameCode.errors).toEqual([{ column: 'employee_code', code: 'EMPLOYEE_CODE_DUPLICATE_IN_FILE' }]);
     expect(sameEmail.errors).toEqual([{ column: 'work_email', code: 'WORK_EMAIL_DUPLICATE_IN_FILE' }]);
   });
 
   it('refuses an email that another person of the company already has', () => {
-    const result = new EmployeeRowClassifier(lookup({ emailOwners: new Map([['a@acme.vn', 'E9']]) })).classify(row());
+    const result = new EmployeeRowClassifier(lookup({ emailOwners: new Map([['a@acme.vn', 'E09']]) })).classify(row());
 
     expect(result.errors).toEqual([{ column: 'work_email', code: 'WORK_EMAIL_TAKEN' }]);
   });
@@ -230,7 +228,7 @@ describe('EmployeeRowClassifier', () => {
   describe('a person who is already there (US-02-02 AC-6, AC-10)', () => {
     const existing: ExistingEmployee = {
       id: 'e-1',
-      employeeCode: 'E1',
+      employeeCode: 'E01',
       fullName: 'Nguyễn Văn A',
       workEmail: 'a@acme.vn',
       employmentType: 'STAFF',
@@ -238,7 +236,7 @@ describe('EmployeeRowClassifier', () => {
       departmentCode: 'P-DES',
       jobTitleName: 'Designer',
     };
-    const withExisting = () => lookup({ existing: new Map([['E1', existing]]) });
+    const withExisting = () => lookup({ existing: new Map([['E01', existing]]) });
 
     it('is skipped as the same when all six columns agree, whatever the case or spaces of the text', () => {
       const result = new EmployeeRowClassifier(withExisting()).classify(
@@ -269,7 +267,7 @@ describe('EmployeeRowClassifier', () => {
 
     it('is never an error because its job title was retired, nor because the department is not known (it is only compared)', () => {
       const retired = lookup({
-        existing: new Map([['E1', { ...existing, jobTitleName: 'Intern' }]]),
+        existing: new Map([['E01', { ...existing, jobTitleName: 'Intern' }]]),
       });
 
       const result = new EmployeeRowClassifier(retired).classify(
@@ -322,11 +320,11 @@ describe('judging the rows of a preview again (US-02-01 AC-9)', () => {
     const lookup = toEmployeeImportLookup({
       departments: [{ id: 'd1', code: 'P-OPS', active: true }],
       employees: [],
-      emailOwners: [{ normalizedEmail: 'a@acme.vn', employeeCode: 'E1' }],
+      emailOwners: [{ normalizedEmail: 'a@acme.vn', employeeCode: 'E01' }],
     });
 
     expect(lookup.departments.get('P-OPS')?.id).toBe('d1');
-    expect(lookup.emailOwners.get('a@acme.vn')).toBe('E1');
+    expect(lookup.emailOwners.get('a@acme.vn')).toBe('E01');
   });
 
   it('locks only what the valid rows use, each once', () => {

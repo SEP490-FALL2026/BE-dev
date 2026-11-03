@@ -103,6 +103,7 @@ const candidatesSchema = z.strictObject({
       fullName: z.string(),
       workEmail: z.string().nullable(),
       department: z.string().nullable(),
+      unplaced: z.boolean(),
     }),
   ),
 });

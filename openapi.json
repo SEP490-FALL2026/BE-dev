@@ -361,6 +361,313 @@
         "tags": ["audit"]
       }
     },
+    "/api/v1/employees/{id}/first-placements": {
+      "post": {
+        "operationId": "employeeFirstPlacement",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FirstPlacementBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/EmployeeResponseDto" },
+                    { "properties": { "message": { "example": "EMPLOYEE.FIRST_PLACED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only SUPER_ADMIN may place employees.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Employee or department not found.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "EMPLOYEE.NOT_FOUND": {
+                    "summary": "Employee not found: <employee-id>",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_FOUND",
+                        "message": "Employee not found: <employee-id>",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.NOT_FOUND": {
+                    "summary": "Department not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.NOT_FOUND",
+                        "message": "Department not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "EMPLOYEE.ALREADY_PLACED, EMPLOYEE.EMPLOYEE_INACTIVE or DEPARTMENT.INACTIVE.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "EMPLOYEE.ALREADY_PLACED": {
+                    "summary": "Nhân viên đã được xếp phòng; đổi phòng dùng điều chuyển.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.ALREADY_PLACED",
+                        "message": "Nhân viên đã được xếp phòng; đổi phòng dùng điều chuyển.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.EMPLOYEE_INACTIVE": {
+                    "summary": "Employee must be active and not handing over.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.EMPLOYEE_INACTIVE",
+                        "message": "Employee must be active and not handing over.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.INACTIVE": {
+                    "summary": "The department is no longer in use.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.INACTIVE",
+                        "message": "The department is no longer in use.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid date or body.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.DATE_INVALID": {
+                    "summary": "Effective date must be on or after today and hire date.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.DATE_INVALID",
+                        "message": "Effective date must be on or after today and hire date.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Place an employee for the first time",
+        "tags": ["employees"]
+      }
+    },
     "/api/v1/employees": {
       "post": {
         "operationId": "employeeCreate",
@@ -518,12 +825,12 @@
                     }
                   },
                   "EMPLOYEE.ROW_INVALID": {
-                    "summary": "The employee row is not valid.",
+                    "summary": "The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "EMPLOYEE.ROW_INVALID",
-                        "message": "The employee row is not valid.",
+                        "message": "The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.",
                         "details": { "reasons": [{ "field": "employeeCode", "code": "EMPLOYEE_CODE_TAKEN" }] },
                         "requestId": "req_example"
                       }
@@ -783,12 +1090,12 @@
                     }
                   },
                   "EMPLOYEE.ROW_INVALID": {
-                    "summary": "The employee row is not valid.",
+                    "summary": "The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "EMPLOYEE.ROW_INVALID",
-                        "message": "The employee row is not valid.",
+                        "message": "The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.",
                         "details": { "reasons": [{ "field": "workEmail", "code": "WORK_EMAIL_TAKEN" }] },
                         "requestId": "req_example"
                       }
@@ -62293,7 +62600,7 @@
         },
         "responses": {
           "201": {
-            "description": "The file was read and every row judged: nothing is written yet. The summary says how many rows are valid, wrong, there already, and the people by department.",
+            "description": "The CSV or XLSX file was read and every row judged: nothing is written yet. The summary says how many rows are valid, wrong, there already, and the people by department.",
             "content": {
               "application/json": {
                 "schema": {
@@ -62401,7 +62708,7 @@
             }
           },
           "422": {
-            "description": "The file cannot be used as a whole: missing, empty, not text, unreadable, too many rows, or lacking a required column such as the department (IMPORT.FILE_*); the job title column is optional.",
+            "description": "The file cannot be used as a whole: missing, unsupported, empty, unreadable, too many rows, or lacking a required column (IMPORT.FILE_*). Department and job title are optional for employees.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -62413,6 +62720,18 @@
                       "error": {
                         "code": "IMPORT.FILE_REQUIRED",
                         "message": "The file cannot be imported: FILE_REQUIRED.",
+                        "details": {},
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "IMPORT.FILE_FORMAT_UNSUPPORTED": {
+                    "summary": "The file cannot be imported: FILE_FORMAT_UNSUPPORTED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IMPORT.FILE_FORMAT_UNSUPPORTED",
+                        "message": "The file cannot be imported: FILE_FORMAT_UNSUPPORTED.",
                         "details": {},
                         "requestId": "req_example"
                       }
@@ -63299,6 +63618,7 @@
                         "details": {
                           "result": {
                             "created": 1,
+                            "newUnplaced": 0,
                             "existingSame": 0,
                             "existingDifferent": 0,
                             "errors": 0,
@@ -70578,28 +70898,17 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
-      "CreateEmployeeBodyDto": {
+      "FirstPlacementBodyDto": {
         "type": "object",
         "properties": {
-          "employeeCode": { "type": "string", "minLength": 1, "maxLength": 50 },
-          "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "workEmail": {
-            "format": "email",
-            "description": "An email address; surrounding whitespace is trimmed before it is checked. The part before any +tag must not be empty: an address that cannot be normalized for matching is refused.",
-            "type": "string",
-            "maxLength": 254,
-            "nullable": true
-          },
-          "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
-          "hireDate": {
+          "departmentId": { "type": "string", "format": "uuid" },
+          "effectiveFrom": {
             "type": "string",
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-          },
-          "departmentCode": { "type": "string", "maxLength": 50, "nullable": true },
-          "jobTitle": { "type": "string", "maxLength": 1000, "nullable": true }
+          }
         },
-        "required": ["employeeCode", "fullName", "employmentType", "hireDate"],
+        "required": ["departmentId", "effectiveFrom"],
         "additionalProperties": false
       },
       "EmployeeResponseDto": {
@@ -70617,8 +70926,8 @@
               "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
               "hireDate": { "type": "string" },
               "status": { "type": "string", "enum": ["ACTIVE"] },
-              "workState": { "type": "string", "enum": ["WORKING"] },
-              "memberSince": { "type": "string" },
+              "workState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE", "HANDING_OVER", "LEFT"] },
+              "memberSince": { "type": "string", "nullable": true },
               "department": {
                 "type": "object",
                 "properties": {
@@ -70627,8 +70936,10 @@
                   "name": { "type": "string" }
                 },
                 "required": ["id", "code", "name"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "nullable": true
               },
+              "unplaced": { "type": "boolean" },
               "jobTitle": { "type": "string", "nullable": true }
             },
             "required": [
@@ -70642,6 +70953,7 @@
               "workState",
               "memberSince",
               "department",
+              "unplaced",
               "jobTitle"
             ],
             "additionalProperties": false,
@@ -70649,6 +70961,43 @@
           }
         },
         "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "CreateEmployeeBodyDto": {
+        "type": "object",
+        "properties": {
+          "employeeCode": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 20,
+            "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$",
+            "description": "3 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. NV-0001."
+          },
+          "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "workEmail": {
+            "format": "email",
+            "description": "An email address; surrounding whitespace is trimmed before it is checked. The part before any +tag must not be empty: an address that cannot be normalized for matching is refused.",
+            "type": "string",
+            "maxLength": 254,
+            "nullable": true
+          },
+          "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
+          "hireDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "departmentCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 20,
+            "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$",
+            "description": "2 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. P-ENG.",
+            "nullable": true
+          },
+          "jobTitle": { "type": "string", "maxLength": 1000, "nullable": true }
+        },
+        "required": ["employeeCode", "fullName", "employmentType", "hireDate"],
         "additionalProperties": false
       },
       "UpdateEmployeeBodyDto": {
@@ -71008,7 +71357,13 @@
       "CreateDepartmentBodyDto": {
         "type": "object",
         "properties": {
-          "code": { "type": "string", "minLength": 1, "maxLength": 50, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+          "code": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 20,
+            "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$",
+            "description": "2 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. P-ENG."
+          },
           "name": { "type": "string", "maxLength": 200 },
           "function": { "type": "string", "maxLength": 1000, "nullable": true },
           "itAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true }
@@ -90622,6 +90977,7 @@
               "summary": {
                 "type": "object",
                 "properties": {
+                  "newUnplaced": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "totalRows": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "valid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "errors": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -90687,6 +91043,7 @@
                   }
                 },
                 "required": [
+                  "newUnplaced",
                   "totalRows",
                   "valid",
                   "errors",
@@ -90702,6 +91059,7 @@
               "result": {
                 "type": "object",
                 "properties": {
+                  "newUnplaced": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "created": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "existingSame": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "existingDifferent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -90729,6 +91087,7 @@
                   }
                 },
                 "required": [
+                  "newUnplaced",
                   "created",
                   "existingSame",
                   "existingDifferent",
@@ -90779,6 +91138,11 @@
                   "properties": {
                     "line": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
                     "outcome": { "type": "string", "enum": ["VALID", "ERROR", "EXISTS_SAME", "EXISTS_DIFFERENT"] },
+                    "unplaced": {
+                      "description": "Whether a valid new row has no department or an existing employee has no placement; null for an invalid row.",
+                      "type": "boolean",
+                      "nullable": true
+                    },
                     "cells": { "type": "object", "additionalProperties": { "type": "string" } },
                     "errors": {
                       "type": "array",
@@ -90804,7 +91168,7 @@
                       "nullable": true
                     }
                   },
-                  "required": ["line", "outcome", "cells", "errors", "differences"],
+                  "required": ["line", "outcome", "unplaced", "cells", "errors", "differences"],
                   "additionalProperties": false
                 }
               },
@@ -90868,6 +91232,7 @@
                   "summary": {
                     "type": "object",
                     "properties": {
+                      "newUnplaced": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "totalRows": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "valid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "errors": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -90933,6 +91298,7 @@
                       }
                     },
                     "required": [
+                      "newUnplaced",
                       "totalRows",
                       "valid",
                       "errors",
@@ -90948,6 +91314,7 @@
                   "result": {
                     "type": "object",
                     "properties": {
+                      "newUnplaced": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "created": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "existingSame": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "existingDifferent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -90975,6 +91342,7 @@
                       }
                     },
                     "required": [
+                      "newUnplaced",
                       "created",
                       "existingSame",
                       "existingDifferent",
@@ -91840,9 +92208,10 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "unplaced": { "type": "boolean" },
                   "jobTitle": { "type": "string", "nullable": true }
                 },
-                "required": ["id", "employeeCode", "fullName", "department", "jobTitle"],
+                "required": ["id", "employeeCode", "fullName", "department", "unplaced", "jobTitle"],
                 "additionalProperties": false
               },
               "roles": {
@@ -91915,9 +92284,10 @@
                     "employeeCode": { "type": "string" },
                     "fullName": { "type": "string" },
                     "workEmail": { "type": "string", "nullable": true },
-                    "department": { "type": "string", "nullable": true }
+                    "department": { "type": "string", "nullable": true },
+                    "unplaced": { "type": "boolean" }
                   },
-                  "required": ["id", "employeeCode", "fullName", "workEmail", "department"],
+                  "required": ["id", "employeeCode", "fullName", "workEmail", "department", "unplaced"],
                   "additionalProperties": false
                 }
               }

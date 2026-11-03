@@ -4,6 +4,7 @@ import type { ImportSummary } from './employee-import.types';
 
 const summary: ImportSummary = {
   totalRows: 12,
+  newUnplaced: 0,
   valid: 9,
   errors: 1,
   existingSame: 1,
@@ -46,6 +47,7 @@ describe('employeeImportSummaryJson (employee_imports.summary)', () => {
   it('writes the summary as it has always been written: the object itself, key for key', () => {
     expect(employeeImportSummaryJson.encode(summary)).toEqual({
       totalRows: 12,
+      newUnplaced: 0,
       valid: 9,
       errors: 1,
       existingSame: 1,

@@ -5,6 +5,7 @@ import type { ImportResult } from './employee-import.types';
 
 const result: ImportResult = {
   created: 9,
+  newUnplaced: 0,
   existingSame: 1,
   existingDifferent: 1,
   errors: 1,
@@ -31,6 +32,7 @@ describe('employeeImportResultJson (employee_imports.result)', () => {
   it('writes the result as it has always been written: the object itself, key for key; no result is the database NULL', () => {
     expect(employeeImportResultJson.encode(result)).toEqual({
       created: 9,
+      newUnplaced: 0,
       existingSame: 1,
       existingDifferent: 1,
       errors: 1,

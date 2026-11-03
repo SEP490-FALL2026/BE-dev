@@ -1,3 +1,4 @@
+import { isEmployeeCodeValid, isDepartmentCodeValid } from '../public/organization-code.policy';
 import { normalizeDisplayName } from '../../../core/display-name';
 import {
   PlacementReasonCode,
@@ -9,6 +10,8 @@ import {
 /** The shared placement reasons, then the two keys the form checks against the people already there. */
 export type EmployeeRowReasonCode =
   | PlacementReasonCode
+  | 'EMPLOYEE_CODE_INVALID'
+  | 'DEPARTMENT_CODE_INVALID'
   | 'EMPLOYEE_CODE_TAKEN'
   | 'WORK_EMAIL_TAKEN'
   /** The code or the email is the record of the person entering: nobody enters their own (`US-02-02` AC-18). */
@@ -50,7 +53,7 @@ const isBlank = (value: string | null | undefined): boolean =>
  * fixed order, so one attempt shows everything to fix. It decides from what the caller looked up and nothing else.
  */
 export function validateEmployeeRow(
-  row: { departmentCode?: string | null; jobTitle?: string | null },
+  row: { employeeCode?: string; departmentCode?: string | null; jobTitle?: string | null },
   lookup: EmployeeRowLookup,
 ): EmployeeRowReason[] {
   const reasons: EmployeeRowReason[] = placementReasons({
@@ -58,6 +61,13 @@ export function validateEmployeeRow(
     jobTitle: { tooLong: isJobTitleTooLong(normalizeDisplayName(row.jobTitle ?? '')) },
   }).map(({ subject, code }) => ({ field: FORM_FIELD[subject], code }));
 
+  if (row.employeeCode !== undefined && !isEmployeeCodeValid(row.employeeCode))
+    reasons.push({ field: 'employeeCode', code: 'EMPLOYEE_CODE_INVALID' });
+  if (!isBlank(row.departmentCode) && !isDepartmentCodeValid(row.departmentCode!.trim().toUpperCase())) {
+    const index = reasons.findIndex((reason) => reason.field === 'departmentCode');
+    if (index >= 0) reasons.splice(index, 1);
+    reasons.unshift({ field: 'departmentCode', code: 'DEPARTMENT_CODE_INVALID' });
+  }
   if (lookup.ownCode) reasons.push({ field: 'employeeCode', code: 'OWN_RECORD' });
   else if (lookup.employeeCodeTaken) reasons.push({ field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' });
   if (lookup.ownEmail) reasons.push({ field: 'workEmail', code: 'OWN_RECORD' });

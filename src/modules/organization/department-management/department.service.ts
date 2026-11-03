@@ -10,6 +10,7 @@ import { DepartmentUseService } from '../department/department-use.service';
 import { DepartmentServiceAccountReaderHook } from '../public/organization.extension-points';
 import { EmployeeAccountsHook } from '../public/organization.extension-points';
 import {
+  DepartmentCodeInvalidError,
   DepartmentInUseError,
   DepartmentInactiveError,
   DepartmentItAdminInvalidError,
@@ -20,6 +21,7 @@ import {
 import { lockAndReadEmployee, requireOrganization } from './department-facts.service';
 import { assertMayChangeOrganization } from '../department/department.policy';
 import { DepartmentRepo } from '../department/department.repo';
+import { isDepartmentCodeValid } from '../public/organization-code.policy';
 import { DEPARTMENT_NAME_MAX_LENGTH } from '../department/department.types';
 
 /** How many of each kind of thing that still keeps the department in use the refusal to retire it lists. */
@@ -69,8 +71,9 @@ export class DepartmentService {
     assertMayChangeOrganization(actor.roles);
     const name = this.requireName(input.name);
     const functionDescription = normalizeFunction(input.functionDescription);
+    const code = input.code.trim().toUpperCase();
+    if (!isDepartmentCodeValid(code)) throw new DepartmentCodeInvalidError();
     const organization = await requireOrganization(this.context);
-    const code = input.code.trim();
 
     return this.runner.run(async (tx) => {
       if (input.itAdminEmployeeId) await this.assertUsableItAdmin(tx, input.itAdminEmployeeId);

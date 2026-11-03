@@ -33,7 +33,21 @@ export class EmployeeUpdateEmptyError extends Error {
 /** A row cannot become an employee; carries every reason at once. */
 export class EmployeeRowInvalidError extends Error {
   constructor(readonly reasons: { field: string; code: string }[]) {
-    super('The employee row is not valid.');
+    super(
+      'The employee row is not valid. Codes must use uppercase letters or digits in groups separated by single hyphens; employee codes have 3 to 20 characters and department codes 2 to 20.',
+    );
     this.name = 'EmployeeRowInvalidError';
+  }
+}
+export class FirstPlacementError extends Error {
+  constructor(readonly problem: 'ALREADY_PLACED' | 'EMPLOYEE_INACTIVE' | 'DATE_INVALID') {
+    super(
+      problem === 'ALREADY_PLACED'
+        ? 'Nhân viên đã được xếp phòng; đổi phòng dùng điều chuyển.'
+        : problem === 'DATE_INVALID'
+          ? 'Effective date must be on or after today and hire date.'
+          : 'Employee must be active and not handing over.',
+    );
+    this.name = 'FirstPlacementError';
   }
 }

@@ -47,6 +47,10 @@ export class OrganizationReadApi {
     private readonly context: OrganizationContextService,
   ) {}
 
+  unplacedAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.employees.unplacedAmong(employeeIds, tx);
+  }
+
   /** Today in the organization's own calendar (`now` is a parameter for tests; `tx` reads the zone in the caller's transaction). */
   businessToday(now: Date = new Date(), tx?: DbTx): Promise<BusinessDate> {
     return this.context.businessToday(now, tx);

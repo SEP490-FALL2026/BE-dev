@@ -6,6 +6,7 @@ import {
   isJobTitleTooLong,
   placementReasons,
 } from '../../../organization/public/employee-placement.policy';
+import { isEmployeeCodeValid, isDepartmentCodeValid } from '../../../organization/public/organization-code.policy';
 import type { EmployeeImportLookupData } from '../../../organization/public/organization.types';
 import {
   EMPLOYEE_COLUMNS,
@@ -20,7 +21,7 @@ import {
  * Without these the file cannot become people (US-02-02 AC-2); the work email and the job title may be left out of the file: the
  * title is optional free text (`QĐ-87e`) and a row without one is a person like any other.
  */
-const OPTIONAL_COLUMNS: readonly EmployeeColumn[] = ['work_email', 'job_title'];
+const OPTIONAL_COLUMNS: readonly EmployeeColumn[] = ['work_email', 'job_title', 'department_code'];
 const REQUIRED_COLUMNS: readonly EmployeeColumn[] = EMPLOYEE_COLUMNS.filter(
   (column) => !OPTIONAL_COLUMNS.includes(column),
 );
@@ -101,7 +102,7 @@ export interface ParsedEmployeeRow {
   departmentCode: string;
   /** The free-text title of the row, or null when the cell is blank. */
   jobTitleName: string | null;
-  departmentId: string;
+  departmentId: string | null;
 }
 
 export interface EmployeeRowResult {
@@ -140,12 +141,12 @@ interface RowText {
 
 function readRow(cells: EmployeeCells): RowText {
   return {
-    code: clean(cells.employee_code),
+    code: clean(cells.employee_code).toUpperCase(),
     fullName: clean(cells.full_name),
     emailText: clean(cells.work_email),
     typeText: clean(cells.employment_type).toUpperCase(),
     hireDate: clean(cells.hire_date),
-    departmentCode: clean(cells.department_code),
+    departmentCode: clean(cells.department_code).toUpperCase(),
     jobTitleText: clean(cells.job_title),
   };
 }
@@ -174,14 +175,21 @@ function typeAndDateIssues(row: RowText): RowIssue[] {
 
 /** Only a person to create is placed; the placement reasons come after this file's own. */
 function placementIssues(row: RowText, department: { id: string; active: boolean } | undefined): RowIssue[] {
+  const invalid = row.departmentCode !== '' && !isDepartmentCodeValid(row.departmentCode);
   return placementReasons({
-    department: { named: row.departmentCode !== '', found: department ?? null },
+    department: invalid ? undefined : { named: row.departmentCode !== '', found: department ?? null },
     jobTitle: { tooLong: isJobTitleTooLong(row.jobTitleText) },
   }).map(({ subject, code }) => ({ column: FILE_COLUMN[subject], code }));
 }
 
+function departmentCodeIssues(code: string): RowIssue[] {
+  return code !== '' && !isDepartmentCodeValid(code)
+    ? [{ column: 'department_code', code: 'DEPARTMENT_CODE_INVALID' }]
+    : [];
+}
+
 /** The person a valid row creates. */
-function parsedRow(row: RowText, departmentId: string): ParsedEmployeeRow {
+function parsedRow(row: RowText, departmentId: string | null): ParsedEmployeeRow {
   return {
     employeeCode: row.code,
     fullName: row.fullName,
@@ -219,22 +227,28 @@ export class EmployeeRowClassifier {
       ...typeAndDateIssues(row),
     );
 
+    errors.push(...departmentCodeIssues(row.departmentCode));
     if (existing !== undefined) {
       if (errors.length > 0) return { outcome: 'ERROR', errors };
 
-      return this.compare(existing, { ...row, normalizedEmail: email.normalizedEmail });
+      return this.compare(existing, {
+        ...row,
+        departmentCode: departmentForComparison(cells, row),
+        normalizedEmail: email.normalizedEmail,
+      });
     }
 
     const department = row.departmentCode === '' ? undefined : this.lookup.departments.get(row.departmentCode);
     errors.push(...placementIssues(row, department));
-    if (errors.length > 0 || !department) return { outcome: 'ERROR', errors };
+    if (errors.length > 0 || (row.departmentCode !== '' && !department)) return { outcome: 'ERROR', errors };
 
-    return { outcome: 'VALID', errors: [], parsed: parsedRow(row, department.id) };
+    return { outcome: 'VALID', errors: [], parsed: parsedRow(row, department?.id ?? null) };
   }
 
   /** The employee code: given, and once in the file. */
   private codeIssues(code: string): RowIssue[] {
     if (code === '') return [{ column: 'employee_code', code: 'EMPLOYEE_CODE_REQUIRED' }];
+    if (!isEmployeeCodeValid(code)) return [{ column: 'employee_code', code: 'EMPLOYEE_CODE_INVALID' }];
     const issues: RowIssue[] = this.seenCodes.has(code)
       ? [{ column: 'employee_code', code: 'EMPLOYEE_CODE_DUPLICATE_IN_FILE' }]
       : [];
@@ -276,7 +290,7 @@ export class EmployeeRowClassifier {
       normalizedEmail: string | null;
       typeText: string;
       hireDate: string;
-      departmentCode: string;
+      departmentCode: string | null;
       jobTitleText: string;
     },
   ): EmployeeRowResult {
@@ -292,9 +306,7 @@ export class EmployeeRowClassifier {
     if (existing.employmentType !== incoming.typeText)
       add('employment_type', existing.employmentType, incoming.typeText);
     if (existing.hireDate !== incoming.hireDate) add('hire_date', existing.hireDate, incoming.hireDate);
-    if ((existing.departmentCode ?? '') !== incoming.departmentCode) {
-      add('department_code', existing.departmentCode ?? '', incoming.departmentCode);
-    }
+    differences.push(...departmentDifferences(existing.departmentCode, incoming.departmentCode));
     if (jobTitleKey(existing.jobTitleName ?? '') !== jobTitleKey(incoming.jobTitleText)) {
       add('job_title', existing.jobTitleName ?? '', incoming.jobTitleText);
     }
@@ -303,6 +315,15 @@ export class EmployeeRowClassifier {
       ? { outcome: 'EXISTS_SAME', errors: [] }
       : { outcome: 'EXISTS_DIFFERENT', errors: [], differences };
   }
+}
+
+function departmentForComparison(cells: EmployeeCells, row: RowText): string | null {
+  return cells.department_code === undefined ? null : row.departmentCode;
+}
+
+function departmentDifferences(current: string | null, incoming: string | null): RowDifference[] {
+  if (incoming === null || (current ?? '') === incoming) return [];
+  return [{ column: 'department_code', current: current ?? '', incoming }];
 }
 
 function safeNormalize(email: string): string | null {
@@ -326,8 +347,8 @@ export function lookupNamesOf(rows: readonly { cells: EmployeeCells }[]): {
   const unique = (values: string[]) => [...new Set(values.filter((value) => value !== ''))];
 
   return {
-    departmentCodes: unique(cells.map((cell) => clean(cell.department_code))),
-    employeeCodes: unique(cells.map((cell) => clean(cell.employee_code))),
+    departmentCodes: unique(cells.map((cell) => clean(cell.department_code).toUpperCase())),
+    employeeCodes: unique(cells.map((cell) => clean(cell.employee_code).toUpperCase())),
     normalizedEmails: unique(cells.map((cell) => safeNormalize(clean(cell.work_email)) ?? '')),
   };
 }
@@ -359,7 +380,7 @@ export function idsUsedByValidRows(
   const departmentIds = new Set<string>();
   for (const row of rows) {
     if (row.outcome !== 'VALID') continue;
-    const department = lookup.departments.get(clean(row.cells.department_code));
+    const department = lookup.departments.get(clean(row.cells.department_code).toUpperCase());
     if (department) departmentIds.add(department.id);
   }
 

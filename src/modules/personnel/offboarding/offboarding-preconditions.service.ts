@@ -69,6 +69,8 @@ export class OffboardingPreconditions {
     const person = await this.organizationReads.getEmployee(input.employeeId, tx);
     const refused = subjectRefusal(person, input.lastWorkingDay);
     if (refused) throw new OffboardingRefusedError(refused);
+    if ((await this.organizationReads.unplacedAmong([input.employeeId], tx)).has(input.employeeId))
+      throw new OffboardingRefusedError('EMPLOYEE_UNPLACED');
     const before = await this.history.getPlacementInForce(tx, input.employeeId, today);
     if (!before) throw new OffboardingRefusedError('PLACEMENT_OVERLAP', { reason: 'NO_OPEN_PLACEMENT' });
     const endsOn = departureEffectiveOn({
