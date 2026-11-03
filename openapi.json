@@ -91139,7 +91139,7 @@
                     "line": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
                     "outcome": { "type": "string", "enum": ["VALID", "ERROR", "EXISTS_SAME", "EXISTS_DIFFERENT"] },
                     "unplaced": {
-                      "description": "Whether the employee has no placement; null if an invalid row does not identify an existing employee.",
+                      "description": "Whether a valid new row has no department or an existing employee has no placement; null for an invalid row.",
                       "type": "boolean",
                       "nullable": true
                     },
