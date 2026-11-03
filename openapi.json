@@ -406,6 +406,134 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only SUPER_ADMIN may place employees.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Employee or department not found.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "EMPLOYEE.NOT_FOUND": {
+                    "summary": "Employee not found: <employee-id>",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_FOUND",
+                        "message": "Employee not found: <employee-id>",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.NOT_FOUND": {
+                    "summary": "Department not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.NOT_FOUND",
+                        "message": "Department not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "EMPLOYEE.ALREADY_PLACED, EMPLOYEE.EMPLOYEE_INACTIVE or DEPARTMENT.INACTIVE.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "EMPLOYEE.ALREADY_PLACED": {
+                    "summary": "Nhân viên đã được xếp phòng; đổi phòng dùng điều chuyển.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.ALREADY_PLACED",
+                        "message": "Nhân viên đã được xếp phòng; đổi phòng dùng điều chuyển.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.EMPLOYEE_INACTIVE": {
+                    "summary": "Employee must be active and not handing over.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.EMPLOYEE_INACTIVE",
+                        "message": "Employee must be active and not handing over.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.INACTIVE": {
+                    "summary": "The department is no longer in use.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.INACTIVE",
+                        "message": "The department is no longer in use.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "413": {
             "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
             "content": {
@@ -448,6 +576,39 @@
               }
             }
           },
+          "422": {
+            "description": "Invalid date or body.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.DATE_INVALID": {
+                    "summary": "Effective date must be on or after today and hire date.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.DATE_INVALID",
+                        "message": "Effective date must be on or after today and hire date.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": {
@@ -461,6 +622,38 @@
                       "error": {
                         "code": "HTTP_TOO_MANY_REQUESTS",
                         "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
                         "requestId": "req_example"
                       }
                     }
@@ -62407,7 +62600,7 @@
         },
         "responses": {
           "201": {
-            "description": "The file was read and every row judged: nothing is written yet. The summary says how many rows are valid, wrong, there already, and the people by department.",
+            "description": "The CSV or XLSX file was read and every row judged: nothing is written yet. The summary says how many rows are valid, wrong, there already, and the people by department.",
             "content": {
               "application/json": {
                 "schema": {
@@ -62515,7 +62708,7 @@
             }
           },
           "422": {
-            "description": "The file cannot be used as a whole: missing, empty, not text, unreadable, too many rows, or lacking a required column such as the department (IMPORT.FILE_*); the job title column is optional.",
+            "description": "The file cannot be used as a whole: missing, unsupported, empty, unreadable, too many rows, or lacking a required column (IMPORT.FILE_*). Department and job title are optional for employees.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -62527,6 +62720,18 @@
                       "error": {
                         "code": "IMPORT.FILE_REQUIRED",
                         "message": "The file cannot be imported: FILE_REQUIRED.",
+                        "details": {},
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "IMPORT.FILE_FORMAT_UNSUPPORTED": {
+                    "summary": "The file cannot be imported: FILE_FORMAT_UNSUPPORTED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IMPORT.FILE_FORMAT_UNSUPPORTED",
+                        "message": "The file cannot be imported: FILE_FORMAT_UNSUPPORTED.",
                         "details": {},
                         "requestId": "req_example"
                       }
@@ -70784,8 +70989,8 @@
           },
           "departmentCode": {
             "type": "string",
-            "maxLength": 20,
             "minLength": 2,
+            "maxLength": 20,
             "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$",
             "description": "2 to 20 letters or digits in hyphen-separated groups; normalized to uppercase, e.g. P-ENG.",
             "nullable": true
@@ -92074,9 +92279,10 @@
                     "employeeCode": { "type": "string" },
                     "fullName": { "type": "string" },
                     "workEmail": { "type": "string", "nullable": true },
-                    "department": { "type": "string", "nullable": true }
+                    "department": { "type": "string", "nullable": true },
+                    "unplaced": { "type": "boolean" }
                   },
-                  "required": ["id", "employeeCode", "fullName", "workEmail", "department"],
+                  "required": ["id", "employeeCode", "fullName", "workEmail", "department", "unplaced"],
                   "additionalProperties": false
                 }
               }

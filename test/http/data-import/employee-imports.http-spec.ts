@@ -76,6 +76,15 @@ describe('people import routes (e2e, no database)', () => {
   describe('validation', () => {
     const asIt = () => ({ Authorization: bearer(principal(['SUPER_ADMIN'])) });
 
+    it('refuses legacy Excel files with the format error', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/employee-imports')
+        .set(asIt())
+        .attach('file', Buffer.from('old'), 'people.xls')
+        .expect(422);
+      expect(bodyOf(response).error.code).toBe('IMPORT.FILE_FORMAT_UNSUPPORTED');
+    });
+
     it('turns away an upload with no file, 422 IMPORT.FILE_REQUIRED', async () => {
       const response = await request(app.getHttpServer()).post('/api/v1/employee-imports').set(asIt()).expect(422);
 

@@ -39,6 +39,16 @@ export function readEmployeeFile(bytes: Buffer): { rows: EmployeeFileRow[]; igno
   }
   if (table.length === 0) throw new ImportFileInvalidError('FILE_EMPTY');
 
+  return employeeTableToRows(table);
+}
+
+export function employeeTableToRows(table: { line: number; cells: string[] }[]): {
+  rows: EmployeeFileRow[];
+  ignored: string[];
+} {
+  if (table.length === 0) throw new ImportFileInvalidError('FILE_EMPTY');
+  if (table.length > MAX_DATA_ROWS + 1)
+    throw new ImportFileInvalidError('FILE_TOO_MANY_ROWS', { maxRows: MAX_DATA_ROWS });
   const [header, ...data] = table;
   const columns = mapEmployeeColumns(header.cells);
   if (columns.missing.length > 0) throw new ImportFileMissingColumnsError(columns.missing);

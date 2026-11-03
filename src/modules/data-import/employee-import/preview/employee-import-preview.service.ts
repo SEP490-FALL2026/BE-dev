@@ -15,7 +15,7 @@ import { EmployeeImportRepo, LatestImport, StoredRow } from '../employee-import.
 import { ImportSummary, ImportView } from '../employee-import.types';
 import { clean } from '../row-validation/employee-import-row-validation.policy';
 import { EmployeeImportRowValidationService } from '../row-validation/employee-import-row-validation.service';
-import { readEmployeeFile } from './employee-import-file.policy';
+import { readUploadedEmployeeFile } from './employee-import-xlsx.service';
 import { reviewQueueOf } from './employee-import-review-queue.service';
 
 /** A preview that is not confirmed goes stale on its own after this long. */
@@ -46,10 +46,13 @@ export class EmployeeImportPreviewService {
     return this.repo.findLatestKept((await this.requireOrganization()).id);
   }
 
-  async upload(actor: AuthenticatedPrincipal, file: { fileName: string; bytes: Buffer }): Promise<ImportView> {
+  async upload(
+    actor: AuthenticatedPrincipal,
+    file: { fileName: string; mimeType?: string; bytes: Buffer },
+  ): Promise<ImportView> {
     assertMayImportEmployees(actor.roles);
     const organization = await this.requireOrganization();
-    const { rows, ignored } = readEmployeeFile(file.bytes);
+    const { rows, ignored } = await readUploadedEmployeeFile(file);
     const contentHash = createHash('sha256').update(file.bytes).digest('hex');
     const evaluated = await this.rowValidation.judge(rows, await this.rowValidation.ownRecord(actor.employeeId));
     const duplicate = await this.repo.findCompletedWithContent(organization.id, contentHash);

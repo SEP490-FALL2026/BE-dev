@@ -1,16 +1,16 @@
-﻿employeeCode,fullName,workEmail,employmentType,hireDate,costCenterCode,managerEmployeeCode,departmentLabel
-EMP001,Nguyễn Minh An,an.emp001@example.test,STAFF,2025-01-01,COMPANY,,Ban điều hành
-EMP002,Trần Hoàng Bình,binh.emp002@example.test,STAFF,2025-02-01,ENG,EMP001,Kỹ thuật
-EMP003,Lê Thu Chi,chi.emp003@example.test,STAFF,2025-02-01,FIN,EMP001,Tài chính
-EMP004,Phạm Quốc Dũng,dung.emp004@example.test,STAFF,2025-02-01,PRJ-ALPHA,EMP001,Dự án Alpha
-EMP005,Hoàng Ngọc Hà,ha.emp005@example.test,STAFF,2025-03-01,ENG,EMP002,Kỹ thuật
-EMP006,Vũ Gia Huy,huy.emp006@example.test,STAFF,2025-03-01,ENG,EMP002,Kỹ thuật
-EMP007,Đặng Mai Lan,lan.emp007@example.test,STAFF,2025-04-01,ENG,EMP002,Kỹ thuật
-EMP008,Bùi Đức Long,long.emp008@example.test,STAFF,2025-04-01,ENG,EMP002,Kỹ thuật
-EMP009,Đỗ Bảo Ngọc,ngoc.emp009@example.test,STAFF,2025-05-01,ENG,EMP002,Kỹ thuật
-EMP010,Hồ Thanh Phúc,phuc.emp010@example.test,STAFF,2025-05-01,ENG,EMP002,Kỹ thuật
-EMP011,Ngô Thảo Quyên,quyen.emp011@example.test,STAFF,2025-03-01,FIN,EMP003,Tài chính
-EMP012,Dương Văn Sơn,son.emp012@example.test,STAFF,2025-04-01,FIN,EMP003,Tài chính
-EMP013,Lý Khánh Trang,trang.emp013@example.test,CONTRACTOR,2025-06-01,PRJ-ALPHA,EMP004,Dự án Alpha
-EMP014,Mai Anh Tú,tu.emp014@example.test,FREELANCER,2025-07-01,PRJ-ALPHA,EMP004,Dự án Alpha
-EMP015,Tạ Hải Yến,yen.emp015@example.test,INTERN,2025-08-01,PRJ-ALPHA,EMP004,Dự án Alpha
+employee_code,full_name,work_email,employment_type,hire_date,department_code,job_title
+NV-0001,Employee 01,employee01@example.test,STAFF,2026-01-05,DS1-ENG,Staff
+NV-0002,Employee 02,employee02@example.test,STAFF,2026-01-05,DS1-DES,Staff
+NV-0003,Employee 03,employee03@example.test,STAFF,2026-01-05,,Staff
+NV-0004,Employee 04,employee04@example.test,STAFF,2026-01-05,DS1-ENG,Staff
+NV-0005,Employee 05,employee05@example.test,STAFF,2026-01-05,DS1-DES,Staff
+NV-0006,Employee 06,employee06@example.test,STAFF,2026-01-05,DS1-OPS,Staff
+NV-0007,Employee 07,employee07@example.test,STAFF,2026-01-05,DS1-ENG,Staff
+NV-0008,Employee 08,employee08@example.test,STAFF,2026-01-05,,Staff
+NV-0009,Employee 09,employee09@example.test,STAFF,2026-01-05,DS1-OPS,Staff
+NV-0010,Employee 10,employee10@example.test,STAFF,2026-01-05,DS1-ENG,Staff
+NV-0011,Employee 11,employee11@example.test,STAFF,2026-01-05,DS1-DES,Staff
+NV-0012,Employee 12,employee12@example.test,STAFF,2026-01-05,DS1-OPS,Staff
+NV-0013,Employee 13,employee13@example.test,STAFF,2026-01-05,,Staff
+NV-0014,Employee 14,employee14@example.test,STAFF,2026-01-05,DS1-DES,Staff
+NV-0015,Employee 15,employee15@example.test,STAFF,2026-01-05,DS1-OPS,Staff

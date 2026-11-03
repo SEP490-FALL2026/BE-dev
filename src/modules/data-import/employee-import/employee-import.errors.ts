@@ -11,7 +11,8 @@ export class ImportForbiddenError extends Error {
   }
 }
 
-export type FileProblem = 'FILE_REQUIRED' | 'FILE_NOT_TEXT' | 'FILE_EMPTY' | 'FILE_TOO_MANY_ROWS';
+export type FileProblem =
+  'FILE_REQUIRED' | 'FILE_NOT_TEXT' | 'FILE_EMPTY' | 'FILE_TOO_MANY_ROWS' | 'FILE_FORMAT_UNSUPPORTED';
 
 /** The file cannot be used as a whole (US-02-02 AC-2): nothing was kept. */
 export class ImportFileInvalidError extends Error {

@@ -47,6 +47,7 @@ describe('EmployeeImportPreviewService: upload (H8 Phase 0 characterization)', (
       });
       const summary = {
         totalRows: 5,
+        newUnplaced: 0,
         valid: 2,
         errors: 1,
         existingSame: 1,
@@ -281,7 +282,7 @@ describe('EmployeeImportPreviewService: upload (H8 Phase 0 characterization)', (
         (e) =>
           expect(e).toMatchObject({
             constructor: ImportFileMissingColumnsError,
-            missing: ['employment_type', 'hire_date', 'department_code'],
+            missing: ['employment_type', 'hire_date'],
           }),
       ],
       [

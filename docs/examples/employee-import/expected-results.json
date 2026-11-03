@@ -1,107 +1,20 @@
 {
-  "status": "Proposed contract; fixture checks only, no API execution",
-  "nameSet": "Logical ERD S0 0.9 import_row_results.outcome (W-19, closed 2026-10-05)",
-  "outcomeValues": ["VALID", "ERROR", "DUPLICATE_SKIPPED", "EXISTING_WITH_DIFFERENCES"],
-  "comparedColumns": [
-    "fullName",
-    "workEmail",
-    "employmentType",
-    "hireDate",
-    "costCenterCode",
-    "managerEmployeeCode",
-    "departmentLabel"
-  ],
-  "prerequisites": [
-    {
-      "code": "COMPANY",
-      "type": "COMPANY"
-    },
-    {
-      "code": "ENG",
-      "type": "UNIT"
-    },
-    {
-      "code": "FIN",
-      "type": "UNIT"
-    },
-    {
-      "code": "PRJ-ALPHA",
-      "type": "PROJECT"
-    }
-  ],
-  "employees15": {
-    "initial": {
-      "valid": 15,
-      "error": 0,
-      "duplicateSkipped": 0,
-      "existingWithDifferences": 0
-    },
-    "afterCommit": {
-      "created": 15,
-      "createdAccounts": 0
-    },
-    "repeat": {
-      "valid": 0,
-      "error": 0,
-      "duplicateSkipped": 15,
-      "existingWithDifferences": 0
-    },
-    "types": {
-      "STAFF": 12,
-      "CONTRACTOR": 1,
-      "FREELANCER": 1,
-      "INTERN": 1
-    }
-  },
-  "invalid": {
+  "employee-template": {
+    "totalRows": 1,
     "valid": 1,
-    "error": 5,
-    "rows": [
-      {
-        "line": 2,
-        "code": "BAD001",
-        "outcome": "VALID"
-      },
-      {
-        "line": 3,
-        "code": "BAD002",
-        "outcome": "ERROR",
-        "errorCode": "COST_CENTER_REQUIRED",
-        "errorColumn": "costCenterCode",
-        "reason": "required costCenterCode missing"
-      },
-      {
-        "line": 4,
-        "code": "BAD003",
-        "outcome": "ERROR",
-        "errorCode": "MANAGER_NOT_FOUND",
-        "errorColumn": "managerEmployeeCode",
-        "reason": "manager UNKNOWN does not exist"
-      },
-      {
-        "line": 5,
-        "code": "BAD004",
-        "outcome": "ERROR",
-        "errorCode": "DUPLICATE_WORK_EMAIL",
-        "errorColumn": "workEmail",
-        "reason": "duplicate normalized workEmail; earliest valid row retained"
-      },
-      {
-        "line": 6,
-        "code": "BAD005",
-        "outcome": "ERROR",
-        "errorCode": "MANAGER_CYCLE",
-        "errorColumn": "managerEmployeeCode",
-        "reason": "manager cycle"
-      },
-      {
-        "line": 7,
-        "code": "BAD006",
-        "outcome": "ERROR",
-        "errorCode": "MANAGER_CYCLE",
-        "errorColumn": "managerEmployeeCode",
-        "reason": "manager cycle"
-      }
-    ]
+    "errors": 0,
+    "newUnplaced": 0
+  },
+  "employees-15": {
+    "totalRows": 15,
+    "valid": 15,
+    "errors": 0,
+    "newUnplaced": 3
+  },
+  "employees-invalid": {
+    "totalRows": 8,
+    "valid": 1,
+    "errors": 7,
+    "newUnplaced": 0
   }
 }
