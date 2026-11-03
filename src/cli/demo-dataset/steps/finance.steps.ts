@@ -1,5 +1,6 @@
 import { as, listAll, summarize, yearOf } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
+import type { DemoBudget } from '../fixture/demo-fixture.types';
 
 type Result = { status: StepOutcome['status']; label: string };
 
@@ -78,15 +79,26 @@ interface Row {
 
 type BudgetMove = { done: boolean; action: string | null };
 
+/** The budget of the year of every department of the fixture that has one, each through its whole chain. */
+async function budgets(ctx: DemoRunContext): Promise<StepOutcome> {
+  const results: Result[] = [];
+  for (const plan of ctx.fixture.budgets) {
+    const outcome = await budget(ctx, plan);
+    results.push({ status: outcome.status, label: `${plan.department}: ${outcome.detail}` });
+  }
+
+  return summarize(results);
+}
+
 /**
- * The budget of the year for the demo department, through its whole chain: the head proposes, Finance builds the version
- * from the proposal and sends it, the spending approver approves it. Each turn reads where the chain stands and takes the
- * one next action, so a run stopped half-way goes on from there.
+ * The budget of the year for one department, through its whole chain: the head proposes, Finance builds the version from
+ * the proposal and sends it, the spending approver approves it. Each turn reads where the chain stands and takes the one
+ * next action, so a run stopped half-way goes on from there.
  */
-async function budget(ctx: DemoRunContext): Promise<StepOutcome> {
+async function budget(ctx: DemoRunContext, plan: DemoBudget): Promise<StepOutcome> {
   let moved = false;
   for (let turn = 0; turn < 6; turn++) {
-    const move = await budgetTurn(ctx);
+    const move = await budgetTurn(ctx, plan);
     if (move.done) return { status: moved ? 'done' : 'present', detail: 'ngân sách năm hiện hành đã được duyệt' };
     if (move.action === null)
       return { status: 'conflict', detail: 'chuỗi ngân sách đã đi hướng khác (bị từ chối hoặc trả về)' };
@@ -97,9 +109,8 @@ async function budget(ctx: DemoRunContext): Promise<StepOutcome> {
   return { status: 'conflict', detail: 'chuỗi ngân sách không tới được trạng thái hiện hành' };
 }
 
-async function budgetTurn(ctx: DemoRunContext): Promise<BudgetMove> {
+async function budgetTurn(ctx: DemoRunContext, plan: DemoBudget): Promise<BudgetMove> {
   const { year } = yearOf(ctx);
-  const plan = ctx.fixture.budget;
   const head = ctx.fixture.departments.find((department) => department.code === plan.department)?.head ?? '';
   const headEmail = await as(ctx, head);
   const mine = await ctx.api.call<{ budget: { status: string } }>(headEmail, 'GET', `/budgets/mine?year=${year}`);
@@ -116,7 +127,8 @@ async function budgetTurn(ctx: DemoRunContext): Promise<BudgetMove> {
     (row) => row.costCenter.id === costCenterId,
   );
   const proposal = proposals[0];
-  if (!proposal) return act(ctx, 'trưởng phòng gửi đề xuất', () => propose(ctx, headEmail, costCenterId, year));
+  if (!proposal)
+    return act(ctx, 'trưởng phòng gửi đề xuất', () => propose(ctx, plan, { headEmail, costCenterId, year }));
   if (proposal.state !== 'SUBMITTED') return { done: false, action: null };
 
   return act(ctx, 'Finance lập phiên bản', () =>
@@ -149,13 +161,17 @@ async function act(ctx: DemoRunContext, action: string, write: () => Promise<unk
   return { done: false, action };
 }
 
-function propose(ctx: DemoRunContext, headEmail: string, costCenterId: string, year: number): Promise<unknown> {
+function propose(
+  ctx: DemoRunContext,
+  plan: DemoBudget,
+  to: { headEmail: string; costCenterId: string; year: number },
+): Promise<unknown> {
   const { lastDay } = yearOf(ctx);
 
-  return ctx.api.call(headEmail, 'POST', '/budget-proposals', {
-    costCenterId,
-    year,
-    lines: ctx.fixture.budget.lines.map((line) => ({
+  return ctx.api.call(to.headEmail, 'POST', '/budget-proposals', {
+    costCenterId: to.costCenterId,
+    year: to.year,
+    lines: plan.lines.map((line) => ({
       description: line.description,
       planId: ctx.ids.plans.get(line.plan),
       seats: line.seats,
@@ -178,8 +194,8 @@ export const FINANCE_STEPS: readonly DemoStep[] = [
   },
   {
     key: 'budget.year',
-    title: 'Ngân sách năm của phòng Kỹ thuật (trưởng phòng → Finance → Người duyệt chi)',
+    title: 'Ngân sách năm của Kỹ thuật, Marketing, Kinh doanh (trưởng phòng → Finance → Người duyệt chi)',
     needs: ['finance.cost-centers', 'catalog.plans', 'org.heads', 'org.approval-roles'],
-    run: budget,
+    run: budgets,
   },
 ];

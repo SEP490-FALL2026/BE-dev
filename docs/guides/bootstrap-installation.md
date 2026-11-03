@@ -105,9 +105,9 @@ cùng quyền `600`. Bảng dưới mô tả [template rỗng](../../.env.bootst
 | ------------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `BOOTSTRAP_TIMEZONE`           | Bắt buộc                               | Múi giờ IANA của tổ chức, ví dụ `Asia/Ho_Chi_Minh`; dùng cho ngày nghiệp vụ và kiểm ngày vào làm. Không đổi được sau cài đặt; không phải cấu hình đổi timezone của container/PostgreSQL.                                                            |
 | `BOOTSTRAP_ORGANIZATION_NAME`  | Bắt buộc                               | Tên tổ chức được tạo trong hệ thống; không phải domain, tên database hay tên Docker project.                                                                                                                                                        |
-| `BOOTSTRAP_DEPARTMENT_CODE`    | Bắt buộc                               | Mã phòng ban đầu tiên, nơi đặt hồ sơ nhân viên Super Admin. Tối đa 32 ký tự; bắt đầu bằng chữ/số, phần còn lại cho phép chữ/số, `.`, `_`, `-`.                                                                                                      |
+| `BOOTSTRAP_DEPARTMENT_CODE`    | Bắt buộc                               | Mã phòng ban đầu tiên, nơi đặt hồ sơ nhân viên Super Admin. Dùng định dạng mã của `QĐ-93i`: chữ in hoa/số, nối bằng `-`, 2–20 ký tự (ví dụ `HQ`, `P-BGD`).                                                                                          |
 | `BOOTSTRAP_DEPARTMENT_NAME`    | Bắt buộc                               | Tên hiển thị của phòng ban đầu tiên. Bootstrap chưa tạo Cost Center, trưởng phòng hoặc IT Admin phụ trách cho phòng này.                                                                                                                            |
-| `BOOTSTRAP_ADMIN_CODE`         | Bắt buộc                               | Mã nhân viên của người giữ Super Admin, cùng quy tắc mã phòng ở trên. Không phải tên đăng nhập; hệ thống đăng nhập bằng email.                                                                                                                      |
+| `BOOTSTRAP_ADMIN_CODE`         | Bắt buộc                               | Mã nhân viên của người giữ Super Admin, định dạng `QĐ-93i` như mã phòng nhưng 3–20 ký tự (ví dụ `SA-001`). Không phải tên đăng nhập; hệ thống đăng nhập bằng email.                                                                                 |
 | `BOOTSTRAP_ADMIN_NAME`         | Bắt buộc                               | Họ tên của người giữ Super Admin, lưu trong hồ sơ nhân viên.                                                                                                                                                                                        |
 | `BOOTSTRAP_ADMIN_EMAIL`        | Bắt buộc                               | Email công việc trong hồ sơ nhân viên; cũng là email đăng nhập nếu không chỉ định `BOOTSTRAP_LOGIN_EMAIL`. Đây không phải tài khoản/mật khẩu SMTP.                                                                                                  |
 | `BOOTSTRAP_ADMIN_HIRE_DATE`    | Bắt buộc                               | Ngày vào làm của nhân viên, định dạng `YYYY-MM-DD`, là ngày hợp lệ và không sau ngày hiện tại theo múi giờ tổ chức. Không phải ngày hết hạn tài khoản.                                                                                              |
@@ -195,7 +195,9 @@ nối CSDL, không thay thế bằng chứng tổ chức/tài khoản đã khở
 bảng theo target của [Task 1.2b action 9](../workspace/items/g0-g6-final-business-baseline-remediation/plan.md#task-12b-mốc-gán--owneroperator-gán-từng-thuê-bao-f02).
 
 Sau cài đặt, phòng đầu tiên chưa có Cost Center, trưởng phòng hoặc IT Admin phụ trách; thiết lập tiếp qua các luồng
-nghiệp vụ của ứng dụng. Dataset nhân viên/demo là việc riêng, sau bootstrap: [demo-dataset](demo-dataset.md).
+nghiệp vụ của ứng dụng. Vai được cấp trực tiếp (`QĐ-93a`): Super Admin cấp `MANAGER` cho một người **trước** khi gán
+người đó làm trưởng phòng, và cấp `SPENDING_APPROVER` cho Người duyệt chi; tới khi có người giữ vai này, Request trả phí
+và phiên bản ngân sách đã gửi chờ có kiểm soát (`NO_SPENDING_APPROVER`). Dataset nhân viên/demo là việc riêng, sau bootstrap: [demo-dataset](demo-dataset.md).
 
 ## Những lần deploy sau và lưu cấu hình
 

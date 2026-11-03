@@ -15,8 +15,8 @@ không có endpoint seed, không dùng `dev:seed`, không thay image API/worker,
 ## 1. Lệnh làm gì và không làm gì
 
 - Dữ liệu là **fixture có phiên bản** trong mã nguồn: [`shared-demo-v1`](../../src/cli/demo-dataset/fixture/shared-demo-v1.ts)
-  — 6 phòng `DS1-*`, 16 nhân viên (14 có tài khoản), Cost Center, 4 ứng dụng/4 gói/4 thuê bao, ngân sách năm của
-  phòng Kỹ thuật, 9 Request ở 9 trạng thái, một bản nháp, một phiếu báo lỗi SaaS, một thông báo BM-09. Toàn bộ là dữ
+  — 8 phòng `DS1-*`, 22 nhân viên (20 có tài khoản), Cost Center, 4 ứng dụng/4 gói/8 thuê bao, ngân sách năm của
+  phòng Kỹ thuật, Marketing và Kinh doanh (phòng Thiết kế cố ý chưa có), 9 Request ở 9 trạng thái, một bản nháp, một phiếu báo lỗi SaaS, một thông báo BM-09. Toàn bộ là dữ
   liệu giả; email dùng miền `ds1.slm-demo.example` (miền `.example` dành cho ví dụ, không thư nào tới người thật).
   Mô tả cho FE: Docs `Figma UI-UX/API-Integration/demo/`.
 - **Mọi bản ghi được ghi qua HTTP API đang chạy**, bằng đúng vai mà nghiệp vụ quy định (Super Admin tạo phòng/nhân
