@@ -116,7 +116,9 @@ if (process.argv[2] === '--runtime-seed-driver') {
         expect(result.code).toBe(2);
         expect(result.stdout).toContain('STATE\tINSTALLED\n');
         expect(result.stdout).toContain('FIXTURE_ORGANIZATION\tyes\nENVIRONMENT\tSHARED\n');
-        expect(result.stdout).toContain('COUNTS\tdepartments=1\taccounts=1\nSECRETS\tnot-checked\n');
+        expect(result.stdout).toContain('COUNTS\tdepartments=1\taccounts=1\n');
+        // The secrets line comes first, before the graph: a wrapper reads it even when the graph then fails.
+        expect(result.stdout.startsWith('SECRETS\tnot-checked\nSTATE\t')).toBe(true);
         expect(
           (await withClient(database.bootstrapUrl, (sql) => sql.query('SELECT count(*)::int AS n FROM audit_events')))
             .rows,

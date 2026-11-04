@@ -184,8 +184,16 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
 
   it('checks local environment and loopback host before any seed-local spawn', () => {
     const script = readFileSync(join(projectRoot, 'scripts/dev/seed-local.mjs'), 'utf8');
-    expect(script.indexOf('const settings = validateLocalSettings(')).toBeGreaterThan(-1);
-    expect(script.indexOf('const settings = validateLocalSettings(')).toBeLessThan(script.indexOf('spawnChild('));
+    // `main` alone: the child runner defined after it would put any spawn after the guard in the whole file.
+    const start = script.indexOf('export async function main(');
+    const main = script.slice(start, script.indexOf('\nclass Refusal', start));
+    const guard = main.indexOf('validateLocalSettings(');
+    expect(start).toBeGreaterThan(-1);
+    expect(guard).toBeGreaterThan(-1);
+    // `main` spawns only through the runner, and creates the runner after the guard.
+    expect(main).not.toMatch(/\bspawn(?:Sync)?\(/);
+    expect(main.indexOf('createChildRunner')).toBeGreaterThan(guard);
+    expect(main.indexOf('runner = ')).toBeGreaterThan(guard);
     expect(script).toContain("settings.NODE_ENV !== 'development'");
     expect(script).toContain("classifyDatabaseUrl(settings.DATABASE_URL) !== 'loopback'");
   });

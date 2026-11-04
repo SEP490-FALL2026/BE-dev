@@ -26,8 +26,20 @@ done
 [ -f "$CONFIG" ] && [ ! -L "$CONFIG" ] || refuse 'private configuration missing or symlinked'
 [ "$(stat -c %a "$CONFIG")" = 600 ] && [ "$(stat -c %u "$CONFIG")" = "$(id -u)" ] || refuse 'private config must be owner-only mode 600'
 command -v flock >/dev/null || refuse 'flock is required'
-exec 9>"$APP_DIR/releases/.deploy.lock"
-flock -n 9 || refuse 'deployment or seed already holds the deploy lock'
+# The deploy lock, taken the way scripts/ops/deploy-release.sh takes it: a regular file opened without truncating it, never
+# through a symlink, and one holder line written through the locked descriptor. A deploy started meanwhile exits 2.
+LOCK_FILE="$APP_DIR/releases/.deploy.lock"
+if [ -L "$LOCK_FILE" ] || { [ -e "$LOCK_FILE" ] && [ ! -f "$LOCK_FILE" ]; }; then refuse 'deploy lock is not a regular file'; fi
+{ exec 9<> "$LOCK_FILE"; } 2>/dev/null || refuse 'cannot open the deploy lock'
+LOCK_STATUS=0
+flock -n -E 3 9 || LOCK_STATUS=$?
+if [ "$LOCK_STATUS" -eq 3 ]; then
+  HOLDER="$(head -c 199 "$LOCK_FILE" 2>/dev/null | tr -cd 'A-Za-z0-9 ._:-' || true)"
+  refuse "a deployment or seed holds the deploy lock (it recorded: ${HOLDER:-nothing})"
+elif [ "$LOCK_STATUS" -ne 0 ]; then
+  refuse "flock could not take the deploy lock (exit $LOCK_STATUS)"
+fi
+printf '%-199.199s\n' "pid $$ seed since $(date -u +%Y-%m-%dT%H:%M:%SZ)" >&9 || true
 
 SEED_ALLOW_RESET=false
 PORT=3000 POSTGRES_DB=software_license_management
@@ -56,13 +68,25 @@ read_settings "$APP_DIR/.env" app
 [[ "$SEED_ALLOW_RESET" = true || "$SEED_ALLOW_RESET" = false ]] || refuse 'SEED_ALLOW_RESET must be true or false'
 [[ "$PORT" =~ ^[0-9]+$ ]] && [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || refuse 'invalid PORT'
 [[ "$POSTGRES_DB" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || refuse 'database name is not a supported identifier'
-IMAGE="$(cat "$APP_DIR/releases/current-image")"
+[ -f "$APP_DIR/releases/current-image" ] && [ ! -L "$APP_DIR/releases/current-image" ] || refuse 'releases/current-image missing or symlinked'
+IMAGE="$(head -n 1 "$APP_DIR/releases/current-image")"
 [[ "$IMAGE" =~ ^[a-zA-Z0-9][a-zA-Z0-9./_-]*(:[0-9a-f]{40}|@sha256:[0-9a-f]{64})$ ]] || refuse 'deployed image must be immutable'
 compose() { API_IMAGE="$IMAGE" docker compose --project-directory "$APP_DIR" -f "$APP_DIR/docker-compose.prod.yml" "$@"; }
 secrets() { printf 'SUPER_ADMIN_PASSWORD=%s\nDEMO_ACCOUNT_PASSWORD=%s\n' "$SEED_SUPER_ADMIN_PASSWORD" "$SEED_DEMO_ACCOUNT_PASSWORD"; }
 seed_call() { secrets | compose run --rm --no-deps -T api node dist/cli.js seed "$@" --environment SHARED --secrets-stdin; }
-HELP="$(compose run --rm --no-deps -T api node dist/cli.js seed --help)" || refuse 'cannot read seed protocol'
+HELP="$(compose run --rm --no-deps -T api node dist/cli.js seed --help </dev/null)" || refuse 'cannot read seed protocol'
 printf '%s\n' "$HELP" | grep -qx 'SEED_PROTOCOL 1' || refuse 'image does not support SEED_PROTOCOL 1'
+SERVED_DB="$(compose exec -T postgres printenv POSTGRES_DB </dev/null | tr -d '\r')" || refuse 'cannot read the database the postgres container serves'
+[ "$SERVED_DB" = "$POSTGRES_DB" ] || refuse 'POSTGRES_DB in .env differs from the running postgres container; recreate it before seeding'
+ready() {
+  local probe deadline
+  probe='fetch("http://127.0.0.1:"+(process.env.PORT||3000)+"/"+(process.env.API_PREFIX||"api")+"/v1/health/ready",{signal:AbortSignal.timeout(10000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))'
+  deadline=$((SECONDS + READY_TIMEOUT))
+  until compose exec -T api node -e "$probe" </dev/null; do
+    [ "$SECONDS" -lt "$deadline" ] || return 1
+    sleep 1
+  done
+}
 set +e
 CHECK="$(seed_call check)"
 CHECK_CODE=$?
@@ -74,9 +98,17 @@ DO_RESET=0
 case "$CHECK_CODE:$STATE" in
   0:EMPTY) ;;
   3:NOT_MIGRATED)
-    compose run --rm --no-deps -T migrate node node_modules/prisma/build/index.js migrate deploy || fail 'migration failed'
-    PHASE=migrated ;;
-  2:INSTALLED|2:INCOMPLETE|1:*)
+    compose run --rm --no-deps -T migrate node node_modules/prisma/build/index.js migrate deploy </dev/null || fail 'migration failed'
+    PHASE=migrated
+    compose run --rm --no-deps -T migrate node dist/database-roles-cli.js reconcile </dev/null || fail 'reconcile failed'
+    PHASE=reconciled
+    compose up -d --force-recreate api worker </dev/null || fail 'startup failed'
+    ready || fail 'API ready timeout'
+    PHASE=ready ;;
+  1:*)
+    [ "$(field SECRETS)" = ok ] || refuse 'seed check failed before the passwords were verified; nothing changed'
+    ;&
+  2:INSTALLED|2:INCOMPLETE)
     printf 'Database %s; organization %s; environment %s; %s\n' "$POSTGRES_DB" "$(field ORGANIZATION)" "$(field ENVIRONMENT)" "$(field COUNTS)"
     CHOICE="$CONFIRM"
     if [ "$CONTINUE" -eq 1 ]; then CHOICE=c
@@ -84,6 +116,7 @@ case "$CHECK_CODE:$STATE" in
     [ -n "$CHOICE" ] || exit 0
     if [ "$CHOICE" = c ]; then
       [ "$CHECK_CODE" -eq 2 ] && [ "$STATE" = INSTALLED ] && [ "$(field FIXTURE_ORGANIZATION)" = yes ] || refuse 'continuation requires a complete fixture organization'
+      [ "$(field ENVIRONMENT)" = SHARED ] || refuse 'continuation requires an installation bootstrapped as SHARED'
     else
       [ "$CHOICE" = "$POSTGRES_DB" ] || refuse 'database confirmation does not match'
       [ "$SEED_ALLOW_RESET" = true ] || refuse 'reset requires SEED_ALLOW_RESET=true'
@@ -92,10 +125,11 @@ case "$CHECK_CODE:$STATE" in
   *) fail 'unexpected seed check result' ;;
 esac
 
-DROP_STARTED=0 DUMP=''
+DROP_STARTED=0 RESET_DONE=0 DUMP=''
 cleanup() {
   local code=$?
-  if [ "$DROP_STARTED" -eq 1 ] && [ "$code" -eq 1 ]; then
+  if [ -n "$DUMP" ] && [ -e "$DUMP.partial" ]; then rm -f -- "$DUMP.partial"; fi
+  if [ "$DROP_STARTED" -eq 1 ] && [ "$RESET_DONE" -eq 0 ] && [ "$code" -ne 0 ]; then
     compose stop api worker >/dev/null 2>&1 || true
     printf 'Stopped api/worker. Completed phase: %s. Restore dump %s: recreate database, run db-admin, pg_restore as deploy role, reconcile, then up -d api worker.\n' "$PHASE" "$DUMP" >&2
     printf 'Recovery commands (use the same immutable API_IMAGE and Compose project):\n' >&2
@@ -107,42 +141,42 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 if [ "$DO_RESET" -eq 1 ]; then
   mkdir -p "$APP_DIR/backups/postgres"
   DUMP="$APP_DIR/backups/postgres/slm-pre-reseed-$(date -u +%Y%m%dT%H%M%SZ).dump"
   [ ! -e "$DUMP" ] && [ ! -e "$DUMP.partial" ] || fail 'backup name already exists'
-  compose run --rm --no-deps -T backup pg_dump --format=custom --no-owner --no-privileges > "$DUMP.partial" || fail 'dump failed; database untouched'
+  compose run --rm --no-deps -T backup pg_dump --format=custom --no-owner --no-privileges </dev/null > "$DUMP.partial" || fail 'dump failed; database untouched'
   [ -s "$DUMP.partial" ] || fail 'dump empty; database untouched'
   compose run --rm --no-deps -T backup pg_restore --list < "$DUMP.partial" >/dev/null || fail 'dump verification failed; database untouched'
   mv -- "$DUMP.partial" "$DUMP"
   PHASE=dump-verified
-  compose stop api worker || fail 'stop failed; database untouched'
+  compose stop api worker </dev/null || fail 'stop failed; database untouched'
   PHASE=services-stopped
   DROP_STARTED=1
-  compose exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE \"$POSTGRES_DB\" WITH (FORCE)" -c "CREATE DATABASE \"$POSTGRES_DB\""' || fail 'database recreation failed'
+  compose exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE \"$POSTGRES_DB\" WITH (FORCE)" -c "CREATE DATABASE \"$POSTGRES_DB\""' </dev/null || fail 'database recreation failed'
   PHASE=database-recreated
-  compose run --rm -T db-admin || fail 'provision failed'
+  compose run --rm -T db-admin </dev/null || fail 'provision failed'
   PHASE=provisioned
-  compose run --rm --no-deps -T migrate node node_modules/prisma/build/index.js migrate deploy || fail 'migration failed'
+  compose run --rm --no-deps -T migrate node node_modules/prisma/build/index.js migrate deploy </dev/null || fail 'migration failed'
   PHASE=migrated
-  compose run --rm --no-deps -T migrate node dist/database-roles-cli.js reconcile || fail 'reconcile failed'
+  compose run --rm --no-deps -T migrate node dist/database-roles-cli.js reconcile </dev/null || fail 'reconcile failed'
   PHASE=reconciled
-  compose up -d api worker || fail 'startup failed'
+  compose up -d api worker </dev/null || fail 'startup failed'
   PHASE=services-started
-  READY_PROBE='fetch("http://127.0.0.1:"+(process.env.PORT||3000)+"/"+(process.env.API_PREFIX||"api")+"/v1/health/ready",{signal:AbortSignal.timeout(10000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))'
-  DEADLINE=$((SECONDS + READY_TIMEOUT))
-  until compose exec -T api node -e "$READY_PROBE"; do
-    [ "$SECONDS" -lt "$DEADLINE" ] || fail 'API ready timeout'
-    sleep 1
-  done
+  ready || fail 'API ready timeout'
   PHASE=ready
+  RESET_DONE=1
 fi
 mkdir -p "$APP_DIR/seed-reports"
 chmod 700 "$APP_DIR/seed-reports"
 REPORT="$APP_DIR/seed-reports/$(date -u +%Y%m%dT%H%M%SZ)-apply.txt"
 [ ! -e "$REPORT" ] || fail 'report name already exists'
+printf 'seed apply %s image %s database %s phase %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$IMAGE" "$POSTGRES_DB" "$PHASE" > "$REPORT"
 set +e
-seed_call apply --allow-bootstrap --api-url "http://api:$PORT" --operator-reference "$SEED_OPERATOR_REFERENCE" | tee "$REPORT"
+seed_call apply --allow-bootstrap --api-url "http://api:$PORT" --operator-reference "$SEED_OPERATOR_REFERENCE" 2>&1 | tee -a "$REPORT"
 RESULT=${PIPESTATUS[0]}
 set -e
+printf 'exit %s\n' "$RESULT" >> "$REPORT"
 exit "$RESULT"

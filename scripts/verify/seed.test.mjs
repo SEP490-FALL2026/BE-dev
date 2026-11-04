@@ -38,6 +38,7 @@ const input=line.includes('--secrets-stdin')||line.includes('pg_restore --list')
 fs.appendFileSync(process.env.FAKE_LOG,JSON.stringify({args,input,image:process.env.API_IMAGE,secrets:Object.keys(process.env).filter(k=>k.startsWith('SEED_'))})+'\\n');
 if(process.env.FAKE_FAIL && line.includes(process.env.FAKE_FAIL)) process.exit(1);
 if(line.includes('--help')) console.log(process.env.FAKE_PROTOCOL||'SEED_PROTOCOL 1');
+else if(line.includes('printenv POSTGRES_DB')) console.log(process.env.FAKE_SERVED_DB||'demo_db');
 else if(line.includes('seed check')) { console.log(process.env.FAKE_CHECK); process.exit(Number(process.env.FAKE_CHECK_CODE)); }
 else if(line.includes('pg_dump')) { if(process.env.FAKE_EMPTY!=='1') console.log('fake-custom-dump'); }
 else if(line.includes('node -e') && process.env.FAKE_READY==='0') process.exit(1);
@@ -46,7 +47,7 @@ else if(line.includes('seed apply')) { console.log('seed report'); process.exit(
   );
   writeFileSync(
     startup,
-    `stat(){ if [ "$2" = '%a' ]; then echo 600; else id -u; fi; }; export -f stat\nflock(){ [ "\${FAKE_LOCKED:-0}" != 1 ]; }; export -f flock\ndocker(){ "$FAKE_NODE" "$FAKE_DOCKER" "$@"; }; export -f docker\n`,
+    `stat(){ if [ "$2" = '%a' ]; then echo 600; else id -u; fi; }; export -f stat\nflock(){ [ "\${FAKE_LOCKED:-0}" != 1 ] || return 3; }; export -f flock\ndocker(){ "$FAKE_NODE" "$FAKE_DOCKER" "$@"; }; export -f docker\n`,
   );
   const check =
     options.check ??
@@ -127,7 +128,27 @@ test('VPS reset orders verified backup, stop, recreate, provision, migrate, reco
   assert(!result.stderr.includes(canary));
   const reports = readdirSync(join(h.app, 'seed-reports'));
   assert.equal(reports.length, 1);
-  assert(!readFileSync(join(h.app, 'seed-reports', reports[0]), 'utf8').includes(canary));
+  const report = readFileSync(join(h.app, 'seed-reports', reports[0]), 'utf8');
+  assert(!report.includes(canary));
+  assert.match(report, /^seed apply \S+ image ghcr\.io\/example\/slm-api:[0-9a-f]{40} database demo_db phase ready\n/);
+  assert.match(report, /seed report\nexit 0\n$/);
+  assert.match(readFileSync(join(h.app, 'releases/.deploy.lock'), 'utf8'), /^pid \d+ seed since /);
+});
+test('an apply that fails after a finished reset keeps the services and prints no restore commands', () => {
+  const h = world(),
+    result = h.run(undefined, { FAKE_APPLY_CODE: '4' });
+  assert.equal(result.status, 4);
+  assert(!result.stderr.includes('pg_restore'));
+  assert(lines(h).at(-1).includes('seed apply'));
+});
+test('the database .env names must be the one the postgres container serves, and the image record must exist', () => {
+  const other = world();
+  assert.equal(other.run([], { FAKE_SERVED_DB: 'another_db' }).status, 3);
+  assert(!lines(other).some((line) => line.includes('seed check')));
+  const missing = world();
+  rmSync(join(missing.app, 'releases/current-image'));
+  assert.equal(missing.run([]).status, 3);
+  assert.equal(missing.calls().length, 0);
 });
 test('reset needs opt-in and exact database confirmation; Enter exits', () => {
   assert.equal(world({ allowReset: false }).run().status, 3);
@@ -164,15 +185,34 @@ test('continuation needs the complete fixture organization, not reset opt-in', (
   assert(!lines(h).some((line) => line.includes('pg_dump')));
   assert.equal(world({ check: 'STATE\tINCOMPLETE\nFIXTURE_ORGANIZATION\tyes' }).run(['--continue']).status, 3);
   assert.equal(world({ check: 'STATE\tINSTALLED\nFIXTURE_ORGANIZATION\tno' }).run(['--continue']).status, 3);
+  const local = world({
+    check: 'STATE\tINSTALLED\nFIXTURE_ORGANIZATION\tyes\nENVIRONMENT\tLOCAL_TEST',
+  });
+  assert.equal(local.run(['--continue']).status, 3);
+  assert(!lines(local).some((line) => line.includes('seed apply')));
 });
 test('unmigrated deploys migrations without reset opt-in; empty applies directly; check failure permits only reset', () => {
   const unmigrated = world({ allowReset: false, checkCode: 3, check: 'STATE\tNOT_MIGRATED' });
   assert.equal(unmigrated.run([]).status, 0);
-  assert(lines(unmigrated).some((line) => line.includes('migrate deploy')));
+  let previous = -1;
+  for (const step of [
+    'migrate deploy',
+    'reconcile',
+    'up -d --force-recreate api worker',
+    'exec -T api node -e',
+    'seed apply',
+  ]) {
+    const at = lines(unmigrated).findIndex((line) => line.includes(step));
+    assert(at > previous, step);
+    previous = at;
+  }
   assert(!lines(unmigrated).some((line) => line.includes('pg_dump')));
   assert.equal(world({ checkCode: 0, check: 'STATE\tEMPTY' }).run([]).status, 0);
-  assert.equal(world({ checkCode: 1, check: '' }).run().status, 0);
-  assert.equal(world({ checkCode: 1, check: '' }).run(['--continue']).status, 3);
+  assert.equal(world({ checkCode: 1, check: 'SECRETS\tok' }).run().status, 0);
+  assert.equal(world({ checkCode: 1, check: 'SECRETS\tok' }).run(['--continue']).status, 3);
+  const unverified = world({ checkCode: 1, check: '' });
+  assert.equal(unverified.run().status, 3);
+  assert(!lines(unverified).some((line) => line.includes('pg_dump')));
 });
 test('password refusal precedes any dump; readiness timeout stops services; apply status is preserved', () => {
   const refused = world({ checkCode: 3, check: 'REFUSED\tSECRETS\tTOO_SHORT' });

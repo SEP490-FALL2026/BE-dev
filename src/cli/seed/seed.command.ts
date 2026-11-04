@@ -39,8 +39,12 @@ export const seedCommand = defineCommand({
       throw error;
     }
 
-    // In production the graph runs the runtime-role check, the first database query of the run.
-    if (args.mode === 'check') return check(secrets !== undefined);
+    if (args.mode === 'check') {
+      // Printed before any graph: a wrapper offers a reset after a failed check only once this line proves both passwords.
+      process.stdout.write(`SECRETS\t${secrets ? 'ok' : 'not-checked'}\n`);
+      // In production the graph runs the runtime-role check, the first database query of the run.
+      return check();
+    }
     if (!secrets) return REFUSED;
     const passwords = secrets;
     clock.enter('startup');
@@ -58,7 +62,7 @@ export const seedCommand = defineCommand({
         for (const warning of outcome.warnings ?? []) process.stderr.write(`warning: ${warning}\n`);
         if ('refused' in outcome) {
           process.stderr.write(`refused: ${outcome.refused}\n`);
-          return REFUSED;
+          return outcome.wrote ? 1 : REFUSED;
         }
         process.stdout.write(args.json ? formatDemoReportJson(outcome.report) : formatDemoReport(outcome.report));
 
@@ -71,7 +75,7 @@ export const seedCommand = defineCommand({
 });
 
 async function bootstrap(args: SeedCommandArguments, secrets: DemoSecrets): Promise<void> {
-  await runInNestContext({
+  const code = await runInNestContext({
     graph: () => import('../../modules/installation/installation.module').then((m) => m.InstallationModule),
     work: async (app) => {
       await app.get(InstallationApi).install(
@@ -88,9 +92,11 @@ async function bootstrap(args: SeedCommandArguments, secrets: DemoSecrets): Prom
       throw error;
     },
   });
+  // A graph that cannot start (its environment does not validate) returns an exit code instead of throwing.
+  if (code !== 0) throw new Error(`The bootstrap graph did not start (exit ${code}).`);
 }
 
-async function check(checkedSecrets: boolean): Promise<number> {
+async function check(): Promise<number> {
   return runInNestContext({
     graph: () => import('../../modules/installation/inspect/inspection-cli.module').then((m) => m.InspectionCliModule),
     work: async (app) => {
@@ -99,7 +105,7 @@ async function check(checkedSecrets: boolean): Promise<number> {
       const environment =
         snapshot.environment === 'LOCAL_TEST' || snapshot.environment === 'SHARED' ? snapshot.environment : 'UNKNOWN';
       process.stdout.write(
-        `STATE\t${snapshot.state}\nORGANIZATION\t${name}\nFIXTURE_ORGANIZATION\t${snapshot.organization === INSTALLATION.organizationName ? 'yes' : 'no'}\nENVIRONMENT\t${environment}\nCOUNTS\tdepartments=${snapshot.departments}\taccounts=${snapshot.accounts}\nSECRETS\t${checkedSecrets ? 'ok' : 'not-checked'}\n`,
+        `STATE\t${snapshot.state}\nORGANIZATION\t${name}\nFIXTURE_ORGANIZATION\t${snapshot.organization === INSTALLATION.organizationName ? 'yes' : 'no'}\nENVIRONMENT\t${environment}\nCOUNTS\tdepartments=${snapshot.departments}\taccounts=${snapshot.accounts}\n`,
       );
       return snapshot.state === 'EMPTY' ? 0 : snapshot.state === 'NOT_MIGRATED' ? 3 : 2;
     },

@@ -7,6 +7,8 @@ import { classifyDatabaseUrl } from './local-database-host.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const CONSENT_KEY = 'PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION';
+/** Read by this wrapper only: the passwords reach the seed CLI through stdin, never through a child's environment. */
+const WRAPPER_ONLY_KEYS = ['SEED_SUPER_ADMIN_PASSWORD', 'SEED_DEMO_ACCOUNT_PASSWORD', 'SEED_READY_TIMEOUT_SECONDS'];
 const READY_PATH = '/api/v1/health/ready';
 
 export function parseSettings(text) {
@@ -35,7 +37,13 @@ export function validateLocalSettings(settings) {
   const url = new URL(settings.DATABASE_URL);
   const database = decodeURIComponent(url.pathname.slice(1));
   if (!database || database.includes('/')) throw new Error('DATABASE_URL must name one database.');
-  return { ...settings, PORT: String(port), timeout, database, host: url.hostname, databasePort: url.port || '5432' };
+  return {
+    settings: { ...settings, PORT: String(port) },
+    timeout,
+    database,
+    host: url.hostname,
+    databasePort: url.port || '5432',
+  };
 }
 
 /** The guards above run before the first possible child process, including build. Tests inject commands, never databases. */
@@ -44,7 +52,8 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
   const output = dependencies.output || ((text) => process.stdout.write(`${text}\n`));
   let runner;
   try {
-    const settings = validateLocalSettings(parseSettings(fs.readFileSync(path.join(root, '.env.seed.local'), 'utf8')));
+    const local = validateLocalSettings(parseSettings(fs.readFileSync(path.join(root, '.env.seed.local'), 'utf8')));
+    const { settings } = local;
     const options = argumentsOf(argv);
     const origin = `http://127.0.0.1:${settings.PORT}`;
     const probe = dependencies.probe || responds;
@@ -57,11 +66,12 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
       DOTENV_CONFIG_PATH: path.join(root, '.env.seed.local'),
     };
     delete env[CONSENT_KEY];
+    for (const key of WRAPPER_ONLY_KEYS) delete env[key];
     runner = dependencies.runner || (dependencies.runnerFactory || createChildRunner)(root, env);
     const run = (command, args, input = '') => runner.run(command, args, input);
     const node = (args, input) => run(process.execPath, args, input);
     const prisma = (args) => node(['node_modules/prisma/build/index.js', ...args]);
-    if ((dependencies.needsBuild || needsBuild)(root)) requireSuccess(await run('pnpm', ['build']));
+    if ((dependencies.needsBuild || needsBuild)(root)) requireSuccess(await run('pnpm', ['build']), 'pnpm build');
     const input = `SUPER_ADMIN_PASSWORD=${settings.SEED_SUPER_ADMIN_PASSWORD}\nDEMO_ACCOUNT_PASSWORD=${settings.SEED_DEMO_ACCOUNT_PASSWORD}\n`;
     const checked = await node(
       ['dist/cli.js', 'seed', 'check', '--environment', 'LOCAL_TEST', '--secrets-stdin'],
@@ -69,15 +79,19 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
     );
     if (runner.aborted) throw new Error('Interrupted');
     const state = fieldsOf(checked.stdout);
-    if (checked.code === 3 && state.STATE !== 'NOT_MIGRATED') return 3;
-    if (![0, 1, 2, 3].includes(checked.code)) throw new Error('Seed check failed.');
-    const action = await chooseAction(settings, options, checked, state, output, dependencies.ask || ask);
+    if (checked.code === 3 && state.STATE !== 'NOT_MIGRATED') {
+      // REFUSED<TAB>SECRETS<TAB><reason>: names the problem, never a password.
+      output(checked.stdout.trim() || 'Seed check refused.');
+      return 3;
+    }
+    if (![0, 1, 2, 3].includes(checked.code)) throw new StepFailure(`seed check failed (exit ${checked.code}).`);
+    const action = await chooseAction(local, options, checked, state, output, dependencies.ask || ask);
     if (action === 'exit') return 0;
-    if (action === 'reset') requireSuccess(await prisma(['migrate', 'reset', '--force']));
-    requireSuccess(await prisma(['migrate', 'deploy']));
+    if (action === 'reset') requireSuccess(await prisma(['migrate', 'reset', '--force']), 'prisma migrate reset');
+    requireSuccess(await prisma(['migrate', 'deploy']), 'prisma migrate deploy');
     runner.start(process.execPath, ['dist/main']);
     runner.start(process.execPath, ['dist/worker']);
-    const deadline = Date.now() + settings.timeout * 1000;
+    const deadline = Date.now() + local.timeout * 1000;
     while (!(await probe(origin + READY_PATH, true))) {
       if (runner.aborted) throw new Error('Interrupted');
       if (Date.now() >= deadline) throw new Error('API ready timeout.');
@@ -102,6 +116,10 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
     output(applied.stdout);
     return applied.code;
   } catch (error) {
+    if (runner?.aborted) {
+      output('Interrupted; the children were stopped.');
+      return 130;
+    }
     output(error instanceof Refusal ? error.message : safeFailure(error));
     return error instanceof Refusal || !runner ? 3 : 1;
   } finally {
@@ -110,13 +128,14 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
 }
 
 class Refusal extends Error {}
+/** A child command that failed: its message names the step and exit code (the child's stderr is already on screen). */
+class StepFailure extends Error {}
 function safeFailure(error) {
-  return error?.message === 'API ready timeout.'
-    ? error.message
-    : 'Seed failed; check the completed steps before retrying.';
+  if (error instanceof StepFailure || error?.message === 'API ready timeout.') return error.message;
+  return 'Seed failed; check the completed steps before retrying.';
 }
-function requireSuccess(result) {
-  if (result.code !== 0) throw new Error('Child command failed.');
+function requireSuccess(result, step) {
+  if (result.code !== 0) throw new StepFailure(`${step} failed (exit ${result.code}).`);
 }
 export function fieldsOf(text) {
   return Object.fromEntries(
@@ -129,8 +148,10 @@ export function fieldsOf(text) {
       }),
   );
 }
-function argumentsOf(argv) {
+function argumentsOf(input) {
   const options = {};
+  // `pnpm seed:local -- --continue` passes the separator through.
+  const argv = input[0] === '--' ? input.slice(1) : input;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--continue') options.continue = true;
     else if (argv[i] === '--confirm-reset' && argv[i + 1]) options.reset = argv[++i];
@@ -139,20 +160,28 @@ function argumentsOf(argv) {
   if (options.continue && options.reset) throw new Refusal('Choose reset or continue.');
   return options;
 }
-async function chooseAction(settings, options, checked, state, output, prompt) {
+async function chooseAction(local, options, checked, state, output, prompt) {
   if (checked.code === 0 || (checked.code === 3 && state.STATE === 'NOT_MIGRATED')) return 'continue';
   output(
-    `Database ${settings.database}; host ${settings.host}; port ${settings.databasePort}; organization ${state.ORGANIZATION || '-'}; environment ${state.ENVIRONMENT || 'UNKNOWN'}; ${state.COUNTS || 'counts unavailable'}`,
+    `Database ${local.database}; host ${local.host}; port ${local.databasePort}; organization ${state.ORGANIZATION || '-'}; environment ${state.ENVIRONMENT || 'UNKNOWN'}; ${state.COUNTS || 'counts unavailable'}`,
   );
+  // A loopback URL can still be a tunnel to a shared server: only an installation recorded as LOCAL_TEST is changed here.
+  if (checked.code === 2 && state.ENVIRONMENT !== 'LOCAL_TEST')
+    throw new Refusal(
+      state.ENVIRONMENT === 'SHARED'
+        ? 'This database was bootstrapped for a shared environment; local seed refused.'
+        : 'This installation records no LOCAL_TEST environment; local seed refused.',
+    );
+  // A failed check may reset only once it printed that both passwords passed (a broken schema, not a broken input).
+  if (checked.code === 1 && state.SECRETS !== 'ok')
+    throw new Refusal('Seed check failed before the passwords were verified; nothing changed.');
   const choice =
     options.reset ??
     (options.continue ? 'c' : await prompt('Type the database name to reset, c to continue, or Enter to exit: '));
   if (choice === '') return 'exit';
   if (choice === 'c' && checked.code === 2 && state.STATE === 'INSTALLED' && state.FIXTURE_ORGANIZATION === 'yes')
     return 'continue';
-  if (choice !== settings.database) throw new Refusal('Confirmation refused for this database state.');
-  if (state.ENVIRONMENT === 'SHARED')
-    throw new Refusal('This database was bootstrapped for a shared environment; local reset refused.');
+  if (choice !== local.database) throw new Refusal('Confirmation refused for this database state.');
   return 'reset';
 }
 async function ask(question) {
@@ -232,7 +261,8 @@ export function createChildRunner(root, env, spawnChild = spawn, terminate = ter
     child.stdout?.on('data', (chunk) => {
       stdout += chunk;
     });
-    child.stderr?.on('data', () => undefined);
+    // Diagnostics stay visible; the passwords travel on stdin and no child writes them to stderr.
+    child.stderr?.on('data', (chunk) => process.stderr.write(chunk));
     const finished = new Promise((resolve) => {
       child.once('error', () => {
         children.delete(entry);

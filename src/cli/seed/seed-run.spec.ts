@@ -149,4 +149,43 @@ describe('a run of ops:seed', () => {
     });
     expect(order).toEqual(['lock', 'state', 'release']);
   });
+
+  describe('with --allow-bootstrap on an EMPTY database', () => {
+    const empty = (inspect: () => Promise<unknown>) =>
+      ({
+        seedState: () => Promise.resolve('EMPTY'),
+        inspect,
+        holdApplyLock: () => Promise.resolve({ release: () => Promise.resolve() }),
+      }) as unknown as DemoAccountsApi;
+    const bootstrapArgs = { ...args('apply'), allowBootstrap: true };
+
+    it('refuses before the bootstrap writes anything when the API is not ready', async () => {
+      const bootstrap = jest.fn(() => Promise.resolve());
+      for (const ready of [() => json(503, {}), () => Promise.reject(new TypeError('fetch failed'))]) {
+        const outcome = await runSeed({
+          args: bootstrapArgs,
+          secrets,
+          accounts: empty(() => Promise.resolve(facts)),
+          fetch: api({ 'GET /health/ready': ready }),
+          bootstrap,
+        });
+        expect(outcome).toEqual({ refused: 'The API at http://slm-api:4000 is not ready: nothing written.' });
+      }
+      expect(bootstrap).not.toHaveBeenCalled();
+    });
+
+    it('marks a refusal after the bootstrap as a run that wrote', async () => {
+      const bootstrap = jest.fn(() => Promise.resolve());
+      const outcome = await runSeed({
+        args: bootstrapArgs,
+        secrets,
+        accounts: empty(() => Promise.resolve({ ...facts, organizationName: 'Another' })),
+        fetch: api({ 'GET /health/ready': () => json(200, {}) }),
+        bootstrap,
+      });
+      expect(bootstrap).toHaveBeenCalledTimes(1);
+      expect(outcome).toMatchObject({ wrote: true });
+      expect('refused' in outcome && outcome.refused).toContain('bootstrapped before this refusal');
+    });
+  });
 });

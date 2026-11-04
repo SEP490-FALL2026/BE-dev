@@ -12,8 +12,11 @@ import { DEMO_FIXTURES, demoSteps } from './seed-steps';
 import { emptyIds, DemoRunContext } from './demo-run.types';
 import type { DemoFixture } from './fixture/demo-fixture.types';
 
-/** `warnings`: what went wrong after the outcome was known and did not change it (one line each, no secret). */
-export type DemoRunOutcome = ({ refused: string } | { report: DemoReport }) & { warnings?: string[] };
+/**
+ * `warnings`: what went wrong after the outcome was known and did not change it (one line each, no secret).
+ * `wrote`: the refusal came after `--allow-bootstrap` wrote the installation, so it is not "nothing written" (exit 1, not 3).
+ */
+export type DemoRunOutcome = ({ refused: string; wrote?: boolean } | { report: DemoReport }) & { warnings?: string[] };
 
 export interface DemoRunInput {
   args: SeedCommandArguments;
@@ -83,11 +86,38 @@ export async function runSeed(input: DemoRunInput): Promise<DemoRunOutcome> {
 async function applyAgainst(input: DemoRunInput, fixture: DemoFixture): Promise<DemoRunOutcome> {
   const { args } = input;
   const state = await input.accounts.seedState();
-  if (state === 'EMPTY' && args.allowBootstrap && input.bootstrap) await input.bootstrap();
-  else if (state === 'EMPTY') return { refused: 'EMPTY: use --allow-bootstrap or ops:bootstrap.' };
+  let bootstrapped = false;
+  if (state === 'EMPTY' && args.allowBootstrap && input.bootstrap) {
+    // Prove the API answers before the bootstrap writes anything: an unreachable target stays "nothing written".
+    if (!(await apiReady(args.apiUrl, input.fetch))) {
+      return { refused: `The API at ${args.apiUrl} is not ready: nothing written.` };
+    }
+    await input.bootstrap();
+    bootstrapped = true;
+  } else if (state === 'EMPTY') return { refused: 'EMPTY: use --allow-bootstrap or ops:bootstrap.' };
   else if (state !== 'INSTALLED') return { refused: `${state}: seed requires a complete installation.` };
   const facts = await installationFacts(input, fixture);
-  return 'refused' in facts ? facts : await runAgainst(input, fixture, facts);
+  const outcome = 'refused' in facts ? facts : await runAgainst(input, fixture, facts);
+  if (bootstrapped && 'refused' in outcome) {
+    return {
+      ...outcome,
+      refused: `${outcome.refused} The installation was bootstrapped before this refusal.`,
+      wrote: true,
+    };
+  }
+  return outcome;
+}
+
+async function apiReady(apiUrl: string, fetchLike: FetchLike = fetch): Promise<boolean> {
+  try {
+    const response = await fetchLike(`${apiUrl}${API_PREFIX}/health/ready`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(10000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 type Facts = NonNullable<Awaited<ReturnType<DemoAccountsApi['inspect']>>> & {

@@ -117,13 +117,35 @@ for (const state of ['EMPTY', 'NOT_MIGRATED'])
     assert.equal(await h.run(), 0);
     assert(!h.calls.some((call) => call.args?.includes('reset')));
   });
-test('check failure permits reset only; shared environment refuses reset', async () => {
-  const failed = world({ check: { code: 1, stdout: '' } });
+test('check failure permits reset only, and only after the passwords passed', async () => {
+  const failed = world({ check: { code: 1, stdout: 'SECRETS\tok\n' } });
   assert.equal(await failed.run(['--confirm-reset', 'demo']), 0);
-  const continuation = world({ check: { code: 1, stdout: protocol() } });
+  assert(failed.calls.some((call) => call.args?.includes('reset')));
+  const unverified = world({ check: { code: 1, stdout: '' } });
+  assert.equal(await unverified.run(['--confirm-reset', 'demo']), 3);
+  assert(!unverified.calls.some((call) => call.args?.includes('reset')));
+  const continuation = world({ check: { code: 1, stdout: `SECRETS\tok\n${protocol()}` } });
   assert.equal(await continuation.run(['--continue']), 3);
-  const shared = world({ check: { code: 2, stdout: protocol().replace('LOCAL_TEST', 'SHARED') } });
-  assert.equal(await shared.run(['--confirm-reset', 'demo']), 3);
+});
+for (const environment of ['SHARED', 'UNKNOWN'])
+  for (const argv of [['--confirm-reset', 'demo'], ['--continue']])
+    test(`an installation recorded as ${environment} refuses ${argv[0]} before any write`, async () => {
+      const h = world({ check: { code: 2, stdout: protocol().replace('LOCAL_TEST', environment) } });
+      assert.equal(await h.run(argv), 3);
+      assert.deepEqual(
+        h.calls.filter((call) => call.args && !call.args.includes('check')),
+        [],
+      );
+    });
+test('the pnpm separator is accepted before the options', async () => {
+  const h = world();
+  assert.equal(await h.run(['--', '--continue']), 0);
+});
+test('a failed child names its step', async () => {
+  const h = world({ fail: (args) => args.includes('deploy') });
+  assert.equal(await h.run(['--continue']), 1);
+  assert(h.output.includes('prisma migrate deploy failed (exit 1).'));
+  assert(!h.calls.some((call) => call.args?.includes('apply')));
 });
 test('another organization rejects continuation', async () => {
   const h = world({ check: { code: 2, stdout: protocol().replace('yes', 'no') } });
@@ -137,7 +159,11 @@ test('weak-password check never resets and removes inherited Prisma consent from
   });
   assert.equal(await h.run(['--confirm-reset', 'demo']), 3);
   assert(!h.calls.some((call) => call.args?.includes('reset')));
+  assert(h.output.includes('REFUSED\tSECRETS\tTOO_SHORT'));
   assert.equal(h.env()[key], undefined);
+  assert.equal(h.env().SEED_SUPER_ADMIN_PASSWORD, undefined);
+  assert.equal(h.env().SEED_DEMO_ACCOUNT_PASSWORD, undefined);
+  assert.equal(h.env().DATABASE_URL, h.configuration.DATABASE_URL);
   assert.equal(h.env().DOTENV_CONFIG_PATH, join(h.root, '.env.seed.local'));
 });
 test('stale build runs first and readiness timeout stops both children', async () => {
