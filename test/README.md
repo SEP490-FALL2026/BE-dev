@@ -129,11 +129,17 @@ it('refuses an employee with 403', async () => {
 
 ## CI
 
-| Sự kiện          | Chạy                                                                                       |
-| ---------------- | ------------------------------------------------------------------------------------------ |
-| push/PR `dev`    | `quality` (`pnpm check`), `http-contract`, `integration` của module đổi + module phụ thuộc |
-| push `main`      | như trên nhưng integration **đầy đủ**, thêm `e2e-smoke`; `deploy` chỉ khi mọi job xanh     |
-| hằng đêm (`dev`) | integration đầy đủ + timing + serial + E2E + `pnpm test:mutation`, lưu báo cáo thời gian   |
+| Sự kiện                   | Chạy                                                                                                                                     |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| push/PR `dev`             | `quality` (`pnpm check`), `http-contract`, 3 shard `integration` của module đổi + module phụ thuộc; timing/serial ở `integration-inband` |
+| push `main`               | như trên nhưng integration **đầy đủ**, thêm `e2e-smoke`; `deploy` chỉ khi mọi job xanh                                                   |
+| Chủ nhật 02:00 VN (`dev`) | integration đầy đủ + timing + serial + E2E + `pnpm test:mutation`, lưu báo cáo thời gian                                                 |
+
+PR chỉ chạy khi đích là `dev`; push `main` vẫn chạy đầy đủ. Push `dev` ở repo deploy `WDP301-FA26-GR8/BE` chỉ chạy
+`select` rồi bỏ qua các job test; repo phát triển vẫn chạy bình thường. Chỉ run PR cũ bị hủy khi có run PR mới; push và
+`workflow_dispatch` không bị hủy. Ba shard và job in-band có artifact thời gian riêng; deploy đợi tất cả xanh.
+Timeout shard tạm giữ 70 phút, chờ ít nhất hai run `main` để đặt theo số đo của
+[ci-integration-shards](../docs/workspace/items/ci-integration-shards/plan.md).
 
 Chọn module bị ảnh hưởng: `scripts/ci/affected-modules.mjs` (đổi `src/core`, `src/infrastructure`, `prisma/`,
 `test/support` hay dependency ⇒ chạy tất cả). Chạy local không thay kết quả GitHub Actions.

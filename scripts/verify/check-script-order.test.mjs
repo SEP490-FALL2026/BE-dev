@@ -80,7 +80,7 @@ test('CI shard matrix covers exactly the denominator of its Jest shard command',
   );
   assert.match(job, /fail-fast: false/);
   assert.match(job, /--passWithNoTests/);
-  assert.match(job, /if: needs\.select\.outputs\.paths != 'NONE'/);
+  assert.match(job, /if: needs\.select\.outputs\.run == 'true' && needs\.select\.outputs\.paths != 'NONE'/);
   assert.match(job, /name: test-timings-integration-\$\{\{ matrix\.shard \}\}/);
   assert.match(ciWorkflow, /needs: \[quality, http-contract, integration, integration-inband, e2e-smoke\]/);
 });

@@ -67,9 +67,17 @@
 - [ ] Spec/plan phản ánh đúng YAML cuối; lựa chọn Owner ghi ở spec.
 - [ ] Giao Owner review; cập nhật roadmap.
 
-### B?ng ch?ng tri?n khai local ? Task 1 (04/11/2026)
+### Bằng chứng triển khai local — Task 1 (04/11/2026)
 
-- Test c?u tr?c `node --test scripts/verify/check-script-order.test.mjs`: 4 pass, 0 fail.
-- ??t bi?n th? c?ng matrix `[1, 2]`: exit 1, expected `[1, 2, 3]`; ?? ho?n l?i bytes g?c.
+- Test cấu trúc `node --test scripts/verify/check-script-order.test.mjs`: 4 pass, 0 fail.
+- Đột biến thủ công matrix `[1, 2]`: exit 1, expected `[1, 2, 3]`; đã hoàn lại bytes gốc.
 - `pnpm rules:format`: pass. `pnpm exec prettier --check .github/workflows/*.yml`: pass.
-- Kh?ng ch?y Actions, integration, timing, serial hay e2e theo ph?m vi giao vi?c.
+- Không chạy Actions, integration, timing, serial hay e2e theo phạm vi giao việc.
+
+### Bằng chứng triển khai local — Task 2 (04/11/2026)
+
+- Đã triển khai OD-CI2/3/4/5. Test cấu trúc cập nhật điều kiện `run` cùng thay đổi YAML (bổ sung vào Files của task để không giữ assertion cũ).
+- `pnpm rules:check`: 419 files, 3434 links, 0 errors. `pnpm rules:format` và Prettier mọi workflow: pass.
+- Test cấu trúc: 4 pass. `pnpm test:scripts` trong sandbox: 275 tests, 211 pass, 62 fail, 2 skip; lỗi quyền tạo thư mục tạm Git Bash (`mkdir /c/Users/Asus: Permission denied`). Đang chạy lại ngoài sandbox.
+- Task 3 chỉ chuẩn bị nhánh thử cục bộ, không push; run đỏ/xanh chờ phiên review/Owner.
+- Task 4: **chờ số đo** ít nhất hai run `main`; chưa đổi timeout theo ước lượng.

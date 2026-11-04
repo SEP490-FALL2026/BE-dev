@@ -7,11 +7,12 @@ name: Backend CI
 # - integration: three parallel shards against disposable PostgreSQL; integration-inband runs timing and serial suites.
 #   On dev/PR only affected modules and their dependents; on main and by hand, everything.
 # - e2e-smoke: a few business journeys end to end, on main and by hand.
-# - deploy: only from main, only when every test job above passed. Nightly runs everything on dev (nightly.yml).
+# - deploy: only from main, only when every test job above passed. Weekly Sunday runs everything on dev (nightly.yml).
 # No step hides a failure (no continue-on-error, no `|| true`).
 
 on:
   pull_request:
+    branches: [dev]
     paths: &watched
       - 'src/**'
       - 'test/**'
@@ -56,6 +57,10 @@ permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   select:
     runs-on: ubuntu-latest
@@ -63,6 +68,7 @@ jobs:
     outputs:
       paths: ${{ steps.select.outputs.paths }}
       serial: ${{ steps.select.outputs.serial }}
+      run: ${{ steps.select.outputs.run }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -77,8 +83,14 @@ jobs:
       - name: Choose the integration suites
         id: select
         env:
+          SKIP_DEPLOY_DEV: ${{ github.repository == 'WDP301-FA26-GR8/BE' && github.ref == 'refs/heads/dev' }}
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
+          if [ "$SKIP_DEPLOY_DEV" = "true" ]; then
+            printf 'run=false\npaths=NONE\nserial=NO-SERIAL\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf 'run=true\n' >> "$GITHUB_OUTPUT"
           if [ "$GITHUB_REF" = "refs/heads/main" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             printf 'paths=ALL\nserial=SERIAL\n' >> "$GITHUB_OUTPUT"
           else
@@ -88,6 +100,8 @@ jobs:
           cat "$GITHUB_OUTPUT"
 
   quality:
+    needs: select
+    if: needs.select.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -165,6 +179,8 @@ jobs:
           if-no-files-found: ignore
 
   http-contract:
+    needs: select
+    if: needs.select.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -187,7 +203,7 @@ jobs:
 
   integration:
     needs: select
-    if: needs.select.outputs.paths != 'NONE'
+    if: needs.select.outputs.run == 'true' && needs.select.outputs.paths != 'NONE'
     strategy:
       fail-fast: false
       matrix:
@@ -234,7 +250,7 @@ jobs:
 
   integration-inband:
     needs: select
-    if: needs.select.outputs.paths != 'NONE' || needs.select.outputs.serial == 'SERIAL'
+    if: needs.select.outputs.run == 'true' && (needs.select.outputs.paths != 'NONE' || needs.select.outputs.serial == 'SERIAL')
     runs-on: ubuntu-latest
     # Keep initial headroom until two main runs provide shard measurements.
     timeout-minutes: 70
@@ -286,7 +302,8 @@ jobs:
           if-no-files-found: ignore
 
   e2e-smoke:
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    needs: select
+    if: needs.select.outputs.run == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
