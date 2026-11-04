@@ -61,10 +61,10 @@ flowchart BT
   identity_access -->|16| audit
   identity_access -->|10| notifications
   identity_access -->|34| organization
-  installation -->|8| audit
+  installation -->|6| audit
   installation -->|2| finance
-  installation -->|18| identity_access
-  installation -->|12| organization
+  installation -->|11| identity_access
+  installation -->|8| organization
   licensing -->|29| audit
   licensing -->|48| catalog
   licensing -->|2| finance

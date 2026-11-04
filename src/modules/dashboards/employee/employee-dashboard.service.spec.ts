@@ -44,11 +44,11 @@ describe('EmployeeDashboardService', () => {
       },
     });
     expect(employeeFacts).toHaveBeenCalledWith('e-1', '2026-10-23');
-    expect(openRequestsSentBy).toHaveBeenCalledWith(actor(['EMPLOYEE']));
+    expect(openRequestsSentBy).toHaveBeenCalledWith('e-1');
   });
 
   it.each(['SUPER_ADMIN', 'SPENDING_APPROVER', 'IT_ADMIN', 'FINANCE', 'MANAGER', 'EMPLOYEE'])(
-    'counts the caller own data for the single role %s',
+    "counts the caller's own data for the single role %s",
     async (role) => {
       const { service, employeeFacts, openRequestsSentBy } = serviceWith(0);
       const overview = await service.overview(actor([role]));
@@ -59,7 +59,7 @@ describe('EmployeeDashboardService', () => {
         reason: null,
       });
       expect(employeeFacts).toHaveBeenCalledWith('e-1', '2026-10-23');
-      expect(openRequestsSentBy).toHaveBeenCalledWith(actor([role]));
+      expect(openRequestsSentBy).toHaveBeenCalledWith('e-1');
     },
   );
 });

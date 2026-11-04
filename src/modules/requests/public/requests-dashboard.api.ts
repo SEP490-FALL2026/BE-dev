@@ -11,10 +11,10 @@ export class RequestsDashboardApi {
     private readonly needQueue: NeedDecisionQueueRepo,
   ) {}
 
-  /** The caller's open requests, including requests sent before their current role. */
-  async openRequestsSentBy(actor: { employeeId: string; roles: readonly string[] }): Promise<number> {
+  /** The open requests this person sent, whatever their role, including requests sent before their current role. */
+  async openRequestsSentBy(employeeId: string): Promise<number> {
     return this.myRequests.countOf({
-      requesterEmployeeId: actor.employeeId,
+      requesterEmployeeId: employeeId,
       states: statesOf('open', undefined),
     });
   }

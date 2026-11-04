@@ -54,8 +54,8 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
   const freshInternal = () => h.plan('K5');
 
   /** What the facade says of the open requests of a person, and what the list "my requests" says. */
-  const openCounts = async (person: Person, roles: readonly string[] = ['EMPLOYEE']) => ({
-    facade: await api.openRequestsSentBy({ employeeId: person.employeeId, roles }),
+  const openCounts = async (person: Person) => ({
+    facade: await api.openRequestsSentBy(person.employeeId),
     list: await myRequestsTotal(person.account, 'open'),
   });
   /** What the facade says of the need steps a person holds, and what the list of need decisions says. */
@@ -86,7 +86,7 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
   describe('openRequestsSentBy', () => {
     it('returns 0 when employee has sent no requests, agreeing with meAccessRequestList?view=open', async () => {
       const listCount = await myRequestsTotal(e1.account, 'open');
-      const count = await api.openRequestsSentBy({ employeeId: e1.employeeId, roles: ['EMPLOYEE'] });
+      const count = await api.openRequestsSentBy(e1.employeeId);
 
       expect(count).toBe(0);
       expect(count).toBe(listCount);
@@ -97,17 +97,14 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
       await h.sent(e1, paid, { termMonths: 1 });
 
       const listCount = await myRequestsTotal(e1.account, 'open');
-      const count = await api.openRequestsSentBy({ employeeId: e1.employeeId, roles: ['EMPLOYEE'] });
+      const count = await api.openRequestsSentBy(e1.employeeId);
 
       expect(count).toBe(2);
       expect(count).toBe(listCount);
     });
 
     it('counts 0 for the Super Admin, who sends no request but reads their own list like every account (QĐ-95d)', async () => {
-      const count = await api.openRequestsSentBy({
-        employeeId: h.seed.superAdmin.employeeId,
-        roles: ['SUPER_ADMIN'],
-      });
+      const count = await api.openRequestsSentBy(h.seed.superAdmin.employeeId);
 
       expect(count).toBe(0);
     });

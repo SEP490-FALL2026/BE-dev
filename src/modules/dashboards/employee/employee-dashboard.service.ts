@@ -33,7 +33,7 @@ export class EmployeeDashboardService {
     const today = await this.organizationReads.businessToday();
     const [facts, openRequests] = await Promise.all([
       this.licensing.employeeFacts(actor.employeeId, today),
-      this.requests.openRequestsSentBy(actor),
+      this.requests.openRequestsSentBy(actor.employeeId),
     ]);
 
     return {

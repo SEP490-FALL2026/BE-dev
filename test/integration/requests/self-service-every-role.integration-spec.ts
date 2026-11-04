@@ -47,9 +47,16 @@ describe('self-service belongs to every account, with one role per account', () 
 
   it('lets all eight callers read only their own software, requests, overview and inbox', async () => {
     const sent = await h.sent(employee, internal);
+    const seat = await right(employee, { planId: await h.plan('K5') });
     for (const account of accounts) {
       for (const path of ['/api/v1/me/software-rights', '/api/v1/me/access-requests', '/api/v1/notifications']) {
         const response = await request(h.server()).get(path).set(h.as(account)).expect(200);
+        if (path.endsWith('software-rights')) {
+          const seats = h
+            .dataOf<{ items: { assignmentId: string }[] }>(response)
+            .items.map((item) => item.assignmentId);
+          expect(seats.includes(seat)).toBe(account.employeeId === employee.employeeId);
+        }
         if (path.endsWith('access-requests')) {
           const ids = h.dataOf<{ items: { id: string }[] }>(response).items.map((item) => item.id);
           expect(ids.includes(sent.id)).toBe(account.employeeId === employee.employeeId);
@@ -113,6 +120,19 @@ describe('self-service belongs to every account, with one role per account', () 
     const own = await h.itemsOf<{ reporter: { employeeId: string } }>('/api/v1/saas-issues', h.it1, { scope: 'mine' });
     expect(own).toHaveLength(1);
     expect(own[0].reporter.employeeId).toBe(h.it1.employeeId);
+  });
+
+  it("counts an IT Admin's own seat and own open request on the employee overview (US-12-15 AC-27)", async () => {
+    const it1 = { employeeId: h.it1.employeeId, account: h.it1 };
+    const before = await h.overviewOf(OVERVIEW_PATHS.employee, h.it1);
+    expect(before.sections.requests.count).toBe(0);
+    const sent = await h.sent(it1, await h.plan('K5'));
+    const after = await h.overviewOf(OVERVIEW_PATHS.employee, h.it1);
+    expect(after.sections.requests).toMatchObject({ state: 'COUNTED', count: 1 });
+    expect(after.sections.softwareRights.count).toBeGreaterThanOrEqual(1);
+    const open = await h.itemsOf<{ id: string }>('/api/v1/me/access-requests', h.it1, { view: 'open' });
+    expect(open.map((item) => item.id)).toEqual([sent.id]);
+    await h.withdrawRequest(sent.id, { reason: 'The work is cancelled' }, h.it1).expect(200);
   });
 
   it('keeps the sending restrictions and writes nothing for rejected senders', async () => {
