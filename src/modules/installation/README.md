@@ -75,3 +75,5 @@ Lệnh nằm ở `src/cli/<lệnh>/` (bảng lệnh: `src/cli/commands.ts`) và 
 
 - Unit: `src/modules/installation/**/*.spec.ts` và `src/cli/{bootstrap,seed,inspect,preflight}/**/*.spec.ts`; HTTP:
   không có (không route); integration: `test/integration/installation/`.
+
+Unified seed: check calls InstallationInspectionApi.seedCheck through the existing read-only inspection graph, with no migration-history query. Apply holds DemoAccountsApi.holdApplyLock before seedState/inspect; EMPTY bootstrap explicitly opens the existing InstallationModule, then writes business records through HTTP. No new graph or binder exception. Reset exists only in owner-run wrappers; see [seed guide](../../../docs/guides/seed.md).

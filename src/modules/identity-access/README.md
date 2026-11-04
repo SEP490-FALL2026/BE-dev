@@ -107,3 +107,5 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
 `20261104120000_identity_one_role_per_account` refuses accounts with `MULTIPLE_ROLES` or `NO_ROLE`, listing employee codes before any schema change. It does not backfill or repair data. Rebuild the database and seed again as instructed by the Owner. A failed `migrate deploy` leaves a failed Prisma history row: after correcting/rebuilding data, the Owner runs `prisma migrate resolve --rolled-back 20261104120000_identity_one_role_per_account` before retrying deployment.
 
 The partial unique index limits effective grants to one per account; all application creation and replacement paths supply that role. Historical revoked grants remain.
+
+Demo accounts are created only by ops:seed through LocalDemoAccountApi; installation creates the separate SUPER_ADMIN. Password preflight uses public/password.policy.ts, a pure wrapper around the same credential policy (Owner-approved alternative to a forbidden re-export). See [seed operations](../../../docs/guides/seed.md).

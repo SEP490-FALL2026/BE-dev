@@ -4,6 +4,8 @@ Hướng dẫn vận hành một lần sau khi deploy lên **database mới đã
 [`bootstrap-installation.sh`](../../scripts/ops/bootstrap-installation.sh) đọc cấu hình từ `.env.bootstrap` rồi gọi CLI
 của đúng image đang deploy. CLI tạo tổ chức, một phòng đầu tiên và tài khoản Super Admin; không tạo dataset demo.
 
+Với DB demo local/VPS, dùng [seed hợp nhất](seed.md): wrapper kiểm trạng thái, xác nhận reset hoặc chạy tiếp, và bootstrap khi DB trống. Hướng dẫn này vẫn dành cho cài đặt thật, giữ nguyên database qua deploy.
+
 Luồng: **commit/push → CI/CD xanh → copy wrapper và template → điền cấu hình → bootstrap → inspect/preflight → đăng nhập**.
 CI/CD tạo schema và chạy BE; nó không tự tạo tổ chức hoặc Super Admin. Xem
 [runbook container và H7](containers.md#postgresql-roles-h7) nếu cần chuẩn bị hạ tầng/cấu hình trước deploy.

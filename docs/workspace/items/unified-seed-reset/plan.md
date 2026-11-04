@@ -52,8 +52,8 @@ test/integration/installation`.
 
 ### Task 2: `check`, mật khẩu kiểm trước, bootstrap trong `apply`, khóa trước khi đọc
 
-- Files: `src/cli/seed/seed.arguments.ts` (+ spec: mode `check`, `--operator-reference` thay `--operator`, bỏ `--organization`,
-  `--allow-bootstrap`, `--help` dòng đầu `SEED_PROTOCOL 1`), `seed.command.ts`, `seed-run.ts`, `seed-secrets.ts`,
+- Files: `src/cli/seed/seed.arguments.ts` (+ spec: mode `check`, `--operator-reference` thay `--operator`, bỏ `--organization`, giữ
+  `--allow-bootstrap` theo Owner xác nhận, `--help` dòng đầu `SEED_PROTOCOL 1`), `seed.command.ts`, `seed-run.ts`, `seed-secrets.ts`,
   `fixture/shared-demo-v2/installation.ts`, `src/modules/installation/public/installation-inspection.api.ts` (`seedCheck`),
   `inspect/inspection-facts.policy.ts` (+ spec: `seedStateOf`), `public/demo-accounts.api.ts` (`seedState`, khóa trước),
   `src/modules/identity-access/public/password.policy.ts` (mới), `src/modules/audit/public/audit.api.ts` và repo của nó
@@ -161,12 +161,12 @@ Quick set + gates + script tests xanh; Owner chạy full suite một lần, `see
 
 ## Verification and handoff
 
-| Lệnh / kiểm tra AC                      | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại |
-| --------------------------------------- | --------------------- | ----------------- | ----------------------- |
-| Quick set + gates + script tests        | —                     | chưa chạy         | —                       |
-| Integration seed (theo file, `_serial`) | —                     | chưa chạy         | —                       |
-| `seed:local` thật trên máy dev          | —                     | chưa chạy         | Owner chạy              |
-| Runbook VPS + `seed.sh` có reset        | —                     | chưa chạy         | Owner chạy              |
+| Lệnh / kiểm tra AC                    | Revision / môi trường          | Kết quả thực chạy                                                                                                      | Giới hạn / việc còn lại               |
+| ------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Scoped quick checks + gates + scripts | feat/unified-seed-reset, local | Unit 145 / 15 suites, gates 325 / 16 suites, scripts 297 total / 295 pass / 2 skip; type/lint/arch/rules/format passed | Review pending; no full check         |
+| Integration seed and runtime _serial  | local source                   | Written, not run by Owner instruction                                                                                  | Review session runs PostgreSQL suites |
+| Real seed:local reset                 | local                          | Not run                                                                                                                | Waiting Owner                         |
+| VPS rebuild / seed.sh reset           | shared demo                    | Not run                                                                                                                | Waiting Owner                         |
 
 - [ ] AC trong scope có bằng chứng.
 - [ ] Spec/plan/guide phản ánh implementation cuối.
@@ -315,3 +315,11 @@ Quick set + gates + script tests xanh; Owner chạy full suite một lần, `see
 ### Task 2 test-matrix completion before final handoff
 
 - Final matrix audit found runtime coverage tested check but did not yet execute apply under production runtime configuration, and the empty-bootstrap case was not explicitly concurrent. Added a production runtime apply child (owned by existing cli-process cleanup, stdin simulated by a bounded Readable, real disposable runtime DB/API) and changed empty apply to two concurrent runs with one success/one lock refusal. Written only, not run. This follow-up test commit is later than Task 7; no business implementation changed.
+
+### Task 8 final handoff evidence
+
+- Completed local/VPS guide and one-time old-image VPS rebuild runbook, documented deploy-lock exit 2 for concurrent CD, backup recovery and retention. Updated reset rules, module boundaries, architecture, root/bootstrap/new-dev/identity docs. AGENTS checked; no change necessary.
+- Owner clarifications are recorded in Changes and acceptance and the final report: keep --allow-bootstrap, approved moved calendar link only, use pure password wrapper instead of re-export.
+- Final scoped unit: 15 suites / 145 tests passed. Full scripts Task 7: 297 total / 295 passed / 2 skipped / 0 failed (exit 0); final targeted VPS/retention rerun 19 passed. Full lint Task 6/7/8 passed; typecheck/arch/rules/format and gates (325 tests) passed. The late Task 2 integration additions also passed typecheck and focused lint; never executed.
+- Task 9 has not started: its plan requires Owner VPS seed, which this session did not perform. Docs repo remains read-only and uncommitted. No checkpoint requiring integration/e2e or real reset is marked accepted.
+- All implementation commits remain local; no push, merge, PR, deploy, SSH or shared database access.

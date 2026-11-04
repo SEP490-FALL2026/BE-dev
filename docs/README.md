@@ -21,7 +21,7 @@ trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn 
 
 - [Bootstrap tổ chức và Super Admin trên VPS](guides/bootstrap-installation.md): nguồn hướng dẫn chính cho wrapper,
   `.env.bootstrap`, copy file, cài đầu tiên, kiểm tra và các lần deploy sau.
-- [Seed demo](guides/seed.md): `pnpm ops:seed`, fixture v2; wrappers follow in Tasks 6/7.
+- [Seed demo](guides/seed.md): `pnpm ops:seed`, fixture v2, local/VPS wrappers and one-time rebuild runbook.
 
 - [Container, PostgreSQL roles và deploy](guides/containers.md): chuẩn bị hạ tầng, backup, migration và phục hồi release.
 

@@ -17,7 +17,7 @@ xác nhận rằng đọc xong là làm được một task đầu tiên mà kh�
 | ---------- | --------------- | ----------------------------- | --------------------------------------------------------------------------------- |
 | API        | `src/main.ts`   | `src/app/app.module.ts`       | HTTP `/api/v1/*` và các sweeper theo giờ (ADR-0018)                               |
 | Worker     | `src/worker.ts` | `src/worker/worker.module.ts` | gửi email từ outbox, xử lý bước mở của Request (`src/worker/request-work.job.ts`) |
-| Lệnh       | `src/cli.ts`    | `src/cli/commands.ts`         | cài đặt, khôi phục, kiểm tra, preflight, role DB, seed local                      |
+| Lệnh       | `src/cli.ts`    | `src/cli/commands.ts`         | cài đặt, khôi phục, kiểm tra, preflight, role DB, seed local/VPS                  |
 
 **Sáu tầng module** (nguồn duy nhất: `scripts/arch/tiers.cjs`; module chỉ import module tầng thấp hơn):
 
@@ -269,3 +269,7 @@ build), rồi `pnpm test:http`, rồi integration của module bạn đụng, v�
   làm việc; `node scripts/arch/comment-codes.mjs` in danh sách để người đọc, không phải gate.
 - **ADR "Accepted" là lựa chọn thiết kế**, không phải bằng chứng code đã làm đúng như vậy: kiểm source trước khi gọi một facade hay
   helper; ADR-0019 vẫn ở trạng thái Proposed.
+
+## Dataset demo
+
+Use [seed local/VPS](seed.md) and the [fixture inventory](../../src/cli/seed/fixture/shared-demo-v2/README.md). `pnpm seed:local` reads private settings and checks development/loopback before offering reset/continue/exit. Real reset belongs to the Owner; Nest does not delete databases. Accounts have one role, department heads hold MANAGER, and self-service follows the current limits. Mock script success is not integration or VPS verification.

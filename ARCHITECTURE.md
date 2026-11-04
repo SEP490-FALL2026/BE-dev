@@ -23,9 +23,12 @@ ba tiến trình chạy từ cùng một image. Ranh giới module, tầng và c
 | ---------- | ---------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | API        | `main.js`                                | `src/app/app.module.ts`       | HTTP `/api/v1/*`, các sweeper theo giờ ([ADR-0018](docs/decisions/0018-sweepers-stay-in-the-api-process.md)) |
 | Worker     | `worker.js`                              | `src/worker/worker.module.ts` | Gửi email từ outbox, xử lý bước mở của Request (thăm dò PostgreSQL, không Redis)                             |
-| Lệnh       | `cli.js <lệnh>` (+ alias `<tên>-cli.js`) | `src/cli/commands.ts`         | Cài đặt, khôi phục, kiểm tra, preflight, role DB, seed local                                                 |
+| Lệnh       | `cli.js <lệnh>` (+ alias `<tên>-cli.js`) | `src/cli/commands.ts`         | Cài đặt, khôi phục, kiểm tra, preflight, role DB, seed local/VPS                                             |
 
-Alias `dist/<tên>-cli.js` sinh lúc build và giữ vĩnh viễn: script deploy/bootstrap và image cũ gọi chúng.
+Alias `dist/<tên>-cli.js` sinh từ bảng lệnh lúc build. Ngoại lệ OD-S3: alias demo-dataset/dev-seed đã bỏ khi chuyển sang seed và dựng lại VPS demo; alias khác giữ ổn định.
+
+`seed check` dùng graph inspection chỉ đọc; `seed apply` dùng graph seed và có thể mở graph installation hiện có để bootstrap.
+Reset thuộc wrapper local/VPS, không thuộc Nest hay CI/CD; xem [seed](docs/guides/seed.md).
 
 ## Tầng source và tầng module
 

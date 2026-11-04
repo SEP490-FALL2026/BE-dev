@@ -71,6 +71,13 @@ và rule chuyên đề liên quan. AGENTS áp dụng toàn repo, bao gồm scrip
 - Đóng app/client trong finally. Test script có logic quyết định hoặc thao tác dữ liệu.
 - Không tạo công cụ trace/spec phụ thuộc một kế hoạch dự án đã bỏ.
 
-Seed command: `pnpm ops:seed`; local and VPS wrappers will be documented in Tasks 6/7. See [seed guide](../docs/guides/seed.md).
+Seed command: `pnpm ops:seed`; local and VPS wrappers are owner-invoked, with real reset pending Owner. See [seed guide](../docs/guides/seed.md).
 
 `dev/seed-local.mjs` (`pnpm seed:local`) reads private .env.seed.local, checks development/loopback before spawning, checks passwords, confirms reset or continuation, migrates, starts API/worker, applies seed and stops children. `dev/local-database-host.mjs` parses PostgreSQL host safety. Script tests use fake commands/HTTP only. Real reset: Owner only.
+
+| Seed file                                                                             | Invocation                | Responsibility                                                                                    |
+| ------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------- |
+| dev/seed-local.mjs                                                                    | pnpm seed:local           | Guard local target, check/confirm, build/migrate/start/seed/cleanup                               |
+| dev/local-database-host.mjs                                                           | imported by local wrapper | Parse host and reject overrides/non-loopback                                                      |
+| ops/seed.sh                                                                           | Owner on demo VPS         | Lock, protocol/check, verified dump, confirmed recreation, provision/migrate/reconcile/ready/seed |
+| verify/seed-local.test.mjs, verify/local-database-host.test.mjs, verify/seed.test.mjs | pnpm test:scripts         | Fake process/HTTP/Docker safety matrices; no real reset                                           |

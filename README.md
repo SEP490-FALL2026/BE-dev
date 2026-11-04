@@ -7,8 +7,8 @@ thì cấu hình Redis mới được kiểm (E2 = A, H6.4). Module mới đặt
 architecture gate, không copy layout của một module cụ thể.
 
 **Đã có trong code:** lệnh khởi tạo `pnpm ops:bootstrap`, đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ
-Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai, đổi/đặt lại mật khẩu, tra cứu Audit Trail, danh mục chức vụ/Cost
-Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, tham số vận hành, import nhân sự CSV, checklist khởi
+Employee, mời/kích hoạt, khóa/mở và đổi vai, đổi/đặt lại mật khẩu, tra cứu Audit Trail, danh mục chức vụ/Cost
+Center, phòng và trưởng phòng (vai Manager gán trực tiếp), Người duyệt chi, tham số vận hành, import nhân sự CSV, checklist khởi
 tạo, lệnh ngoài HTTP đổi người giữ vai Super Admin và khôi phục `pnpm ops:recover --help`, lệnh kiểm trạng thái chỉ đọc
 `pnpm ops:inspect`, lệnh tách vai PostgreSQL production `pnpm ops:db-roles`, và `pnpm ops:seed`
 ([runbook](docs/guides/seed.md)) (các lệnh ngoài HTTP cần
@@ -59,7 +59,7 @@ Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
 5. Khởi tạo một lần bằng `pnpm ops:bootstrap --help`, điền tham số theo help và nhập mật khẩu ở terminal.
 6. Kiểm bằng `pnpm ops:inspect` (chỉ đọc; `--json` cho máy đọc): thoát 0 khi đã cài và nhất quán, 2 khi chưa cài hoặc
    dở dang, 1 khi lỗi. Chỉ in số liệu và email Super Admin đã che.
-7. Tùy chọn, dữ liệu demo: xem [seed](docs/guides/seed.md); wrapper local ở Task 6.
+7. Tùy chọn, dữ liệu demo: xem [seed](docs/guides/seed.md); `pnpm seed:local` đọc .env.seed.local, hỏi xóa/tiếp/thoát và tự dọn API/worker.
 8. Chạy `pnpm start:dev`; chạy worker ở terminal riêng nếu cần gửi thư mời.
 
 CLI khởi tạo chỉ xác thực `NODE_ENV` và cấu hình database; không yêu cầu secret JWT, SMTP hoặc khóa outbox của
@@ -121,3 +121,5 @@ Xem [container guide](docs/guides/containers.md).
 - [Tài liệu](docs/README.md), [scripts](scripts/README.md), [tests](test/README.md).
 
 `package.json` sở hữu lệnh chạy. `openapi.json` sinh bằng `pnpm openapi:export`.
+
+Demo reset and seed: [local/VPS guide](docs/guides/seed.md). VPS reset is Owner-only, requires explicit opt-in, exact database confirmation and a verified dump; CI/CD never seeds or resets. Real resets and full review verification are pending Owner.

@@ -357,4 +357,6 @@ Migration, collection API, jobs/storage: không áp dụng.
 - 04/11/2026 (disposition + Owner): kiểm mật khẩu trước khi xóa; bỏ yêu cầu cửa sổ cảnh báo gia hạn; lịch cuối năm sang năm tài
   chính kế tiếp có ngân sách năm sau; xóa hẳn hai lệnh cũ (ngoại lệ `OD-A7`); runbook VPS giữ đường quay lại; xác nhận bằng tên
   database, local từ chối DB `SHARED`; `check` chỉ đếm phòng/tài khoản; fixture `shared-demo-v2` nhận từ `qd95-one-role-per-account`.
-- Chưa implement.
+- 04/11/2026: implement cục bộ Tasks 1–8; chưa review, chưa chạy integration/e2e hay reset thật. Task 9 Docs chờ Owner seed VPS.
+- Owner xác nhận trong chat: giữ `--allow-bootstrap` theo spec (sửa ghi chú plan nói bỏ cờ); cho sửa duy nhất đích link calendar ở phần tham chiếu sau khi chuyển thư mục.
+- Owner xác nhận dùng hàm public wrapper gọi policy credential hiện có thay cho cú pháp re-export ở phần thiết kế, vì gate cấm re-export trong business module. Không đổi policy hay nới gate. Bằng chứng ở plan và báo cáo implement.
