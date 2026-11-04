@@ -73,6 +73,13 @@ describe('seed password preflight', () => {
     expect(seedSecretsProblem({ ...good, superAdminPassword: 'short' })).toBe('TOO_SHORT');
     expect(seedSecretsProblem({ ...good, superAdminPassword: 'x'.repeat(129) })).toBe('TOO_LONG');
     expect(seedSecretsProblem({ ...good, superAdminPassword: INSTALLATION.loginEmail })).toBe('EQUALS_LOGIN_EMAIL');
+    // A chosen Super Admin email is the one the password must differ from.
+    expect(seedSecretsProblem({ ...good, superAdminPassword: 'owner@example.com' }, 'owner@example.com')).toBe(
+      'EQUALS_LOGIN_EMAIL',
+    );
+    expect(
+      seedSecretsProblem({ ...good, superAdminPassword: INSTALLATION.loginEmail }, 'owner@example.com'),
+    ).toBeNull();
     expect(seedSecretsProblem({ ...good, demoAccountPassword: 'short' })).toBe('DEMO_LENGTH');
   });
 });

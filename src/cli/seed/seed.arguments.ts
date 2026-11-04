@@ -1,4 +1,5 @@
 import { parseArgs } from 'node:util';
+import { InvalidEmailError, normalizeEmail } from '../../core/email';
 
 export class SeedArgumentError extends Error {
   constructor(message: string) {
@@ -9,10 +10,13 @@ export class SeedArgumentError extends Error {
 
 export const SEED_USAGE = `SEED_PROTOCOL 1
 Usage: pnpm ops:seed <check|plan|apply> --environment LOCAL_TEST|SHARED [--fixture shared-demo-v2]
-  [--api-url <origin>] [--operator-reference <reference>] [--allow-bootstrap] [--secrets-stdin] [--json]
+  [--api-url <origin>] [--operator-reference <reference>] [--allow-bootstrap] [--super-admin-email <email>]
+  [--secrets-stdin] [--json]
 
 check reads a runtime-role-safe snapshot without migration metadata. With --secrets-stdin, passwords are validated first.
 plan reads the existing dataset through the API. apply resumes missing records and only bootstraps an EMPTY database with --allow-bootstrap.
+--super-admin-email is the login and work email of the Super Admin the bootstrap creates (default: the fixture's); an installed
+database keeps the Super Admin it has. The Super Admin password must differ from it.
 Passwords are supplied only on stdin: SUPER_ADMIN_PASSWORD=... and DEMO_ACCOUNT_PASSWORD=... .
 No database is deleted by this command. The wrappers handle reset confirmation.
 Exit codes: 0 done or EMPTY; 2 unchanged or INSTALLED/INCOMPLETE check; 3 refused/NOT_MIGRATED; 4 conflict; 1 failure.`;
@@ -22,6 +26,7 @@ const OPTIONS = {
   'api-url': { type: 'string' },
   'operator-reference': { type: 'string' },
   'allow-bootstrap': { type: 'boolean' },
+  'super-admin-email': { type: 'string' },
   environment: { type: 'string' },
   'secrets-stdin': { type: 'boolean' },
   json: { type: 'boolean' },
@@ -37,6 +42,8 @@ export interface SeedCommandArguments {
   json: boolean;
   allowBootstrap: boolean;
   secretsStdin: boolean;
+  /** Absent: the fixture's address. */
+  superAdminEmail?: string;
 }
 
 export type ParsedSeedArguments = { help: true } | { help: false; command: SeedCommandArguments };
@@ -78,6 +85,21 @@ export function parseSeedArguments(argv: readonly string[]): ParsedSeedArguments
   return commandOf(values, positionals[0] as SeedCommandArguments['mode']);
 }
 
+/** The address as given (trimmed), when it is one the installation accepts; absent stays absent. */
+function superAdminEmailOf(value: string | undefined): string | undefined {
+  const email = value?.trim();
+  if (email === undefined) return undefined;
+  try {
+    if (email.length > 254) throw new InvalidEmailError();
+    normalizeEmail(email);
+  } catch (error) {
+    if (error instanceof InvalidEmailError) throw new SeedArgumentError('--super-admin-email is not a valid email.');
+    throw error;
+  }
+
+  return email;
+}
+
 function commandOf(
   values: ReturnType<typeof parseArgs<{ options: typeof OPTIONS }>>['values'],
   mode: SeedCommandArguments['mode'],
@@ -93,6 +115,7 @@ function commandOf(
     throw new SeedArgumentError('--environment must be LOCAL_TEST or SHARED.');
   }
   const operator = mode === 'check' ? (values['operator-reference'] ?? '') : text('operator-reference');
+  const superAdminEmail = superAdminEmailOf(values['super-admin-email']);
   const fixture = values.fixture?.trim() || 'shared-demo-v2';
   const maxReference = 100 - `SEED:${fixture}:`.length;
   if (operator.length > maxReference)
@@ -109,6 +132,7 @@ function commandOf(
       json: values.json === true,
       allowBootstrap: values['allow-bootstrap'] === true,
       secretsStdin: values['secrets-stdin'] === true,
+      ...(superAdminEmail ? { superAdminEmail } : {}),
     },
   };
 }

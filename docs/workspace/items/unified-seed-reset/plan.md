@@ -337,3 +337,9 @@ Quick set + gates + script tests xanh; Owner chạy full suite một lần, `see
 - Giữ nguyên: `planLine` của R2 (đúng `OD-S5`), `holders: 1` (index một Super Admin), literal năm của `seed-calendar` (Date giả).
 - Bằng chứng: run `w1` (full) và `w2` (file đỏ + file sửa) trong `NOTE MD/qd95-logs/`; integration seed, serial `seed-check-runtime`,
   script tests seed/seed-local xanh. Lượt reset thật local/VPS vẫn chờ Owner.
+
+### Task 9 — vận hành VPS (Owner)
+
+- 04/11/2026, bước 1 (dọn DB dưới image cũ) xong: không dump, DROP/CREATE, provision và reconcile `findings: none`, 140 migration tới
+  `20261103160200_organization_drop_projects`, api/worker khởi động, nhả khóa. Runbook từng bước và nhật ký: [seed](../../../guides/seed.md).
+- Bước 2 (deploy QĐ-95), bước 3–4 (seed, kiểm tra): chờ.

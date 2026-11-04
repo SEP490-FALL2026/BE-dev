@@ -137,6 +137,18 @@ for (const environment of ['SHARED', 'UNKNOWN'])
         [],
       );
     });
+test('the chosen Super Admin email reaches check and apply, and stays out of the child environment', async () => {
+  const h = world({ settings: { SEED_SUPER_ADMIN_EMAIL: 'owner@example.com' } });
+  assert.equal(await h.run(['--continue']), 0);
+  for (const mode of ['check', 'apply']) {
+    const args = h.calls.find((call) => call.args?.includes(mode)).args;
+    assert.equal(args[args.indexOf('--super-admin-email') + 1], 'owner@example.com');
+  }
+  assert.equal(h.env().SEED_SUPER_ADMIN_EMAIL, undefined);
+  const plain = world();
+  assert.equal(await plain.run(['--continue']), 0);
+  assert(!plain.calls.some((call) => call.args?.includes('--super-admin-email')));
+});
 test('the pnpm separator is accepted before the options', async () => {
   const h = world();
   assert.equal(await h.run(['--', '--continue']), 0);

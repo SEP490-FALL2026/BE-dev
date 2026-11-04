@@ -9,7 +9,7 @@ Các lệnh cũ `dev-seed`, `demo-dataset` và alias đã bỏ theo OD-S3. Cài 
 ```text
 node dist/cli.js seed <check|plan|apply> --environment LOCAL_TEST|SHARED
   [--fixture shared-demo-v2] [--api-url <origin>]
-  [--operator-reference <reference>] [--allow-bootstrap] [--secrets-stdin] [--json]
+  [--operator-reference <reference>] [--allow-bootstrap] [--super-admin-email <email>] [--secrets-stdin] [--json]
 ```
 
 `--help` bắt đầu bằng `SEED_PROTOCOL 1`. Không có cờ xóa database trong CLI.
@@ -83,7 +83,11 @@ Owner copy script từ checkout **đúng commit đang deploy**, vì CD chỉ ch�
 scp scripts/ops/seed.sh .env.seed.example <demo-host>:/opt/slm/backend/
 ```
 
-Trên VPS, copy template thành `.env.seed`, điền operator reference và hai mật khẩu, đặt quyền 600. `SEED_ALLOW_RESET=false` là mặc định; chỉ đổi thành `true` khi Owner chủ động cho phép reset DB demo. Script đọc file như dữ liệu, không `source` hay thực thi giá trị.
+Trên VPS, copy template thành `.env.seed`, điền operator reference và hai mật khẩu, đặt quyền 600. `SEED_SUPER_ADMIN_EMAIL`
+(tùy chọn, Owner 04/11/2026) là email đăng nhập và email công việc của Super Admin mà lượt bootstrap tạo trên DB trống; để
+trống thì dùng `system.admin@slm-demo.example` của fixture. Mật khẩu Super Admin phải khác email này. DB đã cài giữ nguyên
+Super Admin đang có (đổi email sau đó: `ops:recover reset-credentials --new-login-email`). Wrapper local đọc cùng khóa từ
+`.env.seed.local`. `SEED_ALLOW_RESET=false` là mặc định; chỉ đổi thành `true` khi Owner chủ động cho phép reset DB demo. Script đọc file như dữ liệu, không `source` hay thực thi giá trị.
 
 ```bash
 chmod 600 /opt/slm/backend/.env.seed
@@ -111,16 +115,26 @@ Lỗi (kể cả Ctrl+C/`SIGTERM`) sau khi bắt đầu DROP và trước khi AP
 
 ## Dựng lại VPS một lần trước release QĐ-95 — Owner thực hiện
 
-DB demo cũ nhiều vai sẽ bị migration một vai chặn. Thực hiện dưới **image cũ đang chạy**, sau khi Owner commit các quyết định Docs/rule. Không dùng script seed mới với image cũ chưa có protocol.
+DB demo cũ có tài khoản nhiều vai: migration một vai (`20261104120000_identity_one_role_per_account`) dừng lại khi gặp chúng, nên
+deploy release QĐ-95 lên DB cũ sẽ đỏ. Thứ tự bắt buộc: **dọn DB bằng image cũ → deploy release mới → seed**. Không dùng `seed.sh`
+mới với image cũ (image cũ không có `SEED_PROTOCOL 1`).
 
-Trên VPS, tại app-dir, đặt shell Bash có `set -euo pipefail`, `umask 077`; giữ khóa tới hết giai đoạn dưới:
+### Bước 1 — Dọn DB dưới image cũ đang chạy
+
+Sau khi Owner commit quyết định ở repo Docs. Trên VPS, tại app-dir. `set -euo pipefail` làm một lệnh lỗi đóng luôn phiên SSH
+tương tác: đó là chủ đích (dừng ngay khi lỗi). Kiểm tra sau bước này thì mở phiên mới hoặc gõ `set +euo pipefail`.
 
 ```bash
+set -euo pipefail; umask 077
 cd /opt/slm/backend
-exec 9<>releases/.deploy.lock
-flock -n 9
+exec 9<>releases/.deploy.lock; flock -n 9   # giữ khóa deploy tới hết bước 1
 export API_IMAGE="$(head -n 1 releases/current-image)"
 compose() { docker compose --project-directory "$PWD" -f "$PWD/docker-compose.prod.yml" "$@"; }
+```
+
+Tùy chọn, khi cần giữ dữ liệu cũ: dump trước khi xóa (bỏ qua được nếu chủ động bỏ dữ liệu cũ; khi đó không phục hồi được).
+
+```bash
 DUMP="$PWD/backups/postgres/slm-pre-reseed-$(date -u +%Y%m%dT%H%M%SZ).dump"
 mkdir -p backups/postgres
 test ! -e "$DUMP" && test ! -e "$DUMP.partial"
@@ -128,6 +142,11 @@ compose run --rm --no-deps -T backup pg_dump --format=custom --no-owner --no-pri
 test -s "$DUMP.partial"
 compose run --rm --no-deps -T backup pg_restore --list < "$DUMP.partial" > /dev/null
 mv -- "$DUMP.partial" "$DUMP"
+```
+
+Xóa, dựng lại và khởi động:
+
+```bash
 compose stop api worker
 compose exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE \"$POSTGRES_DB\" WITH (FORCE)" -c "CREATE DATABASE \"$POSTGRES_DB\""'
 compose run --rm -T db-admin
@@ -136,9 +155,68 @@ compose run --rm --no-deps -T migrate node dist/database-roles-cli.js reconcile
 compose up -d api worker
 ```
 
-Kiểm ready bằng probe trong container như [deploy-release.sh](../../scripts/ops/deploy-release.sh), không chỉ kiểm container đang chạy. Chỉ khi ready mới nhả khóa (`flock -u 9; exec 9>&-`). Sau đó để CI/CD deploy release QĐ-95 bình thường: DB trống có lịch sử migration của release cũ, nên deploy không bị chặn vì mất history. Copy `seed.sh` từ checkout release mới, tạo `.env.seed` và chạy script: EMPTY sẽ bootstrap và nạp dataset. Từ lần sau dùng chính `seed.sh` có reset.
+Đầu ra đúng: `DROP DATABASE`, `CREATE DATABASE`; `ops:db-roles provision: DONE` (owner đổi sang deploy role, `findings: none`);
+`All migrations have been successfully applied` với migration cuối **không** phải `…_identity_one_role_per_account` (đó là
+image cũ); `ops:db-roles reconcile: DONE`, `findings: none`; postgres `Healthy`, api/worker `Started`.
 
-Nếu có lỗi sau DROP/CREATE: giữ dịch vụ dừng, giữ dump, sửa nguyên nhân trước khi quyết định chạy tiếp hoặc phục hồi. Phục hồi theo cùng image/Compose project: dựng lại database và provision, rồi dùng service backup (deploy role):
+Kiểm ready (container `Started` chưa phải API sẵn sàng) và DB trống, rồi mới nhả khóa:
+
+```bash
+compose exec -T api node -e 'fetch("http://127.0.0.1:"+(process.env.PORT||3000)+"/"+(process.env.API_PREFIX||"api")+"/v1/health/ready").then(r=>{console.log(r.status);process.exit(r.ok?0:1)},e=>{console.log(e.message);process.exit(1)})'
+compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "select count(*) from organizations"'
+flock -u 9; exec 9>&-
+```
+
+Mong đợi `200` và `0`. Không ra `200`: xem `compose logs --tail=100 api`, giữ khóa tới khi sửa xong.
+
+### Bước 2 — Deploy release QĐ-95 qua CI/CD
+
+Merge vào `main` như thường lệ, chờ CI xanh và workflow deploy xong. DB trống mang lịch sử migration của release cũ nên preflight
+không chặn; deploy áp migration một vai lên DB trống. Deploy gặp khóa đang giữ thì dừng exit 2: nhả khóa ở bước 1 rồi chạy lại.
+
+### Bước 3 — Seed bằng `seed.sh` của release vừa deploy
+
+Trên máy Owner, từ checkout **đúng commit vừa deploy** (CD không chép script này):
+
+```bash
+scp scripts/ops/seed.sh .env.seed.example <demo-host>:/opt/slm/backend/
+```
+
+Trên VPS (phiên Bash thường, không cần `set -e`):
+
+```bash
+cd /opt/slm/backend
+cp .env.seed.example .env.seed && chmod 600 .env.seed
+# điền SEED_OPERATOR_REFERENCE, SEED_SUPER_ADMIN_PASSWORD, SEED_DEMO_ACCOUNT_PASSWORD (12–128 ký tự);
+# SEED_SUPER_ADMIN_EMAIL (tùy chọn) = email đăng nhập Super Admin, trống thì dùng email của fixture;
+# SEED_ALLOW_RESET=true nếu muốn các lần sau reset bằng script
+bash /opt/slm/backend/seed.sh --app-dir /opt/slm/backend --config /opt/slm/backend/.env.seed
+```
+
+DB `EMPTY` nên script không hỏi gì: kiểm protocol và mật khẩu, bootstrap tổ chức `SLM Demo` (phòng gốc `DS1-ADMIN`, Super Admin
+theo `SEED_SUPER_ADMIN_EMAIL`, trống thì `system.admin@slm-demo.example`) rồi nạp dataset qua API. Exit `0` là xong; `2` là không còn gì cần ghi; `3` bị từ chối trước khi ghi
+(đọc dòng `refused:`); `4` xung đột dataset; `1` lỗi. Báo cáo: `seed-reports/<UTC>-apply.txt` (dòng đầu, toàn bộ output, dòng
+`exit <mã>`).
+
+### Bước 4 — Kiểm tra sau seed
+
+- Đăng nhập Super Admin (`SEED_SUPER_ADMIN_EMAIL`, hoặc `system.admin@slm-demo.example` khi để trống) bằng
+  `SEED_SUPER_ADMIN_PASSWORD`; `/me.roles` = `["SUPER_ADMIN"]`.
+- Đăng nhập vài tài khoản demo bằng `SEED_DEMO_ACCOUNT_PASSWORD` (email, vai, phòng ở [README fixture](../../src/cli/seed/fixture/shared-demo-v2/README.md));
+  mỗi tài khoản có đúng một vai.
+- Chạy lại bước 3 với `--continue`: exit `2` (không ghi thêm).
+
+Lỗi ở bước nào: giữ nguyên trạng thái, gửi output và file trong `seed-reports/`; không tự xóa DB lần nữa trước khi xem nguyên nhân.
+
+### Các lần sau
+
+Chỉ cần bước 3 với `SEED_ALLOW_RESET=true`: script in tên DB và số đếm, hỏi gõ đúng tên database để xóa (`c` chạy tiếp, Enter thoát)
+hoặc dùng `--confirm-reset <POSTGRES_DB>` để chạy không hỏi; luôn dump vào `backups/postgres/` trước khi xóa. Bước 1 không cần lặp lại.
+
+### Phục hồi khi có dump
+
+Lỗi sau DROP/CREATE mà có dump: giữ dịch vụ dừng, giữ dump, sửa nguyên nhân trước. Phục hồi theo cùng image/Compose project: dựng
+lại database và provision, rồi dùng service backup (deploy role):
 
 ```bash
 compose run --rm --no-deps -T backup sh -c 'pg_restore --exit-on-error --no-owner --no-privileges --dbname "$PGDATABASE"' < "$DUMP"
@@ -156,4 +234,14 @@ R1 ở nhánh năm sau vẫn cấp từ thuê bao năm hiện tại, hết hạn
 
 ## Bằng chứng và việc Owner còn phải chạy
 
-Script tests dùng Prisma/node/HTTP hoặc Docker giả; chúng kiểm quyết định, thứ tự và bảo mật đầu vào, không chứng minh vận hành VPS thật. Integration (`test/integration/installation/seed*.integration-spec.ts`, `_serial/seed-check-runtime`) chạy `check`/`plan`/`apply` thật trên PostgreSQL và API thật. Lượt `seed:local` có reset thật, runbook VPS và Task 9 tài liệu demo ở repo Docs đều **chờ Owner**; chưa ghi nhận một lượt seed VPS thật.
+Script tests dùng Prisma/node/HTTP hoặc Docker giả; chúng kiểm quyết định, thứ tự và bảo mật đầu vào, không chứng minh vận hành VPS thật. Integration (`test/integration/installation/seed*.integration-spec.ts`, `_serial/seed-check-runtime`) chạy `check`/`plan`/`apply` thật trên PostgreSQL và API thật.
+
+Nhật ký vận hành VPS demo:
+
+| Ngày       | Bước                    | Kết quả                                                                                                                                                                                                                |
+| ---------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 04/11/2026 | 1 — dọn DB, image cũ    | Không dump (Owner bỏ dữ liệu cũ). DROP/CREATE, provision `DONE` (owner → `slm_deploy`, findings none), 140 migration tới `20261103160200_organization_drop_projects`, reconcile `DONE`, api/worker `Started`, nhả khóa |
+| 04/11/2026 | 2 — deploy QĐ-95        | Đang chờ CI/CD                                                                                                                                                                                                         |
+| —          | 3, 4 — seed và kiểm tra | Chờ                                                                                                                                                                                                                    |
+
+Lượt `seed:local` có reset thật và Task 9 tài liệu demo ở repo Docs vẫn **chờ Owner**.

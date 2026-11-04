@@ -4,9 +4,9 @@ The single versioned dataset for seed. All identities are fictional. Passwords c
 
 ## Installation
 
-| Organization | Root department | Super Admin | Login                         | Purpose                                                                                      |
-| ------------ | --------------- | ----------- | ----------------------------- | -------------------------------------------------------------------------------------------- |
-| SLM Demo     | DS1-ADMIN       | DS1-SA      | system.admin@slm-demo.example | Bootstrap and account administration; root department is never reused by organization steps. |
+| Organization | Root department | Super Admin | Login                         | Purpose                                                                                                                                                                                                                   |
+| ------------ | --------------- | ----------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SLM Demo     | DS1-ADMIN       | DS1-SA      | system.admin@slm-demo.example | Bootstrap and account administration; root department is never reused by organization steps. The email is the default: `--super-admin-email` (`SEED_SUPER_ADMIN_EMAIL`) replaces it as login and work email at bootstrap. |
 
 ## Departments
 

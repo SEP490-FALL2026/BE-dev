@@ -8,7 +8,12 @@ import { classifyDatabaseUrl } from './local-database-host.mjs';
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const CONSENT_KEY = 'PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION';
 /** Read by this wrapper only: the passwords reach the seed CLI through stdin, never through a child's environment. */
-const WRAPPER_ONLY_KEYS = ['SEED_SUPER_ADMIN_PASSWORD', 'SEED_DEMO_ACCOUNT_PASSWORD', 'SEED_READY_TIMEOUT_SECONDS'];
+const WRAPPER_ONLY_KEYS = [
+  'SEED_SUPER_ADMIN_PASSWORD',
+  'SEED_DEMO_ACCOUNT_PASSWORD',
+  'SEED_READY_TIMEOUT_SECONDS',
+  'SEED_SUPER_ADMIN_EMAIL',
+];
 const READY_PATH = '/api/v1/health/ready';
 
 export function parseSettings(text) {
@@ -72,9 +77,11 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
     const node = (args, input) => run(process.execPath, args, input);
     const prisma = (args) => node(['node_modules/prisma/build/index.js', ...args]);
     if ((dependencies.needsBuild || needsBuild)(root)) requireSuccess(await run('pnpm', ['build']), 'pnpm build');
+    // Optional: the Super Admin address of a bootstrap; empty keeps the fixture's. The CLI validates it.
+    const emailArgs = settings.SEED_SUPER_ADMIN_EMAIL ? ['--super-admin-email', settings.SEED_SUPER_ADMIN_EMAIL] : [];
     const input = `SUPER_ADMIN_PASSWORD=${settings.SEED_SUPER_ADMIN_PASSWORD}\nDEMO_ACCOUNT_PASSWORD=${settings.SEED_DEMO_ACCOUNT_PASSWORD}\n`;
     const checked = await node(
-      ['dist/cli.js', 'seed', 'check', '--environment', 'LOCAL_TEST', '--secrets-stdin'],
+      ['dist/cli.js', 'seed', 'check', ...emailArgs, '--environment', 'LOCAL_TEST', '--secrets-stdin'],
       input,
     );
     if (runner.aborted) throw new Error('Interrupted');
@@ -103,6 +110,7 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
         'seed',
         'apply',
         '--allow-bootstrap',
+        ...emailArgs,
         '--environment',
         'LOCAL_TEST',
         '--api-url',

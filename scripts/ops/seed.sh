@@ -53,7 +53,7 @@ read_settings() {
     key="${BASH_REMATCH[1]}" value="${BASH_REMATCH[2]}"
     if [[ "$value" = \"*\" || "$value" = \'*\' ]]; then value="${value:1:${#value}-2}"; fi
     if [ "$scope" = seed ]; then
-      case "$key" in SEED_OPERATOR_REFERENCE|SEED_SUPER_ADMIN_PASSWORD|SEED_DEMO_ACCOUNT_PASSWORD|SEED_ALLOW_RESET) ;; *) refuse 'unknown seed configuration key' ;; esac
+      case "$key" in SEED_OPERATOR_REFERENCE|SEED_SUPER_ADMIN_PASSWORD|SEED_DEMO_ACCOUNT_PASSWORD|SEED_ALLOW_RESET|SEED_SUPER_ADMIN_EMAIL) ;; *) refuse 'unknown seed configuration key' ;; esac
     else
       case "$key" in PORT|POSTGRES_DB) ;; *) continue ;; esac
     fi
@@ -73,7 +73,10 @@ IMAGE="$(head -n 1 "$APP_DIR/releases/current-image")"
 [[ "$IMAGE" =~ ^[a-zA-Z0-9][a-zA-Z0-9./_-]*(:[0-9a-f]{40}|@sha256:[0-9a-f]{64})$ ]] || refuse 'deployed image must be immutable'
 compose() { API_IMAGE="$IMAGE" docker compose --project-directory "$APP_DIR" -f "$APP_DIR/docker-compose.prod.yml" "$@"; }
 secrets() { printf 'SUPER_ADMIN_PASSWORD=%s\nDEMO_ACCOUNT_PASSWORD=%s\n' "$SEED_SUPER_ADMIN_PASSWORD" "$SEED_DEMO_ACCOUNT_PASSWORD"; }
-seed_call() { secrets | compose run --rm --no-deps -T api node dist/cli.js seed "$@" --environment SHARED --secrets-stdin; }
+# Optional: the Super Admin address of a bootstrap; empty keeps the fixture's. The CLI validates it.
+EMAIL_ARGS=()
+[ -z "${SEED_SUPER_ADMIN_EMAIL:-}" ] || EMAIL_ARGS=(--super-admin-email "$SEED_SUPER_ADMIN_EMAIL")
+seed_call() { secrets | compose run --rm --no-deps -T api node dist/cli.js seed "$@" ${EMAIL_ARGS[@]+"${EMAIL_ARGS[@]}"} --environment SHARED --secrets-stdin; }
 HELP="$(compose run --rm --no-deps -T api node dist/cli.js seed --help </dev/null)" || refuse 'cannot read seed protocol'
 printf '%s\n' "$HELP" | grep -qx 'SEED_PROTOCOL 1' || refuse 'image does not support SEED_PROTOCOL 1'
 SERVED_DB="$(compose exec -T postgres printenv POSTGRES_DB </dev/null | tr -d '\r')" || refuse 'cannot read the database the postgres container serves'
