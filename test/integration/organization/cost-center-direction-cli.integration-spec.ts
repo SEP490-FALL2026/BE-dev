@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
-import { CLI_COLD_START_MS, CliResult, cliWorkingDirectory, runCli, stopCliProcesses } from '../../support/cli-process';
+import {
+  CLI_COLD_START_MS,
+  CLI_LONG_LOCK_WAIT,
+  CliResult,
+  cliWorkingDirectory,
+  runCli,
+  stopCliProcesses,
+} from '../../support/cli-process';
 import { lastCompatibilityMigration } from '../../support/compat-release';
 import {
   DisposableDatabase,
@@ -40,7 +47,7 @@ describe('ops:cost-center-direction (integration, real CLI and PostgreSQL)', () 
   const run = (args: string[], target: DisposableDatabase = database): Promise<CliResult> =>
     runCli('cost-center-direction', args, {
       cwd: cliWorkingDirectory('slm-cc-direction'),
-      environment: { NODE_ENV: 'production', DATABASE_URL: target.url },
+      environment: { NODE_ENV: 'production', DATABASE_URL: target.url, ...CLI_LONG_LOCK_WAIT },
     });
   const linkArguments = (
     costCenter: string,
@@ -364,9 +371,9 @@ describe('ops:cost-center-direction (integration, real CLI and PostgreSQL)', () 
           await holder.query('BEGIN');
           await holder.query('SELECT id FROM cost_centers WHERE id = $1 FOR UPDATE', [costCenter]);
           const one = link(costCenter, first.code);
-          await waitForLockWaiters(sql, 1, CLI_COLD_START_MS);
+          await waitForLockWaiters(sql, 1, CLI_COLD_START_MS, [one]);
           const two = link(costCenter, second.code);
-          await waitForLockWaiters(sql, 2, CLI_COLD_START_MS);
+          await waitForLockWaiters(sql, 2, CLI_COLD_START_MS, [one, two]);
           await holder.query('COMMIT');
 
           const [a, b] = await Promise.all([one, two]);
@@ -401,7 +408,7 @@ describe('ops:cost-center-direction (integration, real CLI and PostgreSQL)', () 
           await holder.query('BEGIN');
           await holder.query('SELECT id FROM departments WHERE id = $1 FOR UPDATE', [department.id]);
           const linking = link(costCenter, department.code);
-          await waitForLockWaiters(sql, 1, CLI_COLD_START_MS);
+          await waitForLockWaiters(sql, 1, CLI_COLD_START_MS, [linking]);
           await holder.query(
             `INSERT INTO cost_centers (id, organization_id, code, name, kind, status, department_id, linked_at)
              VALUES (gen_random_uuid(), $1, $2, 'Created for it', 'UNIT', 'ACTIVE', $3, now())`,

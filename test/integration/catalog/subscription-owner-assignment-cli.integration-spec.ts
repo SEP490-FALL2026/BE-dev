@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
-import { CLI_COLD_START_MS, CliResult, cliWorkingDirectory, runCli, stopCliProcesses } from '../../support/cli-process';
+import {
+  CLI_COLD_START_MS,
+  CLI_LONG_LOCK_WAIT,
+  CliResult,
+  cliWorkingDirectory,
+  runCli,
+  stopCliProcesses,
+} from '../../support/cli-process';
 import { lastCompatibilityMigration } from '../../support/compat-release';
 import {
   DisposableDatabase,
@@ -36,7 +43,7 @@ describe('ops:assign-subscription-owner (integration, real CLI and PostgreSQL)',
   const run = (args: string[], target: DisposableDatabase = database): Promise<CliResult> =>
     runCli('assign-subscription-owner', args, {
       cwd: cliWorkingDirectory('slm-assign-owner'),
-      environment: { NODE_ENV: 'production', DATABASE_URL: target.url },
+      environment: { NODE_ENV: 'production', DATABASE_URL: target.url, ...CLI_LONG_LOCK_WAIT },
     });
   const argumentsOf = (
     subscription: string,
@@ -196,9 +203,9 @@ describe('ops:assign-subscription-owner (integration, real CLI and PostgreSQL)',
         await holder.query('BEGIN');
         await holder.query('SELECT id FROM subscriptions WHERE id = $1 FOR UPDATE', [subscription]);
         const first = assign(subscription, 'ENG');
-        await waitForLockWaiters(sql, 1, CLI_COLD_START_MS);
+        await waitForLockWaiters(sql, 1, CLI_COLD_START_MS, [first]);
         const second = assign(subscription, 'OPS');
-        await waitForLockWaiters(sql, 2, CLI_COLD_START_MS);
+        await waitForLockWaiters(sql, 2, CLI_COLD_START_MS, [first, second]);
         await holder.query('COMMIT');
 
         const [a, b] = await Promise.all([first, second]);

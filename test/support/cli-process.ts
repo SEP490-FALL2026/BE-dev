@@ -19,6 +19,17 @@ const TS_NODE = require.resolve('ts-node/register/transpile-only');
 const NATIVE_TYPESCRIPT_OFF: readonly string[] = process.features.typescript ? ['--no-experimental-strip-types'] : [];
 /** ts-node compiles the whole module graph on a cold cache. */
 export const CLI_COLD_START_MS = 120000;
+/**
+ * For a CLI that a test parks in a lock wait while it starts another one: the default lock timeout (3 s) ends the first
+ * wait whenever the second command boots slower than that on a busy runner, and the barrier then never sees two waiters.
+ * One minute of lock wait, with the ordering lock < statement < transaction and query > statement kept.
+ */
+export const CLI_LONG_LOCK_WAIT: Readonly<Record<string, string>> = {
+  DB_LOCK_TIMEOUT_MS: '60000',
+  DB_STATEMENT_TIMEOUT_MS: '90000',
+  DB_TRANSACTION_TIMEOUT_MS: '120000',
+  DB_QUERY_TIMEOUT_MS: '100000',
+};
 
 export interface CliResult {
   code: number | null;
