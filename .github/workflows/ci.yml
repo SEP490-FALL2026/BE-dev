@@ -3,8 +3,9 @@ name: Backend CI
 # Test tiers (docs/workspace/items/be-test-architecture-redesign/spec.md, OD-T2, OD-T5):
 # - quality: rules, format, lint, typecheck, unit, static gates, architecture, build, schema drift, OpenAPI, audit.
 # - http-contract: test/http, one Nest application per file, no database.
-# - integration: test/integration against a disposable PostgreSQL. On dev and pull requests only the modules the change
-#   touches and the modules that import them (scripts/ci/affected-modules.mjs); on main and by hand, everything.
+# - select: chooses affected suites without installing dependencies.
+# - integration: three parallel shards against disposable PostgreSQL; integration-inband runs timing and serial suites.
+#   On dev/PR only affected modules and their dependents; on main and by hand, everything.
 # - e2e-smoke: a few business journeys end to end, on main and by hand.
 # - deploy: only from main, only when every test job above passed. Nightly runs everything on dev (nightly.yml).
 # No step hides a failure (no continue-on-error, no `|| true`).
@@ -56,6 +57,36 @@ permissions:
   packages: write
 
 jobs:
+  select:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      paths: ${{ steps.select.outputs.paths }}
+      serial: ${{ steps.select.outputs.serial }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Choose the integration suites
+        id: select
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/main" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            printf 'paths=ALL\nserial=SERIAL\n' >> "$GITHUB_OUTPUT"
+          else
+            node scripts/ci/affected-modules.mjs "$BASE" "$GITHUB_SHA" > "$RUNNER_TEMP/affected.txt"
+            printf 'paths=%s\nserial=%s\n' "$(sed -n 1p "$RUNNER_TEMP/affected.txt")" "$(sed -n 2p "$RUNNER_TEMP/affected.txt")" >> "$GITHUB_OUTPUT"
+          fi
+          cat "$GITHUB_OUTPUT"
+
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -155,10 +186,14 @@ jobs:
           if-no-files-found: ignore
 
   integration:
+    needs: select
+    if: needs.select.outputs.paths != 'NONE'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     runs-on: ubuntu-latest
-    # Measured on 2 vCPU: the parallel step alone took 19–21 min, the whole job about 24–27 min (Owner, 30/10/2026).
-    # After QĐ-93 (309 parallel files, 3 750 tests) the parallel step alone reached 38 min on main and the job was
-    # cancelled at 40 with two files left (run 41570255742, 03/11/2026): room for the in-band steps as well.
+    # Keep initial headroom until two main runs provide shard measurements.
     timeout-minutes: 70
     services:
       postgres: *postgres
@@ -181,39 +216,60 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Choose the integration suites
-        id: select
-        env:
-          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          if [ "$GITHUB_REF" = "refs/heads/main" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            printf 'paths=ALL\nserial=SERIAL\n' >> "$GITHUB_OUTPUT"
-          else
-            node scripts/ci/affected-modules.mjs "$BASE" "$GITHUB_SHA" > "$RUNNER_TEMP/affected.txt"
-            printf 'paths=%s\nserial=%s\n' "$(sed -n 1p "$RUNNER_TEMP/affected.txt")" "$(sed -n 2p "$RUNNER_TEMP/affected.txt")" >> "$GITHUB_OUTPUT"
-          fi
-          cat "$GITHUB_OUTPUT"
-
       - name: Run integration tests (parallel files)
-        if: steps.select.outputs.paths != 'NONE'
         env:
-          PATHS: ${{ steps.select.outputs.paths }}
+          PATHS: ${{ needs.select.outputs.paths }}
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
           TEST_CLI_RUNTIME: dist
         run: |
-          if [ "$PATHS" = "ALL" ]; then pnpm test:integration --maxWorkers=2; else pnpm test:integration --maxWorkers=2 $PATHS; fi
+          if [ "$PATHS" = "ALL" ]; then pnpm test:integration --maxWorkers=2 --shard=${{ matrix.shard }}/3 --passWithNoTests; else pnpm test:integration --maxWorkers=2 --shard=${{ matrix.shard }}/3 --passWithNoTests $PATHS; fi
+
+      - name: Keep test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-timings-integration-${{ matrix.shard }}
+          path: reports/test-timings/
+          if-no-files-found: ignore
+
+  integration-inband:
+    needs: select
+    if: needs.select.outputs.paths != 'NONE' || needs.select.outputs.serial == 'SERIAL'
+    runs-on: ubuntu-latest
+    # Keep initial headroom until two main runs provide shard measurements.
+    timeout-minutes: 70
+    services:
+      postgres: *postgres
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # the affected-module selection diffs against the previous commit of the branch or the PR base
+          fetch-depth: 0
+
+      - name: Set up the backend
+        uses: ./.github/actions/setup
+
+      - name: Provision the test database role
+        uses: ./.github/actions/test-database
+        with:
+          container: ${{ job.services.postgres.id }}
+
+      # The CLI suites start the built `dist/cli.js` (TEST_CLI_RUNTIME=dist) instead of compiling the sources per call.
+      - name: Build
+        run: pnpm build
 
       # The same modules' *.timing-spec.ts: their wall-clock bounds hold only with no other file running.
       - name: Run integration tests that bound wall-clock time (in band)
-        if: steps.select.outputs.paths != 'NONE'
+        if: needs.select.outputs.paths != 'NONE'
         env:
-          PATHS: ${{ steps.select.outputs.paths }}
+          PATHS: ${{ needs.select.outputs.paths }}
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
         run: |
           if [ "$PATHS" = "ALL" ]; then pnpm test:integration:timing; else pnpm test:integration:timing $PATHS; fi
 
       - name: Run integration tests that share the cluster (in band)
-        if: steps.select.outputs.serial == 'SERIAL'
+        if: needs.select.outputs.serial == 'SERIAL'
         env:
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
           TEST_CLI_RUNTIME: dist
@@ -225,7 +281,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-timings-integration
+          name: test-timings-integration-inband
           path: reports/test-timings/
           if-no-files-found: ignore
 
@@ -254,7 +310,7 @@ jobs:
 
   deploy:
     name: Deploy to VPS
-    needs: [quality, http-contract, integration, e2e-smoke]
+    needs: [quality, http-contract, integration, integration-inband, e2e-smoke]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/deploy.yml
     with:

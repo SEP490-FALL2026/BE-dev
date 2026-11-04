@@ -66,3 +66,10 @@
 - [ ] AC trong scope có bằng chứng (run id).
 - [ ] Spec/plan phản ánh đúng YAML cuối; lựa chọn Owner ghi ở spec.
 - [ ] Giao Owner review; cập nhật roadmap.
+
+### B?ng ch?ng tri?n khai local ? Task 1 (04/11/2026)
+
+- Test c?u tr?c `node --test scripts/verify/check-script-order.test.mjs`: 4 pass, 0 fail.
+- ??t bi?n th? c?ng matrix `[1, 2]`: exit 1, expected `[1, 2, 3]`; ?? ho?n l?i bytes g?c.
+- `pnpm rules:format`: pass. `pnpm exec prettier --check .github/workflows/*.yml`: pass.
+- Kh?ng ch?y Actions, integration, timing, serial hay e2e theo ph?m vi giao vi?c.
