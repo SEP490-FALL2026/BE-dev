@@ -185,11 +185,9 @@ Bảng test cũ → mới (điền khi implement):
 - Lint Task 1 phát hiện suppression của hàm tạo tài khoản đã thừa sau khi bỏ vòng lặp: gỡ đúng một suppression và giảm trần `max-lines-per-function` 51 → 50, tổng 107 → 106 trong gate (bổ sung Files bắt buộc để giữ gate chặt hơn).
 - Lint Task 2 lần đầu có lỗi format và `expect.any(String)` cần kiểu string; đã sửa, đang chạy lại. Không chạy integration/e2e.
 
-### Chốt bằng chứng và điểm dừng
+### Scope resolution
 
-- Lint cuối Task 2: pass, exit 0 (`role-task2-lint-final.log`).
-- Task 3 tạm dừng trước mọi sửa: spec yêu cầu đổi `SeedReportItem.role` (`dev-seed.types.ts:46`) thành `initialRole`, nhưng `src/cli/dev-seed/dev-seed-report.ts:29` và spec cạnh nó còn tiêu thụ trường `role`; hai file không thuộc Files của Task 3. Đã hỏi Owner bổ sung Files, chưa tự mở rộng.
-- Task 4–7 chưa làm vì phụ thuộc Task 3; chưa có migration một vai và chưa tuyên bố checkpoint integration xanh.
+- Task 2 final lint passed. Owner approved adding both dev-seed-report consumers to Task 3; Tasks 3-6 subsequently implemented. No active blocker remains from that clarification.
 
 ### Bảng thay test trước Task 4
 
@@ -229,6 +227,15 @@ Bảng test cũ → mới (điền khi implement):
 ### Task 6 evidence
 
 - Added 20261104120000_identity_one_role_per_account after the current last migration. Guard lists every NO_ROLE / MULTIPLE_ROLES account and raises P0001 without repair. Adds partial unique account index and removes only the superseded per-role index and combination trigger/function.
-- prisma:validate, typecheck, arch:check, rules:check and gates passed (16 suites / 327 tests). Full lint running; focused lint for the new migration test passed. No unit file changed.
+- prisma:validate, typecheck, arch:check, rules:check and gates passed (16 suites / 327 tests). Full lint passed (exit 0); focused lint for the new migration test also passed. No unit file changed.
 - New one-role-per-account-migration.integration-spec.ts covers guard/deploy refusal, unchanged rows, empty deployment, retained singleton/head objects and direct unique violation with history replacement. Written only, not run.
 - README records failed Prisma row recovery via Owner migrate resolve --rolled-back after correction/rebuild. No database command executed.
+
+### Task 7 evidence and client handoff
+
+- Updated module invariants, operational rule 6, superseded notes in historical specs (Changes and acceptance only), and roadmap.
+- FE/mobile: create body role? defaults EMPLOYEE; PUT /app-users/{id}/role returns ROLE.CHANGED; old grant/revoke routes 404; removed /me.selfServiceOnly; roles stays an array. No client implementation in scope.
+- Test replacement ledger: old no-role recovery preparation becomes EMPLOYEE; transfer OUT/IN checks exact previous/new roles; SQL allowed-combination cases become unique-account violations; retained singleton, head, request-party, concurrency and rollback tests use atomic replacement.
+- Integration/e2e checkpoints are pending review; never marked green from unit or HTTP evidence.
+
+- Task 7 arch:docs:check and rules:check passed. First rules:format found formatting in the three added superseded notes; formatted those notes and reran. No changes outside Changes and acceptance in historical specs.

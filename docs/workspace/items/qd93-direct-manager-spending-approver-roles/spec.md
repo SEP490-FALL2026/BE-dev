@@ -644,6 +644,8 @@ FE (web và Mobile) phải đổi khi đọc `GET /me` — phát hành cùng b�
 
 ## Changes and acceptance
 
+- 04/11/2026: superseded in part by [qd95-one-role-per-account](../qd95-one-role-per-account/spec.md). Accounts now have one effective role; PUT /app-users/{id}/role replaces additive grant/revoke routes; recovery prepares EMPLOYEE and replaces both holders' roles. Demo uses shared-demo-v2 with initialRole/finalRole and MANAGER-only heads. Earlier design below remains historical.
+
 - 01/11/2026: bản thiết kế đầu (AI theo giao việc của Owner) từ Docs `69e8a3d`, BE `1a77ffe8`. Chưa Owner review, chưa
   implement, chưa nghiệm thu.
 - 01/11/2026 — Owner duyệt các đề xuất kỹ thuật (OD-1 → OD-6); thiết kế vẫn draft chờ Owner review toàn spec. OD-1 theo

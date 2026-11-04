@@ -27,7 +27,7 @@ lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu
 5. **Không commit mật khẩu, token, hash hay private key mặc định.** Credential sinh ra (CSPRNG) chỉ được in **một lần**
    ra terminal gọi lệnh; không log, không audit, không trả lại ở lần chạy lặp.
 6. **Vai demo theo đúng ownership:** `SUPER_ADMIN`, `IT_ADMIN`, `FINANCE`, `EMPLOYEE`, `MANAGER` và
-   `SPENDING_APPROVER` là vai trực tiếp; cấp và thu hồi qua capability sở hữu cùng các luật nghiệp vụ.
+   `SPENDING_APPROVER` là vai trực tiếp; mỗi tài khoản đúng một vai, đổi vai qua capability sở hữu cùng các luật nghiệp vụ.
 7. **Lệnh, fixture và test chia theo capability/use case** dưới cùng ngưỡng kích thước và quy tắc phụ thuộc của
    [module structure](module-structure.md).
 8. **Dọn tài nguyên:** mọi bước kiểm tra tạo container, image, database tạm, tiến trình hay file phải **đăng ký cleanup

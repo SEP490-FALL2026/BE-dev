@@ -206,6 +206,8 @@ Job/queue/storage, collection `GET`: không áp dụng.
 
 ## Changes and acceptance
 
+- 04/11/2026: superseded in part by [qd95-one-role-per-account](../qd95-one-role-per-account/spec.md). Accounts now have one effective role; PUT /app-users/{id}/role replaces additive grant/revoke routes; recovery prepares EMPLOYEE and replaces both holders' roles. Demo uses shared-demo-v2 with initialRole/finalRole and MANAGER-only heads. Earlier design below remains historical.
+
 - 01/11/2026: bản thiết kế đầu (AI theo giao việc của Owner) từ Docs `69e8a3d`, BE `1a77ffe8`. Phát hiện khi thiết kế:
   `transfer-role` hiện từ chối `HOLDER_STILL_USABLE`, nên `QĐ-93e`(2) (đổi người có kế hoạch bằng lệnh vận hành) cần đổi lệnh,
   không chỉ gỡ route. Chưa Owner review, chưa implement, chưa nghiệm thu.
