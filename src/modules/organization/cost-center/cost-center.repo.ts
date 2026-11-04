@@ -122,14 +122,6 @@ export class CostCenterRepo {
     return this.findById(id, tx);
   }
 
-  /** The cost center with this code, with the department charged to it (the local seed fixture, P23-RV-01). */
-  async findByCode(tx: DbTx, organizationId: string, code: string): Promise<CostCenterRecord | null> {
-    const rows = await tx.$queryRaw<CostCenterRow[]>`
-      ${SELECT_WITH_DEPARTMENT} WHERE c.organization_id = ${organizationId}::uuid AND c.code = ${code}`;
-
-    return rows[0] ? toRecord(rows[0]) : null;
-  }
-
   async findById(id: string, tx?: DbTx): Promise<CostCenterRecord | null> {
     const rows = await (tx ?? this.prisma).$queryRaw<CostCenterRow[]>`
       ${SELECT_WITH_DEPARTMENT} WHERE c.id = ${id}::uuid`;

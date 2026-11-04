@@ -3,10 +3,10 @@
 # (.github/workflows/deploy.yml, step 3.5). Runbook: docs/guides/containers.md#backup-before-production-migrations.
 #
 # Keeps the 10 newest backups OF EACH KIND and every backup younger than 30 days.
-# Dry run unless --apply. Touches only regular files named slm-pre-migrate-<UTC yyyyMMddTHHmmssZ>-<sha>.dump directly in
-# reseed dumps named slm-pre-reseed-<UTC stamp>.dump are included as a separate kind. The target
-# directory must be an absolute path ending in /backups/postgres. Age comes from the UTC stamp in the
-# file name, not the file time. RETENTION_NOW=<yyyyMMddTHHmmssZ> fixes "now" (tests only).
+# Dry run unless --apply. Touches only regular files directly in the given directory named
+# slm-pre-migrate-<UTC yyyyMMddTHHmmssZ>-<sha>.dump (deploy workflow) or slm-pre-reseed-<UTC yyyyMMddTHHmmssZ>.dump
+# (scripts/ops/seed.sh), each its own kind. The directory must be an absolute path ending in /backups/postgres. Age comes
+# from the UTC stamp in the file name, not the file time. RETENTION_NOW=<yyyyMMddTHHmmssZ> fixes "now" (tests only).
 #
 # Exit: 0 done (or dry run), 1 a deletion failed, 2 usage error or refused target (nothing deleted).
 set -euo pipefail

@@ -199,7 +199,7 @@ bảng theo target của [Task 1.2b action 9](../workspace/items/g0-g6-final-bus
 Sau cài đặt, phòng đầu tiên chưa có Cost Center, trưởng phòng hoặc IT Admin phụ trách; thiết lập tiếp qua các luồng
 nghiệp vụ của ứng dụng. Vai được cấp trực tiếp (`QĐ-93a`): Super Admin cấp `MANAGER` cho một người **trước** khi gán
 người đó làm trưởng phòng, và cấp `SPENDING_APPROVER` cho Người duyệt chi; tới khi có người giữ vai này, Request trả phí
-và phiên bản ngân sách đã gửi chờ có kiểm soát (`NO_SPENDING_APPROVER`). Dataset nhân viên/demo là việc riêng, sau bootstrap: [demo-dataset](demo-dataset.md).
+và phiên bản ngân sách đã gửi chờ có kiểm soát (`NO_SPENDING_APPROVER`). Dataset nhân viên/demo là việc riêng, sau bootstrap: [seed](seed.md).
 
 ## Những lần deploy sau và lưu cấu hình
 

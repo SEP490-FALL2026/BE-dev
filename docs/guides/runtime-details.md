@@ -142,9 +142,9 @@ kiểm gốc).
 Lệnh vận hành theo [operational commands](../rules/operational-commands.md). `InspectionCliModule` (H6.1) chỉ xác thực biến
 DB, import `ReadOnlyDatabaseSessionModule` nên mọi phiên PostgreSQL mở `default_transaction_read_only=on`, và đọc qua
 `OrganizationService`, `AuditService.countByAction` và `IdentityAccessInspectionService`
-(`identity-access-inspection-facade.module.ts`, chỉ trong đồ thị này). `DevSeedCliModule` (H6.2) chỉ xác thực biến DB, kiểm
-ba chốt local trước transaction và ghi qua `OrganizationService`, `LocalDemoAccountService`
-(`identity-access-local-seed-facade.module.ts`, chỉ trong đồ thị này) và `AuditService`. Không đồ thị lệnh nào tới được
+(`identity-access-inspection-facade.module.ts`, chỉ trong đồ thị này). `SeedCliModule` (`ops:seed`) chỉ xác thực biến DB
+và chỉ ghi tài khoản demo trong tiến trình qua `DemoAccountsApi` (`LocalDemoAccountApi` của
+`identity-access-local-seed-facade.module.ts`, chỉ trong đồ thị này, và `AuditApi`); phần còn lại của dataset đi qua HTTP API. Không đồ thị lệnh nào tới được
 từ `AppModule`/`WorkerModule` (`module-graph.spec.ts`, `operational-commands.spec.ts`). Storage adapter hỗ trợ endpoint
 S3-compatible; chưa có file ownership/API. Readiness chỉ chứng minh PostgreSQL có thể ping, không chứng minh
 schema/migration hoặc chức năng đăng nhập đã sẵn sàng.

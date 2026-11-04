@@ -10,7 +10,8 @@ lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu
 `pnpm build` sinh từ bảng đó `dist/<tên cũ>-cli.js` một dòng cho mỗi lệnh (`scripts/build/emit-cli-aliases.mjs`); image,
 `scripts/ops/*.sh` và runbook gọi các đường này nên không bỏ hay đổi tên alias. Lệnh mới = một dòng bảng + một thư mục.
 
-**OD-A7 exception (Owner 04/11/2026, OD-S3):** the demo-dataset/dev-seed commands and aliases are removed because the demo VPS is rebuilt and seed.sh replaces their callers. Other command aliases remain stable.
+**Ngoại lệ của `OD-A7` (Owner 04/11/2026, `OD-S3`):** lệnh `demo-dataset`, `dev-seed` và alias của chúng đã bỏ vì VPS demo được
+dựng lại và `scripts/ops/seed.sh` thay mọi nơi gọi chúng. Alias của các lệnh khác vẫn giữ nguyên.
 
 ## Tám quy tắc
 
@@ -18,7 +19,11 @@ lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu
    hay callback bị sửa nhầm: phiên PostgreSQL của nó mở với `default_transaction_read_only=on`
    (`ReadOnlyDatabaseSessionModule`), nên server từ chối mọi lệnh ghi (SQLSTATE `25006`). Kiểm "chỉ đọc" bằng bằng
    chứng ở database, không chỉ bằng mock.
-2. **Local reset belongs in the Node wrapper only:** NODE_ENV=development and a parsed loopback host are checked before every child. Exact database-name confirmation is required; local reset refuses SHARED. Nest CLI/installation code cannot delete databases. The wrapper never sets or forwards Prisma consent; the Owner runs real resets. See [seed](../guides/seed.md).
+2. **Reset local chỉ nằm trong wrapper Node** ([`seed-local.mjs`](../../scripts/dev/seed-local.mjs)): `NODE_ENV=development` và
+   host của `DATABASE_URL` **parse** ra loopback được kiểm trước mọi tiến trình con; xóa cần gõ đúng tên database; database đã cài
+   chỉ được xóa hay chạy tiếp khi bootstrap ghi `LOCAL_TEST` (URL loopback vẫn có thể là tunnel tới server dùng chung). Mã Nest
+   (CLI, `installation`) không có lệnh xóa database. Wrapper không đặt và không chuyển tiếp biến consent của Prisma; lượt reset thật
+   do Owner chạy. Xem [seed](../guides/seed.md).
 3. **Entry CLI và module lệnh không tới được từ `AppModule` và `WorkerModule`** (cả import TypeScript lẫn đồ thị Nest).
 4. **Phân vai:** entry (`src/cli/<lệnh>/<lệnh>.command.ts`) parse tham số, in kết quả, chọn mã thoát; repository query; service
    application/domain thực thi workflow và ghi Audit Trail. Không Prisma trực tiếp hay raw SQL trong entry hoặc service
@@ -39,7 +44,8 @@ lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu
 
 **Đúng:**
 
-- `NODE_ENV=development`, `DATABASE_URL` có host parse ra `127.0.0.1`/`localhost`/`::1`, cờ `--confirm-local`.
+- `pnpm seed:local`: `NODE_ENV=development`, `DATABASE_URL` có host parse ra `127.0.0.1`/`localhost`/`::1`, xóa chỉ khi gõ đúng
+  tên database (`--confirm-reset <tên database>`).
 - Mật khẩu tài khoản mới sinh bằng `randomBytes`, in một lần; test tiêm generator cố định.
 - Ghi qua service của module sở hữu (`OrganizationService`, facade của `identity-access`) và `AuditService`.
 
@@ -108,7 +114,10 @@ biến thể literal vẫn bị từ chối theo tên. Hiện thực (`src/cli/b
 `bootstrap.command.ts` chỉ nối. Người dùng cờ này là [bootstrap wrapper](../../scripts/ops/bootstrap-installation.sh) trên VPS
 (`.env.bootstrap` riêng, owner-only, parse như dữ liệu): [containers](../guides/containers.md#bootstrap-wrapper-prompt-06).
 
-**Demo Finance graph limitation:** direct demo-account creation cannot retry an existing Finance step; the HTTP path does. See [seed](../guides/seed.md).
+**Giới hạn của tài khoản demo `FINANCE` (Owner 30/10/2026):** tạo tài khoản demo vai `FINANCE` trong tiến trình (`DemoAccountsApi`)
+phát thay đổi vai trò phê duyệt mà graph của lệnh không có listener của `requests` trả lời, nên một step đang chờ Finance không được
+thử lại (đường API thì thử lại); fixture tạo tài khoản trước mọi Request nên chưa có step nào chờ Finance. Xem
+[seed](../guides/seed.md).
 
 **`ops:seed` (dataset demo của VPS dùng chung):** không phải lệnh ghi local và không thực hiện reset trong Nest.
 Nó ghi qua **HTTP API đang chạy** bằng đúng vai của từng bước (Super Admin, Finance, IT Admin, trưởng phòng, Người duyệt chi,
@@ -124,7 +133,8 @@ không ghi đè; danh sách dài quá giới hạn đọc cũng là xung đột,
 lượt thứ hai bị từ chối, khóa nhả khi xong/lỗi và khi tiến trình chết. Lịch: `apply` ghi mọi ngày; khi cần thì lập thêm ngân sách năm sau,
 năm tài chính phải bắt đầu tháng 1; sang năm khác thì từ chối. Với `NODE_ENV=production` đồ thị lệnh nạp
 `RuntimeDatabaseRoleModule` như API: vai PostgreSQL không phải runtime role thì dừng trước mọi việc. Hai đường vận hành:
-[Seed guide](../guides/seed.md); replacement local/VPS wrappers are implemented in Tasks 6/7.
+[seed](../guides/seed.md): wrapper local [`seed-local.mjs`](../../scripts/dev/seed-local.mjs) và wrapper VPS
+[`seed.sh`](../../scripts/ops/seed.sh).
 
 **Preflight chỉ kiểm, không sửa:** CSDL bị chặn (exit 2) giữ nguyên, deploy dừng trước migration; xem lịch sử được hỗ trợ và
 cách xử lý CSDL bị chặn ở [containers](../guides/containers.md#preflight-before-migrate-deploy-p28-01). Thiết kế:
