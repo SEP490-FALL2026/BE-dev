@@ -88,17 +88,6 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
 
   beforeAll(async () => {
     ctx = await createHttpTestApp();
-    const install = await NestFactory.createApplicationContext(
-      (await import('../../../src/modules/installation/installation.module')).InstallationModule,
-      { logger: false },
-    );
-    try {
-      await install
-        .get(InstallationApi)
-        .install({ ...INSTALLATION, environment: 'LOCAL_TEST', operatorReference: 'TEST-SEED' }, SEED_PASSWORD);
-    } finally {
-      await install.close();
-    }
     baseUrl = `http://127.0.0.1:${((ctx.app.getHttpServer() as unknown as Server).address() as AddressInfo).port}`;
 
     const direct = new URL(ctx.database.url);
@@ -115,6 +104,19 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
       demo = await NestFactory.createApplicationContext(SeedCliModule, { logger: false });
     } finally {
       process.env.TEST_DATABASE_URL = directUrl;
+    }
+    // Installed after the command's graph: both graphs read the environment validated on first import, so importing the
+    // installation module first would pin the command to the direct connection and the relay would see nothing.
+    const install = await NestFactory.createApplicationContext(
+      (await import('../../../src/modules/installation/installation.module')).InstallationModule,
+      { logger: false },
+    );
+    try {
+      await install
+        .get(InstallationApi)
+        .install({ ...INSTALLATION, environment: 'LOCAL_TEST', operatorReference: 'TEST-SEED' }, SEED_PASSWORD);
+    } finally {
+      await install.close();
     }
   }, 300000);
 

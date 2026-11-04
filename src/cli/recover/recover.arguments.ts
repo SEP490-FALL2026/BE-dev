@@ -20,7 +20,7 @@ Modes
       --account-email <login email of the holder>
       --new-login-email <address>      Optional. The link goes only to this address; the login email changes to it only
                                        after the link is opened. Refused if another account already uses it.
-  unlock              The holder's account is locked and the holder still works. Opens it; changes no role.
+  unlock              The holder's account is locked and the holder still works. Opens it; the role it holds stays the same.
       --account-email <login email of the holder>
   transfer-role       Hand the role to another person.
                       Planned transfer (the holder can still act): the successor already has an activated account,

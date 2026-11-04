@@ -103,13 +103,13 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
       expect(count).toBe(listCount);
     });
 
-    it('returns null for Super Admin caller who sends no requests and is refused by meAccessRequestList', async () => {
+    it('counts 0 for the Super Admin, who sends no request but reads their own list like every account (QĐ-95d)', async () => {
       const count = await api.openRequestsSentBy({
         employeeId: h.seed.superAdmin.employeeId,
         roles: ['SUPER_ADMIN'],
       });
 
-      expect(count).toBeNull();
+      expect(count).toBe(0);
     });
 
     it('counts exactly the open requests of the person: not a completed, refused or withdrawn one, a draft, a colleague request or one sent on their behalf', async () => {
@@ -129,7 +129,7 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
         .expect(200);
       const done = await h.sent(person, await freshInternal());
       await h.decide(done.id, { decision: 'APPROVE' }, u.head.account).expect(200);
-      const task = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId: done.id }).expect(200)).task;
+      const task = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId: done.id }).expect(201)).task;
       await h.claim(task.id).expect(200);
       await h.complete(task.id, { evidence: 'Added to the portal' }).expect(200);
       const withdrawn = await h.sent(person, await freshInternal());

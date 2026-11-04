@@ -283,7 +283,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
   it('reports a conflict instead of overwriting data that no longer matches the dataset, and blocks what needs it', async () => {
     const login = await request(ctx.app.getHttpServer())
       .post('/api/v1/auth/login')
-      .send({ email: 'admin@acme.vn', password: SEED_PASSWORD });
+      .send({ email: INSTALLATION.loginEmail, password: SEED_PASSWORD });
     const token = (login.body as { data: { accessToken: string } }).data.accessToken;
     const { rows } = await ctx.sql.query<{ id: string }>(`SELECT id FROM departments WHERE code = 'DS1-OPS'`);
     await request(ctx.app.getHttpServer())

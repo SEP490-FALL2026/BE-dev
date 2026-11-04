@@ -49,7 +49,7 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     return u;
   };
   const granted = async (id: string): Promise<TaskWire> =>
-    h.dataOf<{ task: TaskWire }>(await h.grant({ requestId: id, subscriptionId }).expect(200)).task;
+    h.dataOf<{ task: TaskWire }>(await h.grant({ requestId: id, subscriptionId }).expect(201)).task;
   /** The request is approved by its head and by the approver, so that it waits to be carried out. */
   const approved = async (u: Unit, amount = 15 * M): Promise<string> => {
     const id = await h.waitingForApprover(u, plan, { amount });

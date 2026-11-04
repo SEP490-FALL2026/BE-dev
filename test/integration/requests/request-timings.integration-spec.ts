@@ -54,7 +54,7 @@ describe('the time a request took over PostgreSQL (US-05-15 AC-1, AC-6, AC-11)',
   const present = (timings: TimingsWire) =>
     Object.entries(timings.segments).flatMap(([kind, segment]) => (segment === null ? [] : [[kind, segment] as const]));
   const granted = async (id: string): Promise<TaskWire> =>
-    h.dataOf<{ task: TaskWire }>(await h.grant({ requestId: id, subscriptionId }).expect(200)).task;
+    h.dataOf<{ task: TaskWire }>(await h.grant({ requestId: id, subscriptionId }).expect(201)).task;
   /** A request approved by the head and the approver and sent to the IT Admin as a task. */
   const approvedWithTask = async (u: Unit) => {
     const id = await h.waitingForApprover(u, plan, { amount: 15 * M });

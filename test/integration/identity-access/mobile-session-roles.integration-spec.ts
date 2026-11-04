@@ -183,7 +183,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
         const departed = await person(['EMPLOYEE']);
         const active = await person(['EMPLOYEE']);
         const invited = await h.member(department.code, `MOB-INV-${label['X-Client']}`, await h.title());
-        await adminPost('/api/v1/app-users', { employeeId: invited, roles: ['EMPLOYEE'] }).expect(201);
+        await adminPost('/api/v1/app-users', { employeeId: invited }).expect(201);
 
         await adminPost(`/api/v1/app-users/${locked.account.appUserId}/lock`, {
           reason: 'Mobile uniform answer test',
@@ -330,19 +330,16 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
   });
 
   describe('who gets the Employee tasks (US-16-04 AC-5, AC-6; US-01-01 AC-16, AC-17)', () => {
-    it('gives IT Admin, Finance and Super Admin no EMPLOYEE role by default, and an account made with no role none at all', async () => {
+    it('gives every account exactly the one role it was created with, EMPLOYEE when none is chosen (QĐ-95a, b)', async () => {
       const superAdmin = h.dataOf<{ accessToken: string }>(
         await login(h.seed.superAdmin.email, h.seed.superAdmin.password).expect(200),
       );
-      const itOnly = await accountMadeThroughTheApi(['IT_ADMIN']);
-      const itWithEmployee = await accountMadeThroughTheApi(['IT_ADMIN']);
-      const noRole = await accountMadeThroughTheApi([]);
+      const itOnly = await accountMadeThroughTheApi('IT_ADMIN');
+      const noRole = await accountMadeThroughTheApi();
 
       expect((await meOf(superAdmin.accessToken)).roles).toEqual(['SUPER_ADMIN']);
       expect((await meOf(h.finance.accessToken)).roles).toEqual(['FINANCE']);
       expect((await meOf(itOnly.accessToken)).roles).toEqual(['IT_ADMIN']);
-      // Roles add up and are not inherited: the IT Admin who also holds EMPLOYEE has exactly those two.
-      expect((await meOf(itWithEmployee.accessToken)).roles).toEqual(['IT_ADMIN']);
       const none = await meOf(noRole.accessToken);
       expect(none.roles).toEqual(['EMPLOYEE']);
       expect(none).not.toHaveProperty('selfServiceOnly');
@@ -474,12 +471,12 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
     });
   });
 
-  /** Creates an account through `POST /app-users` with exactly `roles`, activates it through its invitation and signs it in. */
-  async function accountMadeThroughTheApi(roles: string[]): Promise<ApiAccount> {
+  /** Creates an account through `POST /app-users` with `role` (EMPLOYEE when left out), activates it through its invitation and signs it in. */
+  async function accountMadeThroughTheApi(role?: string): Promise<ApiAccount> {
     counter += 1;
     const code = `MOB-API-${counter}`;
     const employeeId = await h.member(department.code, code, await h.title());
-    const created = await adminPost('/api/v1/app-users', { employeeId, roles }).expect(201);
+    const created = await adminPost('/api/v1/app-users', role ? { employeeId, role } : { employeeId }).expect(201);
     const appUserId = h.dataOf<{ id: string }>(created).id;
     await activateInvitedAccount(h.ctx, appUserId);
     const email = `${code.toLowerCase()}@acme.vn`;

@@ -113,7 +113,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
     return sent.id;
   };
   const granted = async (requestId: string, which = 0): Promise<string> =>
-    h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId: plans[which].subscriptionId }).expect(200))
+    h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId: plans[which].subscriptionId }).expect(201))
       .task.id;
   /** The person has left: the departure is recorded and the day arrives. */
   const left = async (person: Person): Promise<CaseWire> => {

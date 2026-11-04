@@ -66,7 +66,7 @@ describe('the Employee on the phone: own software, own requests, send and withdr
   const approvedAndGranted = async (person: Person, options: { take?: boolean } = {}) => {
     const asked = await sent(person, internalPlan);
     await h.decide(asked.id, { decision: 'APPROVE' }, head.account).expect(200);
-    const task = h.dataOf<{ task: TaskWire }>(await h.grant({ requestId: asked.id }).expect(200)).task;
+    const task = h.dataOf<{ task: TaskWire }>(await h.grant({ requestId: asked.id }).expect(201)).task;
     if (options.take !== false) await h.claim(task.id).expect(200);
 
     return { id: asked.id, task };

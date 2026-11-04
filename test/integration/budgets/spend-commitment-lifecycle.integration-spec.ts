@@ -118,7 +118,7 @@ describe('the money held for a request goes back to the budget over PostgreSQL (
     it('keeps the commitment while the grant is only failing, and gives all of it back when the IT Admin closes it as failed', async () => {
       const u = await example();
       const id = await approved(u, 15 * M);
-      const granted = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId: id, subscriptionId }).expect(200));
+      const granted = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId: id, subscriptionId }).expect(201));
       await h.claim(granted.task.id).expect(200);
       const before = (await row(u))?.remaining.amount;
 

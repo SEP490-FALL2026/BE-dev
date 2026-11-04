@@ -390,7 +390,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       }
       // The commitment was written when the request was approved: nothing waits for the approver or for Finance to carry it out.
       const task = h.dataOf<{ task: { id: string } }>(
-        await h.grant({ requestId: sent.id, subscriptionId }).expect(200),
+        await h.grant({ requestId: sent.id, subscriptionId }).expect(201),
       ).task;
       await h.claim(task.id).expect(200);
       expect(await h.state(sent.id)).toBe('EXECUTING');

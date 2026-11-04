@@ -122,15 +122,15 @@ describe('Audit Trail query over HTTP (integration, real PostgreSQL)', () => {
     return cipher.decrypt(rows[0].id, rows[0].payload_key_id, rows[0].payload_ciphertext).token as string;
   };
 
-  /** An account created and activated through the real workflow, holding exactly `roles`. */
-  const newAccount = async (roles: string[]) => {
+  /** An account created and activated through the real workflow, holding exactly `role` (QĐ-95: one role per account). */
+  const newAccount = async (role: string) => {
     counter += 1;
     const email = `audit.reader.${counter}@acme.vn`;
     const { employeeId } = await insertEmployeeFixture(ctx.app, seed, { code: `E-AU${counter}`, email });
     const created = await request(server())
       .post('/api/v1/app-users')
       .set(asAdmin())
-      .send({ employeeId, roles })
+      .send({ employeeId, role })
       .expect(201);
     const id = (created.body as { data: { id: string } }).data.id;
     await request(server())
@@ -143,7 +143,7 @@ describe('Audit Trail query over HTTP (integration, real PostgreSQL)', () => {
 
   describe('what the real workflows wrote', () => {
     it('lists them newest first with every field, attributed to the Super Admin', async () => {
-      const account = await newAccount(['IT_ADMIN']);
+      const account = await newAccount('IT_ADMIN');
       await request(server())
         .post(`/api/v1/app-users/${account.id}/lock`)
         .set(asAdmin())
@@ -188,7 +188,7 @@ describe('Audit Trail query over HTTP (integration, real PostgreSQL)', () => {
     });
 
     it('answers the same set as the database, whichever filter is used', async () => {
-      const lockedAccount = await newAccount(['IT_ADMIN']);
+      const lockedAccount = await newAccount('IT_ADMIN');
       await request(server())
         .post(`/api/v1/app-users/${lockedAccount.id}/lock`)
         .set(asAdmin())
@@ -316,12 +316,12 @@ describe('Audit Trail query over HTTP (integration, real PostgreSQL)', () => {
 
   describe('who may read it (US-01-06 AC-5, AC-6)', () => {
     it.each([
-      ['an employee', ['EMPLOYEE']],
-      ['an IT administrator', ['IT_ADMIN']],
-      ['the finance officer', ['FINANCE']],
-      ['an account with no role at all', []],
-    ])('refuses %s with 403 and returns no data', async (_name, roles) => {
-      const account = await newAccount(roles);
+      ['an employee', 'EMPLOYEE'],
+      ['an IT administrator', 'IT_ADMIN'],
+      ['the finance officer', 'FINANCE'],
+      ['a department head', 'MANAGER'],
+    ])('refuses %s with 403 and returns no data', async (_name, role) => {
+      const account = await newAccount(role);
 
       const response = await list('', { Authorization: `Bearer ${account.token}` }).expect(403);
 
@@ -331,7 +331,7 @@ describe('Audit Trail query over HTTP (integration, real PostgreSQL)', () => {
 
     it('refuses a request with no token, and one whose account was locked after the token was issued', async () => {
       await request(server()).get('/api/v1/audit-events').expect(401);
-      const account = await newAccount(['IT_ADMIN']);
+      const account = await newAccount('IT_ADMIN');
       await list('', { Authorization: `Bearer ${account.token}` }).expect(403);
 
       await request(server())

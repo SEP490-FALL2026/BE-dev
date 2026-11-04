@@ -182,7 +182,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
       const waiting = await h.waitingForApprover(unit, paid, { amount: 5 * M });
       const granted = await h.waitingForApprover({ ...unit, member: colleague }, paid, { amount: 5 * M });
       await h.decideSpend(granted, APPROVE, h.boss.account).expect(200);
-      await h.grant({ requestId: granted, subscriptionId }).expect(200);
+      await h.grant({ requestId: granted, subscriptionId }).expect(201);
       const needBefore = await h.stepOf(waiting, 'NEED');
       const spendBefore = await h.stepOf(waiting, 'SPEND_APPROVAL');
       expect(spendBefore).toMatchObject({ state: 'PENDING', assignee_employee_id: h.boss.employeeId });

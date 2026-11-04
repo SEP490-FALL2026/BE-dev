@@ -116,7 +116,7 @@ describe('a seat of a department sits on a subscription of that department (inte
       const own = await subscriptionOf(u.department.id);
       const id = await waiting(u, own.plan);
 
-      await grant({ requestId: id, subscriptionId: own.id, accountIdentifier: 'ci-bot' }).expect(200);
+      await grant({ requestId: id, subscriptionId: own.id, accountIdentifier: 'ci-bot' }).expect(201);
 
       expect(await seatOf(id)).toEqual({ owning_department_id: u.department.id, subscription_id: own.id });
     });

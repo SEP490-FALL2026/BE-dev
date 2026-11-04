@@ -87,7 +87,7 @@ export class RecoveryLinks {
     });
   }
 
-  /** An invitation for the successor's account, which has no role (AC-12). */
+  /** An invitation for the successor's account, which holds EMPLOYEE until the role moves (AC-12, QĐ-95). */
   async sendInvitation(
     tx: DbTx,
     input: { organizationId: string; appUserId: string; ticketId: string; recipient: string; fullName: string },

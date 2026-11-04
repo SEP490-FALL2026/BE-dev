@@ -316,7 +316,7 @@ describe('my requests: whose they are and what a row says (integration, real Pos
       await h.decide(refused.id, { decision: 'REJECT', reason: 'The team already has seats' }, unit.head.account);
       const done = await h.sent(person, internal);
       await h.decide(done.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
-      const task = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId: done.id }).expect(200)).task;
+      const task = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId: done.id }).expect(201)).task;
       await h.claim(task.id).expect(200);
       await h.complete(task.id, { evidence: 'Added to the portal' }).expect(200);
       const withdrawn = await h.sent(person, await h.plan('K5'));

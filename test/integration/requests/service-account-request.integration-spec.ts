@@ -138,7 +138,7 @@ describe('a request for a service account after the installation over PostgreSQL
     ).rows[0];
   const granted = async (requestId: string, identifier: string, extra: object = {}, account?: ApiAccount) =>
     h.dataOf<{ task: TaskWire }>(
-      await h.grant({ requestId, subscriptionId, accountIdentifier: identifier, ...extra }, account).expect(200),
+      await h.grant({ requestId, subscriptionId, accountIdentifier: identifier, ...extra }, account).expect(201),
     ).task;
   const codeOf = (response: Parameters<typeof h.codeOf>[0]) => h.codeOf(response);
 
@@ -408,7 +408,7 @@ describe('a request for a service account after the installation over PostgreSQL
       const id = await h.approvedInternalService(u, u.member, internalPlan);
       await h.reviewService(id, { decision: 'ACCEPT' }).expect(200);
 
-      await h.grant({ requestId: id, accountIdentifier: 'internal-svc' }).expect(200);
+      await h.grant({ requestId: id, accountIdentifier: 'internal-svc' }).expect(201);
 
       expect(await assignmentOf(id)).toMatchObject({
         kind: 'SERVICE',

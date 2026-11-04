@@ -55,7 +55,7 @@ describe('the grant of the people of a request for a group, one person at a time
   const grant = (id: string, employeeId: string, account: ApiAccount = h.it1) =>
     h.grantLine({ requestId: id, beneficiaryEmployeeId: employeeId, subscriptionId }, account);
   const granted = async (id: string, employeeId: string, account: ApiAccount = h.it1) =>
-    h.dataOf<{ task: TaskWire }>(await grant(id, employeeId, account).expect(200)).task;
+    h.dataOf<{ task: TaskWire }>(await grant(id, employeeId, account).expect(201)).task;
   const done = async (taskId: string) => {
     await h.claim(taskId).expect(200);
     await h.complete(taskId, { evidence: 'Invited by work email' }).expect(200);

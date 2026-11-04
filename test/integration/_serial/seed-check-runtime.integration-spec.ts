@@ -104,7 +104,7 @@ if (process.argv[2] === '--runtime-seed-driver') {
             for (let i = 0; i < count; i++)
               await sql.query(
                 `INSERT INTO audit_events (id, organization_id, actor_kind, actor_roles, action, resource_type, resource_id, "after", correlation_id)
-          VALUES (gen_random_uuid(), $1, 'SYSTEM', '{}', $2, 'Organization', $1, '{"environment":"SHARED"}', gen_random_uuid())`,
+          VALUES (gen_random_uuid(), $1::uuid, 'SYSTEM', '{}', $2, 'Organization', $1::text, '{"environment":"SHARED"}', gen_random_uuid())`,
                 [world.organizationId, action],
               );
           }

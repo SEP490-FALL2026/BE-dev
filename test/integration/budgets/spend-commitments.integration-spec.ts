@@ -129,7 +129,7 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
 
       expect(queue.items.map((item) => item.requestId)).not.toContain(id);
       expect(await h.steps(id, 'FINANCE_REVIEW')).toEqual([]);
-      await h.grant({ requestId: id, subscriptionId }).expect(200);
+      await h.grant({ requestId: id, subscriptionId }).expect(201);
     });
 
     it('is not held a second time for the same year, by the service or by the database (AC-3)', async () => {
@@ -313,7 +313,7 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
       );
       expect(list.items.map((item) => item.requestId)).toContain(id);
       expect(await h.steps(id, 'FINANCE_REVIEW')).toEqual([expect.objectContaining({ state: 'COMPLETED' })]);
-      await h.grant({ requestId: id, subscriptionId }).expect(200);
+      await h.grant({ requestId: id, subscriptionId }).expect(201);
       expect(await h.budgetRows('budget_versions')).toBe(versions);
     });
   });
