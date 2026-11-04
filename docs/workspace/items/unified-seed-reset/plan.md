@@ -311,3 +311,7 @@ Quick set + gates + script tests xanh; Owner chạy full suite một lần, `see
 - Retention now handles pre-migrate and pre-reseed names with ten newest per kind plus all younger than thirty days.
 - Bash syntax checks passed. Targeted fake-Docker/retention: 19 tests passed (exit 0). Quick gates: 16 suites / 325 tests passed; typecheck/arch/rules passed. Full scripts and lint pending collection.
 - Task 6 full scripts finished: 288 total / 286 passed / 2 skipped / 0 failed, exit 0. Real local/VPS reset still waiting Owner.
+
+### Task 2 test-matrix completion before final handoff
+
+- Final matrix audit found runtime coverage tested check but did not yet execute apply under production runtime configuration, and the empty-bootstrap case was not explicitly concurrent. Added a production runtime apply child (owned by existing cli-process cleanup, stdin simulated by a bounded Readable, real disposable runtime DB/API) and changed empty apply to two concurrent runs with one success/one lock refusal. Written only, not run. This follow-up test commit is later than Task 7; no business implementation changed.

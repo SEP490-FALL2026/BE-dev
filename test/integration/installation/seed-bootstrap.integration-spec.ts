@@ -67,8 +67,11 @@ describe('seed bootstrap from an empty database (integration, real API and Postg
   });
 
   it('bootstraps and reaches all scenario targets, then reruns without changes', async () => {
-    const first = await run(true);
-    expect('report' in first && first.report.exitCode).toBe(0);
+    const outcomes = await Promise.all([run(true), run(true)]);
+    expect(outcomes.filter((outcome) => 'report' in outcome && outcome.report.exitCode === 0)).toHaveLength(1);
+    expect(
+      outcomes.filter((outcome) => 'refused' in outcome && outcome.refused.includes('Another apply')),
+    ).toHaveLength(1);
     expect((await ctx.sql.query("SELECT code FROM departments WHERE code = 'DS1-ADMIN'")).rowCount).toBe(1);
     expect(
       (await ctx.sql.query("SELECT role FROM role_grants WHERE role = 'SUPER_ADMIN' AND revoked_at IS NULL")).rowCount,
