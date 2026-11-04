@@ -4,7 +4,7 @@ import type { AddressInfo, Server } from 'node:net';
 import type { DemoDatasetCommandArguments } from '../../../src/cli/demo-dataset/demo-dataset.arguments';
 import { runDemoDataset, type DemoRunOutcome } from '../../../src/cli/demo-dataset/demo-dataset-run';
 import type { FetchLike } from '../../../src/cli/demo-dataset/demo-api-client';
-import { SHARED_DEMO_V1 } from '../../../src/cli/demo-dataset/fixture/shared-demo-v1';
+import { SHARED_DEMO_V2 } from '../../../src/cli/demo-dataset/fixture/shared-demo-v2';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD, seedInstallation } from '../../support/http-test-app';
 import { PgRelay } from '../../support/pg-relay';
@@ -22,7 +22,7 @@ describe('ops:demo-dataset reruns over a slow database connection (A-04, real AP
   const ONE_WAY_DELAY_MS = 50;
   /** Generous: one demo account's transaction needs at most about 18; the old single transaction needed about 165. */
   const MAX_STATEMENTS_PER_TRANSACTION = 40;
-  const demoAccounts = SHARED_DEMO_V1.people.filter((person) => person.account !== null).length;
+  const demoAccounts = SHARED_DEMO_V2.people.filter((person) => person.account !== null).length;
   const secrets = { superAdminPassword: SEED_PASSWORD, demoAccountPassword: 'a demo password for the tests' };
 
   let ctx: HttpTestApp;
@@ -33,7 +33,7 @@ describe('ops:demo-dataset reruns over a slow database connection (A-04, real AP
 
   const args = (mode: 'plan' | 'apply'): DemoDatasetCommandArguments => ({
     mode,
-    fixture: 'shared-demo-v1',
+    fixture: 'shared-demo-v2',
     organization: 'Acme',
     apiUrl: baseUrl,
     operator: 'TEST-A04',
@@ -63,7 +63,7 @@ describe('ops:demo-dataset reruns over a slow database connection (A-04, real AP
 
   async function heldAdvisoryLocks(): Promise<number> {
     const { rows } = await ctx.sql.query<{ n: string }>(
-      `WITH k AS (SELECT hashtextextended('demo-dataset:shared-demo-v1:apply', 0) AS v)
+      `WITH k AS (SELECT hashtextextended('demo-dataset:shared-demo-v2:apply', 0) AS v)
        SELECT count(*) AS n FROM pg_locks, k
         WHERE locktype = 'advisory' AND granted AND objsubid = 1
           AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
@@ -78,7 +78,7 @@ describe('ops:demo-dataset reruns over a slow database connection (A-04, real AP
     );
     const created = await ctx.sql.query<{ n: string }>(
       `SELECT count(*) AS n FROM audit_events WHERE action = 'DEMO_DATASET.ACCOUNT_CREATED' AND operator_reference = $1`,
-      ['DEMO_DATASET:shared-demo-v1:TEST-A04'],
+      ['DEMO_DATASET:shared-demo-v2:TEST-A04'],
     );
     return { accounts: Number(accounts.rows[0].n), created: Number(created.rows[0].n) };
   }

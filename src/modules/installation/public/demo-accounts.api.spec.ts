@@ -12,7 +12,7 @@ import { DemoAccountsChangedError } from './installation.errors';
 const specs: DemoAccountSpec[] = Array.from({ length: 14 }, (_, index) => ({
   employeeCode: `DS1-${index}`,
   loginEmail: `p${index}@ds1.example`,
-  role: 'EMPLOYEE',
+  initialRole: 'EMPLOYEE',
 }));
 
 /** A runner that records, per transaction, how many accounts were judged inside it. */
@@ -118,7 +118,7 @@ describe('DemoAccountsApi.describe', () => {
 });
 
 describe('DemoAccountsApi.create', () => {
-  const attribution = { operatorReference: 'DEMO_DATASET:shared-demo-v1:op', environment: 'LOCAL_TEST' } as const;
+  const attribution = { operatorReference: 'DEMO_DATASET:shared-demo-v2:op', environment: 'LOCAL_TEST' } as const;
   const two = specs.slice(0, 2);
 
   it('reads the employees once to plan, then again inside the write transaction of each account it creates', async () => {

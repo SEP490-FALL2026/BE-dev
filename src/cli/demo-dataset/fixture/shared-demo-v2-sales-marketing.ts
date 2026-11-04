@@ -1,10 +1,10 @@
 import type { DemoBudget, DemoDepartment, DemoPerson, DemoSubscription } from './demo-fixture.types';
 
 /**
- * Two more departments of `shared-demo-v1`, each ready for the whole of F1 on its own (Owner 03/11/2026): a head who holds
+ * Two more departments of `shared-demo-v2`, each ready for the whole of F1 on its own (Owner 03/11/2026): a head who holds
  * MANAGER, two staff with accounts, a Cost Center, an IT Admin in charge, subscriptions of its own and an approved budget of
  * the year. They take part in no scenario request (R1–R9 keep their departments): they are there for live demos. Spread
- * into `SHARED_DEMO_V1`, which stays the one source of the dataset.
+ * into `SHARED_DEMO_V2`, which stays the one source of the dataset.
  */
 export const SALES_MARKETING: {
   departments: DemoDepartment[];
@@ -80,7 +80,14 @@ export const SALES_MARKETING: {
 
 /** A member of staff with an EMPLOYEE account; the head of the two departments is made one by the steps (MANAGER, then head). */
 function staff(code: string, fullName: string, email: string, department: string): DemoPerson {
-  return { code, fullName, email, department, employmentType: 'STAFF', account: 'EMPLOYEE' };
+  return {
+    code,
+    fullName,
+    email,
+    department,
+    employmentType: 'STAFF',
+    account: code === 'DS1-MKTH' || code === 'DS1-SALH' ? 'MANAGER' : 'EMPLOYEE',
+  };
 }
 
 function monthly(

@@ -22,7 +22,7 @@ describe('ops:demo-dataset at the edges of the year (integration, real API and P
     runDemoDataset({
       args: {
         mode,
-        fixture: 'shared-demo-v1',
+        fixture: 'shared-demo-v2',
         organization: 'Acme',
         apiUrl: baseUrl,
         operator: 'TEST-CALENDAR',

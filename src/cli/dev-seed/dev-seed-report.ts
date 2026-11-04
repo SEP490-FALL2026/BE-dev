@@ -26,7 +26,7 @@ const WHY: Record<SeedRefusal, string> = {
 function line(item: SeedReportItem): string {
   const parts = [`  ${LABEL[item.kind].padEnd(12)}${item.key.padEnd(12)}${item.state}`];
   if (item.reason) parts.push(`(${item.reason})`);
-  if (item.role) parts.push(item.role, item.loginEmail ?? '');
+  if (item.initialRole) parts.push(item.initialRole, item.loginEmail ?? '');
   if (item.password) parts.push(`password: ${item.password}`);
   return parts.join('  ').trimEnd();
 }

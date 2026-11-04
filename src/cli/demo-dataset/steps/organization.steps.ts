@@ -120,11 +120,10 @@ function accountSpecs(ctx: DemoRunContext): DemoAccountSpec[] {
     .map((person) => ({
       employeeCode: person.code,
       loginEmail: emailOf(ctx, person.code),
-      role: person.account!,
-      allowedExtraRoles: [
-        ...(ctx.fixture.departments.some((department) => department.head === person.code) ? ['MANAGER' as const] : []),
-        ...(ctx.fixture.approvalRoles.SPENDING_APPROVER === person.code ? ['SPENDING_APPROVER' as const] : []),
-      ],
+      initialRole: person.account!,
+      ...(ctx.fixture.approvalRoles.SPENDING_APPROVER === person.code
+        ? { finalRole: 'SPENDING_APPROVER' as const }
+        : {}),
     }));
 }
 
@@ -184,8 +183,10 @@ async function heads(ctx: DemoRunContext): Promise<StepOutcome> {
       const accountId = ctx.ids.appUsers.get(department.head!);
       if (!accountId) throw new Error(`The head ${department.head} has no account`);
       const account = await ctx.api.call<{ roles: string[] }>(ctx.superAdminEmail, 'GET', `/app-users/${accountId}`);
-      if (!account.roles.includes('MANAGER'))
-        await ctx.api.call(ctx.superAdminEmail, 'POST', `/app-users/${accountId}/role-grants`, { role: 'MANAGER' });
+      if (account.roles.length !== 1 || account.roles[0] !== 'MANAGER') {
+        results.push({ status: 'conflict', label: `${label}: MANAGER required` });
+        continue;
+      }
       await ctx.api.call(ctx.superAdminEmail, 'POST', `/departments/${profile.id}/head-assignments`, {
         employeeId: ctx.ids.employees.get(department.head!),
         effectiveFrom: ctx.today,
@@ -212,7 +213,7 @@ async function spendingApprover(ctx: DemoRunContext, code: string): Promise<Resu
   const holder = accounts.find((item) => item.roles.includes(role));
   if (holder) return { status: 'conflict', label: `${label}: held by ${holder.employee?.employeeCode ?? holder.id}` };
   if (ctx.mode === 'plan') return { status: 'planned', label };
-  await ctx.api.call(ctx.superAdminEmail, 'POST', `/app-users/${accountId}/role-grants`, { role });
+  await ctx.api.call(ctx.superAdminEmail, 'PUT', `/app-users/${accountId}/role`, { role });
   return { status: 'done', label };
 }
 

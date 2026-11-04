@@ -179,7 +179,7 @@ export interface AccountInventory {
 }
 
 /** The direct roles a local demo account may hold (`pnpm dev:seed`): never SUPER_ADMIN, never a derived role. */
-export type DemoAccountRole = 'IT_ADMIN' | 'FINANCE' | 'EMPLOYEE';
+export type DemoAccountRole = 'IT_ADMIN' | 'FINANCE' | 'EMPLOYEE' | 'MANAGER';
 
 /** Whether a demo account can be created, is already there as the fixture wants it, or conflicts with real data. */
 export type DemoAccountState =
@@ -191,7 +191,8 @@ export interface CreateDemoAccountInput {
   organizationId: string;
   employeeId: string;
   loginEmail: string;
-  role: DemoAccountRole;
+  initialRole: DemoAccountRole;
+  finalRole?: 'SPENDING_APPROVER';
   passwordHash: string;
   hashPolicyVersion: number;
 }

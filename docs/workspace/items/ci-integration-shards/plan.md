@@ -81,3 +81,8 @@
 - Test cấu trúc: 4 pass. `pnpm test:scripts` trong sandbox: 275 tests, 211 pass, 62 fail, 2 skip; lỗi quyền tạo thư mục tạm Git Bash (`mkdir /c/Users/Asus: Permission denied`). Đang chạy lại ngoài sandbox.
 - Task 3 chỉ chuẩn bị nhánh thử cục bộ, không push; run đỏ/xanh chờ phiên review/Owner.
 - Task 4: **chờ số đo** ít nhất hai run `main`; chưa đổi timeout theo ước lượng.
+
+### Kết quả script cuối
+
+- `pnpm test:scripts` ngoài sandbox: 275 tests, 273 pass, 2 skip, 0 fail, exit 0 (`ci-scripts-final.log`). Chỉ mock Docker/SSH và thư mục tạm; không kết nối VPS/database thật.
+- Task 3 có commit `f7156cc` trên `ci-trial/deploy-gate`, chưa push/chạy. Dùng `workflow_dispatch` để chạy đủ e2e và ALL trước khi xét probe đỏ/xanh. Nhánh triển khai không chứa test đỏ/probe.

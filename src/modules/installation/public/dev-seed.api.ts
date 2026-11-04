@@ -92,7 +92,7 @@ export class DevSeedApi {
           organizationId: organization.id,
           employeeId: employee?.id ?? null,
           loginEmail: person.workEmail,
-          role: person.role,
+          initialRole: person.role,
         }),
       );
     }
@@ -167,7 +167,7 @@ export class DevSeedApi {
         organizationId,
         employeeId: employeeId as string,
         loginEmail: person.workEmail,
-        role: person.role,
+        initialRole: person.role,
         passwordHash: credential.hash,
         hashPolicyVersion: credential.hashPolicyVersion,
       });
@@ -194,6 +194,6 @@ function report(plan: SeedPlan, credentials: Credentials): SeedReportItem[] {
     if (item.kind !== 'ACCOUNT' || person === undefined) return base;
     const password = item.action === 'create' ? credentials.get(item.key)?.password : undefined;
 
-    return { ...base, role: person.role, loginEmail: person.workEmail, ...(password ? { password } : {}) };
+    return { ...base, initialRole: person.role, loginEmail: person.workEmail, ...(password ? { password } : {}) };
   });
 }

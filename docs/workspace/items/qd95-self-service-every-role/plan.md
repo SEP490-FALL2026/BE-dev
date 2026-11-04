@@ -76,12 +76,12 @@ Quick set + `pnpm test:http` + integration các file đổi xanh; tự review di
 - Lint đã gọi, đang chờ tiến trình kết thúc. Integration chỉ viết, chưa chạy theo chỉ dẫn giao việc.
 - Bổ sung Files: `dashboard-section.policy.spec.ts` phải đổi vai được kiểm từ `EMPLOYEE` sang `IT_ADMIN` vì kiểu `DashboardRole` bỏ `EMPLOYEE`; giữ cả ca cho phép/từ chối.
 
-| Test cũ | Test mới |
-| --- | --- |
-| My software từ chối các vai khác `EMPLOYEE` | Mỗi vai riêng đọc được và service nhận đúng employeeId; không token vẫn 401 |
-| Employee dashboard từ chối vai khác | Các vai đọc overview cá nhân; ma trận các dashboard theo vai còn nguyên |
-| Super Admin my-requests 403 / dashboard NO_DATA_SOURCE | Trang riêng rỗng 200 / COUNTED 0, không thêm grant EMPLOYEE |
-| Super Admin không gửi Request, chưa xét hoàn trả | Thêm hoàn trả seat đang giữ: 403 và không thêm return/task/audit |
+| Test cũ                                                | Test mới                                                                    |
+| ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| My software từ chối các vai khác `EMPLOYEE`            | Mỗi vai riêng đọc được và service nhận đúng employeeId; không token vẫn 401 |
+| Employee dashboard từ chối vai khác                    | Các vai đọc overview cá nhân; ma trận các dashboard theo vai còn nguyên     |
+| Super Admin my-requests 403 / dashboard NO_DATA_SOURCE | Trang riêng rỗng 200 / COUNTED 0, không thêm grant EMPLOYEE                 |
+| Super Admin không gửi Request, chưa xét hoàn trả       | Thêm hoàn trả seat đang giữ: 403 và không thêm return/task/audit            |
 
 ### Bằng chứng Task 2 — 04/11/2026
 
@@ -91,6 +91,8 @@ Quick set + `pnpm test:http` + integration các file đổi xanh; tự review di
 - `pnpm test:gates`: 16 suites / 327 tests pass. Unit policy section: 7 tests pass.
 - `pnpm lint`: hai lỗi format trong file mới; đã format và gọi lại, chờ kết quả cuối.
 - Integration chỉ viết, chưa chạy. Dùng `DashboardHarness` (kế thừa `RequestHarness`) để tái sử dụng import quyền, báo lỗi và đọc overview, không thêm harness.
+
+- Lint cuối Task 2: pass, exit 0 (`ss-task2-lint-final.log`).
 
 - [ ] AC trong scope có bằng chứng; báo FE/mobile.
 - [ ] Giao Owner review; cập nhật roadmap.

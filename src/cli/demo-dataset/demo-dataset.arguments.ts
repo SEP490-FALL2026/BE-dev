@@ -25,7 +25,7 @@ itself (activated, one direct role, audited as an operator action), because an i
           apply writes from 1 January to 30 November of the dataset's year only, plan reads any day of that year.
 
 Options
-  --fixture <id>           The dataset: shared-demo-v1.
+  --fixture <id>           The dataset: shared-demo-v2.
   --organization <name>    The name of the installed organization, exactly: the command refuses another database.
   --api-url <url>          The base URL of the API serving that database (http or https, no path), for example
                            http://slm-api:3000 inside the Compose network. The command checks it is the same installation.

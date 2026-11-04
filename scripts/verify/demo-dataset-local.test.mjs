@@ -16,7 +16,7 @@ const DB_PASSWORD = 'canary-DB-7c1e';
 const SA_PASSWORD = 'canary-SA-4d2a';
 const DEMO_PASSWORD = 'canary-DEMO-9f1b';
 const SETTINGS = [
-  ['DEMO_FIXTURE', 'shared-demo-v1'],
+  ['DEMO_FIXTURE', 'shared-demo-v2'],
   ['DEMO_ORGANIZATION_NAME', 'Công ty TNHH Thử Nghiệm'],
   ['DEMO_OPERATOR_REFERENCE', 'CHG-2026-1030'],
   ['DEMO_API_URL', 'https://slm.example.com'],
@@ -152,7 +152,7 @@ describe('scripts/ops/demo-dataset-local.mjs', () => {
     assert.ok(calls.tunnel.includes('-N') && calls.tunnel.includes('ExitOnForwardFailure=yes'));
     assert.deepEqual(calls.cli.args.slice(1), [
       'apply',
-      '--fixture=shared-demo-v1',
+      '--fixture=shared-demo-v2',
       '--organization=Công ty TNHH Thử Nghiệm',
       '--api-url=https://slm.example.com',
       '--operator=CHG-2026-1030',

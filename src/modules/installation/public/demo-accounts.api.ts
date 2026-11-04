@@ -157,8 +157,8 @@ export class DemoAccountsApi {
       organizationId,
       employeeId: employee.id,
       loginEmail: spec.loginEmail,
-      role: spec.role,
-      ...(spec.allowedExtraRoles ? { allowedExtraRoles: spec.allowedExtraRoles } : {}),
+      initialRole: spec.initialRole,
+      ...(spec.finalRole ? { finalRole: spec.finalRole } : {}),
     });
     const appUserId = await this.identity.findAccountIdOfEmployee(tx, employee.id);
 
@@ -184,7 +184,7 @@ export class DemoAccountsApi {
       organizationId,
       employeeId: item.employeeId,
       loginEmail: spec.loginEmail,
-      role: spec.role,
+      initialRole: spec.initialRole,
       passwordHash: credential.hash,
       hashPolicyVersion: credential.hashPolicyVersion,
     });
@@ -205,7 +205,7 @@ export class DemoAccountsApi {
       emailVerificationSource: 'BOOTSTRAP_ASSERTED',
       environment: attribution.environment,
     });
-    await record('ROLE.GRANTED', { role: spec.role });
+    await record('ROLE.GRANTED', { role: spec.initialRole });
   }
 }
 

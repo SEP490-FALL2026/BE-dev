@@ -43,7 +43,7 @@ describe('LocalDemoAccountApi', () => {
     organizationId,
     employeeId,
     loginEmail: 'IT.Admin@demo.slm.test',
-    role,
+    initialRole: role,
   });
   const usable = { status: 'ACTIVE', activationState: 'ACTIVATED', loginEmail: demoEmail };
 
@@ -74,13 +74,16 @@ describe('LocalDemoAccountApi', () => {
     }
   });
 
-  it('accepts only the additional direct roles declared by the shared fixture', async () => {
-    const existing = build({ accountId: 'u-1', account: usable, roles: ['IT_ADMIN', 'MANAGER'] });
+  it('accepts exactly the initial or final role, including an interrupted apply before the final role', async () => {
+    for (const role of ['EMPLOYEE', 'SPENDING_APPROVER']) {
+      const existing = build({ accountId: 'u-1', account: usable, roles: [role] });
+      await expect(
+        existing.service.describeDemoAccount(tx, { ...ask('EMPLOYEE'), finalRole: 'SPENDING_APPROVER' }),
+      ).resolves.toEqual({ state: 'present' });
+    }
+    const combined = build({ accountId: 'u-1', account: usable, roles: ['EMPLOYEE', 'SPENDING_APPROVER'] });
     await expect(
-      existing.service.describeDemoAccount(tx, { ...ask(), allowedExtraRoles: ['MANAGER'] }),
-    ).resolves.toEqual({ state: 'present' });
-    await expect(
-      existing.service.describeDemoAccount(tx, { ...ask(), allowedExtraRoles: ['SPENDING_APPROVER'] }),
+      combined.service.describeDemoAccount(tx, { ...ask('EMPLOYEE'), finalRole: 'SPENDING_APPROVER' }),
     ).resolves.toEqual({ state: 'conflict', reason: 'ACCOUNT_DIFFERS' });
   });
 
@@ -103,7 +106,7 @@ describe('LocalDemoAccountApi', () => {
         organizationId,
         employeeId: 'e-1',
         loginEmail: ' IT.Admin@demo.slm.test ',
-        role: 'IT_ADMIN',
+        initialRole: 'IT_ADMIN',
         passwordHash: 'hash',
         hashPolicyVersion: 1,
       }),
@@ -123,7 +126,21 @@ describe('LocalDemoAccountApi', () => {
     expect(grants.grantRole).toHaveBeenCalledWith(tx, { organizationId, appUserId: 'u-new', role: 'IT_ADMIN' });
   });
 
-  it.each(['MANAGER', 'SPENDING_APPROVER', 'SUPER_ADMIN', 'ADMIN'])(
+  it('creates a Manager with one grant, without assigning a department head', async () => {
+    const { service, grants } = build({});
+    await service.createDemoAccount(tx, {
+      organizationId,
+      employeeId: 'manager',
+      loginEmail: demoEmail,
+      initialRole: 'MANAGER',
+      passwordHash: 'hash',
+      hashPolicyVersion: 1,
+    });
+    expect(grants.grantRole).toHaveBeenCalledTimes(1);
+    expect(grants.grantRole).toHaveBeenCalledWith(tx, expect.objectContaining({ role: 'MANAGER' }));
+  });
+
+  it.each(['SPENDING_APPROVER', 'SUPER_ADMIN', 'ADMIN'])(
     'refuses the role %s before writing anything',
     async (role) => {
       const { service, accounts, grants } = build({});
@@ -133,7 +150,7 @@ describe('LocalDemoAccountApi', () => {
           organizationId,
           employeeId: 'e-1',
           loginEmail: 'x@demo.slm.test',
-          role: role as DemoAccountRole,
+          initialRole: role as DemoAccountRole,
           passwordHash: 'hash',
           hashPolicyVersion: 1,
         }),

@@ -5,7 +5,7 @@ import request from 'supertest';
 import type { DemoDatasetCommandArguments } from '../../../src/cli/demo-dataset/demo-dataset.arguments';
 import { runDemoDataset, type DemoRunOutcome } from '../../../src/cli/demo-dataset/demo-dataset-run';
 import type { FetchLike } from '../../../src/cli/demo-dataset/demo-api-client';
-import { SHARED_DEMO_V1 } from '../../../src/cli/demo-dataset/fixture/shared-demo-v1';
+import { SHARED_DEMO_V2 } from '../../../src/cli/demo-dataset/fixture/shared-demo-v2';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD, seedInstallation } from '../../support/http-test-app';
 
@@ -19,7 +19,7 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
   let ctx: HttpTestApp;
   let demo: INestApplicationContext;
   let baseUrl: string;
-  const demoAccounts = SHARED_DEMO_V1.people.filter((person) => person.account !== null).length;
+  const demoAccounts = SHARED_DEMO_V2.people.filter((person) => person.account !== null).length;
   const secrets = { superAdminPassword: SEED_PASSWORD, demoAccountPassword: 'a demo password for the tests' };
 
   const args = (
@@ -27,7 +27,7 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
     extra: Partial<DemoDatasetCommandArguments> = {},
   ): DemoDatasetCommandArguments => ({
     mode,
-    fixture: 'shared-demo-v1',
+    fixture: 'shared-demo-v2',
     organization: 'Acme',
     apiUrl: baseUrl,
     operator: 'TEST-DEMO-1',
@@ -68,7 +68,7 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
   /** Sessions holding the apply lock of the fixture: an apply that ended, however it ended, leaves none. */
   async function heldAdvisoryLocks(): Promise<number> {
     const { rows } = await ctx.sql.query<{ n: string }>(
-      `WITH k AS (SELECT hashtextextended('demo-dataset:shared-demo-v1:apply', 0) AS v)
+      `WITH k AS (SELECT hashtextextended('demo-dataset:shared-demo-v2:apply', 0) AS v)
        SELECT count(*) AS n FROM pg_locks, k
         WHERE locktype = 'advisory' AND granted AND objsubid = 1
           AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
@@ -126,7 +126,7 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
 
   it('refuses a second apply while another holds the lock of the fixture, writing nothing and leaving no lock', async () => {
     const before = await businessRows();
-    const other = await demo.get(DemoAccountsApi).holdApplyLock('shared-demo-v1');
+    const other = await demo.get(DemoAccountsApi).holdApplyLock('shared-demo-v2');
     expect(other).not.toBeNull();
     try {
       expect(await heldAdvisoryLocks()).toBe(1);
@@ -140,15 +140,20 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
   }, 120000);
 
   it('stops when the API becomes unreachable half-way, then a second apply goes on to every scenario state', async () => {
-    let writes = 0;
     const flaky: FetchLike = (url, init) => {
-      const write = init.method !== 'GET' && !url.includes('/auth/');
-      if (write && ++writes > 20) return Promise.reject(new TypeError('fetch failed'));
+      if (init.method === 'PATCH' && new URL(url).pathname.includes('/departments/'))
+        return Promise.reject(new TypeError('fetch failed'));
       return fetch(url, init);
     };
     const stopped = reportOf(await run('apply', { fetch: flaky }));
     expect(stopped.exitCode).toBe(1);
     expect(stopped.steps.at(-1)).toMatchObject({ status: 'failed' });
+    expect(stopped.steps.find((step) => step.key === 'org.accounts')?.status).toBe('done');
+    const prepared = await ctx.sql.query<{ role: string }>(
+      `SELECT g.role::text FROM role_grants g JOIN app_users u ON u.id = g.app_user_id
+       JOIN employees e ON e.id = u.employee_id WHERE e.employee_code = 'DS1-CEO' AND g.revoked_at IS NULL`,
+    );
+    expect(prepared.rows).toEqual([{ role: 'EMPLOYEE' }]);
     expect(await heldAdvisoryLocks()).toBe(0);
 
     const resumed = reportOf(await run('apply'));
@@ -184,10 +189,16 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
       { code: 'DS1-DESH', role: 'MANAGER' },
       { code: 'DS1-ENGH', role: 'MANAGER' },
       { code: 'DS1-FINH', role: 'MANAGER' },
-      { code: 'DS1-ITA1', role: 'MANAGER' },
+      { code: 'DS1-ITOH', role: 'MANAGER' },
       { code: 'DS1-MKTH', role: 'MANAGER' },
       { code: 'DS1-SALH', role: 'MANAGER' },
     ]);
+    const invalid = await ctx.sql.query(
+      `SELECT u.id FROM app_users u JOIN employees e ON e.id = u.employee_id
+       LEFT JOIN role_grants g ON g.app_user_id = u.id AND g.revoked_at IS NULL
+       WHERE e.employee_code LIKE 'DS1-%' GROUP BY u.id HAVING count(g.id) <> 1`,
+    );
+    expect(invalid.rows).toEqual([]);
   }, 600000);
 
   it('writes nothing on a rerun (nothing to change), and keeps its accounts hashed and attributed to the operator', async () => {
@@ -206,7 +217,7 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
     ).toBe(true);
     const audit = await ctx.sql.query<{ n: string }>(
       `SELECT count(*) AS n FROM audit_events WHERE action = 'DEMO_DATASET.ACCOUNT_CREATED' AND operator_reference = $1`,
-      ['DEMO_DATASET:shared-demo-v1:TEST-DEMO-1'],
+      ['DEMO_DATASET:shared-demo-v2:TEST-DEMO-1'],
     );
     expect(Number(audit.rows[0].n)).toBe(demoAccounts);
     const doubled = await ctx.sql.query(

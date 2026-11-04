@@ -102,9 +102,9 @@ function build(
   };
   const accounts = {
     describeDemoAccount: jest.fn().mockResolvedValue({ state: options.account ?? 'absent' }),
-    createDemoAccount: jest.fn((_tx: DbTx, input: { role: string; passwordHash: string }) => {
-      events.push(`account ${input.role} ${input.passwordHash}`);
-      return Promise.resolve({ appUserId: `u-${input.role}` });
+    createDemoAccount: jest.fn((_tx: DbTx, input: { initialRole: string; passwordHash: string }) => {
+      events.push(`account ${input.initialRole} ${input.passwordHash}`);
+      return Promise.resolve({ appUserId: `u-${input.initialRole}` });
     }),
   };
   const audit = {
@@ -181,7 +181,9 @@ describe('DevSeedApi', () => {
         'audit ROLE.GRANTED LOCAL_SEED',
       ]),
     ]);
-    expect(result.items.filter((item) => item.password).map((item) => [item.key, item.role, item.password])).toEqual([
+    expect(
+      result.items.filter((item) => item.password).map((item) => [item.key, item.initialRole, item.password]),
+    ).toEqual([
       ['DEMO-IT', 'IT_ADMIN', 'generated-password-1'],
       ['DEMO-FIN', 'FINANCE', 'generated-password-2'],
       ['DEMO-EMP', 'EMPLOYEE', 'generated-password-3'],

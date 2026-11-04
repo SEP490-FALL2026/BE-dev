@@ -18,7 +18,7 @@ const facts = {
 
 const args = (mode: 'plan' | 'apply'): DemoDatasetCommandArguments => ({
   mode,
-  fixture: 'shared-demo-v1',
+  fixture: 'shared-demo-v2',
   organization: 'Acme',
   apiUrl: 'http://slm-api:4000',
   operator: 'CHG-1',

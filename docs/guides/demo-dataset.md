@@ -14,8 +14,8 @@ không có endpoint seed, không dùng `dev:seed`, không thay image API/worker,
 
 ## 1. Lệnh làm gì và không làm gì
 
-- Dữ liệu là **fixture có phiên bản** trong mã nguồn: [`shared-demo-v1`](../../src/cli/demo-dataset/fixture/shared-demo-v1.ts)
-  — 8 phòng `DS1-*`, 22 nhân viên (20 có tài khoản), Cost Center, 4 ứng dụng/4 gói/8 thuê bao, ngân sách năm của
+- Dữ liệu là **fixture có phiên bản** trong mã nguồn: [`shared-demo-v2`](../../src/cli/demo-dataset/fixture/shared-demo-v2.ts)
+  — 8 phòng `DS1-*`, 23 nhân viên (21 có tài khoản), Cost Center, 4 ứng dụng/4 gói/8 thuê bao, ngân sách năm của
   phòng Kỹ thuật, Marketing và Kinh doanh (phòng Thiết kế cố ý chưa có), 9 Request ở 9 trạng thái, một bản nháp, một phiếu báo lỗi SaaS, một thông báo BM-09. Toàn bộ là dữ
   liệu giả; email dùng miền `ds1.slm-demo.example` (miền `.example` dành cho ví dụ, không thư nào tới người thật).
   Mô tả cho FE: Docs `Figma UI-UX/API-Integration/demo/`.
@@ -25,7 +25,7 @@ không có endpoint seed, không dùng `dev:seed`, không thay image API/worker,
   trạng thái, khoản cam kết và Audit Trail là của ứng dụng; lệnh không chèn trạng thái bằng SQL.
 - **Ngoại lệ duy nhất là tài khoản đăng nhập của người demo**: lời mời sẽ gửi email tới hộp thư không tồn tại, nên lệnh
   tạo tài khoản đã kích hoạt qua hợp đồng tài khoản demo có sẵn (cùng hợp đồng với `pnpm dev:seed`: một vai trực tiếp
-  `EMPLOYEE`/`IT_ADMIN`/`FINANCE`, không bao giờ `SUPER_ADMIN`; vai trực tiếp khác được cấp ở bước riêng), mật khẩu hash bằng Argon2id của
+  `EMPLOYEE`/`IT_ADMIN`/`FINANCE`/`MANAGER`, không bao giờ `SUPER_ADMIN`; Người duyệt chi đổi từ vai ban đầu ở bước riêng), mật khẩu hash bằng Argon2id của
   `IdentityAccessApi.prepareCredential`, và ghi Audit Trail `DEMO_DATASET.ACCOUNT_CREATED` với
   `operatorReference = DEMO_DATASET:<fixture>:<tham chiếu operator>`. Phần này chạy bằng **runtime role** của API: với
   `NODE_ENV=production` lệnh kiểm vai PostgreSQL trước mọi việc và dừng nếu là superuser, owner hay deploy role.
@@ -110,7 +110,7 @@ nano .env.demo-dataset
 
 | Biến                        | Bắt buộc                      | Ý nghĩa                                                                                           |
 | --------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------- |
-| `DEMO_FIXTURE`              | có (`shared-demo-v1`)         | Phiên bản dataset.                                                                                |
+| `DEMO_FIXTURE`              | có (`shared-demo-v2`)         | Phiên bản dataset.                                                                                |
 | `DEMO_ORGANIZATION_NAME`    | có                            | Tên tổ chức đã bootstrap, đúng từng ký tự (lệnh từ chối database khác).                           |
 | `DEMO_OPERATOR_REFERENCE`   | có                            | Tham chiếu ticket/phê duyệt, ghi vào Audit Trail. Không phải mật khẩu.                            |
 | `DEMO_SUPER_ADMIN_PASSWORD` | có                            | Mật khẩu Super Admin, để lệnh ghi dữ liệu tổ chức qua API và đọc Audit Trail.                     |

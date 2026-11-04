@@ -23,7 +23,7 @@ const DEMO_PASSWORD = 'canary-DEMO-9f1b `id` 密';
 const ORGANIZATION = 'Công ty TNHH Thử Nghiệm';
 
 const SETTINGS = [
-  ['DEMO_FIXTURE', 'shared-demo-v1'],
+  ['DEMO_FIXTURE', 'shared-demo-v2'],
   ['DEMO_ORGANIZATION_NAME', ORGANIZATION],
   ['DEMO_OPERATOR_REFERENCE', 'CHG-2026-1030'],
   ['DEMO_SUPER_ADMIN_PASSWORD', SA_PASSWORD],
@@ -150,7 +150,7 @@ describe('scripts/ops/demo-dataset.sh', () => {
       'node',
       'dist/demo-dataset-cli.js',
       'apply',
-      '--fixture=shared-demo-v1',
+      '--fixture=shared-demo-v2',
       `--organization=${ORGANIZATION}`,
       '--api-url=http://slm-api:3000',
       '--operator=CHG-2026-1030',
@@ -164,7 +164,7 @@ describe('scripts/ops/demo-dataset.sh', () => {
     assertNoPassword(result.output, 'the output');
     const reports = readdirSync(join(world.app, 'demo-dataset'));
     assert.equal(reports.length, 1);
-    assert.match(reports[0], /-shared-demo-v1-apply\.txt$/);
+    assert.match(reports[0], /-shared-demo-v2-apply\.txt$/);
     const report = readFileSync(join(world.app, 'demo-dataset', reports[0]), 'utf8');
     assert.match(report, /org\.departments/);
     assertNoPassword(report, 'the kept report');
@@ -245,7 +245,7 @@ describe('scripts/ops/demo-dataset.sh', () => {
     const template = readFileSync(TEMPLATE, 'utf8');
     for (const [key] of SETTINGS) assert.match(template, new RegExp(`^${key}=`, 'm'));
     for (const line of template.split('\n').filter((line) => /^DEMO_\w+=/.test(line))) {
-      assert.ok(/^DEMO_FIXTURE=shared-demo-v1$|^DEMO_\w+=$/.test(line), `the template gives a value: ${line}`);
+      assert.ok(/^DEMO_FIXTURE=shared-demo-v2$|^DEMO_\w+=$/.test(line), `the template gives a value: ${line}`);
     }
   });
 });

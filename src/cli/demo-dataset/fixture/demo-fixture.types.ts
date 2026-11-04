@@ -4,7 +4,7 @@
  * name (and the demo accounts through the demo account contract), so a fixture can never say "put this row in that state".
  */
 
-export type DemoRole = 'EMPLOYEE' | 'IT_ADMIN' | 'FINANCE';
+export type DemoRole = 'EMPLOYEE' | 'IT_ADMIN' | 'FINANCE' | 'MANAGER';
 
 export interface DemoDepartment {
   code: string;

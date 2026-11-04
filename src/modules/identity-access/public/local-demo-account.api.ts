@@ -7,7 +7,12 @@ import { RoleGrantService } from '../accounts/role-grant.service';
 import { DemoAccountRoleError } from './identity-access.errors';
 import { CreateDemoAccountInput, DemoAccountRole, DemoAccountState } from './identity-access.types';
 
-const DEMO_ACCOUNT_ROLES: ReadonlySet<string> = new Set<DemoAccountRole>(['IT_ADMIN', 'FINANCE', 'EMPLOYEE']);
+const DEMO_ACCOUNT_ROLES: ReadonlySet<string> = new Set<DemoAccountRole>([
+  'IT_ADMIN',
+  'FINANCE',
+  'EMPLOYEE',
+  'MANAGER',
+]);
 
 /**
  * Demo accounts for `pnpm dev:seed` (after its local guards) and `pnpm ops:demo-dataset` (the shared demo dataset,
@@ -31,8 +36,8 @@ export class LocalDemoAccountApi {
       organizationId: string;
       employeeId: string | null;
       loginEmail: string;
-      role: DemoAccountRole;
-      allowedExtraRoles?: readonly ('MANAGER' | 'SPENDING_APPROVER')[];
+      initialRole: DemoAccountRole;
+      finalRole?: 'SPENDING_APPROVER';
     },
   ): Promise<DemoAccountState> {
     const loginEmail = normalizeEmail(input.loginEmail);
@@ -46,16 +51,14 @@ export class LocalDemoAccountApi {
         account.status === 'ACTIVE' &&
         account.activationState === 'ACTIVATED' &&
         normalizeEmail(account.loginEmail) === loginEmail &&
-        roles.includes(input.role) &&
-        roles.every(
-          (role) => role === input.role || input.allowedExtraRoles?.includes(role as 'MANAGER' | 'SPENDING_APPROVER'),
-        );
+        roles.length === 1 &&
+        [input.initialRole, input.finalRole].includes(roles[0]);
 
       return asWanted ? { state: 'present' } : { state: 'conflict', reason: 'ACCOUNT_DIFFERS' };
     }
     if ((await this.accounts.findAccountByLoginEmail(input.organizationId, loginEmail)) !== null)
       return { state: 'conflict', reason: 'LOGIN_EMAIL_TAKEN' };
-    if (input.role === 'FINANCE' && (await this.grants.financeIsHeld(tx, input.organizationId)))
+    if (input.initialRole === 'FINANCE' && (await this.grants.financeIsHeld(tx, input.organizationId)))
       return { state: 'conflict', reason: 'FINANCE_HELD_ELSEWHERE' };
 
     return { state: 'absent' };
@@ -63,7 +66,7 @@ export class LocalDemoAccountApi {
 
   /** Writes the account, its credential and its one grant in the caller's transaction. The caller audits. */
   async createDemoAccount(tx: DbTx, input: CreateDemoAccountInput): Promise<{ appUserId: string }> {
-    if (!DEMO_ACCOUNT_ROLES.has(input.role)) throw new DemoAccountRoleError(input.role);
+    if (!DEMO_ACCOUNT_ROLES.has(input.initialRole)) throw new DemoAccountRoleError(input.initialRole);
 
     const user = await this.accounts.createAppUser(tx, {
       organizationId: input.organizationId,
@@ -76,7 +79,11 @@ export class LocalDemoAccountApi {
       emailVerifiedAt: new Date(),
     });
     await this.credentials.createCredential(tx, user.id, input.passwordHash, input.hashPolicyVersion);
-    await this.grants.grantRole(tx, { organizationId: input.organizationId, appUserId: user.id, role: input.role });
+    await this.grants.grantRole(tx, {
+      organizationId: input.organizationId,
+      appUserId: user.id,
+      role: input.initialRole,
+    });
 
     return { appUserId: user.id };
   }

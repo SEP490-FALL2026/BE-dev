@@ -3,7 +3,7 @@ import { DemoDatasetArgumentError, parseDemoDatasetArguments } from './demo-data
 const valid = [
   'plan',
   '--fixture',
-  'shared-demo-v1',
+  'shared-demo-v2',
   '--organization',
   'Acme Software',
   '--api-url',
@@ -21,7 +21,7 @@ describe('ops:demo-dataset arguments', () => {
       help: false,
       command: {
         mode: 'plan',
-        fixture: 'shared-demo-v1',
+        fixture: 'shared-demo-v2',
         organization: 'Acme Software',
         apiUrl: 'http://slm-api:3000',
         operator: 'CHG-42',

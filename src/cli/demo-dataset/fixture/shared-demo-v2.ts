@@ -1,8 +1,8 @@
 import type { DemoFixture } from './demo-fixture.types';
-import { SALES_MARKETING } from './shared-demo-v1-sales-marketing';
+import { SALES_MARKETING } from './shared-demo-v2-sales-marketing';
 
 /**
- * `shared-demo-v1`: the demo dataset of the shared course VPS, for the FE to connect to the API, test and demonstrate. Every
+ * `shared-demo-v2`: the demo dataset of the shared course VPS, for the FE to connect to the API, test and demonstrate. Every
  * name, code and email is made up (`.example` domain, RFC 2606: no mail can reach a person). Codes start with `DS1-` and
  * free text carries `[DS1-…]`, so the data is told apart from anything else in the installation. It is written next to the
  * installation's own data (the organization, its first department and the Super Admin of the bootstrap), never over it.
@@ -10,8 +10,8 @@ import { SALES_MARKETING } from './shared-demo-v1-sales-marketing';
  * This file is the one source of the dataset: the Docs page of the FE guide describes it and links here. A change of the
  * data is a new version (a new file and id), never an edit of this one after it was applied somewhere.
  */
-export const SHARED_DEMO_V1: DemoFixture = {
-  id: 'shared-demo-v1',
+export const SHARED_DEMO_V2: DemoFixture = {
+  id: 'shared-demo-v2',
   marker: 'DS1',
   emailDomain: 'ds1.slm-demo.example',
   currency: 'VND',
@@ -52,7 +52,7 @@ export const SHARED_DEMO_V1: DemoFixture = {
       code: 'DS1-ITO',
       name: 'Phòng Công nghệ thông tin (demo)',
       function: 'Quản trị danh mục phần mềm, cấp và thu hồi quyền.',
-      head: 'DS1-ITA1',
+      head: 'DS1-ITOH',
       itAdmin: 'DS1-ITA1',
       costCenter: { code: 'DS1-CC-ITO', name: 'Phòng Công nghệ thông tin (demo)' },
     },
@@ -81,7 +81,7 @@ export const SHARED_DEMO_V1: DemoFixture = {
       email: 'bich.tran',
       department: 'DS1-BOD',
       employmentType: 'STAFF',
-      account: 'EMPLOYEE',
+      account: 'MANAGER',
     },
     {
       code: 'DS1-ENGH',
@@ -89,7 +89,7 @@ export const SHARED_DEMO_V1: DemoFixture = {
       email: 'cuong.le',
       department: 'DS1-ENG',
       employmentType: 'STAFF',
-      account: 'EMPLOYEE',
+      account: 'MANAGER',
     },
     {
       code: 'DS1-DEV1',
@@ -129,7 +129,7 @@ export const SHARED_DEMO_V1: DemoFixture = {
       email: 'khanh.bui',
       department: 'DS1-DES',
       employmentType: 'STAFF',
-      account: 'EMPLOYEE',
+      account: 'MANAGER',
     },
     {
       code: 'DS1-DES1',
@@ -153,7 +153,7 @@ export const SHARED_DEMO_V1: DemoFixture = {
       email: 'ngoc.phan',
       department: 'DS1-FIN',
       employmentType: 'STAFF',
-      account: 'EMPLOYEE',
+      account: 'MANAGER',
     },
     {
       code: 'DS1-FIN1',
@@ -162,6 +162,14 @@ export const SHARED_DEMO_V1: DemoFixture = {
       department: 'DS1-FIN',
       employmentType: 'STAFF',
       account: 'FINANCE',
+    },
+    {
+      code: 'DS1-ITOH',
+      fullName: 'Tran Minh Thanh',
+      email: 'thanh.tran',
+      department: 'DS1-ITO',
+      employmentType: 'STAFF',
+      account: 'MANAGER',
     },
     {
       code: 'DS1-ITA1',

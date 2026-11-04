@@ -160,12 +160,12 @@ Quick set + `pnpm test:http` + `pnpm test:e2e` + integration các file đổi xa
 
 Bảng test cũ → mới (điền khi implement):
 
-| Test cũ | Hành vi | Thay bằng / lý do |
-| ------- | ------- | ----------------- |
-| `validateRoleSet`, `forbiddenPairInSet` unit | Tạo tài khoản với tập vai | DTO chỉ nhận `role`, mặc định EMPLOYEE; test từ chối mọi `roles` array; policy từng vai giữ nguyên |
-| `/me.selfServiceOnly` unit và assertions HTTP/e2e | Phân biệt tài khoản không vai | Không có thuộc tính trong response; giữ `roles`, `managerScope` và kiểm quyền |
-| Fixture My software IT_ADMIN + EMPLOYEE | Tự phục vụ khi có vai thứ hai | Chỉ IT_ADMIN đọc dữ liệu cá nhân theo hạng mục self-service |
-| Fixture Manager + IT Admin | Hợp quyền của hai vai | IT Admin riêng và Manager riêng, giữ kiểm có/không phạm vi trưởng phòng |
+| Test cũ                                           | Hành vi                       | Thay bằng / lý do                                                                                  |
+| ------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------- |
+| `validateRoleSet`, `forbiddenPairInSet` unit      | Tạo tài khoản với tập vai     | DTO chỉ nhận `role`, mặc định EMPLOYEE; test từ chối mọi `roles` array; policy từng vai giữ nguyên |
+| `/me.selfServiceOnly` unit và assertions HTTP/e2e | Phân biệt tài khoản không vai | Không có thuộc tính trong response; giữ `roles`, `managerScope` và kiểm quyền                      |
+| Fixture My software IT_ADMIN + EMPLOYEE           | Tự phục vụ khi có vai thứ hai | Chỉ IT_ADMIN đọc dữ liệu cá nhân theo hạng mục self-service                                        |
+| Fixture Manager + IT Admin                        | Hợp quyền của hai vai         | IT Admin riêng và Manager riêng, giữ kiểm có/không phạm vi trưởng phòng                            |
 
 ### Bằng chứng Task 1 — 04/11/2026
 
@@ -184,6 +184,20 @@ Bảng test cũ → mới (điền khi implement):
 - Integration mới có thay vai, idempotent, hiệu lực request kế tiếp, từ chối, Manager hiện tại/tương lai/kế nhiệm và đua Finance/Người duyệt chi; chỉ viết, chưa chạy.
 - Lint Task 1 phát hiện suppression của hàm tạo tài khoản đã thừa sau khi bỏ vòng lặp: gỡ đúng một suppression và giảm trần `max-lines-per-function` 51 → 50, tổng 107 → 106 trong gate (bổ sung Files bắt buộc để giữ gate chặt hơn).
 - Lint Task 2 lần đầu có lỗi format và `expect.any(String)` cần kiểu string; đã sửa, đang chạy lại. Không chạy integration/e2e.
+
+### Chốt bằng chứng và điểm dừng
+
+- Lint cuối Task 2: pass, exit 0 (`role-task2-lint-final.log`).
+- Task 3 tạm dừng trước mọi sửa: spec yêu cầu đổi `SeedReportItem.role` (`dev-seed.types.ts:46`) thành `initialRole`, nhưng `src/cli/dev-seed/dev-seed-report.ts:29` và spec cạnh nó còn tiêu thụ trường `role`; hai file không thuộc Files của Task 3. Đã hỏi Owner bổ sung Files, chưa tự mở rộng.
+- Task 4–7 chưa làm vì phụ thuộc Task 3; chưa có migration một vai và chưa tuyên bố checkpoint integration xanh.
+
+### Task 3 — tiếp tục theo xác nhận Owner
+
+- Owner xác nhận trong chat 04/11/2026: bổ sung `src/cli/dev-seed/dev-seed-report.ts` và `dev-seed-report.spec.ts` vào Files; điểm dừng ở trên đã được gỡ.
+- Đã đổi hợp đồng demo sang `initialRole`/`finalRole`, giữ một vai ở cả trước/sau bước đổi Người duyệt chi, dùng PUT; fixture v2 có DS1-ITOH và trưởng phòng chỉ MANAGER; đã xóa hai file fixture v1 khỏi source.
+- Unit các file đổi lần đầu: 14 suites / 113 tests pass; thêm unit fixture riêng kiểm số người/tài khoản và mọi trưởng phòng.
+- Integration demo đã viết ca dừng ở PATCH phòng ngay sau org.accounts, CEO còn EMPLOYEE, chạy tiếp rồi chạy lần ba; thêm kiểm mọi tài khoản demo có đúng một grant. Chưa chạy integration.
+- Đã gọi typecheck/lint/arch/rules/gates và script tests; đang thu kết quả cuối, không chạy database thật.
 
 - [ ] AC trong scope có bằng chứng; thay đổi hợp đồng đã báo FE/mobile.
 - [ ] Spec/plan phản ánh implementation cuối.

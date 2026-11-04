@@ -43,7 +43,7 @@ export interface SeedReportItem {
   key: string;
   state: 'created' | 'already-present' | 'conflict';
   reason?: SeedConflict;
-  role?: DemoAccountRole;
+  initialRole?: DemoAccountRole;
   loginEmail?: string;
   password?: string;
 }
