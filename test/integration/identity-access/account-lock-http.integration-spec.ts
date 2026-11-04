@@ -75,7 +75,7 @@ describe('account management over HTTP (integration, real PostgreSQL): lock and 
     it('locking revokes an unused invitation and cancels its mail', async () => {
       const employee = await newEmployee();
       const account = dataOf(
-        await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, roles: [] }).expect(201),
+        await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'EMPLOYEE' }).expect(201),
       );
       const token = await invitationToken(account.id);
 
@@ -105,12 +105,12 @@ describe('account management over HTTP (integration, real PostgreSQL): lock and 
           .expect(409);
         expect(errorCode(response)).toBe('APP_USER.SELF_CHANGE_FORBIDDEN');
       }
-      expect(
-        errorCode(await h.admin.post(`/api/v1/app-users/${self}/role-grants`, { role: 'EMPLOYEE' }).expect(409)),
-      ).toBe('APP_USER.SELF_CHANGE_FORBIDDEN');
-      expect(errorCode(await h.admin.delete(`/api/v1/app-users/${self}/role-grants/SUPER_ADMIN`).expect(409))).toBe(
+      expect(errorCode(await h.admin.put(`/api/v1/app-users/${self}/role`, { role: 'EMPLOYEE' }).expect(409))).toBe(
         'APP_USER.SELF_CHANGE_FORBIDDEN',
       );
+      expect(
+        errorCode(await h.admin.put(`/api/v1/app-users/${self}/role`).send({ role: 'EMPLOYEE' }).expect(409)),
+      ).toBe('APP_USER.SELF_CHANGE_FORBIDDEN');
     });
   });
 

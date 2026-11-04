@@ -109,6 +109,10 @@ describe('organization and identity read contracts (integration, real PostgreSQL
 
   describe('LD-14: a history that is cut says so', () => {
     it('shows the newest 50 grants of an account, oldest of them first, with roleHistoryHasMore', async () => {
+      const latest = await h.ctx.sql.query<{ granted_at: Date }>(
+        'SELECT granted_at FROM role_grants WHERE app_user_id = $1 ORDER BY granted_at DESC LIMIT 1',
+        [h.employee.appUserId],
+      );
       await h.ctx.sql.query(
         `INSERT INTO role_grants (id, organization_id, app_user_id, role, granted_at, revoked_at)
          SELECT gen_random_uuid(), $1, $2, 'FINANCE', timestamptz '2025-01-01' + n * interval '1 day',
@@ -124,9 +128,7 @@ describe('organization and identity read contracts (integration, real PostgreSQL
       expect(detail.roleHistoryHasMore).toBe(true);
       const times = detail.roleHistory.map((entry) => entry.grantedAt);
       expect(times).toEqual([...times].sort());
-      expect(times[times.length - 1]).toBe(
-        new Date('2025-01-01T00:00:00Z').toISOString().replace('2025-01-01', '2025-03-22'),
-      );
+      expect(times[times.length - 1]).toBe(latest.rows[0].granted_at.toISOString());
     });
 
     it('says there is nothing older when the whole history is shown', async () => {

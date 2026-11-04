@@ -7,7 +7,7 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../../support/http-test-app';
-import { ensureManagerGrant } from '../../support/builders/account.builder';
+import { changeRoleTo } from '../../support/builders/account.builder';
 
 interface Step {
   step: number;
@@ -56,11 +56,11 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
     admin = await adminToken(ctx, seed);
-    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
+    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
     finance = await createActivatedAccount(ctx, seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin,
     });
   }, 120000);
@@ -148,8 +148,13 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
   });
 
   it('stops warning about a department once it has a head and an IT Admin in charge', async () => {
-    const head = await createActivatedAccount(ctx, seed, { code: 'E-HEAD', email: 'head@acme.vn', roles: [], admin });
-    await ensureManagerGrant(ctx, admin, head.employeeId);
+    const head = await createActivatedAccount(ctx, seed, {
+      code: 'E-HEAD',
+      email: 'head@acme.vn',
+      role: 'EMPLOYEE',
+      admin,
+    });
+    await changeRoleTo(ctx, admin, head.employeeId, 'MANAGER');
     await request(server())
       .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)
       .set({ Authorization: `Bearer ${admin}` })

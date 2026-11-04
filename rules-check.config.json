@@ -23,6 +23,7 @@
       "docs/guides/containers.md",
       "docs/guides/bootstrap-installation.md",
       "docs/guides/demo-dataset.md",
+      "docs/guides/seed.md",
       "docs/roadmap.md",
       "src/README.md",
       "test/support/README.md",

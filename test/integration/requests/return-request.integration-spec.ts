@@ -139,7 +139,7 @@ describe('the return of a seat over PostgreSQL (US-05-13)', () => {
     it('answers an IT Admin who returns their own seat as the holder, not as the one who works the task', async () => {
       counter += 1;
       const unit = await h.departmentWithHead(`P-RR${counter}`);
-      const admin = await h.staff(unit.department, `RR-IT${counter}`, ['IT_ADMIN']);
+      const admin = await h.staff(unit.department, `RR-IT${counter}`, 'IT_ADMIN');
       const assignmentId = await h.seatOf(admin, plain);
 
       const wire = await sent(assignmentId, admin.account);

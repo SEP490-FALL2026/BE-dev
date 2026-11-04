@@ -61,7 +61,7 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
       const employee = await newEmployee();
 
       const response = await h.admin
-        .post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['IT_ADMIN'] })
+        .post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'IT_ADMIN' })
         .expect(201);
 
       const account = dataOf(response);
@@ -84,7 +84,7 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
 
     it('cannot sign in before the invitation is redeemed, and a granted role has no effect yet (AC-11)', async () => {
       const employee = await newEmployee();
-      await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['IT_ADMIN'] }).expect(201);
+      await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'IT_ADMIN' }).expect(201);
 
       const response = await request(server())
         .post('/api/v1/auth/login')
@@ -94,25 +94,68 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
       expect(errorCode(response)).toBe('AUTH.INVALID_CREDENTIALS');
     });
 
-    it('creates an account with no roles and does not add EMPLOYEE by itself (AC-16)', async () => {
+    it('defaults to exactly EMPLOYEE when no role was selected', async () => {
       const employee = await newEmployee();
 
-      const account = dataOf(
-        await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, roles: [] }).expect(201),
-      );
+      const account = dataOf(await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId }).expect(201));
 
-      expect(account.roles).toEqual([]);
+      expect(account.roles).toEqual(['EMPLOYEE']);
+    });
+
+    it('creates MANAGER and FINANCE as the one role, never a head period; refuses a second Finance and a roles array (US-01-01 AC-23)', async () => {
+      const appUsers = async () =>
+        (await h.ctx.sql.query<{ n: number }>('SELECT count(*)::int AS n FROM app_users')).rows[0].n;
+      const manager = await newEmployee();
+      const made = dataOf(
+        await h.admin.post('/api/v1/app-users', { employeeId: manager.employeeId, role: 'MANAGER' }).expect(201),
+      );
+      expect(made.roles).toEqual(['MANAGER']);
+      expect(
+        (await h.ctx.sql.query('SELECT 1 FROM department_head_periods WHERE employee_id = $1', [manager.employeeId]))
+          .rowCount,
+      ).toBe(0);
+
+      const finance = await newEmployee();
+      const firstFinance = dataOf(
+        await h.admin.post('/api/v1/app-users', { employeeId: finance.employeeId, role: 'FINANCE' }).expect(201),
+      );
+      expect(firstFinance.roles).toEqual(['FINANCE']);
+      const other = await newEmployee();
+      const before = await appUsers();
+      const second = await h.admin
+        .post('/api/v1/app-users', { employeeId: other.employeeId, role: 'FINANCE' })
+        .expect(409);
+      expect(errorCode(second)).toBe('APP_USER.FINANCE_ALREADY_ASSIGNED');
+      const array = await h.admin
+        .post('/api/v1/app-users', { employeeId: other.employeeId, roles: ['EMPLOYEE'] })
+        .expect(422);
+      expect(errorCode(array)).toBe('VALIDATION_ERROR');
+      expect(await appUsers()).toEqual(before);
+      // The Finance seat is free again for the rest of the file.
+      await request(server())
+        .put(`/api/v1/app-users/${firstFinance.id}/role`)
+        .set(as(h.adminToken))
+        .send({ role: 'EMPLOYEE' })
+        .expect(200);
     });
 
     it('accepts a separate login email, which must be unique (AC-8)', async () => {
       const first = await newEmployee();
       const second = await newEmployee();
       await h.admin
-        .post('/api/v1/app-users', { employeeId: first.employeeId, loginEmail: 'Shared.Login@acme.vn', roles: [] })
+        .post('/api/v1/app-users', {
+          employeeId: first.employeeId,
+          loginEmail: 'Shared.Login@acme.vn',
+          role: 'EMPLOYEE',
+        })
         .expect(201);
 
       const clash = await h.admin
-        .post('/api/v1/app-users', { employeeId: second.employeeId, loginEmail: 'shared.login@ACME.vn', roles: [] })
+        .post('/api/v1/app-users', {
+          employeeId: second.employeeId,
+          loginEmail: 'shared.login@ACME.vn',
+          role: 'EMPLOYEE',
+        })
         .expect(409);
 
       expect(errorCode(clash)).toBe('APP_USER.LOGIN_EMAIL_TAKEN');
@@ -125,18 +168,22 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
         terminated: true,
       });
       const employee = await newEmployee();
-      await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, roles: [] }).expect(201);
+      await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'EMPLOYEE' }).expect(201);
 
       expect(
-        errorCode(await h.admin.post('/api/v1/app-users', { employeeId: gone.employeeId, roles: [] }).expect(409)),
+        errorCode(
+          await h.admin.post('/api/v1/app-users', { employeeId: gone.employeeId, role: 'EMPLOYEE' }).expect(409),
+        ),
       ).toBe('APP_USER.EMPLOYEE_TERMINATED');
       expect(
-        errorCode(await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, roles: [] }).expect(409)),
+        errorCode(
+          await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'EMPLOYEE' }).expect(409),
+        ),
       ).toBe('APP_USER.ALREADY_EXISTS_FOR_EMPLOYEE');
       expect(
         errorCode(
           await h.admin
-            .post('/api/v1/app-users', { employeeId: '9b8c6f5e-0000-4000-8000-000000000000', roles: [] })
+            .post('/api/v1/app-users', { employeeId: '9b8c6f5e-0000-4000-8000-000000000000', role: 'EMPLOYEE' })
             .expect(404),
         ),
       ).toBe('ORGANIZATION.EMPLOYEE_NOT_FOUND');
@@ -146,8 +193,8 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
       const employee = await newEmployee();
 
       const results = await Promise.all([
-        h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, roles: [] }),
-        h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, roles: [] }),
+        h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'EMPLOYEE' }),
+        h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'EMPLOYEE' }),
       ]);
 
       expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
@@ -158,10 +205,10 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
       const before = await h.ctx.sql.query('SELECT count(*)::int AS n FROM app_users');
 
       const derived = await h.admin
-        .post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['SPENDING_APPROVER'] })
+        .post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'SPENDING_APPROVER' })
         .expect(422);
       const transfer = await h.admin
-        .post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['SUPER_ADMIN', 'IT_ADMIN'] })
+        .post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'SUPER_ADMIN' })
         .expect(422);
 
       expect(errorCode(derived)).toBe('APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE');
@@ -199,7 +246,7 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
     it('answers every unusable token the same way: unknown, used, replaced and expired', async () => {
       const employee = await newEmployee();
       const account = dataOf(
-        await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, roles: [] }).expect(201),
+        await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'EMPLOYEE' }).expect(201),
       );
       const first = await invitationToken(account.id);
       await h.admin.post(`/api/v1/app-users/${account.id}/invitations`).expect(202);
@@ -229,7 +276,7 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
     it('lets a used token work once only', async () => {
       const employee = await newEmployee();
       const account = dataOf(
-        await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, roles: [] }).expect(201),
+        await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'EMPLOYEE' }).expect(201),
       );
       const token = await invitationToken(account.id);
       const redeem = () =>
@@ -243,7 +290,7 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
     it('resending keeps exactly one usable token, even when the previous one had already expired', async () => {
       const employee = await newEmployee();
       const account = dataOf(
-        await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, roles: [] }).expect(201),
+        await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'EMPLOYEE' }).expect(201),
       );
       await h.ctx.sql.query(
         "UPDATE account_action_tokens SET expires_at = now() - interval '1 hour' WHERE app_user_id = $1",
@@ -270,7 +317,7 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
       const user = await activatedAccount();
       const locked = await newEmployee();
       const lockedAccount = dataOf(
-        await h.admin.post('/api/v1/app-users', { employeeId: locked.employeeId, roles: [] }).expect(201),
+        await h.admin.post('/api/v1/app-users', { employeeId: locked.employeeId, role: 'EMPLOYEE' }).expect(201),
       );
       await h.admin
         .post(`/api/v1/app-users/${lockedAccount.id}/lock`, { reason: 'Locked so a resend must be refused' })

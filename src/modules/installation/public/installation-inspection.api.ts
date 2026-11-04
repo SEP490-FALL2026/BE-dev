@@ -6,6 +6,8 @@ import { IdentityAccessInspectionApi } from '../../identity-access/public/identi
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
   BOOTSTRAP_ACTIONS,
+  seedStateOf,
+  type SeedState,
   NO_ANNOUNCEMENT_GAPS,
   announcementGapTotal,
   bootstrapMismatches,
@@ -33,6 +35,41 @@ export class InstallationInspectionApi {
     private readonly audit: AuditApi,
     private readonly identity: IdentityAccessInspectionApi,
   ) {}
+
+  /** Runtime-role-safe seed snapshot: no reads of _prisma_migrations or migration seeding metadata. */
+  async seedCheck(): Promise<{
+    state: SeedState;
+    organization: string | null;
+    environment: string | null;
+    departments: number;
+    accounts: number;
+  }> {
+    try {
+      return await this.runner.run(async (tx) => {
+        const organization = await this.organizationReads.getOrganization(tx);
+        if (!organization)
+          return { state: 'EMPTY', organization: null, environment: null, departments: 0, accounts: 0 };
+        const counts = await this.audit.countByAction(tx, BOOTSTRAP_ACTIONS);
+        const inventory = await this.identity.accountInventory(tx);
+        const facts = await this.organizationReads.getOnboardingFacts(tx);
+        return {
+          state: seedStateOf({
+            organization: true,
+            bootstrapMismatches: bootstrapMismatches(counts),
+            superAdmin: inventory.superAdmin,
+          }),
+          organization: organization.name,
+          environment: await this.audit.firstAfterField(tx, 'INSTALLATION.ORGANIZATION_CREATED', 'environment'),
+          departments: facts.activeDepartments,
+          accounts: Object.values(inventory.accountsByState).reduce((sum, count) => sum + count, 0),
+        };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === TABLE_DOES_NOT_EXIST)
+        return { state: 'NOT_MIGRATED', organization: null, environment: null, departments: 0, accounts: 0 };
+      throw error;
+    }
+  }
 
   async inspect(): Promise<InstallationInspection> {
     const committed = this.migrations.committedMigrations();

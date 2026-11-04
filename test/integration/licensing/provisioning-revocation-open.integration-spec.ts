@@ -101,7 +101,7 @@ describe('opening the revocation of a seat, the one gate of every source (integr
   it('opens the task in the queue of the IT Admin in charge of the department of the holder today', async () => {
     const designer = await h.jobTitle('Revocation designer');
     const inCharge = await h.person('E-REV-IT');
-    await h.account('E-REV-IT', inCharge, ['IT_ADMIN']);
+    await h.account('E-REV-IT', inCharge, 'IT_ADMIN');
     await h.department('P-REV', inCharge);
     const member = await h.member('P-REV', 'E-REV-M', designer);
     await h.written({ subscriptionId: k2 }, [
@@ -286,7 +286,7 @@ describe('opening the revocation of a seat, the one gate of every source (integr
     let ownSeat: string;
 
     beforeAll(async () => {
-      own = await h.account('E-OWN-IT', await h.person('E-OWN-IT'), ['IT_ADMIN']);
+      own = await h.account('E-OWN-IT', await h.person('E-OWN-IT'), 'IT_ADMIN');
       ownSeat = await h.seat({ subscriptionId: k2 }, 'E-OWN-IT');
     });
 

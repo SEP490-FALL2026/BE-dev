@@ -6,7 +6,7 @@ import type { Command } from './run-command';
  * reading this table loads no command, module graph or environment.
  */
 export interface CommandEntry {
-  /** `node dist/cli.js <name>`; also `pnpm ops:<name>` (`pnpm dev:seed` for dev-seed). */
+  /** `node dist/cli.js <name>`; also `pnpm ops:<name>`. */
   readonly name: string;
   /** One line for `node dist/cli.js --help`. */
   readonly description: string;
@@ -73,15 +73,9 @@ export const COMMANDS: readonly CommandEntry[] = [
     load: () => import('./db-roles/db-roles.command').then((m) => m.dbRolesCommand),
   },
   {
-    name: 'demo-dataset',
+    name: 'seed',
     description: 'Write a versioned demo dataset through the API of a running installation (plan, then apply).',
-    alias: 'demo-dataset-cli',
-    load: () => import('./demo-dataset/demo-dataset.command').then((m) => m.demoDatasetCommand),
-  },
-  {
-    name: 'dev-seed',
-    description: 'Write the local demo data (local databases only, --confirm-local).',
-    alias: 'dev-seed-cli',
-    load: () => import('./dev-seed/dev-seed.command').then((m) => m.devSeedCommand),
+    alias: 'seed-cli',
+    load: () => import('./seed/seed.command').then((m) => m.seedCommand),
   },
 ];

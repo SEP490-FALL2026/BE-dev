@@ -26,11 +26,16 @@ describe('account invitation constraints (integration, real PostgreSQL)', () => 
     await ctx?.close();
   });
 
-  const grant = (appUserId: string, role: string) =>
-    ctx.sql.query(
+  const grant = async (appUserId: string, role: string) => {
+    await ctx.sql.query(
+      "UPDATE role_grants SET revoked_at = now() WHERE app_user_id = $1 AND role = 'EMPLOYEE' AND revoked_at IS NULL",
+      [appUserId],
+    );
+    return ctx.sql.query(
       `INSERT INTO role_grants (id, organization_id, app_user_id, role) VALUES ($1, $2, $3, $4::"AppRole")`,
       [randomUUID(), seed.organizationId, appUserId, role],
     );
+  };
   const revokeAll = (appUserId: string, role: string) =>
     ctx.sql.query('UPDATE role_grants SET revoked_at = now() WHERE app_user_id = $1 AND role = $2::"AppRole"', [
       appUserId,
@@ -62,28 +67,41 @@ describe('account invitation constraints (integration, real PostgreSQL)', () => 
     });
   });
 
-  describe('forbidden role combinations (FR-8.7)', () => {
-    it('rejects granting IT_ADMIN or FINANCE to the SUPER_ADMIN holder', async () => {
-      await expect(grant(seed.superAdmin.appUserId, 'IT_ADMIN')).rejects.toThrow(/forbidden role combination/i);
-      await expect(grant(seed.superAdmin.appUserId, 'FINANCE')).rejects.toThrow(/forbidden role combination/i);
+  describe('one effective role per account (QĐ-95a; replaces the combination trigger of FR-8.7)', () => {
+    const insertRaw = (appUserId: string, role: string) =>
+      ctx.sql.query(
+        `INSERT INTO role_grants (id, organization_id, app_user_id, role) VALUES (gen_random_uuid(), $1, $2, $3::"AppRole")`,
+        [seed.organizationId, appUserId, role],
+      );
+
+    it('refuses a second effective grant on the SUPER_ADMIN holder, whatever the role', async () => {
+      for (const role of ['IT_ADMIN', 'FINANCE', 'EMPLOYEE']) {
+        await expect(insertRaw(seed.superAdmin.appUserId, role)).rejects.toMatchObject({
+          code: '23505',
+          constraint: 'role_grants_one_role_per_account',
+        });
+      }
     });
 
-    it('rejects granting SUPER_ADMIN to an account that already holds IT_ADMIN', async () => {
+    it('refuses SUPER_ADMIN next to an effective IT_ADMIN grant, and leaves the holder unchanged', async () => {
       await ctx.sql.query(
         "UPDATE role_grants SET revoked_at = now() WHERE role = 'SUPER_ADMIN' AND revoked_at IS NULL",
       );
-      await grant(b.appUserId, 'IT_ADMIN');
-
-      await expect(grant(b.appUserId, 'SUPER_ADMIN')).rejects.toThrow(/forbidden role combination/i);
-
-      await revokeAll(b.appUserId, 'IT_ADMIN');
-      await ctx.sql.query("UPDATE role_grants SET revoked_at = NULL WHERE app_user_id = $1 AND role = 'SUPER_ADMIN'", [
-        seed.superAdmin.appUserId,
-      ]);
-    });
-
-    it('still allows EMPLOYEE next to SUPER_ADMIN', async () => {
-      await grant(seed.superAdmin.appUserId, 'EMPLOYEE');
+      try {
+        await grant(b.appUserId, 'IT_ADMIN');
+        await expect(insertRaw(b.appUserId, 'SUPER_ADMIN')).rejects.toMatchObject({
+          code: '23505',
+          constraint: 'role_grants_one_role_per_account',
+        });
+      } finally {
+        await revokeAll(b.appUserId, 'IT_ADMIN');
+        await insertRaw(b.appUserId, 'EMPLOYEE');
+        await ctx.sql.query(
+          `UPDATE role_grants SET revoked_at = NULL
+            WHERE id = (SELECT id FROM role_grants WHERE app_user_id = $1 AND role = 'SUPER_ADMIN' ORDER BY revoked_at DESC LIMIT 1)`,
+          [seed.superAdmin.appUserId],
+        );
+      }
     });
   });
 

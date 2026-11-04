@@ -1,3 +1,10 @@
+import { Prisma } from '../../../generated/prisma/client';
+import {
+  BOOTSTRAP_ACTIONS,
+  bootstrapMismatches,
+  seedStateOf,
+  type SeedState,
+} from '../inspect/inspection-facts.policy';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
@@ -19,9 +26,9 @@ import { DemoAccountsChangedError } from './installation.errors';
 type Credential = { hash: string; hashPolicyVersion: number };
 
 /**
- * The one part of `pnpm ops:demo-dataset` that is not driven through the HTTP API: the sign-in accounts of the demo people.
+ * The one part of `pnpm ops:seed` that is not driven through the HTTP API: the sign-in accounts of the demo people.
  * An invitation would mail a link to a demo mailbox that does not exist, so the accounts are created activated with the
- * password the operator chose, through the same demo account contract as `pnpm dev:seed` (one direct role, and any fixture-declared direct roles, never SUPER_ADMIN; operational-commands rule 6) and audited as an operator action. The employees themselves are
+ * password the operator chose, through the same demo account contract as `pnpm ops:seed` (one direct role, and any fixture-declared direct roles, never SUPER_ADMIN; operational-commands rule 6) and audited as an operator action. The employees themselves are
  * created by the Super Admin through the API before this runs; this never creates or changes an employee.
  */
 @Injectable()
@@ -41,7 +48,26 @@ export class DemoAccountsApi {
    * process ends, so a run that dies leaves no stale lock.
    */
   holdApplyLock(fixtureId: string): Promise<HeldSessionLock | null> {
-    return trySessionAdvisoryLock(this.config.get('DATABASE_URL', { infer: true }), `demo-dataset:${fixtureId}:apply`);
+    return trySessionAdvisoryLock(this.config.get('DATABASE_URL', { infer: true }), `seed:${fixtureId}:apply`);
+  }
+
+  async seedState(): Promise<SeedState> {
+    try {
+      return await this.runner.run(async (tx) => {
+        const organization = await this.organizationReads.getOrganization(tx);
+        if (!organization) return 'EMPTY';
+        const holder = await this.identity.getSuperAdminHolder(tx);
+        const counts = await this.audit.countByAction(tx, BOOTSTRAP_ACTIONS);
+        return seedStateOf({
+          organization: true,
+          bootstrapMismatches: bootstrapMismatches(counts),
+          superAdmin: holder ? { ...holder, holders: 1 } : null,
+        });
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') return 'NOT_MIGRATED';
+      throw error;
+    }
   }
 
   /** Null when the database holds no installation. */
@@ -157,8 +183,8 @@ export class DemoAccountsApi {
       organizationId,
       employeeId: employee.id,
       loginEmail: spec.loginEmail,
-      role: spec.role,
-      ...(spec.allowedExtraRoles ? { allowedExtraRoles: spec.allowedExtraRoles } : {}),
+      initialRole: spec.initialRole,
+      ...(spec.finalRole ? { finalRole: spec.finalRole } : {}),
     });
     const appUserId = await this.identity.findAccountIdOfEmployee(tx, employee.id);
 
@@ -184,7 +210,7 @@ export class DemoAccountsApi {
       organizationId,
       employeeId: item.employeeId,
       loginEmail: spec.loginEmail,
-      role: spec.role,
+      initialRole: spec.initialRole,
       passwordHash: credential.hash,
       hashPolicyVersion: credential.hashPolicyVersion,
     });
@@ -205,7 +231,7 @@ export class DemoAccountsApi {
       emailVerificationSource: 'BOOTSTRAP_ASSERTED',
       environment: attribution.environment,
     });
-    await record('ROLE.GRANTED', { role: spec.role });
+    await record('ROLE.GRANTED', { role: spec.initialRole });
   }
 }
 

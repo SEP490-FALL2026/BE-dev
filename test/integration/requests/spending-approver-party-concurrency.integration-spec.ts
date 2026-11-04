@@ -45,7 +45,7 @@ describe('the grant of the spending approver and a Request of the same person (i
   };
   const grant = (target: Person) =>
     request(h.server())
-      .post(`/api/v1/app-users/${target.account.appUserId}/role-grants`)
+      .put(`/api/v1/app-users/${target.account.appUserId}/role`)
       .set({ Authorization: `Bearer ${h.admin}` })
       .send({ role: 'SPENDING_APPROVER' })
       .then((response) => response);
@@ -98,7 +98,7 @@ describe('the grant of the spending approver and a Request of the same person (i
     await holder.query('COMMIT');
     const [grantAnswer, requestAnswer] = await Promise.all([granted, sent]);
 
-    expect(grantAnswer.status).toBe(201);
+    expect(grantAnswer.status).toBe(200);
     expect(requestAnswer.status).toBe(422);
     expect(h.codeOf(requestAnswer)).toBe('REQUEST_PARTY.INELIGIBLE');
     expect(await holdsRole(e7)).toBe(true);

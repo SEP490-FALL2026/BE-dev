@@ -38,8 +38,6 @@ describe('the reviewer of Finance does not decide what they reviewed or sent (in
   const status = () => h.ctx.app.get(AccountStatusService, { strict: false });
   /** The Super Admin moves the person from FINANCE to the spending approver, the way the routes do (revoke, then grant). */
   const financeBecomesApprover = async (finance: ApiAccount): Promise<Person> => {
-    const actor = await principalOf(h.ctx, h.admin);
-    await status().revokeRole(actor, finance.appUserId, 'FINANCE');
     const person: Person = { employeeId: finance.employeeId, account: finance };
     await h.setRole('SPENDING_APPROVER', person);
 
@@ -48,7 +46,7 @@ describe('the reviewer of Finance does not decide what they reviewed or sent (in
   /** And back: the boss is the spending approver again, the person holds FINANCE again. */
   const restore = async (finance: ApiAccount): Promise<void> => {
     await h.setRole('SPENDING_APPROVER', h.boss);
-    await status().grantRole(await principalOf(h.ctx, h.admin), finance.appUserId, 'FINANCE');
+    await status().changeRole(await principalOf(h.ctx, h.admin), finance.appUserId, 'FINANCE');
   };
 
   it('refuses the spend decision to the person who completed the review of the request (SPEND.REVIEWER_IS_APPROVER)', async () => {

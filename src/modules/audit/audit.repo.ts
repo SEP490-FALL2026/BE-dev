@@ -17,6 +17,14 @@ interface SliceRow {
 
 @Injectable()
 export class AuditRepo {
+  /** String field of the earliest event, ordered deterministically, without exposing the rest of its payload. */
+  async firstAfterField(tx: DbTx, action: string, field: string): Promise<string | null> {
+    const rows = await tx.$queryRaw<{ value: string | null }[]>`
+      SELECT CASE WHEN jsonb_typeof("after" -> ${field}) = 'string' THEN "after" ->> ${field} ELSE NULL END AS value
+      FROM audit_events WHERE action = ${action} ORDER BY occurred_at, id LIMIT 1`;
+    return rows[0]?.value ?? null;
+  }
+
   /** Insert only. The transaction is the caller's, so the event commits or rolls back with the change. */
   async insert(tx: DbTx, event: AuditEventInput): Promise<void> {
     await tx.auditEvent.create({

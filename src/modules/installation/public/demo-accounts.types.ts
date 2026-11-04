@@ -4,8 +4,8 @@ import type { DemoAccountRole } from '../../identity-access/public/identity-acce
 export interface DemoAccountSpec {
   employeeCode: string;
   loginEmail: string;
-  role: DemoAccountRole;
-  allowedExtraRoles?: readonly ('MANAGER' | 'SPENDING_APPROVER')[];
+  initialRole: DemoAccountRole;
+  finalRole?: 'SPENDING_APPROVER';
 }
 
 /** What `pnpm ops:demo-dataset` checks before it touches anything: which installation the database holds. */

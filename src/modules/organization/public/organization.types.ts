@@ -1,6 +1,6 @@
 import { BusinessDate } from '../../../core/business-date';
 import { CostCenterKind, CostCenterStatus } from '../organization-structure.types';
-import { DepartmentStatus, HeadPeriodRecord } from '../organization-structure.types';
+import { HeadPeriodRecord } from '../organization-structure.types';
 
 import type { EmployeeStatus, EmployeeWorkState, EmploymentType } from '../organization-employee.types';
 
@@ -217,31 +217,6 @@ export interface OwningUnit {
 /** An {@link OwningUnit} whose department has a Cost Center in use: what a cost is charged to. */
 export interface CostedOwningUnit extends OwningUnit {
   costCenter: { id: string; code: string; status: CostCenterStatus };
-}
-
-/**
- * The local seed fixture items as `pnpm dev:seed` compares them: every field the fixture fixes, the link
- * between the cost center and its department, and the ids it writes against. Null when absent.
- */
-export interface LocalSeedFixtureFacts {
-  /** Whether the Cost Center link of this local database is activated (a new local database has no previous release to recover). */
-  costCenterDirectionActivated: boolean;
-  costCenter: {
-    id: string;
-    code: string;
-    name: string;
-    kind: CostCenterKind;
-    status: CostCenterStatus;
-    departmentCode: string | null;
-  } | null;
-  department: {
-    id: string;
-    code: string;
-    name: string;
-    status: DepartmentStatus;
-    costCenterId: string | null;
-    costCenterCode: string | null;
-  } | null;
 }
 
 /**

@@ -176,11 +176,11 @@ export class ProvisioningHarness extends SeatHarness {
   }
 
   /** An activated account of the employee holding `roles`, signed in (T2.2: built, not invited through HTTP). */
-  account(code: string, employeeId: string, roles: string[]): Promise<ApiAccount> {
+  account(code: string, employeeId: string, role = 'EMPLOYEE'): Promise<ApiAccount> {
     return buildActivatedAccount(this.ctx, this.seed, {
       code,
       email: `${code.toLowerCase()}@acme.vn`,
-      roles,
+      role,
       employeeId,
     });
   }

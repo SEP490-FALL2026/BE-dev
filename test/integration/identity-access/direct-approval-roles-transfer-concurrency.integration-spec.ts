@@ -40,7 +40,7 @@ describe('a transfer that names a successor and the revoke of MANAGER of that su
           successor: { kind: 'EMPLOYEE', employeeId: heir.employeeId },
         })
         .then((response) => response);
-    const revoke = () => t.revokeRoleFrom(heir.account.appUserId, 'MANAGER').then((response) => response);
+    const revoke = () => t.changeRoleOf(heir.account.appUserId, 'EMPLOYEE').then((response) => response);
     const heirPeriods = async () =>
       Number(
         (

@@ -111,7 +111,7 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     owner = h.businessOwner;
     designer = await h.jobTitle('Designer');
     a1Employee = await h.person('E-A1');
-    await h.account('E-A1', a1Employee, ['IT_ADMIN']);
+    await h.account('E-A1', a1Employee, 'IT_ADMIN');
     await h.department('P-DES', a1Employee);
     people = [];
     for (let index = 0; index < 6; index += 1) people.push(await h.member('P-DES', `E-R${index}`, designer));

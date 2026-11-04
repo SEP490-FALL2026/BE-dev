@@ -242,7 +242,7 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
       const itInCharge = { employeeId: h.it1.employeeId, account: h.it1 };
       await h.setItAdminInCharge(headless, itInCharge);
       const otherDepartment = await h.departmentWithUnit(`P-OT${n}`);
-      const itElsewhere = await h.staff(otherDepartment, `IT-OT${n}`, ['IT_ADMIN']);
+      const itElsewhere = await h.staff(otherDepartment, `IT-OT${n}`, 'IT_ADMIN');
       await h.setItAdminInCharge(otherDepartment, itElsewhere);
 
       const sent = await h.sent(e4, internal);
@@ -341,7 +341,7 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
       n += 1;
       const first = await h.staff(await h.departmentWithUnit(`P-F${n}`), `FIN-A${n}`);
       const second = await h.staff(await h.departmentWithUnit(`P-F${n + 1000}`), `FIN-B${n}`);
-      await h.revokeRoleFrom(h.finance.appUserId, 'FINANCE').expect(200);
+      await h.changeRoleOf(h.finance.appUserId, 'EMPLOYEE').expect(200);
       try {
         await h.route(r4, exceptional.head.account);
         await h.route(r6, ordinary.head.account);
@@ -371,7 +371,7 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
         await h.ctx.sql.query(`UPDATE app_users SET activation_state = 'INVITED' WHERE id = $1`, [
           first.account.appUserId,
         ]);
-        await h.grantRoleTo(first.account.appUserId, 'FINANCE').expect(201);
+        await h.changeRoleOf(first.account.appUserId, 'FINANCE').expect(200);
         expect(await h.stepOf(r4, 'FINANCE_REVIEW')).toMatchObject({ state: 'WAITING', assignee_employee_id: null });
 
         // The account is activated: the sweep gives it, since no change of the role announces an activation.
@@ -388,12 +388,12 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
         expect(await h.state(r4)).toBe('AWAITING_FINANCE_REVIEW');
 
         // The review that is held is not taken from Finance when the role changes person.
-        await h.revokeRoleFrom(first.account.appUserId, 'FINANCE').expect(200);
-        await h.grantRoleTo(second.account.appUserId, 'FINANCE').expect(201);
+        await h.changeRoleOf(first.account.appUserId, 'EMPLOYEE').expect(200);
+        await h.changeRoleOf(second.account.appUserId, 'FINANCE').expect(200);
         expect(await h.stepOf(r4, 'FINANCE_REVIEW')).toMatchObject({ assignee_employee_id: first.employeeId });
       } finally {
-        await h.revokeRoleFrom(second.account.appUserId, 'FINANCE');
-        await h.grantRoleTo(h.finance.appUserId, 'FINANCE');
+        await h.changeRoleOf(second.account.appUserId, 'EMPLOYEE');
+        await h.changeRoleOf(h.finance.appUserId, 'FINANCE');
       }
     });
   });

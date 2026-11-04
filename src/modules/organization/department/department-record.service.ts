@@ -46,10 +46,6 @@ export class DepartmentRecordService {
     return this.departments.lockByCode(tx, organizationId, code);
   }
 
-  findByCode(tx: DbTx, organizationId: string, code: string): Promise<DepartmentRecord | null> {
-    return this.departments.findByCode(tx, organizationId, code);
-  }
-
   countActive(tx?: DbTx): Promise<number> {
     return this.departments.countActiveDepartments(tx);
   }

@@ -33,7 +33,7 @@ describe('what licensing reads of catalog and organization (integration, real Po
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
     const admin = await adminToken(ctx, seed);
-    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
+    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
     businessOwner = (await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' })).employeeId;
     catalog = ctx.app.get(CatalogApi, { strict: false });
     organization = ctx.app.get(OrganizationApi, { strict: false });
@@ -244,7 +244,7 @@ describe('what licensing reads of catalog and organization (integration, real Po
             await createActivatedAccount(ctx, seed, {
               code: 'E-FIN',
               email: 'fin@acme.vn',
-              roles: ['FINANCE'],
+              role: 'FINANCE',
               admin: await adminToken(ctx, seed),
             }),
           ),

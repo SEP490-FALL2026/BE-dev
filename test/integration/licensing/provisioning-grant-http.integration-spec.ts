@@ -32,7 +32,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     await h.start();
     designer = await h.jobTitle('Designer');
     a1Employee = await h.person('E-A1');
-    await h.account('E-A1', a1Employee, ['IT_ADMIN']);
+    await h.account('E-A1', a1Employee, 'IT_ADMIN');
     await h.department('P-DES', a1Employee);
     await h.department('P-NOIT');
     e5 = await h.member('P-DES', 'E-5', designer);

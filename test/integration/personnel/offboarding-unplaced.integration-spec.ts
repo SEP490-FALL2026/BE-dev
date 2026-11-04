@@ -446,7 +446,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
       expect(await h.auditEventsOf('EMPLOYEE.FIRST_PLACEMENT_CANCELLED', emp.id)).toEqual([]);
 
       // The day the placement takes effect the person is a member: the same call is the normal flow, not the short one.
-      const person: Person = { employeeId: emp.id, account: await h.account(employeeCode, emp.id, []) };
+      const person: Person = { employeeId: emp.id, account: await h.account(employeeCode, emp.id, 'EMPLOYEE') };
       const spy = pretendBusinessToday(h.ctx.app, validFrom);
       try {
         const assignmentId = await h.seatOf(person, { subscriptionId: tool }, employeeCode);
@@ -501,7 +501,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
     });
 
     it('11. tells the Super Admin that an unplaced IT Admin in charge of a department is leaving, with a null department (ROLE_HOLDER_LEAVING)', async () => {
-      const itAdmin = await h.unplacedStaff(code('IT-UNP'), ['IT_ADMIN']);
+      const itAdmin = await h.unplacedStaff(code('IT-UNP'), 'IT_ADMIN');
       await h.setItAdminInCharge(des, itAdmin);
 
       const wire = await h.recordedCase(itAdmin);

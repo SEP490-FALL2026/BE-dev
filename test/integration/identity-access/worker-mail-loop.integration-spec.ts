@@ -57,7 +57,7 @@ describe('worker mail loop (integration, PostgreSQL + in-process SMTP)', () => {
     const created = await request(ctx.app.getHttpServer())
       .post('/api/v1/app-users')
       .set({ Authorization: `Bearer ${bodyOf(login).data.accessToken}` })
-      .send({ employeeId, roles: [] })
+      .send({ employeeId, role: 'EMPLOYEE' })
       .expect(201);
     expect(received).toHaveLength(0);
 

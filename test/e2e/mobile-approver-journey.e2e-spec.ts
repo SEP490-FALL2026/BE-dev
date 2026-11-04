@@ -64,7 +64,7 @@ describe('the approvers on the phone: need step, spend step and the request a he
       .declareTaxProfile((await h.vendorOf(plan)).id, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }])
       .expect(200);
     unit = await h.departmentWithHead('P-DES');
-    employee = await h.staff(unit.department, 'DES-E1', ['EMPLOYEE']);
+    employee = await h.staff(unit.department, 'DES-E1', 'EMPLOYEE');
     await h.budgetFor(unit, {
       total: 100 * M,
       lines: [

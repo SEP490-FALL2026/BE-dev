@@ -51,10 +51,10 @@ describe('mobile channel: sign in, list, act, inbox, sign out (e2e)', () => {
   beforeAll(async () => {
     await h.start();
     design = await h.departmentWithUnit('P-MOB');
-    head = await h.staff(design, 'MOB-H1', []);
+    head = await h.staff(design, 'MOB-H1', 'EMPLOYEE');
     await h.makeHead(design, head);
-    employee = await h.staff(design, 'MOB-E1', ['EMPLOYEE']);
-    colleague = await h.staff(design, 'MOB-E2', ['EMPLOYEE']);
+    employee = await h.staff(design, 'MOB-E1', 'EMPLOYEE');
+    colleague = await h.staff(design, 'MOB-E2', 'EMPLOYEE');
     // An internal application (K5): no price and no spend step, the shortest chain a request has.
     planId = await h.plan('K5');
   }, 180000);
@@ -66,10 +66,8 @@ describe('mobile channel: sign in, list, act, inbox, sign out (e2e)', () => {
   it('signs the employee in, and /me gives the roles the web would give', async () => {
     employeeSession = await signIn(employee);
 
-    const me = h.dataOf<{ roles: string[]; selfServiceOnly: boolean }>(
-      await get('/api/v1/me', employeeSession).expect(200),
-    );
-    expect(me).toMatchObject({ roles: ['EMPLOYEE'], selfServiceOnly: false });
+    const me = h.dataOf<{ roles: string[] }>(await get('/api/v1/me', employeeSession).expect(200));
+    expect(me).toMatchObject({ roles: ['EMPLOYEE'] });
   });
 
   it('lists the software and the drafts of the employee (none yet), finds the plan in the catalog, previews the request and sends it: it is the one the web would make', async () => {

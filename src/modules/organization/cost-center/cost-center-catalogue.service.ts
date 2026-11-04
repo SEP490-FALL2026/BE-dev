@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CostCenterBrief, CreateCostCenterInput } from '../public/organization.types';
 import { CostCenterRepo } from './cost-center.repo';
-import { CostCenterRecord } from './cost-center.types';
 
 /**
  * The Cost Center catalogue as the organization facade needs it outside the catalogue's own HTTP use cases: the
@@ -23,10 +22,6 @@ export class CostCenterCatalogueService {
 
   departmentsWithoutCostCenter(tx?: DbTx): Promise<{ id: string; code: string; name: string }[]> {
     return this.repo.departmentsWithoutCostCenter(tx);
-  }
-
-  findByCode(tx: DbTx, organizationId: string, code: string): Promise<CostCenterRecord | null> {
-    return this.repo.findByCode(tx, organizationId, code);
   }
 
   findBriefs(ids: readonly string[], tx?: DbTx): Promise<CostCenterBrief[]> {

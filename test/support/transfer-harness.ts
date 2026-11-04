@@ -90,7 +90,7 @@ export class TransferHarness extends ReassignmentHarness {
 
   /** A person of the department who has been in it since long ago, so a transfer may take effect today. */
   async veteran(department: Department, code: string, roles: string[] = []): Promise<Person> {
-    const person = await this.staff(department, code, roles);
+    const person = await this.staff(department, code, roles[0] ?? 'EMPLOYEE');
     await this.ctx.sql.query(`UPDATE employee_placements SET valid_from = '2026-01-05' WHERE employee_id = $1`, [
       person.employeeId,
     ]);

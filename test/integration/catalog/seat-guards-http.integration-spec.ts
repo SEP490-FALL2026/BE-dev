@@ -52,7 +52,7 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
     await h.start();
     designer = await h.jobTitle('Designer');
     a1Employee = await h.person('E-A1');
-    await h.account('E-A1', a1Employee, ['IT_ADMIN']);
+    await h.account('E-A1', a1Employee, 'IT_ADMIN');
     await h.department('P-DES', a1Employee);
     people = [];
     for (let index = 0; index < 14; index += 1) people.push(await h.member('P-DES', `E-G${index}`, designer));

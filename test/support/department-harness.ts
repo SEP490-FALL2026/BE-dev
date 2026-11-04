@@ -1,7 +1,7 @@
 import { findPlacementCoverageViolations } from './placement-coverage';
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from './api-accounts';
-import { ensureManagerGrant } from './builders/account.builder';
+import { changeRoleTo } from './builders/account.builder';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from './http-test-app';
 import { UseFacts, registerUseReaders } from './organization-use-readers';
 
@@ -143,13 +143,13 @@ export class DepartmentHarness {
     return { employeeId: (response.body as { data: { id: string } }).data.id, code, email: body.workEmail };
   };
 
-  /** A member of the department with an account that holds no role. */
+  /** A member of the department with an activated account holding the default role EMPLOYEE (no MANAGER, so no head). */
   accountIn = async (departmentCode: string): Promise<ApiAccount & { code: string }> => {
     const person = await this.enter(departmentCode);
     const account = await createActivatedAccount(this.ctx, this.seed, {
       code: person.code,
       email: person.email,
-      roles: [],
+      role: 'EMPLOYEE',
       admin: this.admin,
       employeeId: person.employeeId,
     });
@@ -160,7 +160,7 @@ export class DepartmentHarness {
   /** `MANAGER` is granted by the Super Admin before a person is named head (QĐ-93a); a person with no account has none to give. */
   grantManager = async (employeeId: string): Promise<void> => {
     const { rowCount } = await this.ctx.sql.query('SELECT 1 FROM app_users WHERE employee_id = $1', [employeeId]);
-    if (rowCount === 1) await ensureManagerGrant(this.ctx, this.admin, employeeId);
+    if (rowCount === 1) await changeRoleTo(this.ctx, this.admin, employeeId, 'MANAGER');
   };
 
   /** The call of the route as it is, with no grant given first: what the specs of the refusals send. */
@@ -195,14 +195,12 @@ export class DepartmentHarness {
   ): Promise<{
     roles: string[];
     managerScope: { departmentId: string; departmentCode: string } | null;
-    selfServiceOnly: boolean;
   }> =>
     (
       (await this.api().get('/api/v1/me').set(this.as(account)).expect(200)).body as {
         data: {
           roles: string[];
           managerScope: { departmentId: string; departmentCode: string } | null;
-          selfServiceOnly: boolean;
         };
       }
     ).data;
@@ -235,19 +233,19 @@ export class DepartmentHarness {
     this.finance = await createActivatedAccount(this.ctx, this.seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin: this.admin,
     });
     this.it1 = await createActivatedAccount(this.ctx, this.seed, {
       code: 'E-IT1',
       email: 'it1@acme.vn',
-      roles: ['IT_ADMIN'],
+      role: 'IT_ADMIN',
       admin: this.admin,
     });
     this.it2 = await createActivatedAccount(this.ctx, this.seed, {
       code: 'E-IT2',
       email: 'it2@acme.vn',
-      roles: ['IT_ADMIN'],
+      role: 'IT_ADMIN',
       admin: this.admin,
     });
     // What keeps a department or a Cost Center in use lives in other modules: every group answers with nothing unless a case says so.

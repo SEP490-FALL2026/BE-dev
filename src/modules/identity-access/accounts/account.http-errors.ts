@@ -15,9 +15,6 @@ import {
   LoginEmailRequiredError,
   LoginEmailTakenError,
   ManagerStillHeadingError,
-  RoleAlreadyGrantedError,
-  RoleCombinationForbiddenError,
-  RoleNotGrantedError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
   SpendingApproverAccountNotUsableError,
@@ -72,17 +69,7 @@ export function toAccountApiException(error: unknown): unknown {
   if (error instanceof SuperAdminHolderNotLockableError) {
     return refuse(HttpStatus.CONFLICT, 'APP_USER.SUPER_ADMIN_HOLDER_NOT_LOCKABLE', error.message);
   }
-  if (error instanceof RoleAlreadyGrantedError) {
-    return refuse(HttpStatus.CONFLICT, 'APP_USER.ROLE_ALREADY_GRANTED', error.message);
-  }
-  if (error instanceof RoleNotGrantedError) {
-    return refuse(HttpStatus.NOT_FOUND, 'APP_USER.ROLE_NOT_GRANTED', error.message);
-  }
-  if (error instanceof RoleCombinationForbiddenError) {
-    return refuse(HttpStatus.CONFLICT, 'APP_USER.ROLE_COMBINATION_FORBIDDEN', error.message, {
-      conflictingRoles: [...error.conflictingRoles],
-    });
-  }
+
   if (error instanceof ManagerStillHeadingError) {
     return refuse(HttpStatus.CONFLICT, 'APP_USER.MANAGER_STILL_HEADING', error.message, {
       headPeriods: error.headPeriods.map((period) => ({ ...period })),
@@ -132,9 +119,7 @@ export const ACCOUNT_ERROR_EXAMPLES = {
   ALREADY_ACTIVATED: example(new AccountAlreadyActivatedError()),
   ACCOUNT_LOCKED: example(new AccountLockedError()),
   SUPER_ADMIN_HOLDER_NOT_LOCKABLE: example(new SuperAdminHolderNotLockableError()),
-  ROLE_ALREADY_GRANTED: example(new RoleAlreadyGrantedError()),
-  ROLE_NOT_GRANTED: example(new RoleNotGrantedError()),
-  ROLE_COMBINATION_FORBIDDEN: example(new RoleCombinationForbiddenError(['IT_ADMIN'])),
+
   MANAGER_STILL_HEADING: example(
     new ManagerStillHeadingError([
       {

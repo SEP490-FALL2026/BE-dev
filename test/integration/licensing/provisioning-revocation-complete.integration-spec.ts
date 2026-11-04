@@ -222,7 +222,7 @@ describe('completing a revocation by the kind of grant, over HTTP (integration, 
       const { taskId } = await h.open(assignmentId, 'MANAGER_NOT_NEEDED');
       await h.claim(taskId).expect(200);
       const holder = (await h.assignmentsOf({ subscriptionId }))[0].employeeId;
-      const account = await h.account('E-K1-LOCK', holder, []);
+      const account = await h.account('E-K1-LOCK', holder, 'EMPLOYEE');
       await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE id = $1`, [account.appUserId]);
 
       // The account of the person is locked, which is not cancelling the renewal: the task is as it was, the seat held.
@@ -476,7 +476,7 @@ describe('completing a revocation by the kind of grant, over HTTP (integration, 
     });
 
     it('an IT Admin who is the person revoked cannot complete it while another IT Admin can', async () => {
-      const own = await h.account('E-DONE-OWN', await h.person('E-DONE-OWN'), ['IT_ADMIN']);
+      const own = await h.account('E-DONE-OWN', await h.person('E-DONE-OWN'), 'IT_ADMIN');
       const subscriptionId = await h.subscription(3, 'K2');
       const assignmentId = await h.seat({ subscriptionId }, 'E-DONE-OWN');
       const { taskId } = await h.open(assignmentId, 'TRANSFER_REVIEW');

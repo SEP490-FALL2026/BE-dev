@@ -35,7 +35,7 @@ describe('query-count harness (integration, real PostgreSQL)', () => {
     finance = await createActivatedAccount(ctx, seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin,
     });
     organizationId = (await ctx.sql.query<{ id: string }>('SELECT id FROM organizations')).rows[0].id;

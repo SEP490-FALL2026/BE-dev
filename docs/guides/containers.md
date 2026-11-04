@@ -108,8 +108,7 @@ first run committed). Check the state without writing anything:
 `docker compose -f docker-compose.prod.yml run --rm --no-deps migrate node dist/inspect-cli.js` (it reads
 `_prisma_migrations`, which the runtime role may not; its sessions stay read-only) (`--json` for a machine; exit 0
 installed and consistent, 2 not installed or incomplete, 1 error). It reads the database settings only and opens every
-session read-only; it prints counts and the Super Admin email masked. `dev-seed-cli.js` is in the image too, but it
-refuses with exit 3 unless `NODE_ENV` is development or test and the database host is loopback: never point it at a
+session read-only; it prints counts and the Super Admin email masked. The unified `seed` command and wrappers are documented in [seed](seed.md).
 shared database ([operational commands](../rules/operational-commands.md)).
 The installation command needs a terminal (`-it`) because the Super Admin password is typed at a hidden prompt; by default it
 refuses to read it from arguments, the environment or a pipe. The one exception is the explicit switch `--password-stdin`
@@ -401,7 +400,7 @@ because no release ever ran on the new database. Holding the host lock (above), 
 `mkdir releases/archived-<UTC yyyyMMddTHHmmssZ>` then
 `mv docker-compose.prod.yml Caddyfile releases/current-image releases/current-attempt releases/archived-<…>/` (each that
 exists). Emptying the database itself is the Owner's decision on one named target, by the method the Owner approved; no
-command of this repository and no CI/CD step resets a database.
+CI/CD step resets a database. The Owner-run demo seed wrappers are the explicit reset exception: local development/loopback checks or VPS SEED_ALLOW_RESET=true plus exact database confirmation and verified backup. See [seed and the one-time QD-95 rebuild runbook](seed.md).
 
 **Rotate a password:** change `DATABASE_DEPLOY_PASSWORD` or `DATABASE_RUNTIME_PASSWORD` in `.env`, run step 5 again (it
 sets both passwords, nothing else changes on a consistent database), then `up -d --force-recreate api worker`. The
@@ -500,7 +499,7 @@ assign or link cannot be placed between two migrations of one deploy: it is plac
 ### Task 1.2b action 9 on a real server (two paths)
 
 Action 9 records that **one named database** is ready to receive the final release. It is not a deploy of the final release and
-it **seeds no demo data** (the demo dataset is a separate operator step: [demo-dataset](demo-dataset.md)). The Owner/operator runs it on the host, per database, and records the
+it **seeds no demo data** (the demo dataset is a separate operator step: [seed](seed.md)). The Owner/operator runs it on the host, per database, and records the
 evidence in the Task 1.2b template of the work item's plan; a local rehearsal or a CI run never counts as action 9, and nothing here
 runs in CI/CD. Placeholders: `<APP_DIR>`, `<IMAGE>` (`ghcr.io/<owner>/<repo>` in lower case), `<COMPAT_SHA>` =
 `fba4dfe0885f19e6a76a6e6e7e15d30223d124ab`, `<FINAL_SHA>` (the Owner's commit of the final release), `<ATTEMPT>`, `<REF>` (a

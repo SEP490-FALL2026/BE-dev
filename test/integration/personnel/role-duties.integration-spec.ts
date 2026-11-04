@@ -452,7 +452,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
 
       // Even while the Super Admin hands over, nobody is given the role in the application (US-01-01 AC-15).
       const refusedGrant = await request(h.server())
-        .post(`/api/v1/app-users/${h.employee.appUserId}/role-grants`)
+        .put(`/api/v1/app-users/${h.employee.appUserId}/role`)
         .set(h.as(superAdmin()))
         .send({ role: 'SUPER_ADMIN' })
         .expect(422);
@@ -483,7 +483,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       const grant = await request(h.server())
         .post('/api/v1/app-users')
         .set(h.as(h.it1))
-        .send({ employeeId: h.employee.employeeId, roles: ['SUPER_ADMIN'] });
+        .send({ employeeId: h.employee.employeeId, role: 'SUPER_ADMIN' });
       expect(grant.status).toBe(403);
       expect(await watched()).toMatchObject({ status: 'HOLDER_UNUSABLE' });
     });

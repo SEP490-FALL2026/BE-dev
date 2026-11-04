@@ -51,8 +51,6 @@ claude/worktrees/
 .env.*
 !.env.example
 !.env.bootstrap.example
-!.env.demo-dataset.example
-!.env.demo-dataset-local.example
 
 # Shared planning is versioned; only personal scratch is ignored.
 /docs/workspace/local/
@@ -75,3 +73,8 @@ pids
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+
+!.env.seed.local.example
+
+!.env.seed.example
+seed-reports/

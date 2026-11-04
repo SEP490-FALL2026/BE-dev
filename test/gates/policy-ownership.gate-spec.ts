@@ -64,17 +64,6 @@ const PLACEMENT_REASON_CODES: ReadonlySet<string> = new Set([
  */
 const OTHER_DECISIONS: ReadonlyMap<string, { codes: readonly string[]; reason: string }> = new Map([
   [
-    'installation/dev-seed/dev-seed-plan.policy.ts',
-    {
-      codes: ['DEPARTMENT_INACTIVE'],
-      reason: 'dev:seed compares an existing fixture item with the fixture (P23-RV-01 SeedConflict), not a row',
-    },
-  ],
-  [
-    'installation/public/dev-seed.types.ts',
-    { codes: ['DEPARTMENT_INACTIVE'], reason: 'the SeedConflict type of the same comparison' },
-  ],
-  [
     'organization/public/cost-center-direction.errors.ts',
     {
       codes: ['DEPARTMENT_NOT_FOUND'],

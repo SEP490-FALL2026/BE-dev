@@ -103,8 +103,8 @@ describe('my requests: order, pages, narrowing, statements and finance data (int
     paid = await h.planOf(await h.subscription(100));
     design = await h.departmentWithHead('P-MRR');
     await h.setItAdminInCharge(design.department, { employeeId: h.it1.employeeId, account: h.it1 });
-    small = await h.staff(design.department, 'MRR-S', ['EMPLOYEE']);
-    large = await h.staff(design.department, 'MRR-L', ['EMPLOYEE']);
+    small = await h.staff(design.department, 'MRR-S', 'EMPLOYEE');
+    large = await h.staff(design.department, 'MRR-L', 'EMPLOYEE');
     await block(small);
     for (let index = 0; index < 3; index += 1) sentIds.push(...(await block(large)));
   }, 600000);

@@ -155,15 +155,11 @@ export class ReassignmentHarness extends SpendHarness {
 
   waits = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/controlled-waits').query(query).set(this.as(account));
-  grantRoleTo = (appUserId: string, role: string) =>
+  changeRoleOf = (appUserId: string, role: string) =>
     request(this.server())
-      .post(`/api/v1/app-users/${appUserId}/role-grants`)
+      .put(`/api/v1/app-users/${appUserId}/role`)
       .set({ Authorization: `Bearer ${this.admin}` })
       .send({ role });
-  revokeRoleFrom = (appUserId: string, role: string) =>
-    request(this.server())
-      .delete(`/api/v1/app-users/${appUserId}/role-grants/${role}`)
-      .set({ Authorization: `Bearer ${this.admin}` });
 
   /** The day after `today()`, in the calendar of the organization. */
   tomorrow = (): string => new Date(Date.parse(`${this.today()}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);

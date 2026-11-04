@@ -20,7 +20,6 @@ export interface MeView {
   roles: AppRole[];
   /** The department the caller heads today when they hold MANAGER; null otherwise. */
   managerScope: { departmentId: string; departmentCode: string; departmentName: string } | null;
-  selfServiceOnly: boolean;
 }
 
 @Injectable()
@@ -51,7 +50,6 @@ export class MeService {
       employee: profile,
       roles,
       managerScope: await this.managerScopeOf(principal, day),
-      selfServiceOnly: roles.length === 0,
     };
   }
 

@@ -59,15 +59,20 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
     admin = await adminToken(ctx, seed);
-    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
-    it2 = await createActivatedAccount(ctx, seed, { code: 'E-IT2', email: 'it2@acme.vn', roles: ['IT_ADMIN'], admin });
+    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
+    it2 = await createActivatedAccount(ctx, seed, { code: 'E-IT2', email: 'it2@acme.vn', role: 'IT_ADMIN', admin });
     finance = await createActivatedAccount(ctx, seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin,
     });
-    employee = await createActivatedAccount(ctx, seed, { code: 'E-EMP', email: 'emp@acme.vn', roles: [], admin });
+    employee = await createActivatedAccount(ctx, seed, {
+      code: 'E-EMP',
+      email: 'emp@acme.vn',
+      role: 'EMPLOYEE',
+      admin,
+    });
     businessOwner = (await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' })).employeeId;
   }, 120000);
 
@@ -491,7 +496,7 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
         await createActivatedAccount(ctx, seed, {
           code: unique('E-LEFT'),
           email: `left${counter}@acme.vn`,
-          roles: ['IT_ADMIN'],
+          role: 'IT_ADMIN',
           admin,
         })
       ).employeeId;
@@ -620,7 +625,7 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       const leaving = await createActivatedAccount(ctx, seed, {
         code: unique('E-LEAVING'),
         email: `leaving${counter}@acme.vn`,
-        roles: ['IT_ADMIN'],
+        role: 'IT_ADMIN',
         admin,
       });
       await ctx.sql.query('BEGIN');

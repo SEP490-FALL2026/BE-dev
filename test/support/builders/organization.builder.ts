@@ -9,7 +9,7 @@ import {
 import { EmployeeManualService } from '../../../src/modules/organization/employee/employee-manual.service';
 import { CreateEmployeeBodyDto } from '../../../src/modules/organization/employee/employee.dto';
 import type { HttpTestApp } from '../http-test-app';
-import { ensureManagerGrant, principalOf, sent } from './account.builder';
+import { changeRoleTo, principalOf, sent } from './account.builder';
 
 /*
  * T2.2 (spec "Integration: dựng fixture không qua HTTP"): the organization a suite only needs as a precondition, made by the
@@ -67,7 +67,7 @@ export async function assignHead(
   body: { employeeId: string; effectiveFrom?: string },
 ): Promise<void> {
   // The head is a MANAGER first (US-03-06 AC-23); the seam grants it once the application stops deriving the role.
-  await ensureManagerGrant(ctx, adminToken, body.employeeId);
+  await changeRoleTo(ctx, adminToken, body.employeeId, 'MANAGER');
   const actor = await principalOf(ctx, adminToken);
   await ctx.app
     .get(DepartmentHeadService, { strict: false })

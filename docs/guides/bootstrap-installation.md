@@ -4,6 +4,8 @@ Hướng dẫn vận hành một lần sau khi deploy lên **database mới đã
 [`bootstrap-installation.sh`](../../scripts/ops/bootstrap-installation.sh) đọc cấu hình từ `.env.bootstrap` rồi gọi CLI
 của đúng image đang deploy. CLI tạo tổ chức, một phòng đầu tiên và tài khoản Super Admin; không tạo dataset demo.
 
+Với DB demo local/VPS, dùng [seed hợp nhất](seed.md): wrapper kiểm trạng thái, xác nhận reset hoặc chạy tiếp, và bootstrap khi DB trống. Hướng dẫn này vẫn dành cho cài đặt thật, giữ nguyên database qua deploy.
+
 Luồng: **commit/push → CI/CD xanh → copy wrapper và template → điền cấu hình → bootstrap → inspect/preflight → đăng nhập**.
 CI/CD tạo schema và chạy BE; nó không tự tạo tổ chức hoặc Super Admin. Xem
 [runbook container và H7](containers.md#postgresql-roles-h7) nếu cần chuẩn bị hạ tầng/cấu hình trước deploy.
@@ -197,7 +199,7 @@ bảng theo target của [Task 1.2b action 9](../workspace/items/g0-g6-final-bus
 Sau cài đặt, phòng đầu tiên chưa có Cost Center, trưởng phòng hoặc IT Admin phụ trách; thiết lập tiếp qua các luồng
 nghiệp vụ của ứng dụng. Vai được cấp trực tiếp (`QĐ-93a`): Super Admin cấp `MANAGER` cho một người **trước** khi gán
 người đó làm trưởng phòng, và cấp `SPENDING_APPROVER` cho Người duyệt chi; tới khi có người giữ vai này, Request trả phí
-và phiên bản ngân sách đã gửi chờ có kiểm soát (`NO_SPENDING_APPROVER`). Dataset nhân viên/demo là việc riêng, sau bootstrap: [demo-dataset](demo-dataset.md).
+và phiên bản ngân sách đã gửi chờ có kiểm soát (`NO_SPENDING_APPROVER`). Dataset nhân viên/demo là việc riêng, sau bootstrap: [seed](seed.md).
 
 ## Những lần deploy sau và lưu cấu hình
 

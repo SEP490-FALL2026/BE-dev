@@ -10,6 +10,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { ACCESS_REQUEST_ERROR_EXAMPLES } from '../access-request/access-request.http-errors';
 import {
   ReturnBodyDto,
   ReturnIdParamDto,
@@ -62,8 +63,12 @@ export class ReturnRequestsController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'The caller is neither the holder nor the head of the department of the holder (RETURN_REQUEST.NOT_HOLDER), or heads another department (RETURN_REQUEST.OUTSIDE_DEPARTMENT).',
-      examples: [RETURN_ERROR_EXAMPLES.NOT_HOLDER, RETURN_ERROR_EXAMPLES.OUTSIDE_DEPARTMENT],
+        'The Super Admin cannot send a return (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST). The caller is neither the holder nor the head of the department of the holder (RETURN_REQUEST.NOT_HOLDER), or heads another department (RETURN_REQUEST.OUTSIDE_DEPARTMENT).',
+      examples: [
+        ACCESS_REQUEST_ERROR_EXAMPLES.SUPER_ADMIN_CANNOT_REQUEST,
+        RETURN_ERROR_EXAMPLES.NOT_HOLDER,
+        RETURN_ERROR_EXAMPLES.OUTSIDE_DEPARTMENT,
+      ],
     },
     {
       status: HttpStatus.NOT_FOUND,

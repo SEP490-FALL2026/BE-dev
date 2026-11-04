@@ -47,7 +47,7 @@ export function notAvailable(reason: MissingSourceReason): DashboardSection {
 }
 
 /** The role each overview belongs to. */
-export type DashboardRole = 'EMPLOYEE' | 'MANAGER' | 'IT_ADMIN' | 'SUPER_ADMIN';
+export type DashboardRole = 'MANAGER' | 'IT_ADMIN' | 'SUPER_ADMIN';
 
 /**
  * Throws DashboardRefusedError unless the caller holds the role of the overview: the service decides again, so the route is not the only

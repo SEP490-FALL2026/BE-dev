@@ -1,5 +1,4 @@
 import type { SpendingApproverBlocker } from '../public/identity-access.extension-points';
-import type { AppRole } from '../public/identity-access.types';
 
 export class AccountNotFoundError extends Error {
   constructor() {
@@ -78,28 +77,6 @@ export class SuperAdminHolderNotLockableError extends Error {
   constructor() {
     super('The account holding SUPER_ADMIN cannot be locked.');
     this.name = 'SuperAdminHolderNotLockableError';
-  }
-}
-
-export class RoleAlreadyGrantedError extends Error {
-  constructor() {
-    super('The account already holds this role.');
-    this.name = 'RoleAlreadyGrantedError';
-  }
-}
-
-export class RoleNotGrantedError extends Error {
-  constructor() {
-    super('The account does not hold this role.');
-    this.name = 'RoleNotGrantedError';
-  }
-}
-
-export class RoleCombinationForbiddenError extends Error {
-  /** The roles the account holds that stand in the way (empty when only the database could say: a write around the service). */
-  constructor(readonly conflictingRoles: readonly AppRole[] = []) {
-    super('This role cannot be combined with the roles the account holds.');
-    this.name = 'RoleCombinationForbiddenError';
   }
 }
 

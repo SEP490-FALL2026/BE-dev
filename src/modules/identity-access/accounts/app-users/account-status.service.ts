@@ -10,7 +10,6 @@ import { AccountRecordService } from '../account-record.service';
 import {
   accountAuditEvent,
   checkRoleRequest,
-  conflictingRoles,
   isSelfChange,
   RequestedRole,
   stopsLocking,
@@ -19,9 +18,6 @@ import {
   AccountNotFoundError,
   FinanceAlreadyAssignedError,
   ManagerStillHeadingError,
-  RoleAlreadyGrantedError,
-  RoleCombinationForbiddenError,
-  RoleNotGrantedError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
   SpendingApproverHeadsDepartmentError,
@@ -104,21 +100,61 @@ export class AccountStatusService {
 
   // --- role grants ------------------------------------------------------------------
 
-  /**
-   * Locks the account for a grant or a revoke. SPENDING_APPROVER first takes the advisory key of the approval roles, then the
-   * employee, then the account, so the rules of the grant (rules 6 to 10) are checked one writer at a time.
-   */
-  private async lockForRoleChange(tx: DbTx, appUserId: string, role: AppRole): Promise<AccountRecord> {
-    if (role === 'SPENDING_APPROVER') {
-      await this.grants.lockApprovalRolesForChange(tx);
-      const known = await this.accounts.readAccount(tx, appUserId);
-      if (!known) throw new AccountNotFoundError();
-      await this.organizationReads.lockEmployeeForShare(tx, known.employeeId);
-    }
-    const account = await this.accounts.lockAndReadAccount(tx, appUserId);
-    if (!account) throw new AccountNotFoundError();
+  /** Replaces the sole effective role under the approval-role, employee and account locks, in that order. */
+  async changeRole(actor: AuthenticatedPrincipal, appUserId: string, role: RequestedRole): Promise<void> {
+    if (isSelfChange(actor.appUserId, appUserId)) throw new SelfChangeForbiddenError();
+    const violation = checkRoleRequest(role);
+    if (violation) throw new RoleRequestRefusedError(violation);
+    let employeeId: string | null = null;
+    await this.runner
+      .run(async (tx) => {
+        await this.grants.lockApprovalRolesForChange(tx);
+        const known = await this.accounts.readAccount(tx, appUserId);
+        if (!known) throw new AccountNotFoundError();
+        await this.organizationReads.lockEmployeeForShare(tx, known.employeeId);
+        const account = await this.accounts.lockAndReadAccount(tx, appUserId);
+        if (!account) throw new AccountNotFoundError();
+        employeeId = account.employeeId;
+        const held = await this.grants.effectiveRoles(appUserId, tx);
+        if (held.includes('SUPER_ADMIN')) throw new RoleRequestRefusedError('SUPER_ADMIN_TRANSFER_ONLY');
+        if (held.length !== 1) throw new Error('Changing a role requires exactly one effective grant');
+        const previous = held[0];
+        if (previous === role) return;
+        await this.checkRoleReplacement(tx, account, previous, role);
+        // One instant for both rows: the history never shows two effective roles, nor a moment without one.
+        const now = new Date();
+        await this.grants.revokeRole(tx, { appUserId, role: previous, revokedBy: actor.appUserId, now });
+        await this.grants.grantRole(tx, {
+          organizationId: account.organizationId,
+          appUserId,
+          role,
+          grantedBy: actor.appUserId,
+          grantedAt: now,
+        });
+        await this.audit.record(
+          tx,
+          accountAuditEvent(actor, account.organizationId, 'ROLE.CHANGED', appUserId, { role: previous }, { role }),
+        );
+      })
+      .catch(async (error: unknown) => {
+        throw await this.translateRoleWriteError(error, employeeId);
+      });
+  }
 
-    return account;
+  private async checkRoleReplacement(
+    tx: DbTx,
+    account: AccountRecord,
+    previous: AppRole,
+    role: AppRole,
+  ): Promise<void> {
+    if (previous === 'MANAGER') {
+      const periods = await this.organizationReads.headPeriodsFrom(account.employeeId, undefined, tx);
+      if (periods.length > 0) throw new ManagerStillHeadingError(periods);
+    }
+    if (role === 'FINANCE' && (await this.grants.financeIsHeld(tx, account.organizationId))) {
+      throw new FinanceAlreadyAssignedError();
+    }
+    if (role === 'SPENDING_APPROVER') await this.spendingApprover.check(tx, account);
   }
 
   /** A refusal that only the database could make (the race with a head assignment) shows the periods as they are now. */
@@ -133,91 +169,5 @@ export class AccountStatusService {
     }
 
     return translated;
-  }
-
-  async grantRole(actor: AuthenticatedPrincipal, appUserId: string, role: RequestedRole): Promise<void> {
-    if (isSelfChange(actor.appUserId, appUserId)) throw new SelfChangeForbiddenError();
-    const violation = checkRoleRequest(role);
-    if (violation) throw new RoleRequestRefusedError(violation);
-    const granted: AppRole = role;
-    let employeeId: string | null = null;
-
-    await this.runner
-      .run(async (tx) => {
-        const account = await this.lockForRoleChange(tx, appUserId, granted);
-        employeeId = account.employeeId;
-        const held = await this.grants.effectiveRoles(appUserId, tx);
-        if (held.includes(granted)) throw new RoleAlreadyGrantedError();
-        const conflicts = conflictingRoles(held, granted);
-        if (conflicts.length > 0) throw new RoleCombinationForbiddenError(conflicts);
-        if (granted === 'FINANCE' && (await this.grants.financeIsHeld(tx, account.organizationId))) {
-          throw new FinanceAlreadyAssignedError();
-        }
-        if (granted === 'SPENDING_APPROVER') await this.spendingApprover.check(tx, account);
-
-        await this.grants.grantRole(tx, {
-          organizationId: account.organizationId,
-          appUserId,
-          role: granted,
-          grantedBy: actor.appUserId,
-        });
-        await this.audit.record(
-          tx,
-          accountAuditEvent(
-            actor,
-            account.organizationId,
-            'ROLE.GRANTED',
-            appUserId,
-            { roles: held },
-            {
-              roles: [...held, granted].sort(),
-              role: granted,
-            },
-          ),
-        );
-      })
-      .catch(async (error: unknown) => {
-        throw await this.translateRoleWriteError(error, employeeId);
-      });
-  }
-
-  async revokeRole(actor: AuthenticatedPrincipal, appUserId: string, role: RequestedRole): Promise<void> {
-    if (isSelfChange(actor.appUserId, appUserId)) throw new SelfChangeForbiddenError();
-    const violation = checkRoleRequest(role);
-    if (violation) throw new RoleRequestRefusedError(violation);
-    const revoked: AppRole = role;
-    let employeeId: string | null = null;
-
-    await this.runner
-      .run(async (tx) => {
-        const account = await this.lockForRoleChange(tx, appUserId, revoked);
-        employeeId = account.employeeId;
-        const held = await this.grants.effectiveRoles(appUserId, tx);
-        if (!held.includes(revoked)) throw new RoleNotGrantedError();
-        if (revoked === 'MANAGER') {
-          // The role stays while the person heads a department, will head one, or is named as a successor (US-01-01 AC-21).
-          const periods = await this.organizationReads.headPeriodsFrom(account.employeeId, undefined, tx);
-          if (periods.length > 0) throw new ManagerStillHeadingError(periods);
-        }
-
-        await this.grants.revokeRole(tx, { appUserId, role: revoked, revokedBy: actor.appUserId, now: new Date() });
-        await this.audit.record(
-          tx,
-          accountAuditEvent(
-            actor,
-            account.organizationId,
-            'ROLE.REVOKED',
-            appUserId,
-            { roles: held },
-            {
-              roles: held.filter((entry) => entry !== revoked),
-              role: revoked,
-            },
-          ),
-        );
-      })
-      .catch(async (error: unknown) => {
-        throw await this.translateRoleWriteError(error, employeeId);
-      });
   }
 }

@@ -29,11 +29,17 @@ test('CI path filters only list files that exist in the repository', () => {
 
 test('CI provisions and asserts an ordinary integration role before running the suite', () => {
   assert.match(ciWorkflow, /POSTGRES_USER: ci_bootstrap/);
-  // The integration job provisions through the composite action before any integration command runs.
-  const integrationJob = ciWorkflow.slice(ciWorkflow.indexOf('\n  integration:'));
-  const uses = integrationJob.indexOf('uses: ./.github/actions/test-database');
-  const integration = integrationJob.indexOf('pnpm test:integration');
-  assert.ok(uses >= 0 && uses < integration, 'the integration job must provision the role before its suites');
+  const jobs = [...ciWorkflow.matchAll(/^  ([a-z][a-z0-9-]*):\r?\n([\s\S]*?)(?=^  [a-z][a-z0-9-]*:|$(?![\s\S]))/gm)];
+  const integrationJobs = jobs.filter(([, , body]) => body.includes('pnpm test:integration'));
+  assert.deepEqual(
+    integrationJobs.map(([, name]) => name),
+    ['integration', 'integration-inband'],
+  );
+  for (const [, name, body] of integrationJobs) {
+    const provision = body.indexOf('uses: ./.github/actions/test-database');
+    const suite = body.indexOf('pnpm test:integration');
+    assert.ok(provision >= 0 && provision < suite, `${name} must provision the role before its suites`);
+  }
   assert.match(
     testDatabaseAction,
     /CREATE ROLE ci_integration LOGIN NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS/,
@@ -57,4 +63,50 @@ test('CI provisions and asserts an ordinary integration role before running the 
     /TEST_DATABASE_ADMIN_URL: postgresql:\/\/ci_integration:ci-integration-only@127\.0\.0\.1:5432\/postgres/,
   );
   assert.doesNotMatch(ciWorkflow, /TEST_DATABASE_ADMIN_URL:.*ci_bootstrap/);
+});
+
+test('CI shard matrix covers exactly the denominator of its Jest shard command', () => {
+  const job = ciWorkflow.match(/^  integration:\r?\n([\s\S]*?)(?=^  [a-z][a-z0-9-]*:)/m)?.[1];
+  assert.ok(job, 'integration job must exist');
+  const shardList = job
+    .match(/shard: \[([^\]]+)\]/)?.[1]
+    .split(',')
+    .map(Number);
+  const denominator = Number(job.match(/--shard=\$\{\{ matrix\.shard \}\}\/(\d+)/)?.[1]);
+  assert.ok(denominator > 0, 'Jest command must declare a positive shard denominator');
+  assert.deepEqual(
+    shardList,
+    Array.from({ length: denominator }, (_, i) => i + 1),
+  );
+  assert.match(job, /fail-fast: false/);
+  assert.match(job, /--passWithNoTests/);
+  assert.match(job, /if: needs\.select\.outputs\.run == 'true' && needs\.select\.outputs\.paths != 'NONE'/);
+  assert.match(job, /name: test-timings-integration-\$\{\{ matrix\.shard \}\}/);
+  assert.match(ciWorkflow, /needs: \[quality, http-contract, integration, integration-inband, e2e-smoke\]/);
+});
+
+test('CI gates every test job on the selection and keeps the minute-saving choices of the Owner (OD-CI2, OD-CI3, OD-CI5)', () => {
+  const jobs = new Map(
+    [...ciWorkflow.matchAll(/^  ([a-z][a-z0-9-]*):\r?\n([\s\S]*?)(?=^  [a-z][a-z0-9-]*:|$(?![\s\S]))/gm)].map(
+      ([, name, body]) => [name, body],
+    ),
+  );
+  for (const name of ['quality', 'http-contract', 'integration', 'integration-inband', 'e2e-smoke']) {
+    const body = jobs.get(name);
+    assert.ok(body, `${name} job must exist`);
+    assert.match(body, /needs: select/, `${name} must wait for the selection`);
+    assert.match(body, /needs\.select\.outputs\.run == 'true'/, `${name} must skip when the selection says so`);
+  }
+  assert.match(
+    ciWorkflow,
+    /group: \$\{\{ github\.event_name == 'pull_request' && format\('ci-pr-\{0\}', github\.ref\) \|\| format\('ci-run-\{0\}', github\.run_id\) \}\}/,
+  );
+  assert.match(ciWorkflow, /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
+  assert.match(ciWorkflow, /pull_request:\r?\n\s+branches: \[dev\]/);
+  assert.match(
+    ciWorkflow,
+    /BASE: \$\{\{ github\.event_name == 'pull_request' && github\.event\.pull_request\.base\.sha \|\| github\.event\.before \}\}/,
+  );
+  assert.match(ciWorkflow, /github\.ref == 'refs\/heads\/dev' && github\.event_name == 'push'/);
+  assert.match(jobs.get('integration-inband'), /needs\.select\.outputs\.timing == 'TIMING'/);
 });

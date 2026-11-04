@@ -4,8 +4,7 @@ import { CostCenterDirectionRootCliModule } from '../../src/cli/cost-center-dire
 import { AssignSubscriptionOwnerCliModule } from '../../src/cli/assign-subscription-owner/assign-subscription-owner-cli.module';
 import { RecoveryCliModule } from '../../src/cli/recover/recover-cli.module';
 import { RecordSuperAdminEventCliModule } from '../../src/cli/record-super-admin-event/record-super-admin-event-cli.module';
-import { DemoDatasetCliModule } from '../../src/modules/installation/demo-dataset/demo-dataset-cli.module';
-import { DevSeedCliModule } from '../../src/modules/installation/dev-seed/dev-seed-cli.module';
+import { SeedCliModule } from '../../src/modules/installation/seed/seed-cli.module';
 import { InspectionCliModule } from '../../src/modules/installation/inspect/inspection-cli.module';
 import { InstallationModule } from '../../src/modules/installation/installation.module';
 import { MigrationPreflightCliModule } from '../../src/modules/installation/migration-preflight/migration-preflight-cli.module';
@@ -26,6 +25,5 @@ export const PROCESS_GRAPHS: readonly (readonly [string, Type<unknown>])[] = [
   ['MigrationPreflightCliModule', MigrationPreflightCliModule],
   ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule],
   ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule],
-  ['DevSeedCliModule', DevSeedCliModule],
-  ['DemoDatasetCliModule', DemoDatasetCliModule],
+  ['SeedCliModule', SeedCliModule],
 ];

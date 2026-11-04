@@ -4,7 +4,7 @@ import { TransactionRunner } from '../../../src/infrastructure/database/transact
 import { LicensingRenewalApi } from '../../../src/modules/licensing/public/licensing-renewal.api';
 import { ApiAccount, createActivatedAccount } from '../../support/api-accounts';
 import { RevocationHarness } from '../../support/revocation-harness';
-import { ensureManagerGrant } from '../../support/builders/account.builder';
+import { changeRoleTo } from '../../support/builders/account.builder';
 
 const h = new RevocationHarness();
 
@@ -91,11 +91,11 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     const account = await createActivatedAccount(h.ctx, h.seed, {
       code,
       email: `${code.toLowerCase()}@acme.vn`,
-      roles: [],
+      role: 'EMPLOYEE',
       admin: h.admin,
       employeeId,
     });
-    await ensureManagerGrant(h.ctx, h.admin, employeeId);
+    await changeRoleTo(h.ctx, h.admin, employeeId, 'MANAGER');
     await request(h.server())
       .post(`/api/v1/departments/${dept.id}/head-assignments`)
       .set({ Authorization: `Bearer ${h.admin}` })

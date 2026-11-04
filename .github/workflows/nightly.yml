@@ -1,11 +1,11 @@
 name: Backend nightly
 
-# OD-T2: once a night on dev, everything the push pipeline may skip there — the full integration suite, the end-to-end
+# OD-T2: weekly on dev (Sunday 02:00 Vietnam time), or by hand, everything the push pipeline may skip there — the full integration suite, the end-to-end
 # smoke journeys and the targeted mutation run — with the timing report of every file kept as an artifact.
 
 on:
   schedule:
-    - cron: '0 19 * * *' # 02:00 Asia/Ho_Chi_Minh
+    - cron: '0 19 * * 6' # Sunday 02:00 Asia/Ho_Chi_Minh
   workflow_dispatch:
 
 permissions:

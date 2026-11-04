@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { RequestHarness } from '../../support/request-harness';
+import { ReturnHarness } from '../../support/return-harness';
 
 /**
  * `g0-g6-final-business-baseline-remediation`, Task 4.1 (F30, spec L.1): the Super Admin administers the installation and sends no request
@@ -8,7 +8,7 @@ import { RequestHarness } from '../../support/request-harness';
  * `ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST` and writes nothing; the answer comes from the service, so a caller that is not a route (the
  * drafts, the sending of one) is judged the same. A person who is not the Super Admin is not touched by it.
  */
-const h = new RequestHarness();
+const h = new ReturnHarness();
 
 describe('the Super Admin sends no request (integration, real PostgreSQL)', () => {
   let plan: string;
@@ -148,5 +148,17 @@ describe('the Super Admin sends no request (integration, real PostgreSQL)', () =
     const sent = await h.submit(h.form(plan), person.account);
 
     expect(sent.status).toBe(201);
+  });
+
+  it('refuses even the Super Admin own seat and leaves the seat and audit unchanged', async () => {
+    const account = { ...h.seed.superAdmin, accessToken: h.admin };
+    const assignmentId = await h.seatOf({ employeeId: account.employeeId, account }, { planId: await h.plan('K5') });
+    const before = [await count('return_requests'), await count('provisioning_tasks'), await count('audit_events')];
+    const response = await h.returnSeat({ assignmentId, reason: 'No longer needed' }, account).expect(403);
+    expect(h.codeOf(response)).toBe('ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST');
+    expect([await count('return_requests'), await count('provisioning_tasks'), await count('audit_events')]).toEqual(
+      before,
+    );
+    expect((await h.seatRow(assignmentId)).valid_until).toBeNull();
   });
 });

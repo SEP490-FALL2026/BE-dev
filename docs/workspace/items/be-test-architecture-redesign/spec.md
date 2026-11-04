@@ -296,6 +296,11 @@ nightly (dev) ─ toàn bộ integration + e2e-smoke + test:mutation + báo cáo
 | `TEST-R2`             | Integration đỏ trên `main`                                     | CI                      | `deploy` không chạy                                        | chờ CI của Owner ([nghiệm thu §8 bước 2](../../../reviews/be-architecture-test-acceptance-2026-10-29/README.md))                                                           |
 | `TEST-R2`             | Push chỉ đổi `src/modules/finance`                             | CI                      | chạy integration của finance và module phụ thuộc theo tầng | `scripts/verify/affected-modules.test.mjs`: finance → `budgets`, `finance`, `requests`; trên GitHub chờ CI của Owner                                                       |
 
+## Changes and acceptance
+
+- 04/11/2026: `OD-T2` bị thay một phần bởi [ci-integration-shards](../ci-integration-shards/spec.md): integration CI có
+  ba shard + in-band riêng; lịch đầy đủ chuyển từ mỗi đêm sang Chủ nhật 02:00 VN và chạy tay (OD-CI1/OD-CI4).
+
 ## Definition of Done
 
 - Không HTTP spec nào dựng app trong `it`/`beforeEach`; job `http-contract` ≤ 3 phút trên CI.

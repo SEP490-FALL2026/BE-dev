@@ -49,6 +49,8 @@ code thành thư mục phẳng và file cắt theo chữ cái. Người đọc k
    tĩnh ngắn ở `test/gates/` (`OD-A8`); bỏ ledger cấu trúc (xem mục "Luật đã triển khai"). Gốc `src/` chỉ còn ba điểm vào
    và `app/`, `worker/`, `cli/`; lệnh CLI có một điểm vào `dist/cli.js` và alias `dist/<tên>-cli.js` sinh lúc build (`OD-A7`).
 
+OD-S3 exception to OD-A7 (Owner 04/11/2026): demo-dataset/dev-seed and their aliases are removed during unified seed rollout; the rebuilt demo VPS uses seed.sh. This does not add an extension-wiring exception.
+
 ## Luật đã triển khai (R1–R10)
 
 Mỗi luật có một câu ở [module structure](../rules/module-structure.md) và một gate; luật không có máy kiểm ghi "review".

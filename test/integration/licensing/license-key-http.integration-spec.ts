@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount } from '../../support/api-accounts';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
-import { ensureManagerGrant } from '../../support/builders/account.builder';
+import { changeRoleTo } from '../../support/builders/account.builder';
 
 const h = new ProvisioningHarness();
 
@@ -74,8 +74,8 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     const designer = await h.jobTitle('Designer');
     const department = await h.department('P-DES');
     const headId = await h.member('P-DES', 'E-HEAD', designer);
-    head = await h.account('E-HEAD', headId, []);
-    await ensureManagerGrant(h.ctx, h.admin, headId);
+    head = await h.account('E-HEAD', headId, 'EMPLOYEE');
+    await changeRoleTo(h.ctx, h.admin, headId, 'MANAGER');
     await request(h.server())
       .post(`/api/v1/departments/${department.id}/head-assignments`)
       // The head of a department is named by the Super Admin (QĐ-87).
@@ -201,7 +201,7 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     const id = await idOfLine(subscriptionId, `••••${secret.slice(-4)}`);
 
     const first = await reveal(id).expect(200);
-    const second = await reveal(id, await h.account('E-IT2', await h.person('E-IT2'), ['IT_ADMIN'])).expect(200);
+    const second = await reveal(id, await h.account('E-IT2', await h.person('E-IT2'), 'IT_ADMIN')).expect(200);
 
     expect(h.dataOf<{ id: string; value: string }>(first)).toEqual({ id, value: secret });
     expect(first.headers['cache-control']).toBe('no-store');

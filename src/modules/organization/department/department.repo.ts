@@ -136,14 +136,6 @@ export class DepartmentRepo {
     return { id: department.id, code: department.code, name: department.name, active: department.status === 'ACTIVE' };
   }
 
-  /** The department with this code, with its cost center (the local seed fixture, P23-RV-01). */
-  async findByCode(tx: DbTx, organizationId: string, code: string): Promise<DepartmentRecord | null> {
-    const rows = await tx.$queryRaw<DepartmentRow[]>`
-      ${SELECT_DEPARTMENT} WHERE d.organization_id = ${organizationId}::uuid AND d.code = ${code}`;
-
-    return rows[0] ? toRecord(rows[0]) : null;
-  }
-
   /** The department each of these employees was placed in on `onDate`, in one read. */
   async placementsOn(
     employeeIds: readonly string[],

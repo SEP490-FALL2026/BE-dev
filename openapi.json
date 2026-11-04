@@ -36373,7 +36373,7 @@
         ],
         "responses": {
           "200": {
-            "description": "One page of the personal software rights of the signed-in person and nobody else: by default those held on the business day of the organization or starting later, oldest start first; with view ended, those no longer held, latest end first; then by assignment id. Each names the application and plan, the kind of provisioning (K1 to K5), its status on that day (asOf), the day a time-limited right is expected to end and whether that is within seven days, and the day it stops being held when that is set. A right that a renewal continues names the record that takes over. A grant that failed or was cancelled never held anything and is not listed. No price, cost, Cost Center, account identifier, license key or other person is answered: a K4 right shows that the software is granted, never its key. A start that is only the day of recording has a label and no grant date.",
+            "description": "Available to every signed-in account. One page of the personal software rights of the signed-in person and nobody else: by default those held on the business day of the organization or starting later, oldest start first; with view ended, those no longer held, latest end first; then by assignment id. Each names the application and plan, the kind of provisioning (K1 to K5), its status on that day (asOf), the day a time-limited right is expected to end and whether that is within seven days, and the day it stops being held when that is set. A right that a renewal continues names the record that takes over. A grant that failed or was cancelled never held anything and is not listed. No price, cost, Cost Center, account identifier, license key or other person is answered: a K4 right shows that the software is granted, never its key. A start that is only the day of recording has a label and no grant date.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36409,27 +36409,6 @@
                       "error": {
                         "code": "INVALID_ACCESS_TOKEN",
                         "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller does not hold the Employee role; other roles do not read this list.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
                         "requestId": "req_example"
                       }
                     }
@@ -49358,11 +49337,22 @@
             }
           },
           "403": {
-            "description": "The caller is neither the holder nor the head of the department of the holder (RETURN_REQUEST.NOT_HOLDER), or heads another department (RETURN_REQUEST.OUTSIDE_DEPARTMENT).",
+            "description": "The Super Admin cannot send a return (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST). The caller is neither the holder nor the head of the department of the holder (RETURN_REQUEST.NOT_HOLDER), or heads another department (RETURN_REQUEST.OUTSIDE_DEPARTMENT).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST": {
+                    "summary": "The Super Admin does not send requests for access.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST",
+                        "message": "The Super Admin does not send requests for access.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "RETURN_REQUEST.NOT_HOLDER": {
                     "summary": "The return of the seat is refused: NOT_HOLDER.",
                     "value": {
@@ -54096,27 +54086,6 @@
                       "error": {
                         "code": "INVALID_ACCESS_TOKEN",
                         "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The Super Admin sends no request, so has none to list (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST": {
-                    "summary": "The Super Admin does not send requests for access.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST",
-                        "message": "The Super Admin does not send requests for access.",
                         "requestId": "req_example"
                       }
                     }
@@ -70650,7 +70619,7 @@
         },
         "responses": {
           "201": {
-            "description": "The account was created (invited) and its invitation queued.",
+            "description": "The account was created with one role (EMPLOYEE by default), invited and its invitation queued.",
             "content": {
               "application/json": {
                 "schema": {
@@ -70803,18 +70772,6 @@
                       "error": {
                         "code": "APP_USER.FINANCE_ALREADY_ASSIGNED",
                         "message": "Another account already holds the FINANCE role.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APP_USER.ROLE_COMBINATION_FORBIDDEN": {
-                    "summary": "This role cannot be combined with the roles the account holds.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APP_USER.ROLE_COMBINATION_FORBIDDEN",
-                        "message": "This role cannot be combined with the roles the account holds.",
-                        "details": { "conflictingRoles": ["IT_ADMIN"] },
                         "requestId": "req_example"
                       }
                     }
@@ -72141,25 +72098,25 @@
         "tags": ["app-users"]
       }
     },
-    "/api/v1/app-users/{id}/role-grants": {
-      "post": {
-        "operationId": "appUserGrantRole",
+    "/api/v1/app-users/{id}/role": {
+      "put": {
+        "operationId": "appUserChangeRole",
         "parameters": [
           { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantRoleBodyDto" } } }
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangeRoleBodyDto" } } }
         },
         "responses": {
-          "201": {
-            "description": "The role is granted and takes effect at the account next request.",
+          "200": {
+            "description": "Replaces the current role atomically. The same role is a no-op; changes take effect on the next request.",
             "content": {
               "application/json": {
                 "schema": {
                   "allOf": [
                     { "$ref": "#/components/schemas/AccountDetailResponseDto" },
-                    { "properties": { "message": { "example": "ROLE.GRANTED" } } }
+                    { "properties": { "message": { "example": "ROLE.CHANGED" } } }
                   ]
                 }
               }
@@ -72261,7 +72218,7 @@
             }
           },
           "409": {
-            "description": "Already granted, forbidden combination, Finance seat taken, a second spending approver, a head asked to be the spending approver, a person with open work asked to be the spending approver, or the caller.",
+            "description": "Self change, a Manager still heading a department, an occupied Finance or spending approver role, or open work blocking the spending approver.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -72277,25 +72234,24 @@
                       }
                     }
                   },
-                  "APP_USER.ROLE_ALREADY_GRANTED": {
-                    "summary": "The account already holds this role.",
+                  "APP_USER.MANAGER_STILL_HEADING": {
+                    "summary": "The account heads a department, will head one from a later day, or is named as a successor: end or take back that period before revoking MANAGER.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "APP_USER.ROLE_ALREADY_GRANTED",
-                        "message": "The account already holds this role.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APP_USER.ROLE_COMBINATION_FORBIDDEN": {
-                    "summary": "This role cannot be combined with the roles the account holds.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APP_USER.ROLE_COMBINATION_FORBIDDEN",
-                        "message": "This role cannot be combined with the roles the account holds.",
-                        "details": { "conflictingRoles": ["IT_ADMIN"] },
+                        "code": "APP_USER.MANAGER_STILL_HEADING",
+                        "message": "The account heads a department, will head one from a later day, or is named as a successor: end or take back that period before revoking MANAGER.",
+                        "details": {
+                          "headPeriods": [
+                            {
+                              "departmentId": "<department-id>",
+                              "departmentCode": "<department-code>",
+                              "validFrom": "2026-01-01",
+                              "validTo": null,
+                              "timing": "CURRENT"
+                            }
+                          ]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -72318,28 +72274,6 @@
                       "error": {
                         "code": "APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED",
                         "message": "Another account already holds the SPENDING_APPROVER role.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT": {
-                    "summary": "The employee heads a department, will head one from a later day, or is named as a successor, so cannot be the spending approver.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT",
-                        "message": "The employee heads a department, will head one from a later day, or is named as a successor, so cannot be the spending approver.",
-                        "details": {
-                          "headPeriods": [
-                            {
-                              "departmentId": "<department-id>",
-                              "departmentCode": "<department-code>",
-                              "validFrom": "2026-01-01",
-                              "validTo": null,
-                              "timing": "CURRENT"
-                            }
-                          ]
-                        },
                         "requestId": "req_example"
                       }
                     }
@@ -72413,7 +72347,7 @@
             }
           },
           "422": {
-            "description": "The role is the Super Admin role, which changes only by the operations command outside the application, or the person cannot be the spending approver (employee not working, account not usable).",
+            "description": "Invalid input, the Super Admin role changes only outside the application, or the spending approver account or employee is not usable.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -72522,256 +72456,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Grant a role to an account",
-        "tags": ["app-users"]
-      }
-    },
-    "/api/v1/app-users/{id}/role-grants/{role}": {
-      "delete": {
-        "operationId": "appUserRevokeRole",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
-          {
-            "name": "role",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The role is revoked (the last role may be revoked); it stops at the next request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/AccountDetailResponseDto" },
-                    { "properties": { "message": { "example": "ROLE.REVOKED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only the Super Admin may call this route.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such account, or it does not hold this role.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "APP_USER.NOT_FOUND": {
-                    "summary": "Account not found.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APP_USER.NOT_FOUND",
-                        "message": "Account not found.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APP_USER.ROLE_NOT_GRANTED": {
-                    "summary": "The account does not hold this role.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APP_USER.ROLE_NOT_GRANTED",
-                        "message": "The account does not hold this role.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The caller cannot change their own account, or the account still heads a department, will head one, or is named as a successor (MANAGER).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "APP_USER.SELF_CHANGE_FORBIDDEN": {
-                    "summary": "You cannot change your own account.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APP_USER.SELF_CHANGE_FORBIDDEN",
-                        "message": "You cannot change your own account.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APP_USER.MANAGER_STILL_HEADING": {
-                    "summary": "The account heads a department, will head one from a later day, or is named as a successor: end or take back that period before revoking MANAGER.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APP_USER.MANAGER_STILL_HEADING",
-                        "message": "The account heads a department, will head one from a later day, or is named as a successor: end or take back that period before revoking MANAGER.",
-                        "details": {
-                          "headPeriods": [
-                            {
-                              "departmentId": "<department-id>",
-                              "departmentCode": "<department-code>",
-                              "validFrom": "2026-01-01",
-                              "validTo": null,
-                              "timing": "CURRENT"
-                            }
-                          ]
-                        },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The role is the Super Admin role, which changes only by the operations command outside the application, or the person cannot be the spending approver (employee not working, account not usable).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APP_USER.SUPER_ADMIN_TRANSFER_ONLY": {
-                    "summary": "The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APP_USER.SUPER_ADMIN_TRANSFER_ONLY",
-                        "message": "The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Revoke a role from an account",
+        "summary": "Change the role of an account",
         "tags": ["app-users"]
       }
     },
@@ -72781,7 +72466,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "The sections of the overview of the signed-in Employee on the business day (asOf), about the caller only: the software rights held (K4 included) and those about to end within seven days, counted as the list of my software rights shows them; the SaaS error reports the caller sent that are still open; and the requests the caller sent that are not over, counted as meAccessRequestList with view=open counts them (a Super Admin sends none, so that section says it is not available, NO_DATA_SOURCE, instead of a number). No cost, seat count or data of another person is answered. Each section names the operation that lists its rows.",
+            "description": "The sections of the overview of every signed-in account on the business day (asOf), about the caller only: the software rights held (K4 included) and those about to end within seven days, counted as the list of my software rights shows them; the SaaS error reports the caller sent that are still open (saasIssueList with scope=mine); and the requests the caller sent that are not over, counted as meAccessRequestList with view=open counts them (including a count of zero when none were sent). No cost, seat count or data of another person is answered. Each section names the operation that lists its rows.",
             "content": {
               "application/json": {
                 "schema": {
@@ -72817,27 +72502,6 @@
                       "error": {
                         "code": "INVALID_ACCESS_TOKEN",
                         "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller does not hold the Employee role; other roles read their own overview.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
                         "requestId": "req_example"
                       }
                     }
@@ -95355,10 +95019,9 @@
                 "required": ["departmentId", "departmentCode", "departmentName"],
                 "additionalProperties": false,
                 "nullable": true
-              },
-              "selfServiceOnly": { "type": "boolean" }
+              }
             },
-            "required": ["appUserId", "loginEmail", "employee", "roles", "managerScope", "selfServiceOnly"],
+            "required": ["appUserId", "loginEmail", "employee", "roles", "managerScope"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -95429,14 +95092,10 @@
         "properties": {
           "employeeId": { "type": "string", "format": "uuid" },
           "loginEmail": { "type": "string", "maxLength": 254 },
-          "roles": {
-            "default": [],
-            "maxItems": 6,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
-            }
+          "role": {
+            "default": "EMPLOYEE",
+            "type": "string",
+            "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
           }
         },
         "required": ["employeeId"],
@@ -95611,7 +95270,7 @@
         "required": ["reason"],
         "additionalProperties": false
       },
-      "GrantRoleBodyDto": {
+      "ChangeRoleBodyDto": {
         "type": "object",
         "properties": {
           "role": {
@@ -95743,7 +95402,7 @@
                     },
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
-                    "description": "The requests the caller sent that are not over, as meAccessRequestList with view=open counts them; drafts and requests sent on their behalf are not counted. Not available (NO_DATA_SOURCE) for a Super Admin, who sends none. The results are read from the list with view=ended, not from here."
+                    "description": "The requests the caller sent that are not over, as meAccessRequestList with view=open counts them; drafts and requests sent on their behalf are not counted. Counted for every account, zero when none is open: a Super Admin sends none, so only requests sent before the current role can count. The results are read from the list with view=ended, not from here."
                   },
                   "saasIssues": {
                     "type": "object",
@@ -95780,7 +95439,7 @@
                     },
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
-                    "description": "The SaaS error reports the caller sent that are not resolved, closed or marked duplicate."
+                    "description": "The SaaS error reports the caller sent that are not resolved, closed or marked duplicate, as saasIssueList with scope=mine lists them."
                   }
                 },
                 "required": ["softwareRights", "expiringRights", "requests", "saasIssues"],

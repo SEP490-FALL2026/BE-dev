@@ -68,7 +68,7 @@ describe('the queue of the need steps of the person who holds them (integration,
   const colleague = async (u: Unit): Promise<ApiAccount> => {
     number += 1;
 
-    return (await h.staff(u.department, `${u.department.code}-X${number}`, ['EMPLOYEE'])).account;
+    return (await h.staff(u.department, `${u.department.code}-X${number}`, 'EMPLOYEE')).account;
   };
   const withdraw = (id: string, account: ApiAccount) =>
     request(h.server()).post(`/api/v1/access-requests/${id}/withdraw`).set(h.as(account)).send({});

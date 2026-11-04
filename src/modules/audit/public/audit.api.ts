@@ -26,6 +26,10 @@ function assertSafe(value: AuditValue | undefined, path: string): void {
 export class AuditApi {
   constructor(private readonly repo: AuditRepo) {}
 
+  firstAfterField(tx: DbTx, action: string, field: string): Promise<string | null> {
+    return this.repo.firstAfterField(tx, action, field);
+  }
+
   /** Records an event in the caller's transaction. Throws if the payload would store a secret. */
   async record(tx: DbTx, event: AuditEventInput): Promise<void> {
     assertSafe(event.before ?? null, 'before');

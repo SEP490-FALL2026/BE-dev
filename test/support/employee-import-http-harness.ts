@@ -195,13 +195,13 @@ export class EmployeeImportHttpHarness {
     this.it1 = await createActivatedAccount(this.ctx, this.seed, {
       code: 'E-IT1',
       email: 'it1@acme.vn',
-      roles: ['IT_ADMIN'],
+      role: 'IT_ADMIN',
       admin: this.admin,
     });
     this.finance = await createActivatedAccount(this.ctx, this.seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin: this.admin,
     });
     // What keeps a department in use lives in other modules: nothing, unless a case says so.

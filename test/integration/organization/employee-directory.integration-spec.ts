@@ -133,7 +133,7 @@ describe('employee directory read (US-02-02 AC-22, AC-24, AC-25, AC-26, integrat
       await createActivatedAccount(h.ctx, h.seed, {
         code: emp1.code,
         email: emp1.email,
-        roles: ['EMPLOYEE'],
+        role: 'EMPLOYEE',
         admin: h.admin,
         employeeId: emp1.id,
       });

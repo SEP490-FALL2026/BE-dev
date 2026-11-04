@@ -7,6 +7,8 @@ import { TransactionRunner } from '../../src/infrastructure/database/transaction
 import { IdentityAccessApi } from '../../src/modules/identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
 import { PasswordHasher } from '../../src/modules/identity-access/credentials/password-hasher.service';
+import { RoleGrantService } from '../../src/modules/identity-access/accounts/role-grant.service';
+import type { AppRole } from '../../src/modules/identity-access/public/identity-access.types';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
@@ -174,7 +176,7 @@ export async function seedInstallation(app: INestApplication): Promise<SeededIns
 export async function insertAccountFixture(
   app: INestApplication,
   seed: SeededInstallation,
-  options: { code: string; email: string; activated: boolean; password?: string },
+  options: { code: string; email: string; activated: boolean; password?: string; role?: AppRole | null },
 ): Promise<{ appUserId: string; employeeId: string }> {
   const runner = app.get(TransactionRunner);
   const organization = app.get(OrganizationApi);
@@ -209,6 +211,14 @@ export async function insertAccountFixture(
         VALUES (${rows[0].id}::uuid, ${credential.hash}, ${credential.hashPolicyVersion})`;
     }
 
+    // A null role is reserved for database constraint tests that deliberately insert a row before its first grant.
+    if (options.role !== null)
+      await app.get(RoleGrantService, { strict: false }).grantRole(tx, {
+        organizationId: seed.organizationId,
+        appUserId: rows[0].id,
+        role: options.role ?? 'EMPLOYEE',
+        grantedBy: seed.superAdmin.appUserId,
+      });
     return { appUserId: rows[0].id, employeeId: employee.id };
   });
 }

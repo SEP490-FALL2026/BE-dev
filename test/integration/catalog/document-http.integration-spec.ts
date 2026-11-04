@@ -3,7 +3,7 @@ import request from 'supertest';
 import { ApiAccount } from '../../support/api-accounts';
 import { DocumentService } from '../../../src/modules/catalog/contract/document.service';
 import { DocumentHarness, PDF, type DocumentWire } from '../../support/document-harness';
-import { ensureManagerGrant } from '../../support/builders/account.builder';
+import { changeRoleTo } from '../../support/builders/account.builder';
 
 const h = new DocumentHarness();
 const MB = 1024 * 1024;
@@ -24,11 +24,11 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     await h.start();
     const designer = await h.jobTitle('Designer');
     const department = await h.department('P-DES');
-    it2 = await h.account('E-IT2', await h.person('E-IT2'), ['IT_ADMIN']);
-    it3 = await h.account('E-IT3', await h.person('E-IT3'), ['IT_ADMIN']);
+    it2 = await h.account('E-IT2', await h.person('E-IT2'), 'IT_ADMIN');
+    it3 = await h.account('E-IT3', await h.person('E-IT3'), 'IT_ADMIN');
     const headId = await h.member('P-DES', 'E-HEAD', designer);
-    head = await h.account('E-HEAD', headId, []);
-    await ensureManagerGrant(h.ctx, h.admin, headId);
+    head = await h.account('E-HEAD', headId, 'EMPLOYEE');
+    await changeRoleTo(h.ctx, h.admin, headId, 'MANAGER');
     await request(h.server())
       .post(`/api/v1/departments/${department.id}/head-assignments`)
       .set({ Authorization: `Bearer ${h.admin}` })
@@ -143,7 +143,7 @@ describe('the contracts and the files kept for them over HTTP (integration, real
 
   it('US-04-04 AC-6: a role lost before the file is attached takes the right to attach it, and the file waits', async () => {
     const contract = await h.contract();
-    const leaver = await h.account('E-IT-LEAVER', await h.person('E-IT-LEAVER'), ['IT_ADMIN']);
+    const leaver = await h.account('E-IT-LEAVER', await h.person('E-IT-LEAVER'), 'IT_ADMIN');
     const document = await h.uploaded(leaver);
 
     await h.revokeItAdmin(leaver);
