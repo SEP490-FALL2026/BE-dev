@@ -211,3 +211,82 @@ Quick set + gates + script tests xanh; Owner chạy full suite một lần, `see
 - forceNextFiscalYear is an input only, never a CLI flag, and seed-run only passes it into the context under NODE_ENV=test. No context type file needed changing.
 - Calendar/run unit: 2 suites / 22 tests passed. Typecheck, arch/rules and gates passed (327 tests). Focused lint passed; full lint pending collection. Task 2 final full lint passed.
 - Calendar integration now covers December targets and both budget years, plus the forced branch on the real business date. Written only, not executed. Old December refusal test replaced by December plan/apply tests; cross-year refusal retained.
+
+### Task 4 dataset audit (every record)
+
+| Record                      | Current rule                  | Review and fix                                             |
+| --------------------------- | ----------------------------- | ---------------------------------------------------------- |
+| DS1-ADMIN / DS1-SA          | QD-95                         | Separate bootstrap department and SUPER_ADMIN              |
+| DS1-BOD                     | QD-93i / QD-95e               | Valid code; MANAGER head                                   |
+| DS1-ENG                     | QD-93i / QD-95e               | Valid code; MANAGER head                                   |
+| DS1-DES                     | QD-93i / QD-95e               | Valid code; MANAGER head                                   |
+| DS1-FIN                     | QD-93i / QD-95e               | Valid code; MANAGER head                                   |
+| DS1-ITO                     | QD-93i / QD-95e               | Valid code; MANAGER head                                   |
+| DS1-MKT                     | QD-93i / QD-95e               | Valid code; MANAGER head                                   |
+| DS1-SAL                     | QD-93i / QD-95e               | Valid code; MANAGER head                                   |
+| DS1-OPS                     | QD-93i / QD-95e               | Valid code; deliberately no head                           |
+| DS1-CEO                     | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-DEP                     | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-ENGH                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-DEV1                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-DEV2                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-DEV3                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-INT1                    | QD-95a,b,e / QD-93i           | No account; no role                                        |
+| DS1-DESH                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-DES1                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-DES2                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-FINH                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-FIN1                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-ITOH                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-ITA1                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-ITA2                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-MKTH                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-MKT1                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-MKT2                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-SALH                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-SAL1                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-SAL2                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-OPS1                    | QD-95a,b,e / QD-93i           | Exactly one initial role; independent account              |
+| DS1-NEW1                    | QD-95a,b,e / QD-93i           | No account; no role                                        |
+| jira                        | BRD catalog                   | Owner and sensitivity retained                             |
+| jira-standard               | BRD provisioning              | K2 retained                                                |
+| figma                       | BRD catalog                   | Owner and sensitivity retained                             |
+| figma-professional          | BRD provisioning              | K2 retained                                                |
+| chatgpt                     | BRD catalog                   | Owner and sensitivity retained                             |
+| chatgpt-plus                | BRD provisioning              | K1 retained                                                |
+| hr-portal                   | BRD catalog                   | Owner and sensitivity retained                             |
+| hr-portal-access            | BRD provisioning              | K5 retained                                                |
+| jira-eng                    | QD-94 implemented API         | One owner department DS1-ENG                               |
+| figma-eng                   | QD-94 implemented API         | One owner department DS1-ENG                               |
+| figma-des                   | QD-94 implemented API         | One owner department DS1-DES                               |
+| chatgpt-eng                 | QD-94 implemented API         | One owner department DS1-ENG                               |
+| chatgpt-mkt                 | QD-94 implemented API         | One owner department DS1-MKT                               |
+| figma-mkt                   | QD-94 implemented API         | One owner department DS1-MKT                               |
+| jira-sal                    | QD-94 implemented API         | One owner department DS1-SAL                               |
+| chatgpt-sal                 | QD-94 implemented API         | One owner department DS1-SAL                               |
+| DS1-ENG budget              | BRD budget / OD-S5            | Current year and optional next year                        |
+| DS1-ENG line 1              | BRD budget                    | jira-standard ordered line                                 |
+| DS1-ENG line 2              | BRD budget                    | figma-professional ordered line                            |
+| DS1-ENG line 3              | BRD budget                    | chatgpt-plus ordered line                                  |
+| DS1-MKT budget              | BRD budget / OD-S5            | Current year and optional next year                        |
+| DS1-MKT line 1              | BRD budget                    | chatgpt-plus ordered line                                  |
+| DS1-MKT line 2              | BRD budget                    | figma-professional ordered line                            |
+| DS1-SAL budget              | BRD budget / OD-S5            | Current year and optional next year                        |
+| DS1-SAL line 1              | BRD budget                    | jira-standard ordered line                                 |
+| DS1-SAL line 2              | BRD budget                    | chatgpt-plus ordered line                                  |
+| R1                          | QD-93 / QD-94 implemented API | COMPLETED retained                                         |
+| R2                          | QD-93 / QD-94 implemented API | FIX: add planLine 2 to match approved R1/R2 in-plan design |
+| R3                          | QD-93 / QD-94 implemented API | PENDING retained                                           |
+| R4                          | QD-93 / QD-94 implemented API | REJECTED retained                                          |
+| R5                          | QD-93 / QD-94 implemented API | WITHDRAWN retained                                         |
+| R6                          | QD-93 / QD-94 implemented API | AWAITING_EXECUTION retained                                |
+| R7                          | QD-93 / QD-94 implemented API | AWAITING_SPEND_SUBMISSION retained                         |
+| R8                          | QD-93 / QD-94 implemented API | AWAITING_IT_ASSESSMENT retained                            |
+| R9                          | QD-93 / QD-94 implemented API | AWAITING_FINANCE_REVIEW retained                           |
+| draft / SaaS issue / notice | Self-service / personnel      | Existing actors retained; no spending approver party       |
+
+### Task 4 evidence
+
+- Completed record-by-record audit above and fixture README covering every department/person/account/plan/subscription/budget line/request/extra, separate DS1-ADMIN/Super Admin, future candidates and known next-year/renewal limits. No new type or record added.
+- Found R2 missing its approved in-plan binding; added planLine 2 (ENG Figma line). R1 line 1 and R7 offPlan retained. Other audited records satisfy the current implemented contracts.
+- Unit fixture/README table: 5 tests passed after normalizing Markdown padding in the table comparison. Typecheck/arch/rules and gates passed (327 tests). Full lint pending collection. Integration exact final-role table and Request-party check added, not run.

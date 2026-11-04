@@ -14,6 +14,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests'> = {
     },
     {
       key: 'R2',
+      planLine: 2,
       requester: 'DS1-DEV2',
       plan: 'figma-professional',
       termMonths: 1,

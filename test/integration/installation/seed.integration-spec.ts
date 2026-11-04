@@ -209,6 +209,28 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     expect(invalid.rows).toEqual([]);
   }, 600000);
 
+  it('matches the audited one-role account table and keeps the spending approver outside all Request parties', async () => {
+    const rows = await ctx.sql.query<{ code: string; role: string }>(
+      `SELECT e.employee_code AS code, g.role FROM employees e JOIN app_users u ON u.employee_id = e.id JOIN role_grants g ON g.app_user_id = u.id AND g.revoked_at IS NULL WHERE e.employee_code LIKE 'DS1-%' ORDER BY e.employee_code`,
+    );
+    const wanted = SHARED_DEMO_V2.people
+      .filter((person) => person.account)
+      .map((person) => ({
+        code: person.code,
+        role: person.code === SHARED_DEMO_V2.approvalRoles.SPENDING_APPROVER ? 'SPENDING_APPROVER' : person.account,
+      }))
+      .concat([{ code: 'DS1-SA', role: 'SUPER_ADMIN' as const }])
+      .sort((a, b) => a.code.localeCompare(b.code));
+    expect(rows.rows).toEqual(wanted);
+    expect(
+      (
+        await ctx.sql.query(
+          "SELECT r.id FROM access_requests r JOIN employees e ON e.id = r.requester_employee_id WHERE e.employee_code = 'DS1-CEO'",
+        )
+      ).rowCount,
+    ).toBe(0);
+  });
+
   it('writes nothing on a rerun (nothing to change), and keeps its accounts hashed and attributed to the operator', async () => {
     const before = await businessRows();
     const again = reportOf(await run('apply'));
