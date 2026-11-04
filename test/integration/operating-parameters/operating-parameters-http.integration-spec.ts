@@ -55,8 +55,8 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
     admin = await adminToken(ctx, seed);
-    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
-    head = await createActivatedAccount(ctx, seed, { code: 'E-HEAD', email: 'head@acme.vn', roles: [], admin });
+    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
+    head = await createActivatedAccount(ctx, seed, { code: 'E-HEAD', email: 'head@acme.vn', role: 'EMPLOYEE', admin });
     await ensureManagerGrant(ctx, admin, head.employeeId);
     await request(server())
       .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)

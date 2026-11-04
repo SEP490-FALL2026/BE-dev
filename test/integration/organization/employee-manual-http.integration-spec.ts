@@ -61,11 +61,11 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
     admin = await adminToken(ctx, seed);
-    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
+    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
     finance = await createActivatedAccount(ctx, seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin,
     });
     adminAccount = (
@@ -606,7 +606,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       const account = await request(server())
         .post('/api/v1/app-users')
         .set({ Authorization: `Bearer ${admin}` })
-        .send({ employeeId, roles: ['FINANCE'] })
+        .send({ employeeId, role: 'FINANCE' })
         .expect(201);
       const appUserId = (account.body as { data: { id: string } }).data.id;
       await activateInvitedAccount(ctx, appUserId);
@@ -623,7 +623,6 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
         },
         roles: ['FINANCE'],
         managerScope: null,
-        selfServiceOnly: false,
       });
     });
   });

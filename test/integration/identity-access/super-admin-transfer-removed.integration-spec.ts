@@ -46,25 +46,25 @@ describe('the Super Admin role cannot be handed over in the application (integra
     const successor = await createActivatedAccount(ctx, seed, {
       code: 'E-SU1',
       email: 'su1@acme.vn',
-      roles: [],
+      role: 'EMPLOYEE',
       admin,
     });
     const itAdmin = await createActivatedAccount(ctx, seed, {
       code: 'E-IT1',
       email: 'it1@acme.vn',
-      roles: ['IT_ADMIN'],
+      role: 'IT_ADMIN',
       admin,
     });
     const finance = await createActivatedAccount(ctx, seed, {
       code: 'E-FI1',
       email: 'fi1@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin,
     });
     const head: ApiAccount = await createActivatedAccount(ctx, seed, {
       code: 'E-HD1',
       email: 'hd1@acme.vn',
-      roles: [],
+      role: 'EMPLOYEE',
       admin,
     });
     await ensureManagerGrant(ctx, admin, head.employeeId);
@@ -76,7 +76,7 @@ describe('the Super Admin role cannot be handed over in the application (integra
     const employee = await createActivatedAccount(ctx, seed, {
       code: 'E-EM1',
       email: 'em1@acme.vn',
-      roles: ['EMPLOYEE'],
+      role: 'EMPLOYEE',
       admin,
     });
     const before = await roleState();

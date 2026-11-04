@@ -1,4 +1,17 @@
-import { accountStatusChangeBodySchema } from './account-management.dto';
+import { accountStatusChangeBodySchema, createAppUserBodySchema } from './account-management.dto';
+
+describe('creating an account with one role', () => {
+  const employeeId = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
+  it('defaults to EMPLOYEE', () => {
+    expect(createAppUserBodySchema.parse({ employeeId })).toEqual({ employeeId, role: 'EMPLOYEE' });
+  });
+  it.each(['IT_ADMIN', 'MANAGER', 'FINANCE'])('accepts one %s role', (role) => {
+    expect(createAppUserBodySchema.parse({ employeeId, role })).toEqual({ employeeId, role });
+  });
+  it.each([[], ['EMPLOYEE'], ['EMPLOYEE', 'IT_ADMIN']])('rejects the retired roles array %j', (...roles) => {
+    expect(createAppUserBodySchema.safeParse({ employeeId, roles }).success).toBe(false);
+  });
+});
 
 describe('accountStatusChangeBodySchema (lock and unlock reason)', () => {
   it('keeps the reason trimmed, so the Audit Trail stores what was meant', () => {

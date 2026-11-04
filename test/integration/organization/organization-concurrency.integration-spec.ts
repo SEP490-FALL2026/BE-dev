@@ -44,7 +44,7 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
     fin1 = await createActivatedAccount(ctx, seed, {
       code: 'E-FIN1',
       email: 'fin1@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin,
     });
     holder = new Client({ connectionString: ctx.database.url });
@@ -308,7 +308,7 @@ describe('lock protocol: manual entry races (integration, real PostgreSQL)', () 
       await createActivatedAccount(ctx, seed, {
         code: body.employeeCode,
         email: body.workEmail,
-        roles: ['MANAGER'],
+        role: 'MANAGER',
         admin: superAdmin,
         employeeId,
       });

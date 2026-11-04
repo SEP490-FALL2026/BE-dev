@@ -87,7 +87,7 @@ describe('moving an existing installation to the role matrix (integration, Postg
       await request(ctx.app.getHttpServer())
         .post('/api/v1/app-users')
         .set({ Authorization: `Bearer ${bodyOf(login).data.accessToken}` })
-        .send({ employeeId, roles: [] })
+        .send({ employeeId, role: 'EMPLOYEE' })
         .expect(201);
     } finally {
       await ctx.close();

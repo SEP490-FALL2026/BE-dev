@@ -44,10 +44,10 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
     finance = await createActivatedAccount(ctx, seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin,
     });
-    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
+    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
     // The open obligations of a Cost Center are held by other modules (Requests, commitments): nothing, unless a case says so.
     useFacts = registerUseReaders(ctx.app);
   }, 120000);

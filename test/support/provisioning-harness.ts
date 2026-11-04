@@ -180,7 +180,7 @@ export class ProvisioningHarness extends SeatHarness {
     return buildActivatedAccount(this.ctx, this.seed, {
       code,
       email: `${code.toLowerCase()}@acme.vn`,
-      roles,
+      role: roles[0] ?? 'EMPLOYEE',
       employeeId,
     });
   }

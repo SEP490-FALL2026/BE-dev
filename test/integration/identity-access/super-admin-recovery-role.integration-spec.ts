@@ -159,7 +159,7 @@ describe('recovering the Super Admin role outside the application (integration, 
       createActivatedAccount(h.ctx, h.seed, {
         code,
         email: `${code.toLowerCase()}@acme.vn`,
-        roles: [],
+        role: 'EMPLOYEE',
         admin: await adminToken(h.ctx, h.seed),
       });
 
@@ -434,7 +434,7 @@ describe('recovering the Super Admin role outside the application (integration, 
       const successor = await createActivatedAccount(h.ctx, h.seed, {
         code: 'E-RS2',
         email: 'rs2@acme.vn',
-        roles: [],
+        role: 'EMPLOYEE',
         admin: await adminToken(h.ctx, h.seed),
       });
       await h.ctx.sql.query(
@@ -468,7 +468,7 @@ describe('recovering the Super Admin role outside the application (integration, 
       const withItRole = await createActivatedAccount(h.ctx, h.seed, {
         code: 'E-RS4',
         email: 'rs4@acme.vn',
-        roles: ['IT_ADMIN'],
+        role: 'IT_ADMIN',
         admin: await adminToken(h.ctx, h.seed),
       });
       const invited = await insertAccountFixture(h.ctx.app, h.seed, {
@@ -487,14 +487,14 @@ describe('recovering the Super Admin role outside the application (integration, 
       const locked = await createActivatedAccount(h.ctx, h.seed, {
         code: 'E-RS7',
         email: 'rs7@acme.vn',
-        roles: [],
+        role: 'EMPLOYEE',
         admin: await adminToken(h.ctx, h.seed),
       });
       await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE id = $1`, [locked.appUserId]);
       const left = await createActivatedAccount(h.ctx, h.seed, {
         code: 'E-RS8',
         email: 'rs8@acme.vn',
-        roles: [],
+        role: 'EMPLOYEE',
         admin: await adminToken(h.ctx, h.seed),
       });
       await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [left.employeeId]);
@@ -524,13 +524,13 @@ describe('recovering the Super Admin role outside the application (integration, 
       const manager = await createActivatedAccount(h.ctx, h.seed, {
         code: 'E-RM1',
         email: 'rm1@acme.vn',
-        roles: ['MANAGER'],
+        role: 'MANAGER',
         admin: token,
       });
       const head = await createActivatedAccount(h.ctx, h.seed, {
         code: 'E-RM2',
         email: 'rm2@acme.vn',
-        roles: ['MANAGER'],
+        role: 'MANAGER',
         admin: token,
       });
       await assignHead(h.ctx, token, h.seed.departmentId, {
@@ -540,7 +540,7 @@ describe('recovering the Super Admin role outside the application (integration, 
       const approver = await createActivatedAccount(h.ctx, h.seed, {
         code: 'E-RM3',
         email: 'rm3@acme.vn',
-        roles: [],
+        role: 'EMPLOYEE',
         admin: token,
       });
       await setSpendingApprover(h.ctx, token, approver.employeeId);

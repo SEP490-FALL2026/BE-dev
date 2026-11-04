@@ -30,7 +30,7 @@ import type { HttpTestApp, SeededInstallation } from '../http-test-app';
 export interface AccountSpec {
   code: string;
   email: string;
-  roles: readonly string[];
+  role?: string;
   /** An employee that already exists keeps their department; without one, an employee is placed in `departmentId`. */
   employeeId?: string;
   /** Where a new employee is placed; the seeded department by default. */
@@ -112,7 +112,7 @@ export async function buildActivatedAccount(
       emailVerifiedAt: new Date(),
     });
     await credentials.createCredential(tx, user.id, credential.hash, credential.hashPolicyVersion);
-    for (const role of new Set(spec.roles)) {
+    for (const role of [spec.role ?? 'EMPLOYEE']) {
       await grants.grantRole(tx, {
         organizationId: seed.organizationId,
         appUserId: user.id,

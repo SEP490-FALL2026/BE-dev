@@ -81,7 +81,9 @@ export class AccountManagementHttpHarness {
   /** Creates an account through the API and activates it through the invitation, as a user would. */
   activatedAccount = async (roles: string[] = []) => {
     const employee = await this.newEmployee();
-    const created = await this.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, roles }).expect(201);
+    const created = await this.admin
+      .post('/api/v1/app-users', { employeeId: employee.employeeId, role: roles[0] ?? 'EMPLOYEE' })
+      .expect(201);
     const account = dataOf(created);
     const token = await this.invitationToken(account.id);
     await request(this.server())

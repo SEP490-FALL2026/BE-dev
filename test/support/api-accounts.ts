@@ -52,7 +52,7 @@ export async function activateInvitedAccount(ctx: HttpTestApp, appUserId: string
 export async function createActivatedAccount(
   ctx: HttpTestApp,
   seed: SeededInstallation,
-  options: { code: string; email: string; roles: string[]; admin: string; employeeId?: string },
+  options: { code: string; email: string; role?: string; admin: string; employeeId?: string },
 ): Promise<ApiAccount> {
   // An employee that already exists (for example one entered into another department) keeps their department.
   const employeeId =
@@ -61,7 +61,7 @@ export async function createActivatedAccount(
   const created = await request(ctx.app.getHttpServer())
     .post('/api/v1/app-users')
     .set('Authorization', `Bearer ${options.admin}`)
-    .send({ employeeId, roles: options.roles })
+    .send({ employeeId, role: options.role ?? 'EMPLOYEE' })
     .expect(201);
   const appUserId = (created.body as { data: { id: string } }).data.id;
   await activateInvitedAccount(ctx, appUserId);

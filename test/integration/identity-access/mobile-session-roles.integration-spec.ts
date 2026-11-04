@@ -27,7 +27,7 @@ const adminPost = (path: string, body?: object) =>
 
 interface MeData {
   appUserId: string;
-  selfServiceOnly: boolean;
+
   roles: string[];
   managerScope: { departmentId: string; departmentCode: string; departmentName: string } | null;
 }
@@ -301,7 +301,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       await h.vacateHead(department.id).expect(200);
 
       // The grant stays and the scope goes: MANAGER without a department authorizes nothing as a MANAGER (US-01-02 AC-3).
-      expect(await meOf(token)).toMatchObject({ roles: ['MANAGER'], managerScope: null, selfServiceOnly: false });
+      expect(await meOf(token)).toMatchObject({ roles: ['MANAGER'], managerScope: null });
       await get('/api/v1/spend-queue', token).expect(403);
       // The step is no longer the ex-head's: the request is answered as one the caller has no part in, and nothing moved.
       const decided = await h.decide(sent.id, { decision: 'APPROVE' }, head.account).expect(404);
@@ -324,10 +324,10 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       await get('/api/v1/provisioning-tasks', token).expect(403);
       const afterwards = await meOf(token);
       expect(afterwards.roles).toEqual(['EMPLOYEE']);
-      expect(afterwards.selfServiceOnly).toBe(false);
+      expect(afterwards).not.toHaveProperty('selfServiceOnly');
 
       await h.revokeRoleFrom(it2.account.appUserId, 'EMPLOYEE').expect(200);
-      expect((await meOf(token)).selfServiceOnly).toBe(true);
+      expect(await meOf(token)).not.toHaveProperty('selfServiceOnly');
       // Revoking the last role leaves the account signed in: the inbox and /me are self-service, open to every account.
       await get('/api/v1/notifications', token).expect(200);
     });
@@ -339,17 +339,17 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
         await login(h.seed.superAdmin.email, h.seed.superAdmin.password).expect(200),
       );
       const itOnly = await accountMadeThroughTheApi(['IT_ADMIN']);
-      const itWithEmployee = await accountMadeThroughTheApi(['IT_ADMIN', 'EMPLOYEE']);
+      const itWithEmployee = await accountMadeThroughTheApi(['IT_ADMIN']);
       const noRole = await accountMadeThroughTheApi([]);
 
       expect((await meOf(superAdmin.accessToken)).roles).toEqual(['SUPER_ADMIN']);
       expect((await meOf(h.finance.accessToken)).roles).toEqual(['FINANCE']);
       expect((await meOf(itOnly.accessToken)).roles).toEqual(['IT_ADMIN']);
       // Roles add up and are not inherited: the IT Admin who also holds EMPLOYEE has exactly those two.
-      expect((await meOf(itWithEmployee.accessToken)).roles).toEqual(['EMPLOYEE', 'IT_ADMIN']);
+      expect((await meOf(itWithEmployee.accessToken)).roles).toEqual(['IT_ADMIN']);
       const none = await meOf(noRole.accessToken);
-      expect(none.roles).toEqual([]);
-      expect(none.selfServiceOnly).toBe(true);
+      expect(none.roles).toEqual(['EMPLOYEE']);
+      expect(none).not.toHaveProperty('selfServiceOnly');
     });
 
     it('refuses the Super Admin a request of their own with its own code, whichever client asks', async () => {

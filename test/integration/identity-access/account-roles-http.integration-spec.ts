@@ -47,7 +47,7 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
 
       await request(server()).get('/api/v1/probe/employee').set(as(token)).expect(403);
       const me = await request(server()).get('/api/v1/me').set(as(token)).expect(200);
-      expect(dataOf<{ selfServiceOnly: boolean }>(me).selfServiceOnly).toBe(true);
+      expect(dataOf(me)).not.toHaveProperty('selfServiceOnly');
     });
 
     it('keeps the history of grants and revocations on the account detail', async () => {
@@ -105,10 +105,10 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
       const first = await newEmployee();
       const second = await newEmployee();
       const invited = dataOf(
-        await h.admin.post('/api/v1/app-users', { employeeId: first.employeeId, roles: ['FINANCE'] }).expect(201),
+        await h.admin.post('/api/v1/app-users', { employeeId: first.employeeId, role: 'FINANCE' }).expect(201),
       );
       const other = dataOf(
-        await h.admin.post('/api/v1/app-users', { employeeId: second.employeeId, roles: [] }).expect(201),
+        await h.admin.post('/api/v1/app-users', { employeeId: second.employeeId, role: 'EMPLOYEE' }).expect(201),
       );
 
       const whileInvited = await h.admin
@@ -134,12 +134,12 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
     it('lets exactly one of two simultaneous Finance grants through', async () => {
       const first = dataOf(
         await h.admin
-          .post('/api/v1/app-users', { employeeId: (await newEmployee()).employeeId, roles: [] })
+          .post('/api/v1/app-users', { employeeId: (await newEmployee()).employeeId, role: 'EMPLOYEE' })
           .expect(201),
       );
       const second = dataOf(
         await h.admin
-          .post('/api/v1/app-users', { employeeId: (await newEmployee()).employeeId, roles: [] })
+          .post('/api/v1/app-users', { employeeId: (await newEmployee()).employeeId, role: 'EMPLOYEE' })
           .expect(201),
       );
 
@@ -167,7 +167,7 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
       const created = await request(server())
         .post('/api/v1/app-users')
         .set(as(token))
-        .send({ employeeId: employee.employeeId, roles: [] })
+        .send({ employeeId: employee.employeeId, role: 'EMPLOYEE' })
         .expect(403);
       await request(server()).get('/api/v1/app-users').set(as(token)).expect(403);
       await request(server()).get('/api/v1/account-candidates').set(as(token)).expect(403);
@@ -190,7 +190,7 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
     it('filters accounts by activation state and role, with paging', async () => {
       const invited = dataOf(
         await h.admin
-          .post('/api/v1/app-users', { employeeId: (await newEmployee()).employeeId, roles: ['EMPLOYEE'] })
+          .post('/api/v1/app-users', { employeeId: (await newEmployee()).employeeId, role: 'EMPLOYEE' })
           .expect(201),
       );
 
@@ -208,7 +208,7 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
     it('shows the invitation delivery state on the detail', async () => {
       const account = dataOf(
         await h.admin
-          .post('/api/v1/app-users', { employeeId: (await newEmployee()).employeeId, roles: [] })
+          .post('/api/v1/app-users', { employeeId: (await newEmployee()).employeeId, role: 'EMPLOYEE' })
           .expect(201),
       );
 
@@ -223,7 +223,7 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
     it('answers the account list and detail with their own message, data unchanged', async () => {
       const account = dataOf(
         await h.admin
-          .post('/api/v1/app-users', { employeeId: (await newEmployee()).employeeId, roles: [] })
+          .post('/api/v1/app-users', { employeeId: (await newEmployee()).employeeId, role: 'EMPLOYEE' })
           .expect(201),
       );
 

@@ -85,7 +85,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
       const employee = await h.newEmployee();
 
       const created = await h.admin
-        .post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['MANAGER'] })
+        .post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'MANAGER' })
         .expect(201);
 
       expect(dataOf(created).roles).toEqual(['MANAGER']);
@@ -293,7 +293,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
       await h.ctx.sql.query("UPDATE app_users SET status = 'LOCKED' WHERE id = $1", [locked.appUserId]);
       const invited = await h.newEmployee();
       const created = await h.admin
-        .post('/api/v1/app-users', { employeeId: invited.employeeId, roles: [] })
+        .post('/api/v1/app-users', { employeeId: invited.employeeId, role: 'EMPLOYEE' })
         .expect(201);
       const before = await h.ctx.sql.query('SELECT count(*)::int AS n FROM app_users');
       const fresh = await h.newEmployee();
@@ -302,7 +302,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
       const lockedRefusal = await grant(locked.appUserId, 'SPENDING_APPROVER').expect(422);
       const invitedRefusal = await grant(dataOf(created).id, 'SPENDING_APPROVER').expect(422);
       const creation = await h.admin
-        .post('/api/v1/app-users', { employeeId: fresh.employeeId, roles: ['SPENDING_APPROVER'] })
+        .post('/api/v1/app-users', { employeeId: fresh.employeeId, role: 'SPENDING_APPROVER' })
         .expect(422);
 
       for (const response of [lockedRefusal, invitedRefusal, creation]) {

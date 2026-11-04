@@ -113,7 +113,7 @@ export class AppUsersController {
   @ApiSuccessResponse(AccountDetailResponseDto, {
     status: HttpStatus.CREATED,
     message: 'APP_USER.CREATED',
-    description: 'The account was created (invited) and its invitation queued.',
+    description: 'The account was created with one role (EMPLOYEE by default), invited and its invitation queued.',
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
@@ -130,7 +130,6 @@ export class AppUsersController {
         ACCOUNT_ERROR_EXAMPLES.ALREADY_EXISTS_FOR_EMPLOYEE,
         ACCOUNT_ERROR_EXAMPLES.LOGIN_EMAIL_TAKEN,
         ACCOUNT_ERROR_EXAMPLES.FINANCE_ALREADY_ASSIGNED,
-        ACCOUNT_ERROR_EXAMPLES.ROLE_COMBINATION_FORBIDDEN,
       ],
     },
     {

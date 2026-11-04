@@ -14,7 +14,7 @@ export const requestedRoleSchema = appRoleSchema;
 export const createAppUserBodySchema = z.strictObject({
   employeeId: z.uuid(),
   loginEmail: z.string().max(254).optional(),
-  roles: z.array(requestedRoleSchema).max(6).default([]),
+  role: requestedRoleSchema.default('EMPLOYEE'),
 });
 
 export const grantRoleBodySchema = z.strictObject({ role: requestedRoleSchema });

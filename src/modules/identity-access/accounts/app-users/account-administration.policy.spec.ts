@@ -2,11 +2,9 @@ import type { AppRole } from '../../public/identity-access.types';
 import {
   checkRoleRequest,
   conflictingRoles,
-  forbiddenPairInSet,
   forbidsCombination,
   isSelfChange,
   stopsLocking,
-  validateRoleSet,
 } from './account-administration.policy';
 
 describe('account administration policy', () => {
@@ -86,40 +84,6 @@ describe('account administration policy', () => {
 
     it('agrees with forbidsCombination', () => {
       for (const [held, adding] of pairs) expect(forbidsCombination([held], adding)).toBe(forbidden(held, adding));
-    });
-  });
-
-  describe('forbiddenPairInSet (the set of roles asked for at creation)', () => {
-    it('names the first pair that cannot go together, whatever the order', () => {
-      expect(forbiddenPairInSet(['SPENDING_APPROVER', 'EMPLOYEE', 'IT_ADMIN'])).toEqual([
-        'SPENDING_APPROVER',
-        'IT_ADMIN',
-      ]);
-      expect(forbiddenPairInSet(['IT_ADMIN', 'SPENDING_APPROVER'])).toEqual(['IT_ADMIN', 'SPENDING_APPROVER']);
-      expect(forbiddenPairInSet(['MANAGER', 'SUPER_ADMIN'])).toEqual(['MANAGER', 'SUPER_ADMIN']);
-    });
-
-    it('finds none in a set that can be held together, and none in a set of one role or a repeated role', () => {
-      expect(forbiddenPairInSet(['MANAGER', 'IT_ADMIN', 'FINANCE', 'EMPLOYEE'])).toBeNull();
-      expect(forbiddenPairInSet(['SPENDING_APPROVER', 'EMPLOYEE'])).toBeNull();
-      expect(forbiddenPairInSet(['SPENDING_APPROVER', 'SPENDING_APPROVER'])).toBeNull();
-      expect(forbiddenPairInSet([])).toBeNull();
-    });
-  });
-
-  describe('validateRoleSet', () => {
-    it('reports the first violation for a set requested at creation', () => {
-      expect(validateRoleSet([])).toBeNull();
-      expect(validateRoleSet(['IT_ADMIN', 'EMPLOYEE'])).toBeNull();
-      expect(validateRoleSet(['IT_ADMIN', 'MANAGER'])).toBeNull();
-      expect(validateRoleSet(['IT_ADMIN', 'SPENDING_APPROVER'])).toBe('ROLE_COMBINATION_FORBIDDEN');
-      expect(validateRoleSet(['MANAGER', 'SPENDING_APPROVER'])).toBe('ROLE_COMBINATION_FORBIDDEN');
-      expect(validateRoleSet(['SPENDING_APPROVER', 'EMPLOYEE'])).toBeNull();
-      expect(validateRoleSet(['SUPER_ADMIN', 'IT_ADMIN'])).toBe('SUPER_ADMIN_TRANSFER_ONLY');
-    });
-
-    it('treats a repeated role as one', () => {
-      expect(validateRoleSet(['EMPLOYEE', 'EMPLOYEE'])).toBeNull();
     });
   });
 

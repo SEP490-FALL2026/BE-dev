@@ -185,7 +185,7 @@ export class SuperAdminRecoveryHarness {
     this.it1 = await createActivatedAccount(this.ctx, this.seed, {
       code: 'E-IT1',
       email: 'it1@acme.vn',
-      roles: ['IT_ADMIN'],
+      role: 'IT_ADMIN',
       admin: this.admin,
     });
     this.originalCredential = (

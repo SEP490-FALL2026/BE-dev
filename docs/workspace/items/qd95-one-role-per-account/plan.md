@@ -162,6 +162,18 @@ Bảng test cũ → mới (điền khi implement):
 
 | Test cũ | Hành vi | Thay bằng / lý do |
 | ------- | ------- | ----------------- |
+| `validateRoleSet`, `forbiddenPairInSet` unit | Tạo tài khoản với tập vai | DTO chỉ nhận `role`, mặc định EMPLOYEE; test từ chối mọi `roles` array; policy từng vai giữ nguyên |
+| `/me.selfServiceOnly` unit và assertions HTTP/e2e | Phân biệt tài khoản không vai | Không có thuộc tính trong response; giữ `roles`, `managerScope` và kiểm quyền |
+| Fixture My software IT_ADMIN + EMPLOYEE | Tự phục vụ khi có vai thứ hai | Chỉ IT_ADMIN đọc dữ liệu cá nhân theo hạng mục self-service |
+| Fixture Manager + IT Admin | Hợp quyền của hai vai | IT Admin riêng và Manager riêng, giữ kiểm có/không phạm vi trưởng phòng |
+
+### Bằng chứng Task 1 — 04/11/2026
+
+- Đổi tạo tài khoản sang `role?`, mặc định `EMPLOYEE`, một grant và audit tương ứng; bỏ `/me.selfServiceOnly`.
+- Chuyển các lời gọi tạo tài khoản trong fixture sang body mới, giữ response/principal `roles` là mảng.
+- `pnpm typecheck`: pass; unit các file đổi: 3 suites / 70 tests pass; `pnpm test:gates`: 16 suites / 327 tests pass; HTTP identity-access: 2 suites / 14 tests pass.
+- `pnpm arch:check`, `pnpm rules:check`, `pnpm openapi:export` đã gọi; lint đang chờ kết quả cuối.
+- Integration/e2e chỉ sửa, không chạy. Các test gán/thu hồi và helper đổi vai vẫn chuyển tiếp ở Task 2–4 theo plan; chưa xác nhận checkpoint integration.
 
 - [ ] AC trong scope có bằng chứng; thay đổi hợp đồng đã báo FE/mobile.
 - [ ] Spec/plan phản ánh implementation cuối.

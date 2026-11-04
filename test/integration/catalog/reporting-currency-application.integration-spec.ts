@@ -31,7 +31,7 @@ describe('the reporting currency under the application (integration, DB-01 and D
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
     const admin = await adminToken(ctx, seed);
-    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
+    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
     businessOwner = (await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' })).employeeId;
     finance = ctx.app.get(FinanceApi, { strict: false });
     runner = ctx.app.get(TransactionRunner, { strict: false });

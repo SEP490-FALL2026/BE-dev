@@ -84,7 +84,11 @@ describe('the API and the worker run as the runtime role (integration, PostgreSQ
       .expect(200);
     const authorization = { Authorization: `Bearer ${bodyOf(refreshed).data.accessToken}` };
     const { employeeId } = await insertEmployeeFixture(ctx.app, seed, { code: 'E-H7', email: 'h7.runtime@acme.vn' });
-    await request(server).post('/api/v1/app-users').set(authorization).send({ employeeId, roles: [] }).expect(201);
+    await request(server)
+      .post('/api/v1/app-users')
+      .set(authorization)
+      .send({ employeeId, role: 'EMPLOYEE' })
+      .expect(201);
     const trail = await request(server).get('/api/v1/audit-events').set(authorization).expect(200);
 
     expect(sessionRole).toEqual([{ who: database.runtime.role }]);

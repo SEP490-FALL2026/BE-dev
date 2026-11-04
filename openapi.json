@@ -70619,7 +70619,7 @@
         },
         "responses": {
           "201": {
-            "description": "The account was created (invited) and its invitation queued.",
+            "description": "The account was created with one role (EMPLOYEE by default), invited and its invitation queued.",
             "content": {
               "application/json": {
                 "schema": {
@@ -70772,18 +70772,6 @@
                       "error": {
                         "code": "APP_USER.FINANCE_ALREADY_ASSIGNED",
                         "message": "Another account already holds the FINANCE role.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APP_USER.ROLE_COMBINATION_FORBIDDEN": {
-                    "summary": "This role cannot be combined with the roles the account holds.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APP_USER.ROLE_COMBINATION_FORBIDDEN",
-                        "message": "This role cannot be combined with the roles the account holds.",
-                        "details": { "conflictingRoles": ["IT_ADMIN"] },
                         "requestId": "req_example"
                       }
                     }
@@ -95303,10 +95291,9 @@
                 "required": ["departmentId", "departmentCode", "departmentName"],
                 "additionalProperties": false,
                 "nullable": true
-              },
-              "selfServiceOnly": { "type": "boolean" }
+              }
             },
-            "required": ["appUserId", "loginEmail", "employee", "roles", "managerScope", "selfServiceOnly"],
+            "required": ["appUserId", "loginEmail", "employee", "roles", "managerScope"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -95377,14 +95364,10 @@
         "properties": {
           "employeeId": { "type": "string", "format": "uuid" },
           "loginEmail": { "type": "string", "maxLength": 254 },
-          "roles": {
-            "default": [],
-            "maxItems": 6,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
-            }
+          "role": {
+            "default": "EMPLOYEE",
+            "type": "string",
+            "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
           }
         },
         "required": ["employeeId"],

@@ -15,7 +15,7 @@ export async function handOthersToSecondItAdmin(h: RequestHarness): Promise<ApiA
     account = await createActivatedAccount(h.ctx, h.seed, {
       code: 'E-IT2',
       email: 'it2@acme.vn',
-      roles: ['IT_ADMIN'],
+      role: 'IT_ADMIN',
       admin: h.admin,
     });
     made.set(h, account);

@@ -91,7 +91,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     const account = await createActivatedAccount(h.ctx, h.seed, {
       code,
       email: `${code.toLowerCase()}@acme.vn`,
-      roles: [],
+      role: 'EMPLOYEE',
       admin: h.admin,
       employeeId,
     });

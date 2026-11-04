@@ -111,7 +111,7 @@ describe('my software rights (integration, real PostgreSQL)', () => {
     counter = QueryCounter.on(relay);
     e1 = await h.account('MS-E1', await h.person('MS-E1'), ['EMPLOYEE']);
     e2 = await h.account('MS-E2', await h.person('MS-E2'), ['EMPLOYEE']);
-    e3 = await h.account('MS-E3', await h.person('MS-E3'), ['IT_ADMIN', 'EMPLOYEE']);
+    e3 = await h.account('MS-E3', await h.person('MS-E3'), ['IT_ADMIN']);
 
     const figma = await h.subscription(10, 'K2');
     const office = await h.subscription(10, 'K4');

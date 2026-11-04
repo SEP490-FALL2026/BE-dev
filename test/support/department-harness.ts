@@ -149,7 +149,7 @@ export class DepartmentHarness {
     const account = await createActivatedAccount(this.ctx, this.seed, {
       code: person.code,
       email: person.email,
-      roles: [],
+      role: 'EMPLOYEE',
       admin: this.admin,
       employeeId: person.employeeId,
     });
@@ -195,14 +195,12 @@ export class DepartmentHarness {
   ): Promise<{
     roles: string[];
     managerScope: { departmentId: string; departmentCode: string } | null;
-    selfServiceOnly: boolean;
   }> =>
     (
       (await this.api().get('/api/v1/me').set(this.as(account)).expect(200)).body as {
         data: {
           roles: string[];
           managerScope: { departmentId: string; departmentCode: string } | null;
-          selfServiceOnly: boolean;
         };
       }
     ).data;
@@ -235,19 +233,19 @@ export class DepartmentHarness {
     this.finance = await createActivatedAccount(this.ctx, this.seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin: this.admin,
     });
     this.it1 = await createActivatedAccount(this.ctx, this.seed, {
       code: 'E-IT1',
       email: 'it1@acme.vn',
-      roles: ['IT_ADMIN'],
+      role: 'IT_ADMIN',
       admin: this.admin,
     });
     this.it2 = await createActivatedAccount(this.ctx, this.seed, {
       code: 'E-IT2',
       email: 'it2@acme.vn',
-      roles: ['IT_ADMIN'],
+      role: 'IT_ADMIN',
       admin: this.admin,
     });
     // What keeps a department or a Cost Center in use lives in other modules: every group answers with nothing unless a case says so.

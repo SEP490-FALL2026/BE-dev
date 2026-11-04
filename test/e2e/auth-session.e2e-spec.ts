@@ -105,7 +105,7 @@ describe('a session from the installation to the logout (e2e)', () => {
     const created = await request(server())
       .post('/api/v1/app-users')
       .set(bearer(adminToken))
-      .send({ employeeId, roles: ['IT_ADMIN'] })
+      .send({ employeeId, role: 'IT_ADMIN' })
       .expect(201);
     appUserId = (created.body as { data: { id: string } }).data.id;
     expect(mails).toEqual([]);

@@ -342,7 +342,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
       const head = await createActivatedAccount(h.ctx, h.seed, {
         code: unique('E-HEAD'),
         email: `${unique('head')}@acme.vn`,
-        roles: [],
+        role: 'EMPLOYEE',
         admin: h.admin,
       });
       await ensureManagerGrant(h.ctx, h.admin, head.employeeId);
@@ -354,7 +354,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
       const employee = await createActivatedAccount(h.ctx, h.seed, {
         code: unique('E-EMP'),
         email: `${unique('emp')}@acme.vn`,
-        roles: [],
+        role: 'EMPLOYEE',
         admin: h.admin,
       });
       const imports = await count('employee_imports');

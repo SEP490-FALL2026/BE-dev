@@ -75,7 +75,7 @@ describe('account management over HTTP (integration, real PostgreSQL): lock and 
     it('locking revokes an unused invitation and cancels its mail', async () => {
       const employee = await newEmployee();
       const account = dataOf(
-        await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, roles: [] }).expect(201),
+        await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'EMPLOYEE' }).expect(201),
       );
       const token = await invitationToken(account.id);
 

@@ -5,11 +5,10 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import { AuditApi } from '../../../audit/public/audit.api';
 import { EmployeeNotFoundError } from '../../../organization/public/organization.errors';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
-import { AppRole } from '../../public/identity-access.types';
 import { employeeHasNotLeft } from '../account.policy';
 import { translateAccountWriteError } from './account-constraints.errors';
 import { AccountRecordService } from '../account-record.service';
-import { accountAuditEvent, isSelfChange, RequestedRole, validateRoleSet } from './account-administration.policy';
+import { accountAuditEvent, isSelfChange, RequestedRole, checkRoleRequest } from './account-administration.policy';
 import {
   AccountAlreadyActivatedError,
   AccountAlreadyExistsError,
@@ -19,7 +18,6 @@ import {
   FinanceAlreadyAssignedError,
   LoginEmailInvalidError,
   LoginEmailRequiredError,
-  RoleCombinationForbiddenError,
   RoleRequestRefusedError,
   SpendingApproverAccountNotUsableError,
   SelfChangeForbiddenError,
@@ -30,7 +28,7 @@ import { RoleGrantService } from '../role-grant.service';
 export interface CreateAccountInput {
   employeeId: string;
   loginEmail?: string;
-  roles: RequestedRole[];
+  role?: RequestedRole;
 }
 
 /**
@@ -51,8 +49,8 @@ export class AccountInvitationService {
 
   /** Creates the account, grants its roles and queues the invitation. Returns the new account's id. */
   async createAccount(actor: AuthenticatedPrincipal, input: CreateAccountInput): Promise<string> {
-    const violation = validateRoleSet(input.roles);
-    if (violation === 'ROLE_COMBINATION_FORBIDDEN') throw new RoleCombinationForbiddenError();
+    const role = input.role ?? 'EMPLOYEE';
+    const violation = checkRoleRequest(role);
     if (violation) throw new RoleRequestRefusedError(violation);
 
     const organization = await this.organizationReads.getOrganization();
@@ -60,9 +58,8 @@ export class AccountInvitationService {
     const employee = await this.organizationReads.getEmployee(input.employeeId);
     if (!employee) throw new EmployeeNotFoundError(input.employeeId);
 
-    const roles = [...new Set(input.roles)] as AppRole[];
     // A new account has not been activated, so it cannot be given the role: the whole command is refused (rule 8 of the grant).
-    if (roles.includes('SPENDING_APPROVER')) throw new SpendingApproverAccountNotUsableError();
+    if (role === 'SPENDING_APPROVER') throw new SpendingApproverAccountNotUsableError();
 
     return this.runner
       .run(async (tx) => {
@@ -78,7 +75,7 @@ export class AccountInvitationService {
         if ((await this.accounts.findAccountIdByEmployee(tx, input.employeeId)) !== null) {
           throw new AccountAlreadyExistsError();
         }
-        if (roles.includes('FINANCE') && (await this.grants.financeIsHeld(tx, organization.id))) {
+        if (role === 'FINANCE' && (await this.grants.financeIsHeld(tx, organization.id))) {
           throw new FinanceAlreadyAssignedError();
         }
 
@@ -93,18 +90,13 @@ export class AccountInvitationService {
           emailVerificationSource: null,
           emailVerifiedAt: null,
         });
-        for (const role of roles) {
-          await this.grants.grantRole(tx, {
-            organizationId: organization.id,
-            appUserId: user.id,
-            role,
-            grantedBy: actor.appUserId,
-          });
-          await this.audit.record(
-            tx,
-            accountAuditEvent(actor, organization.id, 'ROLE.GRANTED', user.id, null, { role }),
-          );
-        }
+        await this.grants.grantRole(tx, {
+          organizationId: organization.id,
+          appUserId: user.id,
+          role,
+          grantedBy: actor.appUserId,
+        });
+        await this.audit.record(tx, accountAuditEvent(actor, organization.id, 'ROLE.GRANTED', user.id, null, { role }));
         await this.audit.record(
           tx,
           accountAuditEvent(actor, organization.id, 'APP_USER.CREATED', user.id, null, {
@@ -112,7 +104,7 @@ export class AccountInvitationService {
             loginEmail: rawEmail.trim(),
             status: 'ACTIVE',
             activationState: 'INVITED',
-            roles,
+            roles: [role],
           }),
         );
         await this.invitations.send(tx, actor, organization.id, user.id, rawEmail.trim(), current, now);

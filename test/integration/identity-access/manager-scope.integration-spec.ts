@@ -15,7 +15,7 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
   let unit: Unit;
   /** Holds MANAGER and heads nothing: the person this file is about. */
   let holder: Person;
-  /** Holds MANAGER, IT_ADMIN and heads nothing. */
+  /** Holds IT_ADMIN and heads nothing. */
   let holderWhoIsItAdmin: Person;
   let counter = 0;
 
@@ -24,7 +24,7 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
     await h.withApprover();
     unit = await h.departmentWithHead('P-MS1');
     holder = await h.staff(unit.department, 'MS-HOLD', ['MANAGER']);
-    holderWhoIsItAdmin = await h.staff(unit.department, 'MS-HOLD-IT', ['MANAGER', 'IT_ADMIN']);
+    holderWhoIsItAdmin = await h.staff(unit.department, 'MS-HOLD-IT', ['IT_ADMIN']);
   }, 240000);
 
   afterAll(async () => {
@@ -81,7 +81,7 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
       expect(asItAdmin.status).toBe(200);
     });
 
-    it('opens the tools of a department to the IT Admin who also holds MANAGER, and to no MANAGER who heads nothing', async () => {
+    it('opens the tools of a department to the IT Admin with only IT_ADMIN, and to no MANAGER who heads nothing', async () => {
       const refused = await call('get', `/api/v1/departments/${departmentId()}/tools-in-use`, holder.account);
       expect([refused.status, h.codeOf(refused)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
 
@@ -93,7 +93,7 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
       expect(asItAdmin.status).toBe(200);
     });
 
-    it('opens the notices of the heads to the IT Admin who also holds MANAGER, and to no MANAGER who heads nothing', async () => {
+    it('opens the notices of the heads to the IT Admin with only IT_ADMIN, and to no MANAGER who heads nothing', async () => {
       const refused = await call('get', '/api/v1/personnel-notices', holder.account);
       expect([refused.status, h.codeOf(refused)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
 

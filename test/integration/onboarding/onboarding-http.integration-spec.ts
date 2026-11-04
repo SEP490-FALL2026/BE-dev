@@ -56,11 +56,11 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
     admin = await adminToken(ctx, seed);
-    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
+    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
     finance = await createActivatedAccount(ctx, seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin,
     });
   }, 120000);
@@ -148,7 +148,12 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
   });
 
   it('stops warning about a department once it has a head and an IT Admin in charge', async () => {
-    const head = await createActivatedAccount(ctx, seed, { code: 'E-HEAD', email: 'head@acme.vn', roles: [], admin });
+    const head = await createActivatedAccount(ctx, seed, {
+      code: 'E-HEAD',
+      email: 'head@acme.vn',
+      role: 'EMPLOYEE',
+      admin,
+    });
     await ensureManagerGrant(ctx, admin, head.employeeId);
     await request(server())
       .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)

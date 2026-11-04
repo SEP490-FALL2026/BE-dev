@@ -483,7 +483,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       const grant = await request(h.server())
         .post('/api/v1/app-users')
         .set(h.as(h.it1))
-        .send({ employeeId: h.employee.employeeId, roles: ['SUPER_ADMIN'] });
+        .send({ employeeId: h.employee.employeeId, role: 'SUPER_ADMIN' });
       expect(grant.status).toBe(403);
       expect(await watched()).toMatchObject({ status: 'HOLDER_UNUSABLE' });
     });
