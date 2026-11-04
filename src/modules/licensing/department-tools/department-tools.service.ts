@@ -3,10 +3,10 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ToolsDepartmentNotFoundError, ToolsDepartmentOutOfScopeError } from '../public/licensing.errors';
 import type { AssignmentKind, AssignmentSource } from '../public/licensing.types';
-import { RevocationReadService } from '../provisioning/revocation-read.service';
+import { RevocationViewService } from '../provisioning/revocation-view.service';
 import { effectiveFromLabel } from '../assignment/assignment.policy';
 import { AssignmentDepartmentRepo } from '../assignment/assignment-department.repo';
 
@@ -48,9 +48,9 @@ export interface ToolsSummaryLine {
 export class DepartmentToolsService {
   constructor(
     private readonly repo: AssignmentDepartmentRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
-    private readonly revocations: RevocationReadService,
+    private readonly revocations: RevocationViewService,
   ) {}
 
   /** Throws ToolsDepartmentNotFoundError and ToolsDepartmentOutOfScopeError. `summary` counts every seat, `items` is one page. */
@@ -59,8 +59,8 @@ export class DepartmentToolsService {
     departmentId: string,
     query: { page: number; pageSize: number },
   ): Promise<{ asOf: BusinessDate; summary: ToolsSummaryLine[]; page: Page<ToolInUse> }> {
-    const today = await this.organization.businessToday();
-    const memberIds = await this.organization.getDepartmentMemberIds(departmentId, today);
+    const today = await this.organizationReads.businessToday();
+    const memberIds = await this.organizationReads.getDepartmentMemberIds(departmentId, today);
     if (!memberIds) throw new ToolsDepartmentNotFoundError();
     await this.assertMayRead(principal, departmentId, today);
 
@@ -79,9 +79,9 @@ export class DepartmentToolsService {
       ).map((plan) => [plan.planId, plan]),
     );
     const people = new Map(
-      (await this.organization.getEmployees([...new Set(assignments.map((assignment) => assignment.employeeId))])).map(
-        (person) => [person.id, person],
-      ),
+      (
+        await this.organizationReads.getEmployees([...new Set(assignments.map((assignment) => assignment.employeeId))])
+      ).map((person) => [person.id, person]),
     );
     // A seat is on its way out only when its renewal was cancelled and its access runs on to the end of the paid period (AC-19): the
     // read of the revocations says which of these people hold one, and the seats of this page are picked from it.
@@ -142,7 +142,7 @@ export class DepartmentToolsService {
     today: BusinessDate,
   ): Promise<void> {
     if (principal.roles.includes('IT_ADMIN')) return;
-    const headed = await this.organization.getHeadedDepartment(principal.employeeId, today);
+    const headed = await this.organizationReads.getHeadedDepartment(principal.employeeId, today);
     if (headed?.departmentId !== departmentId) throw new ToolsDepartmentOutOfScopeError();
   }
 }

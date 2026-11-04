@@ -66,9 +66,13 @@ src/modules/requests/
   spend/ …                   capability khác
 ```
 
-- Facade công khai tên `<M>Api` trong `public/<m>.api.ts`; module khác chỉ import file trong `public/`.
+- Facade công khai tên `<M>Api` trong `public/<m>.api.ts`; module khác chỉ import file trong `public/`. Module có nhiều phương thức tách
+  facade theo việc, mỗi facade một file (`organization`: `OrganizationReadApi` để đọc, `OrganizationApi` để ghi; R10 giữ danh sách).
 - Hậu tố file nói vai trò: `.controller` map HTTP, `.service` một use case, `.policy` quy tắc thuần, `.repo` mọi SQL,
-  `.mapper`, `.dto`, `.types`, `.errors`/`.http-errors`, `.listener` (đăng ký extension point), `.job` (việc định kỳ).
+  `.mapper`, `.dto`, `.types`, `.errors`/`.http-errors`, `.listener` (đăng ký extension point), `.job` (việc định kỳ), `.json` (codec của
+  một cột JSON: đọc qua `decode`, không ép kiểu). Service chỉ đọc mang tên `-query`, `-facts` hoặc `-view`, service vừa đọc vừa ghi một bảng
+  cho nơi khác mang `-record`; Nest module mang tên nói graph (`-http`, `-facade`, `-cli`). Bảng tên đầy đủ và gate `module-layout` ở
+  [module structure](docs/rules/module-structure.md).
 - Tối đa 2 cấp thư mục dưới module, 25 file mỗi thư mục. Thư mục con của capability là nhóm chức năng, gọi qua file
   mang tên nhóm; phần còn lại của nhóm riêng tư. Capability trong một module import nhau nhưng không theo vòng (R6).
 - `src/core` chỉ giữ primitive ít nhất hai vùng dùng (R7). Một Nest module chỉ export ra ngoài facade và port; export còn lại
@@ -78,6 +82,8 @@ src/modules/requests/
   [module structure](docs/rules/module-structure.md#luật-máy-kiểm-r1r10-và-luật-review).
 - Mọi graph tiến trình (API, worker, mỗi lệnh có Nest graph) phải có đủ bên đăng ký của extension point nó dùng (R1, gate
   `extension-wiring`). Comment trong `src` nói lý do, không nói mã finding hay lát (review).
+- Lỗi của sweeper và vòng worker ghi một dòng do `describeForOperator` viết (tên lớp lỗi, mã, `column=` của cột JSON sai hình dạng,
+  `retryable=`; không message, gate `module-layout` L1); cách đọc ở [hướng dẫn dev mới](docs/guides/huong-dan-dev-moi.md#5-gỡ-lỗi-từ-requestid-đến-nguyên-nhân).
 
 ## Một request HTTP đi qua đâu
 

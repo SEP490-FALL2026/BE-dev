@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { SaasIssueError } from './saas-issue.errors';
 import {
@@ -36,7 +36,7 @@ const blankToNull = (text: string | null): string | null => (text && text.trim()
 export class SaasIssueHandlingService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly calendar: SaasIssueCalendar,
     private readonly issues: SaasIssueRepo,
     private readonly facts: SaasIssueFactsRepo,
@@ -44,7 +44,7 @@ export class SaasIssueHandlingService {
   ) {}
 
   async transition(actor: AuthenticatedPrincipal, id: string, input: TransitionInput): Promise<SaasIssueRecord> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const reopenUntil = input.to === 'RESOLVED' ? await this.calendar.reopenUntil(today) : null;
 
     return this.runner.run(async (tx) => {

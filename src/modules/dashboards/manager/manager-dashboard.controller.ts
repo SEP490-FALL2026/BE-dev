@@ -26,7 +26,7 @@ export class ManagerDashboardController {
   @ApiSuccessResponse(ManagerDashboardResponseDto, {
     message: 'DASHBOARD.MANAGER_RETRIEVED',
     description:
-      'The sections of the overview of the head for the department they head on the business day (asOf), and no other department. The seats the department is granted or manages and the open reviews after a transfer are counted; the queue ready for spending submission, the budget proposals and the lines of the approved version name the operation that lists them; the need decisions waiting, the ghost seats and the actual cost and commitments say they are not available yet and are never shown as zero. No remaining budget, budget check result, company total or usage measure is answered.',
+      'The sections of the overview of the head for the department they head on the business day (asOf), and no other department. The seats the department is granted or manages and the open reviews after a transfer are counted; the queue ready for spending submission, the budget proposals and the lines of the approved version name the operation that lists them; the need decisions waiting are counted as needDecisionList counts them; the ghost seats and the actual cost and commitments say they are not available yet and are never shown as zero. No remaining budget, budget check result, company total or usage measure is answered.',
   })
   @ApiErrorResponses(UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE, {
     status: HttpStatus.FORBIDDEN,

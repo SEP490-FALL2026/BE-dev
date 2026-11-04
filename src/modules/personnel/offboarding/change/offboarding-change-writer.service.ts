@@ -38,14 +38,17 @@ export class OffboardingChangeWriter {
     judged: JudgedMove,
     input: ChangeLastDayInput,
   ): Promise<OffboardingRecord> {
-    const scheduled = await this.periods.schedule(tx, {
-      organizationId: held.organizationId,
-      employeeId: held.employeeId,
-      departmentId: held.departmentId,
-      endsOn: judged.endsOn,
-      leavesAsHead: judged.leavesAsHead,
-      successor: judged.chosen,
-    });
+    const scheduled =
+      held.departmentId !== null
+        ? await this.periods.schedule(tx, {
+            organizationId: held.organizationId,
+            employeeId: held.employeeId,
+            departmentId: held.departmentId,
+            endsOn: judged.endsOn,
+            leavesAsHead: judged.leavesAsHead,
+            successor: judged.chosen,
+          })
+        : { headHandover: null, placementClosedId: null };
     const moved = await this.repo.reschedule(tx, held.id, {
       lastWorkingDay: input.lastWorkingDay,
       departureEffectiveOn: judged.endsOn,
@@ -111,9 +114,12 @@ export class OffboardingChangeWriter {
     actor: PersonnelActor,
     held: OffboardingRecord,
     why: { reason: string; today: string },
-  ): Promise<OffboardingRecord> {
+  ): Promise<OffboardingRecord & { firstPlacementRestored?: boolean }> {
     const { reason } = why;
-    await this.periods.undo(tx, held);
+    if (held.departmentId !== null) {
+      await this.periods.undo(tx, held);
+    }
+    const firstPlacementRestored = await this.periods.restoreFirstPlacement(tx, held);
     await this.handovers.cancel(tx, actor, held, reason);
     // The person is back to what they were doing: a leave ended for the handover is taken up again when its day is still ahead (`AC-26`).
     const resumed =
@@ -128,7 +134,7 @@ export class OffboardingChangeWriter {
       kind: 'CANCELLED',
       oldLastWorkingDay: held.lastWorkingDay,
       reason,
-      detail: { workState: resumed },
+      detail: { workState: resumed, ...(firstPlacementRestored !== undefined ? { firstPlacementRestored } : {}) },
       changedByAppUserId: by.appUserId,
       changedByTicketId: by.ticketId,
     });
@@ -148,7 +154,7 @@ export class OffboardingChangeWriter {
     });
     await this.tell(tx, cancelled, 'DEPARTURE_CANCELLED', held.departureEffectiveOn);
 
-    return cancelled;
+    return { ...cancelled, ...(firstPlacementRestored !== undefined ? { firstPlacementRestored } : {}) };
   }
 
   /** The person and the head of their department are told the departure moved or was cancelled, in the same transaction. */

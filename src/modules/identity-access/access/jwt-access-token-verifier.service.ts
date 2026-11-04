@@ -6,14 +6,13 @@ import {
   InvalidAccessTokenError,
   TokenVerificationUnavailableError,
 } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { EmployeeRecord } from '../../organization/public/organization.types';
-import { ApprovalRoleDirectoryService } from '../approval-roles/approval-role-directory.service';
-import { SessionDirectoryService } from '../auth/session-directory.service';
+import { SessionRecordService } from '../auth/session-record.service';
 import { TokenService } from '../auth/token.service';
 import { PrincipalContext } from '../public/identity-access.types';
 import { employeeHasNotLeft } from '../accounts/account.policy';
-import { resolveEffectiveRoles } from './effective-roles.policy';
+import { authorizingRoles } from './effective-roles.policy';
 
 /**
  * Verifies the signed token, then asks the database whether the session and account are still
@@ -24,9 +23,8 @@ import { resolveEffectiveRoles } from './effective-roles.policy';
 export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
   constructor(
     private readonly tokens: TokenService,
-    private readonly sessions: SessionDirectoryService,
-    private readonly organization: OrganizationApi,
-    private readonly approvalRoles: ApprovalRoleDirectoryService,
+    private readonly sessions: SessionRecordService,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   async verify(token: string): Promise<AuthenticatedPrincipal> {
@@ -36,7 +34,7 @@ export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
     let employee: EmployeeRecord | null;
     try {
       context = await this.sessions.findPrincipalContext(claims.sid);
-      employee = context ? await this.organization.getEmployee(context.employeeId) : null;
+      employee = context ? await this.organizationReads.getEmployee(context.employeeId) : null;
     } catch (error) {
       // Could not reach the database: the token may be fine, so this is a 503, never a 401.
       // Anything toTransientError does not recognise is a defect, and stays one (a 500 with a log).
@@ -58,32 +56,25 @@ export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
       throw new InvalidAccessTokenError();
     }
 
-    // Roles that follow from data, read on every request like the grants: a head period that begins today applies
-    // today, one that ended yesterday no longer does (US-01-02 AC-2).
-    let headed: { departmentId: string } | null;
-    let isSpendingApprover: boolean;
-    try {
-      [headed, isSpendingApprover] = await Promise.all([
-        this.organization.getHeadedDepartment(context.employeeId),
-        this.approvalRoles.isSpendingApprover(context.employeeId),
-      ]);
-    } catch (error) {
-      if (toTransientError(error)) throw new TokenVerificationUnavailableError(error);
-      throw error;
+    // MANAGER counts only while the person heads a department, read on every request like the grants: a head period that begins
+    // today applies today, one that ended yesterday no longer does (US-01-02 AC-2). No role is derived from data (QĐ-93a).
+    let headsDepartmentToday = false;
+    if (context.directRoles.includes('MANAGER')) {
+      try {
+        headsDepartmentToday = (await this.organizationReads.getHeadedDepartment(context.employeeId)) !== null;
+      } catch (error) {
+        if (toTransientError(error)) throw new TokenVerificationUnavailableError(error);
+        throw error;
+      }
     }
-    const roles = resolveEffectiveRoles(context.directRoles, {
-      headsDepartment: headed !== null,
-      isSpendingApprover,
-    });
 
     return {
       subject: context.appUserId,
       appUserId: context.appUserId,
       sessionId: context.sessionId,
       employeeId: context.employeeId,
-      directRoles: roles.direct,
-      derivedRoles: roles.derived,
-      roles: roles.effective,
+      directRoles: [...context.directRoles].sort(),
+      roles: authorizingRoles(context.directRoles, headsDepartmentToday),
     };
   }
 }

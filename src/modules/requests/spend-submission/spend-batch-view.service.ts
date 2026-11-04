@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SpendBatchRepo, type BatchRecord } from '../spend/spend-batch.repo';
 import { SpendBatchNotFoundError } from '../spend/spend.errors';
-import { SpendReadSupport } from '../spend/spend-read.service';
+import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { SpendRequestRepo } from '../spend/spend-request.repo';
 import type { BatchItemWire, BatchWire } from '../spend/spend-submission.dto';
 
@@ -19,16 +19,16 @@ export class SpendBatchViewService {
   constructor(
     private readonly batches: SpendBatchRepo,
     private readonly found: SpendRequestRepo,
-    private readonly organization: OrganizationApi,
-    private readonly support: SpendReadSupport,
+    private readonly organizationReads: OrganizationReadApi,
+    private readonly wireView: SpendWireViewService,
   ) {}
 
   /** Throws SpendBatchNotFoundError. */
   async get(actor: AuthenticatedPrincipal, id: string): Promise<BatchWire> {
     const batch = await this.readable(actor, id);
     const [people, department] = await Promise.all([
-      this.support.people([batch.submittedByEmployeeId]),
-      this.organization.getDepartmentBrief(batch.departmentId),
+      this.wireView.people([batch.submittedByEmployeeId]),
+      this.organizationReads.getDepartmentBrief(batch.departmentId),
     ]);
     const submittedBy = people.get(batch.submittedByEmployeeId);
     if (!submittedBy || !department) throw new Error(`The batch ${id} points at a missing record.`);

@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { PersonnelFileHookContributions, type PersonnelFileEvent } from '../public/personnel.extension-points';
@@ -33,7 +33,7 @@ export class RoleDutiesHook implements OnModuleInit {
     private readonly hooks: PersonnelFileHookContributions,
     private readonly repo: RoleDutiesRepo,
     private readonly roles: RoleDutiesService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly notifier: PersonnelNotifier,
   ) {}
@@ -62,7 +62,7 @@ export class RoleDutiesHook implements OnModuleInit {
         : stage === 'DUE_CHANGED'
           ? view.flags.length > 0 && !sameFlags(found.roleFlags, view.flags)
           : isHighPriority(view.flags);
-    const organization = tell ? await this.organization.getOrganization(tx) : null;
+    const organization = tell ? await this.organizationReads.getOrganization(tx) : null;
     if (!tell || !organization) return;
 
     await this.audit.record(

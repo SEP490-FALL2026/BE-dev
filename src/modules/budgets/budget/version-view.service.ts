@@ -3,8 +3,8 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCostCenterNotFoundError, BudgetLineNotFoundError, BudgetVersionNotFoundError } from './budget.errors';
-import { isOverdue } from './budget.policy';
-import { BudgetSupportService } from './budget-support.service';
+import { isOverdue, versionWaitingReason } from './budget.policy';
+import { BudgetFactsService } from './budget-facts.service';
 import { DecisionRepo, type DecisionRecord } from './decision.repo';
 import { VersionLineRepo, type LineChangeRecord, type VersionLineRecord } from './version-line.repo';
 import { VersionRepo, type VersionRecord, type VersionState } from './version.repo';
@@ -17,7 +17,7 @@ export class VersionViewService {
     private readonly versions: VersionRepo,
     private readonly lineRepo: VersionLineRepo,
     private readonly decisions: DecisionRepo,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
   ) {}
 
   async require(id: string): Promise<VersionRecord> {
@@ -28,7 +28,7 @@ export class VersionViewService {
   }
 
   async get(actor: AuthenticatedPrincipal, id: string): Promise<VersionWire> {
-    await this.support.requireVersionReader(actor);
+    await this.facts.requireVersionReader(actor);
 
     return this.wire(await this.require(id));
   }
@@ -37,7 +37,7 @@ export class VersionViewService {
     actor: AuthenticatedPrincipal,
     query: { state?: VersionState; year?: number; page: number; pageSize: number },
   ): Promise<Page<VersionSummaryWire>> {
-    await this.support.requireVersionReader(actor);
+    await this.facts.requireVersionReader(actor);
     const { items, total } = await this.versions.page({
       ...(query.state ? { state: query.state } : {}),
       ...(query.year ? { year: query.year } : {}),
@@ -53,7 +53,7 @@ export class VersionViewService {
     id: string,
     query: { page: number; pageSize: number },
   ): Promise<Page<VersionLineWire>> {
-    await this.support.requireVersionReader(actor);
+    await this.facts.requireVersionReader(actor);
     const version = await this.require(id);
     const { items, total } = await this.lineRepo.pageLines(id, (query.page - 1) * query.pageSize, query.pageSize);
 
@@ -66,7 +66,7 @@ export class VersionViewService {
     position: number,
     query: { page: number; pageSize: number },
   ): Promise<Page<LineChangeWire>> {
-    await this.support.requireVersionReader(actor);
+    await this.facts.requireVersionReader(actor);
     await this.require(id);
     if (!(await this.lineRepo.findLine(id, position))) throw new BudgetLineNotFoundError();
     const { items, total } = await this.lineRepo.pageLineChanges(
@@ -75,7 +75,7 @@ export class VersionViewService {
       (query.page - 1) * query.pageSize,
       query.pageSize,
     );
-    const people = await this.support.people(items.map((change) => change.changedByEmployeeId));
+    const people = await this.facts.people(items.map((change) => change.changedByEmployeeId));
 
     return pageOf(
       items.map((change) => toChangeWire(change, people.get(change.changedByEmployeeId) ?? null)),
@@ -90,8 +90,8 @@ export class VersionViewService {
   }
 
   async lineWires(currency: string, lines: readonly VersionLineRecord[]): Promise<VersionLineWire[]> {
-    const money = await this.support.formatter(currency);
-    const today: BusinessDate = await this.support.today(new Date());
+    const money = await this.facts.formatter(currency);
+    const today: BusinessDate = await this.facts.today(new Date());
 
     return lines.map((line) => ({
       position: line.position,
@@ -121,16 +121,20 @@ export class VersionViewService {
       this.versions.totalsOf(
         versions.flatMap((version) => (version.basedOnVersionId ? [version.basedOnVersionId] : [])),
       ),
-      this.support.costCenters(versions.map((version) => version.costCenterId)),
+      this.facts.costCenters(versions.map((version) => version.costCenterId)),
     ]);
-    const people = await this.support.people([
+    // Read once for the page, and only when some version waits for a decision.
+    const approver = versions.some((version) => version.state === 'SENT')
+      ? await this.facts.usableSpendingApproverEmployeeId()
+      : null;
+    const people = await this.facts.people([
       ...versions.map((version) => version.createdByEmployeeId),
       ...[...latest.values()].map((decision) => decision.decidedByEmployeeId),
     ]);
 
     return Promise.all(
       versions.map(async (version) => {
-        const money = await this.support.formatter(version.currency);
+        const money = await this.facts.formatter(version.currency);
         const costCenter = centers.get(version.costCenterId);
         if (!costCenter) throw new BudgetCostCenterNotFoundError();
         const [q1, q2, q3, q4] = version.quarters ?? [];
@@ -156,6 +160,7 @@ export class VersionViewService {
               : { q1: money(q1), q2: money(q2), q3: money(q3), q4: money(q4) },
           reason: version.reason,
           previousTotal: version.basedOnVersionId ? money(previous.get(version.basedOnVersionId) ?? 0n) : null,
+          waitingReason: versionWaitingReason(version.state, approver),
           decision: toDecisionWire(latest.get(version.id), people),
           createdBy: people.get(version.createdByEmployeeId) ?? null,
           createdAt: version.createdAt.toISOString(),

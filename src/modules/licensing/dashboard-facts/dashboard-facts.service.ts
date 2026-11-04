@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentDepartmentRepo } from '../assignment/assignment-department.repo';
 import { isExpiringSoon, rightStatusOf } from '../my-software/my-software.policy';
 import type {
@@ -20,7 +20,7 @@ export class DashboardFactsService {
   constructor(
     private readonly repo: DashboardFactsRepo,
     private readonly departments: AssignmentDepartmentRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   async employee(employeeId: string, today: BusinessDate): Promise<EmployeeLicensingFacts> {
@@ -32,7 +32,7 @@ export class DashboardFactsService {
 
   /** The seats the department uses on the business day, counted as the tools it uses are listed; null when it does not exist. */
   async department(departmentId: string, today: BusinessDate): Promise<DepartmentLicensingFacts | null> {
-    const memberIds = await this.organization.getDepartmentMemberIds(departmentId, today);
+    const memberIds = await this.organizationReads.getDepartmentMemberIds(departmentId, today);
     if (!memberIds) return null;
     const { total } = await this.departments.toolsOfDepartment({ memberIds, departmentId }, today, 0, 0);
 

@@ -69,7 +69,7 @@ describe('seat baseline routes (e2e, no database)', () => {
   ])('refuses %s on every route of the seat baseline with 403', async (_name, direct, derived) => {
     for (const [route, call] of ROUTES) {
       const response = await call(app.getHttpServer())
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
       expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
     }

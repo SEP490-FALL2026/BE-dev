@@ -9,7 +9,7 @@ architecture gate, không copy layout của một module cụ thể.
 **Đã có trong code:** lệnh khởi tạo `pnpm ops:bootstrap`, đăng nhập/làm mới/đăng xuất, `/me`, tạo tài khoản từ
 Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai, đổi/đặt lại mật khẩu, tra cứu Audit Trail, danh mục chức vụ/Cost
 Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, tham số vận hành, import nhân sự CSV, checklist khởi
-tạo, chuyển giao Super Admin, lệnh khôi phục ngoài HTTP `pnpm ops:recover --help`, lệnh kiểm trạng thái chỉ đọc
+tạo, lệnh ngoài HTTP đổi người giữ vai Super Admin và khôi phục `pnpm ops:recover --help`, lệnh kiểm trạng thái chỉ đọc
 `pnpm ops:inspect`, lệnh tách vai PostgreSQL production `pnpm ops:db-roles`, lệnh dữ liệu demo chỉ local
 `pnpm dev:seed -- --confirm-local` và lệnh nạp dataset demo dùng chung qua API `pnpm ops:demo-dataset`
 ([runbook](docs/guides/demo-dataset.md)) (các lệnh ngoài HTTP cần

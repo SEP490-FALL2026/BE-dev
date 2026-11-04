@@ -71,7 +71,7 @@ describe('the lock of the Cost Center and the year under the check of a request 
     // checked and waits for the approver, nothing is held yet.
     await h.route(first, u.head.account);
     expect(await checks(first)).toEqual([{ number: 1, route: 'SPEND_APPROVAL' }]);
-    const approver = await h.deciderOf(u);
+    const approver = h.deciderOf();
     const holder = await hold(u.department.unitId, h.year);
     const queued: Array<Promise<unknown>> = [];
     try {

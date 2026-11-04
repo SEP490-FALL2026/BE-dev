@@ -3,7 +3,7 @@ import { addDays, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { RevocationSource } from '../public/licensing.types';
 import { shortDueOn } from './handover-confirmer.policy';
 
@@ -19,13 +19,13 @@ const CALENDAR_WINDOW_DAYS = 90;
 @Injectable()
 export class HandoverCaseFacts {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly history: OrganizationHistoryApi,
     private readonly parameters: OperatingParametersApi,
   ) {}
 
   today(now: Date, tx?: DbTx): Promise<BusinessDate> {
-    return this.organization.businessToday(now, tx);
+    return this.organizationReads.businessToday(now, tx);
   }
 
   /** The deadline of a handover opened today by this source, counted in working days after today. */
@@ -38,7 +38,7 @@ export class HandoverCaseFacts {
 
   /** The department the person is placed in on the day, or null when they are in none. */
   async departmentOf(employeeId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
-    return (await this.organization.getEmployeePlacement(employeeId, today, tx))?.departmentId ?? null;
+    return (await this.organizationReads.getEmployeePlacement(employeeId, today, tx))?.departmentId ?? null;
   }
 
   /** Whether the person heads the department on the day. */

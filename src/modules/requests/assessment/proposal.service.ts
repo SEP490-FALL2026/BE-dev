@@ -2,15 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
-import {
-  AccessRequestNoDepartmentError,
-  AccessRequestSuperAdminCannotRequestError,
-} from '../access-request/access-request.errors';
+import { AccessRequestSuperAdminCannotRequestError } from '../access-request/access-request.errors';
 import { hasSpendStep, mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
+import { RequestSenderService } from '../request-intake/request-sender.service';
 import { AssessmentRepo } from './assessment.repo';
 import { RequestFactsService } from '../access-request/request-facts.service';
 import type { ProposalBodyDto } from './assessment.dto';
@@ -28,7 +25,7 @@ export class ProposalService {
     private readonly runner: TransactionRunner,
     private readonly repo: AccessRequestRepo,
     private readonly assessments: AssessmentRepo,
-    private readonly organization: OrganizationApi,
+    private readonly sender: RequestSenderService,
     private readonly assessment: RequestFactsService,
     private readonly audit: AuditApi,
   ) {}
@@ -39,9 +36,7 @@ export class ProposalService {
     const settings = await this.assessment.settings();
 
     return this.runner.run(async (tx) => {
-      await this.organization.lockEmployeeForShare(tx, actor.employeeId);
-      const employee = await this.organization.getEmployee(actor.employeeId, tx);
-      if (!employee) throw new AccessRequestNoDepartmentError();
+      const employee = await this.sender.lockEligible(tx, actor);
 
       const now = new Date();
       const assessed = await this.assessment.assessProposal(tx, {
@@ -67,7 +62,6 @@ export class ProposalService {
         costCenterId: unit.costCenter.id,
         businessReason: body.purpose,
         termMonths: body.termMonths,
-        projectLabel: body.projectLabel ?? null,
         pricing,
         policy,
         createdByAppUserId: actor.appUserId,

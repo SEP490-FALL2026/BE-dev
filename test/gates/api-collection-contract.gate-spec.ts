@@ -109,7 +109,7 @@ const FINDING = /^LD-\d+$/;
  * A finding of the baseline remediation (`g0-g6-final-business-baseline-remediation`, F55, P03-D14 = A): the only thing it may
  * serve in this ledger is the removal of the entries of an operation that was removed, a `closed` event.
  */
-const REMOVED_OPERATION_FINDING = /^F\d+$/;
+const REMOVED_OPERATION_FINDING = /^(?:F\d+|QĐ-\d+[a-z]?)$/;
 const WORK_ITEM_FOLDER = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const NEEDS_MAXIMUM_MESSAGE = 'needs a business maximum: maxItems as a positive integer item count, with its source';
 
@@ -682,7 +682,6 @@ const INVALID_MAXIMA: Record<string, object> = {
 
 /** The arrays review LD-R2-RV-02 named; the recursive inventory must find every one the ledger has not closed. */
 const REVIEW_NAMED_ARRAYS = [
-  'approvalRoleList#history',
   'standardToolsetList#plans',
   'applicationList#domains',
   'vendorGroupList#serviceLines',
@@ -785,6 +784,7 @@ describe('collection and detail contract gate', () => {
     expect(REVIEW_NAMED_ARRAYS.filter((key) => closed.includes(key))).toEqual([
       'standardToolsetList#plans',
       'applicationList#domains',
+      'departmentGet#projects.departments',
     ]);
   });
 
@@ -869,7 +869,11 @@ describe('collection and detail contract gate', () => {
         { ...eventOf('licenseKeyList#query'), key: 'currencyList#bounded' },
         { ...eventOf('licenseKeyList#query'), key: 'thingList#query' },
         { ...eventOf('provisioningTaskList#steps'), key: 'healthGetReadiness#checks' },
-        { ...eventOf('projectGet#departments'), key: 'auditEventList#actorRoles', bound: 'resolveEffectiveRoles' },
+        {
+          ...eventOf('applicationRetirementGet#retirement.blockers.assignmentsByPlan'),
+          key: 'auditEventList#actorRoles',
+          bound: 'authorizingRoles',
+        },
       ];
 
       expect(check({}, [...REGISTRY_EVENTS_SINCE_INITIAL, ...idle])).toEqual([
@@ -878,8 +882,8 @@ describe('collection and detail contract gate', () => {
         'ledger nested closed healthGetReadiness#checks: the key is still in NESTED_ARRAYS, so nothing was closed',
         'ledger nested added auditEventList#actorRoles: the key is already in INITIAL_NESTED_ARRAYS, so nothing was added',
       ]);
-      expect(check({}, replaced('departmentGet#projects', { from: 'owner-decision' }))).toEqual([
-        "ledger nested reclassified departmentGet#projects: from 'owner-decision' but INITIAL_NESTED_ARRAYS holds 'unbounded'",
+      expect(check({}, replaced('applicationGet#similarApplications', { from: 'owner-decision' }))).toEqual([
+        "ledger nested reclassified applicationGet#similarApplications: from 'owner-decision' but INITIAL_NESTED_ARRAYS holds 'unbounded'",
       ]);
       expect(check({}, replaced('planTermsGet#opinions', { to: 'unbounded' }))).toEqual([
         "ledger nested reclassified planTermsGet#opinions: to 'unbounded' but NESTED_ARRAYS holds 'bounded'",
@@ -908,11 +912,11 @@ describe('collection and detail contract gate', () => {
         exceptions: [...COLLECTION_EXCEPTIONS, entry({ operationId: 'thingList', classification: 'unbounded' })],
       };
 
-      expect(check({}, replaced('departmentGet#projects', { bound: 'A_GUESS' }))).toEqual([
-        "ledger nested reclassified departmentGet#projects: the NESTED_ARRAYS source of the key does not name its bound 'A_GUESS'",
+      expect(check({}, replaced('applicationGet#similarApplications', { bound: 'A_GUESS' }))).toEqual([
+        "ledger nested reclassified applicationGet#similarApplications: the NESTED_ARRAYS source of the key does not name its bound 'A_GUESS'",
       ]);
-      expect(check({}, replaced('departmentGet#projects', { bound: undefined }))).toEqual([
-        'ledger nested reclassified departmentGet#projects: a bounded event names the constant or validation that proves the maximum (bound)',
+      expect(check({}, replaced('applicationGet#similarApplications', { bound: undefined }))).toEqual([
+        'ledger nested reclassified applicationGet#similarApplications: a bounded event names the constant or validation that proves the maximum (bound)',
       ]);
       expect(check(live, [...REGISTRY_EVENTS_SINCE_INITIAL, added])).toEqual([
         'ledger exceptions added thingList#unbounded: adding an exception needs the Owner decision that allows it',

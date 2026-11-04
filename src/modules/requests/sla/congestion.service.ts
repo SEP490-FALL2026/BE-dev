@@ -6,7 +6,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { EmployeeRecord } from '../../organization/public/organization.types';
 import { CongestionHolderNotFoundError } from './congestion.errors';
 import { CongestionRepo, type IncidentRecord } from './congestion.repo';
@@ -34,7 +34,7 @@ export class CongestionService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly congestion: CongestionRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly parameters: OperatingParametersApi,
     private readonly audit: AuditApi,
   ) {}
@@ -117,7 +117,8 @@ export class CongestionService {
     now: Date = new Date(),
   ): Promise<CongestionIncidentWire> {
     const organization = await this.requireOrganization();
-    const holder = input.holderEmployeeId === null ? null : await this.organization.getEmployee(input.holderEmployeeId);
+    const holder =
+      input.holderEmployeeId === null ? null : await this.organizationReads.getEmployee(input.holderEmployeeId);
     if (input.holderEmployeeId !== null && holder === null) throw new CongestionHolderNotFoundError();
 
     const record = await this.runner.run(async (tx) => {
@@ -188,7 +189,7 @@ export class CongestionService {
     const wanted = [...new Set(ids.filter((id): id is string => id !== null))];
     if (wanted.length === 0) return new Map();
 
-    return new Map((await this.organization.getEmployees(wanted)).map((employee) => [employee.id, employee]));
+    return new Map((await this.organizationReads.getEmployees(wanted)).map((employee) => [employee.id, employee]));
   }
 
   /** The days nobody works from the day the oldest of these began to today. */
@@ -202,7 +203,7 @@ export class CongestionService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The congestion board was used before installation');
 
     return organization;

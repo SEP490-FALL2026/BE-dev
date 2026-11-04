@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { superiorOf, type QueueRecipientFacts, type StepRecipientFacts } from './step-sla.policy';
 
 /**
@@ -13,7 +13,7 @@ import { superiorOf, type QueueRecipientFacts, type StepRecipientFacts } from '.
 @Injectable()
 export class SlaRecipientFactsService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
   ) {}
 
@@ -38,7 +38,7 @@ export class SlaRecipientFactsService {
 
   /** The people to tell about a request that waits in the queue of the head of `departmentId`. */
   async forQueue(tx: DbTx, input: { departmentId: string; today: BusinessDate }): Promise<QueueRecipientFacts> {
-    const heads = await this.organization.getDepartmentHeads([input.departmentId], input.today, tx);
+    const heads = await this.organizationReads.getDepartmentHeads([input.departmentId], input.today, tx);
     const head = heads.get(input.departmentId)?.employeeId ?? null;
 
     return {
@@ -50,16 +50,16 @@ export class SlaRecipientFactsService {
 
   /** The person above the holder if they still work and are somebody else; null when there is none. */
   private async superiorOfHolder(tx: DbTx, holder: string, today: BusinessDate): Promise<string | null> {
-    const placement = await this.organization.getEmployeePlacement(holder, today, tx);
+    const placement = await this.organizationReads.getEmployeePlacement(holder, today, tx);
     const heads = placement
-      ? await this.organization.getDepartmentHeads([placement.departmentId], today, tx)
+      ? await this.organizationReads.getDepartmentHeads([placement.departmentId], today, tx)
       : new Map<string, { employeeId: string }>();
-    const roles = await this.identity.getApprovalRoleHolders(tx);
+    const spendingApprover = await this.identity.getSpendingApproverEmployeeId(tx);
     const superior = superiorOf({
       holderEmployeeId: holder,
-      isSpendingApprover: roles.spendingApproverEmployeeId === holder,
+      isSpendingApprover: spendingApprover === holder,
       departmentHeadEmployeeId: placement ? (heads.get(placement.departmentId)?.employeeId ?? null) : null,
-      spendingApproverEmployeeId: roles.spendingApproverEmployeeId,
+      spendingApproverEmployeeId: spendingApprover,
     });
 
     return superior !== null && (await this.working(tx, [superior])).has(superior) ? superior : null;
@@ -67,7 +67,7 @@ export class SlaRecipientFactsService {
 
   /** Which of these employees still work for the company. */
   private async working(tx: DbTx, employeeIds: readonly string[]): Promise<Set<string>> {
-    const found = await this.organization.getEmployees([...employeeIds], tx);
+    const found = await this.organizationReads.getEmployees([...employeeIds], tx);
 
     return new Set(found.filter((employee) => employee.status === 'ACTIVE').map((employee) => employee.id));
   }

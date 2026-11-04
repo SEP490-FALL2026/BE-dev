@@ -84,8 +84,12 @@ export class ReturnRequestsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is invalid (VALIDATION_ERROR): exactly one seat and a reason are required. The request named is not the one whose grant made the seat, or the caller has no part in it (RETURN_REQUEST.ORIGIN_MISMATCH). Nothing is written.',
-      examples: [VALIDATION_EXAMPLE, RETURN_ERROR_EXAMPLES.ORIGIN_MISMATCH],
+        'The form is invalid (VALIDATION_ERROR): exactly one seat and a reason are required. The request named is not the one whose grant made the seat, or the caller has no part in it (RETURN_REQUEST.ORIGIN_MISMATCH). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        RETURN_ERROR_EXAMPLES.ORIGIN_MISMATCH,
+        RETURN_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE,
+      ],
     },
   )
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: ReturnBodyDto) {

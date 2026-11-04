@@ -3,10 +3,10 @@ import { PrismaService } from '../../../src/infrastructure/database/prisma.servi
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { CostCenterCatalogueService } from '../../../src/modules/organization/cost-center/cost-center-catalogue.service';
 import { CostCenterRepo } from '../../../src/modules/organization/cost-center/cost-center.repo';
-import { DepartmentDirectoryService } from '../../../src/modules/organization/department/department-directory.service';
+import { DepartmentRecordService } from '../../../src/modules/organization/department/department-record.service';
 import { DepartmentHeadRepo } from '../../../src/modules/organization/department/department-head.repo';
 import { DepartmentRepo } from '../../../src/modules/organization/department/department.repo';
-import { EmployeeDirectoryService } from '../../../src/modules/organization/employee/employee-directory.service';
+import { EmployeeRecordService } from '../../../src/modules/organization/employee/employee-record.service';
 import { EmployeeDepartureRepo } from '../../../src/modules/organization/employee/employee-departure.repo';
 import { EmployeeRepo } from '../../../src/modules/organization/employee/employee.repo';
 import { ImportLookupRepo } from '../../../src/modules/organization/employee/import-lookup.repo';
@@ -22,6 +22,7 @@ import { DepartmentUseService } from '../../../src/modules/organization/departme
 import { AnnouncementRepo } from '../../../src/modules/organization/change-announcement/announcement.repo';
 import { OrganizationChangeService } from '../../../src/modules/organization/change-announcement/organization-change.service';
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import {
   CostCenterUseContributions,
   DepartmentUseContributions,
@@ -41,6 +42,7 @@ describe('organization foundation (integration)', () => {
   let prisma: PrismaService;
   let runner: TransactionRunner;
   let organization: OrganizationApi;
+  let organizationReads: OrganizationReadApi;
   let sql: Client;
   let organizationId: string;
   let unitCostCenterId: string;
@@ -52,20 +54,34 @@ describe('organization foundation (integration)', () => {
     const config = testConfig({ DATABASE_URL: database.url });
     prisma = new PrismaService(config);
     runner = new TransactionRunner(prisma, config);
-    const departments = new DepartmentDirectoryService(new DepartmentRepo(prisma), new DepartmentHeadRepo(prisma));
+    const departments = new DepartmentRecordService(new DepartmentRepo(prisma), new DepartmentHeadRepo(prisma));
     const organizationRepo = new OrganizationRepo(prisma);
+    const employees = new EmployeeRecordService(
+      new EmployeeRepo(prisma),
+      new ImportLookupRepo(prisma),
+      new EmployeeDepartureRepo(),
+      departments,
+    );
+    const costCenters = new CostCenterCatalogueService(new CostCenterRepo(prisma));
+    const changes = new OrganizationChangeService(
+      new OrganizationChangeListeners(),
+      new AnnouncementRepo(prisma),
+      runner,
+    );
     organization = new OrganizationApi(
       organizationRepo,
       departments,
-      new EmployeeDirectoryService(
-        new EmployeeRepo(prisma),
-        new ImportLookupRepo(prisma),
-        new EmployeeDepartureRepo(),
-        departments,
-      ),
-      new CostCenterCatalogueService(new CostCenterRepo(prisma)),
+      employees,
+      costCenters,
       new DepartmentUseService(new DepartmentUseContributions(), new CostCenterUseContributions()),
-      new OrganizationChangeService(new OrganizationChangeListeners(), new AnnouncementRepo(prisma), runner),
+      changes,
+    );
+    organizationReads = new OrganizationReadApi(
+      organizationRepo,
+      departments,
+      employees,
+      costCenters,
+      changes,
       new OrganizationContextService(organizationRepo),
     );
     sql = new Client({ connectionString: database.url });
@@ -188,8 +204,63 @@ describe('organization foundation (integration)', () => {
     const violations = await findPlacementCoverageViolations(sql);
     expect(violations).toEqual([{ employee_id: id, problem: 'gap or overlap between consecutive placements' }]);
 
-    await sql.query(`DELETE FROM employee_placements WHERE employee_id = $1`, [id]);
-    await sql.query(`DELETE FROM employees WHERE id = $1`, [id]);
+    // database is dropped at afterAll
+  });
+
+  // Task A.2 (INV-20): what the coverage query says of the employees of these cases; the gap above stays in the database.
+  const problemsOf = async (employeeId: string) =>
+    (await findPlacementCoverageViolations(sql))
+      .filter((row) => row.employee_id === employeeId)
+      .map((row) => row.problem);
+
+  it('coverage query accepts an employee who has no placement (unplaced, INV-20)', async () => {
+    const { rows } = await sql.query<{ id: string }>(
+      `INSERT INTO employees (id, organization_id, employee_code, full_name, employment_type, hire_date, status, work_state, updated_at)
+       VALUES (gen_random_uuid(), $1, 'E-COV1', 'Person E-COV1', 'STAFF', '2026-01-05', 'ACTIVE', 'WORKING', now())
+       RETURNING id`,
+      [organizationId],
+    );
+
+    await expect(problemsOf(rows[0].id)).resolves.toEqual([]);
+  });
+
+  it('coverage query detects an active employee with two open placements', async () => {
+    const { id } = await hire('E-COV2', 'e-cov2@acme.vn', '2026-01-05');
+    // The exclusion constraint refuses two open placements, so it is dropped inside a transaction that is rolled back.
+    await sql.query('BEGIN');
+    try {
+      await sql.query(`ALTER TABLE employee_placements DROP CONSTRAINT employee_placements_no_overlap`);
+      await sql.query(
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2026-02-01')`,
+        [organizationId, id, departmentId],
+      );
+
+      await expect(problemsOf(id)).resolves.toEqual([
+        'gap or overlap between consecutive placements',
+        'active employee with a placement must have exactly one open placement',
+      ]);
+    } finally {
+      await sql.query('ROLLBACK');
+    }
+
+    await expect(problemsOf(id)).resolves.toEqual([]);
+  });
+
+  it('coverage query detects a first placement before the hire date or between it and the day recorded, and accepts one not before both', async () => {
+    const { id } = await hire('E-COV3', 'e-cov3@acme.vn', '2026-06-10');
+    const problem = 'first placement does not start at hire date or at the day the employee was recorded';
+    await sql.query(`UPDATE employee_placements SET valid_from = '2026-06-09' WHERE employee_id = $1`, [id]);
+    await expect(problemsOf(id)).resolves.toEqual([problem]);
+    // After the hire date but before the day the employee was recorded (today): neither of the two days, and before both.
+    await sql.query(`UPDATE employee_placements SET valid_from = '2026-08-01' WHERE employee_id = $1`, [id]);
+    await expect(problemsOf(id)).resolves.toEqual([problem]);
+
+    // A first placement on the hire date, and one later than both days (a recorded employee placed in the future), are valid.
+    await sql.query(`UPDATE employee_placements SET valid_from = '2026-06-10' WHERE employee_id = $1`, [id]);
+    await expect(problemsOf(id)).resolves.toEqual([]);
+    await sql.query(`UPDATE employee_placements SET valid_from = '2999-01-01' WHERE employee_id = $1`, [id]);
+    await expect(problemsOf(id)).resolves.toEqual([]);
   });
 
   it('stores the title of a person as free text in its display form (T-12, QĐ-87e): no catalogue, and none at all is allowed', async () => {
@@ -226,9 +297,9 @@ describe('organization foundation (integration)', () => {
 
   it('locks an employee through the facade and reports a missing one', async () => {
     const { id } = await hire('E8', 'e8@acme.vn');
-    await expect(runner.run((tx) => organization.lockEmployeeForShare(tx, id))).resolves.toBeUndefined();
+    await expect(runner.run((tx) => organizationReads.lockEmployeeForShare(tx, id))).resolves.toBeUndefined();
     await expect(
-      runner.run((tx) => organization.lockEmployeeForShare(tx, '4f24d10d-63ad-49b1-a7a1-c988765990ae')),
+      runner.run((tx) => organizationReads.lockEmployeeForShare(tx, '4f24d10d-63ad-49b1-a7a1-c988765990ae')),
     ).rejects.toThrow(/not found/i);
   });
 
@@ -237,7 +308,8 @@ describe('organization foundation (integration)', () => {
   it('reports a missing employee with the public EmployeeNotFoundError, for both lock modes', async () => {
     const missing = '0b4d7a5c-2f1e-4c3b-9a8d-7e6f5a4b3c2d';
     const locks = [
-      (tx: Parameters<typeof organization.lockEmployeeForShare>[0]) => organization.lockEmployeeForShare(tx, missing),
+      (tx: Parameters<typeof organizationReads.lockEmployeeForShare>[0]) =>
+        organizationReads.lockEmployeeForShare(tx, missing),
       (tx: Parameters<typeof organization.lockEmployeeForUpdate>[0]) => organization.lockEmployeeForUpdate(tx, missing),
     ];
     for (const lock of locks) {
@@ -251,8 +323,8 @@ describe('organization foundation (integration)', () => {
     const first = await hire('E-MANY1', null);
     const second = await hire('E-MANY2', null);
 
-    await expect(organization.getEmployees([])).resolves.toEqual([]);
-    const found = await organization.getEmployees([second.id, '6e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b', first.id]);
+    await expect(organizationReads.getEmployees([])).resolves.toEqual([]);
+    const found = await organizationReads.getEmployees([second.id, '6e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b', first.id]);
     expect(found.map((employee) => employee.employeeCode).sort()).toEqual(['E-MANY1', 'E-MANY2']);
     expect(Object.keys(found[0]).sort()).toEqual([
       'employeeCode',
@@ -269,7 +341,7 @@ describe('organization foundation (integration)', () => {
   });
 
   it('creates the installation cost center as a UNIT for its department, and lists as without one only the active departments that have none in use', async () => {
-    const without = async () => (await organization.getOnboardingFacts()).departmentsWithoutCostCenter;
+    const without = async () => (await organizationReads.getOnboardingFacts()).departmentsWithoutCostCenter;
     const before = await without();
 
     const bare = await runner.run((tx) =>
@@ -331,14 +403,14 @@ describe('organization foundation (integration)', () => {
       await insertHeadPeriod(current.id, '2026-03-01', '2099-01-01');
       await insertHeadPeriod(later.id, '2099-01-01', null);
 
-      expect(await organization.isDepartmentHead(past.id)).toBe(false);
-      expect(await organization.isDepartmentHead(current.id)).toBe(true);
-      expect(await organization.isDepartmentHead(later.id)).toBe(true);
-      expect(await runner.run((tx) => organization.isDepartmentHead(never.id, tx))).toBe(false);
-      expect(await organization.getHeadedDepartment(past.id, '2026-02-15')).toEqual({ departmentId });
-      expect(await organization.getHeadedDepartment(past.id, '2026-03-01')).toBeNull();
-      expect(await organization.getHeadedDepartment(current.id)).toEqual({ departmentId });
-      expect(await organization.getHeadedDepartment(later.id)).toBeNull();
+      expect(await organizationReads.isDepartmentHead(past.id)).toBe(false);
+      expect(await organizationReads.isDepartmentHead(current.id)).toBe(true);
+      expect(await organizationReads.isDepartmentHead(later.id)).toBe(true);
+      expect(await runner.run((tx) => organizationReads.isDepartmentHead(never.id, tx))).toBe(false);
+      expect(await organizationReads.getHeadedDepartment(past.id, '2026-02-15')).toEqual({ departmentId });
+      expect(await organizationReads.getHeadedDepartment(past.id, '2026-03-01')).toBeNull();
+      expect(await organizationReads.getHeadedDepartment(current.id)).toEqual({ departmentId });
+      expect(await organizationReads.getHeadedDepartment(later.id)).toBeNull();
     });
 
     it('creates the installation department as given, and locks a department by code for an entry', async () => {
@@ -364,7 +436,8 @@ describe('organization foundation (integration)', () => {
           cost_center: 'CC-P-NOHEAD',
         },
       ]);
-      const lock = (code: string) => runner.run((tx) => organization.lockDepartmentForEntry(tx, organizationId, code));
+      const lock = (code: string) =>
+        runner.run((tx) => organizationReads.lockDepartmentForEntry(tx, organizationId, code));
       await expect(lock('P-NOHEAD')).resolves.toEqual({
         id: created.id,
         code: 'P-NOHEAD',
@@ -387,7 +460,7 @@ describe('organization foundation (integration)', () => {
         .id;
 
       await expect(
-        organization.departmentsWithoutHead([
+        organizationReads.departmentsWithoutHead([
           departmentId,
           withoutHead,
           retired,
@@ -395,7 +468,7 @@ describe('organization foundation (integration)', () => {
         ]),
       ).resolves.toEqual([{ id: withoutHead, code: 'P-NOHEAD', name: 'No head' }]);
 
-      const facts = await organization.getOnboardingFacts();
+      const facts = await organizationReads.getOnboardingFacts();
       const count = async (query: string) => (await sql.query<{ n: number }>(query)).rows[0].n;
       expect(facts.activeDepartments).toBe(
         await count(`SELECT count(*)::int AS n FROM departments WHERE status = 'ACTIVE'`),

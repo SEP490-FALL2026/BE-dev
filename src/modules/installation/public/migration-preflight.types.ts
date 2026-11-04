@@ -134,6 +134,22 @@ export interface RetiredKindFacts {
   pendingMoveIds: string[];
 }
 
+/**
+ * The people `QĐ-93k(4)` stops the conversion of `MANAGER` and `SPENDING_APPROVER` to granted roles for
+ * (`…_identity_direct_roles`). Read, only while that migration is not applied, in the schema the database has now: the spending
+ * approver is the open row of the table of the old configuration of the approval roles, never a value the new enum has. Codes of people and departments only.
+ */
+export interface DirectRoleFacts {
+  /** A head of a department today or later who has no account: no `MANAGER` can be granted to them. */
+  headsWithoutAccount: Array<{ employeeCode: string; department: string }>;
+  /** The spending approver heads a department today or later (`QĐ-93b`: never both). */
+  spendingApproverHeads: Array<{ employeeCode: string; department: string }>;
+  /** The spending approver also holds a role that cannot go with it. */
+  spendingApproverHoldsRoles: Array<{ employeeCode: string; role: 'SUPER_ADMIN' | 'IT_ADMIN' | 'FINANCE' }>;
+  /** The spending approver has no account to carry the grant. A locked, not activated or handing-over one does not stop it. */
+  spendingApproverWithoutAccount: Array<{ employeeCode: string }>;
+}
+
 /** A row that needs attention later but does not stop the deploy. Ids only: no name, no amount, no basis. */
 export type PreflightInformation = {
   code: 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE';
@@ -143,6 +159,14 @@ export type PreflightInformation = {
 
 export type PreflightBlocker =
   | { code: 'MIGRATION_FAILED'; migration: string }
+  | { code: 'DIRECT_ROLES_HEAD_WITHOUT_ACCOUNT'; employeeCode: string; department: string }
+  | { code: 'DIRECT_ROLES_SPENDING_APPROVER_IS_HEAD'; employeeCode: string; department: string }
+  | {
+      code: 'DIRECT_ROLES_SPENDING_APPROVER_HOLDS_ROLE';
+      employeeCode: string;
+      role: 'SUPER_ADMIN' | 'IT_ADMIN' | 'FINANCE';
+    }
+  | { code: 'DIRECT_ROLES_SPENDING_APPROVER_WITHOUT_ACCOUNT'; employeeCode: string }
   | { code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED'; subscriptionId: string }
   | { code: 'SUBSCRIPTION_OWNER_UNASSIGNED'; subscriptionId: string }
   | { code: 'SUBSCRIPTION_OWNER_SCHEMA_PARTIAL' }

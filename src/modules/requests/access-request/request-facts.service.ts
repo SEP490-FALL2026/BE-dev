@@ -6,7 +6,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
   AccessRequestApplicationRetiredError,
   AccessRequestNoDepartmentError,
@@ -33,11 +33,12 @@ export interface RequestSettings {
 /**
  * The department of the day and its Unit: the Cost Center is there when the department has one in use and null when it has none
  * yet (`QĐ-87d(1)`). A request that costs money, or that ends in a service seat, is judged only with one
- * (`OrganizationApi.requireUnitCostCenter`); a free internal request is judged without it (`QĐ-87g(2)`).
+ * (`OrganizationReadApi.requireUnitCostCenter`); a free internal request is judged without it (`QĐ-87g(2)`).
  */
-type OwningUnit = Awaited<ReturnType<OrganizationApi['getOwningUnits']>> extends Map<string, infer Unit> ? Unit : never;
+type OwningUnit =
+  Awaited<ReturnType<OrganizationReadApi['getOwningUnits']>> extends Map<string, infer Unit> ? Unit : never;
 /** The same with the Cost Center in use: what a cost is charged to. */
-type CostedUnit = ReturnType<OrganizationApi['requireUnitCostCenter']>;
+type CostedUnit = ReturnType<OrganizationReadApi['requireUnitCostCenter']>;
 type SeatTarget = NonNullable<Awaited<ReturnType<CatalogApi['findPlanSeatTargets']>>[number]>;
 
 /** Everything a request is decided by, read for one person asking for one plan on one day. */
@@ -90,7 +91,7 @@ export interface AssessmentInput {
 @Injectable()
 export class RequestFactsService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly routing: RoutingFactsService,
     private readonly parameters: OperatingParametersApi,
@@ -112,8 +113,8 @@ export class RequestFactsService {
    * AccessRequestSpendDateNotAllowedError.
    */
   async assess(tx: DbTx, input: AssessmentInput): Promise<Assessment> {
-    const today = await this.organization.businessToday(input.now, tx);
-    const found = (await this.organization.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
+    const today = await this.organizationReads.businessToday(input.now, tx);
+    const found = (await this.organizationReads.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
     if (!found) throw new AccessRequestNoDepartmentError();
 
     const [target] = await this.catalog.findPlanSeatTargets([input.planId], tx);
@@ -125,8 +126,8 @@ export class RequestFactsService {
     const unit =
       policy.branch === 'INTERNAL_FREE' && !input.chargedToUnit
         ? found
-        : this.organization.requireUnitCostCenter(found);
-    if (input.lockDepartment) await this.organization.lockDepartmentShared(tx, unit.departmentId);
+        : this.organizationReads.requireUnitCostCenter(found);
+    if (input.lockDepartment) await this.organizationReads.lockDepartmentShared(tx, unit.departmentId);
 
     const pricing = await this.priceFor(tx, {
       planId: input.planId,
@@ -165,11 +166,11 @@ export class RequestFactsService {
     tx: DbTx,
     input: Pick<AssessmentInput, 'employeeId' | 'expectedSpendOn' | 'now' | 'settings' | 'lockDepartment'>,
   ): Promise<ProposalAssessment> {
-    const today = await this.organization.businessToday(input.now, tx);
-    const found = (await this.organization.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
+    const today = await this.organizationReads.businessToday(input.now, tx);
+    const found = (await this.organizationReads.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
     if (!found) throw new AccessRequestNoDepartmentError();
-    const unit = this.organization.requireUnitCostCenter(found);
-    if (input.lockDepartment) await this.organization.lockDepartmentShared(tx, unit.departmentId);
+    const unit = this.organizationReads.requireUnitCostCenter(found);
+    if (input.lockDepartment) await this.organizationReads.lockDepartmentShared(tx, unit.departmentId);
 
     const policy = proposalPolicy(input.settings.slaWorkingDays);
     const expectedSpendOn = input.expectedSpendOn ?? today;

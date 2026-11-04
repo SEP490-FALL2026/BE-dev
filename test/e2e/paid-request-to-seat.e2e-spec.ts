@@ -25,7 +25,7 @@ describe('a paid request from the employee to the seat (e2e, D-1)', () => {
 
   beforeAll(async () => {
     await h.start();
-    // The spending approver (and the substitute for when they are a party), named by the Super Admin.
+    // The spending approver, named by the Super Admin: nobody takes their place (QĐ-93c).
     await h.withApprover();
     // A plan of the catalog at 1 000 000 VND per seat per month; the department of the request owns a subscription of it.
     subscriptionId = await h.subscription(10);

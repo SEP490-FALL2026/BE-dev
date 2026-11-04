@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SeatOccupancyHook } from '../public/catalog.extension-points';
 import { assertQuantityNotBelowOccupied } from './seat-guard.policy';
 
@@ -8,12 +8,12 @@ import { assertQuantityNotBelowOccupied } from './seat-guard.policy';
 @Injectable()
 export class SubscriptionChangeGuard {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly occupancy: SeatOccupancyHook,
   ) {}
 
   async requireOrganizationId(): Promise<string> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('Subscriptions were used before installation');
 
     return organization.id;
@@ -30,7 +30,7 @@ export class SubscriptionChangeGuard {
     requested: number | undefined,
   ): Promise<void> {
     if (requested === undefined || current === null || requested >= current) return;
-    const today = await this.organization.businessToday(new Date(), tx);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
     const occupied = await this.occupancy.get().occupiedBySubscription(subscriptionId, today, tx);
     assertQuantityNotBelowOccupied({ requested, occupied });
   }

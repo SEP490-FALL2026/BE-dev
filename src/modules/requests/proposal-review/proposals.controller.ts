@@ -24,7 +24,7 @@ import {
 } from '../assessment/assessment.dto';
 import { ASSESSMENT_ERROR_EXAMPLES as EXAMPLES, toAssessmentApiException } from '../assessment/assessment.http-errors';
 import { AssessmentCompletionService } from '../assessment/assessment-completion.service';
-import { AssessmentReader } from '../assessment/assessment-reader.service';
+import { AssessmentQueryService } from '../assessment/assessment-query.service';
 import { AssessmentRejectionService } from '../assessment/assessment-rejection.service';
 import { AssessmentService } from '../assessment/assessment.service';
 import { CatalogLinkService } from '../assessment/catalog-link.service';
@@ -68,7 +68,7 @@ export class ProposalsController {
   constructor(
     private readonly proposals: ProposalService,
     private readonly assessments: AssessmentService,
-    private readonly assessmentReads: AssessmentReader,
+    private readonly assessmentReads: AssessmentQueryService,
     private readonly completions: AssessmentCompletionService,
     private readonly rejections: AssessmentRejectionService,
     private readonly links: CatalogLinkService,
@@ -101,8 +101,8 @@ export class ProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required. Nothing is written.',
-      examples: [VALIDATION_EXAMPLE],
+        'The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.REQUEST_PARTY_INELIGIBLE],
     },
   )
   async propose(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: ProposalBodyDto) {

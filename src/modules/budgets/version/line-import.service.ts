@@ -5,10 +5,10 @@ import { TransactionRunner, type DbTx } from '../../../infrastructure/database/t
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { FinanceApi } from '../../finance/public/finance.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { BudgetImportFileInvalidError } from '../budget/budget.errors';
 import { LINE_DESCRIPTION_MAX, REASON_MAX, type RepeatCycle } from '../budget/budget.policy';
-import { budgetAuditEvent, BudgetSupportService } from '../budget/budget-support.service';
+import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionAccessService } from './version-access.service';
 import { VersionHistoryService } from './version-history.service';
 import { VersionLineRepo, type VersionLineRecord } from '../budget/version-line.repo';
@@ -42,8 +42,8 @@ export class LineImportService {
     private readonly access: VersionAccessService,
     private readonly history: VersionHistoryService,
     private readonly lineRepo: VersionLineRepo,
-    private readonly support: BudgetSupportService,
-    private readonly organization: OrganizationApi,
+    private readonly facts: BudgetFactsService,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly finance: FinanceApi,
     private readonly audit: AuditApi,
   ) {}
@@ -53,16 +53,18 @@ export class LineImportService {
    * BudgetVersionNotEditableError.
    */
   async load(actor: AuthenticatedPrincipal, id: string, text: string): Promise<ImportWire> {
-    this.support.requireFinance(actor);
+    this.facts.requireFinance(actor);
     const table = this.read(text);
-    const fiscalStart = await this.support.fiscalYearStartMonth();
+    const fiscalStart = await this.facts.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
       const version = await this.access.lockEditable(tx, id, fiscalStart);
 
-      const own = await this.support.costCenter(version.costCenterId, tx);
+      const own = await this.facts.costCenter(version.costCenterId, tx);
       const codes = [...new Set(table.rows.map((row) => row.cost_center_code).filter((code) => code !== ''))];
-      const known = new Set((await this.organization.getCostCentersByCodes(codes, tx)).map((center) => center.code));
+      const known = new Set(
+        (await this.organizationReads.getCostCentersByCodes(codes, tx)).map((center) => center.code),
+      );
 
       const lines: Omit<VersionLineRecord, 'position'>[] = [];
       const errors: { row: number; code: string }[] = [];

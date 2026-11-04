@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import request from 'supertest';
-import { HR_BASIS } from '../../support/hr-basis';
 import { waitForLockWaiters } from '../../support/lock-wait';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 
@@ -29,7 +28,7 @@ describe('kind of staff and the expected end of open seats (integration, P28-04,
     request(h.server())
       .patch(`/api/v1/employees/${id}`)
       .set({ Authorization: `Bearer ${h.admin}` })
-      .send({ employmentType, hrBasis: HR_BASIS });
+      .send({ employmentType });
   const reasonsOf = (response: request.Response) =>
     (response.body as { error: { details: { reasons: { field: string; code: string }[] } } }).error.details.reasons;
   const kindOf = async (id: string) =>

@@ -46,7 +46,7 @@ Cần gọi ngược chiều (module dưới cần biết điều module trên g
 ```text
 src/modules/<m>/
   README.md                 # module card: mục đích, tầng, public API, bảng sở hữu, extension point
-  <m>.module.ts             # wiring Nest (và <m>-http.module.ts … nếu cần tách graph API/worker/CLI)
+  <m>.module.ts             # wiring Nest; tên file nói graph (mục Tên Nest module nói graph): <m>-http, <m>-<x>-facade, <cap>-cli …
   <m>-<…>.<vai trò>.ts      # chỉ khi nhiều capability dùng chung: <m>-audit-event.mapper.ts, <m>.http-errors.ts …
   public/                   # cửa DUY NHẤT cho module khác và composition root
     <m>.api.ts              # facade: class <M>Api (một module có thể mở nhiều facade: <x>.api.ts → <X>Api)
@@ -77,7 +77,7 @@ src/modules/<m>/
 - **Cửa công khai (R4).** `*.api.ts` và `*.extension-points.ts` chỉ nằm trong `public/`; mỗi `public/<x>.api.ts` export đúng một
   lớp `<X>Api` (tên file viết PascalCase + `Api`), một module được mở nhiều facade.
 - **Capability không vòng (R6, `OD-R3`).** Capability trong một module được import nhau nhưng không theo vòng: `a → b → a` là lỗi, ở
-  **mọi** module. `pnpm arch:capabilities [--module <m>]` in cạnh và vòng của từng module kèm cạnh file; gate `capability-graph` đỏ
+  **mọi** module. `pnpm arch:capabilities [--module <m>]` in cạnh và vòng của từng module kèm cạnh file, và với `--module` thêm tầng L0–L3 của từng capability (L3 có controller; còn lại L0 không import capability nào, L1 chỉ import L0, L2 import L1 hoặc L2); gate `capability-graph` đỏ
   và nêu chu trình cùng cạnh file cần gỡ. File ở gốc module và trong `public/` không phải capability nhưng không chặn đồ thị: capability
   import facade của module (`public/<m>.api.ts`) hoặc một file gốc thì được tính cạnh tới mọi capability file đó chạm, in
   `(via <file>)`. Vì vậy capability **không import facade của chính module mình** (facade là cửa cho module khác; capability tiêm
@@ -113,8 +113,72 @@ Nest module cho nhóm, không barrel. Mẫu: `data-import/employee-import/`
 | `.extension-points.ts`           | Hook/Listeners/Contributions module này mở, chỉ trong `public/`           | không                  |
 | `.listener.ts`                   | Hiện thực extension point của module khác (bind/add trong `onModuleInit`) | Nest                   |
 | `.job.ts`                        | Việc định kỳ (sweeper, vòng của worker)                                   | Nest                   |
+| `.json.ts`                       | Codec của một cột JSON: zod schema, `decode` (đọc), `encode` (ghi)        | kiểu Prisma            |
 
 Spec unit nằm cạnh file: `x.policy.ts` → `x.policy.spec.ts`. Tên file kebab-case, bắt đầu bằng danh từ của capability.
+
+**`.json.ts` — cột JSON.** Mỗi cột `Json`/`Json?` của `prisma/models` có đúng một codec, đặt trong capability của repo sở hữu bảng. Repo
+và mapper đọc qua `decode` và ghi qua `encode`, không bao giờ ép kiểu (`as unknown as`: gate `module-layout` đỏ ở mọi file non-spec của
+`src/modules`). Các cột cùng một hình dạng (`before`/`after`, hai bảng giữ cùng một dữ kiện) chung một schema và một file. Một cột có hai
+hình dạng theo trạng thái của dòng thì có hai codec: `access_requests.policy` là `RequestPolicy` khi request đã gửi
+(`access-request/access-request.json.ts`) và `{ draft: … }` khi còn là bản nháp (`request-draft/request-draft-policy.json.ts`).
+
+Chỗ đặt có hai ngoại lệ vì trần 25 file mỗi thư mục (spec tính vào trần), và một chỗ ở gốc module:
+
+- `requests/access-request/access-request.json.ts` giữ hai cột khác hình dạng của `access_requests` trong một file, và spec của chúng nằm trong
+  `access-request.policy.spec.ts` (policy) và `pricing.policy.spec.ts` (payment_schedule) vì thư mục đã đủ 25 file.
+- `personnel/personnel-change-detail.json.ts` ở gốc module vì `personnel/offboarding/` đã 24 file; spec cạnh file.
+- `personnel/personnel-head-handover.json.ts` ở gốc module vì không có capability thấp hơn mà cả ba bên đọc (`transfer`, `offboarding`,
+  `role-duties`) đã cùng import: `offboarding` đã import `transfer`, còn `role-duties` thì chưa, và thêm cạnh đó chỉ để lấy một codec là
+  cạnh mới. Hai capability khác cùng cần một hình dạng thì đặt codec ở capability thấp nhất cả hai đã import (R5).
+
+Quy tắc đầy đủ ở [database rules](database-business.md#cột-json-một-codec-đọc-qua-decode); module card của `requests` và `personnel` ghi spec
+của codec nằm ở đâu.
+
+## Tên service đọc
+
+Một service **chỉ đọc** mang một trong ba tên, nên "đọc X nằm ở file nào" đoán được từ tên. Gate `module-layout` đỏ khi một `*.service.ts`
+của module kết thúc bằng `-directory`, `-lookup`, `-reader`, `-read` hoặc `-support`, số ít hay số nhiều (năm hậu tố cũ không nói trả gì cho ai).
+
+| Hậu tố              | Trả về                                                                                              | Chạy ở đâu                          | Ví dụ                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------- |
+| `<x>-query.service` | bản ghi hoặc trang cho HTTP đọc (list, detail), ngoài transaction ghi                               | controller gọi                      | `requests/assessment/assessment-query.service.ts`, `catalog/vendor/vendor-query.service.ts`   |
+| `<x>-facts.service` | dữ kiện một quyết định, một capability hoặc module khác cần; `tx` tùy chọn; không trả thẳng ra wire | service ghi, policy hoặc facade gọi | `catalog/plan/plan-facts.service.ts`, `catalog/catalog-entry/application-facts.service.ts`    |
+| `<x>-view.service`  | ghép nhiều nguồn thành một hình chiếu trước khi `mapper` ra wire                                    | controller hoặc query gọi           | `licensing/provisioning/revocation-view.service.ts`, `budgets/budget/version-view.service.ts` |
+
+- Một service vừa đọc vừa **ghi** một bảng cho các capability khác không phải service đọc: đặt `<x>-record.service.ts`
+  (`identity-access/accounts/account-record.service.ts`, `organization/employee/employee-record.service.ts`). Đừng đặt `-query`, `-facts` hay
+  `-view` cho nó, vì ba tên đó hứa không ghi. Hậu tố `-record` là bản ghi nhận 31/10/2026 ngoài ba tên của `OD-F4` = A (lý do: `<x>.service.ts`
+  trơn nghĩa là một use case và đã bị `DepartmentService`, `SessionService` chiếm); **Owner xác nhận 31/10/2026**.
+- Tên đúng là tên theo việc nó làm, không theo chữ: một service gọi là `-facts` mà có `create` là service ghi.
+
+## Tên Nest module nói graph
+
+Tên một `*.module.ts` nói nó thuộc graph nào, nên "khai provider ở module nào" trả lời được từ tên file, không cần module card. Gate
+`module-layout` đỏ khi một `*.module.ts` của `src/modules/` không khớp **đúng một** dòng, hoặc một module gốc lệnh của `src/cli/` không
+tên `<lệnh>-cli.module.ts`.
+
+| Tên file                              | Graph                                                                                 | Nơi đặt                  |
+| ------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------ |
+| `<m>.module.ts`                       | mọi graph cần module: facade, provider, listener, extension point                     | gốc module               |
+| `<m>-http.module.ts`                  | chỉ API: controller, sweeper                                                          | gốc module               |
+| `<m>-<x>-facade.module.ts`            | tập con dùng chung với worker hoặc lệnh; `<x>` có thể bỏ trống                        | gốc module               |
+| `<cap>-cli.module.ts`                 | phần của **một** module mà chỉ một lệnh dùng (không controller, không export cho API) | `src/modules/<m>/<cap>/` |
+| `<m>-<x>-cli.module.ts`               | như dòng trên, khi phần đó không thuộc capability nào                                 | gốc module               |
+| `src/cli/<lệnh>/<lệnh>-cli.module.ts` | gốc graph của đúng một lệnh, ghép các module                                          | `src/cli/<lệnh>/`        |
+
+- Phần `<x>` của `-facade` bỏ trống thì đó là phần mọi graph cần của module: `identity-access-facade.module.ts`; có `<x>` thì là tập con
+  cho một nơi dùng: `requests-work-facade.module.ts` (worker), `identity-access-inspection-facade.module.ts` (`ops:inspect`),
+  `identity-access-local-seed-facade.module.ts` (`dev:seed`, `ops:demo-dataset`).
+- `<cap>-cli.module.ts` chỉ cần kết thúc bằng `-cli`, không buộc trùng tên thư mục (`installation/inspect/inspection-cli.module.ts`).
+- `installation/installation.module.ts` giữ tên: nó là **module** `installation` (tầng T6), không phải phần của một lệnh; bootstrap là
+  lệnh duy nhất dùng nó.
+- Lớp theo tên file (`inspection-cli.module.ts` → `InspectionCliModule`). Lớp gốc của lệnh (`src/cli/<lệnh>/`) đặt tên theo lệnh; riêng
+  `cost-center-direction` có cùng tên cho phần và gốc nên gốc là `CostCenterDirectionRootCliModule`.
+- Gốc graph của một lệnh thường là `src/cli/<lệnh>/<lệnh>-cli.module.ts`, nhưng `ops:inspect`, `ops:preflight`, `dev:seed` và `ops:demo-dataset`
+  dùng chính `<cap>-cli.module.ts` của module làm gốc (lệnh không ghép thêm gì), và `PROCESS_GRAPHS` ghi các lớp đó làm graph.
+- Lệnh mới có Nest graph: thêm vào `PROCESS_GRAPHS` ([process-graphs](../../test/support/process-graphs.ts)); đổi tên graph thì đổi cả
+  `GRAPH_WIRING_EXCEPTIONS` của gate `extension-wiring`.
 
 ## Liên module
 
@@ -236,12 +300,12 @@ không phải gate. Test trong `test/` được giữ mã tham chiếu ở dòng
 
 ## Gate
 
-| Lệnh                   | Kiểm                                                                                                                                                                                                                                                                                                                                   |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm arch:check`      | Tầng module, cửa `public/`, composition root, nhóm chỉ qua điểm vào, không vòng import, controller không import controller                                                                                                                                                                                                             |
-| `pnpm test:gates`      | Layout và từ vựng file (R3 → R5), capability không vòng (R6), `src/core` chỉ primitive dùng chung (R7), export Nest chỉ được module cùng thư mục dùng (R10), chỗ đặt lỗi/SQL/HTTP, sở hữu bảng Prisma, lệnh vận hành, dependency chạy thật của `src` nằm trong `dependencies`, cỡ spec database/server ≤ 800 dòng, trần nợ lint (TG-2) |
-| `pnpm arch:docs:check` | `docs/generated/module-graph.md` và `docs/generated/routes.md` khớp code (`pnpm arch:graph`, `pnpm arch:routes`)                                                                                                                                                                                                                       |
-| `pnpm lint`            | Kích thước và độ phức tạp (mục trên)                                                                                                                                                                                                                                                                                                   |
+| Lệnh                   | Kiểm                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm arch:check`      | Tầng module, cửa `public/`, composition root, nhóm chỉ qua điểm vào, không vòng import, controller không import controller                                                                                                                                                                                                                                                                                                                                            |
+| `pnpm test:gates`      | Layout và từ vựng file (R3 → R5), capability không vòng (R6), `src/core` chỉ primitive dùng chung (R7), export Nest chỉ được module cùng thư mục dùng (R10), log lỗi của job qua `describeForOperator`, không `as unknown as` trong module, tên Nest module nói graph, từ vựng service đọc, chỗ đặt lỗi/SQL/HTTP, sở hữu bảng Prisma, lệnh vận hành, dependency chạy thật của `src` nằm trong `dependencies`, cỡ spec database/server ≤ 800 dòng, trần nợ lint (TG-2) |
+| `pnpm arch:docs:check` | `docs/generated/module-graph.md` và `docs/generated/routes.md` khớp code (`pnpm arch:graph`, `pnpm arch:routes`)                                                                                                                                                                                                                                                                                                                                                      |
+| `pnpm lint`            | Kích thước và độ phức tạp (mục trên)                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## Thêm một use case
 

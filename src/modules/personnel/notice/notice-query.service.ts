@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
 import { NoticeRefusedError } from './notice.errors';
@@ -26,7 +26,7 @@ export interface NoticePage {
 export class NoticeQueryService {
   constructor(
     private readonly notices: NoticeRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
   ) {}
 
@@ -42,7 +42,7 @@ export class NoticeQueryService {
       pageSize: number;
     },
   ): Promise<NoticePage> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const scope = await this.scopeOf(actor);
     const { items, total } = await this.notices.list({
       ...filter,
@@ -77,10 +77,10 @@ export class NoticeQueryService {
   }
 
   async detailOf(actor: AuthenticatedPrincipal, record: NoticeRecord): Promise<NoticeDetailWire> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const [employees, target, verification] = await Promise.all([
       this.employeesOf([record.employeeId, record.senderEmployeeId]),
-      record.targetDepartmentId ? this.organization.getDepartmentBrief(record.targetDepartmentId) : null,
+      record.targetDepartmentId ? this.organizationReads.getDepartmentBrief(record.targetDepartmentId) : null,
       readAccessOf(actor) === 'FULL' ? this.notices.findVerification(record.id) : null,
     ]);
 
@@ -97,10 +97,10 @@ export class NoticeQueryService {
     const access = readAccessOf(actor);
     if (access === 'FULL') return { access };
     if (access === 'MINIMAL') {
-      const departments = await this.organization.getItAdminScope(actor.employeeId, (ids) =>
+      const departments = await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
         this.identity.findUsableItAdminEmployeeIds(ids),
       );
-      const members = await Promise.all(departments.map((id) => this.organization.getDepartmentMemberIds(id)));
+      const members = await Promise.all(departments.map((id) => this.organizationReads.getDepartmentMemberIds(id)));
 
       return { access, employeeIds: members.flatMap((ids) => ids ?? []) };
     }
@@ -110,7 +110,7 @@ export class NoticeQueryService {
   }
 
   private async employeesOf(ids: string[]) {
-    const employees = await this.organization.getEmployees([...new Set(ids)]);
+    const employees = await this.organizationReads.getEmployees([...new Set(ids)]);
 
     return new Map(employees.map((employee) => [employee.id, employee]));
   }

@@ -90,8 +90,9 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
     ctx = await createHttpTestApp();
     await seedInstallation(ctx.app);
     baseUrl = `http://127.0.0.1:${((ctx.app.getHttpServer() as unknown as Server).address() as AddressInfo).port}`;
-    const { DemoDatasetModule } = await import('../../../src/modules/installation/demo-dataset/demo-dataset.module');
-    demo = await NestFactory.createApplicationContext(DemoDatasetModule, { logger: false });
+    const { DemoDatasetCliModule } =
+      await import('../../../src/modules/installation/demo-dataset/demo-dataset-cli.module');
+    demo = await NestFactory.createApplicationContext(DemoDatasetCliModule, { logger: false });
   }, 300000);
 
   afterAll(async () => {
@@ -164,6 +165,29 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
       R8: 'AWAITING_IT_ASSESSMENT',
       R9: 'AWAITING_FINANCE_REVIEW',
     });
+    // Three departments hold an approved budget of the year (QĐ-93 demo: ENG, MKT, SAL); Design has none, for R9.
+    const approved = await ctx.sql.query<{ code: string }>(
+      `SELECT c.code FROM budget_versions v JOIN cost_centers c ON c.id = v.cost_center_id
+        WHERE v.state = 'APPROVED' AND c.code LIKE 'DS1-%' ORDER BY c.code`,
+    );
+    expect(approved.rows.map((row) => row.code)).toEqual(['DS1-CC-ENG', 'DS1-CC-MKT', 'DS1-CC-SAL']);
+    // Heads hold MANAGER as a direct grant and the spending approver holds SPENDING_APPROVER, nothing derived (QĐ-93a).
+    const grants = await ctx.sql.query<{ code: string; role: string }>(
+      `SELECT e.employee_code AS code, g.role::text AS role FROM role_grants g
+         JOIN app_users u ON u.id = g.app_user_id JOIN employees e ON e.id = u.employee_id
+        WHERE g.revoked_at IS NULL AND g.role IN ('MANAGER', 'SPENDING_APPROVER') AND e.employee_code LIKE 'DS1-%'
+        ORDER BY e.employee_code, g.role`,
+    );
+    expect(grants.rows).toEqual([
+      { code: 'DS1-CEO', role: 'SPENDING_APPROVER' },
+      { code: 'DS1-DEP', role: 'MANAGER' },
+      { code: 'DS1-DESH', role: 'MANAGER' },
+      { code: 'DS1-ENGH', role: 'MANAGER' },
+      { code: 'DS1-FINH', role: 'MANAGER' },
+      { code: 'DS1-ITA1', role: 'MANAGER' },
+      { code: 'DS1-MKTH', role: 'MANAGER' },
+      { code: 'DS1-SALH', role: 'MANAGER' },
+    ]);
   }, 600000);
 
   it('writes nothing on a rerun (nothing to change), and keeps its accounts hashed and attributed to the operator', async () => {
@@ -224,10 +248,7 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
     await request(ctx.app.getHttpServer())
       .patch(`/api/v1/departments/${rows[0].id}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({
-        name: 'Vận hành (đổi tay)',
-        hrBasis: { type: 'Quyết định', reference: 'QD-TEST', issuer: 'Ban Giám đốc', issuedOn: '2026-01-02' },
-      })
+      .send({ name: 'Vận hành (đổi tay)' })
       .expect(200);
 
     const report = reportOf(await run('apply'));

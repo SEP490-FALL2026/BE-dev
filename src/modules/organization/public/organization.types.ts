@@ -40,12 +40,12 @@ export interface CreateEmployeeWithPlacementInput {
    * recorded, so no placement is ever made up for days before the person was in the system.
    */
   memberSince?: BusinessDate;
-  departmentId: string;
+  departmentId: string | null;
   /** Free text (`QĐ-87e`); the catalogue entry is the database's business, not this call's. */
   jobTitle: string | null;
 }
 
-/** The official fields of an employee record the Super Admin may correct on an HR basis (`US-02-02` AC-19, `QĐ-87a`). */
+/** The official fields of an employee record the Super Admin may correct (`US-02-02` AC-19, `QĐ-87a`, no HR basis since `QĐ-93f`). */
 export interface OfficialFieldsPatch {
   fullName?: string;
   workEmail?: string | null;
@@ -84,6 +84,7 @@ export interface EmployeeTechnicalView {
 }
 
 export interface EmployeeProfile {
+  unplaced: boolean;
   id: string;
   employeeCode: string;
   fullName: string;
@@ -131,6 +132,7 @@ export interface ItAdminInCharge {
 }
 
 export interface EmployeeCandidate {
+  unplaced: boolean;
   id: string;
   employeeCode: string;
   fullName: string;
@@ -240,6 +242,18 @@ export interface LocalSeedFixtureFacts {
     costCenterId: string | null;
     costCenterCode: string | null;
   } | null;
+}
+
+/**
+ * A period in which an employee heads a department that has not ended on the day asked about (`headPeriodsFrom`): `CURRENT` when it
+ * has begun by then, `UPCOMING` when it begins later (a head from a later day, or a successor named for it).
+ */
+export interface EmployeeHeadPeriod {
+  departmentId: string;
+  departmentCode: string;
+  validFrom: BusinessDate;
+  validTo: BusinessDate | null;
+  timing: 'CURRENT' | 'UPCOMING';
 }
 
 /** What another module needs to know of a department to point at it: its code, name and whether it and its Cost Center are active. */

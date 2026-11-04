@@ -58,7 +58,7 @@ describe('the queue of the need steps of the person who holds them (e2e, no data
     await app?.close();
   });
 
-  const as = (...roles: string[]) => bearer(principal(roles, [], { employeeId: 'caller-employee' }));
+  const as = (...roles: string[]) => bearer(principal(roles, { employeeId: 'caller-employee' }));
 
   describe('who may call it', () => {
     it('needs a token', async () => {

@@ -2,16 +2,19 @@
 
 ## Trạng thái
 
-**Proposed, chấp nhận một phần** — Owner chốt `OD-A1` → `OD-A8` của
+**Accepted — Owner chấp nhận ngày 31/10/2026**, qua xác nhận trực tiếp "ADR-0019 thì tui accept nha" sau khi được bàn giao
+tóm tắt và kết quả Prompt 09. Bao gồm quy tắc nhóm chức năng (mục 3) và chi tiết extension point (mục 5).
+Acceptance thiết kế này không thay thế walkthrough O7 hoặc kiểm thử nghiệp vụ; O7 vẫn chưa có kết quả người thật.
+
+Lịch sử: Owner chốt `OD-A1` → `OD-A8` của
 [be-architecture-boundaries-restructure](../workspace/items/be-architecture-boundaries-restructure/spec.md) theo đề xuất
 ngày 28/10/2026; triển khai 29/10/2026 và bổ sung R1–R10 trong
 [be-architecture-readability-hardening](../workspace/items/be-architecture-readability-hardening/spec.md) (30–31/10/2026).
 Ngày 29/10/2026 Owner chấp nhận ba sai khác của lượt triển khai
 ([nghiệm thu](../reviews/be-architecture-test-acceptance-2026-10-29/README.md)): capability trong cùng module được import
 nhau (S5, O1), `Dockerfile` chép `scripts/build` ở stage build để sinh alias lệnh (S12, O2) và ba văn bản OpenAPI rút gọn
-(S13, O3). Trạng thái **giữ Proposed** (`OD-R7`): ADR chưa được ghi là Accepted, và chưa có sự kiện Owner review cho hai phần
-còn lại — quy tắc nhóm chức năng và điểm vào nhóm (mục 3) và chi tiết extension point (mục 5). Hai phần đó ghi
-**Owner review: pending** ở mục tương ứng; khi Owner review, ghi ngày và người vào đó. Thay một phần
+(S13, O3). ADR giữ Proposed (`OD-R7`) tới trước xác nhận ngày 31/10/2026 ở trên; hai phần còn lại từng chờ Owner
+review nay đã được chấp nhận. Thay một phần
 [ADR-0003](0003-flat-feature-module-layout.md) (layout phẳng, độ sâu ≤ 2, allowlist file gốc).
 [ADR-0001](0001-modular-monolith.md) giữ nguyên: vẫn một modular monolith.
 
@@ -36,12 +39,12 @@ code thành thư mục phẳng và file cắt theo chữ cái. Người đọc k
    `<…>-<nhóm>.service|policy|types.ts` từ bất kỳ file nào của capability; phần còn lại của nhóm riêng tư; ngoài capability
    chỉ Nest module và `public/` thấy nhóm. Bản đầu (chỉ Nest module và `public/` được import thư mục use case) chặn
    controller của capability điều phối sang các nhóm, nên được thay ngày 29/10/2026; gate: `group-is-private`,
-   `group-entry-from-capability`, `group-entry-from-sibling`. **Owner review: pending.**
+   `group-entry-from-capability`, `group-entry-from-sibling`. **Owner: Accepted, 31/10/2026.**
 4. **Từ vựng 14 hậu tố** thay 54 loại; vai trò đọc được từ tên file.
 5. **Ba kiểu extension point** ở `src/core/extension/`: `Hook` (một hiện thực, ném lỗi có tên khi chưa bind), `Listeners`
    (0..n, trong transaction của bên phát), `Contributions` (0..n trả giá trị). Mỗi điểm là một provider Nest — một instance
    mỗi app — thay lớp chuyển tiếp tự viết. Một graph tiến trình thiếu bên đăng ký mà nó cần bị gate `extension-wiring`
-   chặn (R1), không còn cơ chế giá trị thay thế khai tại chỗ. **Owner review: pending.**
+   chặn (R1), không còn cơ chế giá trị thay thế khai tại chỗ. **Owner: Accepted, 31/10/2026.**
 6. **Gate bằng công cụ chuẩn:** dependency-cruiser (`OD-A3`) cho import, ESLint cho kích thước/độ phức tạp, vài gate
    tĩnh ngắn ở `test/gates/` (`OD-A8`); bỏ ledger cấu trúc (xem mục "Luật đã triển khai"). Gốc `src/` chỉ còn ba điểm vào
    và `app/`, `worker/`, `cli/`; lệnh CLI có một điểm vào `dist/cli.js` và alias `dist/<tên>-cli.js` sinh lúc build (`OD-A7`).

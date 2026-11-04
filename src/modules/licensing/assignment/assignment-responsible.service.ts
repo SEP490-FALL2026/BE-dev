@@ -6,7 +6,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentNotFoundError } from '../public/licensing.errors';
 import { ResponsibleDeadlineHook } from '../public/licensing.extension-points';
 import type { ResponsibleHolder } from '../public/licensing-service-account.types';
@@ -35,7 +35,7 @@ export interface Succession {
 export class AssignmentResponsibleService {
   constructor(
     private readonly repo: AssignmentRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -52,9 +52,9 @@ export class AssignmentResponsibleService {
     assignmentId: string,
     input: { employeeId: string; effectiveFrom: BusinessDate; expectedEndDate: BusinessDate | null },
   ): Promise<{ ended: AssignmentView; created: AssignmentView }> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A service account changed hands before installation');
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
 
     return this.runner.run(async (tx) => {
       const current = await this.lockAssignment(tx, assignmentId);
@@ -149,15 +149,15 @@ export class AssignmentResponsibleService {
   /** The person who would take over, locked `FOR SHARE` so they cannot leave meanwhile; null when there is none. */
   async lockHolder(tx: DbTx, employeeId: string, onDate: BusinessDate): Promise<ResponsibleHolder | null> {
     try {
-      await this.organization.lockEmployeeForShare(tx, employeeId);
+      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
     } catch (error) {
       if (error instanceof EmployeeNotFoundError) return null;
       throw error;
     }
-    const employee = await this.organization.getEmployee(employeeId, tx);
+    const employee = await this.organizationReads.getEmployee(employeeId, tx);
 
     if (!employee) return null;
-    const unit = (await this.organization.getOwningUnits([employeeId], onDate, tx)).get(employeeId);
+    const unit = (await this.organizationReads.getOwningUnits([employeeId], onDate, tx)).get(employeeId);
 
     return {
       status: employee.status,

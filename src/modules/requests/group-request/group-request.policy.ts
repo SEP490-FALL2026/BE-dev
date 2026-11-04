@@ -59,7 +59,9 @@ export function checkLineCount(facts: LineCountFacts): LineCountRefusals {
   return { tooMany: facts.requested.length > max ? { max } : null, duplicates: [...duplicates] };
 }
 
-export type LineReason = 'OUTSIDE_DEPARTMENT' | BeneficiaryRefusal | 'HAS_ACCESS' | 'HAS_OPEN_REQUEST';
+/** The first reason a person cannot be a line, in the order a caller should learn it; the spending approver is never a party of a Request, so they come first (`D-S21`). */
+export type LineReason =
+  'SPENDING_APPROVER' | 'OUTSIDE_DEPARTMENT' | BeneficiaryRefusal | 'HAS_ACCESS' | 'HAS_OPEN_REQUEST';
 
 /** What is known of one person who was named, read on the day. */
 export interface LineFacts {
@@ -78,6 +80,8 @@ export interface LineFacts {
   hasOpenRequest: boolean;
   /** The sender heads the department and this is their own line: it asks for no email and no end day. */
   isHeadOwnLine: boolean;
+  /** The person holds the spending approver role: they are no party of a Request, and the reason comes before any other. */
+  spendingApprover: boolean;
 }
 
 export interface RefusedLine {
@@ -100,6 +104,7 @@ export function checkLines(departmentId: string, people: readonly LineFacts[], t
 }
 
 function reasonFor(departmentId: string, person: LineFacts, today: BusinessDate): LineReason | null {
+  if (person.spendingApprover) return 'SPENDING_APPROVER';
   if (person.departmentId !== departmentId) return 'OUTSIDE_DEPARTMENT';
   const refusal = checkBeneficiary(
     {

@@ -2,8 +2,8 @@ import request from 'supertest';
 import { Client } from 'pg';
 import { OperatingParametersApi } from '../../../src/modules/operating-parameters/public/operating-parameters.api';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
-import { HR_BASIS } from '../../support/hr-basis';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
+import { ensureManagerGrant } from '../../support/builders/account.builder';
 
 interface ParameterWire {
   key: string;
@@ -11,6 +11,10 @@ interface ParameterWire {
   default: unknown;
   isDefault: boolean;
   unit: string;
+  unitLabel: string;
+  label: string;
+  group: string;
+  groupLabel: string;
   description: string;
   constraints: Record<string, unknown>;
   changedAt: string | null;
@@ -53,11 +57,12 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
     admin = await adminToken(ctx, seed);
     it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
     head = await createActivatedAccount(ctx, seed, { code: 'E-HEAD', email: 'head@acme.vn', roles: [], admin });
+    await ensureManagerGrant(ctx, admin, head.employeeId);
     await request(server())
       .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)
       // The head of a department is named by the Super Admin (QĐ-87).
       .set(asAdmin())
-      .send({ employeeId: head.employeeId, effectiveFrom: today(), hrBasis: HR_BASIS })
+      .send({ employeeId: head.employeeId, effectiveFrom: today() })
       .expect(200);
   }, 120000);
 
@@ -116,6 +121,104 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         expect(parameter.unit.length).toBeGreaterThan(0);
         expect(parameter.constraints).toHaveProperty('kind');
       }
+    });
+
+    it('lists the parameters by group, each with its label, group, group name and unit label (QĐ93-PARAM-LABEL)', async () => {
+      const response = await request(server()).get('/api/v1/operating-parameters').set(asAdmin()).expect(200);
+      const items = (response.body as { data: { items: ParameterWire[] } }).data.items;
+
+      expect(items.map((item) => item.key)).toEqual([
+        'APPROVAL_SLA_WORKING_DAYS',
+        'BACKLOG_ALERT_THRESHOLD',
+        'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
+        'FISCAL_YEAR_START_MONTH',
+        'FORECAST_ERROR_THRESHOLD_PERCENT',
+        'TRANSFER_REVIEW_WORKING_DAYS',
+        'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
+        'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
+        'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
+        'PROVISIONING_RETRY_COUNT',
+        'SAAS_ISSUE_RESPONSE_WORKING_DAYS',
+        'SAAS_ISSUE_REOPEN_WORKING_DAYS',
+        'INVITATION_REMINDER_DAYS',
+        'INVITATION_WITHDRAW_DAYS',
+        'DOCUMENT_MAX_SIZE_MB',
+        'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
+        'ACTIVITY_WINDOW_MINUTES',
+        'DETECTION_THRESHOLD_DAYS',
+        'RULE_SCHEDULE_G1_G2',
+        'RULE_SCHEDULE_G3_G4',
+      ]);
+      expect([...new Set(items.map((item) => item.group))]).toEqual([
+        'WORKFLOW',
+        'BUDGET',
+        'PERSONNEL',
+        'PROVISIONING',
+        'ACCOUNT',
+        'DOCUMENT',
+        'SUBSCRIPTION',
+        'USAGE',
+      ]);
+      const byKey = new Map(items.map((item) => [item.key, item]));
+      expect(byKey.get('APPROVAL_SLA_WORKING_DAYS')).toMatchObject({
+        label: 'Hạn xử lý một bước phê duyệt',
+        group: 'WORKFLOW',
+        groupLabel: 'Phê duyệt và quy trình',
+        unit: 'working days',
+        unitLabel: 'ngày làm việc',
+      });
+      expect(byKey.get('TRANSFER_REVIEW_WORKING_DAYS')).toMatchObject({
+        label: 'Hạn rà soát quyền sau điều chuyển',
+        group: 'PERSONNEL',
+        groupLabel: 'Nhân sự và bàn giao',
+      });
+      expect(byKey.get('FORECAST_ERROR_THRESHOLD_PERCENT')).toMatchObject({
+        group: 'BUDGET',
+        groupLabel: 'Ngân sách và chi phí',
+        unit: 'percent',
+        unitLabel: '%',
+      });
+      expect(byKey.get('DETECTION_THRESHOLD_DAYS')).toMatchObject({
+        label: 'Ngưỡng ngày không dùng của ghế',
+        group: 'USAGE',
+        groupLabel: 'Sử dụng và lãng phí',
+        unitLabel: 'ngày',
+        value: [30, 60, 90],
+        constraints: { kind: 'int-list', min: 1, max: 365, length: { min: 3, max: 3 }, order: 'ascending' },
+      });
+      expect(byKey.get('RULE_SCHEDULE_G1_G2')).toMatchObject({
+        label: 'Lịch chạy luật lãng phí (dữ liệu nội bộ)',
+        unitLabel: 'lịch',
+        value: 'DAILY',
+        constraints: {
+          kind: 'enum',
+          options: ['DAILY', 'WEEKLY'],
+          optionLabels: { DAILY: 'Hằng ngày', WEEKLY: 'Hằng tuần' },
+        },
+      });
+      expect(byKey.get('APPROVAL_SLA_WORKING_DAYS')?.constraints).toEqual({ kind: 'int', min: 1, max: 30 });
+      for (const item of items) {
+        expect(item.label.length).toBeGreaterThan(0);
+        expect(item.groupLabel.length).toBeGreaterThan(0);
+        expect(item.unitLabel.length).toBeGreaterThan(0);
+        expect(item).toMatchObject({ isDefault: true, changedAt: null });
+      }
+    });
+
+    it('answers a change with the same label, group, group name and unit label (QĐ93-PARAM-LABEL)', async () => {
+      const response = await setParameter('APPROVAL_SLA_WORKING_DAYS', 3).expect(200);
+
+      expect((response.body as { data: ParameterWire }).data).toMatchObject({
+        key: 'APPROVAL_SLA_WORKING_DAYS',
+        label: 'Hạn xử lý một bước phê duyệt',
+        group: 'WORKFLOW',
+        groupLabel: 'Phê duyệt và quy trình',
+        unitLabel: 'ngày làm việc',
+        value: 3,
+        default: 2,
+        isDefault: false,
+      });
+      await setParameter('APPROVAL_SLA_WORKING_DAYS', 2).expect(200);
     });
 
     it('changes the hand-over review deadline from 5 to 3 working days, and records 5 → 3 (AC-12)', async () => {

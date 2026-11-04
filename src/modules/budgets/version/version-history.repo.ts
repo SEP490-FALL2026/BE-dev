@@ -1,10 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { VersionStateName } from '../budget/budget.policy';
+import {
+  historyAfterJson,
+  historyBeforeJson,
+  type HistoryAfter,
+  type HistoryBefore,
+} from './version-history-snapshot.json';
 
-export type HistoryKind = 'FIGURES_UPDATED' | 'LINE_UPDATED' | 'LINES_ADDED' | 'LINES_IMPORTED' | 'WINDOW_MOVED';
+export type HistoryKind =
+  | 'FIGURES_UPDATED'
+  | 'LINE_UPDATED'
+  | 'LINES_ADDED'
+  | 'LINES_IMPORTED'
+  | 'WINDOW_MOVED'
+  | 'ATTACHMENT_ADDED'
+  | 'ATTACHMENT_REMOVED';
 
 export interface HistoryEntryRecord {
   seq: number;
@@ -29,8 +41,8 @@ export interface NewHistoryEntry {
   fromPosition?: number;
   toPosition?: number;
   lineCount?: number;
-  before: Prisma.InputJsonObject | null;
-  after: Prisma.InputJsonObject | Prisma.InputJsonArray;
+  before: HistoryBefore;
+  after: HistoryAfter;
   changedByEmployeeId: string;
   now: Date;
 }
@@ -61,8 +73,8 @@ export class VersionHistoryRepo {
         fromPosition: entry.fromPosition ?? null,
         toPosition: entry.toPosition ?? null,
         lineCount: entry.lineCount ?? null,
-        before: entry.before ?? Prisma.DbNull,
-        after: entry.after,
+        before: historyBeforeJson.encode(entry.before),
+        after: historyAfterJson.encode(entry.after),
         changedByEmployeeId: entry.changedByEmployeeId,
         changedAt: entry.now,
       },
@@ -89,8 +101,8 @@ export class VersionHistoryRepo {
         fromPosition: row.fromPosition,
         toPosition: row.toPosition,
         lineCount: row.lineCount,
-        before: (row.before as Record<string, unknown> | null) ?? null,
-        after: row.after as Record<string, unknown> | unknown[],
+        before: historyBeforeJson.decode(row.before),
+        after: historyAfterJson.decode(row.after),
         changedByEmployeeId: row.changedByEmployeeId,
         changedAt: row.changedAt,
       })),

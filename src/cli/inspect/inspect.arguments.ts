@@ -11,7 +11,7 @@ export const INSPECTION_USAGE = `Usage: pnpm ops:inspect [--json]
 
 Reports the installation state without changing anything: migrations, organization, the installation records (the
 current set and the set of an earlier installation are both accepted), the changes of the organization an earlier seeding
-missed, the Super Admin account (email masked), account and role counts, approval roles and department gaps.
+missed, the Super Admin account (email masked), account and role counts and department gaps.
 Reads the database settings only (NODE_ENV, DATABASE_URL, DB_*); every database session is read-only.
 
 Options

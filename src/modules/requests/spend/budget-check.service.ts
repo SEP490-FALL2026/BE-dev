@@ -6,7 +6,7 @@ import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { chargedCostCenterId } from '../access-request/access-request.policy';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
@@ -40,7 +40,7 @@ export class BudgetCheckService {
     private readonly budgets: BudgetsApi,
     private readonly finance: FinanceApi,
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly parameters: OperatingParametersApi,
     private readonly assessments: AssessmentReadRepo,
   ) {}
@@ -117,7 +117,7 @@ export class BudgetCheckService {
     }
     if (binding.size === 0) return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
 
-    const today = await this.organization.businessToday(now, tx);
+    const today = await this.organizationReads.businessToday(now, tx);
     const startMonth = Number(await this.parameters.getValue('FISCAL_YEAR_START_MONTH'));
     const currentYear = fiscalYearOf(today, startMonth);
     const assessment = request.branch === 'NEW_SOFTWARE' ? await this.assessments.findAssessment(request.id, tx) : null;

@@ -317,7 +317,7 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
       }
     });
 
-    it('tells the requester that a step they were waiting on waits again, the Super Admin and the IT Admin in charge of the alert, and then that it is given', async () => {
+    it('tells the requester that a step they were waiting on waits for a head, the Super Admin alone of the alert and nobody else, and then that it is given', async () => {
       const u = await example();
       const successor = await h.staff(u.department, `NW-S${counter}`);
       const sent = await h.sent(u.member, plan, { termMonths: 1 });
@@ -332,17 +332,22 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
         requestId: sent.id,
         stepKind: 'NEED',
       });
-      for (const person of [superAdminEmployeeId, h.it1.employeeId]) {
-        const alerts = (await h.noticesOf(person, 'CONTROLLED_WAIT_ALERT')).filter((row) => row.subject_id === sent.id);
-        expect(alerts.map((row) => row.params)).toEqual([
-          {
-            requestId: sent.id,
-            stepKind: 'NEED',
-            waitingReason: 'NO_FALLBACK_APPROVER',
-            configurationHint: 'CONFIGURE_FALLBACK_APPROVER',
-          },
-        ]);
-      }
+      const alerts = (await h.noticesOf(superAdminEmployeeId, 'CONTROLLED_WAIT_ALERT')).filter(
+        (row) => row.subject_id === sent.id,
+      );
+      expect(alerts.map((row) => row.params)).toEqual([
+        {
+          requestId: sent.id,
+          stepKind: 'NEED',
+          waitingReason: 'NO_DEPARTMENT_HEAD',
+          configurationHint: 'ASSIGN_DEPARTMENT_HEAD',
+        },
+      ]);
+      // Nobody is told in the place of the Super Admin: not the IT Admin in charge, who held the alert for a missing approver of last resort.
+      const itAdminAlerts = (await h.noticesOf(h.it1.employeeId, 'CONTROLLED_WAIT_ALERT')).filter(
+        (row) => row.subject_id === sent.id,
+      );
+      expect(itAdminAlerts).toEqual([]);
 
       await h.makeHead(u.department, successor);
       await h.project();

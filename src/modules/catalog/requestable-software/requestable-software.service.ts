@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { ApplicationKind } from '../catalog-entry/application.types';
-import { SubscriptionLookupService } from '../subscription/subscription-lookup.service';
+import { SubscriptionFactsService } from '../subscription/subscription-facts.service';
 import {
   RequestableApplicationNotFoundError,
   RequestablePlanNotFoundError,
@@ -37,8 +37,8 @@ interface PageQuery {
 export class RequestableSoftwareService {
   constructor(
     private readonly catalog: RequestableSoftwareRepo,
-    private readonly organization: OrganizationApi,
-    private readonly subscriptions: SubscriptionLookupService,
+    private readonly organizationReads: OrganizationReadApi,
+    private readonly subscriptions: SubscriptionFactsService,
   ) {}
 
   /** Throws RequestableSoftwareNoDepartmentError. */
@@ -126,8 +126,8 @@ export class RequestableSoftwareService {
 
   /** The department of the day of the caller and whether it has a Cost Center in use, read as the preview reads it. */
   private async submitter(actor: AuthenticatedPrincipal): Promise<Submitter> {
-    const today = await this.organization.businessToday();
-    const unit = (await this.organization.getOwningUnits([actor.employeeId], today)).get(actor.employeeId);
+    const today = await this.organizationReads.businessToday();
+    const unit = (await this.organizationReads.getOwningUnits([actor.employeeId], today)).get(actor.employeeId);
     if (!unit) throw new RequestableSoftwareNoDepartmentError();
 
     return { departmentId: unit.departmentId, hasCostCenter: unit.costCenter !== null };

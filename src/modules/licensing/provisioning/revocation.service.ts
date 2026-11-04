@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentEndService } from '../assignment/assignment-end.service';
 import { SeatTargetNotFoundError } from '../public/licensing.errors';
 import type { OpenedRevocation, OpenRevocationInput } from '../public/licensing.types';
@@ -28,7 +28,7 @@ export class RevocationService {
     private readonly reasons: ProvisioningTaskReasonRepo,
     private readonly ending: AssignmentEndService,
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly frame: ProvisioningTaskFrame,
     private readonly factory: RevocationTaskFactory,
     private readonly recorder: RevocationRecorder,
@@ -59,7 +59,7 @@ export class RevocationService {
       provisioningType: plan.provisioningType,
     });
     const selfExecuted = await this.selfExecuted(tx, actor, assignment.employeeId);
-    const organization = await this.organization.getOrganization(tx);
+    const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A revocation was opened before installation');
 
     const task =

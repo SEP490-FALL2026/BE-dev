@@ -17,7 +17,7 @@ import { EmployeeIdParamDto, MaintainedEmployeeResponseDto, UpdateEmployeeBodyDt
 import { EmployeeMaintenanceService } from './employee-maintenance.service';
 
 /**
- * Correcting the official fields of an employee record on an HR basis (`US-02-02` AC-19). The Super Admin does it (`QĐ-87a`), the IT
+ * Correcting the official fields of an employee record, with no HR basis to give (`US-02-02` AC-19, `QĐ-93f`). The Super Admin does it (`QĐ-87a`), the IT
  * Admin does not, and nobody does it on their own record here: that goes through the controlled procedure (`QĐ-87c`). The
  * department and the status are never changed here. Who may is decided by the policy of the service as well as by the role of the
  * route.
@@ -33,7 +33,7 @@ export class EmployeeMaintenanceController {
   @ApiSuccessResponse(MaintainedEmployeeResponseDto, {
     message: 'EMPLOYEE.UPDATED',
     description:
-      'The name, work email, kind of staff, job title (free text; null clears it) or a hire date still to come were changed on the HR basis given; the Audit Trail keeps the values before and after and the basis, and the employee and the head of their department are told. The login email, the department and the status are untouched.',
+      'The name, work email, kind of staff, job title (free text; null clears it) or a hire date still to come were changed; the Audit Trail keeps who, when and the values before and after, and the employee and the head of their department are told. The login email, the department and the status are untouched.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
@@ -51,7 +51,7 @@ export class EmployeeMaintenanceController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is malformed, names a field that is not an official one or lacks a part of the HR basis (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST, JOB_TITLE_TOO_LONG, OPEN_ASSIGNMENT_NEEDS_EXPECTED_END — a contractor, freelancer or intern needs an expected end on every open seat).',
+        'The body is malformed, names a field that is not an official one, among them an HR basis, which no correction takes (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST, JOB_TITLE_TOO_LONG, OPEN_ASSIGNMENT_NEEDS_EXPECTED_END — a contractor, freelancer or intern needs an expected end on every open seat).',
       examples: [
         VALIDATION_EXAMPLE,
         EMPLOYEE_ERROR_EXAMPLES.EMPLOYEE_UPDATE_ROW_INVALID,

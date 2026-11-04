@@ -17,6 +17,14 @@ const NEXT_STEP = {
 } as const;
 
 /** `node dist/cli.js record-super-admin-event` (`pnpm ops:record-super-admin-event`, alias `dist/super-admin-event-cli.js`). */
+/**
+ * What the operator reads when the command refused: the stable word, and for a refused successor the enumerated reason after a colon
+ * (`Refused (DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE: MANAGER_ROLE_REQUIRED). Nothing was changed.`). No name, email or basis.
+ */
+export function refusalLine(error: SuperAdminEventRefusedError): string {
+  return `Refused (${error.problem}${error.reason === undefined ? '' : `: ${error.reason}`}). Nothing was changed.`;
+}
+
 export const recordSuperAdminEventCommand = defineCommand({
   usage: SUPER_ADMIN_EVENT_USAGE,
   parse: parseSuperAdminEventArguments,
@@ -25,7 +33,7 @@ export const recordSuperAdminEventCommand = defineCommand({
   execute: ({ command }) =>
     runInNestContext({
       // The graph validates the whole environment.
-      graph: () => import('./record-super-admin-event-cli.module').then((m) => m.SuperAdminEventCliModule),
+      graph: () => import('./record-super-admin-event-cli.module').then((m) => m.RecordSuperAdminEventCliModule),
       work: async (app) => {
         const result = await app.get(SuperAdminEventApi).run(command);
 
@@ -44,8 +52,7 @@ export const recordSuperAdminEventCommand = defineCommand({
         return result.outcome === 'RECORDED' ? EXIT.done : EXIT.nothingToDo;
       },
       failed: (error) => {
-        if (error instanceof SuperAdminEventRefusedError)
-          return fail(`Refused (${error.problem}). Nothing was changed.`);
+        if (error instanceof SuperAdminEventRefusedError) return fail(refusalLine(error));
 
         return fail(
           `The command failed; nothing was changed, check the state before running it again: ${errorName(error)}`,

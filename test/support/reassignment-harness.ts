@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
+import { OrganizationReadApi } from '../../src/modules/organization/public/organization-read.api';
 import type { NewOrganizationChange } from '../../src/modules/organization/public/organization.types';
 import { StepReassignmentService } from '../../src/modules/requests/reassignment/step-reassignment.service';
 import {
@@ -8,7 +9,7 @@ import {
   type SweepResult,
 } from '../../src/modules/requests/public/step-redetermination-sweep.api';
 import type { ApiAccount } from './api-accounts';
-import { HR_BASIS } from './hr-basis';
+import { spendingApproverEmployeeId } from './builders/account.builder';
 import { SpendHarness } from './spend-harness';
 
 /** A step as the database keeps it, with the moments the deadline and the wait are measured from. */
@@ -102,7 +103,7 @@ export class ReassignmentHarness extends SpendHarness {
     request(this.server())
       .post(`/api/v1/departments/${departmentId}/head-vacancies`)
       .set({ Authorization: `Bearer ${this.admin}` })
-      .send({ effectiveFrom: this.today(), hrBasis: HR_BASIS });
+      .send({ effectiveFrom: this.today() });
 
   /** A sweep of the worker that has not run the pass of the day yet, which is what the first sweep of a worker does. */
   freshSweep(): StepRedeterminationSweepApi {
@@ -110,7 +111,7 @@ export class ReassignmentHarness extends SpendHarness {
 
     return new StepRedeterminationSweepApi(
       app.get(StepReassignmentService, { strict: false }),
-      app.get(OrganizationApi, { strict: false }),
+      app.get(OrganizationReadApi, { strict: false }),
     );
   }
 
@@ -138,14 +139,9 @@ export class ReassignmentHarness extends SpendHarness {
     return rows;
   }
 
-  /** Who holds the approval role now, by employee id; null when nobody does. */
-  async getApprovalRoleHolder(role: string): Promise<string | null> {
-    const { rows } = await this.ctx.sql.query<{ employee_id: string }>(
-      `SELECT employee_id FROM approval_role_holders WHERE role = $1::"ApprovalRole" AND held_until IS NULL`,
-      [role],
-    );
-
-    return rows[0]?.employee_id ?? null;
+  /** Who is the spending approver now, by employee id; null when nobody is: the holder of the grant that is in force. */
+  async getSpendingApproverEmployeeId(): Promise<string | null> {
+    return spendingApproverEmployeeId(this.ctx);
   }
 
   async requestRow(requestId: string): Promise<{ state: string; policy: unknown; department_id: string }> {

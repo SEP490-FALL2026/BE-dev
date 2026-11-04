@@ -4,7 +4,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestNoDepartmentError,
@@ -17,6 +17,7 @@ import { mayRequest, policyFor } from '../access-request/access-request.policy';
 import { beneficiaryCountOfContent, contentOf, draftSnapshot, toContentJson } from './request-draft-content.mapper';
 import type { AccessRequestDraftWire, DraftSaveBody } from './request-draft.dto';
 import { draftVerdict, REQUEST_TYPE_OF_KIND } from '../request-draft/request-draft.policy';
+import { RequestSenderService } from '../request-intake/request-sender.service';
 import { RequestDraftRepo, type DraftRow } from '../request-draft/request-draft.repo';
 
 /**
@@ -32,9 +33,10 @@ export class RequestDraftService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly drafts: RequestDraftRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
+    private readonly sender: RequestSenderService,
   ) {}
 
   /** Throws AccessRequestSuperAdminCannotRequestError, AccessRequestNoDepartmentError and AccessRequestPlanNotFoundError. */
@@ -43,11 +45,14 @@ export class RequestDraftService {
 
     return this.runner.run(async (tx) => {
       // The sender is relied on until commit, as when a request is sent: they cannot leave the company between the check and the write.
-      await this.organization.lockEmployeeForShare(tx, actor.employeeId);
-      const employee = await this.organization.getEmployee(actor.employeeId, tx);
-      if (!employee) throw new AccessRequestNoDepartmentError();
-      const today = await this.organization.businessToday(new Date(), tx);
-      const unit = (await this.organization.getOwningUnits([actor.employeeId], today, tx)).get(actor.employeeId);
+      // A draft that could never be sent is not kept (`D-S21`, OD-3): a group draft is judged with every line, as the group is.
+      const employee = await this.sender.lockEligible(
+        tx,
+        actor,
+        body.kind === 'GROUP' ? body.lines.map((line) => line.employeeId) : undefined,
+      );
+      const today = await this.organizationReads.businessToday(new Date(), tx);
+      const unit = (await this.organizationReads.getOwningUnits([actor.employeeId], today, tx)).get(actor.employeeId);
       if (!unit) throw new AccessRequestNoDepartmentError();
       const [target] = await this.catalog.findPlanSeatTargets([body.planId], tx);
       if (!target) throw new AccessRequestPlanNotFoundError();
@@ -65,7 +70,6 @@ export class RequestDraftService {
         departmentId: unit.departmentId,
         businessReason: body.businessReason,
         termMonths: body.termMonths,
-        projectLabel: body.projectLabel ?? null,
         content: toContentJson(body),
         createdByAppUserId: actor.appUserId,
       });

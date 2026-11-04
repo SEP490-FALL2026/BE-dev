@@ -102,6 +102,8 @@ describe('who follows the head of the department a person leaves (US-03-01 AC-8,
     memberOfOldDepartmentOnDay: true,
     stillWorking: true,
     holdsSuperAdmin: false,
+    holdsManager: true,
+    holdsSpendingApprover: false,
     hasPendingTransfer: false,
   };
 
@@ -124,6 +126,37 @@ describe('who follows the head of the department a person leaves (US-03-01 AC-8,
     expect(
       successorRefusal(required({ chosen: { kind: 'EMPLOYEE', employeeId: 'e' }, candidate: { ...member, ...patch } })),
     ).toEqual({ code: 'SUCCESSOR_NOT_A_MEMBER_ON_DATE', details: { reason } });
+  });
+
+  it('refuses a successor without MANAGER (US-03-01 AC-8, US-03-06 AC-23)', () => {
+    const chosen = { kind: 'EMPLOYEE', employeeId: 'e' } as const;
+
+    expect(successorRefusal(required({ chosen, candidate: { ...member, holdsManager: false } }))).toEqual({
+      code: 'SUCCESSOR_NOT_A_MEMBER_ON_DATE',
+      details: { reason: 'MANAGER_ROLE_REQUIRED' },
+    });
+  });
+
+  it('refuses the spending approver as successor before the MANAGER check, which they never pass (US-03-06 AC-24)', () => {
+    const chosen = { kind: 'EMPLOYEE', employeeId: 'e' } as const;
+
+    expect(
+      successorRefusal(
+        required({ chosen, candidate: { ...member, holdsManager: false, holdsSpendingApprover: true } }),
+      ),
+    ).toEqual({ code: 'SUCCESSOR_NOT_A_MEMBER_ON_DATE', details: { reason: 'SPENDING_APPROVER_CANNOT_HEAD' } });
+  });
+
+  it('judges the Super Admin before the spending approver and the spending approver before the missing MANAGER', () => {
+    const chosen = { kind: 'EMPLOYEE', employeeId: 'e' } as const;
+    const reasonOf = (patch: Partial<NonNullable<SuccessorFacts['candidate']>>) =>
+      successorRefusal(required({ chosen, candidate: { ...member, ...patch } }))?.details?.reason;
+
+    expect(reasonOf({ holdsSuperAdmin: true, holdsSpendingApprover: true, holdsManager: false })).toBe(
+      'SUPER_ADMIN_CANNOT_HEAD',
+    );
+    expect(reasonOf({ holdsSpendingApprover: true, holdsManager: false })).toBe('SPENDING_APPROVER_CANNOT_HEAD');
+    expect(reasonOf({ holdsManager: false, hasPendingTransfer: true })).toBe('HAS_PENDING_TRANSFER');
   });
 
   it('refuses a successor who does not exist, and accepts a member who works', () => {
@@ -175,6 +208,8 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
         memberOfOldDepartmentOnDay: false,
         stillWorking: true,
         holdsSuperAdmin: false,
+        holdsManager: true,
+        holdsSpendingApprover: false,
         hasPendingTransfer: false,
       },
     };

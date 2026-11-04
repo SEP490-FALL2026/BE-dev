@@ -1,9 +1,9 @@
 import { Client } from 'pg';
 import { DepartmentHarness, today, addDays } from '../../support/department-harness';
 
-describe('department profiles, heads and the derived MANAGER role over HTTP (integration, real PostgreSQL): what the database keeps true and the lock protocol', () => {
+describe('department profiles, heads and the MANAGER role over HTTP (integration, real PostgreSQL): what the database keeps true and the lock protocol', () => {
   const h = new DepartmentHarness();
-  const { newDepartment, enter, assignHead } = h;
+  const { newDepartment, enter, accountIn, assignHead } = h;
 
   beforeAll(async () => {
     await h.start();
@@ -147,8 +147,8 @@ describe('department profiles, heads and the derived MANAGER role over HTTP (int
       const deadlocksBefore = await deadlocks();
       for (let round = 0; round < 4; round += 1) {
         const department = await newDepartment();
-        const first = await enter(department.code);
-        const second = await enter(department.code);
+        const first = await accountIn(department.code);
+        const second = await accountIn(department.code);
 
         await holder.query('BEGIN');
         await holder.query('SELECT id FROM departments WHERE id = $1 FOR UPDATE', [department.id]);

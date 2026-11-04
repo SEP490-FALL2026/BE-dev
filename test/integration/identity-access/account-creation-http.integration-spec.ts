@@ -153,18 +153,18 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
       expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
     });
 
-    it('refuses derived and transfer-only roles at creation without creating anything (AC-4, AC-14)', async () => {
+    it('refuses SPENDING_APPROVER for a new account and the transfer-only role at creation without creating anything (US-01-03 AC-6, AC-14)', async () => {
       const employee = await newEmployee();
       const before = await h.ctx.sql.query('SELECT count(*)::int AS n FROM app_users');
 
       const derived = await h.admin
-        .post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['MANAGER'] })
+        .post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['SPENDING_APPROVER'] })
         .expect(422);
       const transfer = await h.admin
         .post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['SUPER_ADMIN', 'IT_ADMIN'] })
         .expect(422);
 
-      expect(errorCode(derived)).toBe('APP_USER.ROLE_DERIVED');
+      expect(errorCode(derived)).toBe('APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE');
       expect(errorCode(transfer)).toBe('APP_USER.SUPER_ADMIN_TRANSFER_ONLY');
       expect((await h.ctx.sql.query('SELECT count(*)::int AS n FROM app_users')).rows).toEqual(before.rows);
     });
@@ -177,7 +177,7 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
       const { token } = await signIn(user.email, user.password);
 
       const me = await request(server()).get('/api/v1/me').set(as(token)).expect(200);
-      expect(dataOf<{ roles: { effective: string[] } }>(me).roles.effective).toEqual(['IT_ADMIN']);
+      expect(dataOf<{ roles: string[] }>(me).roles).toEqual(['IT_ADMIN']);
       await request(server()).get('/api/v1/probe/it').set(as(token)).expect(200);
       const row = await h.ctx.sql.query(
         'SELECT activation_state, email_verification_source FROM app_users WHERE id = $1',

@@ -192,6 +192,29 @@ export class ProposalRepo {
     return rows.map(toRecord);
   }
 
+  /**
+   * The proposals the person sent that are still being dealt with (OD-6): sent or given back, or reviewed with a version made from it
+   * that nobody has decided (a draft, one sent to the approver, one the approver asked to look at again). A withdrawn proposal, one closed
+   * with its year and one whose version was decided are over. At most `limit`, by id.
+   */
+  async inProgressOf(tx: DbTx, employeeId: string, limit: number): Promise<{ id: string; year: number }[]> {
+    return tx.budgetProposal.findMany({
+      where: {
+        submittedByEmployeeId: employeeId,
+        OR: [
+          { state: { in: ['SUBMITTED', 'RETURNED'] } },
+          {
+            state: 'REVIEWED',
+            versions: { some: { detachedAt: null, state: { in: ['DRAFT', 'SENT', 'CHANGES_REQUESTED'] } } },
+          },
+        ],
+      },
+      select: { id: true, year: true },
+      orderBy: { id: 'asc' },
+      take: limit,
+    });
+  }
+
   /** The reviewed proposal of the Cost Center and year that nobody has followed yet, if any: at most one (the open key). */
   async reviewedWithoutSuccessor(costCenterId: string, year: number, tx?: DbTx): Promise<ProposalRecord | null> {
     const row = await (tx ?? this.prisma).budgetProposal.findFirst({

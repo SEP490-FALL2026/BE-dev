@@ -1,11 +1,11 @@
 import { findPlacementCoverageViolations } from './placement-coverage';
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from './api-accounts';
+import { ensureManagerGrant } from './builders/account.builder';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from './http-test-app';
-import { HR_BASIS } from './hr-basis';
 import { UseFacts, registerUseReaders } from './organization-use-readers';
 
-/** The departments, heads and projects over HTTP: the types of the wire, the calendar and the set-up the department specs share. */
+/** The departments and heads over HTTP: the types of the wire, the calendar and the set-up the department specs share. */
 export interface DepartmentWire {
   id: string;
   code: string;
@@ -19,7 +19,6 @@ export interface DepartmentWire {
   memberCount: number;
   warnings: string[];
   headHistory: { employeeCode: string; validFrom: string; validTo: string | null }[];
-  projects: { id: string; name: string; description: string | null; status: string; departments: { code: string }[] }[];
   /** The person named to take over from a day after today; null when nobody is (`QĐ-87` `D-5`). */
   successor: { employeeId: string; employeeCode: string; since: string } | null;
   deactivatedAt: string | null;
@@ -79,23 +78,7 @@ export class DepartmentHarness {
 
   useFacts!: UseFacts;
 
-  /**
-   * Every change the Super Admin makes to a department or a project cites its HR basis (`QĐ-87b(1)`): the request carries one unless
-   * the case names `hrBasis` itself (`hrBasis: undefined` leaves it out). Reads and the other routes go as they are.
-   */
-  api = () => {
-    const writes = (test: request.Test, path: string): request.Test =>
-      /^\/api\/v1\/(departments|projects)/.test(path) ? test.send({ hrBasis: HR_BASIS }) : test;
-
-    const agent = request(this.server());
-
-    return {
-      get: (path: string) => agent.get(path),
-      delete: (path: string) => agent.delete(path),
-      post: (path: string) => writes(agent.post(path), path),
-      patch: (path: string) => writes(agent.patch(path), path),
-    };
-  };
+  api = () => request(this.server());
 
   unique = (prefix: string): string => {
     this.counter += 1;
@@ -121,11 +104,10 @@ export class DepartmentHarness {
     return { id: (response.body as { data: { id: string } }).data.id, code };
   };
 
-  /** What the Super Admin sends to create a department: no Cost Center, and the HR basis it is created from. */
+  /** What the Super Admin sends to create a department: no Cost Center, and no HR basis (`QĐ-93f`). */
   departmentBody = (overrides: Record<string, unknown> = {}) => ({
     code: this.unique('P'),
     name: 'Design',
-    hrBasis: HR_BASIS,
     ...overrides,
   });
 
@@ -154,7 +136,6 @@ export class DepartmentHarness {
       hireDate: '2026-10-01',
       departmentCode,
       jobTitle: 'Administrator',
-      hrBasis: HR_BASIS,
       ...overrides,
     };
     const response = await this.api().post('/api/v1/employees').set(this.asAdmin()).send(body).expect(201);
@@ -176,18 +157,55 @@ export class DepartmentHarness {
     return { ...account, code: person.code };
   };
 
-  assignHead = (departmentId: string, employeeId: string, effectiveFrom = today(), headers = this.asAdmin()) =>
+  /** `MANAGER` is granted by the Super Admin before a person is named head (QĐ-93a); a person with no account has none to give. */
+  grantManager = async (employeeId: string): Promise<void> => {
+    const { rowCount } = await this.ctx.sql.query('SELECT 1 FROM app_users WHERE employee_id = $1', [employeeId]);
+    if (rowCount === 1) await ensureManagerGrant(this.ctx, this.admin, employeeId);
+  };
+
+  /** The call of the route as it is, with no grant given first: what the specs of the refusals send. */
+  assignHeadRaw = (departmentId: string, employeeId: string, effectiveFrom = today(), headers = this.asAdmin()) =>
     this.api()
       .post(`/api/v1/departments/${departmentId}/head-assignments`)
       .set(headers)
       .send({ employeeId, effectiveFrom });
 
-  rolesOf = async (account: ApiAccount): Promise<{ derived: string[]; effective: string[] }> =>
+  /**
+   * The same call, after the Super Admin gave the person `MANAGER` (the seam of QĐ-93a: a head holds the grant). The grant is made when
+   * the request is sent, so `.expect(...)` chains as before.
+   */
+  assignHead = (departmentId: string, employeeId: string, effectiveFrom = today(), headers = this.asAdmin()) => {
+    const call = this.assignHeadRaw(departmentId, employeeId, effectiveFrom, headers);
+    const send = call.end.bind(call);
+    call.end = (callback?: request.CallbackHandler) => {
+      void this.grantManager(employeeId).then(
+        () => send(callback),
+        (error: unknown) => callback?.(error as Error, undefined as unknown as request.Response),
+      );
+
+      return call;
+    };
+
+    return call;
+  };
+
+  /** What `GET /me` says of the account: its granted roles and the department it heads today. */
+  meOf = async (
+    account: ApiAccount,
+  ): Promise<{
+    roles: string[];
+    managerScope: { departmentId: string; departmentCode: string } | null;
+    selfServiceOnly: boolean;
+  }> =>
     (
       (await this.api().get('/api/v1/me').set(this.as(account)).expect(200)).body as {
-        data: { roles: { derived: string[]; effective: string[] } };
+        data: {
+          roles: string[];
+          managerScope: { departmentId: string; departmentCode: string } | null;
+          selfServiceOnly: boolean;
+        };
       }
-    ).data.roles;
+    ).data;
 
   auditOf = async (resourceId: string): Promise<{ action: string; before: unknown; after: unknown }[]> =>
     (
@@ -210,8 +228,8 @@ export class DepartmentHarness {
   /** The employees whose placements are not exactly what the invariant I-2 asks for, over everything this file made. */
   placementViolations = () => findPlacementCoverageViolations(this.ctx.sql);
 
-  async start() {
-    this.ctx = await createHttpTestApp();
+  async start(options: Parameters<typeof createHttpTestApp>[0] = {}) {
+    this.ctx = await createHttpTestApp(options);
     this.seed = await seedInstallation(this.ctx.app);
     this.admin = await adminToken(this.ctx, this.seed);
     this.finance = await createActivatedAccount(this.ctx, this.seed, {

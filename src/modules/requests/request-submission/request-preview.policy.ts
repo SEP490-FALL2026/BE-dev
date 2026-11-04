@@ -12,11 +12,7 @@ export type PreviewStepKind = 'NEED' | 'SPEND_SUBMISSION' | 'SPEND_APPROVAL' | '
 
 /** Why the need step names this person (`US-05-01` AC-5): the row of the routing table, in words a screen can show. */
 export type NeedExplanation =
-  | 'DEPARTMENT_HEAD'
-  | 'HEAD_ASKS_FOR_SELF'
-  | 'HEAD_IS_THE_APPROVER'
-  | 'DEPARTMENT_HAS_NO_HEAD'
-  | 'WAITING_FOR_AN_APPROVER';
+  'DEPARTMENT_HEAD' | 'HEAD_ASKS_FOR_SELF' | 'WAITS_FOR_DEPARTMENT_HEAD' | 'WAITING_FOR_AN_APPROVER';
 
 export interface PreviewStep {
   sequence: number;
@@ -32,11 +28,11 @@ export interface PreviewStep {
   waitingReason: WaitingReason | null;
 }
 
-const NEED_EXPLANATION: Readonly<Record<1 | 2 | 3 | 4, NeedExplanation>> = {
+const NEED_EXPLANATION: Readonly<Record<1 | 2 | 4 | 8, NeedExplanation>> = {
   1: 'DEPARTMENT_HEAD',
   2: 'HEAD_ASKS_FOR_SELF',
-  3: 'HEAD_IS_THE_APPROVER',
-  4: 'DEPARTMENT_HAS_NO_HEAD',
+  4: 'WAITS_FOR_DEPARTMENT_HEAD',
+  8: 'WAITING_FOR_AN_APPROVER',
 };
 
 export function buildChain(policy: RequestPolicy, decision: RoutingDecision, facts: RoutingFacts): PreviewStep[] {
@@ -56,7 +52,7 @@ export function buildChain(policy: RequestPolicy, decision: RoutingDecision, fac
           role: 'MANAGER',
           assigneeEmployeeId: null,
           expectedWorkingDays: days,
-          explanation: 'WAITING_FOR_AN_APPROVER',
+          explanation: NEED_EXPLANATION[decision.row],
           waitingReason: decision.reason,
         };
   const steps: Array<Omit<PreviewStep, 'sequence'>> = [need];
@@ -68,7 +64,7 @@ export function buildChain(policy: RequestPolicy, decision: RoutingDecision, fac
       role: 'MANAGER',
       assigneeEmployeeId: facts.departmentHeadEmployeeId,
       expectedWorkingDays: days,
-      explanation: facts.departmentHeadEmployeeId === null ? 'DEPARTMENT_HAS_NO_HEAD' : 'DEPARTMENT_HEAD',
+      explanation: facts.departmentHeadEmployeeId === null ? 'WAITS_FOR_DEPARTMENT_HEAD' : 'DEPARTMENT_HEAD',
       waitingReason: null,
     });
     steps.push({

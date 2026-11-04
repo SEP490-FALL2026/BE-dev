@@ -49,8 +49,9 @@ export const OFFBOARDING_OPEN_REQUESTS = 'OPEN_REQUESTS_OF_LEAVER';
 
 /**
  * The roles a person who leaves holds that someone must take over (`US-03-04` AC-11, AC-27, AC-28), as the wire names them and in the
- * order it lists them: the Super Admin, Finance, the three approval roles, the IT Admin in charge of a department, the head of a
+ * order it lists them: the Super Admin, Finance, the spending approver, the IT Admin in charge of a department, the head of a
  * department and the owner or administrator of the workspace of a K2 plan. A flag warns; it never stops a record, a lock or a revocation.
+ * `SUBSTITUTE_APPROVER` and `FALLBACK_APPROVER` are historical (`QĐ-93c`): a case recorded before may carry them, none is made now.
  */
 export const ROLE_FLAGS = [
   'SUPER_ADMIN_HOLDER',

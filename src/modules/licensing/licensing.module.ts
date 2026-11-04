@@ -17,6 +17,7 @@ import { ServiceAccountDutiesController } from './assignment/service-account-dut
 import { ServiceAccountDutyRepo } from './assignment/service-account-duty/service-account-duty.repo';
 import { ServiceAccountDutyService } from './assignment/service-account-duty/service-account-duty.service';
 import { ServiceAccountDutySweeper } from './assignment/service-account-duty/service-account-duty.job';
+import { ServiceAccountSpendingApproverGrantCheck } from './assignment/service-account-duty/spending-approver-grant.listener';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
 import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
@@ -93,7 +94,7 @@ import { RevocationLeaverAlert } from './provisioning/revocation-completion/revo
 import { OpenGrantTaskRepo } from './provisioning/open-grants/open-grant-task.repo';
 import { OpenGrantTaskService } from './provisioning/open-grants/open-grant-task.service';
 import { RevocationReadRepo } from './provisioning/revocation-read.repo';
-import { RevocationReadService } from './provisioning/revocation-read.service';
+import { RevocationViewService } from './provisioning/revocation-view.service';
 import { RevocationRecorder } from './provisioning/revocation-recorder.service';
 import { RevocationTaskFactory } from './provisioning/revocation-task-factory.service';
 import { RevocationService } from './provisioning/revocation.service';
@@ -112,10 +113,11 @@ import { SeatBaselineRepo } from './seat-baseline/seat-baseline.repo';
 import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
 import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
 import { RenewalDeadlineService } from './subscription-renewal/deadline/renewal-deadline.service';
-import { RenewalDecisionSupport } from './subscription-renewal/decision/renewal-decision-support.service';
+import { RenewalDecisionTrail } from './subscription-renewal/decision/renewal-decision-trail.service';
 import { RenewalDecisionService } from './subscription-renewal/decision/renewal-decision.service';
 import { RenewalOutcomeService } from './subscription-renewal/outcome/renewal-outcome.service';
 import { RenewalProposalService } from './subscription-renewal/proposal/renewal-proposal.service';
+import { RenewalSpendingApproverWaitListener } from './subscription-renewal/spending-approver-wait.listener';
 import { RenewalNotifier } from './subscription-renewal/subscription-renewal-notifier.service';
 import { RenewalPartiesService } from './subscription-renewal/subscription-renewal-parties.service';
 import { RenewalRankingService } from './subscription-renewal/subscription-renewal-ranking.service';
@@ -177,6 +179,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     ServiceAccountDutyRepo,
     ServiceAccountDutyService,
     ServiceAccountDutySweeper,
+    ServiceAccountSpendingApproverGrantCheck,
     AssignmentListService,
     DepartmentToolsService,
     SeatBaselineRepo,
@@ -201,7 +204,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     RevocationCompletionService,
     RevocationLeaverAlert,
     RevocationReadRepo,
-    RevocationReadService,
+    RevocationViewService,
     OpenGrantTaskRepo,
     OpenGrantTaskService,
     HandoverRepo,
@@ -236,8 +239,9 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     RenewalPartiesService,
     RenewalRankingService,
     RenewalNotifier,
+    RenewalSpendingApproverWaitListener,
     RenewalProposalService,
-    RenewalDecisionSupport,
+    RenewalDecisionTrail,
     RenewalDecisionService,
     RenewalOutcomeService,
     RenewalAlertsService,

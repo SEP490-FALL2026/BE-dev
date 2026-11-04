@@ -136,7 +136,7 @@ const decisionSchema = z.strictObject({
   overrideReason: z.string().nullable(),
   decidedBy: employeeRef,
   decidedAt: z.iso.datetime(),
-  /** The substitute decided, because the approver was a party. */
+  /** Historical: true only for a decision of before `QĐ-93`, taken by the substitute for a conflict of interest; never true now. */
   bySubstitute: z.boolean(),
 });
 
@@ -154,7 +154,7 @@ const approvalDetailSchema = z.strictObject({
   step: z.strictObject({
     id: z.uuid(),
     state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED']),
-    waitingReason: z.enum(['NO_SPENDING_APPROVER', 'NO_CONFLICT_SUBSTITUTE']).nullable(),
+    waitingReason: z.enum(['NO_SPENDING_APPROVER', 'SPENDING_APPROVER_IS_PARTY']).nullable(),
     assignee: employeeRef.nullable(),
     openedAt: z.iso.datetime(),
     decidedAt: z.iso.datetime().nullable(),

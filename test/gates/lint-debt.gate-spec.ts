@@ -19,12 +19,12 @@ const ROOT = join(__dirname, '..', '..');
 
 /** The most suppressions each rule and each part of the codebase may still carry. Lower these when you fix code, never raise them. */
 const CEILINGS = {
-  complexity: 59,
-  'max-lines-per-function': 54,
+  complexity: 56,
+  'max-lines-per-function': 51,
   /** `complexity` and `max-lines-per-function` together: a function that is too long and too branched is two findings. */
-  complexityAndLines: 113,
+  complexityAndLines: 107,
   /** Every suppression in `src/modules/requests`, the module that carries most of the debt. */
-  requests: 37,
+  requests: 36,
 } as const;
 
 /** The size rules of R8 as ESLint applies them to a file of `src` that is not a spec: severity 2 (error) and the options. */

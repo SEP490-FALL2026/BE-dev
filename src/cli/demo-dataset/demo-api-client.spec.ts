@@ -81,6 +81,60 @@ describe('the HTTP client of ops:demo-dataset', () => {
     await expect(api.signIn('b@x.example', 'pw')).rejects.toBeInstanceOf(DemoApiUnreachableError);
   });
 
+  describe('an API that cannot be reached', () => {
+    /** One login that fails with `thrown` after the fake clock moved `elapsed` ms. */
+    async function unreachable(thrown: Error | DOMException, elapsed = 12): Promise<DemoApiUnreachableError> {
+      let now = 5_000;
+      const fetch: FetchLike = () => {
+        now += elapsed;
+        return Promise.reject(thrown);
+      };
+      const api = new DemoApiClient('http://slm-api:4000/api/v1', { fetch, now: () => now });
+      const error = await api.signIn('a@x.example', 'the-password').catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(DemoApiUnreachableError);
+      return error as DemoApiUnreachableError;
+    }
+
+    it('keeps the socket code fetch hides in its cause, and the time it took', async () => {
+      const cause = Object.assign(new Error('connect ECONNREFUSED 172.18.0.4:3000'), { code: 'ECONNREFUSED' });
+      const error = await unreachable(new TypeError('fetch failed', { cause }));
+
+      expect(error).toMatchObject({ kind: 'NETWORK', code: 'ECONNREFUSED', elapsedMs: 12 });
+      expect(error.message).toBe(
+        'POST /auth/login: the API could not be reached (kind=NETWORK code=ECONNREFUSED elapsedMs=12)',
+      );
+      expect(error.message).not.toContain('172.18.0.4');
+    });
+
+    it('tells a request that timed out from one that never connected', async () => {
+      const error = await unreachable(
+        new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+        30_000,
+      );
+
+      expect(error).toMatchObject({ kind: 'TIMEOUT', code: null, elapsedMs: 30_000 });
+      expect(error.message).toBe('POST /auth/login: the API could not be reached (kind=TIMEOUT elapsedMs=30000)');
+    });
+
+    it('finds a listed code among the attempts of an AggregateError (Happy Eyeballs), deep in the cause chain', async () => {
+      const attempts = new AggregateError([
+        Object.assign(new Error('a'), { code: 'EHOSTUNREACH' }),
+        Object.assign(new Error('b'), { code: 'ECONNREFUSED' }),
+      ]);
+      const error = await unreachable(new TypeError('fetch failed', { cause: attempts }));
+
+      expect(error.code).toBe('EHOSTUNREACH');
+    });
+
+    it('shows no code that is not on the list, and never the message of the cause', async () => {
+      const cause = Object.assign(new Error('token=secret-value'), { code: 'E_SOMETHING_NEW' });
+      const error = await unreachable(new TypeError('fetch failed', { cause }));
+
+      expect(error.code).toBeNull();
+      expect(error.message).toBe('POST /auth/login: the API could not be reached (kind=NETWORK elapsedMs=12)');
+    });
+  });
+
   it('ends every session it opened with the refresh token, and forgets them', async () => {
     const { api, calls } = client([() => json(200, tokens), () => new Response(null, { status: 204 })]);
     await api.signIn('a@x.example', 'pw');

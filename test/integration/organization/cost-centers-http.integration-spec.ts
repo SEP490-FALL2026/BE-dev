@@ -3,7 +3,6 @@ import { Client } from 'pg';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
 import { findPlacementCoverageViolations } from '../../support/placement-coverage';
-import { HR_BASIS } from '../../support/hr-basis';
 import { UseFacts, registerUseReaders } from '../../support/organization-use-readers';
 
 interface CostCenterWire {
@@ -454,7 +453,6 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
         .post('/api/v1/employees')
         .set(asSuperAdmin())
         .send({
-          hrBasis: HR_BASIS,
           employeeCode: unique('E-STAY'),
           fullName: 'Stays In',
           employmentType: 'STAFF',
@@ -547,7 +545,6 @@ describe('the Cost Center catalogue over HTTP (integration, real PostgreSQL)', (
           .post('/api/v1/employees')
           .set(asSuperAdmin())
           .send({
-            hrBasis: HR_BASIS,
             employeeCode: unique('E-LATE'),
             fullName: 'Late Joiner',
             employmentType: 'STAFF',

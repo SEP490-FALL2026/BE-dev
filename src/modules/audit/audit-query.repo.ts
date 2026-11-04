@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AuditEventFilter, buildAuditEventWhere } from './audit-filter.repo';
+import { auditEventAfterJson, auditEventBeforeJson } from './audit-event-payload.json';
 import { StoredAuditEvent } from './public/audit.types';
 
 /** Everything a reader gets, and nothing else: no organization, no internal column. */
@@ -18,6 +20,24 @@ const READ_SELECT = {
   correlationId: true,
   operatorReference: true,
 } as const;
+
+type EventRow = Prisma.AuditEventGetPayload<{ select: typeof READ_SELECT }>;
+
+/** The row as a reader gets it: the snapshots through their codec, so a JSON that is not an object is told, not passed on. */
+const toStoredEvent = (row: EventRow): StoredAuditEvent => ({
+  id: row.id,
+  occurredAt: row.occurredAt,
+  actorKind: row.actorKind,
+  actorAppUserId: row.actorAppUserId,
+  actorRoles: row.actorRoles,
+  action: row.action,
+  resourceType: row.resourceType,
+  resourceId: row.resourceId,
+  before: auditEventBeforeJson.decode(row.before),
+  after: auditEventAfterJson.decode(row.after),
+  correlationId: row.correlationId,
+  operatorReference: row.operatorReference,
+});
 
 /**
  * Reads the Audit Trail. Kept apart from `AuditRepo`, which only ever inserts inside someone else's
@@ -54,7 +74,6 @@ export class AuditQueryRepo {
       { isolationLevel: 'RepeatableRead' },
     );
 
-    // Only objects are ever written to before/after (AuditEventInput), so the JSON column reads back as one.
-    return { items: rows as unknown as StoredAuditEvent[], total };
+    return { items: rows.map(toStoredEvent), total };
   }
 }

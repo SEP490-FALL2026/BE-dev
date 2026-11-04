@@ -8,7 +8,7 @@ const lookup = (overrides: Partial<EmployeeImportLookup> = {}): EmployeeImportLo
 });
 
 const row = (overrides: Record<string, string> = {}) => ({
-  employee_code: 'E1',
+  employee_code: 'E-1',
   full_name: 'Nguyễn Văn A',
   work_email: 'a@acme.vn',
   employment_type: 'STAFF',
@@ -20,7 +20,7 @@ const row = (overrides: Record<string, string> = {}) => ({
 
 describe('EmployeeRowClassifier', () => {
   describe('the record of the person importing (US-02-02 AC-18)', () => {
-    const own = { employeeCode: 'E1', normalizedEmail: 'sa@acme.vn' };
+    const own = { employeeCode: 'E-1', normalizedEmail: 'sa@acme.vn' };
 
     it('refuses a row with the importer own code, even when it would only be a person already there', () => {
       const result = new EmployeeRowClassifier(lookup({ own })).classify(row());
@@ -31,13 +31,13 @@ describe('EmployeeRowClassifier', () => {
     it('refuses a row with the importer own work email, after normalization, and not as a taken email', () => {
       const result = new EmployeeRowClassifier(
         lookup({ own, emailOwners: new Map([['sa@acme.vn', 'E-SA']]) }),
-      ).classify(row({ employee_code: 'E7', work_email: 'Sa+tag@Acme.vn' }));
+      ).classify(row({ employee_code: 'E-7', work_email: 'Sa+tag@Acme.vn' }));
 
       expect(result.errors).toEqual([{ column: 'work_email', code: 'OWN_RECORD' }]);
     });
 
     it('does not touch the rows of everybody else', () => {
-      expect(new EmployeeRowClassifier(lookup({ own })).classify(row({ employee_code: 'E7' })).outcome).toBe('VALID');
+      expect(new EmployeeRowClassifier(lookup({ own })).classify(row({ employee_code: 'E-7' })).outcome).toBe('VALID');
     });
   });
 });

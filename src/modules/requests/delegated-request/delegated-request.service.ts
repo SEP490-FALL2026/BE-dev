@@ -4,7 +4,8 @@ import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { RequestPartyEligibilityApi } from '../../identity-access/public/request-party-eligibility.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestAlreadyHoldsAccessError,
@@ -39,9 +40,10 @@ export class DelegatedRequestService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly repo: AccessRequestRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly assessment: RequestFactsService,
     private readonly audit: AuditApi,
+    private readonly requestParties: RequestPartyEligibilityApi,
   ) {}
 
   /**
@@ -56,11 +58,12 @@ export class DelegatedRequestService {
     const settings = await this.assessment.settings();
 
     return this.runner.run(async (tx) => {
-      await this.organization.lockEmployeeForShare(tx, actor.employeeId);
-      const head = await this.organization.getEmployee(actor.employeeId, tx);
+      await this.organizationReads.lockEmployeeForShare(tx, actor.employeeId);
+      const head = await this.organizationReads.getEmployee(actor.employeeId, tx);
       if (!head) throw new AccessRequestNoDepartmentError();
+      await this.requireEligibleParties(tx, actor, body.beneficiaryEmployeeIds);
       const now = new Date();
-      const today = await this.organization.businessToday(now, tx);
+      const today = await this.organizationReads.businessToday(now, tx);
       const headedDepartmentId = await this.headedDepartment(tx, actor.employeeId, today);
       const batchId = randomUUID();
 
@@ -77,16 +80,32 @@ export class DelegatedRequestService {
     });
   }
 
+  /**
+   * Every person the head sends for is locked, in the order of their ids, and then the head and they are judged all at once (`D-S21`,
+   * `D-S22`): when one of them is the spending approver, nothing is sent for any, and no department is read before. A person who is not in
+   * the company is not locked here: `requireDelegable` refuses them as outside the department, as before.
+   */
+  private async requireEligibleParties(tx: DbTx, actor: AuthenticatedPrincipal, beneficiaryIds: readonly string[]) {
+    const ordered = [...new Set(beneficiaryIds)].sort();
+    for (const id of ordered) {
+      if (await this.organizationReads.getEmployee(id, tx)) await this.organizationReads.lockEmployeeForShare(tx, id);
+    }
+    await this.requestParties.assertEligible(tx, {
+      requesterEmployeeId: actor.employeeId,
+      beneficiaryEmployeeIds: ordered,
+    });
+  }
+
   /** The department the caller heads today, or null when they head none. */
   private async headedDepartment(tx: DbTx, employeeId: string, today: BusinessDate): Promise<string | null> {
-    const own = (await this.organization.getOwningUnits([employeeId], today, tx)).get(employeeId);
+    const own = (await this.organizationReads.getOwningUnits([employeeId], today, tx)).get(employeeId);
     if (!own) return null;
-    const heads = await this.organization.getDepartmentHeads([own.departmentId], today);
+    const heads = await this.organizationReads.getDepartmentHeads([own.departmentId], today);
 
     return heads.get(own.departmentId)?.employeeId === employeeId ? own.departmentId : null;
   }
 
-  /** The person is locked while the head sends for them; a person who is not in the company is outside the department as far as the head is concerned. */
+  /** The person was locked by `requireEligibleParties`; a person who is not in the company is outside the department as far as the head is concerned. */
   private async requireDelegable(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
@@ -94,30 +113,24 @@ export class DelegatedRequestService {
     body: DelegatedBodyDto,
   ): Promise<void> {
     const { beneficiaryId, headedDepartmentId, today } = who;
-    const exists = await this.organization.getEmployee(beneficiaryId, tx);
-    if (!exists) throw new DelegatedRequestRefusedError('OUTSIDE_DEPARTMENT', beneficiaryId);
-    await this.organization.lockEmployeeForShare(tx, beneficiaryId);
-    const person = await this.organization.getEmployee(beneficiaryId, tx);
-    const unit = (await this.organization.getOwningUnits([beneficiaryId], today, tx)).get(beneficiaryId);
-    const refusal = person
-      ? checkDelegation({
-          actorEmployeeId: actor.employeeId,
-          actorHeadedDepartmentId: headedDepartmentId,
-          beneficiaryEmployeeId: beneficiaryId,
-          beneficiaryDepartmentId: unit?.departmentId ?? null,
-          beneficiaryActive: person.status === 'ACTIVE',
-          beneficiaryWorkEmail: person.workEmail ?? null,
-          beneficiaryEmploymentType: person.employmentType,
-          beneficiaryHireDate: person.hireDate,
-          today,
-          expectedEndDate: body.expectedEndDate,
-          termMonths: body.termMonths,
-          termConfirmed: (body.termConfirmation?.reason ?? '').trim() !== '',
-          longTermMonths: LONG_TERM_MONTHS,
-        })
-      : headedDepartmentId === null
-        ? 'NOT_HEAD'
-        : 'OUTSIDE_DEPARTMENT';
+    const person = await this.organizationReads.getEmployee(beneficiaryId, tx);
+    if (!person) throw new DelegatedRequestRefusedError('OUTSIDE_DEPARTMENT', beneficiaryId);
+    const unit = (await this.organizationReads.getOwningUnits([beneficiaryId], today, tx)).get(beneficiaryId);
+    const refusal = checkDelegation({
+      actorEmployeeId: actor.employeeId,
+      actorHeadedDepartmentId: headedDepartmentId,
+      beneficiaryEmployeeId: beneficiaryId,
+      beneficiaryDepartmentId: unit?.departmentId ?? null,
+      beneficiaryActive: person.status === 'ACTIVE',
+      beneficiaryWorkEmail: person.workEmail ?? null,
+      beneficiaryEmploymentType: person.employmentType,
+      beneficiaryHireDate: person.hireDate,
+      today,
+      expectedEndDate: body.expectedEndDate,
+      termMonths: body.termMonths,
+      termConfirmed: (body.termConfirmation?.reason ?? '').trim() !== '',
+      longTermMonths: LONG_TERM_MONTHS,
+    });
     if (refusal) throw new DelegatedRequestRefusedError(refusal, beneficiaryId);
   }
 

@@ -3,7 +3,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessInspectionApi } from '../../identity-access/public/identity-access-inspection.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
   BOOTSTRAP_ACTIONS,
   NO_ANNOUNCEMENT_GAPS,
@@ -29,7 +29,7 @@ export class InstallationInspectionApi {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly migrations: MigrationStateRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly identity: IdentityAccessInspectionApi,
   ) {}
@@ -39,12 +39,12 @@ export class InstallationInspectionApi {
     const snapshot = await this.runner.run(async (tx) => {
       const migrations = summarizeMigrations(committed, await this.migrations.appliedMigrations(tx));
       if (migrations.applied === 0) return { migrations, installed: null };
-      const organization = await this.findOrganization(() => this.organization.getOrganization(tx));
+      const organization = await this.findOrganization(() => this.organizationReads.getOrganization(tx));
       if (organization === null) return { migrations, installed: null };
 
       const counts = await this.audit.countByAction(tx, BOOTSTRAP_ACTIONS);
       const inventory = await this.identity.accountInventory(tx);
-      const facts = await this.organization.getOnboardingFacts(tx);
+      const facts = await this.organizationReads.getOnboardingFacts(tx);
       const named = facts.departmentsByItAdmin.flatMap((department) =>
         department.itAdminEmployeeId === null ? [] : [department.itAdminEmployeeId],
       );
@@ -53,7 +53,7 @@ export class InstallationInspectionApi {
       // The changes the seeding migration missed. Read in the same transaction, only when that migration was recorded.
       const seededAt = await this.migrations.changeAnnouncementsSeededAt(tx);
       const announcements =
-        seededAt === null ? NO_ANNOUNCEMENT_GAPS : await this.organization.countUnmarkedChangesAsOf(tx, seededAt);
+        seededAt === null ? NO_ANNOUNCEMENT_GAPS : await this.organizationReads.countUnmarkedChangesAsOf(tx, seededAt);
 
       return { migrations, installed: { organization, counts, inventory, facts, usable, announcements } };
     });
@@ -89,7 +89,6 @@ export class InstallationInspectionApi {
         byState: inventory.accountsByState,
       },
       directRoles: inventory.directRoles,
-      approvalRoles: inventory.approvalRoles,
       departments: {
         active: facts.activeDepartments,
         withoutCurrentHead: facts.departmentsWithoutHead.length,
@@ -125,7 +124,6 @@ function notInstalled(migrations: MigrationReport): InstallationInspection {
     superAdmin: null,
     accounts: null,
     directRoles: null,
-    approvalRoles: null,
     departments: null,
   };
 }

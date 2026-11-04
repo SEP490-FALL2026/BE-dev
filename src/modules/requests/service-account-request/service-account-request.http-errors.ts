@@ -11,6 +11,7 @@ import {
   AccessRequestSpendDateNotAllowedError,
   AccessRequestSuperAdminCannotRequestError,
 } from '../access-request/access-request.errors';
+import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 import { ServiceAccountReviewRefusedError, ServiceAccountSubmitRefusedError } from './service-account-request.errors';
 
@@ -53,6 +54,13 @@ export const SERVICE_ACCOUNT_ERROR_EXAMPLES = {
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  REQUEST_PARTY_INELIGIBLE: example(
+    new RequestPartyIneligibleError({
+      reason: 'SPENDING_APPROVER',
+      party: 'REQUESTER',
+      employeeIds: ['<employee-id>'],
+    }),
+  ),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
   NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),

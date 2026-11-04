@@ -129,7 +129,7 @@ describe('the question of the spending approver to Finance over PostgreSQL (US-0
       const u = await unit();
       const id = await waiting(u);
 
-      for (const account of [h.finance, u.head.account, h.it1, u.member.account, h.substitute.account]) {
+      for (const account of [h.finance, u.head.account, h.it1, u.member.account, h.bystander.account]) {
         await ask(id, undefined, account).expect(403);
       }
       expect(h.codeOf(await ask(id, undefined, h.finance))).toBe('BUDGET_INFORMATION.NOT_THE_ASSIGNEE');
@@ -250,7 +250,7 @@ describe('the question of the spending approver to Finance over PostgreSQL (US-0
         await h.approvalOf(id, h.boss.account).expect(200),
       ).spendApproval.latestBudgetInformation;
       expect(latest.id).toBe(second.id);
-      for (const account of [u.head.account, h.it1, u.member.account, h.substitute.account]) {
+      for (const account of [u.head.account, h.it1, u.member.account, h.bystander.account]) {
         await h.questionsOf(id, account).expect(404);
       }
     });
@@ -270,25 +270,16 @@ describe('the question of the spending approver to Finance over PostgreSQL (US-0
   });
 
   describe('Finance that is also the one who decides (US-06-03 AC-4)', () => {
-    it('is refused, whether it holds the role of the spending approver or holds the step', async () => {
+    it('is refused when it holds the step (Finance cannot hold the role of the spending approver: QĐ-93b, US-01-03 AC-11)', async () => {
       const u = await unit();
       const id = await waiting(u);
       const question = await asked(id);
-      const finance = { employeeId: h.finance.employeeId, account: h.finance };
-      await h.setRole('SPENDING_APPROVER', finance);
-      try {
-        const refused = await answer(question.id).expect(403);
-
-        expect(h.codeOf(refused)).toBe('BUDGET_INFORMATION.SOD_APPROVER');
-      } finally {
-        await h.setRole('SPENDING_APPROVER', h.boss);
-      }
-      expect(await rowOf(question.id)).toMatchObject({ state: 'OPEN' });
-      // The step given to Finance, whoever holds the role, is refused the same.
+      // The step given to Finance, by a write around the application, is refused the same as before.
       await h.ctx.sql.query(`UPDATE access_request_steps SET assignee_employee_id = $2 WHERE id = $1`, [
         question.stepId,
         h.finance.employeeId,
       ]);
+
       expect(h.codeOf(await answer(question.id).expect(403))).toBe('BUDGET_INFORMATION.SOD_APPROVER');
       expect(await rowOf(question.id)).toMatchObject({ state: 'OPEN' });
     });

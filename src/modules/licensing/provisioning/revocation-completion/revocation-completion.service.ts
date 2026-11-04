@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { AssignmentEndService } from '../../assignment/assignment-end.service';
 import {
   AssignmentNotOpenError,
@@ -34,7 +34,7 @@ export class RevocationCompletionService {
     private readonly views: ProvisioningTaskViewService,
     private readonly ending: AssignmentEndService,
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly revocation: RevocationListeners,
     private readonly leaverAlert: RevocationLeaverAlert,
   ) {}
@@ -57,7 +57,7 @@ export class RevocationCompletionService {
         const [plan] = await this.catalog.getPlanRevocationInfo([locked.assignment.planId], tx);
         if (!plan) throw new SeatTargetNotFoundError('PLAN');
         const assignment = await this.ending.lock(tx, locked.assignmentId);
-        const today = await this.organization.businessToday(now, tx);
+        const today = await this.organizationReads.businessToday(now, tx);
         const done = planCompletion(input, { type: plan.provisioningType, startsOn: assignment.effectiveFrom, today });
 
         await this.tasks.markRevocationCompleted(tx, locked.id, actor.appUserId, done, now);
@@ -111,7 +111,7 @@ export class RevocationCompletionService {
       write: async ({ tx, task: locked, organizationId, now }) => {
         const assignment = await this.ending.lock(tx, locked.assignmentId);
         if (assignment.validUntil === null) throw new AssignmentNotOpenError();
-        const today = await this.organization.businessToday(now, tx);
+        const today = await this.organizationReads.businessToday(now, tx);
         const cut = planAccessCut(input, {
           today,
           startsOn: assignment.effectiveFrom,

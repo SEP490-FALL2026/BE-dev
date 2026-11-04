@@ -5,7 +5,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   FunctionalGroupNameInvalidError,
@@ -35,7 +35,7 @@ function cleanName(raw: string): string {
 export class FunctionalGroupService {
   constructor(
     private readonly groups: FunctionalGroupRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -126,7 +126,7 @@ export class FunctionalGroupService {
   }
 
   private async requireOrganizationId(): Promise<string> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The functional groups were used before installation');
 
     return organization.id;

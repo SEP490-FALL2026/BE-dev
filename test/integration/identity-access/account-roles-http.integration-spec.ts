@@ -62,11 +62,11 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
       expect(detail.roleHistory?.filter((entry) => entry.revokedAt !== null)).toHaveLength(1);
     });
 
-    it('refuses derived, transfer-only, repeated, missing and forbidden-combination roles with their own codes', async () => {
+    it('refuses transfer-only, repeated and missing roles with their own codes', async () => {
       const user = await activatedAccount(['IT_ADMIN']);
       const grant = (role: string) => h.admin.post(`/api/v1/app-users/${user.appUserId}/role-grants`, { role });
 
-      expect(errorCode(await grant('MANAGER').expect(422))).toBe('APP_USER.ROLE_DERIVED');
+      // MANAGER and SPENDING_APPROVER are granted like IT_ADMIN and FINANCE since QĐ-93a (their rules: direct-approval-roles).
       expect(errorCode(await grant('SUPER_ADMIN').expect(422))).toBe('APP_USER.SUPER_ADMIN_TRANSFER_ONLY');
       expect(errorCode(await grant('IT_ADMIN').expect(409))).toBe('APP_USER.ROLE_ALREADY_GRANTED');
       expect(
@@ -75,6 +75,30 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
       expect(
         errorCode(await h.admin.delete(`/api/v1/app-users/${user.appUserId}/role-grants/SUPER_ADMIN`).expect(422)),
       ).toBe('APP_USER.SUPER_ADMIN_TRANSFER_ONLY');
+    });
+
+    it('says the Super Admin role changes only by the operations command outside the application, and the holder cannot change their own account (US-01-09 AC-7, US-01-01 AC-13)', async () => {
+      const user = await activatedAccount(['IT_ADMIN']);
+      const holders = () =>
+        h.ctx.sql.query(`SELECT app_user_id FROM role_grants WHERE role = 'SUPER_ADMIN' AND revoked_at IS NULL`);
+      const before = (await holders()).rows;
+
+      const grant = await h.admin
+        .post(`/api/v1/app-users/${user.appUserId}/role-grants`, { role: 'SUPER_ADMIN' })
+        .expect(422);
+      const revoke = await h.admin.delete(`/api/v1/app-users/${user.appUserId}/role-grants/SUPER_ADMIN`).expect(422);
+      const own = await h.admin
+        .post(`/api/v1/app-users/${h.seed.superAdmin.appUserId}/role-grants`, { role: 'EMPLOYEE' })
+        .expect(409);
+
+      for (const refused of [grant, revoke]) {
+        expect(errorCode(refused)).toBe('APP_USER.SUPER_ADMIN_TRANSFER_ONLY');
+        expect(bodyOf(refused).error.message).toBe(
+          'The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.',
+        );
+      }
+      expect(errorCode(own)).toBe('APP_USER.SELF_CHANGE_FORBIDDEN');
+      expect((await holders()).rows).toEqual(before);
     });
 
     it('allows only one Finance: a holder who is still invited or locked keeps the place; revoking frees it (AC-18)', async () => {
@@ -232,7 +256,6 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
         sessionId: other.appUserId,
         employeeId: other.employeeId,
         directRoles: ['IT_ADMIN'],
-        derivedRoles: [],
         roles: ['IT_ADMIN'],
       };
       const lockedBefore = await countAudit('APP_USER.LOCKED', h.seed.superAdmin.appUserId);

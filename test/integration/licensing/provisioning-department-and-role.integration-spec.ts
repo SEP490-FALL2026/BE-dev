@@ -42,7 +42,6 @@ describe('the grant of a seat and the work on a task: the department of the seat
     sessionId: 'test',
     employeeId,
     directRoles: roles,
-    derivedRoles: [],
     roles,
   });
   const notices = async (taskId: string) =>

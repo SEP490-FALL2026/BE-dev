@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
-import type { HrBasis } from '../public/hr-basis.types';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -12,14 +11,14 @@ import {
   EmployeeOpenSeatNeedsEndError,
 } from '../public/organization.errors';
 import { OrganizationContextService } from '../organization-context.service';
-import { EmployeeDirectoryService } from '../employee/employee-directory.service';
+import { EmployeeRecordService } from '../employee/employee-record.service';
 import type { EmployeeRecord } from '../public/organization.types';
 import { EmployeeWorkState, EmploymentType } from '../public/organization.types';
 import { EmployeeRowInvalidError, EmployeeUpdateEmptyError } from './employee.errors';
 import { correctionOf, OFFICIAL_FIELDS, workEmailToCheck, type Correction } from './employee-correction.policy';
 import { assertMayCorrectEmployee } from './employee.policy';
 
-/** The official fields of a record that the Super Admin may correct on an HR basis (`QĐ-82m`, `QĐ-87a`); nothing else is here. */
+/** The official fields of a record that the Super Admin may correct, with no HR basis to give (`QĐ-82m`, `QĐ-87a`, `QĐ-93f`); nothing else is here. */
 export interface OfficialFieldsInput {
   fullName?: string;
   workEmail?: string | null;
@@ -27,7 +26,6 @@ export interface OfficialFieldsInput {
   hireDate?: BusinessDate;
   /** Free text (`QĐ-87e`); null or blank clears it. */
   jobTitle?: string | null;
-  hrBasis: HrBasis;
 }
 
 export interface MaintainedEmployeeView {
@@ -44,7 +42,7 @@ export interface MaintainedEmployeeView {
 
 /**
  * Correcting the official fields of a record that exists (`US-02-02` AC-19, `QĐ-82m` `INF-20`, `QĐ-87a`): name, work email, kind
- * of staff, free-text job title and a hire date that has not come yet, always on an HR basis, by the Super Admin alone and never on
+ * of staff, free-text job title and a hire date that has not come yet, with no HR basis to give (`QĐ-93f`), by the Super Admin alone and never on
  * the Super Admin's own record (`QĐ-87c`: that goes through the controlled procedure, so this refuses with 403 and writes
  * nothing). The department and the status are events with a day they take effect (`US-03-01`) and are never changed here; neither
  * are the account, its roles or the login email (`FR-8.6`). The person, and the head of their department, are told in the same
@@ -54,7 +52,7 @@ export interface MaintainedEmployeeView {
 export class EmployeeMaintenanceService {
   constructor(
     private readonly context: OrganizationContextService,
-    private readonly employees: EmployeeDirectoryService,
+    private readonly employees: EmployeeRecordService,
     private readonly audit: AuditApi,
     private readonly notifications: NotificationsApi,
     private readonly runner: TransactionRunner,
@@ -108,7 +106,7 @@ export class EmployeeMaintenanceService {
     const workEmailTaken = toCheck !== null && (await this.employees.isWorkEmailTaken(tx, who.organizationId, toCheck));
     const correction = correctionOf(current, input, { today: who.today, workEmailTaken });
     if (correction.reasons.length > 0) throw new EmployeeRowInvalidError(correction.reasons);
-    if (Object.keys(correction.changes).length > 0) await this.writeChanges(tx, who, current, correction, input);
+    if (Object.keys(correction.changes).length > 0) await this.writeChanges(tx, who, current, correction);
 
     return viewOf(current, correction, input);
   }
@@ -119,7 +117,6 @@ export class EmployeeMaintenanceService {
     who: { actor: AuthenticatedPrincipal; organizationId: string; employeeId: string; today: BusinessDate },
     current: EmployeeRecord,
     correction: Correction,
-    input: OfficialFieldsInput,
   ): Promise<void> {
     await this.employees.updateOfficialFields(tx, who.employeeId, correction.changes);
     await this.audit.record(
@@ -131,7 +128,7 @@ export class EmployeeMaintenanceService {
         'Employee',
         who.employeeId,
         { employeeCode: current.employeeCode, ...(correction.before as Record<string, string | null>) },
-        { ...(correction.changes as Record<string, string | null>), hrBasis: { ...input.hrBasis } },
+        { ...(correction.changes as Record<string, string | null>) },
       ),
     );
     const notices = await this.employees.profileNotices(tx, {

@@ -10,7 +10,7 @@ const h = new LeaveHarness();
 describe('recording the start of a long leave (integration, real PostgreSQL)', () => {
   let des: Department;
   let sequence = 0;
-  const code = (prefix: string) => `${prefix}${(sequence += 1)}`;
+  const code = (prefix: string) => `${prefix}-${(sequence += 1)}`;
   const body = (employeeId: string, extra: object = {}) => ({
     employeeId,
     startedOn: h.day(-30),

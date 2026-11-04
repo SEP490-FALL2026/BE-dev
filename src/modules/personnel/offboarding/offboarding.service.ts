@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { OffboardingCaseWriter } from './offboarding-case-writer.service';
@@ -21,7 +21,7 @@ import type { OffboardingRecord, RecordOffboardingInput } from './offboarding.ty
 export class OffboardingService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly guard: TransferGuardService,
     private readonly frame: OffboardingFrame,
     private readonly preconditions: OffboardingPreconditions,
@@ -40,7 +40,7 @@ export class OffboardingService {
   async recordInTx(tx: DbTx, actor: PersonnelActor, input: RecordOffboardingInput): Promise<OffboardingRecord> {
     this.guard.requireWriter(actor, input.employeeId);
     const organization = await this.guard.requireOrganization();
-    const today = await this.organization.businessToday(new Date(), tx);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
 
     const { seen, held } = await this.preconditions.require(tx, actor, input, today);
     const scheduled = await this.endings.end(tx, actor, input, { seen, held, organizationId: organization.id, today });

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { overdueDaysOf } from './transfer-review.policy';
@@ -23,17 +23,17 @@ export class TransferReviewOverdueService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly reviews: TransferReviewRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly notifier: PersonnelNotifier,
   ) {}
 
   /** Returns how many reviews were told in this pass. */
   async noticeOverdue(now: Date = new Date()): Promise<number> {
-    const today = await this.organization.businessToday(now);
+    const today = await this.organizationReads.businessToday(now);
     const late = await this.reviews.listOverdueUnnoticed(today, BATCH);
     if (late.length === 0) return 0;
-    const heads = await this.organization.getDepartmentHeads(
+    const heads = await this.organizationReads.getDepartmentHeads(
       [...new Set(late.map((review) => review.departmentId))],
       today,
     );

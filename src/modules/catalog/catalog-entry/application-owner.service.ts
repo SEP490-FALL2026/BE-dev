@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ApplicationNotFoundError } from './application.errors';
 import { replacementRequired } from './application.policy';
 import { ApplicationRepo } from './application.repo';
@@ -47,13 +47,15 @@ function viewOf(employee: EmployeeFacts | undefined): BusinessOwnerView {
 export class ApplicationOwnerService {
   constructor(
     private readonly applications: ApplicationRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** Every application, of every kind, whose Business Owner has left, by name. */
   async warnings(query: { page: number; pageSize: number }): Promise<Page<OwnerWarning>> {
     const ownerIds = await this.applications.currentOwnerIds();
-    const owners = new Map((await this.organization.getEmployees(ownerIds)).map((employee) => [employee.id, employee]));
+    const owners = new Map(
+      (await this.organizationReads.getEmployees(ownerIds)).map((employee) => [employee.id, employee]),
+    );
     const departed = ownerIds.filter((id) => {
       const owner = owners.get(id);
 
@@ -89,7 +91,7 @@ export class ApplicationOwnerService {
       query.pageSize,
     );
     const employees = new Map(
-      (await this.organization.getEmployees([...new Set(periods.map((period) => period.employeeId))])).map(
+      (await this.organizationReads.getEmployees([...new Set(periods.map((period) => period.employeeId))])).map(
         (employee) => [employee.id, employee],
       ),
     );

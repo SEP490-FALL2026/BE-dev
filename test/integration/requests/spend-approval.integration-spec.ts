@@ -227,6 +227,34 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
       expect(await records(id)).toHaveLength(1);
     });
 
+    it('never answers 409 for a spend step after a transfer of the role: the new holder decides, anybody else is refused as not the assignee', async () => {
+      const { u } = await example();
+      const transferred = await h.waitingForApprover(u, plan, { amount: 15 * M });
+      const other = await h.waitingForApprover(u, plan, { amount: 15 * M });
+      counter += 1;
+      const next = await h.staff(await h.departmentWithUnit(`P-NX${counter}`), `NX-${counter}`);
+      const substitute = await h.staff(await h.departmentWithUnit(`P-SB${counter}`), `SB-${counter}`);
+      // A step of the rule before QĐ-93 (the migration of the removal refuses a database that still has one): the substitute holds
+      // it and never held the role. Nothing freezes it any more (`STEP_AWAITING_CONVERSION` is gone), so it is refused as a step
+      // of somebody else is, with the code of every refusal of a person who does not hold the step.
+      await h.ctx.sql.query(
+        `UPDATE access_request_steps SET assignee_employee_id = $2 WHERE request_id = $1 AND kind = 'SPEND_APPROVAL'`,
+        [other, substitute.employeeId],
+      );
+
+      try {
+        // The role is handed over: the step the approver held goes to the new one, who decides it with no 409.
+        await h.setRole('SPENDING_APPROVER', next);
+        await approve(transferred, {}, next.account).expect(200);
+        expect(h.codeOf(await approve(other, {}, next.account).expect(403))).toBe('SPEND.NOT_THE_ASSIGNEE');
+        expect(await records(other)).toEqual([]);
+        expect(await decided(other)).toEqual([]);
+        expect(await h.state(other)).toBe('AWAITING_SPEND_DECISION');
+      } finally {
+        await h.setRole('SPENDING_APPROVER', h.boss);
+      }
+    });
+
     it('refuses with a reason, ends the request as refused, and makes nothing after it (AC-4)', async () => {
       const { u } = await example();
       const id = await h.waitingForApprover(u, plan, { amount: 15 * M });
@@ -269,14 +297,12 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
     });
 
     it('has two records of two decisions, each flagged as one person, when the same person holds both steps (AC-7)', async () => {
-      const executive = await h.ctx.sql.query<{ id: string; cost_center_id: string }>(
-        `SELECT d.id, c.id AS cost_center_id FROM departments d
-           JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
-      );
-      const department = { id: executive.rows[0].id, code: 'P-EXE', unitId: executive.rows[0].cost_center_id };
-      const exe: Unit = { department, head: h.boss, member: await h.staff(department, 'EXE-E9') };
-      await h.budgetFor(exe, { total: 100 * M });
-      const id = await h.paidRequest(exe, plan, { amount: 10 * M });
+      // A head's own request goes to the spending approver for the need (row 2), who also holds the spend step.
+      const { u } = await example();
+      const sent = await h.sent(u.head, plan, { termMonths: 1 });
+      await h.decide(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
+      await h.setPayments(sent.id, { amount: 10 * M });
+      const id = sent.id;
 
       await approve(id).expect(200);
 

@@ -2,7 +2,6 @@ import {
   ACTOR,
   FAKE_CLOCK,
   FILE,
-  HR_BASIS,
   NOW,
   TODAY,
   confirmBody,
@@ -92,6 +91,7 @@ describe('EmployeeImportConfirmationService: confirm (H8 Phase 0 characterizatio
       ]);
       const result = {
         created: 2,
+        newUnplaced: 0,
         existingSame: 1,
         existingDifferent: 1,
         errors: 1,
@@ -117,13 +117,12 @@ describe('EmployeeImportConfirmationService: confirm (H8 Phase 0 characterizatio
           resourceType: 'Employee',
           resourceId: `new-${employeeCode}`,
           before: null,
-          // The code, the department and the title of the file and the HR basis: no name and no email.
+          // The code, the department and the title of the file: no name, no email and no HR basis (`QĐ-93f`).
           after: {
             employeeCode,
             department: index === 0 ? 'P-OPS' : 'P-DES',
             jobTitle: index === 0 ? 'Administrator' : 'designer',
             importId: id,
-            hrBasis: HR_BASIS,
           },
           correlationId: 'session-1',
         })),
@@ -158,7 +157,6 @@ describe('EmployeeImportConfirmationService: confirm (H8 Phase 0 characterizatio
             existingDifferent: 1,
             errors: 1,
             repeatedFile: false,
-            hrBasis: HR_BASIS,
           },
           correlationId: 'session-1',
         },

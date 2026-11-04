@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -8,7 +8,15 @@ import { after, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const { capabilityGraph, capabilityNames, coreUsers, cyclesOf, placeOf } = require('../arch/capability-graph.cjs');
+const {
+  capabilityGraph,
+  capabilityNames,
+  controllerCapabilities,
+  coreUsers,
+  cyclesOf,
+  layersOf,
+  placeOf,
+} = require('../arch/capability-graph.cjs');
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const edges = (pairs) =>
@@ -95,6 +103,82 @@ describe('cyclesOf', () => {
         ]),
       ),
       [['a', 'b', 'c']],
+    );
+  });
+});
+
+describe('layersOf', () => {
+  const layers = (pairs, names, controllers = []) => layersOf(edges(pairs), names, new Set(controllers));
+  const summary = (map) => Object.fromEntries([...map].map(([name, info]) => [name, info.layer]));
+
+  test('puts a capability with a controller in L3, one with no outgoing edge in L0, one that imports only L0 in L1, the rest in L2', () => {
+    const result = layers(
+      [
+        ['b', 'a'],
+        ['c', 'a'],
+        ['c', 'b'],
+        ['d', 'c'],
+        ['e', 'a'],
+        ['e', 'd'],
+      ],
+      ['a', 'b', 'c', 'd', 'e', 'iso'],
+      ['e'],
+    );
+
+    assert.deepEqual(summary(result), { a: 'L0', iso: 'L0', b: 'L1', c: 'L2', d: 'L2', e: 'L3' });
+  });
+
+  test('lets the controller decide before the edges: a use case that imports nothing is L3, not L0', () => {
+    assert.deepEqual(summary(layers([['b', 'a']], ['a', 'b', 'lone'], ['lone'])), { a: 'L0', b: 'L1', lone: 'L3' });
+  });
+
+  test('lists what each capability imports and who imports it, sorted, and orders the map by layer then name', () => {
+    const result = layers(
+      [
+        ['z', 'a'],
+        ['y', 'a'],
+        ['y', 'z'],
+      ],
+      ['z', 'y', 'a'],
+    );
+
+    assert.deepEqual([...result.keys()], ['a', 'z', 'y']);
+    assert.deepEqual(result.get('a'), { layer: 'L0', controller: false, imports: [], importedBy: ['y', 'z'] });
+    assert.deepEqual(result.get('y'), { layer: 'L2', controller: false, imports: ['a', 'z'], importedBy: [] });
+  });
+
+  test('gives a layer to a module with no edge at all, and to none when there is no capability', () => {
+    assert.deepEqual(summary(layers([], ['a', 'b'])), { a: 'L0', b: 'L0' });
+    assert.equal(layers([], []).size, 0);
+  });
+});
+
+describe('controllerCapabilities', () => {
+  const root = mkdtempSync(join(tmpdir(), 'slm-capability-controllers-'));
+  after(() => rmSync(root, { recursive: true, force: true }));
+  const put = (path) => {
+    const file = join(root, 'src', path);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, '');
+  };
+  put('modules/m/a/a.controller.ts');
+  put('modules/m/b/group/b-group.controller.ts');
+  put('modules/m/c/c.service.ts');
+  put('modules/m/d/d.controller.spec.ts');
+  put('modules/m/e/generated/e.controller.ts');
+  put('modules/m/public/m.controller.ts');
+  put('modules/m/m.controller.ts');
+  put('modules/n/x/x.controller.ts');
+  put('modules/p/q/q.service.ts');
+
+  test('finds the capability folders with a controller at any depth, and leaves out specs, generated, the module root and public/', () => {
+    assert.deepEqual(
+      controllerCapabilities(join(root, 'src')),
+      new Map([
+        ['m', new Set(['a', 'b'])],
+        ['n', new Set(['x'])],
+        ['p', new Set()],
+      ]),
     );
   });
 });
@@ -309,5 +393,73 @@ describe('the command', () => {
 
     assert.doesNotMatch(stdout, /^ {6}\S+ -> \S+ \(via$/m);
     assert.match(stdout, /^ {6}modules\/catalog\/\S+\.ts -> modules\/catalog\/\S+\.ts( \(via \S+( -> \S+)*\))?$/m);
+  });
+});
+
+describe('the layers of requests, as the command prints them and as the module card writes them', () => {
+  const printed = spawnSync(process.execPath, ['scripts/arch/capabilities.mjs', '--module', 'requests'], {
+    cwd: projectRoot,
+    encoding: 'utf8',
+  });
+  // "  L2           assessment  imports 5, imported by 5" (an L3 that is imported adds ": importer, importer", an isolated L0 is "L0 (cô lập)")
+  const lines = [
+    ...printed.stdout.matchAll(/^ {2}(L[0-3])(?: \(cô lập\))? +(\S+) +imports (\d+), imported by (\d+)(?:: (.+))?$/gm),
+  ];
+  const printedLayers = { L0: [], L1: [], L2: [], L3: [] };
+  for (const [, layer, name] of lines) printedLayers[layer].push(name);
+
+  /** The capabilities each row of the table "Tầng trong module" of the module card names, in backticks, as a capability of requests. */
+  const cardLayers = () => {
+    const card = readFileSync(join(projectRoot, 'src', 'modules', 'requests', 'README.md'), 'utf8');
+    const names = new Set(capabilityNames(join(projectRoot, 'src')).get('requests'));
+    const rows = {};
+    for (const [, layer, cell] of card.matchAll(/^\| (L[0-3]) +\| (.+?) +\| .+ +\|\r?$/gm)) {
+      rows[layer] = [...cell.matchAll(/`([^`]+)`/g)].map(([, token]) => token).filter((token) => names.has(token));
+    }
+    return rows;
+  };
+
+  test('prints one line with a layer for each of the 39 capabilities, every one in exactly one layer', () => {
+    assert.equal(printed.status, 0);
+    assert.equal(lines.length, 39);
+    assert.equal(new Set(lines.map(([, , name]) => name)).size, 39);
+  });
+
+  test('marks as isolated, and only as such, the capability that imports nothing and that nothing imports', () => {
+    assert.deepEqual(
+      [...printed.stdout.matchAll(/^ {2}L0 \(cô lập\) +(\S+) /gm)].map(([, name]) => name),
+      ['status'],
+    );
+  });
+
+  test('puts in each layer exactly the capabilities the module card lists there (the card is fixed, not the command, when they differ)', () => {
+    const card = cardLayers();
+
+    for (const layer of ['L0', 'L1', 'L2', 'L3']) {
+      assert.deepEqual([...card[layer]].sort(), [...printedLayers[layer]].sort(), layer);
+    }
+  });
+
+  test('has no capability below L3 that imports a capability with a controller, and names the importers of each L3 that is imported', () => {
+    const imported = lines.filter(([, layer, , , by]) => layer === 'L3' && Number(by) > 0);
+    // the five exceptions of the card (the list itself is in the gate capability-graph)
+    assert.deepEqual(imported.map(([, , name]) => name).sort(), [
+      'draft',
+      'group-request-submission',
+      'line-closure',
+      'service-account-request',
+      'sla',
+    ]);
+    for (const [, , name, , , importers] of imported) assert.ok(importers, name);
+    const graph = capabilityGraph(join(projectRoot, 'src')).get('requests');
+    const l3 = new Set(printedLayers.L3);
+    for (const [from, targets] of graph) {
+      if (l3.has(from)) continue;
+      assert.deepEqual(
+        [...targets.keys()].filter((target) => l3.has(target)),
+        [],
+        from,
+      );
+    }
   });
 });

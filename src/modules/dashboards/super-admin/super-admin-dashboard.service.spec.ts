@@ -1,6 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { OnboardingFacts } from '../../organization/public/organization.types';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
@@ -12,7 +12,6 @@ const actor = (roles: readonly string[]): AuthenticatedPrincipal => ({
   sessionId: 's1',
   employeeId: 'sa-1',
   directRoles: roles,
-  derivedRoles: [],
   roles,
 });
 
@@ -36,7 +35,7 @@ function serviceWith() {
     {
       businessToday: () => Promise.resolve('2026-10-23'),
       getOnboardingFacts: () => Promise.resolve(FACTS),
-    } as unknown as OrganizationApi,
+    } as unknown as OrganizationReadApi,
     { findUsableItAdminEmployeeIds } as unknown as IdentityAccessApi,
     { noticesAwaitingHandling } as unknown as PersonnelDashboardApi,
   );
@@ -58,7 +57,7 @@ describe('SuperAdminDashboardService', () => {
       departmentsWithoutItAdmin: { state: 'COUNTED', count: 3, sourceOperationId: 'departmentWarningList' },
       personnelNotices: { state: 'COUNTED', count: 6, sourceOperationId: 'personnelNoticeList' },
       congestion: { state: 'AT_SOURCE', sourceOperationId: 'stepCongestionList' },
-      approverConfiguration: { state: 'AT_SOURCE', sourceOperationId: 'approvalRoleList' },
+      approverConfiguration: { state: 'AT_SOURCE', sourceOperationId: 'appUserList' },
       superAdminRole: { state: 'AT_SOURCE', sourceOperationId: 'superAdminWatchGet' },
       accountCandidates: { state: 'AT_SOURCE', sourceOperationId: 'accountCandidatesList' },
       backgroundJobs: { state: 'NOT_AVAILABLE', count: null, reason: 'NO_DATA_SOURCE' },

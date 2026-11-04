@@ -225,11 +225,10 @@ export function toBudgetApiException(error: unknown): unknown {
 const example = (error: Error) => errorExampleOf(toBudgetApiException(error));
 
 /**
- * What the 403 of the reads of the versions says: the service lets Finance, the spending approver and the substitute who decides in a
- * conflict of interest read them (`requireVersionReader`); the routes themselves have no role guard.
+ * What the 403 of the reads of the versions says: the service lets Finance and the spending approver read them
+ * (`requireVersionReader`); the routes themselves have no role guard.
  */
-export const VERSION_READERS_DESCRIPTION =
-  'Only Finance, the spending approver and the substitute who decides in a conflict of interest read the versions of a budget.';
+export const VERSION_READERS_DESCRIPTION = 'Only Finance and the spending approver read the versions of a budget.';
 
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
 export const BUDGET_ERROR_EXAMPLES = {

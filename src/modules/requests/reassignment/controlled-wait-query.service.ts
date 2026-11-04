@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ControlledWaitRepo } from './controlled-wait.repo';
 import type { ControlledWaitWire } from './controlled-wait.dto';
 import { configurationHintOf } from '../step-routing/reassignment.policy';
@@ -15,7 +15,7 @@ import { configurationHintOf } from '../step-routing/reassignment.policy';
 export class ControlledWaitQueryService {
   constructor(
     private readonly waits: ControlledWaitRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   async page(
@@ -24,17 +24,17 @@ export class ControlledWaitQueryService {
   ): Promise<Page<ControlledWaitWire>> {
     const departmentIds = actor.roles.includes('SUPER_ADMIN')
       ? null
-      : await this.organization.getDepartmentIdsInChargeOf(actor.employeeId);
+      : await this.organizationReads.getDepartmentIdsInChargeOf(actor.employeeId);
     if (departmentIds !== null && departmentIds.length === 0) return pageOf([], 0, query.page, query.pageSize);
 
     const { rows, total } = await this.waits.page(departmentIds, (query.page - 1) * query.pageSize, query.pageSize);
     const people = new Map(
-      (await this.organization.getEmployees([...new Set(rows.map((row) => row.requesterEmployeeId))])).map(
+      (await this.organizationReads.getEmployees([...new Set(rows.map((row) => row.requesterEmployeeId))])).map(
         (employee) => [employee.id, employee],
       ),
     );
     const departments = new Map(
-      (await this.organization.getDepartmentBriefs([...new Set(rows.map((row) => row.departmentId))])).map(
+      (await this.organizationReads.getDepartmentBriefs([...new Set(rows.map((row) => row.departmentId))])).map(
         (department) => [department.id, department],
       ),
     );

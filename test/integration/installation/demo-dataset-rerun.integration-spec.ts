@@ -98,8 +98,9 @@ describe('ops:demo-dataset reruns over a slow database connection (A-04, real AP
     const directUrl = process.env.TEST_DATABASE_URL;
     process.env.TEST_DATABASE_URL = relayed.toString();
     try {
-      const { DemoDatasetModule } = await import('../../../src/modules/installation/demo-dataset/demo-dataset.module');
-      demo = await NestFactory.createApplicationContext(DemoDatasetModule, { logger: false });
+      const { DemoDatasetCliModule } =
+        await import('../../../src/modules/installation/demo-dataset/demo-dataset-cli.module');
+      demo = await NestFactory.createApplicationContext(DemoDatasetCliModule, { logger: false });
     } finally {
       process.env.TEST_DATABASE_URL = directUrl;
     }

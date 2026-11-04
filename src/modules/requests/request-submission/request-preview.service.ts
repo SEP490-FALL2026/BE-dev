@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
+import { RequestPartyEligibilityApi } from '../../identity-access/public/request-party-eligibility.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNoDepartmentError } from '../access-request/access-request.errors';
 import type { PreviewBodyDto, PreviewWire } from './request-preview.dto';
 import { buildChain, spendSubmissionOf, termNeedsConfirmation } from './request-preview.policy';
@@ -19,26 +21,15 @@ export class RequestPreviewService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly assessment: RequestFactsService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly pricing: PricingViewService,
+    private readonly requestParties: RequestPartyEligibilityApi,
   ) {}
 
-  /** Throws AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError and AccessRequestSpendDateNotAllowedError. */
+  /** Throws RequestPartyIneligibleError (only `UNPLACED`), AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError and AccessRequestSpendDateNotAllowedError. */
   async preview(actor: AuthenticatedPrincipal, body: PreviewBodyDto): Promise<PreviewWire> {
-    const settings = await this.assessment.settings();
-    const { assessed, vendorId } = await this.runner.run(async (tx) => ({
-      assessed: await this.assessment.assess(tx, {
-        employeeId: actor.employeeId,
-        planId: body.planId,
-        termMonths: body.termMonths,
-        expectedSpendOn: body.expectedSpendOn,
-        now: new Date(),
-        settings,
-        lockDepartment: false,
-      }),
-      vendorId: await this.catalog.getPlanVendorId(body.planId, tx),
-    }));
+    const { assessed, vendorId, blockedBy } = await this.read(actor, body);
     const { unit, target, policy, pricing, routing } = assessed;
     // A plan of the catalog is always one of the first two branches; only a proposal takes the third.
     if (policy.branch === 'NEW_SOFTWARE') throw new Error('A plan of the catalog cannot be a proposal.');
@@ -46,9 +37,9 @@ export class RequestPreviewService {
     const peopleIds = [...new Set(chain.flatMap((step) => (step.assigneeEmployeeId ? [step.assigneeEmployeeId] : [])))];
 
     const [department, costCenters, people, priceView, costEstimate] = await Promise.all([
-      this.organization.getDepartmentBrief(unit.departmentId),
-      unit.costCenter ? this.organization.costCentersByIds([unit.costCenter.id]) : Promise.resolve([]),
-      this.organization.getEmployees(peopleIds),
+      this.organizationReads.getDepartmentBrief(unit.departmentId),
+      unit.costCenter ? this.organizationReads.costCentersByIds([unit.costCenter.id]) : Promise.resolve([]),
+      this.organizationReads.getEmployees(peopleIds),
       this.pricing.view(pricing),
       this.pricing.costEstimate(pricing, vendorId),
     ]);
@@ -70,14 +61,14 @@ export class RequestPreviewService {
       },
       branch: policy.branch,
       termMonths: body.termMonths,
-      projectLabel: body.projectLabel ?? null,
       department: { id: department.id, code: department.code, name: department.name },
       costCenter: costCenter && { id: costCenter.id, code: costCenter.code, name: costCenter.name },
       requirements: {
         termConfirmationByHead: termNeedsConfirmation(body.termMonths),
       },
       existingAccess: assessed.heldAccess,
-      canSubmit: assessed.heldAccess === null,
+      blockedBy,
+      canSubmit: assessed.heldAccess === null && blockedBy === null,
       expectedSpendOn: pricing.expectedSpendOn,
       budgetYear: pricing.budgetYear,
       pricing: priceView,
@@ -87,5 +78,28 @@ export class RequestPreviewService {
       possibleExtraSteps: paid ? [{ kind: 'FINANCE_REVIEW', beforeStep: 'SPEND_APPROVAL' }] : [],
       totalExpectedWorkingDays: chain.reduce((sum, step) => sum + step.expectedWorkingDays, 0),
     };
+  }
+
+  /** What the preview is made of, read in one transaction that locks nothing: who is refused (before the department is read), the facts of sending and the vendor. */
+  private async read(actor: AuthenticatedPrincipal, body: PreviewBodyDto) {
+    const settings = await this.assessment.settings();
+
+    return this.runner.run(async (tx) => {
+      const blockedBy = await this.requestParties.blockOf(
+        { requesterEmployeeId: actor.employeeId, beneficiaryEmployeeIds: [actor.employeeId] },
+        tx,
+      );
+      if (blockedBy?.reason === 'UNPLACED') throw new RequestPartyIneligibleError(blockedBy);
+      const assessed = await this.assessment.assess(tx, {
+        employeeId: actor.employeeId,
+        planId: body.planId,
+        termMonths: body.termMonths,
+        expectedSpendOn: body.expectedSpendOn,
+        now: new Date(),
+        settings,
+        lockDepartment: false,
+      });
+      return { blockedBy, assessed, vendorId: await this.catalog.getPlanVendorId(body.planId, tx) };
+    });
   }
 }

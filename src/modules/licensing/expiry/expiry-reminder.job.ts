@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { ExpiryReminderService } from './expiry-reminder.service';
+import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 
 /** The first sweep waits, so a short-lived process (a test, a command) never starts one. */
 const FIRST_SWEEP_AFTER_MS = 5 * 60 * 1000;
@@ -43,7 +44,7 @@ export class ExpiryReminderSweeper implements OnApplicationBootstrap, OnModuleDe
       const told = await this.reminders.noticeDue();
       if (told > 0) this.logger.log(`Wrote ${told} reminder(s) that a right is about to end`);
     } catch (error) {
-      this.logger.error(`Expiry reminder sweep failed: ${(error as Error).name}`);
+      this.logger.error(`Expiry reminder sweep failed: ${describeForOperator(error)}`, traceForOperator(error));
     } finally {
       this.schedule(SWEEP_EVERY_MS);
     }

@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeDisplayName } from '../../../core/display-name';
-import type { HrBasis } from '../public/hr-basis.types';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { organizationAuditEvent } from '../organization-audit-event.mapper';
 import { OrganizationContextService } from '../organization-context.service';
-import { EmployeeDirectoryService } from '../employee/employee-directory.service';
+import { EmployeeRecordService } from '../employee/employee-record.service';
 import { DepartmentUseService } from '../department/department-use.service';
 import { DepartmentServiceAccountReaderHook } from '../public/organization.extension-points';
 import { EmployeeAccountsHook } from '../public/organization.extension-points';
 import {
+  DepartmentCodeInvalidError,
   DepartmentInUseError,
   DepartmentInactiveError,
   DepartmentItAdminInvalidError,
@@ -18,15 +18,16 @@ import {
   DepartmentNotFoundError,
   DepartmentUpdateEmptyError,
 } from '../department/department.errors';
-import { lockAndReadEmployee, requireOrganization } from './department-lookups.service';
+import { lockAndReadEmployee, requireOrganization } from './department-facts.service';
 import { assertMayChangeOrganization } from '../department/department.policy';
 import { DepartmentRepo } from '../department/department.repo';
+import { isDepartmentCodeValid } from '../public/organization-code.policy';
+import { DEPARTMENT_NAME_MAX_LENGTH } from '../department/department.types';
 
-const DEPARTMENT_NAME_MAX_LENGTH = 200;
-const DEPARTMENT_FUNCTION_MAX_LENGTH = 1000;
 /** How many of each kind of thing that still keeps the department in use the refusal to retire it lists. */
 const IN_USE_LISTED = 20;
 
+/** The length of a function is bounded by the schema of the request (`API-DOC-F05`); here it is only composed and trimmed. */
 const normalizeFunction = (raw: string | null | undefined): string | null => {
   // Free text keeps its line breaks: accents composed, the ends trimmed, nothing else.
   const text = raw === null || raw === undefined ? '' : raw.normalize('NFC').trim();
@@ -37,7 +38,7 @@ const normalizeFunction = (raw: string | null | undefined): string | null => {
 /**
  * Department profiles (`US-03-06`, `US-01-11`): the Super Admin creates a department, with no Cost Center (Finance creates one for
  * it afterwards, `QĐ-87d(1)`), changes it, names who is in charge of its technical work and retires it once nothing keeps it in
- * use, always on an HR basis (`QĐ-87a`, `QĐ-87b(1)`). The IT Admin changes none of it. Who heads it is `DepartmentHeadService`;
+ * use, with no HR basis to give (`QĐ-87a`, `QĐ-93f`): the Audit Trail records who, when, before and after. The IT Admin changes none of it. Who heads it is `DepartmentHeadService`;
  * what a profile shows is `DepartmentQueryService`; who may do what is `department.policy.ts`, run first in every use case.
  */
 @Injectable()
@@ -45,7 +46,7 @@ export class DepartmentService {
   constructor(
     private readonly repo: DepartmentRepo,
     private readonly context: OrganizationContextService,
-    private readonly employees: EmployeeDirectoryService,
+    private readonly employees: EmployeeRecordService,
     private readonly use: DepartmentUseService,
     private readonly serviceAccounts: DepartmentServiceAccountReaderHook,
     private readonly employeeAccounts: EmployeeAccountsHook,
@@ -55,7 +56,7 @@ export class DepartmentService {
 
   /**
    * Creates a department with no Cost Center and returns its id: Finance creates the Cost Center for it afterwards, and it is
-   * never changed by renaming the department or changing its head (AC-4). The HR basis is recorded with the change. Throws
+   * never changed by renaming the department or changing its head (AC-4). Throws
    * DepartmentForbiddenError, DepartmentNameInvalidError, DepartmentItAdminInvalidError or DepartmentCodeTakenError.
    */
   async create(
@@ -65,14 +66,14 @@ export class DepartmentService {
       name: string;
       functionDescription?: string | null;
       itAdminEmployeeId?: string | null;
-      hrBasis: HrBasis;
     },
   ): Promise<string> {
     assertMayChangeOrganization(actor.roles);
     const name = this.requireName(input.name);
-    const functionDescription = this.requireFunction(input.functionDescription);
+    const functionDescription = normalizeFunction(input.functionDescription);
+    const code = input.code.trim().toUpperCase();
+    if (!isDepartmentCodeValid(code)) throw new DepartmentCodeInvalidError();
     const organization = await requireOrganization(this.context);
-    const code = input.code.trim();
 
     return this.runner.run(async (tx) => {
       if (input.itAdminEmployeeId) await this.assertUsableItAdmin(tx, input.itAdminEmployeeId);
@@ -91,7 +92,6 @@ export class DepartmentService {
           name,
           function: functionDescription,
           itAdminEmployeeId: input.itAdminEmployeeId ?? null,
-          hrBasis: { ...input.hrBasis },
         }),
       );
 
@@ -106,7 +106,7 @@ export class DepartmentService {
   async update(
     actor: AuthenticatedPrincipal,
     id: string,
-    input: { name?: string; functionDescription?: string | null; itAdminEmployeeId?: string | null; hrBasis: HrBasis },
+    input: { name?: string; functionDescription?: string | null; itAdminEmployeeId?: string | null },
   ): Promise<void> {
     assertMayChangeOrganization(actor.roles);
     if (input.name === undefined && input.functionDescription === undefined && input.itAdminEmployeeId === undefined) {
@@ -114,7 +114,7 @@ export class DepartmentService {
     }
     const name = input.name === undefined ? undefined : this.requireName(input.name);
     const functionDescription =
-      input.functionDescription === undefined ? undefined : this.requireFunction(input.functionDescription);
+      input.functionDescription === undefined ? undefined : normalizeFunction(input.functionDescription);
     const organization = await requireOrganization(this.context);
 
     await this.runner.run(async (tx) => {
@@ -146,16 +146,7 @@ export class DepartmentService {
       await this.repo.update(tx, id, changes, new Date());
       await this.audit.record(
         tx,
-        organizationAuditEvent(
-          actor,
-          organization.id,
-          'DEPARTMENT.UPDATED',
-          'Department',
-          id,
-          before,
-          // The basis the change is made on is part of what it says (`QĐ-87b(1)`).
-          { ...after, hrBasis: { ...input.hrBasis } },
-        ),
+        organizationAuditEvent(actor, organization.id, 'DEPARTMENT.UPDATED', 'Department', id, before, after),
       );
     });
   }
@@ -167,7 +158,7 @@ export class DepartmentService {
    * department was, who headed it and what was charged to it stay as they were. Already retired ⟹ the same answer. Throws
    * DepartmentForbiddenError, DepartmentNotFoundError or DepartmentInUseError.
    */
-  async deactivate(actor: AuthenticatedPrincipal, id: string, input: { hrBasis: HrBasis }): Promise<void> {
+  async deactivate(actor: AuthenticatedPrincipal, id: string): Promise<void> {
     assertMayChangeOrganization(actor.roles);
     const organization = await requireOrganization(this.context);
 
@@ -203,7 +194,7 @@ export class DepartmentService {
           'Department',
           id,
           { status: current.status },
-          { status: 'INACTIVE', hrBasis: { ...input.hrBasis } },
+          { status: 'INACTIVE' },
         ),
       );
     });
@@ -221,12 +212,5 @@ export class DepartmentService {
     if (name === '' || [...name].length > DEPARTMENT_NAME_MAX_LENGTH) throw new DepartmentNameInvalidError();
 
     return name;
-  }
-
-  private requireFunction(raw: string | null | undefined): string | null {
-    const text = normalizeFunction(raw);
-    if (text !== null && [...text].length > DEPARTMENT_FUNCTION_MAX_LENGTH) throw new DepartmentNameInvalidError();
-
-    return text;
   }
 }

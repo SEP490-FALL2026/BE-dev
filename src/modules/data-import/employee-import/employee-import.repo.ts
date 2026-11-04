@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../../../generated/prisma/client';
+import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { employeeImportCellsJson } from './employee-import-cells.json';
+import { employeeImportDifferencesJson } from './employee-import-differences.json';
+import { employeeImportErrorsJson } from './employee-import-errors.json';
+import { employeeImportResultJson } from './employee-import-result.json';
 import { EmployeeColumn, EmployeeRowOutcome, RowDifference, RowIssue } from './employee-import-row.types';
-
-export type ImportStatus = 'PREVIEW' | 'COMPLETED' | 'CANCELLED';
+import { employeeImportSummaryJson } from './employee-import-summary.json';
+import type { ImportResult, ImportStatus, ImportSummary } from './employee-import.types';
 
 export interface ImportRecord {
   id: string;
@@ -15,8 +19,8 @@ export interface ImportRecord {
   status: ImportStatus;
   previewVersion: number;
   ignoredColumns: string[];
-  summary: unknown;
-  result: unknown;
+  summary: ImportSummary;
+  result: ImportResult | null;
   confirmKey: string | null;
   createdAt: Date;
   expiresAt: Date;
@@ -50,6 +54,14 @@ const IMPORT_SELECT = {
   cancelledAt: true,
 } as const;
 
+type ImportRow = Prisma.EmployeeImportGetPayload<{ select: typeof IMPORT_SELECT }>;
+
+const toRecord = (row: ImportRow): ImportRecord => ({
+  ...row,
+  summary: employeeImportSummaryJson.decode(row.summary),
+  result: employeeImportResultJson.decode(row.result),
+});
+
 /** Owns EmployeeImport and EmployeeImportRow (US-02-01). */
 @Injectable()
 export class EmployeeImportRepo {
@@ -63,7 +75,7 @@ export class EmployeeImportRepo {
       fileName: string;
       contentHash: string;
       ignoredColumns: string[];
-      summary: unknown;
+      summary: ImportSummary;
       expiresAt: Date;
       rows: StoredRow[];
     },
@@ -75,7 +87,7 @@ export class EmployeeImportRepo {
         fileName: input.fileName,
         contentHash: input.contentHash,
         ignoredColumns: input.ignoredColumns,
-        summary: input.summary as Prisma.InputJsonValue,
+        summary: employeeImportSummaryJson.encode(input.summary),
         expiresAt: input.expiresAt,
       },
       select: { id: true },
@@ -91,16 +103,18 @@ export class EmployeeImportRepo {
       data: rows.map((row) => ({
         importId,
         lineNumber: row.lineNumber,
-        cells: row.cells,
+        cells: employeeImportCellsJson.encode(row.cells),
         outcome: row.outcome,
-        errors: row.errors as unknown as Prisma.InputJsonValue,
-        differences: (row.differences ?? undefined) as unknown as Prisma.InputJsonValue | undefined,
+        errors: employeeImportErrorsJson.encode(row.errors),
+        differences: row.differences ? employeeImportDifferencesJson.encode(row.differences) : undefined,
       })),
     });
   }
 
   async find(id: string, tx?: DbTx): Promise<ImportRecord | null> {
-    return (tx ?? this.prisma).employeeImport.findUnique({ where: { id }, select: IMPORT_SELECT });
+    const row = await (tx ?? this.prisma).employeeImport.findUnique({ where: { id }, select: IMPORT_SELECT });
+
+    return row ? toRecord(row) : null;
   }
 
   /** Takes the import's row lock (`FOR UPDATE`) and reads it in a statement of its own. Null when there is none. */
@@ -147,7 +161,7 @@ export class EmployeeImportRepo {
   async replacePreview(
     tx: DbTx,
     importId: string,
-    input: { rows: StoredRow[]; summary: unknown; expiresAt: Date },
+    input: { rows: StoredRow[]; summary: ImportSummary; expiresAt: Date },
   ): Promise<number> {
     await tx.employeeImportRow.deleteMany({ where: { importId } });
     await this.insertRows(tx, importId, input.rows);
@@ -155,7 +169,7 @@ export class EmployeeImportRepo {
       where: { id: importId },
       data: {
         previewVersion: { increment: 1 },
-        summary: input.summary as Prisma.InputJsonValue,
+        summary: employeeImportSummaryJson.encode(input.summary),
         expiresAt: input.expiresAt,
       },
       select: { previewVersion: true },
@@ -164,12 +178,16 @@ export class EmployeeImportRepo {
     return updated.previewVersion;
   }
 
-  async markCompleted(tx: DbTx, id: string, input: { result: unknown; confirmKey: string; now: Date }): Promise<void> {
+  async markCompleted(
+    tx: DbTx,
+    id: string,
+    input: { result: ImportResult; confirmKey: string; now: Date },
+  ): Promise<void> {
     await tx.employeeImport.update({
       where: { id },
       data: {
         status: 'COMPLETED',
-        result: input.result as Prisma.InputJsonValue,
+        result: employeeImportResultJson.encode(input.result),
         confirmKey: input.confirmKey,
         confirmedAt: input.now,
       },
@@ -192,7 +210,7 @@ export class EmployeeImportRepo {
     return {
       id: row.id,
       status: row.status,
-      errorRows: (row.summary as { errors?: number } | null)?.errors ?? 0,
+      errorRows: employeeImportSummaryJson.decode(row.summary).errors,
       createdAt: row.createdAt,
     };
   }
@@ -230,9 +248,9 @@ function toStoredRow(row: {
 }): StoredRow {
   return {
     lineNumber: row.lineNumber,
-    cells: row.cells as StoredRow['cells'],
+    cells: employeeImportCellsJson.decode(row.cells),
     outcome: row.outcome as EmployeeRowOutcome,
-    errors: row.errors as RowIssue[],
-    differences: (row.differences ?? null) as RowDifference[] | null,
+    errors: employeeImportErrorsJson.decode(row.errors),
+    differences: employeeImportDifferencesJson.decode(row.differences),
   };
 }

@@ -1,4 +1,4 @@
-import request from 'supertest';
+﻿import request from 'supertest';
 import type { ApiAccount } from '../../support/api-accounts';
 import { NoticeHarness, type NoticeWire } from '../../support/notice-harness';
 import type { Department, Person } from '../../support/request-harness';
@@ -95,6 +95,36 @@ describe('verifying and recording the notices of the heads (integration, real Po
       const [row] = await h.noticeRows(e1.employeeId);
       expect(await h.caseRow(row.recorded_event_id as string)).toMatchObject({ last_working_day: h.day(12) });
     });
+  });
+
+  it('refuses recording a head transfer notice with a successor without MANAGER and keeps the notice pending', async () => {
+    const heir = await h.worker(des, code());
+    const sent = await h.sentNotice(
+      {
+        employeeId: h1.employeeId,
+        kind: 'DEPARTMENT_TRANSFER_IN',
+        proposedOn: h.day(5),
+        targetDepartmentId: fin.id,
+      },
+      h2.account,
+    );
+    const result = await h.recordNotice(
+      sent.id,
+      h.recording(
+        {
+          effectiveOn: h.day(6),
+          successor: { kind: 'EMPLOYEE', employeeId: heir.employeeId },
+        },
+        { grounds: h.grounds },
+      ),
+    );
+    expect([result.status, h.codeOf(result), h.detailsOf(result)]).toEqual([
+      422,
+      'DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE',
+      { reason: 'MANAGER_ROLE_REQUIRED' },
+    ]);
+    expect(await stillWaiting(h1)).toBe(true);
+    expect(await h.eventsOfNotice(sent.id)).toEqual([]);
   });
 
   describe('rejecting (AC-2)', () => {

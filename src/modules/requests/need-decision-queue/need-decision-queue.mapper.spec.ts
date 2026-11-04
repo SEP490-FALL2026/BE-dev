@@ -85,17 +85,22 @@ describe('a row of the queue of the need steps', () => {
   it.each([
     [1, 'MANAGER'],
     [2, 'SPENDING_APPROVER'],
-    [3, 'FALLBACK_APPROVER'],
-    [4, 'FALLBACK_APPROVER'],
     [5, 'MANAGER'],
     [9, 'MANAGER'],
   ])('names the role of the holder from the row %i of the routing table: %s', (routingRow, role) => {
     expect(needQueueItemOf(row({ routingRow }), lookups()).deciderRole).toBe(role);
   });
 
-  it('asks the spending approver and the fallback approver for no line of the plan, and the head of free software neither', () => {
+  it('names no decider role for a row that gives the step to nobody (3, 4, 8): the queue does not carry such a step', () => {
+    for (const routingRow of [3, 4, 8]) {
+      expect(() => needQueueItemOf(row({ routingRow }), lookups())).toThrow(
+        `The routing row ${routingRow} gives the step to nobody`,
+      );
+    }
+  });
+
+  it('asks the spending approver for no line of the plan, and the head of free software neither', () => {
     expect(needQueueItemOf(row({ routingRow: 2 }), lookups()).planLineRequired).toBe(false);
-    expect(needQueueItemOf(row({ routingRow: 3 }), lookups()).planLineRequired).toBe(false);
     const free = { policy: { ...PAID, chain: ['NEED', 'IT_EXECUTION'] }, amountMinor: null, amountCurrency: null };
     expect(needQueueItemOf(row({ request: free }), lookups()).planLineRequired).toBe(false);
   });

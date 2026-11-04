@@ -2,6 +2,10 @@ import { HttpStatus } from '@nestjs/common';
 import { FORBIDDEN_ERROR } from '../../../infrastructure/http/errors/access-errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import {
+  RequestPartyIneligibleError,
+  requestPartyRefusalBody,
+} from '../../identity-access/public/request-party.errors';
 import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import {
   AssignmentConflictError,
@@ -80,6 +84,10 @@ export function toProvisioningApiException(error: unknown): unknown {
   }
   if (error instanceof ProvisioningResponsibleInvalidError) {
     return refuse(UNPROCESSABLE, 'PROVISIONING.RESPONSIBLE_INVALID', error.message, { problem: error.problem });
+  }
+  // The person IT Admin names as responsible cannot be the spending approver: the same answer as every route that makes a Request (`D-S21`).
+  if (error instanceof RequestPartyIneligibleError) {
+    return new ApiException(UNPROCESSABLE, requestPartyRefusalBody(error));
   }
   if (error instanceof ProvisioningResponsibleNotInDepartmentError) {
     return refuse(CONFLICT, 'PROVISIONING.RESPONSIBLE_NOT_IN_DEPARTMENT', error.message);
@@ -187,6 +195,13 @@ export const PROVISIONING_GRANT_EXAMPLES = {
     example(new ProvisioningPersonalAccountError()),
     example(new ProvisioningAccountIdentifierRequiredError()),
     example(new ProvisioningResponsibleInvalidError('OUTSIDE_DEPARTMENT')),
+    example(
+      new RequestPartyIneligibleError({
+        reason: 'SPENDING_APPROVER',
+        party: 'BENEFICIARY',
+        employeeIds: ['<employee-id>'],
+      }),
+    ),
     example(new ProvisioningSubscriptionError('REQUIRED')),
     example(new ProvisioningSubscriptionError('NOT_ALLOWED')),
     example(new ProvisioningSubscriptionError('PLAN_MISMATCH')),

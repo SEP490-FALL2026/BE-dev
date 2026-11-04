@@ -1,9 +1,13 @@
+import { JsonColumnShapeError } from '../../../infrastructure/database/json-column.errors';
+import { requestPolicyJson } from './access-request.json';
 import {
   CURRENT_POLICY_VERSION,
   canViewRequest,
   chargedCostCenterId,
   mayRequest,
   policyFor,
+  proposalPolicy,
+  type RequestPolicy,
 } from './access-request.policy';
 
 describe('who may see a request (BM-01: the requester, the people who decide, the IT Admin)', () => {
@@ -90,5 +94,58 @@ describe('the Cost Center a request is charged to (F91, QĐ-87g)', () => {
     expect(() => chargedCostCenterId({ id: 'r-9', costCenterId: null })).toThrow(
       'The request r-9 is charged to no Cost Center.',
     );
+  });
+});
+
+describe('requestPolicyJson (the codec of access_requests.policy)', () => {
+  const stored = {
+    version: 1,
+    branch: 'PAID_IN_CATALOG',
+    chain: ['NEED', 'SPEND_APPROVAL', 'IT_EXECUTION'],
+    slaWorkingDays: 3,
+  };
+
+  it('reads the policy of a sent request as the domain type', () => {
+    const policy: RequestPolicy = requestPolicyJson.decode(stored);
+
+    expect(policy).toEqual({ ...stored });
+  });
+
+  it.each([
+    ['a missing field', { version: 1, branch: 'PAID_IN_CATALOG', slaWorkingDays: 3 }],
+    ['a version that is text', { ...stored, version: '1' }],
+    ['a branch the policy does not know', { ...stored, branch: 'FREE_FOR_ALL' }],
+    ['a step of the chain the policy does not know', { ...stored, chain: ['NEED', 'LUNCH'] }],
+    ['null', null],
+    ['the content of a draft', { draft: { kind: 'INDIVIDUAL' } }],
+  ])('refuses %s with the table and the column, and never the value', (_label, value) => {
+    expect(() => requestPolicyJson.decode(value)).toThrow(JsonColumnShapeError);
+    expect(() => requestPolicyJson.decode(value)).toThrow('access_requests.policy');
+    expect(() => requestPolicyJson.decode(value)).not.toThrow(/INDIVIDUAL|LUNCH|FREE_FOR_ALL/);
+  });
+
+  // The JSON a request has always been written with: the object `policyFor` and `proposalPolicy` return, key for key.
+  it('writes the same JSON as the policy object has always been written as, for each branch', () => {
+    const free = policyFor('INTERNAL', 2);
+    const paid = policyFor('SAAS', 3);
+    const proposal = proposalPolicy(5);
+
+    expect(requestPolicyJson.encode(free)).toEqual({
+      version: 1,
+      branch: 'INTERNAL_FREE',
+      chain: ['NEED', 'IT_EXECUTION'],
+      slaWorkingDays: 2,
+    });
+    expect(requestPolicyJson.encode(paid)).toEqual(stored);
+    expect(requestPolicyJson.encode(proposal)).toEqual({
+      version: 1,
+      branch: 'NEW_SOFTWARE',
+      chain: ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'],
+      slaWorkingDays: 5,
+    });
+    for (const policy of [free, paid, proposal]) {
+      expect(requestPolicyJson.encode(policy)).toEqual(JSON.parse(JSON.stringify(policy)));
+      expect(requestPolicyJson.decode(JSON.parse(JSON.stringify(requestPolicyJson.encode(policy))))).toEqual(policy);
+    }
   });
 });

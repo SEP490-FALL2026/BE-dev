@@ -37,6 +37,8 @@ export interface OpenStep {
   holderEmployeeId: string | null;
   /** The holder has left the company: they no longer count as valid even though the step still names them. */
   holderGone: boolean;
+  /** Why the step waits now; null while somebody holds it. */
+  waitingReason: string | null;
 }
 
 /** Who the routing table gives the step on today's data: a person, or nobody and why. */
@@ -46,13 +48,18 @@ export type StepTarget =
 export type ReassignmentDecision =
   | { action: 'KEEP' }
   | { action: 'ASSIGN'; assigneeEmployeeId: string; routingRow: number | null }
-  | { action: 'WAIT'; reason: WaitingReasonCode };
+  | { action: 'WAIT'; reason: WaitingReasonCode }
+  /** A step that waits goes on waiting, for another reason: only the reason is written, the stretch and the deadline stay. */
+  | { action: 'REWAIT'; reason: WaitingReasonCode };
 
+/**
+ * Every reason a step can be read waiting for. `SPENDING_APPROVER_IS_PARTY` is a current reason: the spend routing writes it when
+ * the spending approver is a party of the request (`QĐ-93d(2)`). The column is text: no migration.
+ */
 export const WAITING_REASON_CODES = [
   'NO_SPENDING_APPROVER',
-  'NO_FALLBACK_APPROVER',
-  'FALLBACK_IS_REQUESTER',
-  'NO_CONFLICT_SUBSTITUTE',
+  'NO_DEPARTMENT_HEAD',
+  'SPENDING_APPROVER_IS_PARTY',
   'NO_FINANCE_REVIEWER',
   'NO_IT_ADMIN_IN_CHARGE',
 ] as const;
@@ -85,10 +92,11 @@ export function touchesHeldStep(step: OpenStep, trigger: ReassignmentTrigger): b
 }
 
 /**
- * Keep, give or wait. A step that waits is tried again on every event: nobody holds it, so there is no holder to protect and
- * `FR-3.12` gives it as soon as somebody valid exists. A step somebody holds is looked at only when the event may touch it;
- * then it stays with the holder when the table still names them (the deadline is never reset by a holder who stays), goes to
- * the person the table names otherwise, and waits when the table names nobody.
+ * Keep, give, wait or wait again. A step that waits is tried again on every event: nobody holds it, so there is no holder to
+ * protect and `FR-3.12` gives it as soon as somebody valid exists; when the table still names nobody but for another reason than
+ * the step waits for, only the reason is written (`REWAIT`). A step somebody holds is looked at only when the event may touch it;
+ * then it stays with the holder when the table still names them (the deadline is never reset by a holder who stays), goes to the
+ * person the table names otherwise, and waits when the table names nobody.
  */
 export function decideReassignment(
   step: OpenStep,
@@ -96,31 +104,31 @@ export function decideReassignment(
   target: StepTarget,
 ): ReassignmentDecision {
   if (step.state === 'WAITING') {
-    return target.assigneeEmployeeId === null
-      ? { action: 'KEEP' }
-      : { action: 'ASSIGN', assigneeEmployeeId: target.assigneeEmployeeId, routingRow: target.routingRow };
+    if (target.assigneeEmployeeId !== null) {
+      return { action: 'ASSIGN', assigneeEmployeeId: target.assigneeEmployeeId, routingRow: target.routingRow };
+    }
+
+    return target.reason === step.waitingReason ? { action: 'KEEP' } : { action: 'REWAIT', reason: target.reason };
   }
   if (!touchesHeldStep(step, trigger)) return { action: 'KEEP' };
   if (target.assigneeEmployeeId === null) return { action: 'WAIT', reason: target.reason };
-  if (target.assigneeEmployeeId === step.holderEmployeeId && !step.holderGone) return { action: 'KEEP' };
+  if (target.assigneeEmployeeId === step.holderEmployeeId && !step.holderGone) {
+    return { action: 'KEEP' };
+  }
 
   return { action: 'ASSIGN', assigneeEmployeeId: target.assigneeEmployeeId, routingRow: target.routingRow };
 }
 
-/** What the Super Admin or the IT Admin does to end a wait: the configuration that is missing, by the reason the step waits. */
+/**
+ * What the Super Admin or the IT Admin does to end a wait: the configuration that is missing, by the reason the step waits.
+ */
 export type ConfigurationHint =
-  | 'CONFIGURE_SPENDING_APPROVER'
-  | 'CONFIGURE_FALLBACK_APPROVER'
-  | 'CONFIGURE_CONFLICT_SUBSTITUTE'
-  | 'GRANT_FINANCE_ROLE'
-  | 'ASSIGN_DEPARTMENT_HEAD'
-  | 'NAME_IT_ADMIN_IN_CHARGE';
+  'CONFIGURE_SPENDING_APPROVER' | 'GRANT_FINANCE_ROLE' | 'ASSIGN_DEPARTMENT_HEAD' | 'NAME_IT_ADMIN_IN_CHARGE';
 
 const HINTS: Record<WaitingReasonCode, ConfigurationHint> = {
   NO_SPENDING_APPROVER: 'CONFIGURE_SPENDING_APPROVER',
-  NO_FALLBACK_APPROVER: 'CONFIGURE_FALLBACK_APPROVER',
-  FALLBACK_IS_REQUESTER: 'ASSIGN_DEPARTMENT_HEAD',
-  NO_CONFLICT_SUBSTITUTE: 'CONFIGURE_CONFLICT_SUBSTITUTE',
+  NO_DEPARTMENT_HEAD: 'ASSIGN_DEPARTMENT_HEAD',
+  SPENDING_APPROVER_IS_PARTY: 'CONFIGURE_SPENDING_APPROVER',
   NO_FINANCE_REVIEWER: 'GRANT_FINANCE_ROLE',
   NO_IT_ADMIN_IN_CHARGE: 'NAME_IT_ADMIN_IN_CHARGE',
 };
@@ -131,14 +139,12 @@ export function configurationHintOf(reason: string): ConfigurationHint | null {
 }
 
 /**
- * Who is told that a step waits: always the Super Admin, who configures the roles; and the IT Admin in charge of the department
- * when the need step waits because the department has neither a head nor a fallback approver (`US-05-11` AC-6).
+ * Who is told that a step waits: always the Super Admin, who assigns the head and grants the roles (`US-05-11` AC-6, `D-S20`).
+ * Nobody else: the IT Admin in charge was told only when a department had neither a head nor a fallback approver, and there is
+ * no fallback approver any more (`QĐ-93c`). Never empty, so a stretch of waiting is always told to somebody.
  */
-export function alertRecipientsOf(
-  kind: ReassignableStepKind,
-  reason: string,
-): ('SUPER_ADMIN' | 'IT_ADMIN_IN_CHARGE')[] {
-  return kind === 'NEED' && reason === 'NO_FALLBACK_APPROVER' ? ['SUPER_ADMIN', 'IT_ADMIN_IN_CHARGE'] : ['SUPER_ADMIN'];
+export function alertRecipientsOf(): ['SUPER_ADMIN'] {
+  return ['SUPER_ADMIN'];
 }
 
 /**

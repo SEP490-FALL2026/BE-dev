@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
 import {
   assertHoldsRole,
@@ -42,7 +42,7 @@ export interface ItAdminDashboard {
 @Injectable()
 export class ItAdminDashboardService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly licensing: LicensingDashboardApi,
     private readonly personnel: PersonnelDashboardApi,
@@ -51,8 +51,8 @@ export class ItAdminDashboardService {
   /** Throws DashboardRefusedError for a caller without the IT Admin role. */
   async overview(actor: AuthenticatedPrincipal): Promise<ItAdminDashboard> {
     assertHoldsRole(actor.roles, 'IT_ADMIN');
-    const today = await this.organization.businessToday();
-    const departmentIds = await this.organization.getItAdminScope(actor.employeeId, (ids) =>
+    const today = await this.organizationReads.businessToday();
+    const departmentIds = await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
       this.identity.findUsableItAdminEmployeeIds(ids),
     );
     const work = await this.licensing.itAdminFacts(actor.employeeId);

@@ -31,11 +31,15 @@ export function assertContext(context: RecoveryContext): void {
 
 /**
  * In a shared environment the approver and the operator are two people, and the person who receives the link is not
- * the operator (AC-13). A local test environment lets one person do both, and the audit says it was a test.
+ * the operator (AC-13). In a role transfer that names the holder, the approver is not the holder either. A local test
+ * environment lets one person do both, and the audit says it was a test.
  */
-export function assertSeparation(context: RecoveryContext, recipients: string[]): void {
+export function assertSeparation(context: RecoveryContext, recipients: string[], holderEmail?: string): void {
   if (context.environment !== 'SHARED') return;
   if (same(context.approverRef, context.operatorRef)) throw new RecoveryRefusedError('APPROVER_IS_OPERATOR');
+  if (holderEmail !== undefined && holderEmail.trim() !== '' && same(context.approverRef, holderEmail)) {
+    throw new RecoveryRefusedError('APPROVER_IS_HOLDER');
+  }
   if (recipients.some((recipient) => recipient.trim() !== '' && same(recipient, context.operatorRef))) {
     throw new RecoveryRefusedError('RECIPIENT_IS_OPERATOR');
   }

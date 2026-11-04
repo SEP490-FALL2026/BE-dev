@@ -7,6 +7,7 @@ import type {
 import { NoticeHarness } from '../../support/notice-harness';
 import type { Department } from '../../support/request-harness';
 
+import { clearSpendingApprover, setSpendingApprover } from '../../support/builders/account.builder';
 import { superAdminEventService } from '../../support/super-admin-event-runner';
 const h = new NoticeHarness();
 const SUBJECT_CODE = 'E-ADMIN';
@@ -312,6 +313,53 @@ describe('the controlled procedure for an event about the Super Admin (integrati
 
       expect(problem).toMatch(/^DEPARTMENT_TRANSFER\./);
       expect(await counts()).toBe(before);
+    });
+  });
+
+  describe('the successor of a head who leaves (US-03-01 AC-8, US-03-04 AC-8, QĐ-93a)', () => {
+    it('refuses a successor without MANAGER and the spending approver, with the reason the command prints, and writes nothing', async () => {
+      // The Super Admin never heads a department; a head period written by SQL is the only way to put the case in front of the command.
+      const placement = await h.ctx.sql.query<{ department_id: string; code: string }>(
+        `SELECT p.department_id, d.code FROM employee_placements p JOIN departments d ON d.id = p.department_id
+          WHERE p.employee_id = $1 AND p.valid_to IS NULL`,
+        [saEmployee()],
+      );
+      const home = { id: placement.rows[0].department_id, code: placement.rows[0].code, unitId: '' };
+      const withoutRole = await h.staff(home, 'S-NOROLE');
+      const approver = await h.staff(home, 'S-APPROVER');
+      await setSpendingApprover(h.ctx, h.admin, approver.employeeId);
+      await h.ctx.sql.query(
+        `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2026-02-01')`,
+        [h.seed.organizationId, home.id, saEmployee()],
+      );
+      const before = await counts();
+      const refusal = async (parameters: SuperAdminEventParameters) => {
+        const error = await run(parameters).catch((thrown: unknown) => thrown);
+        expect(error).toBeInstanceOf(SuperAdminEventRefusedError);
+
+        return [(error as SuperAdminEventRefusedError).problem, (error as SuperAdminEventRefusedError).reason];
+      };
+      const successor = (employeeId: string) => ({ kind: 'EMPLOYEE' as const, employeeId });
+
+      expect(
+        await refusal({
+          mode: 'transfer-record',
+          toDepartmentId: fin.id,
+          effectiveOn: h.day(20),
+          successor: successor(withoutRole.employeeId),
+        }),
+      ).toEqual(['DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE', 'MANAGER_ROLE_REQUIRED']);
+      expect(
+        await refusal({
+          mode: 'departure-record',
+          lastWorkingDay: h.day(12),
+          successor: successor(approver.employeeId),
+        }),
+      ).toEqual(['OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE', 'SPENDING_APPROVER_CANNOT_HEAD']);
+      expect(await counts()).toBe(before);
+      await h.ctx.sql.query('DELETE FROM department_head_periods WHERE employee_id = $1', [saEmployee()]);
+      await clearSpendingApprover(h.ctx, h.admin);
     });
   });
 

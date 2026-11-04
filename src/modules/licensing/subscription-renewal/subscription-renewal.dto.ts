@@ -103,6 +103,8 @@ export const renewalSummarySchema = z.strictObject({
   executionPoint: executionPoint.nullable(),
   outcome: outcome.nullable(),
   lateFlagged: z.boolean(),
+  /** Set while the case waits for its decision and nobody who works holds the role of the spending approver: nobody else decides it (`QĐ-93d`(1)). */
+  waitingReason: z.enum(['NO_SPENDING_APPROVER']).nullable(),
   proposedAt: z.iso.datetime(),
 });
 
@@ -153,6 +155,7 @@ export const renewalDetailSchema = renewalSummarySchema.extend({
       quantity: z.number().int().nullable(),
       reason: z.string().nullable(),
       decidedByEmployeeId: z.uuid(),
+      /** `CONFLICT_SUBSTITUTE` is historical: a decision of before `QĐ-93`; none is written now. */
       deciderRole: z.enum(['SPENDING_APPROVER', 'CONFLICT_SUBSTITUTE']),
       decidedAt: z.iso.datetime(),
       decidedOn: z.string(),

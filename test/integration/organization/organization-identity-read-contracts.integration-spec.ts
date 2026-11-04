@@ -2,12 +2,11 @@ import request from 'supertest';
 import { PgRelay } from '../../support/pg-relay';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { QueryCounter, tablesOf } from '../../support/query-count';
-import { HR_BASIS } from '../../support/hr-basis';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
 
-/** LD-11, LD-12, LD-14 and LD-15 of the post-merge review: paged projects, one snapshot, histories that say when they are cut. */
+/** LD-11, LD-14 and LD-15 of the post-merge review: one snapshot, histories that say when they are cut (LD-12, the projects, went with QĐ-93h). */
 describe('organization and identity read contracts (integration, real PostgreSQL)', () => {
   let relay: PgRelay;
   let counter: QueryCounter;
@@ -57,77 +56,15 @@ describe('organization and identity read contracts (integration, real PostgreSQL
     );
   };
 
-  describe('LD-12: the projects', () => {
-    let departmentId: string;
+  describe('LD-12 retired (QĐ-93h): no project on the profile', () => {
+    it('reads the department profile with no project key and without touching a project table', async () => {
+      const { result, statements } = await get(`/api/v1/departments/${h.seed.departmentId}`);
 
-    beforeAll(async () => {
-      departmentId = h.seed.departmentId;
-      await h.ctx.sql.query(
-        `INSERT INTO projects (id, organization_id, name, description, status, updated_at)
-         SELECT gen_random_uuid(), $1, 'LD12 project ' || lpad(n::text, 3, '0'), repeat('long text ', 200), 'RUNNING', now()
-           FROM generate_series(1, 30) AS n`,
-        [h.seed.organizationId],
-      );
-      await h.ctx.sql.query(
-        `INSERT INTO project_departments (project_id, department_id)
-         SELECT id, $1 FROM projects WHERE name LIKE 'LD12 project %'`,
-        [departmentId],
-      );
-    }, 60000);
-
-    it('pages the list by name, leaves the description to the detail, and never reads it from the table', async () => {
-      // The projects are read by the Super Admin, who owns them (QĐ-87).
-      const { result, statements } = await get(
-        `/api/v1/projects?page=2&pageSize=10&departmentId=${departmentId}`,
-        asAdmin(),
-      );
-
-      const page = dataOf<{
-        items: Record<string, unknown>[];
-        pagination: { page: number; pageSize: number; totalItems: number; totalPages: number };
-      }>(result);
-      expect(page.items.map((item) => item.name)).toEqual(
-        Array.from({ length: 10 }, (_, index) => `LD12 project ${String(index + 11).padStart(3, '0')}`),
-      );
-      expect(page.pagination).toEqual({ page: 2, pageSize: 10, totalItems: 30, totalPages: 3 });
-      for (const item of page.items) {
-        expect(Object.keys(item).sort()).toEqual(['departments', 'id', 'name', 'status', 'updatedAt']);
-      }
-      for (const statement of statements.filter((one) => tablesOf(one).includes('projects'))) {
-        expect(statement).not.toContain('"description"');
-      }
-      expect(oneSnapshot(statements, 'projects', 2)).toBe(true);
-    });
-
-    it('refuses a page size over 100, and gives the whole project, with its description, from the detail route', async () => {
-      await request(h.server()).get('/api/v1/projects?pageSize=101').set(asAdmin()).expect(422);
-      const [{ id }] = (
-        await h.ctx.sql.query<{ id: string }>(`SELECT id FROM projects WHERE name = 'LD12 project 001'`)
-      ).rows;
-
-      const { result } = await get(`/api/v1/projects/${id}`, asAdmin());
-
-      expect(dataOf<{ description: string; departments: unknown[] }>(result)).toMatchObject({
-        description: expect.stringContaining('long text') as unknown,
-        departments: [expect.objectContaining({ id: departmentId }) as unknown],
-      });
-      expect(
-        (
-          await request(h.server())
-            .get('/api/v1/projects/3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11')
-            .set(asAdmin())
-            .expect(404)
-        ).body,
-      ).toMatchObject({ error: { code: 'PROJECT.NOT_FOUND' } });
-      await request(h.server()).get(`/api/v1/projects/${id}`).set(h.as(h.finance)).expect(403);
-    });
-
-    it('embeds 20 projects in the department profile and says how many there are', async () => {
-      const { result } = await get(`/api/v1/departments/${departmentId}`);
-
-      const profile = dataOf<{ projects: unknown[]; projectTotal: number }>(result);
-      expect(profile.projects).toHaveLength(20);
-      expect(profile.projectTotal).toBe(30);
+      const profile = dataOf<Record<string, unknown>>(result);
+      expect(profile).not.toHaveProperty('projects');
+      expect(profile).not.toHaveProperty('projectTotal');
+      expect(statements.filter((one) => /\b(?:projects|project_departments)\b/i.test(one))).toEqual([]);
+      await request(h.server()).get('/api/v1/projects').set(asAdmin()).expect(404);
     });
   });
 
@@ -146,6 +83,7 @@ describe('organization and identity read contracts (integration, real PostgreSQL
       expect(page.pagination.totalItems).toBeGreaterThanOrEqual(5);
       expect(Object.keys(page.items[0]).sort()).toEqual([
         'employeeCode',
+        'employeeId',
         'fullName',
         'hasWorkEmail',
         'memberSince',
@@ -197,25 +135,6 @@ describe('organization and identity read contracts (integration, real PostgreSQL
       expect(dataOf<{ roleHistoryHasMore: boolean }>(result).roleHistoryHasMore).toBe(false);
     });
 
-    it('shows the newest 20 holders of an approval role with historyHasMore', async () => {
-      const holder = await h.person('LD14H');
-      await h.ctx.sql.query(
-        `INSERT INTO approval_role_holders (id, organization_id, role, employee_id, held_from, held_until)
-         SELECT gen_random_uuid(), $1, 'FALLBACK_APPROVER', $2, timestamptz '2025-01-01' + n * interval '1 day',
-                timestamptz '2025-01-01' + n * interval '1 day' + interval '1 hour'
-           FROM generate_series(1, 25) AS n`,
-        [h.seed.organizationId, holder],
-      );
-
-      const { result } = await get('/api/v1/approval-roles', asAdmin());
-
-      const roles = dataOf<{ items: { role: string; history: unknown[]; historyHasMore: boolean }[] }>(result).items;
-      const fallback = roles.find((role) => role.role === 'FALLBACK_APPROVER');
-      expect(fallback?.history).toHaveLength(20);
-      expect(fallback?.historyHasMore).toBe(true);
-      expect(roles.find((role) => role.role === 'SPENDING_APPROVER')?.historyHasMore).toBe(false);
-    });
-
     it('shows the newest 20 values of an operating parameter with hasMore', async () => {
       await h.ctx.sql.query(
         `INSERT INTO parameter_values (id, organization_id, key, value, valid_from, valid_to)
@@ -255,7 +174,7 @@ describe('organization and identity read contracts (integration, real PostgreSQL
         await request(h.server())
           .post('/api/v1/departments')
           .set({ Authorization: `Bearer ${h.admin}` })
-          .send({ code, name: code, hrBasis: HR_BASIS })
+          .send({ code, name: code })
           .expect(201);
       }
 

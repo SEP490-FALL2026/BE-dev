@@ -130,15 +130,17 @@ export class AppUsersController {
         ACCOUNT_ERROR_EXAMPLES.ALREADY_EXISTS_FOR_EMPLOYEE,
         ACCOUNT_ERROR_EXAMPLES.LOGIN_EMAIL_TAKEN,
         ACCOUNT_ERROR_EXAMPLES.FINANCE_ALREADY_ASSIGNED,
+        ACCOUNT_ERROR_EXAMPLES.ROLE_COMBINATION_FORBIDDEN,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The body is invalid or a requested role cannot be granted by hand.',
+      description:
+        'The body is invalid, or a requested role cannot be granted by hand, or the new account cannot hold SPENDING_APPROVER.',
       examples: [
         VALIDATION_EXAMPLE,
-        ACCOUNT_ERROR_EXAMPLES.ROLE_DERIVED,
         ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_TRANSFER_ONLY,
+        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_ACCOUNT_NOT_USABLE,
         ACCOUNT_ERROR_EXAMPLES.LOGIN_EMAIL_REQUIRED,
         ACCOUNT_ERROR_EXAMPLES.LOGIN_EMAIL_INVALID,
       ],
@@ -155,7 +157,11 @@ export class AppUsersController {
   }
 
   @Get('app-users')
-  @ApiOperation({ operationId: 'appUserList', summary: 'List accounts' })
+  @ApiOperation({
+    operationId: 'appUserList',
+    summary: 'List accounts',
+    description: 'Filter by department membership on a date; memberOn requires departmentId.',
+  })
   @ApiSuccessResponse(AccountPageResponseDto, { message: 'APP_USER.LISTED', description: 'A page of accounts.' })
   @ApiErrorResponses(...COMMON_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -323,21 +329,27 @@ export class AppUsersController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description: 'Already granted, forbidden combination, Finance seat taken, or the caller.',
+      description:
+        'Already granted, forbidden combination, Finance seat taken, a second spending approver, a head asked to be the spending approver, a person with open work asked to be the spending approver, or the caller.',
       examples: [
         ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN,
         ACCOUNT_ERROR_EXAMPLES.ROLE_ALREADY_GRANTED,
         ACCOUNT_ERROR_EXAMPLES.ROLE_COMBINATION_FORBIDDEN,
         ACCOUNT_ERROR_EXAMPLES.FINANCE_ALREADY_ASSIGNED,
+        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_ALREADY_ASSIGNED,
+        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_HEADS_DEPARTMENT,
+        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_HAS_OPEN_WORK,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The role is derived or moves only by transfer.',
+      description:
+        'The role is the Super Admin role, which changes only by the operations command outside the application, or the person cannot be the spending approver (employee not working, account not usable).',
       examples: [
         VALIDATION_EXAMPLE,
-        ACCOUNT_ERROR_EXAMPLES.ROLE_DERIVED,
         ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_TRANSFER_ONLY,
+        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE,
+        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_ACCOUNT_NOT_USABLE,
       ],
     },
   )
@@ -370,17 +382,15 @@ export class AppUsersController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description: 'The caller cannot change their own account.',
-      examples: [ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN],
+      description:
+        'The caller cannot change their own account, or the account still heads a department, will head one, or is named as a successor (MANAGER).',
+      examples: [ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN, ACCOUNT_ERROR_EXAMPLES.MANAGER_STILL_HEADING],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The role is derived or moves only by transfer.',
-      examples: [
-        VALIDATION_EXAMPLE,
-        ACCOUNT_ERROR_EXAMPLES.ROLE_DERIVED,
-        ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_TRANSFER_ONLY,
-      ],
+      description:
+        'The role is the Super Admin role, which changes only by the operations command outside the application, or the person cannot be the spending approver (employee not working, account not usable).',
+      examples: [VALIDATION_EXAMPLE, ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_TRANSFER_ONLY],
     },
   )
   async revokeRole(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserRoleParamDto) {

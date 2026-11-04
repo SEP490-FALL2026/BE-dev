@@ -6,9 +6,10 @@ import { NestFactory } from '@nestjs/core';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { AlreadyInstalledError } from '../../../src/modules/installation/public/installation.errors';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
-import { AccountDirectoryService } from '../../../src/modules/identity-access/accounts/account-directory.service';
+import { AccountRecordService } from '../../../src/modules/identity-access/accounts/account-record.service';
 import { RoleGrantService } from '../../../src/modules/identity-access/accounts/role-grant.service';
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import {
   DisposableDatabase,
   dropDisposableDatabase,
@@ -84,12 +85,9 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
       SELECT (SELECT bootstrap_completed_at IS NOT NULL FROM organizations) AS bootstrapped,
              (SELECT count(*)::int FROM cost_centers) AS cost_centers,
              (SELECT count(*)::int FROM department_head_periods) AS head_periods,
-             (SELECT count(*)::int FROM departments WHERE it_admin_employee_id IS NOT NULL) AS with_it_admin,
-             (SELECT count(*)::int FROM approval_role_holders) AS approval_holders`);
+             (SELECT count(*)::int FROM departments WHERE it_admin_employee_id IS NOT NULL) AS with_it_admin`);
 
-    expect(facts.rows).toEqual([
-      { bootstrapped: true, cost_centers: 0, head_periods: 0, with_it_admin: 0, approval_holders: 0 },
-    ]);
+    expect(facts.rows).toEqual([{ bootstrapped: true, cost_centers: 0, head_periods: 0, with_it_admin: 0 }]);
   });
 
   it('applies every committed migration folder, each finished and none rolled back', async () => {
@@ -109,7 +107,7 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
   it('finds the Super Admin holder and reads its account without any credential field', async () => {
     const runner = app.get(TransactionRunner);
     const holder = await runner.run((tx) => app.get(RoleGrantService).findSuperAdminHolderId(tx));
-    const record = await app.get(AccountDirectoryService).findAccountRecord(holder ?? '');
+    const record = await app.get(AccountRecordService).findAccountRecord(holder ?? '');
 
     expect(holder).not.toBeNull();
     expect(record).toMatchObject({ status: 'ACTIVE', activationState: 'ACTIVATED', loginEmail: 'bao@acme.vn' });
@@ -139,8 +137,9 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
     /** A person in the first department, with no account yet (the installation creates only the Super Admin's). */
     const newPerson = async (tx: Parameters<Parameters<TransactionRunner['run']>[0]>[0], code: string) => {
       const organization = app.get(OrganizationApi);
-      const org = await organization.getOrganization(tx);
-      const lookup = await organization.lookupForEmployeeImport(
+      const organizationReads = app.get(OrganizationReadApi);
+      const org = await organizationReads.getOrganization(tx);
+      const lookup = await organizationReads.lookupForEmployeeImport(
         {
           departmentCodes: ['P-ENG'],
           employeeCodes: [],
@@ -164,7 +163,7 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
 
     const newEmployee = async (tx: Parameters<Parameters<TransactionRunner['run']>[0]>[0], code: string) => {
       const { organizationId, employeeId } = await newPerson(tx, code);
-      const user = await app.get(AccountDirectoryService).createAppUser(tx, {
+      const user = await app.get(AccountRecordService).createAppUser(tx, {
         organizationId,
         employeeId,
         loginEmail: `${code.toLowerCase()}@acme.vn`,
@@ -202,7 +201,7 @@ describe('installation bootstrap facts (integration, real PostgreSQL)', () => {
     it('refuses a second account for the same login email', async () => {
       const error = await attempt(async (tx) => {
         const { organizationId, employeeId } = await newPerson(tx, 'E104');
-        await app.get(AccountDirectoryService).createAppUser(tx, {
+        await app.get(AccountRecordService).createAppUser(tx, {
           organizationId,
           employeeId,
           loginEmail: 'Bao@Acme.vn',

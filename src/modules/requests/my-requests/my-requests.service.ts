@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestSuperAdminCannotRequestError } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
 import type { MyRequestSummaryWire } from './my-requests.dto';
@@ -38,7 +38,7 @@ export class MyRequestsService {
   constructor(
     private readonly requests: MyRequestsRepo,
     private readonly facts: MyRequestsFactsRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
   ) {}
 
@@ -77,7 +77,7 @@ export class MyRequestsService {
     const planIds = idsOf(rows, (row) => row.planId);
     const [people, plans, softwareNames, checks, reviews, openFinanceReview, openSpendApproval, spendRefusals] =
       await Promise.all([
-        personIds.length === 0 ? Promise.resolve([]) : this.organization.getEmployees([...new Set(personIds)]),
+        personIds.length === 0 ? Promise.resolve([]) : this.organizationReads.getEmployees([...new Set(personIds)]),
         planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
         this.requests.proposalNames(idsOf(rows, (row) => (row.branch === 'NEW_SOFTWARE' ? row.id : null))),
         this.facts.latestChecks(queued),

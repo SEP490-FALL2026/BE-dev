@@ -3,9 +3,9 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
-import { PlanLookupService } from '../plan/plan-lookup.service';
+import { PlanFactsService } from '../plan/plan-facts.service';
 import { SubscriptionPeriodRefusedError } from '../public/subscription-period.errors';
 import type { NextPeriodInput, RenewalPeriodFacts } from '../public/subscription-period.types';
 import { snapshotOf } from './subscription.mapper';
@@ -60,9 +60,9 @@ function factsOf(record: SubscriptionRecord, renewedById: string | null): Renewa
 export class SubscriptionPeriodService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
-    private readonly plans: PlanLookupService,
+    private readonly plans: PlanFactsService,
     private readonly pricing: SubscriptionPricingService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -132,7 +132,7 @@ export class SubscriptionPeriodService {
     }
     const money = await this.pricing.read(input.unitPrice);
     const priced = await this.pricing.priceToday(tx, money);
-    const organization = await this.organization.getOrganization(tx);
+    const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A renewal was recorded before installation');
 
     const created = await this.subscriptions.insert(tx, {

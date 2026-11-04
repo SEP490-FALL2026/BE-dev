@@ -3,6 +3,9 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AppRole, RoleGrantRecord } from '../public/identity-access.types';
 
+/** One advisory-lock key for every change to the approval roles and to the grant of SPENDING_APPROVER, so the pairing rule is checked one writer at a time. */
+const APPROVAL_ROLES_LOCK_KEY = 7_300_001;
+
 /** Owns RoleGrant: the roles granted to accounts, with their history. The one writer of `role_grants`. */
 @Injectable()
 export class RoleGrantRepo {
@@ -13,6 +16,48 @@ export class RoleGrantRepo {
     input: { organizationId: string; appUserId: string; role: AppRole; grantedBy?: string },
   ): Promise<{ id: string }> {
     return tx.roleGrant.create({ data: input, select: { id: true } });
+  }
+
+  /** Serializes everything that changes the approval roles or grants SPENDING_APPROVER, for the rest of the transaction. Taken first. */
+  async lockApprovalRolesForChange(tx: DbTx): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${APPROVAL_ROLES_LOCK_KEY}::bigint)`;
+  }
+
+  /** True when an account of the organization holds an effective SPENDING_APPROVER grant, whatever its state (QĐ-93a). */
+  async spendingApproverIsHeld(tx: DbTx, organizationId: string): Promise<boolean> {
+    const row = await tx.roleGrant.findFirst({
+      where: { organizationId, role: 'SPENDING_APPROVER', revokedAt: null },
+      select: { id: true },
+    });
+
+    return row !== null;
+  }
+
+  /** The employee who holds the effective SPENDING_APPROVER grant, whatever the state of the account; null when nobody does. */
+  async spendingApproverEmployeeId(client?: DbTx, options?: { forShare?: boolean }): Promise<string | null> {
+    if (options?.forShare === true && client !== undefined) return this.spendingApproverLockedFor(client);
+    const row = await (client ?? this.prisma).roleGrant.findFirst({
+      where: { role: 'SPENDING_APPROVER', revokedAt: null },
+      select: { appUser: { select: { employeeId: true } } },
+    });
+
+    return row?.appUser.employeeId ?? null;
+  }
+
+  /**
+   * The same, with the row of the grant locked `FOR SHARE` until the transaction ends: the revocation `UPDATE`s that very row, so a step
+   * that is being opened and a revocation that is being made meet on it and take turns (`M6`). A revocation that commits first is seen
+   * here — the row no longer matches once the statement is re-evaluated — and nobody holds the role.
+   */
+  private async spendingApproverLockedFor(tx: DbTx): Promise<string | null> {
+    const rows = await tx.$queryRaw<{ employee_id: string }[]>`
+      SELECT u.employee_id
+        FROM role_grants g
+        JOIN app_users u ON u.id = g.app_user_id
+       WHERE g.role = 'SPENDING_APPROVER' AND g.revoked_at IS NULL
+         FOR SHARE OF g`;
+
+    return rows[0]?.employee_id ?? null;
   }
 
   /** The employee an account belongs to; null when there is no such account. */
@@ -32,7 +77,7 @@ export class RoleGrantRepo {
     return row?.appUserId ?? null;
   }
 
-  /** Which of the roles `roles` each of these employees holds on an effective grant, whatever the state of the account (one read). */
+  /** Which of the roles `roles` each of these people holds on an effective grant, whatever the state of the account (one read). */
   async listHoldersAmong(
     employeeIds: readonly string[],
     roles: readonly AppRole[],

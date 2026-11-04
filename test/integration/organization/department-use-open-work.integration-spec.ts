@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
@@ -61,7 +62,7 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
 
   beforeAll(async () => {
     await h.start();
-    today = await h.ctx.app.get(OrganizationApi, { strict: false }).businessToday();
+    today = await h.ctx.app.get(OrganizationReadApi, { strict: false }).businessToday();
     owner = await h.department('P-OWNER');
     other = await h.department('P-OTHER');
     nothing = await h.department('P-NOTHING');

@@ -212,16 +212,26 @@ and the attempt id `<run id>-<run attempt>` of the job. The same script also run
 - **One release state.** The live `docker-compose.prod.yml`, `Caddyfile` and `releases/current-image` (the image of the
   live release) change together. The script keeps the previous ones — and `releases/current-attempt`, when there is one —
   in `releases/<sha>/attempts/<id>/replaced/`, replaces each by one rename and recreates `api`, `worker`, `caddy`.
-- **Ready before success (H7-OPS-RV-04).** `up -d` exiting 0 is not a success. The script then waits at most 300 s
-  (`--ready-timeout`), looking every 2 s (`--poll-interval`), for one look where each of `api`, `worker`, `caddy` has
+- **Sequential startup.** After backup, preflight, migrations, role reconciliation and promotion, the script stops the old
+  worker, recreates only the API and waits for its real readiness endpoint. Only then does it recreate worker, followed
+  by Caddy. Each Compose mutation is bounded at 120 s; `--no-deps` prevents an implicit restart of the ready API.
+  From API creation, the API-only wait and first full ready look share `--ready-timeout` (300 s by default);
+  staging does not silently double the readiness budget. Recovery starts a fresh budget for the previous release.
+  A failure at any stage enters recovery. Recovery uses the same sequence after the data-compatibility check, so the
+  previous API is also started before its worker. This reduces simultaneous startup demand; improvement must be measured
+  on the VPS under comparable conditions. Worker processing pauses until the API is ready; this is a restart deployment,
+  not a zero-downtime rollout.
+- **Ready before success (H7-OPS-RV-04).** `up -d` exiting 0 is not a success. After all three startup steps, the script uses
+  the remaining startup budget (`--ready-timeout`), looking every 2 s (`--poll-interval`), for one look where each of `api`, `worker`, `caddy` has
   exactly one container, running and not restarting; `api` and `worker` run exactly `<IMAGE>:<SHA>`; Caddy mounts the live
   `Caddyfile` (the sha256 of `/etc/caddy/Caddyfile` in the container is the one on disk); and `/api/v1/health/ready`,
   called from inside the API container, answers 2xx. It then watches for 20 s (`--stability-window`): every look must
-  find the same containers with the same restart count, still ready — a crash-looping worker or a container another
+  find the same containers with the same restart count, still ready. The API identity and restart count must also match
+  the API-only startup check — a crash-looping worker or a container another
   deployment replaced fails here. The workflow uses these defaults; the options exist for a slow host and for tests.
 - **Failure after the promotion began** — a rename, the recreation, the readiness or the record below: the script puts
   the previous release state back whole, recreates the previous containers when the new ones had been created (one
-  attempt, at most 300 s, with the image of `releases/current-image`, or of the `api` container on a host deployed before
+  attempt, with the staged startup limits above and the image of `releases/current-image`, or of the `api` container on a host deployed before
   that file existed), and checks the previous release exactly as above. It always exits 1 and prints two separate
   verdicts: `RESULT: release <sha> (attempt <id>) FAILED while <step>` and one of `RECOVERY: the previous release <image>
 is ready`, `RECOVERY: FAILED — …` (the previous release does not answer ready, or its containers or files could not be
@@ -232,8 +242,11 @@ is ready`, `RECOVERY: FAILED — …` (the previous release does not answer read
   reads its rows. Each runtime image declares in its label `io.github.baophipham.slm.data-reads` the data representations
   it reads that an older runtime cannot (Dockerfile, stage `runtime`); an image built before that label (the compatibility
   image `fba4dfe` and every older one) declares none. `ops:preflight --recovery-target "<labels>"`, run read-only from the
-  candidate as the deploy role, counts the rows of each representation the database holds (today one:
-  `access-request-null-cost-center`, a sent internal free Request with no Cost Center) and says `COMPATIBLE` (exit 0),
+  candidate as the deploy role, counts the rows of each representation the database holds (today three:
+  `access-request-null-cost-center`, a sent internal free Request with no Cost Center;
+  `access-request-cancel-spending-approver-party`, a Request or a group line closed with cause `SPENDING_APPROVER_PARTY` and no
+  closing employee; `access-request-step-qd93-waiting-reason`, a step that waits with `NO_DEPARTMENT_HEAD`, `NO_SPENDING_APPROVER`
+  or `SPENDING_APPROVER_IS_PARTY`, values an image before `QĐ-93c` cannot read) and says `COMPATIBLE` (exit 0),
   `INCOMPATIBLE` (2) or `NO_HISTORY` (3: no migration ever ran here). The script judges the previous image twice:
   - **before `migrate deploy`:** an image that is not on the host (its labels cannot be read) or a database with no
     migration history while the host names a previous release (a reset database under an old release state) stops the
@@ -331,6 +344,35 @@ are untouched and `.env` was **not** restored, because nothing live changed): `a
 Either fix the cause and run step 7 again with a new `<ATTEMPT>`, or return to the old wiring by hand:
 `cp -p .env.pre-h7 .env`, then `API_IMAGE=<image noted in step 0> docker compose -f docker-compose.prod.yml up -d api worker`.
 The roles and owners provisioned in step 5 do not stop the old wiring (the superuser bypasses every privilege).
+
+**Host timeline:** before recreating containers and at each readiness look, the script records timestamped Linux
+`/proc` load, memory, CPU, swap/page and pressure counters in the private diagnostic directory's `host-timeline.txt`.
+Compare counter deltas between samples to distinguish CPU/steal, swapping and I/O stalls. This bounded file (1 MiB)
+is also retained on successful deploys for comparison. It uses no Docker call, background sampler or extra Node process.
+On failure, a separate `host-failure.txt` retains the final sample even if the timeline's size cap was reached.
+Missing counters or collection failures do not affect readiness. Remove old diagnostic directories after review.
+
+**Startup phases:** API and worker write immediate JSON entries with `context=StartupTiming`, outside Nest's buffered
+logger. `imports-loaded` measures wall time/CPU since the Node process started (including static imports); subsequent
+entries report deltas for Nest creation, basic HTTP configuration, Swagger generation when enabled, application
+initialization and listening. Worker reports `worker-ready` after its context initializes. Fields `elapsedMs`, `phaseMs`,
+`cpuMs`, `phaseCpuMs` and `rssMiB` contain no environment values or URLs. Wall time much greater than CPU time suggests
+waiting/scheduling and must be compared with host I/O/swap/CPU counters; it does not identify a dependency by itself.
+The API/worker `*-startup.log` files retain these entries privately on success or failure (64 KiB per file, best effort,
+last 2000 container log lines scanned). Swagger behavior is unchanged so the first comparison isolates startup order.
+
+**Failure diagnostics:** after a recreation/readiness failure, before restoring files or stopping containers, the script
+collects best-effort evidence in `<APP_DIR>/.deploy-diagnostics-<RELEASE>-<ATTEMPT>/` (outside `releases/`): host memory/swap, load, disk and
+container stats, `vmstat` samples, processes (command names only), selected container state (including OOM, exit and restart counts), and the last 200 timestamped log
+lines per API/worker/Caddy container. Each command has a timeout; each file is capped at 1 MiB. Collection failure does
+not prevent recovery. The directory is `0700`, files `0600`; raw logs can contain sensitive application data, so only
+the location is printed to Actions. Review on the VPS, redact before sharing, and remove the diagnostics after the
+incident is resolved. No environment/configuration dump or automatic upload is performed. The readiness failure now
+includes the probe exit code (`124` normally means the outer 15-second Docker exec/probe timeout expired, not a proven HTTP failure).
+Container IDs found during readiness are cached so log capture can proceed when subsequent Compose listings fail;
+recovery checks do not overwrite candidate IDs or host samples. The HTTP probe still uses the real endpoint, with unchanged
+readiness and stability criteria. Evidence describes the
+containers present at capture time, which may be mixed old/new after a partial recreation; use their image identifiers.
 
 **If step 7 fails after the promotion began** (`RESULT: … FAILED while <step>`: a rename, the recreation, the readiness or
 the marker): the script has put the old `docker-compose.prod.yml` and `Caddyfile` back and removed the
@@ -537,6 +579,24 @@ SHA-256, the UTC time, the revision (the BE SHA and the last migration applied b
 protected location, never a public URL or the content. A rehearsal keeps its dump outside every repository, readable by the person
 running it only, and deletes it when the resources are cleaned up. `git ls-files '*.dump' '*.backup' '*.sql.gz'` stays empty.
 
+## Releasing the removal of the approval roles and of the department projects (QĐ-93c, QĐ-93h phase 2)
+
+Three migrations drop what earlier releases stopped using: `…_identity_drop_approval_role_holders` (the table, its trigger and
+function, the `ApprovalRole` type; the Super Admin / department head exclusion stays), `…_requests_drop_project_label` (the column
+`access_requests.project_label`) and `…_organization_drop_projects` (the tables `projects` and `project_departments` and the
+`ProjectStatus` type). They cannot be undone (no `down`, `DB-05`).
+
+- **Deploy condition.** The release that carries them (N+1) is deployed only while the running image is the release that no longer
+  reads or writes those objects (N: the approval-role routes and the project routes and fields are gone) or a later one. An image
+  older than N still reads them and fails on the schema N+1 leaves.
+- **Way back.** The image N: it does not read the dropped objects, so its schema stays valid for it. `--recovery-target` does not
+  check these objects, because no image that is a way back reads them.
+- **Each migration refuses before it writes.** It raises `P0001` and names every row, so a deploy that was run without a look still
+  stops with the data untouched: `…_identity_drop_approval_role_holders` for the three kinds above; `…_requests_drop_project_label`
+  for a request that was sent and still carries a label (the label of a draft is not kept, and its copy in the draft JSON is
+  removed); `…_organization_drop_projects` for any row of `projects` or `project_departments`. The Super Admin fixes or removes the
+  rows in the running release, and the deploy is run again. Nothing is deleted by a migration.
+
 ## Backup before production migrations
 
 `DB-05`, added 22/10/2026 by `delivery-gate-hardening`. The deploy (`scripts/ops/deploy-release.sh`, run by
@@ -570,7 +630,24 @@ read-only (PostgreSQL refuses any write, `25006`). `--json` gives the same repor
   deploy is refused). `SERVICE_ACCOUNT_WITHOUT_DEPARTMENT_ON_START`, `SERVICE_ACCOUNT_WITHOUT_DEPARTMENT_ON_RECORDED_DAY`,
   `COST_ALLOCATION_NAMES_COMPANY`, `DEPARTMENT_CHARGED_TO_COMPANY`: the data cannot be carried without inventing HR or
   finance history. See _Supported and blocked histories_ below for what may happen next.
+  `DIRECT_ROLES_HEAD_WITHOUT_ACCOUNT`, `DIRECT_ROLES_SPENDING_APPROVER_IS_HEAD`, `DIRECT_ROLES_SPENDING_APPROVER_HOLDS_ROLE`,
+  `DIRECT_ROLES_SPENDING_APPROVER_WITHOUT_ACCOUNT` (`QĐ-93k(4)`, read only until `…_identity_direct_roles` is applied): the
+  conversion of `MANAGER` and `SPENDING_APPROVER` to granted roles stops for a head without an account, and for a spending
+  approver who heads a department, holds `SUPER_ADMIN`, `IT_ADMIN` or `FINANCE`, or has no account. Each row is named by
+  employee code (and department or role). The Super Admin fixes them in the running release (give the head an account, end the
+  double role, hand the role over) and runs the command again; a spending approver whose account is locked or not activated, or
+  who is handing over, is carried over and blocks nothing.
 - **1:** the command failed (database unreachable, settings invalid); nothing was judged.
+
+**No conversion command for the removal of the fallback approver and the substitute (`QĐ-93c`).** The release that removes
+the two roles goes onto a new VPS with an empty database, created by CI/CD and then seeded (Owner 03/11/2026), so there is no
+fallback- or substitute-held step, no request of a spending approver and no old waiting reason to carry over: nothing runs
+between `migrate` and the start of `api`, and `pnpm ops:approval-role-conversion` does not exist. Steps of the old rule would
+only appear on a database that ran an older release. The code no longer reads or freezes them: the migration
+`…_identity_drop_approval_role_holders` stops with `P0001` and lists every such row (a request of which the spending approver is a
+party, a step on an old routing row or with an old waiting reason, a spend step held by somebody who never had the grant), and the
+Super Admin puts them right in the running release before the deploy is run again (see _Releasing the removal of the approval
+roles and of the department projects_).
 
 **The preflight is a read-only check, not a repair.** It changes nothing, and no command in this repository invents a
 department or `Unit`, rewrites immutable placement or allocation history, or recreates a database (`P29-RV-01`).

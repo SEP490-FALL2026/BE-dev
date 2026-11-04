@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import type { ProposalRecord } from '../access-request/assessment-record.types';
 import { PricingViewService, type PricingView } from './pricing-view.service';
@@ -115,7 +115,8 @@ export interface WithdrawalView {
 }
 
 export interface CancellationView {
-  cancelledBy: EmployeeRefView;
+  /** Null when the conversion command closed the request for the spending approver (`SPENDING_APPROVER_PARTY`, OD-6). */
+  cancelledBy: EmployeeRefView | null;
   cancelledAt: Date;
   cause: ReadableCancelCause;
   note: string | null;
@@ -126,7 +127,7 @@ export interface CancellationView {
 export class AccessRequestQueryService {
   constructor(
     private readonly repo: AccessRequestRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly pricing: PricingViewService,
     private readonly assessments: AssessmentReadRepo,
@@ -165,10 +166,12 @@ export class AccessRequestQueryService {
       ),
     ];
     const [people, plans, department, costCenters, proposal, spend] = await Promise.all([
-      this.organization.getEmployees(peopleIds),
+      this.organizationReads.getEmployees(peopleIds),
       record.planId === null ? Promise.resolve([]) : this.catalog.getPlanSummaries([record.planId]),
-      this.organization.getDepartmentBrief(record.departmentId),
-      record.costCenterId === null ? Promise.resolve([]) : this.organization.costCentersByIds([record.costCenterId]),
+      this.organizationReads.getDepartmentBrief(record.departmentId),
+      record.costCenterId === null
+        ? Promise.resolve([])
+        : this.organizationReads.costCentersByIds([record.costCenterId]),
       record.branch === 'NEW_SOFTWARE' ? this.assessments.findProposal(record.id) : Promise.resolve(null),
       this.spendStatus.of(record),
     ]);
@@ -206,7 +209,6 @@ export class AccessRequestQueryService {
       lineCount: record.beneficiaryEmployeeIds.length,
       businessReason: record.businessReason,
       termMonths: record.termMonths,
-      projectLabel: record.projectLabel,
       offPlan: record.offPlan,
       delegatedBatchId: record.delegatedBatchId,
       expectedEndDate: record.expectedEndDate,
@@ -234,7 +236,10 @@ export class AccessRequestQueryService {
         record.cancellation === null
           ? null
           : {
-              cancelledBy: person(record.cancellation.cancelledByEmployeeId),
+              cancelledBy:
+                record.cancellation.cancelledByEmployeeId === null
+                  ? null
+                  : person(record.cancellation.cancelledByEmployeeId),
               cancelledAt: record.cancellation.cancelledAt,
               cause: record.cancellation.cause,
               note: record.cancellation.note,

@@ -7,7 +7,7 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { SeatTargetNotFoundError } from '../../licensing/public/licensing.errors';
 import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.types';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { handoverFor } from './handover.policy';
@@ -33,7 +33,7 @@ export class ReturnRequestService {
     private readonly runner: TransactionRunner,
     private readonly returns: ReturnRequestRepo,
     private readonly requests: AccessRequestRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly seat: ReturnSeatGate,
     private readonly catalog: CatalogApi,
     private readonly parameters: OperatingParametersApi,
@@ -49,7 +49,7 @@ export class ReturnRequestService {
 
     return this.runner.run(async (tx) => {
       const now = new Date();
-      const today = await this.organization.businessToday(now, tx);
+      const today = await this.organizationReads.businessToday(now, tx);
       const { facts, holderUnit, sender, plan } = await this.requireReturnable(tx, actor, body, today);
 
       // The revocation is opened first: it holds the lock of the seat, so what is judged after it is judged on a seat nobody else
@@ -73,7 +73,7 @@ export class ReturnRequestService {
         requestedOn: today,
         shortDeadlineWorkingDays,
       });
-      const organization = await this.organization.getOrganization(tx);
+      const organization = await this.organizationReads.getOrganization(tx);
       if (!organization) throw new Error('A return was sent before installation');
       const created = await this.returns.insert(tx, {
         id,
@@ -113,9 +113,12 @@ export class ReturnRequestService {
 
   /** The seat, who may return it, and the plan and the origin it is judged against. Throws ReturnRequestRefusedError. */
   private async requireReturnable(tx: DbTx, actor: AuthenticatedPrincipal, body: ReturnBodyDto, today: string) {
-    const facts = await this.seat.factsOf(tx, body.assignmentId);
-    const holderUnit = (await this.organization.getOwningUnits([facts.employeeId], today, tx)).get(facts.employeeId);
-    const headed = await this.organization.getHeadedDepartment(actor.employeeId, today);
+    // The sender and the holder of the seat cannot be the spending approver (`D-S21`): judged before any department is read.
+    const facts = await this.seat.factsOf(tx, actor.employeeId, body.assignmentId);
+    const holderUnit = (await this.organizationReads.getOwningUnits([facts.employeeId], today, tx)).get(
+      facts.employeeId,
+    );
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, today);
     const sender = checkSender({
       actorEmployeeId: actor.employeeId,
       holderEmployeeId: facts.employeeId,

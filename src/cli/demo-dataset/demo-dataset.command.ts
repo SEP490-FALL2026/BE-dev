@@ -1,6 +1,6 @@
 import { DemoAccountsApi } from '../../modules/installation/public/demo-accounts.api';
 import { defineCommand, runInNestContext, writeCliFailure as fail } from '../run-command';
-import { failureLine } from './demo-dataset-failure';
+import { DemoRunClock, describeDemoFailure } from './demo-failure';
 import { formatDemoReport, formatDemoReportJson } from './demo-dataset-report';
 import { runDemoDataset } from './demo-dataset-run';
 import { DemoSecretsError, readDemoSecrets } from './demo-dataset-secrets';
@@ -14,8 +14,10 @@ export const demoDatasetCommand = defineCommand({
   usage: DEMO_DATASET_USAGE,
   parse: parseDemoDatasetArguments,
   argumentError: DemoDatasetArgumentError,
-  crashed: failureLine,
+  crashed: (error) => `The demo dataset run failed: ${describeDemoFailure(error)}`,
   execute: async ({ command: args }) => {
+    const clock = new DemoRunClock();
+    clock.enter('secrets');
     let secrets;
     try {
       secrets = await readDemoSecrets(process.stdin);
@@ -27,12 +29,15 @@ export const demoDatasetCommand = defineCommand({
       throw error;
     }
 
+    // In production the graph runs the runtime-role check, the first database query of the run.
+    clock.enter('startup');
     return runInNestContext({
       // The graph validates the database settings only; the dataset itself goes through the HTTP API.
       graph: () =>
-        import('../../modules/installation/demo-dataset/demo-dataset.module').then((m) => m.DemoDatasetModule),
+        import('../../modules/installation/demo-dataset/demo-dataset-cli.module').then((m) => m.DemoDatasetCliModule),
       work: async (app) => {
-        const outcome = await runDemoDataset({ args, secrets, accounts: app.get(DemoAccountsApi) });
+        const outcome = await runDemoDataset({ args, secrets, accounts: app.get(DemoAccountsApi), clock });
+        for (const warning of outcome.warnings ?? []) process.stderr.write(`warning: ${warning}\n`);
         if ('refused' in outcome) {
           process.stderr.write(`refused: ${outcome.refused}\n`);
           return REFUSED;
@@ -41,8 +46,8 @@ export const demoDatasetCommand = defineCommand({
 
         return outcome.report.exitCode;
       },
-      // Reported by its name and, for a database failure, its code (demo-dataset-failure.ts): no URL, no stack, no password.
-      failed: (error) => fail(failureLine(error)),
+      // Phase, time, kind, code and the fixed pg message only: no URL, no message of the error, no stack, no password.
+      failed: (error) => fail(clock.failureLine(error)),
     });
   },
 });

@@ -13,7 +13,7 @@ describe('the history of a person and the list of transfers (integration, real P
   let des: Department;
   let fin: Department;
   let sequence = 0;
-  const code = (prefix: string) => `${prefix}${(sequence += 1)}`;
+  const code = (prefix: string) => `${prefix}-${(sequence += 1)}`;
   const body = (employeeId: string, extra: object = {}) => ({
     employeeId,
     toDepartmentId: fin.id,
@@ -115,7 +115,7 @@ describe('the history of a person and the list of transfers (integration, real P
 
       await set('ON_LONG_LEAVE');
       expect(await state(person.employeeId)).toBe('ON_LONG_LEAVE');
-      expect((await h.organizationService().getEmployee(person.employeeId))?.workState).toBe('ON_LONG_LEAVE');
+      expect((await h.organizationReads().getEmployee(person.employeeId))?.workState).toBe('ON_LONG_LEAVE');
       await expect(set('LEFT')).rejects.toBeDefined();
       expect(await state(person.employeeId)).toBe('ON_LONG_LEAVE');
     });

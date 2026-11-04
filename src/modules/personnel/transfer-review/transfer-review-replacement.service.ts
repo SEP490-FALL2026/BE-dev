@@ -90,8 +90,7 @@ export class TransferReviewReplacementService {
       appUserId,
       sessionId: line.reviewId,
       employeeId: line.decidedByEmployeeId,
-      directRoles: [],
-      derivedRoles: ['MANAGER'],
+      directRoles: ['MANAGER'],
       roles: ['MANAGER'],
     };
   }

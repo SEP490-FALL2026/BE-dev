@@ -39,12 +39,12 @@ describe('application retirement routes (e2e, no database)', () => {
 
     const confirm = await request(server)
       .post(`${BASE}/retirement-confirmations`)
-      .set('Authorization', bearer(principal(direct, derived)))
+      .set('Authorization', bearer(principal([...direct, ...derived])))
       .send({ businessOwnerEmployeeId: ID, note: 'x' })
       .expect(403);
     const retire = await request(server)
       .post(`${BASE}/retire`)
-      .set('Authorization', bearer(principal(direct, derived)))
+      .set('Authorization', bearer(principal([...direct, ...derived])))
       .expect(403);
 
     expect(bodyOf(confirm).error.code).toBe('AUTHORIZATION.FORBIDDEN');

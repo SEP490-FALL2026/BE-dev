@@ -29,7 +29,6 @@ describe('what the database refuses when assignments are written (integration, r
       sessionId: 's1',
       employeeId: 'e1',
       directRoles: ['IT_ADMIN'],
-      derivedRoles: [],
       roles: ['IT_ADMIN'],
     };
   }, 180000);

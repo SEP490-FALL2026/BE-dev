@@ -6,6 +6,7 @@
 - Nguồn: Docs commit `3341ea0` ([sources](../../sources.md)). `US-01-09` AC-1 → AC-14, `US-01-01` AC-12 (nhánh chuyển giao), AC-15; `US-01-10` AC-10; `QĐ-44`, `QĐ-47a`, `QĐ-47f`, `QĐ-67a`, `QĐ-67b`.
 - _Đính chính 18/10/2026 ([audit nền tảng](../../../reviews/be-foundation-audit-2026-10-18/README.md)):_ AC đã giao — căn cứ là bảng nghiệm thu bên dưới: `US-01-09` AC-1 → AC-14 (AC-3 (c)(d) và AC-8 vế nghỉ việc dùng fixture, luồng thật ở G6); `US-01-01` AC-12 (nhánh chuyển giao, qua AC-3), AC-15 (vế nghỉ việc bằng fixture). `US-01-10` AC-10 **chưa có bằng chứng**: không có hàng nghiệm thu/test, và luồng yêu cầu quên mật khẩu không kiểm phiếu khôi phục đang chờ — chuyển sang lát H3 của [foundation-remediation-handoff-2026-10-18](../foundation-remediation-handoff-2026-10-18/spec.md). _Cập nhật 18/10/2026:_ lát [H3c](../h3c-forgot-password-during-recovery/spec.md) xác nhận lỗi bằng test đỏ (yêu cầu quên mật khẩu thu hồi liên kết khôi phục và gửi thư mới) rồi sửa; `US-01-10` AC-10 nay có bằng chứng `verified` local ở [plan H3c](../h3c-forgot-password-during-recovery/plan.md#verification-and-handoff), chưa commit/Owner review. Câu "chưa có bằng chứng" ở trên là trạng thái tại audit.
 - Trạng thái yêu cầu: Story `BASELINED` (`QĐ-72`).
+- _Superseded một phần (02/11/2026, `QĐ-93e`; xem [qd93-remove-in-app-super-admin-transfer](../qd93-remove-in-app-super-admin-transfer/spec.md)):_ vế **chuyển giao trong ứng dụng** (`POST /api/v1/super-admin-transfers`, AC-1 → AC-8 qua route) đã gỡ; đổi người giữ vai chỉ còn bằng `pnpm ops:recover transfer-role`, kể cả ca có kế hoạch khi người giữ vai còn dùng được (lý do `HOLDER_STILL_USABLE` bị gỡ; `--holder-email` bắt buộc khi đã có người giữ vai; ở `SHARED` người vận hành và người phê duyệt khác người giữ vai). Các đoạn dưới đây mô tả route và điều kiện cũ chỉ còn giá trị lịch sử.
 - [Kế hoạch](plan.md).
 
 ## Vấn đề và phạm vi
@@ -65,6 +66,8 @@ Audit: `SUPER_ADMIN.TRANSFERRED_OUT/IN`, `SUPER_ADMIN.RECOVERY_LINK_ISSUED`, `SU
 ## Thay đổi và nghiệm thu
 
 16/10/2026: thiết kế và triển khai cùng phiên. **Owner xác nhận khi review:** (1) `BOOTSTRAP_ASSERTED` không đủ để **nhận** vai (`QĐ-67b`) — nếu Owner muốn khác, đổi ở `SuccessorEligibility`; (2) liên kết khôi phục dùng cùng hạn lời mời và không có tham số riêng; (3) quy trình vận hành thật (ai giữ phiếu, kênh xác minh danh tính, nơi lưu nhật ký lệnh) là việc tổ chức, không phải của mã — lệnh chỉ ghi tham chiếu. Chưa review, chưa nghiệm thu; chưa chạy thử lệnh trên môi trường dùng chung.
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): `US-01-09` AC-1, AC-2, AC-6, AC-7 (viết lại theo `QĐ-93e`: không còn chuyển giao trong ứng dụng) và AC-16 mới chuyển sang `qd93-remove-in-app-super-admin-transfer`, AC-3 sang `qd93-direct-manager-spending-approver-roles` (scope map G1); AC còn lại giữ `not affected` (giao trước GOV.1 ở lát này). Lát này không có bảng Primary nên không sửa bảng.
 
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 

@@ -50,6 +50,7 @@ const UPLOAD_LIMIT_ERRORS = [
 
 /** The part of a multipart upload this controller uses; multer's own type is not a dependency of the project. */
 interface UploadedBinary {
+  mimetype: string;
   originalname: string;
   buffer: Buffer;
   size: number;
@@ -99,7 +100,7 @@ function toWire(view: ImportView) {
 
 /**
  * Importing people from a file in six steps (`US-02-01`): upload → read → preview → confirm → write → summary. The Super
- * Admin uploads a CSV file and confirms it with the HR basis it is entered on; nothing is written until the preview is
+ * Admin uploads a CSV or XLSX file and confirms it with no HR basis to give (`QĐ-93f`); nothing is written until the preview is
  * confirmed, and then once. The IT Admin, Managers and Finance do not import people (`US-02-02` AC-12, `QĐ-82i`).
  * Upload, reading, judging again and cancelling are the preview (`preview/`); writing the people is the confirmation
  * (`confirmation/`).
@@ -124,14 +125,15 @@ export class EmployeeImportsController {
     status: HttpStatus.CREATED,
     message: 'EMPLOYEE_IMPORT.UPLOADED',
     description:
-      'The file was read and every row judged: nothing is written yet. The summary says how many rows are valid, wrong, there already, and the people by department.',
+      'The CSV or XLSX file was read and every row judged: nothing is written yet. The summary says how many rows are valid, wrong, there already, and the people by department.',
   })
   @ApiErrorResponses(...COMMON_ERRORS, ...UPLOAD_LIMIT_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The file cannot be used as a whole: missing, empty, not text, unreadable, too many rows, or lacking a required column such as the department (IMPORT.FILE_*); the job title column is optional.',
+      'The file cannot be used as a whole: missing, unsupported, empty, unreadable, too many rows, or lacking a required column (IMPORT.FILE_*). Department and job title are optional for employees. A workbook is unreadable (details.reason INVALID_XLSX) when it is not a plain single-disk zip, and is refused with details.reason UNCOMPRESSED_SIZE_EXCEEDED when its entries inflate to more than 20 MB (the real inflated size is checked, not the size the file declares).',
     examples: [
       IMPORT_ERROR_EXAMPLES.FILE_REQUIRED,
+      IMPORT_ERROR_EXAMPLES.FILE_FORMAT_UNSUPPORTED,
       IMPORT_ERROR_EXAMPLES.FILE_EMPTY,
       IMPORT_ERROR_EXAMPLES.FILE_NOT_TEXT,
       IMPORT_ERROR_EXAMPLES.FILE_TOO_MANY_ROWS,
@@ -142,8 +144,11 @@ export class EmployeeImportsController {
   async upload(@CurrentPrincipal() actor: AuthenticatedPrincipal, @UploadedFile() file: UploadedBinary | undefined) {
     try {
       if (!file) throw new ImportFileInvalidError('FILE_REQUIRED');
+      if (file.originalname.toLowerCase().endsWith('.xls')) throw new ImportFileInvalidError('FILE_FORMAT_UNSUPPORTED');
 
-      return toWire(await this.previews.upload(actor, { fileName: file.originalname, bytes: file.buffer }));
+      return toWire(
+        await this.previews.upload(actor, { fileName: file.originalname, mimeType: file.mimetype, bytes: file.buffer }),
+      );
     } catch (error) {
       throw toImportApiException(error);
     }
@@ -190,6 +195,7 @@ export class EmployeeImportsController {
         items: page.items.map((row) => ({
           line: row.lineNumber,
           outcome: row.outcome,
+          unplaced: row.unplaced,
           cells: row.cells,
           errors: row.errors,
           differences: row.differences,
@@ -228,14 +234,15 @@ export class EmployeeImportsController {
   @ApiSuccessResponse(EmployeeImportConfirmationResponseDto, {
     message: 'EMPLOYEE_IMPORT.CONFIRMED',
     description:
-      'The people the preview promised are created, once, on the HR basis given; each carries it in the Audit Trail. The same confirmation sent again (same idempotency key) returns the first answer with replayed set.',
+      'The people the preview promised are created, once; the Audit Trail keeps who, when and what was created, and no HR basis. The same confirmation sent again (same idempotency key) returns the first answer with replayed set.',
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
     NOT_FOUND,
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The request is invalid or lacks a part of the HR basis (VALIDATION_ERROR).',
+      description:
+        'The request is invalid, among them one that still carries an HR basis, which no confirmation takes (VALIDATION_ERROR).',
       examples: [VALIDATION_EXAMPLE],
     },
     {

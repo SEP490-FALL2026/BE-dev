@@ -79,8 +79,9 @@ describe('ops:demo-dataset at the edges of the year (integration, real API and P
     ctx = await createHttpTestApp();
     await seedInstallation(ctx.app);
     baseUrl = `http://127.0.0.1:${((ctx.app.getHttpServer() as unknown as Server).address() as AddressInfo).port}`;
-    const { DemoDatasetModule } = await import('../../../src/modules/installation/demo-dataset/demo-dataset.module');
-    demo = await NestFactory.createApplicationContext(DemoDatasetModule, { logger: false });
+    const { DemoDatasetCliModule } =
+      await import('../../../src/modules/installation/demo-dataset/demo-dataset-cli.module');
+    demo = await NestFactory.createApplicationContext(DemoDatasetCliModule, { logger: false });
   }, 300000);
 
   afterAll(async () => {

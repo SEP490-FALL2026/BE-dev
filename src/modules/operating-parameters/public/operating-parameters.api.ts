@@ -2,12 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { cutHistory } from '../../../core/application/pagination';
 import { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ParameterNotFoundError } from '../operating-parameters.errors';
 import { OperatingParametersRepo } from '../operating-parameters.repo';
 import {
+  GROUP_LABELS,
   PARAMETER_DEFINITIONS,
   ParameterDefinition,
+  ParameterGroup,
   ParameterValue,
   definitionOf,
   effectiveValues,
@@ -17,10 +19,17 @@ const HISTORY_LIMIT = 20;
 
 export interface ParameterView {
   key: string;
+  /** What the screen shows for the parameter, in Vietnamese. */
+  label: string;
+  group: ParameterGroup;
+  /** The name of the group, in Vietnamese. */
+  groupLabel: string;
   value: ParameterValue;
   default: ParameterValue;
   isDefault: boolean;
   unit: string;
+  /** The unit, in Vietnamese. */
+  unitLabel: string;
   description: string;
   constraints: ParameterDefinition['shape'];
   /** When the current value took effect; null while the default stands. */
@@ -36,7 +45,7 @@ export interface ParameterView {
 export class OperatingParametersApi {
   constructor(
     private readonly repo: OperatingParametersRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** The value in force now: the stored one, or the default of the parameter. Throws ParameterNotFoundError for an unknown key. */
@@ -107,10 +116,14 @@ export class OperatingParametersApi {
 
       return {
         key: definition.key,
+        label: definition.label,
+        group: definition.group,
+        groupLabel: GROUP_LABELS[definition.group],
         value: row ? row.value : definition.default,
         default: definition.default,
         isDefault: !row || JSON.stringify(row.value) === JSON.stringify(definition.default),
         unit: definition.unit,
+        unitLabel: definition.unitLabel,
         description: definition.description,
         constraints: definition.shape,
         changedAt: row ? row.validFrom : null,
@@ -130,6 +143,6 @@ export class OperatingParametersApi {
 
   /** The business date the organization is on now, for the non-working-date rules. */
   today(): Promise<BusinessDate> {
-    return this.organization.businessToday();
+    return this.organizationReads.businessToday();
   }
 }

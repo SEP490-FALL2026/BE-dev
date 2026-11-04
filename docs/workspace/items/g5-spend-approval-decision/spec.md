@@ -1,5 +1,7 @@
 # Spec: Người duyệt chi quyết định trên snapshot ngân sách, kể cả quyết trong lô
 
+> The substitute who decides in a conflict of interest (`US-06-08`) is superseded by [QĐ-93c](../qd93-remove-fallback-substitute-approvers/spec.md): the spending approver alone decides the spend step, nobody takes their place.
+
 - Phụ trách: AI theo giao việc của người dùng (23/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc của người dùng (23/10/2026) — khung từ bản đồ phân rã G5.
 - Thiết kế: `ready`. Owner review: chưa review.
@@ -14,7 +16,7 @@ Người duyệt chi mở bước duyệt chi của một Request, thấy nhu c�
 ## Sizing decision
 
 - Container: G5 (nhóm giao việc, không phải ranh giới hạng mục).
-- Mode: `grouped-stories`.
+- Mode: `single-story`.
 - Outcome and owner: Người duyệt chi quyết định trên snapshot ngân sách, kể cả quyết trong lô.
 - Boundaries: Một transaction ghi quyết định, snapshot và bản ghi phê duyệt; chỉ Người duyệt chi hoặc người thay thế; Finance và IT không duyệt chi.
 - Not larger: các AC còn lại của những Story này thuộc hạng mục khác trong scope map, vì chúng đi qua ranh giới transaction, dữ liệu hoặc vai khác.
@@ -24,10 +26,9 @@ Người duyệt chi mở bước duyệt chi của một Request, thấy nhu c�
 
 ## Primary Story/AC
 
-| Story    | AC                                   | Coverage | Phần còn lại thuộc                                              |
-| -------- | ------------------------------------ | -------- | --------------------------------------------------------------- |
-| US-06-01 | AC-1→AC-10, AC-12→AC-14, AC-16→AC-21 | partial  | AC-15: `g5-group-requests`                                      |
-| US-06-08 | AC-1, AC-3→AC-8, AC-11               | partial  | AC-2, AC-9: `g5-delegated-requests`; AC-10: `g5-group-requests` |
+| Story    | AC                                   | Coverage | Phần còn lại thuộc                                                             |
+| -------- | ------------------------------------ | -------- | ------------------------------------------------------------------------------ |
+| US-06-01 | AC-1→AC-10, AC-12→AC-14, AC-16→AC-21 | partial  | AC-15: `g5-group-requests`; AC-22: `qd93-remove-fallback-substitute-approvers` |
 
 ## Supporting references
 
@@ -119,6 +120,8 @@ Người duyệt chi mở bước duyệt chi của một Request, thấy nhu c�
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Scope map chuyển `US-06-01` AC-15, `US-06-08` AC-10 và `US-05-17` AC-9 sang `g5-group-requests`, `US-06-08` AC-2, AC-9 sang `g5-delegated-requests`. Duyệt chưa tạo khoản cam kết: `g5-commitment-creation` thêm vào đúng chỗ ghi quyết định. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
 
 24/10/2026 (sau `g5-group-requests`): `US-06-01` AC-15, `US-06-08` AC-10 và `US-05-17` AC-9 đã làm ở `g5-group-requests` (`POST /access-requests/{id}/line-spend-decisions`); `POST .../spend-approval` và quyết cả lô trả `409 ACCESS_REQUEST.GROUP_USES_LINES` hay bỏ qua với lý do `GROUP_NEEDS_LINES` cho Request nhóm; phần giữ cam kết và đóng bước về trưởng phòng dùng chung `SpendEffectsService`.
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): `US-06-08` `RETIRED` (`QĐ-93d`) — AC-1, AC-3→AC-8, AC-11 bỏ khỏi bảng (khóa lịch sử `not affected` ở scope map G5; nhánh người thay thế khi xung đột gỡ ở `qd93-remove-fallback-substitute-approvers`); AC mới `US-06-01` AC-22 thuộc `qd93-remove-fallback-substitute-approvers`. Bảng chỉ còn một primary Story nên `Mode` ở `## Sizing decision` đổi `grouped-stories` → `single-story` (yêu cầu của `pnpm rules:check`); phần còn lại của mục đó giữ nguyên làm lịch sử.
 
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 

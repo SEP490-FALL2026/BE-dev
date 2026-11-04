@@ -219,6 +219,51 @@ describe('the notices of the renewal of a subscription (a06, EP-11)', () => {
   });
 });
 
+describe('the controlled-wait alert of a budget version or a renewal (D-S16, US-06-11 AC-12, US-11-02 AC-23)', () => {
+  const VERSION = '00000000-0000-4000-8000-0000000000b1';
+  const alert = (subject: { type: string; id: string }, params: InAppNotificationInput['params']) =>
+    notice({
+      code: 'CONTROLLED_WAIT_ALERT',
+      subject,
+      params,
+      eventKey: `CONTROLLED_WAIT_ALERT:${subject.type}:${subject.id}:sent:1`,
+    });
+  const waiting = { waitingReason: 'NO_SPENDING_APPROVER', configurationHint: 'CONFIGURE_SPENDING_APPROVER' };
+
+  it('lets CONTROLLED_WAIT_ALERT name a budget version or a renewal, never an amount', () => {
+    expect(
+      refuseInAppNotification(
+        alert(
+          { type: 'BUDGET_VERSION', id: VERSION },
+          { ...waiting, versionId: VERSION, costCenterId: REQUEST, year: 2027 },
+        ),
+      ),
+    ).toBeNull();
+    expect(
+      refuseInAppNotification(
+        alert(
+          { type: 'SUBSCRIPTION_RENEWAL', id: VERSION },
+          { ...waiting, renewalId: VERSION, subscriptionId: REQUEST },
+        ),
+      ),
+    ).toBeNull();
+    for (const key of ['amount', 'total', 'budgetTotal']) {
+      expect(
+        refuseInAppNotification(
+          alert({ type: 'BUDGET_VERSION', id: VERSION }, { ...waiting, versionId: VERSION, [key]: 1 }),
+        ),
+      ).not.toBeNull();
+    }
+  });
+
+  it('keeps the table of codes as it was: the alert is the one of line 27, not a code of its own', () => {
+    expect(IN_APP_NOTIFICATION_CODES).toContain('CONTROLLED_WAIT_ALERT');
+    expect(PARAM_KEYS_BY_CODE.CONTROLLED_WAIT_ALERT).toEqual(
+      expect.arrayContaining(['requestId', 'stepKind', 'waitingReason', 'configurationHint']),
+    );
+  });
+});
+
 describe('what the table says it may carry (INF-06, FR-3.11)', () => {
   it('has a list of keys for every code of the table and a code for every list', () => {
     expect(Object.keys(PARAM_KEYS_BY_CODE).sort()).toEqual([...IN_APP_NOTIFICATION_CODES].sort());

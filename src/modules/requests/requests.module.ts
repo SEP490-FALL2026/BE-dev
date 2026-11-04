@@ -1,3 +1,4 @@
+import { RequestsDashboardApi } from './public/requests-dashboard.api';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
@@ -28,7 +29,7 @@ import { AssessmentCompletionService } from './assessment/assessment-completion.
 import { AssessmentGate } from './assessment/assessment-gate.service';
 import { AssessmentPatchService } from './assessment/assessment-patch.service';
 import { AssessmentPricingService } from './assessment/assessment-pricing.service';
-import { AssessmentReader } from './assessment/assessment-reader.service';
+import { AssessmentQueryService } from './assessment/assessment-query.service';
 import { AssessmentRejectionService } from './assessment/assessment-rejection.service';
 import { AssessmentService } from './assessment/assessment.service';
 import { AssessmentViewService } from './assessment/assessment-view.service';
@@ -41,6 +42,7 @@ import { ProposalsController } from './proposal-review/proposals.controller';
 import { AccessRequestQueryService } from './request-view/access-request-query.service';
 import { AccessRequestRepo } from './access-request/access-request.repo';
 import { AccessRequestService } from './request-intake/access-request.service';
+import { RequestSenderService } from './request-intake/request-sender.service';
 import { AccessRequestsController } from './request-submission/access-requests.controller';
 import { NeedDecisionController } from './need-decision/need-decision.controller';
 import { NeedDecisionQueueController } from './need-decision-queue/need-decision-queue.controller';
@@ -127,11 +129,11 @@ import { SpendEffectsService } from './budget-information/spend-effects.service'
 import { SpendEntryService } from './spend/spend-entry.service';
 import { SpendHeadService } from './spend-submission/spend-head.service';
 import { SpendQueueService } from './spend-submission/spend-queue.service';
-import { SpendReadSupport } from './spend/spend-read.service';
+import { SpendWireViewService } from './spend/spend-wire-view.service';
 import { SpendSubmissionController } from './spend-submission/spend-submission.controller';
 import { SupplementRepo } from './spend-submission/supplement.repo';
 import { SupplementPricing } from './spend-submission/supplement-pricing.service';
-import { SupplementReadService } from './spend-submission/supplement-read.service';
+import { SupplementQueryService } from './spend-submission/supplement-query.service';
 import { SupplementRecorder } from './spend-submission/supplement-recorder.service';
 import { SupplementService } from './spend-submission/supplement.service';
 import { RepricingService } from './assessment/repricing.service';
@@ -146,6 +148,7 @@ import { RenewalApplyService } from './renewal-apply/renewal-apply.service';
 import { RenewalHoldReader } from './renewal-request/renewal-hold.listener';
 import { RenewalRequestRepo } from './renewal-apply/renewal-request.repo';
 import { RenewalRequestTrail } from './renewal-request/renewal-request-trail.service';
+import { RenewalSeatFactsService } from './renewal-request/renewal-seat-facts.service';
 import { RenewalRequestWriter } from './renewal-request/renewal-request-writer.service';
 import { RenewalRequestService } from './renewal-request/renewal-request.service';
 import { RenewalRequestsController } from './renewal-request/renewal-requests.controller';
@@ -226,6 +229,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     RequestFactsService,
     RequestPreviewService,
     AccessRequestService,
+    RequestSenderService,
     RequestDraftService,
     RequestDraftSubmitService,
     // The listeners of the outcome of a request, the extension point this module opens, and the service that tells them.
@@ -235,7 +239,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     QuoteService,
     AssessmentViewService,
     AssessmentGate,
-    AssessmentReader,
+    AssessmentQueryService,
     AssessmentPatchService,
     AssessmentPricingService,
     AssessmentCompletionService,
@@ -275,7 +279,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     FinanceReviewService,
     SpendBudgetListener,
     RepricingService,
-    SpendReadSupport,
+    SpendWireViewService,
     SpendHeadService,
     PlanLineService,
     PlanLineRouteService,
@@ -287,7 +291,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     SupplementRepo,
     SupplementPricing,
     SupplementRecorder,
-    SupplementReadService,
+    SupplementQueryService,
     SupplementService,
     SpendDecisionRepo,
     SpendDecisionRecorder,
@@ -318,6 +322,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     ReturnRevocationHook,
     RenewalRequestRepo,
     RenewalRequestWriter,
+    RenewalSeatFactsService,
     RenewalRequestService,
     RenewalApplyService,
     RenewalRequestTrail,
@@ -354,7 +359,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     MyRequestsRepo,
     MyRequestsFactsRepo,
     MyRequestsService,
+    RequestsDashboardApi,
   ],
-  exports: [RequestsApi, RequestOutcomeListeners],
+  exports: [RequestsApi, RequestOutcomeListeners, RequestsDashboardApi],
 })
 export class RequestsModule {}

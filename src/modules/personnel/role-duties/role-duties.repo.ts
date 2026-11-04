@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { offboardingHeadHandoverJson } from '../personnel-head-handover.json';
 import type { RoleFlag } from '../public/personnel.types';
 
 /** What the flows of the roles read of a case of a person who leaves. */
@@ -12,7 +13,7 @@ export interface RoleDutyCase {
   lastWorkingDay: BusinessDate;
   /** The person headed the department they leave; who follows them: an employee, nobody, or null when they did not head it. */
   headSuccessor: 'EMPLOYEE' | 'NONE' | null;
-  departmentId: string;
+  departmentId: string | null;
   closed: boolean;
   roleFlags: RoleFlag[];
 }
@@ -65,18 +66,16 @@ export class RoleDutiesRepo {
     state: 'HANDING_OVER' | 'LEFT' | 'CANCELLED';
     lastWorkingDay: Date;
     headHandover: unknown;
-    departmentId: string;
+    departmentId: string | null;
     closedAt: Date | null;
     roleFlags: RoleFlag[];
   }): RoleDutyCase {
-    const handover = row.headHandover as { successor?: 'EMPLOYEE' | 'NONE' } | null;
-
     return {
       id: row.id,
       employeeId: row.employeeId,
       state: row.state,
       lastWorkingDay: fromDateColumn(row.lastWorkingDay),
-      headSuccessor: handover?.successor ?? null,
+      headSuccessor: offboardingHeadHandoverJson.decode(row.headHandover)?.successor ?? null,
       departmentId: row.departmentId,
       closed: row.closedAt !== null,
       roleFlags: row.roleFlags,

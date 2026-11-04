@@ -14,7 +14,7 @@ import type {
 } from '../public/licensing-handover.types';
 import type { RevocationContext, RevocationReasonFacts, RevocationTaskFacts } from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
-import { RevocationReadService } from '../provisioning/revocation-read.service';
+import { RevocationViewService } from '../provisioning/revocation-view.service';
 import { isOverdue, requirementOf } from './handover-confirmer.policy';
 import { HandoverConfirmerResolver } from './handover-confirmer.service';
 import { HandoverCaseFacts } from './handover-case-facts.service';
@@ -40,7 +40,7 @@ export class HandoverService {
   constructor(
     private readonly issue: HandoverIssueService,
     private readonly repo: HandoverRepo,
-    private readonly reads: RevocationReadService,
+    private readonly view: RevocationViewService,
     private readonly catalog: CatalogApi,
     private readonly facts: HandoverCaseFacts,
     private readonly audit: AuditApi,
@@ -78,7 +78,7 @@ export class HandoverService {
   async open(tx: DbTx, actor: AuthenticatedPrincipal, input: OpenHandoverDutiesInput): Promise<OpenedHandoverDuties> {
     const today = await this.facts.today(input.now ?? new Date(), tx);
     const departmentId = input.departmentId ?? (await this.facts.departmentOf(input.leaverEmployeeId, today, tx));
-    const seats = await this.reads.personalSeatsOf(input.leaverEmployeeId, today, tx);
+    const seats = await this.view.personalSeatsOf(input.leaverEmployeeId, today, tx);
     const result: OpenedHandoverDuties = { opened: [], reused: 0, notRequired: 0 };
 
     for (const seat of seats) {
@@ -117,11 +117,12 @@ export class HandoverService {
       .map((reason) => ({ source: reason.source, decidedByEmployeeId: reason.decidedByEmployeeId }));
     const [plan] = await this.catalog.getPlanRevocationInfo([task.planId], tx);
     if (!plan) throw new SeatTargetNotFoundError('PLAN');
-    const required = requirementOf(asked, plan.dataLossOnRemoval);
-    if (!required) return;
 
     const today = await this.facts.today(now, tx);
     const departmentId = context.departmentId ?? (await this.facts.departmentOf(task.employeeId, today, tx));
+
+    const required = requirementOf(asked, plan.dataLossOnRemoval, { departmentId });
+    if (!required) return;
     // The person who leaves heads the department: a successor is looked for from tomorrow, never the person themselves.
     const leaverIsHead =
       DEPARTING.has(required.source) &&

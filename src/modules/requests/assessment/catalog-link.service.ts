@@ -3,7 +3,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestApplicationRetiredError,
@@ -28,7 +28,7 @@ export class CatalogLinkService {
     private readonly runner: TransactionRunner,
     private readonly requests: AccessRequestRepo,
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -46,7 +46,7 @@ export class CatalogLinkService {
       if (!target) throw new AccessRequestPlanNotFoundError();
       if (target.applicationStatus === 'RETIRED') throw new AccessRequestApplicationRetiredError();
       const ownerId = await this.catalog.getPlanBusinessOwnerId(planId, tx);
-      const [owner] = ownerId === null ? [] : await this.organization.getEmployees([ownerId], tx);
+      const [owner] = ownerId === null ? [] : await this.organizationReads.getEmployees([ownerId], tx);
       if (!owner || owner.status !== 'ACTIVE') throw new CatalogLinkRefusedError('BUSINESS_OWNER_REQUIRED');
 
       await this.requests.setPlan(tx, requestId, planId);

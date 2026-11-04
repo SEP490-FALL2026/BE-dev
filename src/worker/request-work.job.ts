@@ -4,6 +4,7 @@ import { EnvironmentVariables } from '../infrastructure/config/env-schema';
 import { RequestStatusProjectorApi } from '../modules/requests/public/request-status-projector.api';
 import { StepRedeterminationSweepApi } from '../modules/requests/public/step-redetermination-sweep.api';
 import { StepSlaSweepApi } from '../modules/requests/public/step-sla-sweep.api';
+import { describeForOperator, traceForOperator } from '../infrastructure/observability/operator-error';
 
 /**
  * The worker's loop over the open steps of requests: a database poll like the mail loop, not a queue job. Each tick runs the
@@ -58,7 +59,7 @@ export class RequestWorkLoop implements OnApplicationBootstrap, OnModuleDestroy 
     try {
       await work();
     } catch (error) {
-      this.logger.error(`${name} failed: ${(error as Error).name}`);
+      this.logger.error(`${name} failed: ${describeForOperator(error)}`, traceForOperator(error));
     }
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AssignmentListFilter, AssignmentSummaryView } from '../public/licensing.types';
 import { AssignmentRepo } from './assignment.repo';
 import { toAssignmentView } from './assignment.policy';
@@ -15,7 +15,7 @@ import { toAssignmentView } from './assignment.policy';
 export class AssignmentListService {
   constructor(
     private readonly repo: AssignmentRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
   ) {}
 
@@ -26,9 +26,9 @@ export class AssignmentListService {
     const { page, pageSize, ...rest } = filter;
     const { items, total } = await this.repo.page({ ...rest, skip: (page - 1) * pageSize, take: pageSize });
     const [people, plans, costCenters] = await Promise.all([
-      this.organization.getEmployees([...new Set(items.map((item) => item.employeeId))]),
+      this.organizationReads.getEmployees([...new Set(items.map((item) => item.employeeId))]),
       this.catalog.getPlanSummaries([...new Set(items.map((item) => item.planId))]),
-      this.organization.costCentersByIds([
+      this.organizationReads.costCentersByIds([
         ...new Set(items.flatMap((item) => (item.costCenterId ? [item.costCenterId] : []))),
       ]),
     ]);

@@ -18,34 +18,49 @@ export type SeatCells = Partial<Record<SeatColumn, string>>;
 
 export type SeatRowOutcome = 'VALID' | 'ERROR';
 
-/** Why a row cannot be written; the codes are the ones the preview shows (`US-02-05`). */
-export type SeatRowErrorCode =
-  | 'EMPLOYEE_NOT_FOUND'
-  | 'EMPLOYEE_NOT_ACTIVE'
-  | 'KIND_INVALID'
-  | 'SHARED_ACCOUNT_NOT_SUPPORTED'
-  | 'ACCOUNT_IDENTIFIER_MISSING'
-  | 'ACCOUNT_IDENTIFIER_INVALID'
-  | 'ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET'
-  | 'ACCOUNT_IDENTIFIER_IN_USE'
-  | 'NOT_COMPANY_ACCOUNT'
-  | 'GRANTED_ON_INVALID'
-  | 'GRANTED_ON_IN_FUTURE'
-  | 'EFFECTIVE_BEFORE_HIRE'
-  | 'EXPECTED_END_REQUIRED'
-  | 'EXPECTED_END_INVALID'
-  | 'OVERLAP'
-  | 'SEAT_LIMIT_EXCEEDED'
-  | 'REASON_REQUIRED'
-  | 'OWNING_DEPARTMENT_NOT_FOUND'
-  | 'COST_CENTER_NOT_FOUND'
-  | 'COST_CENTER_INACTIVE'
-  | 'COST_CENTER_NOT_OWNING_UNIT'
-  | 'COST_CENTER_NOT_ALLOWED'
-  | 'SUBSCRIPTION_DEPARTMENT_MISMATCH';
+/** Why a row cannot be written; the codes are the ones the preview shows (`US-02-05`). The list is what the codec of `errors` reads. */
+export const SEAT_ROW_ERROR_CODES = [
+  'EMPLOYEE_NOT_FOUND',
+  'EMPLOYEE_NOT_ACTIVE',
+  'KIND_INVALID',
+  'SHARED_ACCOUNT_NOT_SUPPORTED',
+  'ACCOUNT_IDENTIFIER_MISSING',
+  'ACCOUNT_IDENTIFIER_INVALID',
+  'ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET',
+  'ACCOUNT_IDENTIFIER_IN_USE',
+  'NOT_COMPANY_ACCOUNT',
+  'GRANTED_ON_INVALID',
+  'GRANTED_ON_IN_FUTURE',
+  'EFFECTIVE_BEFORE_HIRE',
+  'EXPECTED_END_REQUIRED',
+  'EXPECTED_END_INVALID',
+  'OVERLAP',
+  'SEAT_LIMIT_EXCEEDED',
+  'REASON_REQUIRED',
+  'OWNING_DEPARTMENT_NOT_FOUND',
+  'COST_CENTER_NOT_FOUND',
+  'COST_CENTER_INACTIVE',
+  'COST_CENTER_NOT_OWNING_UNIT',
+  'COST_CENTER_NOT_ALLOWED',
+  'SUBSCRIPTION_DEPARTMENT_MISMATCH',
+] as const;
+export type SeatRowErrorCode = (typeof SEAT_ROW_ERROR_CODES)[number];
+
+/**
+ * Codes the preview wrote into `seat_baseline_import_rows.errors` from 20/10/2026 (G2–G4) and stopped writing on 23/10/2026, when a
+ * Cost Center stopped being required of a seat row. No migration rewrote the rows already stored, so an old import still reads them:
+ * the codec accepts these when it reads and never when it writes.
+ */
+export const RETIRED_SEAT_ROW_ERROR_CODES = ['COST_CENTER_REQUIRED', 'COST_CENTER_NOT_COMPANY'] as const;
+export type RetiredSeatRowErrorCode = (typeof RETIRED_SEAT_ROW_ERROR_CODES)[number];
 
 export interface SeatRowError {
   code: SeatRowErrorCode;
+}
+
+/** An error as a stored row keeps it: what the preview writes now, or a code it wrote before it was retired. */
+export interface StoredSeatRowError {
+  code: SeatRowErrorCode | RetiredSeatRowErrorCode;
 }
 
 /** What a valid row asks to be written, with the people and the Cost Center it names already found. */

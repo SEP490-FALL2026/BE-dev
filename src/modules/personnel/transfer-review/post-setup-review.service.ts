@@ -4,7 +4,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import type { SeatBaselineClosedEvent } from '../../licensing/public/licensing.extension-points';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { TransferReviewRepo } from './transfer-review.repo';
 import { TransferReviewService } from './transfer-review.service';
@@ -25,7 +25,7 @@ export class PostSetupReviewService {
     private readonly reviews: TransferReviewRepo,
     private readonly opening: TransferReviewService,
     private readonly licensing: LicensingApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly history: OrganizationHistoryApi,
     private readonly audit: AuditApi,
   ) {}
@@ -39,7 +39,7 @@ export class PostSetupReviewService {
           .map((assignment) => assignment.assignmentId),
       );
       if (foreign.size === 0) continue;
-      const employee = await this.organization.getEmployee(holder.employeeId, tx);
+      const employee = await this.organizationReads.getEmployee(holder.employeeId, tx);
       if (!employee || employee.status !== 'ACTIVE' || employee.workState === 'LEFT') continue;
       const placement = await this.history.getPlacementInForce(tx, holder.employeeId, event.closedOn);
       if (!placement) continue;

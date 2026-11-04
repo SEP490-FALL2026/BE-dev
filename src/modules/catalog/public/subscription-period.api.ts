@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { ApplicationLookupService } from '../catalog-entry/application-lookup.service';
+import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
 import { SubscriptionPeriodService } from '../subscription/subscription-period.service';
 import type { NextPeriodInput, RenewalPeriodFacts } from './subscription-period.types';
 
@@ -15,7 +15,7 @@ import type { NextPeriodInput, RenewalPeriodFacts } from './subscription-period.
 export class SubscriptionPeriodApi {
   constructor(
     private readonly periods: SubscriptionPeriodService,
-    private readonly applications: ApplicationLookupService,
+    private readonly applications: ApplicationFactsService,
   ) {}
 
   /** The periods with these ids, in one read; an id that does not exist is absent. */

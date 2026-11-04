@@ -132,7 +132,13 @@ done
 for key in DEMO_SUPER_ADMIN_PASSWORD DEMO_ACCOUNT_PASSWORD; do
   [[ "${CFG[$key]}" != *$'\n'* ]] || refuse "$key must be one line"
 done
-API_URL="${CFG[DEMO_API_URL]:-http://slm-api:3000}"
+if [ -n "${CFG[DEMO_API_URL]:-}" ]; then
+  API_URL="${CFG[DEMO_API_URL]}"
+  API_SOURCE='from DEMO_API_URL'
+else
+  API_URL='http://slm-api:3000'
+  API_SOURCE='default: DEMO_API_URL is not set'
+fi
 
 # --- The deployed image: exactly the one the last deployment recorded, never `latest` or an inherited value --------------
 IMAGE_FILE="$APP_DIR/releases/current-image"
@@ -180,15 +186,22 @@ args=(
 )
 
 echo "Running the demo dataset command ($MODE) of $IMAGE against $API_URL (settings and passwords from $CONFIG)."
+# The report starts with what a failure is read against (no setting but the API origin, no password) and keeps the
+# command's standard error too: its refusal, warning and failure lines (phase, time, kind and code of the error) are
+# worded to carry no secret, and without them a failed run left a report with nothing in it.
+printf 'Demo dataset %s — image %s — API %s (%s) — started %s\n' \
+  "$MODE" "$IMAGE" "$API_URL" "$API_SOURCE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$REPORT"
+run_started=$SECONDS
 run_status=0
 set +e
 # The passwords go through a pipe from a builtin: they are in no process's argument list, no environment and no file.
 builtin printf 'SUPER_ADMIN_PASSWORD=%s\nDEMO_ACCOUNT_PASSWORD=%s\n' \
   "${CFG[DEMO_SUPER_ADMIN_PASSWORD]}" "${CFG[DEMO_ACCOUNT_PASSWORD]}" 2> /dev/null |
-  compose_run "${args[@]}" | tee "$REPORT"
+  compose_run "${args[@]}" 2>&1 | tee -a "$REPORT"
 run_status="${PIPESTATUS[1]}"
 set -e
 unset CFG
+printf 'Finished: exit %s after %s s\n' "$run_status" "$((SECONDS - run_started))" >> "$REPORT"
 
 echo "Report kept in $REPORT."
 case "$run_status" in

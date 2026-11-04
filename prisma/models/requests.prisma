@@ -69,6 +69,9 @@ enum AccessRequestCancelCause {
   BENEFICIARY_LEFT
   // The IT Admin closed what was left of it because the beneficiary was transferred (spec L.10). Read only here.
   BENEFICIARY_TRANSFERRED
+  // The conversion command closed it because the spending approver is one of its parties (QĐ-93d(2), QĐ-93k(1)); nobody closed it:
+  // the one cause for which the column of who closed it may be empty (OD-6).
+  SPENDING_APPROVER_PARTY
 }
 
 // Whether the request has an amount: internal software has none; paid software is priced from its plan in the catalog, or
@@ -150,7 +153,7 @@ model AccessRequest {
   businessReason        String                     @map("business_reason")
   termMonths            Int                        @map("term_months")
   // Context only: it changes neither the Cost Center nor the chain (US-05-02 AC-7).
-  projectLabel          String?                    @map("project_label")
+  // Retired in QD-93h phase 1; dropped in phase 2.
   pricingStatus         AccessRequestPricingStatus @default(NOT_APPLICABLE) @map("pricing_status")
   // Why the price is missing (NO_PRICED_SUBSCRIPTION, CYCLE_UNKNOWN, AMOUNT_TOO_LARGE); null when it is not.
   priceMissingReason    String?                    @map("price_missing_reason")
@@ -357,7 +360,7 @@ model AccessRequestStep {
   state               AccessRequestStepState
   assigneeEmployeeId  String?                @map("assignee_employee_id") @db.Uuid
   routingRow          Int                    @map("routing_row")
-  // Why nobody holds a waiting step (NO_SPENDING_APPROVER, NO_FALLBACK_APPROVER, FALLBACK_IS_REQUESTER); null when held.
+  // Why nobody holds a waiting step (NO_SPENDING_APPROVER, NO_DEPARTMENT_HEAD, SPENDING_APPROVER_IS_PARTY, NO_FINANCE_REVIEWER, NO_IT_ADMIN_IN_CHARGE); null when held.
   waitingReason       String?                @map("waiting_reason")
   // The same person holds this step and the spend step of the same request: both are flagged (US-05-03 AC-9).
   samePersonAsSpend   Boolean                @default(false) @map("same_person_as_spend")

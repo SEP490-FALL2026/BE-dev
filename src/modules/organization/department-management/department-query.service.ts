@@ -5,9 +5,8 @@ import { normalizeDisplayName } from '../../../core/display-name';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { EmployeeTechnicalView } from '../public/organization.types';
 import { OrganizationContextService } from '../organization-context.service';
-import { DepartmentDirectoryService } from '../department/department-directory.service';
+import { DepartmentRecordService } from '../department/department-record.service';
 import { EmployeeAccountsHook } from '../public/organization.extension-points';
-import { ProjectService } from '../project/project.service';
 import {
   DepartmentForbiddenError,
   DepartmentNotFoundError,
@@ -62,8 +61,7 @@ export class DepartmentQueryService {
     private readonly repo: DepartmentRepo,
     private readonly technical: DepartmentTechnicalMembersRepo,
     private readonly context: OrganizationContextService,
-    private readonly departments: DepartmentDirectoryService,
-    private readonly projects: ProjectService,
+    private readonly departments: DepartmentRecordService,
     private readonly employeeAccounts: EmployeeAccountsHook,
   ) {}
 
@@ -100,7 +98,6 @@ export class DepartmentQueryService {
 
     const [view] = await this.toViews([record]);
     const today = await this.context.businessToday();
-    const projects = await this.projects.forProfile(id);
     const heads = cutHistory(
       await this.departments.headHistory(undefined, id, DEPARTMENT_HEAD_HISTORY_LIMIT + 1),
       DEPARTMENT_HEAD_HISTORY_LIMIT,
@@ -111,8 +108,6 @@ export class DepartmentQueryService {
       headHistory: heads.items,
       headHistoryHasMore: heads.hasMore,
       successor: pendingSuccessor(heads.items, today),
-      projects: projects.items,
-      projectTotal: projects.total,
     };
   }
 

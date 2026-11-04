@@ -15,21 +15,21 @@ không có endpoint seed, không dùng `dev:seed`, không thay image API/worker,
 ## 1. Lệnh làm gì và không làm gì
 
 - Dữ liệu là **fixture có phiên bản** trong mã nguồn: [`shared-demo-v1`](../../src/cli/demo-dataset/fixture/shared-demo-v1.ts)
-  — 6 phòng `DS1-*`, 16 nhân viên (14 có tài khoản), Cost Center, 4 ứng dụng/4 gói/4 thuê bao, ngân sách năm của
-  phòng Kỹ thuật, 9 Request ở 9 trạng thái, một bản nháp, một phiếu báo lỗi SaaS, một thông báo BM-09. Toàn bộ là dữ
+  — 8 phòng `DS1-*`, 22 nhân viên (20 có tài khoản), Cost Center, 4 ứng dụng/4 gói/8 thuê bao, ngân sách năm của
+  phòng Kỹ thuật, Marketing và Kinh doanh (phòng Thiết kế cố ý chưa có), 9 Request ở 9 trạng thái, một bản nháp, một phiếu báo lỗi SaaS, một thông báo BM-09. Toàn bộ là dữ
   liệu giả; email dùng miền `ds1.slm-demo.example` (miền `.example` dành cho ví dụ, không thư nào tới người thật).
   Mô tả cho FE: Docs `Figma UI-UX/API-Integration/demo/`.
 - **Mọi bản ghi được ghi qua HTTP API đang chạy**, bằng đúng vai mà nghiệp vụ quy định (Super Admin tạo phòng/nhân
-  viên/trưởng phòng/vai trò phê duyệt; Finance tạo Cost Center và lập ngân sách; IT Admin khai danh mục và cấp ghế;
+  viên/trưởng phòng/Người duyệt chi (một grant `SPENDING_APPROVER`, không còn approver dự phòng hay người thay thế, QĐ-93c); Finance tạo Cost Center và lập ngân sách; IT Admin khai danh mục và cấp ghế;
   trưởng phòng duyệt nhu cầu và trình lô; Người duyệt chi duyệt chi; nhân viên gửi Request). Mọi validation, chuyển
   trạng thái, khoản cam kết và Audit Trail là của ứng dụng; lệnh không chèn trạng thái bằng SQL.
 - **Ngoại lệ duy nhất là tài khoản đăng nhập của người demo**: lời mời sẽ gửi email tới hộp thư không tồn tại, nên lệnh
   tạo tài khoản đã kích hoạt qua hợp đồng tài khoản demo có sẵn (cùng hợp đồng với `pnpm dev:seed`: một vai trực tiếp
-  `EMPLOYEE`/`IT_ADMIN`/`FINANCE`, không bao giờ vai suy ra hay `SUPER_ADMIN`), mật khẩu hash bằng Argon2id của
+  `EMPLOYEE`/`IT_ADMIN`/`FINANCE`, không bao giờ `SUPER_ADMIN`; vai trực tiếp khác được cấp ở bước riêng), mật khẩu hash bằng Argon2id của
   `IdentityAccessApi.prepareCredential`, và ghi Audit Trail `DEMO_DATASET.ACCOUNT_CREATED` với
   `operatorReference = DEMO_DATASET:<fixture>:<tham chiếu operator>`. Phần này chạy bằng **runtime role** của API: với
   `NODE_ENV=production` lệnh kiểm vai PostgreSQL trước mọi việc và dừng nếu là superuser, owner hay deploy role.
-- **Giới hạn của tài khoản `FINANCE` (Owner 30/10/2026):** cấp vai `FINANCE` phát thay đổi vai trò phê duyệt mà graph của lệnh
+- **Giới hạn của tài khoản `FINANCE` (Owner 30/10/2026):** cấp vai `FINANCE` phát thay đổi vai (`ApprovalRoleChange`) mà graph của lệnh
   không có listener của `requests` trả lời, nên một step đang chờ Finance **không** được thử lại (đường API thì thử lại); trên
   database dataset nhắm tới chưa có step nào chờ Finance.
 - **Trước khi ghi**, lệnh chứng minh đúng đích: database có tổ chức đúng tên `DEMO_ORGANIZATION_NAME`, tiền tệ báo cáo
@@ -47,19 +47,19 @@ không có endpoint seed, không dùng `dev:seed`, không thay image API/worker,
   dữ liệu ngoài dataset đang giữ, hoặc **một bản ghi của dataset đã bị sửa khác fixture**, là **xung đột**: bước đó không
   ghi, bước phụ thuộc bị chặn, phần độc lập vẫn chạy (exit 4). Những gì được so:
 
-  | Bản ghi                                             | Nhận ra bằng                                | So với fixture (khác ⟹ xung đột)                                         |
-  | --------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------ |
-  | Phòng                                               | mã `DS1-*`                                  | tên, đang hoạt động                                                      |
-  | Nhân viên                                           | mã                                          | là thành viên đúng phòng, họ tên                                         |
-  | Tài khoản                                           | nhân viên                                   | email đăng nhập, vai trực tiếp (hợp đồng tài khoản demo)                 |
-  | Trưởng phòng, IT Admin phụ trách, vai trò phê duyệt | phòng/vai                                   | người giữ                                                                |
-  | Ứng dụng                                            | tên + nhà cung cấp                          | Business Owner                                                           |
-  | Gói                                                 | tên trong ứng dụng                          | kiểu cấp, mô hình giá, mức kiểm soát, mất dữ liệu khi gỡ, chia sẻ        |
-  | Thuê bao                                            | gói + phòng sở hữu                          | số lượng, đơn giá và tiền tệ, chu kỳ, ngày đầu/cuối kỳ, thời hạn báo hủy |
-  | Cost Center                                         | mã                                          | phòng gắn                                                                |
-  | Hồ sơ thuế nhà cung cấp                             | nhà cung cấp                                | nhóm thuế                                                                |
-  | Request R1→R9                                       | Audit Trail của người gửi + thẻ `[DS1-Rn]`  | gói; trạng thái phải đi được tới đích theo kịch bản                      |
-  | Phiếu báo lỗi, thông báo BM-09                      | thẻ `[DS1-ISSUE]`/`[DS1-NOTICE]` ở nội dung | —                                                                        |
+  | Bản ghi                                           | Nhận ra bằng                                | So với fixture (khác ⟹ xung đột)                                         |
+  | ------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------ |
+  | Phòng                                             | mã `DS1-*`                                  | tên, đang hoạt động                                                      |
+  | Nhân viên                                         | mã                                          | là thành viên đúng phòng, họ tên                                         |
+  | Tài khoản                                         | nhân viên                                   | email đăng nhập, vai trực tiếp (hợp đồng tài khoản demo)                 |
+  | Trưởng phòng, IT Admin phụ trách, Người duyệt chi | phòng/vai                                   | người giữ                                                                |
+  | Ứng dụng                                          | tên + nhà cung cấp                          | Business Owner                                                           |
+  | Gói                                               | tên trong ứng dụng                          | kiểu cấp, mô hình giá, mức kiểm soát, mất dữ liệu khi gỡ, chia sẻ        |
+  | Thuê bao                                          | gói + phòng sở hữu                          | số lượng, đơn giá và tiền tệ, chu kỳ, ngày đầu/cuối kỳ, thời hạn báo hủy |
+  | Cost Center                                       | mã                                          | phòng gắn                                                                |
+  | Hồ sơ thuế nhà cung cấp                           | nhà cung cấp                                | nhóm thuế                                                                |
+  | Request R1→R9                                     | Audit Trail của người gửi + thẻ `[DS1-Rn]`  | gói; trạng thái phải đi được tới đích theo kịch bản                      |
+  | Phiếu báo lỗi, thông báo BM-09                    | thẻ `[DS1-ISSUE]`/`[DS1-NOTICE]` ở nội dung | —                                                                        |
 
   Được **dùng lại có chủ đích**: ngân sách năm hiện hành `APPROVED` của `DS1-CC-ENG` dù ở phiên bản nào (Finance được sửa
   ngân sách khi demo); bản nháp `INDIVIDUAL` cùng gói của `DS1-DEV3` (route bản nháp không trả nội dung để so); mật khẩu
@@ -130,7 +130,11 @@ bash demo-dataset.sh --app-dir /opt/slm/backend --config /opt/slm/backend/.env.d
 Wrapper chạy `docker compose run --rm --no-deps -T api node dist/demo-dataset-cli.js <mode> … --environment=SHARED
 --secrets-stdin` với đúng image của `releases/current-image` (không bao giờ `latest`), bằng **runtime role** của service
 `api` (H7 giữ nguyên), trong mạng Compose để gọi API trực tiếp. Báo cáo (không mật khẩu/token) được lưu tại
-`/opt/slm/backend/demo-dataset/<UTC>-<fixture>-<mode>.txt`. Kiểm tra: [mục 5](#5-kiểm-tra-và-mã-thoát).
+`/opt/slm/backend/demo-dataset/<UTC>-<fixture>-<mode>.txt`; dòng đầu ghi mode, image, **API đích kèm nguồn** (`from
+DEMO_API_URL` hay `default: DEMO_API_URL is not set` — mặc định là `http://slm-api:3000`, nên khi API chạy cổng khác,
+ví dụ `PORT=4000`, phải đặt `DEMO_API_URL`), dòng cuối ghi mã thoát và số giây; báo cáo giữ cả stderr của lệnh (dòng
+`refused:`/`warning:`/lỗi), trước 31/10/2026 chỉ giữ stdout nên báo cáo của lượt lỗi trống. Kiểm tra:
+[mục 5](#5-kiểm-tra-và-mã-thoát).
 
 ## 4. Cách B — chạy từ máy local (Windows) qua SSH tunnel
 
@@ -144,7 +148,11 @@ local — PostgreSQL vẫn không công bố cổng nào trên VPS, tunnel đi t
 - SSH vào VPS **bằng khóa hoặc agent, không hỏi mật khẩu** (wrapper dùng `BatchMode=yes`); user SSH chạy được `docker`
   (như user deploy) và đọc được `<app dir>/releases/current-image`.
 - Checkout BE ở commit có hạng mục này, **và** `prisma/` cùng `openapi.json` giống hệt commit đang deploy. Wrapper tự
-  kiểm (mục 4.3); nếu khác, deploy trước (cách A) hoặc chờ.
+  kiểm (mục 4.3); nếu khác, deploy trước (cách A) hoặc chờ. Commit đang deploy do CD build từ repository
+  `WDP301-FA26-GR8/BE`, có thể không có ở `origin` của checkout (`SEP490-FALL2026/BE-dev`): lấy đúng object đó mà không
+  thêm remote hay đổi nhánh bằng `git fetch git@github.com:WDP301-FA26-GR8/BE.git <sha của releases/current-image>`.
+- Trên VPS `e2-micro` (958 MiB RAM, swap trên cùng đĩa) đây là cách được chọn (Owner, 31/10/2026): container one-off của
+  cách A khởi động Node ngay trên host và đã làm truy vấn đầu quá `DB_QUERY_TIMEOUT_MS` (plan của hạng mục, Task 7).
 - Build: tại gốc repo BE, `pnpm install --frozen-lockfile` rồi `pnpm build`. Wrapper từ chối bản build cũ hơn mã nguồn.
 
 ### 4.2. File riêng (ngoài repository)
@@ -214,14 +222,37 @@ nghi tunnel còn mở: `Test-NetConnection 127.0.0.1 -Port 15432` phải `False`
 | `2`      | `apply`: mọi bước đã có, không ghi gì                                                            | Không cần làm gì.                                                                                                                     |
 | `4`      | Có bước **xung đột** hoặc **bị chặn**; bước khác đã chạy                                         | Đọc dòng `XUNG ĐỘT`: dữ liệu ngoài dataset đang giữ chỗ, hoặc bản ghi của dataset đã bị sửa — quyết định thủ công, lệnh không ghi đè. |
 | `3`      | Từ chối trước khi ghi (cấu hình, image, tương thích, lịch, khóa, sai tổ chức/API/mật khẩu)       | Sửa theo thông báo; chưa có bản ghi nào của dataset thay đổi.                                                                         |
-| `1`      | Lỗi giữa chừng (API không tới được, lỗi 5xx, tunnel đứt, vai PostgreSQL không phải runtime role) | Báo cáo nêu bước đã xong; sửa nguyên nhân rồi chạy lại `apply`, lệnh đi tiếp. Lỗi database kèm mã trong `[…]`: xem dưới bảng.         |
+| `1`      | Lỗi giữa chừng (API không tới được, lỗi 5xx, tunnel đứt, vai PostgreSQL không phải runtime role) | Báo cáo nêu bước đã xong; sửa nguyên nhân rồi chạy lại `apply`, lệnh đi tiếp. Lỗi database kèm `code=…`/`pg="…"`: xem dưới bảng.      |
 
-Lỗi database ở mã thoát `1` kèm mã nguyên nhân trong ngoặc vuông (không URL, không giá trị): `[P2028]` — một transaction
-của lệnh quá `DB_TRANSACTION_TIMEOUT_MS` (đường tới PostgreSQL chậm hoặc host quá tải); `[Query read timeout]`, thường đi
-sau dòng `warning: A database connection was retired …` — một câu lệnh không được trả lời trong `DB_QUERY_TIMEOUT_MS`
-(tunnel/mạng khựng, host bỏ đói tiến trình, hay DDL lúc deploy); `[ECONNRESET]`/`[Connection terminated …]` — kết nối bị
-cắt; `[P2010 57014]` — `statement_timeout` phía server. Chạy lại `apply` khi đường đã ổn; đối chiếu chi tiết:
+Lỗi database ở mã thoát `1` kèm nguyên nhân bằng mã, không URL, không giá trị: `code=P2028` — một transaction của lệnh quá
+`DB_TRANSACTION_TIMEOUT_MS` (đường tới PostgreSQL chậm hoặc host quá tải); `pg="Query read timeout"`, thường đi sau dòng
+`warning: A database connection was retired …` — một câu lệnh không được trả lời trong `DB_QUERY_TIMEOUT_MS` (tunnel/mạng
+khựng, host bỏ đói tiến trình, hay DDL lúc deploy); `code=ECONNRESET` hoặc `pg="Connection terminated …"` — kết nối bị cắt;
+`code=P2010 sqlState=57014` — `statement_timeout` phía server. Chạy lại `apply` khi đường đã ổn; đối chiếu chi tiết:
 [A-04 operator verification](../workspace/items/a04-seed-rerun-diagnosis/operator-verification.md).
+
+**Đọc dòng lỗi.** Lỗi ngoài các bước in một dòng
+`The demo dataset run failed in phase <phase> after <ms> ms (run <ms> ms): <loại> [code=…] [sqlState=…] retryable=… [cause=…] [pg="…"]`
+— không URL, không thông điệp gốc của lỗi, không stack, không mật khẩu. `pg="…"` chỉ là thông điệp cố định của
+node-postgres cho lỗi kết nối (`Query read timeout`, `Connection terminated unexpectedly`, …).
+
+| Phase                | Đang làm gì                                                                                        |
+| -------------------- | -------------------------------------------------------------------------------------------------- |
+| `secrets`            | đọc hai mật khẩu từ stdin                                                                          |
+| `startup`            | mở đồ thị lệnh; ở production chạy truy vấn đầu tiên kiểm runtime role, **ngoài** transaction       |
+| `installation-facts` | đọc tổ chức, ngày, Super Admin trong database                                                      |
+| `apply-lock`         | (`apply`) lấy khóa advisory trên kết nối riêng                                                     |
+| `api-proof`          | đăng nhập Super Admin qua API và đối chiếu `/me`                                                   |
+| `calendar`           | đọc tham số năm tài chính và Audit Trail qua API                                                   |
+| `steps`              | các bước của dataset                                                                               |
+| `lock-release`       | (`apply`) nhả khóa; lỗi ở đây chỉ in `warning:`, **không** thay báo cáo hay mã thoát của lượt chạy |
+
+`warning: A database connection was retired …` rồi `phase startup … Error retryable=true pg="Query read timeout"` nghĩa
+là database (hoặc đường mạng tới nó, hoặc tiến trình bị nghẽn CPU) không trả lời truy vấn kiểm vai trong
+`DB_QUERY_TIMEOUT_MS`: chưa có gì được ghi; kiểm tình trạng PostgreSQL/host rồi chạy lại, **không** tăng timeout để
+che. API không tới được in `(<METHOD> <path> kind=NETWORK|TIMEOUT [code=ECONNREFUSED|ENOTFOUND|…] elapsedMs=…)`:
+`NETWORK` + `ECONNREFUSED` = sai cổng hoặc API chưa nghe; `ENOTFOUND`/`EAI_AGAIN` = tên máy; `TIMEOUT` = API nhận
+kết nối nhưng không trả lời trong 30 giây.
 
 ## 6. Bàn giao cho FE
 

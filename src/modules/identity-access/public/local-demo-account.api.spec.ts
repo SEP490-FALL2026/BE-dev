@@ -1,5 +1,5 @@
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { CredentialService } from '../credentials/credential.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
 import { DemoAccountRoleError } from './identity-access.errors';
@@ -32,7 +32,7 @@ describe('LocalDemoAccountApi', () => {
     };
     const credentials = { createCredential: jest.fn().mockResolvedValue(undefined) };
     const service = new LocalDemoAccountApi(
-      accounts as unknown as AccountDirectoryService,
+      accounts as unknown as AccountRecordService,
       grants as unknown as RoleGrantService,
       credentials as unknown as CredentialService,
     );
@@ -72,6 +72,16 @@ describe('LocalDemoAccountApi', () => {
         reason: 'ACCOUNT_DIFFERS',
       });
     }
+  });
+
+  it('accepts only the additional direct roles declared by the shared fixture', async () => {
+    const existing = build({ accountId: 'u-1', account: usable, roles: ['IT_ADMIN', 'MANAGER'] });
+    await expect(
+      existing.service.describeDemoAccount(tx, { ...ask(), allowedExtraRoles: ['MANAGER'] }),
+    ).resolves.toEqual({ state: 'present' });
+    await expect(
+      existing.service.describeDemoAccount(tx, { ...ask(), allowedExtraRoles: ['SPENDING_APPROVER'] }),
+    ).resolves.toEqual({ state: 'conflict', reason: 'ACCOUNT_DIFFERS' });
   });
 
   it('conflicts when the login email belongs to another account, or FINANCE is held by someone else', async () => {

@@ -6,6 +6,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { technicalStepRefusal } from '../personnel-self-action.policy';
 import type { PersonnelActor } from '../public/personnel.types';
@@ -40,6 +41,7 @@ export class OffboardingFrame {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly repo: OffboardingRepo,
@@ -97,9 +99,13 @@ export class OffboardingFrame {
     rules.beforeLocks(seen);
 
     const work = async (tx: DbTx): Promise<T> => {
-      const today = await this.organization.businessToday(new Date(), tx);
+      const today = await this.organizationReads.businessToday(new Date(), tx);
       if (options.lockDepartment) {
-        await this.history.lockDepartments(tx, { updateIds: [seen.departmentId], shareIds: [] });
+        if (seen.departmentId) {
+          await this.history.lockDepartments(tx, { updateIds: [seen.departmentId], shareIds: [] });
+        } else if (seen.cancelledPlacementDepartmentId) {
+          await this.history.lockDepartments(tx, { updateIds: [], shareIds: [seen.cancelledPlacementDepartmentId] });
+        }
       }
       await this.organization.lockEmployeeForUpdate(tx, seen.employeeId);
       const chosen = options.successorEmployeeId ?? null;
@@ -109,7 +115,7 @@ export class OffboardingFrame {
       const earlier = held.headHandover?.successorEmployeeId ?? null;
       if (options.lockDepartment && earlier && earlier !== chosen) await this.lockShared(tx, earlier);
       await rules.afterLocks?.(tx, seen);
-      const zone = (await this.organization.getOrganization(tx))?.timeZone ?? 'UTC';
+      const zone = (await this.organizationReads.getOrganization(tx))?.timeZone ?? 'UTC';
 
       return apply(tx, { held, today, recordedOn: businessDateAt(held.recordedAt, zone) });
     };
@@ -119,7 +125,7 @@ export class OffboardingFrame {
 
   private async lockShared(tx: DbTx, employeeId: string): Promise<void> {
     try {
-      await this.organization.lockEmployeeForShare(tx, employeeId);
+      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
     } catch (error) {
       if (!(error instanceof EmployeeNotFoundError)) throw error;
     }

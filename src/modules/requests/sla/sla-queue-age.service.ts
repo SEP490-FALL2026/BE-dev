@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { wallClockAt } from '../../../core/working-days';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SlaReminderRepo } from './sla-reminder.repo';
 import { standingOf } from './step-sla.policy';
 
@@ -25,7 +25,7 @@ export interface QueueAge {
 @Injectable()
 export class SlaQueueAgeService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly parameters: OperatingParametersApi,
     private readonly reminders: SlaReminderRepo,
   ) {}
@@ -37,7 +37,7 @@ export class SlaQueueAgeService {
   ): Promise<Map<string, QueueAge>> {
     const queued = rows.filter((row): row is { requestId: string; queuedAt: Date } => row.queuedAt !== null);
     if (queued.length === 0) return new Map();
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) return new Map();
     const today = wallClockAt(now, organization.timeZone).date;
     const oldest = wallClockAt(

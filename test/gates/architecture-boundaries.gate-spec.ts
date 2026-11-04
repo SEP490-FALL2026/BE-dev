@@ -88,6 +88,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   BudgetVersionDecision: 'budgets',
   BudgetCommitment: 'budgets',
   BudgetCommitmentRelease: 'budgets',
+  BudgetAttachment: 'budgets',
   RequestBudgetCheck: 'requests',
   RequestBudgetCheckYear: 'requests',
   RequestFinanceReview: 'requests',
@@ -111,8 +112,6 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   CostCenterDirectionActivation: 'organization',
   Department: 'organization',
   DepartmentHeadPeriod: 'organization',
-  Project: 'organization',
-  ProjectDepartment: 'organization',
   Employee: 'organization',
   EmployeePlacement: 'organization',
   OrganizationChangeAnnouncement: 'organization',
@@ -129,7 +128,6 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   PersonnelNoticeCounter: 'personnel',
   SuperAdminEventTicket: 'personnel',
   AppUser: 'identity-access',
-  ApprovalRoleHolder: 'identity-access',
   RecoveryTicket: 'identity-access',
   PasswordCredential: 'identity-access',
   RoleGrant: 'identity-access',
@@ -296,6 +294,20 @@ describe('architecture boundaries', () => {
       const writes = [...statements, ...fragments].flatMap((sql) => sql.match(SQL_WRITE) ?? []);
       expect({ path, writes }).toEqual({ path, writes: [] });
     }
+  });
+
+  it('reads the table of the old approval roles in no file of src but the preflight repository (qd93-remove-fallback-substitute-approvers)', () => {
+    // The configuration of the substitute and of the fallback approver is gone (`QĐ-93c`): no use case, facade or command reads or writes
+    // the table any more; the image of Phase A stays a valid way back for a database after Phase B only because of this. Neither the
+    // delegate nor the name of the table appears in a file of src, generated code left out, but the one that reads the schema before a migration.
+    const allowed = new Set(['modules/installation/migration-preflight/migration-preflight.repo.ts']);
+    const readers = listTypeScriptFiles(sourceRoot)
+      .filter((file) => !file.includes(`${sep}generated${sep}`))
+      .filter((file) => /approval_role_holders|approvalRoleHolder/.test(readFileSync(file, 'utf8')))
+      .map((file) => relative(sourceRoot, file).split(sep).join('/'))
+      .filter((file) => !allowed.has(file));
+
+    expect(readers).toEqual([]);
   });
 
   it('reaches each pre-migration reader from the preflight command only: never the API, the worker or another command', () => {

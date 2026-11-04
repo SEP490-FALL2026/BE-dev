@@ -17,7 +17,7 @@ import {
   BudgetCommitmentRefusedError,
 } from '../budget/budget.errors';
 import { planRelease, planRemainder, type PlannedRelease, type ReleasePlan } from '../budget/commitment-release.policy';
-import { budgetAuditEvent, BudgetSupportService } from '../budget/budget-support.service';
+import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo } from '../budget/commitment.repo';
 import type { CommitmentWire, ReleaseWire } from './commitment.dto';
 
@@ -32,7 +32,7 @@ export class CommitmentService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly commitments: CommitmentRepo,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
     private readonly audit: AuditApi,
     private readonly releaseGuard: CommitmentReleaseGuardHook,
   ) {}
@@ -93,9 +93,9 @@ export class CommitmentService {
   async pageReleases(id: string, query: { page: number; pageSize: number }): Promise<Page<ReleaseWire>> {
     if (!(await this.commitments.exists(id))) throw new BudgetCommitmentNotFoundError();
     const { rows, total } = await this.commitments.pageReleases(id, (query.page - 1) * query.pageSize, query.pageSize);
-    const people = await this.support.people(rows.map((row) => row.releasedByEmployeeId));
+    const people = await this.facts.people(rows.map((row) => row.releasedByEmployeeId));
     const commitment = await this.page({ page: 1, pageSize: 1, id });
-    const money = await this.support.formatter(commitment.items[0].amount.currency);
+    const money = await this.facts.formatter(commitment.items[0].amount.currency);
     const items = rows.map((row): ReleaseWire => ({
       id: row.id,
       amount: money(row.amountMinor),
@@ -208,9 +208,9 @@ export class CommitmentService {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     });
-    const centers = await this.support.costCenters(rows.map((row) => row.costCenterId));
+    const centers = await this.facts.costCenters(rows.map((row) => row.costCenterId));
     const money = new Map<string, (minor: bigint) => { amount: string; currency: string }>();
-    for (const code of new Set(rows.map((row) => row.currency))) money.set(code, await this.support.formatter(code));
+    for (const code of new Set(rows.map((row) => row.currency))) money.set(code, await this.facts.formatter(code));
 
     const items = rows.map((row): CommitmentWire => {
       const center = centers.get(row.costCenterId);

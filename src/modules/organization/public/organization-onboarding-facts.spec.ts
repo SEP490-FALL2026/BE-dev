@@ -1,22 +1,17 @@
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CostCenterCatalogueService } from '../cost-center/cost-center-catalogue.service';
-import { DepartmentDirectoryService } from '../department/department-directory.service';
-import { EmployeeDirectoryService } from '../employee/employee-directory.service';
+import { DepartmentRecordService } from '../department/department-record.service';
+import { EmployeeRecordService } from '../employee/employee-record.service';
 import { OrganizationContextService } from '../organization-context.service';
 import { OrganizationRepo } from '../organization.repo';
-import { DepartmentUseService } from '../department/department-use.service';
 import { AnnouncementRepo } from '../change-announcement/announcement.repo';
 import { OrganizationChangeService } from '../change-announcement/organization-change.service';
 import type { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from './organization.api';
-import {
-  CostCenterUseContributions,
-  DepartmentUseContributions,
-  OrganizationChangeListeners,
-} from './organization.extension-points';
+import { OrganizationReadApi } from './organization-read.api';
+import { OrganizationChangeListeners } from './organization.extension-points';
 
 /** With a transaction, every read behind the onboarding facts runs in it; without one, none is passed. */
-describe('OrganizationApi.getOnboardingFacts', () => {
+describe('OrganizationReadApi.getOnboardingFacts', () => {
   const TX = { name: 'caller transaction' } as unknown as DbTx;
 
   function build() {
@@ -40,12 +35,11 @@ describe('OrganizationApi.getOnboardingFacts', () => {
       ),
     };
     const employees = { countActive: jest.fn(recorded('employeesCountActive', 2)) };
-    const service = new OrganizationApi(
+    const service = new OrganizationReadApi(
       repo as unknown as OrganizationRepo,
-      departments as unknown as DepartmentDirectoryService,
-      employees as unknown as EmployeeDirectoryService,
+      departments as unknown as DepartmentRecordService,
+      employees as unknown as EmployeeRecordService,
       costCenters as unknown as CostCenterCatalogueService,
-      new DepartmentUseService(new DepartmentUseContributions(), new CostCenterUseContributions()),
       new OrganizationChangeService(new OrganizationChangeListeners(), {} as AnnouncementRepo, {} as TransactionRunner),
       new OrganizationContextService(repo as unknown as OrganizationRepo),
     );

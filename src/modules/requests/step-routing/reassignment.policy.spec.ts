@@ -22,13 +22,20 @@ const held = (kind: ReassignableStepKind, extra: Partial<OpenStep> = {}): OpenSt
   state: 'PENDING',
   holderEmployeeId: OLD,
   holderGone: false,
+  waitingReason: null,
   ...extra,
 });
-const waiting = (kind: ReassignableStepKind): OpenStep => ({
+const waiting = (
+  kind: ReassignableStepKind,
+  waitingReason: string = 'NO_SPENDING_APPROVER',
+  extra: Partial<OpenStep> = {},
+): OpenStep => ({
   kind,
   state: 'WAITING',
   holderEmployeeId: null,
   holderGone: false,
+  waitingReason,
+  ...extra,
 });
 const on = (kind: ReassignmentTriggerKind, employeeId: string | null = null): ReassignmentTrigger => ({
   kind,
@@ -38,10 +45,11 @@ const goesTo = (assigneeEmployeeId: string, routingRow: number | null = 1): Step
   assigneeEmployeeId,
   routingRow,
 });
-const nobody: StepTarget = { assigneeEmployeeId: null, reason: 'NO_FALLBACK_APPROVER' };
+const nobody: StepTarget = { assigneeEmployeeId: null, reason: 'NO_DEPARTMENT_HEAD' };
+const EVERYDAY_TRIGGERS = REASSIGNMENT_TRIGGERS;
 
 describe('which steps an event may touch (FR-3.16, US-05-12)', () => {
-  it('is a closed list of events: the four of FR-3.16, the day a change takes effect, and the retry of a waiting step', () => {
+  it('is a closed list of events: the four of FR-3.16, the day a change takes effect and the retry of a waiting step', () => {
     expect([...REASSIGNMENT_TRIGGERS].sort()).toEqual(
       [
         'DEPARTMENT_CHANGED',
@@ -101,17 +109,17 @@ describe('keep, give or wait', () => {
   });
 
   it('gives the step to the person the table names now', () => {
-    expect(decideReassignment(held('NEED'), on('HEAD_CHANGED'), goesTo(NEW, 4))).toEqual({
+    expect(decideReassignment(held('NEED'), on('HEAD_CHANGED'), goesTo(NEW, 1))).toEqual({
       action: 'ASSIGN',
       assigneeEmployeeId: NEW,
-      routingRow: 4,
+      routingRow: 1,
     });
   });
 
   it('makes the step wait, with the reason, when the table names nobody', () => {
     expect(decideReassignment(held('NEED'), on('DEPARTMENT_CHANGED'), nobody)).toEqual({
       action: 'WAIT',
-      reason: 'NO_FALLBACK_APPROVER',
+      reason: 'NO_DEPARTMENT_HEAD',
     });
   });
 
@@ -123,7 +131,7 @@ describe('keep, give or wait', () => {
   });
 
   it.each(KINDS)('gives a waiting %s step to a person as soon as the table names one, on any event', (kind) => {
-    for (const trigger of REASSIGNMENT_TRIGGERS) {
+    for (const trigger of EVERYDAY_TRIGGERS) {
       expect(decideReassignment(waiting(kind), on(trigger), goesTo(NEW, null))).toEqual({
         action: 'ASSIGN',
         assigneeEmployeeId: NEW,
@@ -132,10 +140,29 @@ describe('keep, give or wait', () => {
     }
   });
 
-  it('leaves a waiting step waiting while the table names nobody', () => {
-    for (const trigger of REASSIGNMENT_TRIGGERS) {
-      expect(decideReassignment(waiting('SPEND_APPROVAL'), on(trigger), nobody)).toEqual({ action: 'KEEP' });
+  it('leaves a waiting step waiting, for the same reason, while the table names nobody for that reason', () => {
+    for (const trigger of EVERYDAY_TRIGGERS) {
+      expect(decideReassignment(waiting('NEED', 'NO_DEPARTMENT_HEAD'), on(trigger), nobody)).toEqual({
+        action: 'KEEP',
+      });
     }
+  });
+
+  it('rewaits with the new reason and keeps the stretch', () => {
+    // The step waits for another reason than the table gives now: only the reason is written, the stretch (and so the deadline)
+    // goes on — the decision carries no holder, no row and no time.
+    for (const trigger of EVERYDAY_TRIGGERS) {
+      expect(decideReassignment(waiting('NEED', 'NO_SPENDING_APPROVER'), on(trigger), nobody)).toEqual({
+        action: 'REWAIT',
+        reason: 'NO_DEPARTMENT_HEAD',
+      });
+    }
+    expect(
+      decideReassignment(waiting('SPEND_APPROVAL', 'SPENDING_APPROVER_IS_PARTY'), on('WAITING_RETRY'), {
+        assigneeEmployeeId: null,
+        reason: 'NO_SPENDING_APPROVER',
+      }),
+    ).toEqual({ action: 'REWAIT', reason: 'NO_SPENDING_APPROVER' });
   });
 
   it('takes a step from a holder who has left, to the one the table names or to a wait', () => {
@@ -158,9 +185,8 @@ describe('keep, give or wait', () => {
 describe('what a waiting step needs to be put right (US-05-11)', () => {
   it.each([
     ['NO_SPENDING_APPROVER', 'CONFIGURE_SPENDING_APPROVER'],
-    ['NO_FALLBACK_APPROVER', 'CONFIGURE_FALLBACK_APPROVER'],
-    ['FALLBACK_IS_REQUESTER', 'ASSIGN_DEPARTMENT_HEAD'],
-    ['NO_CONFLICT_SUBSTITUTE', 'CONFIGURE_CONFLICT_SUBSTITUTE'],
+    ['NO_DEPARTMENT_HEAD', 'ASSIGN_DEPARTMENT_HEAD'],
+    ['SPENDING_APPROVER_IS_PARTY', 'CONFIGURE_SPENDING_APPROVER'],
     ['NO_FINANCE_REVIEWER', 'GRANT_FINANCE_ROLE'],
     ['NO_IT_ADMIN_IN_CHARGE', 'NAME_IT_ADMIN_IN_CHARGE'],
   ] as const)('%s asks for %s', (reason, hint) => {
@@ -172,12 +198,16 @@ describe('what a waiting step needs to be put right (US-05-11)', () => {
     expect(configurationHintOf('SOMETHING_ELSE')).toBeNull();
   });
 
-  it('tells the Super Admin always, and the IT Admin in charge when the department has neither head nor fallback (AC-6)', () => {
-    expect(alertRecipientsOf('NEED', 'NO_FALLBACK_APPROVER')).toEqual(['SUPER_ADMIN', 'IT_ADMIN_IN_CHARGE']);
-    expect(alertRecipientsOf('NEED', 'NO_SPENDING_APPROVER')).toEqual(['SUPER_ADMIN']);
-    expect(alertRecipientsOf('SPEND_APPROVAL', 'NO_SPENDING_APPROVER')).toEqual(['SUPER_ADMIN']);
-    expect(alertRecipientsOf('FINANCE_REVIEW', 'NO_FINANCE_REVIEWER')).toEqual(['SUPER_ADMIN']);
-    expect(alertRecipientsOf('IT_ASSESSMENT', 'NO_IT_ADMIN_IN_CHARGE')).toEqual(['SUPER_ADMIN']);
+  it('never asks for a configuration that is gone: no hint names the fallback approver or the substitute', () => {
+    const hints = WAITING_REASON_CODES.map((reason) => configurationHintOf(reason));
+
+    expect(hints).not.toContain('CONFIGURE_FALLBACK_APPROVER');
+    expect(hints).not.toContain('CONFIGURE_CONFLICT_SUBSTITUTE');
+  });
+
+  it('tells the Super Admin, and nobody else, whatever waits: no IT Admin in charge, no approver of last resort (AC-6, D-S20)', () => {
+    // One answer for every kind of step and every reason, so a stretch of waiting is always told to somebody.
+    expect(alertRecipientsOf()).toEqual(['SUPER_ADMIN']);
   });
 
   it.each([

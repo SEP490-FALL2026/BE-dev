@@ -131,6 +131,32 @@ describe('the supplementary file of the head over PostgreSQL (US-06-14 AC-13, AC
       expect(await history(id)).toEqual([]);
     });
 
+    it('has no way to add a person, the spending approver or anybody: a field that names one is refused and the request stays as it was (US-06-14 AC-16, D-S23)', async () => {
+      const id = await closed();
+      const before = await h.requestRows();
+
+      for (const over of [
+        { addEmployeeIds: [h.boss.employeeId] },
+        { beneficiaryEmployeeIds: [h.boss.employeeId] },
+        { dropEmployeeIds: [h.boss.employeeId], addEmployeeIds: [h.boss.employeeId] },
+      ]) {
+        const response = await supplement(id, over).expect(422);
+
+        expect(h.codeOf(response)).toBe('VALIDATION_ERROR');
+      }
+
+      expect(await history(id)).toEqual([]);
+      expect(await h.requestRows()).toBe(before);
+      expect(
+        (
+          await h.ctx.sql.query(
+            `SELECT 1 FROM access_request_beneficiaries WHERE request_id = $1 AND employee_id = $2`,
+            [id, h.boss.employeeId],
+          )
+        ).rowCount,
+      ).toBe(0);
+    });
+
     it('is not made to the day it already is, and nothing is written', async () => {
       const id = await closed();
 
@@ -157,7 +183,7 @@ describe('the supplementary file of the head over PostgreSQL (US-06-14 AC-13, AC
       await supplement(id, {}, other.head.account).expect(404);
       await supplement(id, {}, design.member.account).expect(403);
       await supplement(id, {}, h.finance).expect(403);
-      await supplement(id, {}, h.boss.account).expect(404);
+      await supplement(id, {}, h.boss.account).expect(403); // the approver heads no department (QĐ-93b)
       expect(await history(id)).toEqual([]);
     });
 

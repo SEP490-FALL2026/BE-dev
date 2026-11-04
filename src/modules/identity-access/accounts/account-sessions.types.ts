@@ -8,7 +8,7 @@ import type { SessionRevokedReason } from '../public/identity-access.types';
  * account, `recovery` resets the holder's credential, and `auth` implements it, so putting it in `auth/` would make
  * `accounts` and `recovery` import `auth`.
  *
- * Sessions belong to auth, which implements this (SessionDirectoryService); the consumers name only what they need, so
+ * Sessions belong to auth, which implements this (SessionRecordService); the consumers name only what they need, so
  * neither imports auth.
  */
 export interface AccountSessions {

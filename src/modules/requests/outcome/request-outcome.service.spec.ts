@@ -1,5 +1,5 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { OrganizationApi } from '../../organization/public/organization.api';
+import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RequestOutcomeListeners, type RequestOutcomeEvent } from '../public/requests.extension-points';
 import { RequestOutcomeService, type OutcomeSubject } from './request-outcome.service';
 
@@ -15,7 +15,7 @@ interface RequestOutcomeListener {
 function listeners(today = '2026-10-28') {
   const businessToday = jest.fn().mockResolvedValue(today);
   const point = new RequestOutcomeListeners();
-  const outcomes = new RequestOutcomeService(point, { businessToday } as unknown as OrganizationApi);
+  const outcomes = new RequestOutcomeService(point, { businessToday } as unknown as OrganizationReadApi);
   const registry = {
     register: (listener: RequestOutcomeListener) =>
       point.add(`listener-${point.names().length + 1}`, (tx, event) => listener.requestOutcome(tx, event)),

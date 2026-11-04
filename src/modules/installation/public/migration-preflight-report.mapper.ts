@@ -83,6 +83,19 @@ const DECISION: Record<PreflightBlocker['code'], string> = {
     'came of it (a refusal that does not match the return, several refusals, a proposal sent after the return that does not point ' +
     'back at it, or two that send it again). The migration of this release reconciles only the cases it can prove; this one is not ' +
     'guessed: Owner/operator decision for each proposal on a restored copy, then run this command again.',
+  DIRECT_ROLES_HEAD_WITHOUT_ACCOUNT:
+    'This release gives a department head the role MANAGER as a grant on the account (QĐ-93a), and this head, today or from a ' +
+    'later day, has no account to carry it. Fix it in the running release before the deploy: the Super Admin invites the ' +
+    'person, or ends the head period. Nothing is inferred and the migration changes no row of its own accord.',
+  DIRECT_ROLES_SPENDING_APPROVER_IS_HEAD:
+    'The spending approver heads a department today or from a later day, and this release allows no one to be both (QĐ-93b). ' +
+    'Fix it in the running release: the Super Admin hands the spending approver role over, or names another head. Nothing is inferred.',
+  DIRECT_ROLES_SPENDING_APPROVER_HOLDS_ROLE:
+    'The spending approver also holds SUPER_ADMIN, IT_ADMIN or FINANCE, which this release does not allow together with the ' +
+    'spending approver role (QĐ-93b). Fix it in the running release: revoke the other role or hand the spending approver role over.',
+  DIRECT_ROLES_SPENDING_APPROVER_WITHOUT_ACCOUNT:
+    'The spending approver has no account, so the role cannot become a grant on one. Fix it in the running release: the Super ' +
+    'Admin invites the person (a locked, not yet activated or leaving holder is carried over as it is), or hands the role over.',
 };
 
 /** What each row to attend to later is, and how the operator resolves it. */
@@ -166,6 +179,13 @@ function rowText(blocker: PreflightBlocker): string {
       return `transfer ${blocker.transferId}`;
     case 'SERVICE_ACCOUNT_MOVE_PENDING':
       return `service account move ${blocker.moveId}`;
+    case 'DIRECT_ROLES_HEAD_WITHOUT_ACCOUNT':
+    case 'DIRECT_ROLES_SPENDING_APPROVER_IS_HEAD':
+      return `employee ${blocker.employeeCode}, department ${blocker.department}`;
+    case 'DIRECT_ROLES_SPENDING_APPROVER_HOLDS_ROLE':
+      return `employee ${blocker.employeeCode} also holds ${blocker.role}`;
+    case 'DIRECT_ROLES_SPENDING_APPROVER_WITHOUT_ACCOUNT':
+      return `employee ${blocker.employeeCode}`;
     case 'BUDGET_PROPOSAL_LEGACY_RETURN_AMBIGUOUS':
       return `budget proposal ${blocker.proposalId} (versions ${blocker.versionIds.join(', ')}; decisions ${blocker.decisionIds.join(', ')}; related ${blocker.relatedProposalIds.join(', ') || 'none'})`;
   }

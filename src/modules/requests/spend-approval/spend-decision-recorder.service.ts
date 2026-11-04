@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
@@ -38,7 +37,6 @@ export class SpendDecisionRecorder {
     private readonly requests: AccessRequestRepo,
     private readonly decisions: SpendDecisionRepo,
     private readonly effects: SpendEffectsService,
-    private readonly identity: IdentityAccessApi,
     private readonly audit: AuditApi,
     private readonly renewals: RenewalApplyService,
     private readonly outcomes: RequestOutcomeService,
@@ -51,8 +49,7 @@ export class SpendDecisionRecorder {
     decided: SpendDecided,
   ): Promise<SpendDecisionResult> {
     const { request, step, now } = of;
-    const holders = await this.identity.getApprovalRoleHolders(tx);
-    const recorded = spendDecisionRecordOf(holders, actor.employeeId, { request, step }, decided);
+    const recorded = spendDecisionRecordOf({ request, step }, decided);
     await this.decisions.record(tx, {
       organizationId: request.organizationId,
       requestId: request.id,

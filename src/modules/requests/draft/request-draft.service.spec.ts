@@ -3,7 +3,8 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { RequestSenderService } from '../request-intake/request-sender.service';
 import { RequestDraftRepo, type DraftRow } from '../request-draft/request-draft.repo';
 import { RequestDraftService } from './request-draft.service';
 
@@ -15,7 +16,6 @@ const principal = (employeeId: string): AuthenticatedPrincipal => ({
   sessionId: 'session-1',
   employeeId,
   directRoles: ['EMPLOYEE'],
-  derivedRoles: [],
   roles: ['EMPLOYEE'],
 });
 
@@ -47,9 +47,10 @@ describe('RequestDraftService.readOwn', () => {
         RequestDraftService,
         { provide: TransactionRunner, useValue: {} },
         { provide: RequestDraftRepo, useValue: drafts },
-        { provide: OrganizationApi, useValue: {} },
+        { provide: OrganizationReadApi, useValue: {} },
         { provide: CatalogApi, useValue: {} },
         { provide: AuditApi, useValue: {} },
+        { provide: RequestSenderService, useValue: {} },
       ],
     }).compile();
     service = module.get(RequestDraftService);
@@ -91,18 +92,17 @@ describe('RequestDraftService.save', () => {
   const tx = { name: 'tx' };
   const drafts = { insert: jest.fn() };
   const organization = {
-    lockEmployeeForShare: jest.fn(),
-    getEmployee: jest.fn(),
     businessToday: jest.fn(),
     getOwningUnits: jest.fn(),
   };
+  const sender = { lockEligible: jest.fn() };
   const catalog = { findPlanSeatTargets: jest.fn() };
   const audit = { record: jest.fn() };
   let service: RequestDraftService;
 
   beforeEach(async () => {
     jest.resetAllMocks();
-    organization.getEmployee.mockResolvedValue({ organizationId: 'o-1' });
+    sender.lockEligible.mockResolvedValue({ organizationId: 'o-1' });
     organization.businessToday.mockResolvedValue('2026-10-28');
     organization.getOwningUnits.mockResolvedValue(new Map([['e-owner', { departmentId: 'd-1', costCenter: null }]]));
     catalog.findPlanSeatTargets.mockResolvedValue([{ planId: PLAN, applicationKind: 'INTERNAL' }]);
@@ -125,9 +125,10 @@ describe('RequestDraftService.save', () => {
         RequestDraftService,
         { provide: TransactionRunner, useValue: { run: (fn: (client: unknown) => unknown) => fn(tx) } },
         { provide: RequestDraftRepo, useValue: drafts },
-        { provide: OrganizationApi, useValue: organization },
+        { provide: OrganizationReadApi, useValue: organization },
         { provide: CatalogApi, useValue: catalog },
         { provide: AuditApi, useValue: audit },
+        { provide: RequestSenderService, useValue: sender },
       ],
     }).compile();
     service = module.get(RequestDraftService);
@@ -148,5 +149,41 @@ describe('RequestDraftService.save', () => {
       expect.objectContaining({ type: 'GRANT', branch: 'INTERNAL_FREE', planId: PLAN, departmentId: 'd-1' }),
     );
     expect(wire).toMatchObject({ kind: 'SERVICE_ACCOUNT', departmentId: 'd-1', planId: PLAN, beneficiaryCount: 1 });
+  });
+
+  it('judges the sender alone for a draft of one person, and the sender with every line for a group draft (D-S21, OD-3)', async () => {
+    const group = {
+      kind: 'GROUP',
+      planId: PLAN,
+      lines: [{ employeeId: 'e-1' }, { employeeId: 'e-2' }],
+      businessReason: 'The new brand needs the shared workspace',
+      termMonths: 3,
+    };
+
+    await service.save(principal('e-owner'), group as never);
+    await service.save(principal('e-owner'), {
+      kind: 'INDIVIDUAL',
+      planId: PLAN,
+      businessReason: 'x',
+      termMonths: 3,
+    } as never);
+
+    expect(sender.lockEligible).toHaveBeenNthCalledWith(1, tx, expect.anything(), ['e-1', 'e-2']);
+    expect(sender.lockEligible).toHaveBeenNthCalledWith(2, tx, expect.anything(), undefined);
+  });
+
+  it('writes nothing when the sender is refused as a party of a request', async () => {
+    sender.lockEligible.mockRejectedValue(new Error('refused'));
+
+    await expect(
+      service.save(principal('e-owner'), {
+        kind: 'INDIVIDUAL',
+        planId: PLAN,
+        businessReason: 'x',
+        termMonths: 3,
+      } as never),
+    ).rejects.toThrow('refused');
+
+    expect(drafts.insert).not.toHaveBeenCalled();
   });
 });

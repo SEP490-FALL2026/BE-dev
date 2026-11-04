@@ -12,6 +12,8 @@ pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+demo-dataset-reports/
+claude/worktrees/
 
 # OS
 .DS_Store

@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { TransientDatabaseError } from '../infrastructure/database/transaction-runner';
 import { EmailDispatchLoop } from './email-dispatch.job';
 
 describe('EmailDispatchLoop', () => {
@@ -39,8 +40,32 @@ describe('EmailDispatchLoop', () => {
     loop.onApplicationBootstrap();
     await jest.advanceTimersByTimeAsync(0);
 
-    expect(logged).toHaveBeenCalledWith('Mail dispatch tick failed: TypeError');
+    expect(logged).toHaveBeenCalledWith(
+      'Mail dispatch tick failed: TypeError retryable=false',
+      expect.stringMatching(/^\s+at /),
+    );
     expect(JSON.stringify(logged.mock.calls)).not.toContain('s3cr3t');
+    logged.mockRestore();
+    void loop.onModuleDestroy();
+  });
+
+  it('logs a database that was only unavailable as retryable, with no trace, and ticks again', async () => {
+    const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const dispatchDue = jest
+      .fn()
+      .mockRejectedValueOnce(new TransientDatabaseError('57014', new Error('statement timeout')))
+      .mockResolvedValue(0);
+    const { loop } = build(dispatchDue);
+
+    loop.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(1000);
+
+    expect(dispatchDue).toHaveBeenCalledTimes(2);
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged).toHaveBeenCalledWith(
+      'Mail dispatch tick failed: TransientDatabaseError sqlState=57014 retryable=true cause=Error',
+      undefined,
+    );
     logged.mockRestore();
     void loop.onModuleDestroy();
   });
@@ -62,6 +87,7 @@ describe('EmailDispatchLoop', () => {
   });
 
   it('keeps going after a tick fails', async () => {
+    const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     const dispatchDue = jest.fn().mockRejectedValueOnce(new Error('database down')).mockResolvedValue(0);
     const { loop } = build(dispatchDue);
 
@@ -69,6 +95,7 @@ describe('EmailDispatchLoop', () => {
     await jest.advanceTimersByTimeAsync(2000);
 
     expect(dispatchDue.mock.calls.length).toBeGreaterThanOrEqual(2);
+    logged.mockRestore();
     void loop.onModuleDestroy();
   });
 

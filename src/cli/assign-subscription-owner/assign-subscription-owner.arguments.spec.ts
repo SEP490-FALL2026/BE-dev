@@ -84,4 +84,11 @@ describe('ops:assign-subscription-owner arguments (spec L.3)', () => {
 
     expect(parseAssignmentArguments(copy)).toMatchObject({ command: { basis: 'PO-2026-0042' } });
   });
+
+  it('uppercases and trims the department code', () => {
+    const copy = [...VALID];
+    copy[copy.indexOf('--department') + 1] = '  eng  ';
+
+    expect(parseAssignmentArguments(copy)).toMatchObject({ command: { departmentCode: 'ENG' } });
+  });
 });

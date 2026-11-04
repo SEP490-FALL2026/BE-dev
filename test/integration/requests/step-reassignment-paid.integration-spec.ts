@@ -115,4 +115,81 @@ describe('a transfer redetermines the need step of internal requests only (F28)'
 
     expect(await h.stepOf(sentPaid.id, 'NEED')).toMatchObject({ assignee_employee_id: from.head.employeeId });
   });
+
+  describe('the spend step across a change of the spending approver (US-01-03 AC-3, US-05-11 AC-10, QĐ-93k(2))', () => {
+    const M = 1_000_000;
+
+    /** A paid request whose spend step the spending approver holds, and the person who will hold the role next. */
+    const withSpendStep = async () => {
+      const unit = await scene();
+      await h.budgetFor(unit, { total: 100 * M });
+      counter += 1;
+      const next = await h.staff(await h.departmentWithUnit(`P-NX${counter}`), `NX-${counter}`);
+      const id = await h.waitingForApprover(unit, paid, { amount: 5 * M });
+
+      return { unit, id, next };
+    };
+
+    it('moves the pending spend step of a revoked or transferred spending approver as before', async () => {
+      const { id, next } = await withSpendStep();
+      const original = await h.stepOf(id, 'SPEND_APPROVAL');
+      expect(original).toMatchObject({ state: 'PENDING', assignee_employee_id: h.boss.employeeId });
+      counter += 1;
+      const third = await h.staff(await h.departmentWithUnit(`P-TH${counter}`), `TH-${counter}`);
+
+      try {
+        // Revoked and not given to anybody: the step of the one who held the role waits (never frozen), with its age.
+        await h.clearRole('SPENDING_APPROVER');
+        const waiting = await h.stepOf(id, 'SPEND_APPROVAL');
+        expect(waiting).toMatchObject({
+          state: 'WAITING',
+          assignee_employee_id: null,
+          waiting_reason: 'NO_SPENDING_APPROVER',
+        });
+        expect(waiting.created_at).toEqual(original.created_at);
+
+        // Given to a new spending approver: the step goes to them, who decide it — never a 409.
+        await h.setRole('SPENDING_APPROVER', next);
+        expect(await h.stepOf(id, 'SPEND_APPROVAL')).toMatchObject({
+          state: 'PENDING',
+          assignee_employee_id: next.employeeId,
+          created_at: original.created_at,
+        });
+        // Transferred again, in one move: the step follows the role.
+        await h.setRole('SPENDING_APPROVER', third);
+        expect(await h.stepOf(id, 'SPEND_APPROVAL')).toMatchObject({
+          state: 'PENDING',
+          assignee_employee_id: third.employeeId,
+        });
+        expect(h.codeOf(await h.decideSpend(id, APPROVE, next.account).expect(403))).toBe('SPEND.NOT_THE_ASSIGNEE');
+        await h.decideSpend(id, APPROVE, third.account).expect(200);
+      } finally {
+        await h.setRole('SPENDING_APPROVER', h.boss);
+      }
+    });
+
+    it('treats a spend step held by somebody who never held the role like any other: no freeze, so it follows its holder who leaves', async () => {
+      const { id } = await withSpendStep();
+      counter += 1;
+      const substitute = await h.staff(await h.departmentWithUnit(`P-SB${counter}`), `SB-${counter}`);
+      // A step of the rule before QĐ-93 (the migration of the removal refuses a database that still has one): the substitute for a
+      // conflict of interest holds it and never held the role. It is moved like every step: nothing keeps it still.
+      const step = await h.stepOf(id, 'SPEND_APPROVAL');
+      await h.ctx.sql.query(`UPDATE access_request_steps SET assignee_employee_id = $2 WHERE id = $1`, [
+        step.id,
+        substitute.employeeId,
+      ]);
+
+      await h.leave(substitute.employeeId);
+      await h.sweep();
+
+      expect(await h.stepOf(id, 'SPEND_APPROVAL')).toMatchObject({
+        state: 'PENDING',
+        assignee_employee_id: h.boss.employeeId,
+        created_at: step.created_at,
+      });
+      expect(await h.audit('ACCESS_REQUEST.STEP_REDETERMINED', step.id)).toHaveLength(1);
+      await h.decideSpend(id, APPROVE, h.boss.account).expect(200);
+    });
+  });
 });

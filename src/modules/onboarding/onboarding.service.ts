@@ -4,7 +4,7 @@ import { CatalogApi } from '../catalog/public/catalog.api';
 import { DataImportApi } from '../data-import/public/data-import.api';
 import { IdentityAccessApi } from '../identity-access/public/identity-access.api';
 import { LicensingSeatBaselineApi } from '../licensing/public/licensing-seat-baseline.api';
-import { OrganizationApi } from '../organization/public/organization.api';
+import { OrganizationReadApi } from '../organization/public/organization-read.api';
 import { assertMayReadChecklist } from './onboarding.policy';
 
 export type StepStatus = 'DONE' | 'INCOMPLETE' | 'BLOCKED' | 'NOT_AVAILABLE';
@@ -67,7 +67,7 @@ export interface OnboardingChecklist {
 @Injectable()
 export class OnboardingService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly imports: DataImportApi,
     private readonly catalog: CatalogApi,
@@ -78,7 +78,7 @@ export class OnboardingService {
   async checklist(actor: Pick<AuthenticatedPrincipal, 'roles'>): Promise<OnboardingChecklist> {
     assertMayReadChecklist(actor.roles);
     const [facts, latest, catalog, baseline] = await Promise.all([
-      this.organization.getOnboardingFacts(),
+      this.organizationReads.getOnboardingFacts(),
       this.imports.latestEmployeeImport(),
       this.catalog.getOnboardingFacts(),
       this.licensingBaseline.getBaselineProgress(),

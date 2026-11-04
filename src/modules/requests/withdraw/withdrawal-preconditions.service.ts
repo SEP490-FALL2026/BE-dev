@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingApi } from '../../licensing/public/licensing.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
   AccessRequestNotFoundError,
   AccessRequestWithdrawalRefusedError,
@@ -23,7 +23,7 @@ export class WithdrawalPreconditions {
   constructor(
     private readonly repo: AccessRequestRepo,
     private readonly licensing: LicensingApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly spendStatus: SpendStatusService,
   ) {}
 
@@ -37,8 +37,8 @@ export class WithdrawalPreconditions {
     await this.licensing.lockGrantOfRequest(tx, requestId);
     const request = await this.repo.lockById(tx, requestId);
     const now = new Date();
-    const today = await this.organization.businessToday(now, tx);
-    const headed = await this.organization.getHeadedDepartment(actor.employeeId, today);
+    const today = await this.organizationReads.businessToday(now, tx);
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, today);
     const heads = headed?.departmentId === request?.departmentId;
     if (!request || !(heads || canViewRequest(actor, viewFactsOf(request)))) {
       throw new AccessRequestNotFoundError();

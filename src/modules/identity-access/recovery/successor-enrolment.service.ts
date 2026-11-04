@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { EmployeeRecord } from '../../organization/public/organization.types';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { ActionLinkRevocation } from '../accounts/action-link-revocation.service';
 import { SuccessorEligibility } from '../accounts/successor-eligibility.service';
 import { RecoveryLinks } from './recovery-links.service';
@@ -21,7 +21,7 @@ import { RecoveryContext, RecoveryResult } from '../public/recovery.types';
 @Injectable()
 export class SuccessorEnrolment {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly eligibility: SuccessorEligibility,
     private readonly links: RecoveryLinks,
     private readonly revocation: ActionLinkRevocation,
@@ -134,5 +134,15 @@ export class SuccessorEnrolment {
     if (problem) throw new RecoveryRefusedError(problem);
 
     return null;
+  }
+
+  /**
+   * The role is handed over while the holder can still act (a planned transfer): the successor's account is made in the
+   * application like any other (US-01-01), so this never creates one and never sends or replaces an invitation. Any
+   * reason the successor cannot take the role, NOT_ACTIVATED included, refuses the run.
+   */
+  async requireReady(tx: DbTx, successorAccountId: string): Promise<void> {
+    const problem = await this.eligibility.check(tx, successorAccountId);
+    if (problem) throw new RecoveryRefusedError(problem);
   }
 }

@@ -4,10 +4,10 @@ import { ApprovalRoleChangeListeners } from '../../../src/modules/identity-acces
 import { OrganizationChangeListeners } from '../../../src/modules/organization/public/organization.extension-points';
 import { StepReassignmentService } from '../../../src/modules/requests/reassignment/step-reassignment.service';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { HR_BASIS } from '../../support/hr-basis';
 import { ReassignmentHarness } from '../../support/reassignment-harness';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
+import { ensureManagerGrant } from '../../support/builders/account.builder';
 
 const h = new ReassignmentHarness();
 const M = 1_000_000;
@@ -17,7 +17,6 @@ describe('who holds a step when the organization or a role changes, over Postgre
   let internal: string;
   let paid: string;
   let subscriptionId: string;
-  let fallback: Person;
   let counter = 0;
   let failOrganizationListener = false;
   let failRoleListener = false;
@@ -31,8 +30,6 @@ describe('who holds a step when the organization or a role changes, over Postgre
     await h
       .declareTaxProfile((await h.vendorOf(paid)).id, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }])
       .expect(200);
-    fallback = await h.staff(await h.departmentWithUnit('P-FBK'), 'FBK-R0');
-    await h.setRole('FALLBACK_APPROVER', fallback);
     // Two listeners that fail on demand, registered after the one of the requests: a change that one of them refuses is rolled back with what the first wrote.
     h.ctx.app
       .get(OrganizationChangeListeners, { strict: false })
@@ -211,7 +208,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
   });
 
   describe('the head of a department changes (AC-2)', () => {
-    it('gives the need steps of the department to the new head, those held by the head who goes and those held by the fallback, and no other department', async () => {
+    it('gives the need steps of the department to the new head, those held by the head who goes and those waiting for a head, and no other department', async () => {
       const des = await scene();
       const other = await scene();
       counter += 1;
@@ -220,9 +217,13 @@ describe('who holds a step when the organization or a role changes, over Postgre
       const opsNew = await h.staff(opsDepartment, `OPS-N${counter}`);
       const h3 = await person(des, 'DES-H3');
       const underHead = await h.sent(des.member, internal);
-      const underFallback = await h.sent(opsMember, internal);
+      const underNobody = await h.sent(opsMember, internal);
       const elsewhere = await h.sent(other.member, internal);
-      expect((await h.stepOf(underFallback.id, 'NEED')).assignee_employee_id).toBe(fallback.employeeId);
+      expect(await h.stepOf(underNobody.id, 'NEED')).toMatchObject({
+        state: 'WAITING',
+        assignee_employee_id: null,
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
+      });
       const created = (await h.stepOf(underHead.id, 'NEED')).created_at;
       const elsewhereBefore = await h.stepOf(elsewhere.id, 'NEED');
 
@@ -232,7 +233,11 @@ describe('who holds a step when the organization or a role changes, over Postgre
       const moved = await h.stepOf(underHead.id, 'NEED');
       expect(moved).toMatchObject({ assignee_employee_id: h3.employeeId, routing_row: 1 });
       expect(moved.created_at).toEqual(created);
-      expect(await h.stepOf(underFallback.id, 'NEED')).toMatchObject({ assignee_employee_id: opsNew.employeeId });
+      expect(await h.stepOf(underNobody.id, 'NEED')).toMatchObject({
+        state: 'PENDING',
+        assignee_employee_id: opsNew.employeeId,
+        routing_row: 1,
+      });
       expect(await h.stepOf(elsewhere.id, 'NEED')).toEqual(elsewhereBefore);
       expect((await h.audit('ACCESS_REQUEST.STEP_REDETERMINED', moved.id))[0].after).toMatchObject({
         trigger: 'HEAD_CHANGED',
@@ -240,22 +245,161 @@ describe('who holds a step when the organization or a role changes, over Postgre
       });
     });
 
-    it('gives the need step to the fallback approver when the head goes and nobody follows', async () => {
+    it('hands a waiting need step to the new head without resetting its age', async () => {
+      counter += 1;
+      const headless = await h.departmentWithUnit(`P-HW${counter}`);
+      const requester = await h.staff(headless, `HW-E${counter}`);
+      const newHead = await h.staff(headless, `HW-H${counter}`);
+      const sent = await h.sent(requester, internal);
+      // Three days of waiting for a head: the step is as old as the request, and the stretch of waiting is its own.
+      await h.ctx.sql.query(
+        `UPDATE access_request_steps SET created_at = created_at - interval '3 days' WHERE request_id = $1`,
+        [sent.id],
+      );
+      const waiting = await h.stepOf(sent.id, 'NEED');
+      expect(waiting).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD', routing_row: 4 });
+
+      await h.makeHead(headless, newHead);
+
+      const handed = await h.stepOf(sent.id, 'NEED');
+      expect(handed).toMatchObject({
+        state: 'PENDING',
+        assignee_employee_id: newHead.employeeId,
+        routing_row: 1,
+        waiting_reason: null,
+        waiting_since: null,
+      });
+      // The deadline runs from the day the request was sent (QĐ-62c): the days of waiting are spent, not given back.
+      expect(handed.created_at).toEqual(waiting.created_at);
+      expect(await h.state(sent.id)).toBe('PENDING');
+      const [event] = await h.audit('ACCESS_REQUEST.STEP_ASSIGNED_FROM_WAIT', waiting.id);
+      expect(event).toMatchObject({
+        before: { assigneeEmployeeId: null, waitingReason: 'NO_DEPARTMENT_HEAD' },
+        after: {
+          trigger: 'HEAD_CHANGED',
+          assigneeEmployeeId: newHead.employeeId,
+          stepCreatedAt: waiting.created_at.toISOString(),
+        },
+      });
+      await h.decide(sent.id, APPROVE, newHead.account).expect(200);
+    });
+
+    it('waits until a future-dated head starts, then hands the step over', async () => {
+      counter += 1;
+      const headless = await h.departmentWithUnit(`P-FD${counter}`);
+      const requester = await h.staff(headless, `FD-E${counter}`);
+      const nominee = await h.staff(headless, `FD-H${counter}`);
+      // A member who holds MANAGER and heads nothing is not a head: the step does not go to them (US-01-02 AC-10).
+      const manager = await h.staff(headless, `FD-M${counter}`);
+      await ensureManagerGrant(h.ctx, h.admin, manager.employeeId);
+      const sent = await h.sent(requester, internal);
+      expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD' });
+
+      // The head is named from tomorrow: nothing changes today, not for the one who holds MANAGER either.
+      await ensureManagerGrant(h.ctx, h.admin, nominee.employeeId);
+      await request(h.server())
+        .post(`/api/v1/departments/${headless.id}/head-assignments`)
+        .set({ Authorization: `Bearer ${h.admin}` })
+        .send({ employeeId: nominee.employeeId, effectiveFrom: h.tomorrow() })
+        .expect(200);
+      await h.sweep();
+      expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({
+        state: 'WAITING',
+        assignee_employee_id: null,
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
+      });
+
+      // The day arrives (the period began tomorrow; it is today now, and nobody announced it): the pass of the day hands the step over.
+      await h.ctx.sql.query(
+        `UPDATE department_head_periods SET valid_from = $2 WHERE department_id = $1 AND valid_to IS NULL`,
+        [headless.id, h.today()],
+      );
+      await h.sweep();
+
+      expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({
+        state: 'PENDING',
+        assignee_employee_id: nominee.employeeId,
+        routing_row: 1,
+        waiting_reason: null,
+      });
+      expect((await h.stepOf(sent.id, 'NEED')).assignee_employee_id).not.toBe(manager.employeeId);
+    });
+
+    it('waits for a head when the head goes and nobody follows: nobody takes the step in place of one', async () => {
       const unit = await scene();
       const sent = await h.sent(unit.member, internal);
 
       await h.vacateHead(unit.department.id).expect(200);
 
       expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({
-        state: 'PENDING',
-        assignee_employee_id: fallback.employeeId,
-        routing_row: 4,
+        state: 'WAITING',
+        assignee_employee_id: null,
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
       });
+      expect(await h.state(sent.id)).toBe('WAITING_CONTROLLED');
+    });
+
+    it('rewaits a step that waits for another reason than the table gives now: only the reason changes, the stretch, the age and the row stay (spec B1)', async () => {
+      counter += 1;
+      const headless = await h.departmentWithUnit(`P-RW${counter}`);
+      const requester = await h.staff(headless, `RW-E${counter}`);
+      const sent = await h.sent(requester, internal);
+      const step = await h.stepOf(sent.id, 'NEED');
+      // The step waits for the spending approver, as a step of a head who sent it did; now the department has no head: the table
+      // names nobody again, but for another reason.
+      await h.ctx.sql.query(`UPDATE access_request_steps SET waiting_reason = 'NO_SPENDING_APPROVER' WHERE id = $1`, [
+        step.id,
+      ]);
+      const stale = await h.stepOf(sent.id, 'NEED');
+      expect(stale).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_SPENDING_APPROVER' });
+
+      await h.sweep();
+
+      const rewaited = await h.stepOf(sent.id, 'NEED');
+      expect(rewaited).toMatchObject({
+        state: 'WAITING',
+        assignee_employee_id: null,
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
+      });
+      expect(rewaited.waiting_since).toEqual(stale.waiting_since);
+      expect(rewaited.created_at).toEqual(stale.created_at);
+      expect(rewaited.routing_row).toBe(stale.routing_row);
+      const [event] = await h.audit('ACCESS_REQUEST.STEP_WAITING_REASON_CHANGED', step.id);
+      expect(event).toMatchObject({
+        before: { waitingReason: 'NO_SPENDING_APPROVER' },
+        after: {
+          trigger: 'WAITING_RETRY',
+          waitingReason: 'NO_DEPARTMENT_HEAD',
+          stepCreatedAt: stale.created_at.toISOString(),
+        },
+      });
+      // One alert for the stretch, whatever the reason (unique per step and stretch), and the queue reads the new reason and hint.
+      const alerts = await h.ctx.sql.query(`SELECT 1 FROM controlled_wait_alerts WHERE step_id = $1`, [step.id]);
+      expect(alerts.rowCount).toBe(1);
+      const queue = await request(h.server())
+        .get('/api/v1/controlled-waits')
+        .query({ pageSize: 100 })
+        .set({ Authorization: `Bearer ${h.admin}` })
+        .expect(200);
+      const wire = h
+        .dataOf<{ items: { stepId: string }[] }>(queue)
+        .items.find((item: { stepId: string }) => item.stepId === step.id);
+      expect(wire).toMatchObject({ waitingReason: 'NO_DEPARTMENT_HEAD', configurationHint: 'ASSIGN_DEPARTMENT_HEAD' });
+
+      // Run again on the same data: nothing is written, and no second alert for the same stretch.
+      const events = await auditCount();
+      await h.sweep();
+      expect(await h.stepOf(sent.id, 'NEED')).toEqual(rewaited);
+      expect(await auditCount()).toBe(events);
+      expect((await h.audit('ACCESS_REQUEST.STEP_WAITING_REASON_CHANGED', step.id)).length).toBe(1);
+      expect(
+        (await h.ctx.sql.query(`SELECT 1 FROM controlled_wait_alerts WHERE step_id = $1`, [step.id])).rowCount,
+      ).toBe(1);
     });
   });
 
   describe('a holder leaves the company (AC-3)', () => {
-    it('gives the need step to the fallback approver, then to the head who is named, with the deadline unchanged', async () => {
+    it('makes the need step wait for a head, then gives it to the head who is named, with the deadline unchanged', async () => {
       const unit = await scene();
       const successor = await person(unit, 'LV-N');
       const sent = await h.sent(unit.member, internal);
@@ -263,19 +407,21 @@ describe('who holds a step when the organization or a role changes, over Postgre
 
       await h.leave(unit.head.employeeId);
       expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({
-        state: 'PENDING',
-        assignee_employee_id: fallback.employeeId,
-        routing_row: 4,
+        state: 'WAITING',
+        assignee_employee_id: null,
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
       });
 
       await h.makeHead(unit.department, successor);
       const step = await h.stepOf(sent.id, 'NEED');
       expect(step).toMatchObject({ assignee_employee_id: successor.employeeId, routing_row: 1 });
       expect(step.created_at).toEqual(created);
-      expect((await h.audit('ACCESS_REQUEST.STEP_REDETERMINED', step.id)).map((row) => row.after.trigger)).toEqual([
+      expect((await h.audit('ACCESS_REQUEST.STEP_WAITING', step.id)).map((row) => row.after.trigger)).toEqual([
         'HOLDER_LEFT',
-        'HEAD_CHANGED',
       ]);
+      expect(
+        (await h.audit('ACCESS_REQUEST.STEP_ASSIGNED_FROM_WAIT', step.id)).map((row) => row.after.trigger),
+      ).toEqual(['HEAD_CHANGED']);
     });
 
     it('makes the review of Finance wait when its holder leaves and nobody else holds the role, and gives it back when somebody does', async () => {
@@ -342,17 +488,12 @@ describe('who holds a step when the organization or a role changes, over Postgre
   });
 
   describe('an approval role changes hands (AC-4)', () => {
-    it('gives the spend step and the need step the approver held to the new approver, and a request the new approver is party to goes to the substitute', async () => {
+    it('gives the spend step and the need step the approver held to the new approver', async () => {
       const unit = await scene();
       await h.budgetFor(unit, { total: 100 * M });
       counter += 1;
       const c2 = await h.staff(await h.departmentWithUnit(`P-C2-${counter}`), `C2-${counter}`);
       const spend = await h.waitingForApprover(unit, paid, { amount: 5 * M });
-      const party = await h.waitingForApprover(unit, paid, { amount: 5 * M });
-      await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
-        party,
-        c2.employeeId,
-      ]);
       const own = await h.sent(unit.head, paid);
       expect(await h.stepOf(own.id, 'NEED')).toMatchObject({ assignee_employee_id: h.boss.employeeId, routing_row: 2 });
       const created = {
@@ -368,11 +509,11 @@ describe('who holds a step when the organization or a role changes, over Postgre
         const movedOwn = await h.stepOf(own.id, 'NEED');
         expect(movedOwn).toMatchObject({ state: 'PENDING', assignee_employee_id: c2.employeeId, routing_row: 2 });
         expect(movedOwn.created_at).toEqual(created.own);
-        expect(await h.stepOf(party, 'SPEND_APPROVAL')).toMatchObject({
-          state: 'PENDING',
-          assignee_employee_id: h.substitute.employeeId,
+        // The role is handed over in two steps (revoke, then grant): the step waits, then goes to the new approver (US-01-03 AC-3, AC-9).
+        expect((await h.audit('ACCESS_REQUEST.STEP_WAITING', movedSpend.id))[0].after).toMatchObject({
+          trigger: 'ROLE_HOLDER_CHANGED',
         });
-        expect((await h.audit('ACCESS_REQUEST.STEP_REDETERMINED', movedSpend.id))[0].after).toMatchObject({
+        expect((await h.audit('ACCESS_REQUEST.STEP_ASSIGNED_FROM_WAIT', movedSpend.id))[0].after).toMatchObject({
           trigger: 'ROLE_HOLDER_CHANGED',
           assigneeEmployeeId: c2.employeeId,
         });
@@ -387,20 +528,14 @@ describe('who holds a step when the organization or a role changes, over Postgre
     });
 
     it('flags both steps when one person ends up holding the need step and the spend step, and clears it when they do not', async () => {
-      // The head of the department of the approver is the approver: the check ran when the head approved the need.
-      const { rows } = await h.ctx.sql.query<{ id: string; cost_center_id: string }>(
-        `SELECT d.id, c.id AS cost_center_id FROM departments d
-           JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
-      );
-      const executive = { id: rows[0].id, code: 'P-EXE', unitId: rows[0].cost_center_id };
-      const unit: Unit = {
-        department: executive,
-        head: h.boss,
-        member: await h.staff(executive, `EXE-S${(counter += 1)}`),
-      };
+      // A head's own request goes to the spending approver for the need (row 2): the check ran when the approver approved it.
+      const unit = await h.departmentWithHead(`P-C3-${(counter += 1)}`);
       await h.budgetFor(unit, { total: 100 * M });
-      const c2 = await h.staff(await h.departmentWithUnit(`P-C3-${counter}`), `C3-${counter}`);
-      const id = await h.paidRequest(unit, paid, { amount: 5 * M });
+      const c2 = await h.staff(await h.departmentWithUnit(`P-C3X-${counter}`), `C3-${counter}`);
+      const sent = await h.sent(unit.head, paid, { termMonths: 1 });
+      await h.decide(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
+      await h.setPayments(sent.id, { amount: 5 * M });
+      const id = sent.id;
       // One person holds the need step they approved and the spend step: both are flagged (US-05-03 AC-9).
       expect(await h.stepOf(id, 'NEED')).toMatchObject({ same_person_as_spend: true });
       expect(await h.stepOf(id, 'SPEND_APPROVAL')).toMatchObject({
@@ -478,10 +613,11 @@ describe('who holds a step when the organization or a role changes, over Postgre
 
       failOrganizationListener = true;
       try {
+        await ensureManagerGrant(h.ctx, h.admin, successor.employeeId);
         await request(h.server())
           .post(`/api/v1/departments/${unit.department.id}/head-assignments`)
           .set({ Authorization: `Bearer ${h.admin}` })
-          .send({ employeeId: successor.employeeId, effectiveFrom: h.today(), hrBasis: HR_BASIS })
+          .send({ employeeId: successor.employeeId, effectiveFrom: h.today() })
           .expect(500);
       } finally {
         failOrganizationListener = false;
@@ -492,27 +628,25 @@ describe('who holds a step when the organization or a role changes, over Postgre
       expect(await auditCount()).toBe(events);
     });
 
-    it('rolls the setting of a role back when a listener of the roles refuses it', async () => {
+    it('rolls the revoke of the spending approver role back when a listener of the roles refuses it', async () => {
       const unit = await scene();
       await h.budgetFor(unit, { total: 100 * M });
-      counter += 1;
-      const c2 = await h.staff(await h.departmentWithUnit(`P-C4-${counter}`), `C4-${counter}`);
       const id = await h.waitingForApprover(unit, paid, { amount: 5 * M });
       const before = await h.stepOf(id, 'SPEND_APPROVAL');
 
       failRoleListener = true;
       try {
+        // Taking the role from the approver is the change; the listener that refuses it takes the revoke back with it.
         await request(h.server())
-          .put('/api/v1/approval-roles/SPENDING_APPROVER')
+          .delete(`/api/v1/app-users/${h.boss.account.appUserId}/role-grants/SPENDING_APPROVER`)
           .set({ Authorization: `Bearer ${h.admin}` })
-          .send({ employeeId: c2.employeeId })
           .expect(500);
       } finally {
         failRoleListener = false;
       }
 
       expect(await h.stepOf(id, 'SPEND_APPROVAL')).toEqual(before);
-      expect((await h.getApprovalRoleHolder('SPENDING_APPROVER')) ?? null).toBe(h.boss.employeeId);
+      expect((await h.getSpendingApproverEmployeeId()) ?? null).toBe(h.boss.employeeId);
     });
 
     it('moves a step once when two changes reach the same request at the same time, without waiting in a circle', async () => {

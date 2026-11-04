@@ -4,8 +4,8 @@ import { DbTx, TransactionRunner } from '../../../infrastructure/database/transa
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { ApplicationLookupService } from '../catalog-entry/application-lookup.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   PlanApplicationNotFoundError,
@@ -75,8 +75,8 @@ export class PlanService {
   constructor(
     private readonly plans: PlanRepo,
     private readonly workspace: PlanWorkspaceService,
-    private readonly applications: ApplicationLookupService,
-    private readonly organization: OrganizationApi,
+    private readonly applications: ApplicationFactsService,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -218,7 +218,7 @@ export class PlanService {
   }
 
   private async requireOrganizationId(): Promise<string> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The plans were used before installation');
 
     return organization.id;

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../infrastructure/config/env-schema';
 import { IdentityAccessApi } from '../modules/identity-access/public/identity-access.api';
 import { EmailDeliveryApi } from '../modules/notifications/public/email-delivery.api';
+import { describeForOperator, traceForOperator } from '../infrastructure/observability/operator-error';
 
 /**
  * The worker's mail loop (ADR-0012): a database poll, not a queue job. It lives at the
@@ -50,7 +51,7 @@ export class EmailDispatchLoop implements OnApplicationBootstrap, OnModuleDestro
     try {
       await this.delivery.dispatchDue((hash) => this.identity.isActionLinkUsable(hash));
     } catch (error) {
-      this.logger.error(`Mail dispatch tick failed: ${(error as Error).name}`);
+      this.logger.error(`Mail dispatch tick failed: ${describeForOperator(error)}`, traceForOperator(error));
     } finally {
       this.schedule(this.config.get('OUTBOX_POLL_INTERVAL_MS', { infer: true }));
     }

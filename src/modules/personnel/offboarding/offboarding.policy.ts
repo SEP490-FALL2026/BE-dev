@@ -18,11 +18,11 @@ export function departureEffectiveOn(facts: {
   lastWorkingDay: BusinessDate;
   abrupt: boolean;
   today: BusinessDate;
-  placementFrom: BusinessDate;
+  placementFrom: BusinessDate | null;
 }): BusinessDate {
   const after = addDays(facts.lastWorkingDay, 1);
   if (!facts.abrupt) return after;
-  const floors = [after, facts.today, addDays(facts.placementFrom, 1)];
+  const floors = [after, facts.today, ...(facts.placementFrom ? [addDays(facts.placementFrom, 1)] : [])];
 
   return floors.reduce((latest, day) => (day > latest ? day : latest));
 }
@@ -36,14 +36,14 @@ export interface LastDayFacts {
   today: BusinessDate;
   hireDate: BusinessDate;
   /** The first day of the placement the person is in. */
-  placementFrom: BusinessDate;
+  placementFrom: BusinessDate | null;
 }
 
 /** Whether `day` can be the last working day of a planned handover (`AC-2`): there is one, and it is neither before the person came nor already past. */
 function plannedDayRefusal(day: BusinessDate | undefined, facts: LastDayFacts): OffboardingRefusal | null {
   if (day === undefined || day.trim() === '') return { code: 'LAST_WORKING_DAY_REQUIRED' };
   if (day < facts.hireDate) return { code: 'LAST_WORKING_DAY_INVALID', details: { reason: 'BEFORE_HIRE_DATE' } };
-  if (day < facts.placementFrom)
+  if (facts.placementFrom !== null && day < facts.placementFrom)
     return {
       code: 'LAST_WORKING_DAY_INVALID',
       details: { reason: 'BEFORE_PLACEMENT_START', placementFrom: facts.placementFrom },
@@ -58,7 +58,7 @@ function plannedDayRefusal(day: BusinessDate | undefined, facts: LastDayFacts): 
 function abruptDayRefusal(day: BusinessDate | undefined, facts: LastDayFacts): OffboardingRefusal | null {
   if (day === undefined || day.trim() === '') return { code: 'LAST_WORKING_DAY_REQUIRED' };
   if (day < facts.hireDate) return { code: 'LAST_WORKING_DAY_INVALID', details: { reason: 'BEFORE_HIRE_DATE' } };
-  if (day < facts.placementFrom)
+  if (facts.placementFrom !== null && day < facts.placementFrom)
     return {
       code: 'LAST_WORKING_DAY_INVALID',
       details: { reason: 'BEFORE_PLACEMENT_START', placementFrom: facts.placementFrom },

@@ -1,8 +1,12 @@
 import { INestApplication } from '@nestjs/common';
+import type { OpenAPIObject } from '@nestjs/swagger';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { createOpenApiDocument } from '../../../src/app/configure-application';
+import { ENUM_OPTIONS_MAX } from '../../../src/modules/operating-parameters/parameter-definitions.policy';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
+import { OPENAPI_DOCUMENT_BUDGET_MS } from '../../support/openapi-document-budget';
 
 type Call = (server: App) => request.Test;
 
@@ -54,7 +58,7 @@ describe('operating parameter routes (e2e, no database)', () => {
   ])('refuses %s with 403 on every route (US-01-04 AC-6)', async (_name, direct, derived) => {
     for (const [route, call] of ROUTES) {
       const response = await call(app.getHttpServer())
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
       expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
     }
@@ -104,5 +108,105 @@ describe('operating parameter routes (e2e, no database)', () => {
       expect([404, 422]).toContain(response.status);
       expect(bodyOf(response).error.code).toMatch(/^(HTTP_NOT_FOUND|PARAMETER\.NOT_FOUND)$/);
     });
+  });
+});
+
+type SchemaNode = {
+  $ref?: string;
+  allOf?: SchemaNode[];
+  oneOf?: SchemaNode[];
+  properties?: Record<string, SchemaNode>;
+  required?: string[];
+  items?: SchemaNode;
+  enum?: unknown[];
+  maxItems?: number;
+  additionalProperties?: unknown;
+};
+type OperationNode = { responses: Record<string, { content: { 'application/json': { schema: SchemaNode } } }> };
+
+describe('the document says what an operating parameter is (QĐ93-PARAM-LABEL)', () => {
+  let document: OpenAPIObject;
+  let app: INestApplication<App>;
+
+  beforeAll(async () => {
+    app = await createHttpContractApp();
+    document = createOpenApiDocument(app);
+  }, OPENAPI_DOCUMENT_BUDGET_MS);
+
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  const resolve = (node: SchemaNode): SchemaNode => {
+    if (node.$ref) {
+      const name = node.$ref.replace('#/components/schemas/', '');
+
+      return resolve(document.components?.schemas?.[name] ?? {});
+    }
+    if (node.allOf) return resolve(node.allOf[0]);
+
+    return node;
+  };
+  const itemOf = (method: 'get' | 'put', path: string, status: string): SchemaNode => {
+    const operation = (document.paths[path] as unknown as Record<string, OperationNode>)[method];
+    const data = resolve(operation.responses[status].content['application/json'].schema).properties?.data as SchemaNode;
+    const body = resolve(data);
+
+    return resolve(body.properties?.items?.items ?? body);
+  };
+
+  it.each([
+    ['list', 'get', '/api/v1/operating-parameters', '200'],
+    ['set', 'put', '/api/v1/operating-parameters/{key}', '200'],
+  ] as const)(
+    'gives the %s response a label, a group with its name and a unit label',
+    (_name, method, path, status) => {
+      const item = itemOf(method, path, status);
+
+      expect(Object.keys(item.properties ?? {}).sort()).toEqual([
+        'changedAt',
+        'constraints',
+        'default',
+        'description',
+        'group',
+        'groupLabel',
+        'isDefault',
+        'key',
+        'label',
+        'unit',
+        'unitLabel',
+        'value',
+      ]);
+      expect(item.required).toEqual(expect.arrayContaining(['label', 'group', 'groupLabel', 'unitLabel']));
+      expect(item.properties?.group.enum).toEqual([
+        'WORKFLOW',
+        'BUDGET',
+        'PERSONNEL',
+        'PROVISIONING',
+        'ACCOUNT',
+        'DOCUMENT',
+        'SUBSCRIPTION',
+        'USAGE',
+      ]);
+    },
+  );
+
+  it('types constraints as one of three shapes, told apart by kind, the choices of an enum bounded', () => {
+    const constraints = itemOf('get', '/api/v1/operating-parameters', '200').properties?.constraints as SchemaNode;
+    const shapes = constraints.oneOf ?? [];
+
+    expect(shapes).toHaveLength(3);
+    const byKind = Object.fromEntries(
+      shapes.map((shape) => {
+        const resolved = resolve(shape);
+
+        return [(resolved.properties?.kind.enum as string[])[0], resolved];
+      }),
+    );
+    expect(Object.keys(byKind).sort()).toEqual(['enum', 'int', 'int-list']);
+    expect(Object.keys(byKind.int.properties ?? {}).sort()).toEqual(['kind', 'max', 'min']);
+    expect(Object.keys(byKind['int-list'].properties ?? {}).sort()).toEqual(['kind', 'length', 'max', 'min', 'order']);
+    expect(Object.keys(byKind.enum.properties ?? {}).sort()).toEqual(['kind', 'optionLabels', 'options']);
+    expect(byKind.enum.properties?.options.maxItems).toBe(ENUM_OPTIONS_MAX);
   });
 });

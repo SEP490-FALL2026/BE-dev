@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentRefusedError } from './subscription-owner-assignment.errors';
 import { SubscriptionOwnerAssignmentRepo } from '../subscription-owner-assignment/subscription-owner-assignment.repo';
 import type { AssignmentCommand, AssignmentResult } from './subscription-owner-assignment.types';
@@ -16,7 +16,7 @@ import type { AssignmentCommand, AssignmentResult } from './subscription-owner-a
 export class SubscriptionOwnerAssignmentApi {
   constructor(
     private readonly repo: SubscriptionOwnerAssignmentRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -27,7 +27,7 @@ export class SubscriptionOwnerAssignmentApi {
       if (!(await this.repo.schemaReady(tx))) throw new AssignmentRefusedError('SCHEMA_NOT_READY');
       const subscription = await this.repo.lockSubscription(tx, command.subscriptionId);
       if (!subscription) throw new AssignmentRefusedError('SUBSCRIPTION_NOT_FOUND');
-      const department = await this.organization.lockDepartmentForEntry(
+      const department = await this.organizationReads.lockDepartmentForEntry(
         tx,
         subscription.organizationId,
         command.departmentCode,

@@ -4,14 +4,14 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { chargedCostCenterId, hasSpendStep } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { PlanLineService } from '../plan-line/plan-line.service';
 import { SpendHeadService } from './spend-head.service';
-import { SpendReadSupport } from '../spend/spend-read.service';
+import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import type { PlanLineBody, PlanLineStateWire, SuggestionWire } from '../spend/spend-submission.dto';
 import { SpendNotInQueueError } from '../spend/spend.errors';
 
@@ -31,8 +31,8 @@ export class PlanLineRouteService {
     private readonly planLines: PlanLineService,
     private readonly budgets: BudgetsApi,
     private readonly catalog: CatalogApi,
-    private readonly organization: OrganizationApi,
-    private readonly support: SpendReadSupport,
+    private readonly organizationReads: OrganizationReadApi,
+    private readonly wireView: SpendWireViewService,
   ) {}
 
   /** Throws SpendNotHeadError, AccessRequestNotFoundError, SpendNotInQueueError and AccessRequestPlanLineRefusedError. */
@@ -46,7 +46,7 @@ export class PlanLineRouteService {
         throw new SpendNotInQueueError(requestId);
       }
 
-      const today = await this.organization.businessToday(new Date(), tx);
+      const today = await this.organizationReads.businessToday(new Date(), tx);
       await this.planLines.choose(
         tx,
         actor,
@@ -94,11 +94,11 @@ export class PlanLineRouteService {
           );
     if (!lines) return pageOf([], 0, query.page, query.pageSize);
 
-    const today = await this.organization.businessToday(new Date());
+    const today = await this.organizationReads.businessToday(new Date());
     const planIds = [...new Set(lines.items.map((line) => line.planId).filter((id): id is string => id !== null))];
     const [plans, money] = await Promise.all([
       planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
-      this.support.formatter(lines.currency),
+      this.wireView.formatter(lines.currency),
     ]);
 
     return pageOf(

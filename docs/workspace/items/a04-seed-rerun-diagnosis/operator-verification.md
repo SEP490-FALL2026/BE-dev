@@ -36,8 +36,9 @@ làm lần nạp đầu hỏng và ≳ 165 ms làm lần chạy lại hỏng; sa
    (wrapper vẫn kiểm `prisma/` + `openapi.json` giống bản đang deploy; A-04 không đổi hai thứ đó).
 2. `--mode plan` → mong đợi exit 0, các bước `ĐÃ CÓ` (hoặc `SẼ GHI` cho phần lần trước chưa xong).
 3. `--mode apply` → exit 0 nếu còn phần dở, rồi **chạy lại `apply` thêm hai lần** → mỗi lần exit **2**, `Tổng: ĐÃ CÓ 24`.
-4. Nếu vẫn lỗi: dòng lỗi giờ kèm mã trong ngoặc vuông, ví dụ `[P2028]` (transaction quá ngân sách), `[Query read timeout]`
-   (không trả lời 8 s), `[ECONNRESET]` (kết nối bị cắt), `[P2010 57014]` (statement timeout phía server). Ghi đúng dòng đó
+4. Nếu vẫn lỗi: dòng lỗi giờ kèm nguyên nhân bằng mã (sau tích hợp với `describeForOperator`, không còn ngoặc vuông), ví dụ
+   `code=P2028` (transaction quá ngân sách), `pg="Query read timeout"` (không trả lời 8 s), `code=ECONNRESET` (kết nối bị cắt),
+   `code=P2010 sqlState=57014` (statement timeout phía server). Ghi đúng dòng đó
    vào báo cáo; không tự tăng `DB_*` trên VPS khi chưa có quyết định của Owner.
 
 ## 4. Kiểm nhanh không ghi gì

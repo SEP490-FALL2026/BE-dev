@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { OrganizationContextService } from '../organization-context.service';
 import { OrganizationChangeService } from './organization-change.service';
+import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 
 /** The first sweep waits, so a short-lived process (a test, a command) never starts one. */
 const FIRST_SWEEP_AFTER_MS = 5 * 60 * 1000;
@@ -48,7 +49,7 @@ export class OrganizationChangeSweeper implements OnApplicationBootstrap, OnModu
       const { told, failed } = await this.changes.announceDue(await this.context.businessToday());
       if (told > 0 || failed > 0) this.logger.log(`Told ${told} change(s) of the organization, ${failed} failed`);
     } catch (error) {
-      this.logger.error(`Organization change sweep failed: ${(error as Error).name}`);
+      this.logger.error(`Organization change sweep failed: ${describeForOperator(error)}`, traceForOperator(error));
     } finally {
       this.schedule(SWEEP_EVERY_MS);
     }

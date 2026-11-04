@@ -20,6 +20,8 @@ enum AppRole {
   IT_ADMIN
   FINANCE
   EMPLOYEE
+  MANAGER
+  SPENDING_APPROVER
 }
 
 enum SessionRevokedReason {
@@ -68,7 +70,8 @@ model PasswordCredential {
   @@map("password_credentials")
 }
 
-// Direct role grants with history. MANAGER and the spending approver are derived, never stored here.
+// Direct role grants with history, all six roles (QĐ-93a). MANAGER only counts while the holder heads a department today;
+// SPENDING_APPROVER is held by at most one person (role_grants_one_spending_approver).
 model RoleGrant {
   id             String    @id @default(uuid()) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
@@ -168,29 +171,6 @@ model AccountActionToken {
   @@map("account_action_tokens")
 }
 
-enum ApprovalRole {
-  SPENDING_APPROVER
-  CONFLICT_SUBSTITUTE
-  FALLBACK_APPROVER
-}
-
-// Who holds each of the three approval roles the Super Admin configures (US-01-03), with history: at any moment at
-// most one current holder per role (heldUntil null). The roles are configuration, not grants: the holder does not
-// need an account role for them, and the Super Admin sets them without approving anything (SoD-1).
-model ApprovalRoleHolder {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  role           ApprovalRole
-  employeeId     String       @map("employee_id") @db.Uuid
-  heldFrom       DateTime     @default(now()) @map("held_from") @db.Timestamptz(3)
-  heldUntil      DateTime?    @map("held_until") @db.Timestamptz(3)
-  setBy          String?      @map("set_by") @db.Uuid
-
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
-
-  @@index([employeeId])
-  @@map("approval_role_holders")
-}
 
 enum RecoveryMode {
   RESET_CREDENTIALS

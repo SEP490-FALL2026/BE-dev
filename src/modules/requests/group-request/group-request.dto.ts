@@ -2,7 +2,6 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import {
-  PROJECT_LABEL_MAX_LENGTH,
   REASON_MAX_LENGTH,
   TERM_MONTHS_MAX,
   employeeRef,
@@ -34,12 +33,12 @@ export const groupBodySchema = z.strictObject({
     .max(GROUP_BODY_LINES_MAX),
   businessReason: reason,
   termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
-  projectLabel: z.string().trim().min(1).max(PROJECT_LABEL_MAX_LENGTH).optional(),
   expectedSpendOn: businessDate.optional(),
   termConfirmation: z.strictObject({ reason }).optional(),
 });
 
 const LINE_REASONS = [
+  'SPENDING_APPROVER',
   'OUTSIDE_DEPARTMENT',
   'NOT_ACTIVE',
   'EMAIL_REQUIRED',
@@ -91,6 +90,7 @@ const lineDecisionSchema = z.strictObject({
   decision: z.enum(['APPROVED', 'REJECTED']),
   reason: z.string().nullable(),
   decidedBy: employeeRef,
+  /** `FALLBACK_APPROVER` and `CONFLICT_SUBSTITUTE` are historical: a decision of before `QĐ-93`; none is written now. */
   deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER', 'FALLBACK_APPROVER', 'CONFLICT_SUBSTITUTE']),
   decidedAt: z.iso.datetime(),
 });
@@ -117,8 +117,8 @@ const lineSchema = z.strictObject({
   endedAt: z.iso.datetime().nullable(),
   endedBy: employeeRef.nullable(),
   endReason: z.string().nullable(),
-  /** Why the IT Admin closed the line, when it ended as cancelled. */
-  cancelCause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED']).nullable(),
+  /** Why the line ended as cancelled: the IT Admin closed it, or the conversion command because the spending approver is a party. */
+  cancelCause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED', 'SPENDING_APPROVER_PARTY']).nullable(),
 });
 
 export class GroupBodyDto extends createZodDto(groupBodySchema) {}

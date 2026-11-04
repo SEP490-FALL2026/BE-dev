@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { SeatTarget, SeatTargetRef } from '../public/catalog.types';
-import { PlanLookupService } from '../plan/plan-lookup.service';
-import type { LockedPlan as PlanLookup } from '../plan/plan-lookup.service';
+import { PlanFactsService } from '../plan/plan-facts.service';
+import type { LockedPlan as PlanLookup } from '../plan/plan-facts.service';
 import { missingData } from './subscription.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import type { SubscriptionRecord } from './subscription.types';
@@ -50,7 +50,7 @@ const ofSubscription = (subscription: SubscriptionRecord, plan: PlanLookup): Sea
 export class SeatTargetService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
-    private readonly plans: PlanLookupService,
+    private readonly plans: PlanFactsService,
   ) {}
 
   async find(ref: SeatTargetRef, tx?: DbTx): Promise<SeatTarget | null> {

@@ -3,6 +3,7 @@ import type { AuditApi } from '../../audit/public/audit.api';
 import type { FinanceApi } from '../../finance/public/finance.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { OrganizationApi } from '../../organization/public/organization.api';
+import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AlreadyInstalledError, InstallationInputError } from './installation.errors';
 import { InstallationApi } from './installation.api';
 
@@ -102,6 +103,7 @@ function harness(options: { installed?: boolean } = {}) {
   const service = new InstallationApi(
     runner as unknown as TransactionRunner,
     organization as unknown as OrganizationApi,
+    organization as unknown as OrganizationReadApi,
     identity as unknown as IdentityAccessApi,
     audit as unknown as AuditApi,
     repo,
@@ -261,11 +263,11 @@ describe('InstallationApi (QĐ-87f(1): organization, one department, the Super A
 
     expect(error).toBeInstanceOf(InstallationInputError);
     expect((error as InstallationInputError).issues).toEqual([
-      'departmentCode: use letters, digits, ".", "_" or "-" (max 32)',
+      'departmentCode: use uppercase letters and digits in groups joined by "-", 2 to 20 characters (e.g. HQ)',
       'operatorReference: Invalid input: expected string, received undefined',
     ]);
     expect((error as Error).message).toBe(
-      'The installation input is not valid:\n - departmentCode: use letters, digits, ".", "_" or "-" (max 32)\n - operatorReference: Invalid input: expected string, received undefined',
+      'The installation input is not valid:\n - departmentCode: use uppercase letters and digits in groups joined by "-", 2 to 20 characters (e.g. HQ)\n - operatorReference: Invalid input: expected string, received undefined',
     );
     expect(h.calls).toEqual([]);
   });

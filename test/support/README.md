@@ -224,10 +224,11 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   fails to find files that exist once the module graph is large. To run `pnpm openapi:export` by hand on such a Node, set
   `NODE_OPTIONS=--no-experimental-strip-types`.
 - `support/placement-coverage.ts`: truy vấn kiểm coverage của placement (bắt khoảng trống mà exclusion
-  constraint cho phép). Chạy ở cuối test ghi dữ liệu tổ chức.
+  constraint cho phép; placement đầu bắt đầu ở ngày vào, ngày ghi hồ sơ hoặc không trước cả hai; người đang làm có placement thì có
+  đúng một placement mở; người không có placement nào là chưa xếp phòng hợp lệ, `INV-20`). Chạy ở cuối test ghi dữ liệu tổ chức.
 - `support/test-config.ts`: `ConfigService` có kiểu cho test tự dựng service.
 - `support/pretend-today.ts`: `pretendBusinessToday(app, day)`, cách **duy nhất** để test nói tổ chức đang ở ngày nào: stub
-  `OrganizationContextService.businessToday`, chỗ capability của `organization` đọc ngày trực tiếp và `OrganizationApi.businessToday`
+  `OrganizationContextService.businessToday`, chỗ capability của `organization` đọc ngày trực tiếp và `OrganizationReadApi.businessToday`
   ủy quyền vào. Spy trên facade chỉ điều khiển module khác, capability của `organization` vẫn đọc ngày thật; các harness
   (`pretendToday(day)`, `today(day)`) đều đi qua helper này.
 - `support/pg-relay.ts`: `PgRelay`, relay TCP trước PostgreSQL trên `127.0.0.1` (cổng ngẫu nhiên) để mô phỏng

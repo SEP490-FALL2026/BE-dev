@@ -4,10 +4,10 @@ import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { EmptyState } from '../public/catalog.types';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
-import { PlanLookupService, type LockedPlan } from '../plan/plan-lookup.service';
+import { PlanFactsService, type LockedPlan } from '../plan/plan-facts.service';
 import {
   SubscriptionApplicationRetiredError,
   SubscriptionNotFoundError,
@@ -71,10 +71,10 @@ export interface UpdateSubscriptionInput {
 export class SubscriptionService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
-    private readonly plans: PlanLookupService,
+    private readonly plans: PlanFactsService,
     private readonly pricing: SubscriptionPricingService,
     private readonly views: SubscriptionViewService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -141,7 +141,7 @@ export class SubscriptionService {
     if (!plan) throw new SubscriptionPlanNotFoundError();
     if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError();
     // Held FOR SHARE until commit, so the department cannot be stopped between this check and the row (QĐ-89a).
-    const owner = await this.organization.lockDepartmentShared(tx, input.ownerDepartmentId);
+    const owner = await this.organizationReads.lockDepartmentShared(tx, input.ownerDepartmentId);
     if (!owner?.active) throw new SubscriptionOwnerDepartmentInactiveError();
     const state = declaredStateOf(input);
     this.assertShape(plan, input.kind, state);
@@ -251,7 +251,7 @@ export class SubscriptionService {
   }
 
   private async requireOrganizationId(): Promise<string> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('Subscriptions were used before installation');
 
     return organization.id;

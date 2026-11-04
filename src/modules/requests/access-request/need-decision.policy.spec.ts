@@ -75,12 +75,7 @@ describe('what a decision leads to', () => {
   });
 
   it('names the role a person decided in from the row of the routing table that gave them the step', () => {
-    expect([1, 2, 3, 4].map(deciderRoleOf)).toEqual([
-      'MANAGER',
-      'SPENDING_APPROVER',
-      'FALLBACK_APPROVER',
-      'FALLBACK_APPROVER',
-    ]);
+    expect([1, 2].map(deciderRoleOf)).toEqual(['MANAGER', 'SPENDING_APPROVER']);
   });
 
   it('names the head the role of the manager in the rows of a request for a group: sent by the head (5) and sent by an Employee (9)', () => {
@@ -88,7 +83,9 @@ describe('what a decision leads to', () => {
   });
 
   it('has no role for a row that gives the step to nobody', () => {
-    expect(() => deciderRoleOf(8)).toThrow();
+    for (const row of [3, 4, 8]) {
+      expect(() => deciderRoleOf(row)).toThrow();
+    }
   });
 });
 
@@ -109,15 +106,19 @@ describe('what a decision of the need step leads to (US-05-04 AC-12, AC-16, US-0
       requestState: 'AWAITING_EXECUTION',
       deciderRole: 'MANAGER',
     });
-    expect(needDecisionOutcome(asked('NEW_SOFTWARE', 3), approve)).toMatchObject({
+    expect(needDecisionOutcome(asked('NEW_SOFTWARE', 2), approve)).toMatchObject({
       requestState: 'AWAITING_IT_ASSESSMENT',
-      deciderRole: 'FALLBACK_APPROVER',
+      deciderRole: 'SPENDING_APPROVER',
     });
     expect(needDecisionOutcome(asked('PAID_IN_CATALOG', 2), { decision: 'REJECT' })).toMatchObject({
       approved: false,
       requestState: 'REJECTED',
       deciderRole: 'SPENDING_APPROVER',
     });
+  });
+
+  it('records no decision for a legacy row 3 or 4: nobody decides in it', () => {
+    for (const row of [3, 4]) expect(() => needDecisionOutcome(asked('PAID_IN_CATALOG', row), approve)).toThrow();
   });
 
   it('has the head choose the line only when a head approves a request that costs money', () => {

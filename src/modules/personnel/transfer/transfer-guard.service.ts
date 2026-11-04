@@ -4,7 +4,7 @@ import { readSqlState, type DbTx } from '../../../infrastructure/database/transa
 import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { operatorSubjectRefusal, userWriterRefusal } from '../personnel-self-action.policy';
 import type { PersonnelActor } from '../public/personnel.types';
@@ -17,14 +17,14 @@ import type { SuccessorChoice } from './transfer.types';
 @Injectable()
 export class TransferGuardService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly transfers: TransferRepo,
   ) {}
 
   /** The installation's organization; a transfer before installation is a programming error. */
   async requireOrganization(): Promise<{ id: string }> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A transfer was recorded before installation');
 
     return organization;
@@ -70,9 +70,9 @@ export class TransferGuardService {
     const { required, chosen } = input;
     if (!required || chosen?.kind !== 'EMPLOYEE') return { required, chosen, candidate: null };
     const candidateId = chosen.employeeId;
-    const employee = await this.organization.getEmployee(candidateId, tx);
+    const employee = await this.organizationReads.getEmployee(candidateId, tx);
     if (!employee) return { required, chosen, candidate: null };
-    const placement = await this.organization.getEmployeePlacement(candidateId, input.day, tx);
+    const placement = await this.organizationReads.getEmployeePlacement(candidateId, input.day, tx);
     const account = await this.identity.inspectEmployeeAccount(tx, candidateId);
 
     return {
@@ -83,6 +83,8 @@ export class TransferGuardService {
         memberOfOldDepartmentOnDay: placement?.departmentId === input.oldDepartmentId,
         stillWorking: employee.status === 'ACTIVE' && employee.workState !== 'LEFT',
         holdsSuperAdmin: account.roles.includes('SUPER_ADMIN'),
+        holdsManager: account.roles.includes('MANAGER'),
+        holdsSpendingApprover: account.roles.includes('SPENDING_APPROVER'),
         hasPendingTransfer: (await this.transfers.findPendingOf(tx, candidateId)) !== null,
       },
     };
@@ -127,7 +129,6 @@ export class TransferGuardService {
       sessionId: actor.ticketId,
       employeeId: holder.employeeId,
       directRoles: ['SUPER_ADMIN'],
-      derivedRoles: [],
       roles: ['SUPER_ADMIN'],
     };
   }

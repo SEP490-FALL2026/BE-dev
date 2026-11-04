@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { MailSendError, MailTransport } from '../../../infrastructure/mail/mail-transport';
+import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 import { renderEmail } from './email-templates.mapper';
 import { PayloadDecryptionError, UnknownEmailTemplateError } from '../notifications.errors';
 import { NotificationsRepo } from '../notifications.repo';
@@ -51,7 +52,10 @@ export class EmailDispatcher {
         await this.deliver(email, leaseId, isUsable);
       } catch (error) {
         // One bad row must not stop the rest; its lease expires and it is taken again.
-        this.logger.error(`Delivery of outbox row ${email.id} failed unexpectedly: ${(error as Error).name}`);
+        this.logger.error(
+          `Delivery of outbox row ${email.id} failed unexpectedly: ${describeForOperator(error)}`,
+          traceForOperator(error),
+        );
       }
     }
 

@@ -67,12 +67,13 @@ export const nextRequestState = (branch: AccessRequestBranchCode): ApprovedReque
       ? 'AWAITING_IT_ASSESSMENT'
       : 'AWAITING_SPEND_SUBMISSION';
 
-export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER' | 'FALLBACK_APPROVER';
+/** The role a decision is recorded in from now on; the approver of last resort is gone (`QĐ-93c`), and what was recorded stays readable. */
+export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER';
 
 /**
  * The role a person decided in, from the row of the routing table that gave them the step (`US-05-03`): the roles can
- * change after the request is sent, so the record keeps the role as it stood. A row that gives the step to nobody (8)
- * has no decider.
+ * change after the request is sent, so the record keeps the role as it stood. A row that gives the step to nobody (3, 4, 8) has
+ * no decider, and throws: no step is held on such a row (the queue lists only the rows of `HELD_ROUTING_ROWS`).
  */
 export function deciderRoleOf(routingRow: number): DeciderRole {
   switch (routingRow) {
@@ -83,9 +84,6 @@ export function deciderRoleOf(routingRow: number): DeciderRole {
       return 'MANAGER';
     case 2:
       return 'SPENDING_APPROVER';
-    case 3:
-    case 4:
-      return 'FALLBACK_APPROVER';
     default:
       throw new Error(`The routing row ${routingRow} gives the step to nobody, so nobody decides in it.`);
   }
@@ -113,6 +111,11 @@ export function needDecisionOutcome(
 ): NeedDecisionOutcome {
   const approved = input.decision === 'APPROVE';
   const deciderRole = deciderRoleOf(asked.routingRow);
+  if (deciderRole === null) {
+    throw new Error(
+      `The routing row ${asked.routingRow} is a legacy row: its step is frozen, so nobody decides in it.`,
+    );
+  }
 
   return {
     approved,

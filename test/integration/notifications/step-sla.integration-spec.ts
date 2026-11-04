@@ -1,6 +1,5 @@
 import { NotificationsApi } from '../../../src/modules/notifications/public/notifications.api';
 import { SlaHarness } from '../../support/sla-harness';
-import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new SlaHarness();
@@ -32,8 +31,6 @@ const FRIDAY_16 = at(0, '16:00');
 describe('the reminders of a step that is late, over PostgreSQL (US-05-09, US-05-06 AC-10, US-05-10 AC-5)', () => {
   let internal: string;
   let paid: string;
-  let fallback: Person;
-  let fallbackHead: Person;
   let financeUnit: Unit;
   let superAdmin: string;
   let counter = 0;
@@ -46,11 +43,6 @@ describe('the reminders of a step that is late, over PostgreSQL (US-05-09, US-05
     await h
       .declareTaxProfile((await h.vendorOf(paid)).id, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }])
       .expect(200);
-    const fallbackDepartment = await h.departmentWithUnit('P-FBK');
-    fallback = await h.staff(fallbackDepartment, 'FBK-R0');
-    fallbackHead = await h.staff(fallbackDepartment, 'FBK-H');
-    await h.makeHead(fallbackDepartment, fallbackHead);
-    await h.setRole('FALLBACK_APPROVER', fallback);
     // Finance sits in a department with its own head, so that the head of that department is the superior of Finance.
     financeUnit = await h.departmentWithHead('P-FIN');
     await h.moveTo(h.finance.employeeId, financeUnit.department.id, { announce: false });
@@ -271,24 +263,20 @@ describe('the reminders of a step that is late, over PostgreSQL (US-05-09, US-05
       expect(await h.stepCount(id)).toBe(stepsBefore);
     });
 
-    it('reminds the fallback approver and the head of their own department, and the step stays with the fallback approver (AC-9)', async () => {
+    it('reminds the Super Admin, every working day, of a need step that waits for a head, and leaves the step waiting (AC-9, QĐ-93c)', async () => {
       const headless = await h.departmentWithUnit(`P-NH${(counter += 1)}`);
       const requester = await h.staff(headless, `NH-E${counter}`);
       const sent = await h.sent(requester, internal);
       const step = await h.stepOf(sent.id, 'NEED');
-      expect(step).toMatchObject({ state: 'PENDING', assignee_employee_id: fallback.employeeId });
+      expect(step).toMatchObject({ state: 'WAITING', assignee_employee_id: null });
       await h.beganAt(sent.id, 'NEED', FRIDAY_16);
 
       await h.sweepAt(at(5, '10:00'));
 
       const [reminder] = await h.remindersOf(step.id);
-      expect(roles(reminder.recipients)).toEqual(
-        [`${fallback.employeeId}:HOLDER`, `${fallbackHead.employeeId}:SUPERIOR`].sort(),
-      );
-      expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({
-        assignee_employee_id: fallback.employeeId,
-        state: 'PENDING',
-      });
+      expect(reminder.holder_employee_id).toBeNull();
+      expect(roles(reminder.recipients)).toEqual([`${superAdmin}:SUPER_ADMIN`]);
+      expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({ assignee_employee_id: null, state: 'WAITING' });
     });
   });
 

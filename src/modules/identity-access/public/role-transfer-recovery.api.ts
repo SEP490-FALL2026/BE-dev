@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { employeeHasNotLeft } from '../accounts/account.policy';
 import { assertContext, assertSeparation, checkSameTicket } from '../recovery/recovery-procedure.policy';
 import { RecoveryTargets } from '../recovery/recovery-targets.service';
@@ -11,16 +11,19 @@ import { RoleHandover } from '../recovery/role-handover.service';
 import { SuccessorEnrolment } from '../recovery/successor-enrolment.service';
 
 /**
- * Handing the Super Admin role to a person when the holder cannot act any more (`US-01-09` AC-12): left, locked, or
- * nobody holds it. Run by an operator outside the application. Two stages, one ticket: the first creates the
- * successor's account, which has no role, and invites them; once they have activated it, the same ticket run again
- * moves the role in one transaction. Locks: the employees (by id), then the accounts (by id), then the ticket.
+ * Handing the Super Admin role to a person, run by an operator outside the application: no route of the application
+ * does it. When the holder cannot act any more (`US-01-09` AC-12: left, locked, or nobody holds it) there are two
+ * stages under one ticket: the first creates the successor's account, which has no role, and invites them; once they
+ * have activated it, the same ticket run again moves the role in one transaction. When the holder can still act (a
+ * planned transfer, AC-1) there is one stage: the successor already has an activated account, made in the application,
+ * and the role moves in one transaction; no account is created and no invitation is sent. Locks: the employees (by
+ * id), then the accounts (by id), then the ticket.
  */
 @Injectable()
 export class RoleTransferRecoveryApi {
   constructor(
     private readonly targets: RecoveryTargets,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly tickets: RecoveryRepo,
     private readonly enrolment: SuccessorEnrolment,
     private readonly handover: RoleHandover,
@@ -33,14 +36,14 @@ export class RoleTransferRecoveryApi {
   ): Promise<RecoveryResult> {
     assertContext(context);
     const organization = await this.targets.requireOrganization();
-    const successorEmployee = await this.organization.getEmployeeByCode(input.successorEmployeeCode);
+    const successorEmployee = await this.organizationReads.getEmployeeByCode(input.successorEmployeeCode);
     if (!successorEmployee) throw new RecoveryRefusedError('SUCCESSOR_NOT_FOUND');
     const holder = input.holderEmail ? await this.targets.locateByEmail(organization.id, input.holderEmail) : null;
-    assertSeparation(context, [
-      successorEmployee.workEmail ?? '',
-      input.holderEmail ?? '',
-      successorEmployee.employeeCode,
-    ]);
+    assertSeparation(
+      context,
+      [successorEmployee.workEmail ?? '', input.holderEmail ?? '', successorEmployee.employeeCode],
+      input.holderEmail,
+    );
 
     return this.runner.run(async (tx) => {
       const successorAccountId = await this.targets.lockForTransfer(tx, successorEmployee.id, holder);
@@ -61,11 +64,12 @@ export class RoleTransferRecoveryApi {
         current.account.status === 'ACTIVE' &&
         current.account.activationState === 'ACTIVATED' &&
         employeeHasNotLeft(current.employee);
-      if (holderUsable) throw new RecoveryRefusedError('HOLDER_STILL_USABLE');
+      // A planned transfer never creates the successor's account (AC-12): without one it is refused before a ticket is opened.
+      if (holderUsable && successorAccountId === null) throw new RecoveryRefusedError('SUCCESSOR_NOT_FOUND_ACCOUNT');
       if (current.account && current.account.employeeId === successorEmployee.id) {
         throw new RecoveryRefusedError('SUCCESSOR_IS_HOLDER');
       }
-      const successor = await this.organization.getEmployee(successorEmployee.id, tx);
+      const successor = await this.organizationReads.getEmployee(successorEmployee.id, tx);
       if (!successor || successor.status !== 'ACTIVE') throw new RecoveryRefusedError('EMPLOYEE_NOT_WORKING');
 
       const { ticket, created } = await this.tickets.openAndLock(tx, {
@@ -92,9 +96,14 @@ export class RoleTransferRecoveryApi {
       // Stage 1: the successor has no account yet.
       if (successorAccountId === null) return this.enrolment.createAccount(tx, { ...step, successor });
 
-      // Stage 2, or the wait for it: the successor has an account.
-      const waiting = await this.enrolment.awaitActivation(tx, { ...step, successorAccountId, successor });
-      if (waiting) return waiting;
+      // A planned transfer: the account must be ready now, there is no second stage and no invitation to send again.
+      if (holderUsable) {
+        await this.enrolment.requireReady(tx, successorAccountId);
+      } else {
+        // Stage 2, or the wait for it: the successor has an account.
+        const waiting = await this.enrolment.awaitActivation(tx, { ...step, successorAccountId, successor });
+        if (waiting) return waiting;
+      }
 
       return this.handover.move(tx, { ...step, holderId: current.holderId, successorAccountId });
     });

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AssessmentQueueItemWire } from './assessment-queue.dto';
 import { queueItemOf, type QueueLookups } from './assessment-queue.mapper';
 import { AssessmentQueueRepo, type AssessmentQueueRow } from './assessment-queue.repo';
@@ -16,7 +16,7 @@ import { AssessmentQueueRepo, type AssessmentQueueRow } from './assessment-queue
 export class AssessmentQueueService {
   constructor(
     private readonly queue: AssessmentQueueRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
   ) {}
 
@@ -24,7 +24,7 @@ export class AssessmentQueueService {
     actor: AuthenticatedPrincipal,
     query: { page: number; pageSize: number },
   ): Promise<Page<AssessmentQueueItemWire>> {
-    const departmentIds = await this.organization.getItAdminScope(actor.employeeId, (ids) =>
+    const departmentIds = await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
       this.identity.findUsableItAdminEmployeeIds(ids),
     );
     if (departmentIds.length === 0) return pageOf([], 0, query.page, query.pageSize);
@@ -57,8 +57,8 @@ export class AssessmentQueueService {
       ),
     ];
     const departmentIds = [...new Set(rows.map((row) => row.departmentId))];
-    const people = await this.organization.getEmployees(personIds);
-    const departments = await this.organization.getDepartmentBriefs(departmentIds);
+    const people = await this.organizationReads.getEmployees(personIds);
+    const departments = await this.organizationReads.getDepartmentBriefs(departmentIds);
 
     return {
       people: new Map(people.map((person) => [person.id, person])),

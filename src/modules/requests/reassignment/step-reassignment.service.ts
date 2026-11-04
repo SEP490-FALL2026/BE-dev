@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import type { OperatorAuditActor } from '../../licensing/public/licensing-handover.types';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ControlledWaitAlertService } from './controlled-wait-alert.service';
 import {
   decideReassignment,
@@ -31,6 +32,8 @@ export interface ReconcileResult {
   madeToWait: number;
   /** Steps that waited and are now held. */
   assignedFromWait: number;
+  /** Steps that went on waiting, for another reason (`QĐ-93k(2)`). */
+  rewaited: number;
   /** Alerts raised for a stretch of waiting that had none. */
   alerted: number;
 }
@@ -55,7 +58,7 @@ export class StepReassignmentService {
     private readonly repo: StepReassignmentRepo,
     private readonly targets: StepTargetService,
     private readonly alerts: ControlledWaitAlertService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -70,7 +73,7 @@ export class StepReassignmentService {
   async requestIdsHeldByLeavers(): Promise<string[]> {
     const holders = await this.repo.holderIds();
     if (holders.length === 0) return [];
-    const left = (await this.organization.getEmployees(holders))
+    const left = (await this.organizationReads.getEmployees(holders))
       .filter((employee) => employee.status !== 'ACTIVE')
       .map((employee) => employee.id);
 
@@ -102,8 +105,16 @@ export class StepReassignmentService {
     trigger: ReassignmentTrigger,
     correlationId: string,
     now: Date,
+    operator?: OperatorAuditActor,
   ): Promise<ReconcileResult> {
-    const result: ReconcileResult = { requests: 0, redetermined: 0, madeToWait: 0, assignedFromWait: 0, alerted: 0 };
+    const result: ReconcileResult = {
+      requests: 0,
+      redetermined: 0,
+      madeToWait: 0,
+      assignedFromWait: 0,
+      rewaited: 0,
+      alerted: 0,
+    };
     const requests = await this.repo.lockWithOpenSteps(tx, requestIds);
     if (requests.length === 0) return result;
 
@@ -111,7 +122,7 @@ export class StepReassignmentService {
     const gone = await this.holdersWhoLeft(tx, requests);
     for (const request of requests) {
       result.requests += 1;
-      await this.reconcileOne(tx, request, trigger, correlationId, now, facts, gone, result);
+      await this.reconcileOne(tx, request, trigger, correlationId, now, facts, { gone, operator }, result);
     }
 
     return result;
@@ -130,7 +141,7 @@ export class StepReassignmentService {
     if (holders.length === 0) return new Set();
 
     return new Set(
-      (await this.organization.getEmployees(holders, tx))
+      (await this.organizationReads.getEmployees(holders, tx))
         .filter((employee) => employee.status !== 'ACTIVE')
         .map((employee) => employee.id),
     );
@@ -143,9 +154,10 @@ export class StepReassignmentService {
     correlationId: string,
     now: Date,
     facts: TodayFacts,
-    gone: ReadonlySet<string>,
+    context: { gone: ReadonlySet<string>; operator?: OperatorAuditActor },
     result: ReconcileResult,
   ): Promise<void> {
+    const { gone, operator } = context;
     const steps = request.steps.map((step) => ({ ...step }));
     let state = request.state;
     let holdersChanged = false;
@@ -157,12 +169,42 @@ export class StepReassignmentService {
         state: step.state as 'PENDING' | 'WAITING',
         holderEmployeeId: step.assigneeEmployeeId,
         holderGone: step.assigneeEmployeeId !== null && gone.has(step.assigneeEmployeeId),
+        waitingReason: step.waitingReason,
       };
       if (open.state === 'PENDING' && !touchesHeldStep(open, trigger)) continue;
 
       const decision = decideReassignment(open, trigger, await this.targets.targetOf(tx, request, step, facts));
       if (decision.action === 'KEEP') {
-        if (open.state === 'WAITING') result.alerted += await this.alert(tx, request, step, facts, correlationId);
+        if (open.state === 'WAITING') result.alerted += await this.alert(tx, request, step, correlationId);
+        continue;
+      }
+      if (decision.action === 'REWAIT') {
+        const previousReason = step.waitingReason;
+        await this.repo.rewait(tx, step.id, decision.reason);
+        step.waitingReason = decision.reason;
+        await this.audit.record(
+          tx,
+          reassignmentAuditEvent(
+            request.organizationId,
+            'ACCESS_REQUEST.STEP_WAITING_REASON_CHANGED',
+            'ACCESS_REQUEST_STEP',
+            step.id,
+            {
+              requestId: request.id,
+              stepKind: step.kind,
+              trigger: trigger.kind,
+              source: correlationId,
+              waitingReason: decision.reason,
+              // The stretch of waiting goes on: the deadline and the alert of the stretch do not start again.
+              stepCreatedAt: step.createdAt.toISOString(),
+            },
+            correlationId,
+            { waitingReason: previousReason },
+            operator,
+          ),
+        );
+        result.rewaited += 1;
+        result.alerted += await this.alert(tx, request, step, correlationId);
         continue;
       }
 
@@ -196,6 +238,7 @@ export class StepReassignmentService {
             },
             correlationId,
             { assigneeEmployeeId: previous, waitingReason: previousReason },
+            operator,
           ),
         );
         if (wasWaiting) result.assignedFromWait += 1;
@@ -225,10 +268,11 @@ export class StepReassignmentService {
             },
             correlationId,
             { assigneeEmployeeId: previous },
+            operator,
           ),
         );
         result.madeToWait += 1;
-        result.alerted += await this.alert(tx, request, step, facts, correlationId);
+        result.alerted += await this.alert(tx, request, step, correlationId);
       }
       if (step.kind === 'NEED' || step.kind === 'SPEND_APPROVAL') holdersChanged = true;
     }
@@ -259,7 +303,6 @@ export class StepReassignmentService {
     tx: DbTx,
     request: ReassignableRequest,
     step: ReassignableStep,
-    facts: TodayFacts,
     correlationId: string,
   ): Promise<number> {
     if (step.waitingSince === null || step.waitingReason === null) return 0;
@@ -274,7 +317,6 @@ export class StepReassignmentService {
         waitingReason: step.waitingReason,
         waitingSince: step.waitingSince,
       },
-      facts.today,
       correlationId,
     );
 
@@ -300,7 +342,7 @@ export class StepReassignmentService {
       ? need.assigneeEmployeeId !== null && need.assigneeEmployeeId === spend.assigneeEmployeeId
       : request.chainHasSpendStep &&
         need.assigneeEmployeeId !== null &&
-        need.assigneeEmployeeId === facts.roles.spendingApproverEmployeeId;
+        need.assigneeEmployeeId === facts.spendingApproverEmployeeId;
     const changing = [need, ...(spend ? [spend] : [])].filter((step) => step.samePersonAsSpend !== same);
     await this.repo.flagSamePerson(
       tx,

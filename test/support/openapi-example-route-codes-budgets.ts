@@ -8,6 +8,24 @@ import type { RouteErrorStatus } from './openapi-example-manifest';
  */
 export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> =
   {
+    budgetAttachmentComplete: {
+      '404': ['BUDGET_ATTACHMENT.NOT_FOUND'],
+      '409': [
+        'BUDGET.VERSION_NOT_EDITABLE',
+        'BUDGET_ATTACHMENT.LIMIT_REACHED',
+        'BUDGET_ATTACHMENT.NOT_AWAITING_UPLOAD',
+        'BUDGET_ATTACHMENT.UPLOAD_EXPIRED',
+        'BUDGET_ATTACHMENT.UPLOAD_PENDING',
+      ],
+      '422': ['BUDGET.YEAR_ENDED', 'BUDGET_ATTACHMENT.UPLOAD_MISMATCH'],
+    },
+    budgetAttachmentDiscard: {
+      '404': ['BUDGET_ATTACHMENT.NOT_FOUND'],
+      '409': ['BUDGET_ATTACHMENT.NOT_DISCARDABLE'],
+    },
+    budgetAttachmentLink: {
+      '404': ['BUDGET_ATTACHMENT.NOT_FOUND'],
+    },
     budgetCommitmentRelease: {
       '404': ['BUDGET.COMMITMENT_NOT_FOUND'],
       '409': ['BUDGET.COMMITMENT_NOT_HELD', 'BUDGET.COMMITMENT_REQUEST_OPEN'],
@@ -20,6 +38,17 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     },
     budgetMineLineList: {
       '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
+    },
+    budgetMineVersionList: {
+      '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
+    },
+    budgetProposalAttachmentDeclare: {
+      '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
+      '409': ['BUDGET_ATTACHMENT.LIMIT_REACHED', 'FINANCE.SETUP_INCOMPLETE'],
+      '422': ['BUDGET_ATTACHMENT.FILE_INVALID', 'BUDGET_ATTACHMENT.TOO_LARGE', 'BUDGET_ATTACHMENT.TYPE_NOT_ALLOWED'],
+    },
+    budgetProposalAttachmentList: {
+      '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
     },
     budgetProposalGet: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
@@ -36,6 +65,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
         'BUDGET.PROPOSAL_INCOMPLETE',
         'BUDGET.WINDOW_BACKWARDS',
         'BUDGET.YEAR_ENDED',
+        'BUDGET_ATTACHMENT.NOT_ATTACHABLE',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',
         'MONEY_SCALE_EXCEEDED',
@@ -56,6 +86,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
         'BUDGET.PROPOSAL_INCOMPLETE',
         'BUDGET.WINDOW_BACKWARDS',
         'BUDGET.YEAR_ENDED',
+        'BUDGET_ATTACHMENT.NOT_ATTACHABLE',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',
         'MONEY_SCALE_EXCEEDED',
@@ -64,6 +95,25 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetProposalWithdraw: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
       '409': ['BUDGET.PROPOSAL_CANNOT_WITHDRAW'],
+      '422': ['BUDGET.YEAR_ENDED'],
+    },
+    budgetVersionAttachmentDeclare: {
+      '404': ['BUDGET.VERSION_NOT_FOUND'],
+      '409': ['BUDGET.VERSION_NOT_EDITABLE', 'BUDGET_ATTACHMENT.LIMIT_REACHED'],
+      '422': [
+        'BUDGET.YEAR_ENDED',
+        'BUDGET_ATTACHMENT.FILE_INVALID',
+        'BUDGET_ATTACHMENT.TOO_LARGE',
+        'BUDGET_ATTACHMENT.TYPE_NOT_ALLOWED',
+      ],
+    },
+    budgetVersionAttachmentList: {
+      '403': ['AUTHORIZATION.FORBIDDEN'],
+      '404': ['BUDGET.VERSION_NOT_FOUND'],
+    },
+    budgetVersionAttachmentRemove: {
+      '404': ['BUDGET.VERSION_NOT_FOUND', 'BUDGET_ATTACHMENT.NOT_FOUND'],
+      '409': ['BUDGET.VERSION_NOT_EDITABLE', 'BUDGET_ATTACHMENT.ALREADY_REMOVED'],
       '422': ['BUDGET.YEAR_ENDED'],
     },
     budgetVersionCreate: {

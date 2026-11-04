@@ -11,7 +11,7 @@
   [g5-it-assessment-of-new-software](../g5-it-assessment-of-new-software/spec.md); source `requests/assessment/**` (reader, view,
   gate, step repo, policy, controller), `access-request/assessment-read.repo.ts`, `delegated-request/grant-queue.*` và
   `spend-approval-view/spend-approval-queue.service.ts` (mẫu hàng đợi), `dashboards/it-admin/it-admin-dashboard.service.ts` và
-  `organization/department/department-directory.service.ts` (`getItAdminScope`, quy ước phạm vi IT Admin).
+  `organization/department/department-record.service.ts` (`getItAdminScope`, quy ước phạm vi IT Admin).
 - Đối chiếu mâu thuẫn trước khi viết mặc định: không có ADR hay spec nào ghi quyết định "không có list" để bác bỏ một danh sách; spec
   assessment chỉ không chứa list (ghi ở `## Behavior and design`, không phải ADR), và README audit nói rõ chưa đủ căn cứ coi queue
   riêng là AC. Không có route list assessment nào đã tồn tại. Nên mặc định được triển khai, không dừng.

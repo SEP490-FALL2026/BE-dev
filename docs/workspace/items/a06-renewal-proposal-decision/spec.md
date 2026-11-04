@@ -1,5 +1,7 @@
 # Spec: gia hạn subscription — đề xuất của IT Admin và quyết định của Người duyệt chi
 
+> The substitute who decides a renewal is superseded by [QĐ-93c](../qd93-remove-fallback-substitute-approvers/spec.md): only the spending approver decides.
+
 - Phụ trách: AI theo giao việc A-06 của người dùng (31/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc A-06 của người dùng (31/10/2026).
 - Thiết kế: `ready`. Triển khai: `verified` (local, worktree cô lập tại `6eb12d1`, chưa commit, 31/10/2026). Owner review: chưa review.
@@ -67,7 +69,7 @@ code. Phụ thuộc `RevocationService` (`g6-revocation-by-grant-kind`), bảng 
 ## Ownership: module, data, API
 
 - **licensing `subscription-renewal/`:** `proposal/renewal-proposal.{service,policy}.ts`, `decision/renewal-decision.{service,policy}.ts`,
-  `decision/renewal-decision-support.service.ts`, `subscription-renewal-ranking.{policy,service}.ts`, `subscription-renewal-parties.service.ts`,
+  `decision/renewal-decision-trail.service.ts`, `subscription-renewal-ranking.{policy,service}.ts`, `subscription-renewal-parties.service.ts`,
   `subscription-renewal.repo.ts`, `subscription-renewal-seat.repo.ts`, `subscription-renewal-view.service.ts`, controller, DTO, lỗi.
 - **catalog:** `public/subscription-period.{api,types,errors}.ts`, `subscription/subscription-period.service.ts`; cột `renewed_from_id`.
 - **Bảng:** `subscription_renewals` (một dòng mỗi kỳ, unique `subscription_id`; trigger `subscription_renewals_guard` đóng băng từng

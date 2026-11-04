@@ -6,7 +6,7 @@ import { OBJECT_STORAGE, type ObjectStoragePort } from '../../../infrastructure/
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import {
   ContractNotFoundError,
@@ -63,7 +63,7 @@ export class DocumentService {
   constructor(
     private readonly documents: DocumentRepo,
     private readonly contracts: ContractRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly parameters: OperatingParametersApi,
     private readonly keys: ObjectKeyFactory,
     private readonly audit: AuditApi,
@@ -391,7 +391,7 @@ export class DocumentService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A document was kept before installation');
 
     return organization;

@@ -40,6 +40,7 @@ const FILE_SUFFIXES = [
   'extension-points',
   'listener',
   'job',
+  'json',
 ] as const;
 const CATCH_ALL_FOLDERS = ['errors', 'common', 'shared', 'utils', 'helpers'] as const;
 /** R3: folders that name a technical layer, not a function: forbidden at every level below a module. */
@@ -446,6 +447,135 @@ function oversizedModuleSpecs(specs: SourceFile[]): string[] {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Readability rules L1-L4 (docs/workspace/items/be-readability-debuggability-followup/spec.md, RV2-01 to RV2-04)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Blanks every comment but keeps its newlines, so a match is reported on its real line. A `//` after a `:` is a URL, not a comment.
+ * Limit: any other `//` inside a string literal reads as the start of a comment, so the rest of that line is not looked at.
+ */
+const withoutComments = (source: string): string =>
+  source.replace(/\/\*[\s\S]*?\*\/|(?<!:)\/\/[^\n]*/g, (comment) => comment.replace(/[^\n]/g, ' '));
+
+const lineOf = (text: string, index: number): number => text.slice(0, index).split('\n').length;
+
+/** `path:line` of every match of `pattern` (flag `g`) in the code of the files, in path order. */
+function matchLines(files: SourceFile[], pattern: RegExp): string[] {
+  return [...files]
+    .sort((a, b) => (a.path < b.path ? -1 : 1))
+    .flatMap(({ path, source }) => {
+      const code = withoutComments(source);
+
+      return [...code.matchAll(pattern)].map((match) => `${path}:${lineOf(code, match.index ?? 0)}`);
+    });
+}
+
+const ERROR_NAME_CAST = /\(\s*[\w.]+\s+as\s+Error\s*\)\s*\.name\b/g;
+
+/**
+ * L1 (RV2-01): a catch block that logs `(error as Error).name` tells the operator neither which record failed nor whether trying
+ * again can help. Any non-spec file of `src/` describes a failure with `describeForOperator` instead.
+ */
+function errorNameCasts(files: SourceFile[]): string[] {
+  return matchLines(
+    files.filter(({ path }) => !isSpec(path)),
+    ERROR_NAME_CAST,
+  );
+}
+
+const DOUBLE_CAST = /\bas\s+unknown\s+as\b/g;
+
+/**
+ * L2 (RV2-02): a non-spec file of a module never casts through `unknown`. A JSON column is read through the `decode` of its
+ * `*.json.ts` codec and written through `encode`; a query result gets its row type from the generic of the query. The casts of
+ * `src/infrastructure` (a pool client, the body parser, the validation result of a library) are outside this rule.
+ */
+function doubleCastsInModules(files: SourceFile[]): string[] {
+  return matchLines(
+    files.filter(({ path }) => isModuleFile(path) && !isSpec(path)),
+    DOUBLE_CAST,
+  );
+}
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** The kinds of Nest module file (RV2-03): one row per graph a file can belong to; `parts` is the path split by `/`. */
+const NEST_MODULE_ROWS: ReadonlyArray<{ row: string; matches: (parts: string[]) => boolean }> = [
+  { row: '<m>.module.ts', matches: (parts) => parts.length === 3 && parts[2] === `${parts[1]}.module.ts` },
+  { row: '<m>-http.module.ts', matches: (parts) => parts.length === 3 && parts[2] === `${parts[1]}-http.module.ts` },
+  {
+    // `<m>-facade` is the part every graph needs; `<m>-<part>-facade` is a subset for a worker or a command.
+    row: '<m>-<part>-facade.module.ts',
+    matches: (parts) =>
+      parts.length === 3 &&
+      new RegExp(`^${escapeRegExp(parts[1])}-(?:[a-z0-9-]+-)?facade\\.module\\.ts$`).test(parts[2]),
+  },
+  {
+    row: '<m>-<x>-cli.module.ts',
+    matches: (parts) =>
+      parts.length === 3 && new RegExp(`^${escapeRegExp(parts[1])}-[a-z0-9-]+-cli\\.module\\.ts$`).test(parts[2]),
+  },
+  {
+    row: '<cap>-cli.module.ts',
+    matches: (parts) => parts.length === 4 && parts[2] !== 'public' && /^[a-z0-9-]+-cli\.module\.ts$/.test(parts[3]),
+  },
+];
+
+/**
+ * L3 (RV2-03): every `*.module.ts` of `src/modules` is named for the graph it serves and fits exactly one row of the naming table in
+ * docs/rules/module-structure.md (`<m>`, `<m>-http`, `<m>-<part>-facade` with an optional part, `<m>-<x>-cli` at the module root,
+ * `<cap>-cli` in a capability), and a module of `src/cli` is the root graph of one command, `<command>-cli.module.ts` in `src/cli/<command>/`.
+ */
+const COMMAND_ROOT_ROW = 'src/cli/<command>/<command>-cli.module.ts';
+const isCommandRoot = (parts: string[]): boolean => parts.length === 3 && parts[2] === `${parts[1]}-cli.module.ts`;
+
+/** The rows of the naming table a `*.module.ts` fits; `parts` is its path split by `/`. */
+function rowsOf(parts: string[]): string[] {
+  if (parts[0] !== 'cli') return NEST_MODULE_ROWS.filter(({ matches }) => matches(parts)).map(({ row }) => row);
+  if (isCommandRoot(parts)) return [COMMAND_ROOT_ROW];
+
+  return [];
+}
+
+function nestModuleNames(paths: string[]): string[] {
+  return paths
+    .filter((path) => (isModuleFile(path) || path.startsWith('cli/')) && !isSpec(path) && path.endsWith('.module.ts'))
+    .flatMap((path) => {
+      const rows = rowsOf(path.split('/'));
+
+      return rows.length === 1
+        ? []
+        : [`${path}: ${rows.length === 0 ? 'fits no row of the naming table' : `fits ${rows.join(' and ')}`}`];
+    })
+    .sort();
+}
+
+/** The five older suffixes, each with its plural too (`-lookups`, `-directories`, `-readers`, `-reads`, `-supports`). */
+const RETIRED_READ_SUFFIXES = [
+  'directory',
+  'directories',
+  'lookup',
+  'lookups',
+  'reader',
+  'readers',
+  'read',
+  'reads',
+  'support',
+  'supports',
+] as const;
+const RETIRED_READ_SERVICE = new RegExp(`-(?:${RETIRED_READ_SUFFIXES.join('|')})\\.service\\.ts$`);
+
+/**
+ * L4 (RV2-04): a service that only reads is `<x>-query`, `<x>-facts` or `<x>-view`; the five older suffixes, singular or plural, say
+ * nothing about what is returned or to whom, so no `*.service.ts` of a module ends with one.
+ */
+function retiredReadServiceNames(paths: string[]): string[] {
+  return paths
+    .filter((path) => isModuleFile(path) && !isSpec(path) && RETIRED_READ_SERVICE.test(fileName(path)))
+    .sort();
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // The gate on the real tree
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -532,6 +662,26 @@ describe('module layout (src/modules)', () => {
 
     expect(specs.length).toBeGreaterThan(0);
     expect(oversizedModuleSpecs(specs)).toEqual([]);
+  });
+
+  // L1
+  it('never logs `(x as Error).name` anywhere in src: a failed pass is described with describeForOperator', () => {
+    expect(errorNameCasts(sources)).toEqual([]);
+  });
+
+  // L2
+  it('casts nothing through `as unknown as` in a non-spec file of src/modules: a JSON column goes through its codec', () => {
+    expect(doubleCastsInModules(sources)).toEqual([]);
+  });
+
+  // L3
+  it('names every *.module.ts of a module, and of a command, after one row of the Nest module naming table', () => {
+    expect(nestModuleNames(allPaths)).toEqual([]);
+  });
+
+  // L4
+  it('has no *.service.ts ending -directory, -lookup, -reader, -read or -support: a read service is -query, -facts or -view', () => {
+    expect(retiredReadServiceNames(allPaths)).toEqual([]);
   });
 });
 
@@ -886,5 +1036,137 @@ ${body}
         file('infrastructure/config/env-schema.spec.ts', lines(612)),
       ]),
     ).toEqual(['modules/sample/over.spec.ts: 401 lines']);
+  });
+
+  // L1
+  it('names each cast of an error name with its line, in a job, a service or the worker, and not prose, a spec or instanceof', () => {
+    expect(
+      errorNameCasts([
+        file('modules/sample/sample.job.ts', 'try {\n} catch (error) {\n  log(`failed: ${(error as Error).name}`);\n}'),
+        file('modules/sample/sample.service.ts', 'x((err as Error).name);\ny(( e.cause as Error ).name);'),
+        file('worker/loop.job.ts', 'const label = (reason as Error)\n  .name;'),
+        file(
+          'modules/sample/sample.listener.ts',
+          '// (error as Error).name was logged here\n/* (error as Error).name */',
+        ),
+        file('modules/sample/sample.policy.ts', 'if (error instanceof Error) log(describeForOperator(error));'),
+        file('modules/sample/sample.job.spec.ts', 'expect((error as Error).name).toBe("X");'),
+      ]),
+    ).toEqual([
+      'modules/sample/sample.job.ts:3',
+      'modules/sample/sample.service.ts:1',
+      'modules/sample/sample.service.ts:2',
+      'worker/loop.job.ts:1',
+    ]);
+  });
+
+  // L2
+  it('names each `as unknown as` of a module file with its line, and not a spec, a comment or src/infrastructure', () => {
+    expect(
+      doubleCastsInModules([
+        file(
+          'modules/sample/sample.repo.ts',
+          'const a = row.summary as unknown as Summary;\nconst b = x as unknown\n  as Y;',
+        ),
+        file('modules/sample/sample.controller.ts', 'return view.constraints as unknown as Record<string, unknown>;'),
+        file(
+          'modules/sample/sample.mapper.ts',
+          '// the old code said `as unknown as` here\nconst ok = Schema.parse(row.summary);',
+        ),
+        file('modules/sample/sample.repo.spec.ts', 'const stub = {} as unknown as Repo;'),
+        file('infrastructure/database/pg-pool.ts', 'const c = client as unknown as RetireOnTimeoutClient;'),
+      ]),
+    ).toEqual([
+      'modules/sample/sample.controller.ts:1',
+      'modules/sample/sample.repo.ts:1',
+      'modules/sample/sample.repo.ts:2',
+    ]);
+  });
+
+  // L3
+  it('lets a Nest module file fit exactly one row of the naming table, and names the rest', () => {
+    expect(
+      nestModuleNames([
+        // the five rows of a module, and the sixth: the root graph of a command in src/cli
+        'modules/sample/sample.module.ts',
+        'modules/sample/sample-http.module.ts',
+        'modules/sample/sample-facade.module.ts',
+        'modules/sample/sample-work-facade.module.ts',
+        'modules/identity-access/identity-access-local-seed-facade.module.ts',
+        'modules/identity-access/identity-access-recovery-cli.module.ts',
+        'modules/sample/capability/capability-cli.module.ts',
+        'modules/installation/inspect/inspection-cli.module.ts',
+        'cli/inspect/inspect-cli.module.ts',
+        // not Nest modules, specs and the other tiers are not looked at
+        'modules/sample/sample.service.ts',
+        'modules/sample/sample.module.spec.ts',
+        'cli/inspect/inspect.command.ts',
+        'app.module.ts',
+        'worker/worker.module.ts',
+        // offenders: the name says no graph, or the file sits where its row does not
+        'modules/sample/capability/capability.module.ts',
+        'modules/installation/inspect/inspection.module.ts',
+        'modules/identity-access/recovery.module.ts',
+        'modules/sample/other.module.ts',
+        'modules/sample/sample-cli.module.ts',
+        'modules/sample/capability/sample-http.module.ts',
+        'modules/sample/capability/group/deep-cli.module.ts',
+        'modules/sample/public/stray-cli.module.ts',
+        'modules/sample/sampler-http.module.ts',
+        'cli/inspect/inspection.module.ts',
+        'cli/inspect/other-cli.module.ts',
+        'cli/inspect/deep/inspect-cli.module.ts',
+      ]),
+    ).toEqual([
+      'cli/inspect/deep/inspect-cli.module.ts: fits no row of the naming table',
+      'cli/inspect/inspection.module.ts: fits no row of the naming table',
+      'cli/inspect/other-cli.module.ts: fits no row of the naming table',
+      'modules/identity-access/recovery.module.ts: fits no row of the naming table',
+      'modules/installation/inspect/inspection.module.ts: fits no row of the naming table',
+      'modules/sample/capability/capability.module.ts: fits no row of the naming table',
+      'modules/sample/capability/group/deep-cli.module.ts: fits no row of the naming table',
+      'modules/sample/capability/sample-http.module.ts: fits no row of the naming table',
+      'modules/sample/other.module.ts: fits no row of the naming table',
+      'modules/sample/public/stray-cli.module.ts: fits no row of the naming table',
+      'modules/sample/sample-cli.module.ts: fits no row of the naming table',
+      'modules/sample/sampler-http.module.ts: fits no row of the naming table',
+    ]);
+  });
+
+  // L4
+  it('names a service ending with a retired read suffix, and leaves the three read names and other files alone', () => {
+    expect(
+      retiredReadServiceNames([
+        'modules/sample/vendor/vendor-directory.service.ts',
+        'modules/sample/vendor/vendor-lookup.service.ts',
+        'modules/sample/assessment/assessment-reader.service.ts',
+        'modules/sample/spend/spend-read.service.ts',
+        'modules/sample/budget/budget-support.service.ts',
+        'modules/sample/vendor/vendor-query.service.ts',
+        'modules/sample/status/status-facts.service.ts',
+        'modules/sample/status/status-view.service.ts',
+        'modules/sample/spend/spread.service.ts',
+        'modules/sample/spend/spend-read.repo.ts',
+        'modules/sample/vendor/vendor-lookup.service.spec.ts',
+        'infrastructure/mail/mail-lookup.service.ts',
+        // the plural forms
+        'modules/sample/department/department-lookups.service.ts',
+        'modules/sample/vendor/vendor-directories.service.ts',
+        'modules/sample/assessment/assessment-readers.service.ts',
+        'modules/sample/spend/spend-reads.service.ts',
+        'modules/sample/budget/budget-supports.service.ts',
+      ]),
+    ).toEqual([
+      'modules/sample/assessment/assessment-reader.service.ts',
+      'modules/sample/assessment/assessment-readers.service.ts',
+      'modules/sample/budget/budget-support.service.ts',
+      'modules/sample/budget/budget-supports.service.ts',
+      'modules/sample/department/department-lookups.service.ts',
+      'modules/sample/spend/spend-read.service.ts',
+      'modules/sample/spend/spend-reads.service.ts',
+      'modules/sample/vendor/vendor-directories.service.ts',
+      'modules/sample/vendor/vendor-directory.service.ts',
+      'modules/sample/vendor/vendor-lookup.service.ts',
+    ]);
   });
 });

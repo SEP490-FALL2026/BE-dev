@@ -3,9 +3,9 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
-import { VendorDictionaryLookupService } from '../vendor-dictionary/vendor-dictionary-lookup.service';
+import { VendorDictionaryFactsService } from '../vendor-dictionary/vendor-dictionary-facts.service';
 import { VendorProposalIntakeService } from '../vendor-dictionary/vendor-proposal-intake.service';
-import { VendorDirectoryService } from '../vendor/vendor-directory.service';
+import { VendorRecordService } from '../vendor/vendor-record.service';
 import {
   ApplicationDictionaryLineMismatchError,
   ApplicationDictionaryLineNotFoundError,
@@ -21,8 +21,8 @@ import type { ApplicationRecord } from './application.types';
 @Injectable()
 export class ApplicationVendorLinkService {
   constructor(
-    private readonly dictionary: VendorDictionaryLookupService,
-    private readonly vendors: VendorDirectoryService,
+    private readonly dictionary: VendorDictionaryFactsService,
+    private readonly vendors: VendorRecordService,
     private readonly proposals: VendorProposalIntakeService,
     private readonly audit: AuditApi,
   ) {}

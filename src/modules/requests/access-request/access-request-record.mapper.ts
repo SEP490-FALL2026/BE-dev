@@ -1,9 +1,8 @@
 import type { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn } from '../../../core/business-date';
 import { toPricing } from './access-request-pricing.mapper';
-import type { WaitingReason } from './routing.policy';
-import type { RequestPolicy } from './access-request.policy';
-import type { NeedStepState, AccessRequestRecord } from './access-request.types';
+import type { NeedStepState, AccessRequestRecord, ReadableNeedWaitingReason } from './access-request.types';
+import { requestPolicyJson } from './access-request.json';
 
 /** What a request is read as: the columns, the people it is for, its need steps with their decisions, and the lines of a group. */
 export const SELECT_REQUEST = {
@@ -18,7 +17,6 @@ export const SELECT_REQUEST = {
   costCenterId: true,
   businessReason: true,
   termMonths: true,
-  projectLabel: true,
   pricingStatus: true,
   priceMissingReason: true,
   expectedSpendOn: true,
@@ -135,7 +133,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     state: step.state as NeedStepState,
     assigneeEmployeeId: step.assigneeEmployeeId,
     routingRow: step.routingRow,
-    waitingReason: step.waitingReason as WaitingReason | null,
+    waitingReason: step.waitingReason as ReadableNeedWaitingReason | null,
     samePersonAsSpend: step.samePersonAsSpend,
     slaWorkingDays: step.slaWorkingDays,
     createdAt: step.createdAt,
@@ -159,7 +157,6 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     costCenterId: sent.costCenterId,
     businessReason: row.businessReason,
     termMonths: row.termMonths,
-    projectLabel: row.projectLabel,
     pricing: toPricing(row),
     planLine:
       row.planLineVersionId !== null && row.planLinePosition !== null
@@ -168,8 +165,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     offPlan: row.offPlan,
     delegatedBatchId: row.delegatedBatchId,
     expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
-    // Written by `insert` from a `RequestPolicy`, and nowhere else.
-    policy: row.policy as unknown as RequestPolicy,
+    policy: requestPolicyJson.decode(row.policy),
     submittedAt: sent.submittedAt,
     withdrawal:
       row.withdrawalRequestedAt !== null && row.withdrawnByEmployeeId !== null
@@ -181,7 +177,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
           }
         : null,
     cancellation:
-      row.cancelledAt !== null && row.cancelledByEmployeeId !== null && row.cancelCause !== null
+      row.cancelledAt !== null && row.cancelCause !== null
         ? {
             cancelledAt: row.cancelledAt,
             cancelledByEmployeeId: row.cancelledByEmployeeId,

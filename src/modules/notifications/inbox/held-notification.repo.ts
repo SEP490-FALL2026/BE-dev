@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { HeldDepartmentNotificationInput, InAppParamValue } from '../public/notifications.types';
+import { heldNotificationParamsJson } from './notification-params.json';
 
 /** A held notice as it is read back to be handed to the first head of its department. */
 export interface HeldNotificationRow {
@@ -30,7 +31,7 @@ export class HeldNotificationRepo {
           code: input.code,
           subjectType: input.subject?.type ?? null,
           subjectId: input.subject?.id ?? null,
-          params: input.params,
+          params: heldNotificationParamsJson.encode(input.params),
           eventKey: input.eventKey,
         },
       ],
@@ -52,7 +53,8 @@ export class HeldNotificationRepo {
         code: string;
         subject_type: string | null;
         subject_id: string | null;
-        params: Record<string, InAppParamValue>;
+        /** The JSON as PostgreSQL returns it; `heldNotificationParamsJson` says what it is. */
+        params: unknown;
         event_key: string;
       }[]
     >`
@@ -69,7 +71,7 @@ export class HeldNotificationRepo {
       code: row.code,
       subjectType: row.subject_type,
       subjectId: row.subject_id,
-      params: row.params,
+      params: heldNotificationParamsJson.decode(row.params),
       eventKey: row.event_key,
     }));
   }

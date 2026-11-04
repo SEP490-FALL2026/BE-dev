@@ -5,19 +5,28 @@ import {
   executionPointOf,
   needsChargeableOwner,
   renewalDeciderOf,
+  renewalWaitingReason,
   seatsToRelease,
 } from './renewal-decision.policy';
 
-const holders = { spendingApproverEmployeeId: 'C1', conflictSubstituteEmployeeId: 'S1' };
+describe('the decider of a renewal (FR-3.13, QĐ-93d(1))', () => {
+  it('is the spending approver, and nobody in their place', () => {
+    expect(renewalDeciderOf('C1', 'IT1')).toEqual({ employeeId: 'C1', role: 'SPENDING_APPROVER' });
+  });
 
-describe('the decider of a renewal (FR-3.13, FR-3.15)', () => {
-  it('is the spending approver, or the substitute when the approver proposed the case', () => {
-    expect(renewalDeciderOf(holders, 'IT1')).toEqual({ employeeId: 'C1', role: 'SPENDING_APPROVER' });
-    expect(renewalDeciderOf(holders, 'C1')).toEqual({ employeeId: 'S1', role: 'CONFLICT_SUBSTITUTE' });
-    expect(renewalDeciderOf({ spendingApproverEmployeeId: null, conflictSubstituteEmployeeId: null }, 'IT1')).toEqual({
-      employeeId: null,
-      role: 'SPENDING_APPROVER',
-    });
+  it('is nobody when the approver proposed the case: no substitute takes the place (data of before QĐ-93)', () => {
+    expect(renewalDeciderOf('C1', 'C1')).toEqual({ employeeId: null, role: 'SPENDING_APPROVER' });
+  });
+
+  it('is nobody while the role has no holder', () => {
+    expect(renewalDeciderOf(null, 'IT1')).toEqual({ employeeId: null, role: 'SPENDING_APPROVER' });
+  });
+
+  it('is what a case waits for: the spending approver, while nobody who works holds the role and the case waits for its decision', () => {
+    expect(renewalWaitingReason('PROPOSED', null)).toBe('NO_SPENDING_APPROVER');
+    expect(renewalWaitingReason('PROPOSED', 'C1')).toBeNull();
+    expect(renewalWaitingReason('DECIDED', null)).toBeNull();
+    expect(renewalWaitingReason('OUTCOME_RECORDED', null)).toBeNull();
   });
 
   it('refuses anyone but the decider, never lets the proposer decide, and only a case that waits (SoD-3, US-11-02 AC-6)', () => {

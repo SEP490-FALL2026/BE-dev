@@ -142,6 +142,9 @@ export const OFFBOARDING_ERROR_EXAMPLES = {
       blockers: ['ACCOUNT_LOCK_NOT_RECORDED', 'PERSONAL_RIGHTS_OPEN'],
     }),
   ),
-  PLACEMENT_OVERLAP: example(new OffboardingRefusedError('PLACEMENT_OVERLAP', { reason: 'NO_OPEN_PLACEMENT' })),
+  // One example per code in a response: the reason a caller has to act on (`D-S28`); `NO_OPEN_PLACEMENT` is in the descriptions.
+  PLACEMENT_OVERLAP: example(
+    new OffboardingRefusedError('PLACEMENT_OVERLAP', { reason: 'FIRST_PLACEMENT_PENDING', validFrom: '2026-01-01' }),
+  ),
   CONCURRENT_CHANGE: example(new OffboardingRefusedError('CONCURRENT_CHANGE')),
 } as const;

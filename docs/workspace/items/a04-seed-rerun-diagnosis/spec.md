@@ -49,7 +49,7 @@ rerun/idempotency và hướng dẫn kiểm chứng (DEV-A A-04). Hạng mục s
 
 - SSH, chạy lệnh, reset/nạp lại, đổi role hay xóa dump/volume trên VPS (không có quyền; DEV-A A-04).
 - Đổi giá trị mặc định `DB_*`, `pg-pool.ts`, `TransactionRunner` dùng chung với API/worker.
-- Batch hóa các truy vấn của `LocalDemoAccountApi`/`AccountDirectoryService` (hai truy vấn đọc ngoài transaction, xem
+- Batch hóa các truy vấn của `LocalDemoAccountApi`/`AccountRecordService` (hai truy vấn đọc ngoài transaction, xem
   `## Behavior and design`): không cần cho bản sửa, chạm module `identity-access` dùng chung với `dev:seed`.
 
 ## Dependencies and blockers
@@ -65,6 +65,11 @@ rerun/idempotency và hướng dẫn kiểm chứng (DEV-A A-04). Hạng mục s
   (thông điệp `DemoAccountsChangedError`).
 - CLI: `src/cli/demo-dataset/demo-dataset-failure.ts` (mã nguyên nhân), `demo-dataset-runner.ts`, `demo-dataset.command.ts`.
 - Infrastructure: `session-advisory-lock.ts` (`release` không ném).
+
+> **01/11/2026 — sau tích hợp refactor lượt 2 (`be-readability-debuggability-followup`):** dòng lỗi do `src/cli/demo-dataset/demo-failure.ts` in dạng `code=… sqlState=… retryable=… pg="…"`; cùng thông tin, khác định dạng (`demo-dataset-failure.ts` và các nhãn `[P2028]`, `[Query read timeout]`, `[ECONNRESET]` nêu ở đây không còn).
+
+> **01/11/2026 — sau tích hợp refactor lượt 2:** `release()` của `session-advisory-lock.ts` lại ném khi kết nối giữ khóa đã đứt (đóng kết nối trong mọi trường hợp); báo cáo của lượt do người gọi giữ (`runDemoDataset`, phase `lock-release`, kèm cảnh báo "The apply lock could not be released"), nên một lượt apply thứ hai không bị chặn từ lúc đó vẫn được nói ra cho operator.
+
 - Test support: `test/support/pg-relay.ts` (`delay`). Bảng ghi: `app_users`, `password_credentials`, `role_grants`,
   `audit_events` như trước. HTTP/OpenAPI: không đổi.
 

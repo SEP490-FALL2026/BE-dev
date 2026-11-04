@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import type { HrBasis } from '../../../organization/public/hr-basis.types';
 import { DbTx, TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
 import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../../../organization/public/organization.errors';
 import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { importConfirmedEvent, importEmployeeCreatedEvent } from '../employee-import-audit.mapper';
 import type { EmployeeCells } from '../employee-import-row.types';
 import { outcomeCounts, toImportView } from '../employee-import-view.mapper';
@@ -45,6 +45,7 @@ export class EmployeeImportConfirmationService {
   constructor(
     private readonly repo: EmployeeImportRepo,
     private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
     private readonly notifications: NotificationsApi,
@@ -60,7 +61,7 @@ export class EmployeeImportConfirmationService {
   async confirm(
     actor: AuthenticatedPrincipal,
     id: string,
-    input: { previewVersion: number; idempotencyKey: string; acknowledgeDuplicateFile: boolean; hrBasis: HrBasis },
+    input: { previewVersion: number; idempotencyKey: string; acknowledgeDuplicateFile: boolean },
   ): Promise<{ import: ImportView; replayed: boolean }> {
     assertMayImportEmployees(actor.roles);
     const organization = await this.requireOrganization();
@@ -93,21 +94,20 @@ export class EmployeeImportConfirmationService {
 
       const own = await this.rowValidation.ownRecord(actor.employeeId, tx);
       const { fresh, before } = await this.judgeAgainUnderLocks(tx, id, own);
-      const createdByDepartment = await this.writeValidRows(tx, organization.id, fresh, {
-        actor,
-        importId: id,
-        hrBasis: input.hrBasis,
-      });
+      const createdByDepartment = await this.writeValidRows(tx, organization.id, fresh, { actor, importId: id });
 
       const { existingSame, existingDifferent, errors } = outcomeCounts(fresh);
       const result: ImportResult = {
+        newUnplaced: createdByDepartment.get('') ?? 0,
         created: [...createdByDepartment.values()].reduce((sum, count) => sum + count, 0),
         existingSame,
         existingDifferent,
         errors,
-        createdByDepartment: [...createdByDepartment].map(([departmentCode, count]) => ({ departmentCode, count })),
+        createdByDepartment: [...createdByDepartment]
+          .filter(([code]) => code !== '')
+          .map(([departmentCode, count]) => ({ departmentCode, count })),
         departmentsWithoutHead: await this.rowValidation.departmentsWithoutHead(before, [
-          ...createdByDepartment.keys(),
+          ...[...createdByDepartment.keys()].filter(Boolean),
         ]),
       };
       await this.repo.markCompleted(tx, id, { result, confirmKey: input.idempotencyKey, now: new Date() });
@@ -117,7 +117,6 @@ export class EmployeeImportConfirmationService {
           previewVersion: current.previewVersion,
           result,
           repeatedFile: duplicate !== null,
-          hrBasis: input.hrBasis,
         }),
       );
     });
@@ -134,7 +133,7 @@ export class EmployeeImportConfirmationService {
     const cells = stored.map((row) => ({ lineNumber: row.lineNumber, cells: row.cells }));
     const before = await this.rowValidation.lookup(cells, own, tx);
     const wanted = idsUsedByValidRows(stored, before);
-    await this.organization.lockForEmployeeImport(tx, wanted.departmentIds);
+    await this.organizationReads.lockForEmployeeImport(tx, wanted.departmentIds);
     const fresh = judgeEmployeeRows(cells, await this.rowValidation.lookup(cells, own, tx));
     const changed = fresh.filter((row, index) => !sameJudgement(row, stored[index])).map((row) => row.lineNumber);
     if (changed.length > 0) throw new ImportPreviewStaleError(changed);
@@ -147,9 +146,9 @@ export class EmployeeImportConfirmationService {
     tx: DbTx,
     organizationId: string,
     fresh: JudgedRow[],
-    on: { actor: AuthenticatedPrincipal; importId: string; hrBasis: HrBasis },
+    on: { actor: AuthenticatedPrincipal; importId: string },
   ): Promise<Map<string, number>> {
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const createdByDepartment = new Map<string, number>();
     for (const row of fresh) {
       if (row.outcome !== 'VALID' || !row.parsed) continue;
@@ -172,15 +171,16 @@ export class EmployeeImportConfirmationService {
             employeeCode: row.parsed.employeeCode,
             department: row.parsed.departmentCode,
             jobTitle: row.parsed.jobTitleName,
-            hrBasis: on.hrBasis,
           }),
         );
-        const notices = await this.organization.getProfileNotices(tx, {
-          kind: 'CREATED',
-          organizationId,
-          employeeId,
-          onDate: today,
-        });
+        const notices = row.parsed.departmentId
+          ? await this.organizationReads.getProfileNotices(tx, {
+              kind: 'CREATED',
+              organizationId,
+              employeeId,
+              onDate: today,
+            })
+          : [];
         for (const notice of notices) await this.notifications.notifyInApp(tx, notice);
       } catch (error) {
         // Someone entered the same code or email between the judgement and the write: the preview is stale.
@@ -203,7 +203,7 @@ export class EmployeeImportConfirmationService {
   }
 
   private async requireOrganization() {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A people file was imported before installation');
 
     return organization;

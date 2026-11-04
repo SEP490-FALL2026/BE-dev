@@ -16,7 +16,6 @@ describe('requests over HTTP: from an approved request to a granted seat (integr
     await h.makeHead(design, head);
     spender = await h.staff(await h.departmentWithUnit('P-EXE'), 'EXE-C1');
     await h.setRole('SPENDING_APPROVER', spender);
-    await h.setRole('FALLBACK_APPROVER', await h.staff(await h.departmentWithUnit('P-HR'), 'HR-R0'));
     paidPlan = await h.plan('K2');
   }, 240000);
 

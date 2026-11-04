@@ -24,9 +24,9 @@ Employee xin tài khoản dịch vụ cho chủ thể phi con người; IT Admin
 
 ## Primary Story/AC
 
-| Story    | AC        | Coverage | Phần còn lại thuộc |
-| -------- | --------- | -------- | ------------------ |
-| US-05-21 | AC-1→AC-7 | full     | —                  |
+| Story    | AC        | Coverage | Phần còn lại thuộc                                                                                                                 |
+| -------- | --------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| US-05-21 | AC-1→AC-7 | partial  | AC-8: vế Người duyệt chi `qd93-remove-fallback-substitute-approvers`, vế _chưa xếp phòng_ `qd93-unplaced-employee-first-placement` |
 
 ## Supporting references
 
@@ -115,6 +115,8 @@ Mã lỗi: `409` `SERVICE_ACCOUNT_REQUEST.BASELINE_NOT_CLOSED`, `BOUNDARY_ALREAD
 24/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Gửi Request tài khoản dịch vụ sau khởi tạo, IT Admin quyết ranh giới phi con người (chấp nhận, hoặc từ chối giải phóng cam kết và kết thúc `IT_REJECTED`), cấp với định danh do IT Admin nhập, người chịu trách nhiệm đổi phòng được chỉ định lại, IT Admin là người chịu trách nhiệm theo `QĐ-77m`. Khác bản thiết kế: từ chối ranh giới không đóng bước và không cho mục lô rời lô (không còn gì để đóng ở `AWAITING_EXECUTION`); điều kiện khởi tạo và kiểu cấp kiểm sau `assess`; sự kiện audit của Request thường không thêm `type`. `pnpm rules:check`: 0 lỗi (273 tệp). Nhánh (c) phần mềm chưa có trong danh mục vẫn ngoài phạm vi (câu hỏi mở cho Owner). Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
 
 25/10/2026: `g6-service-account-handover` đã xong (`verified` local): người chịu trách nhiệm tài khoản dịch vụ được cấp từ Request này có thể được thay trước điều chuyển hoặc nghỉ việc (người mới phải làm việc ở phòng sở hữu, không đang bàn giao; ngày không muộn hơn ngày hiệu lực của hồ sơ) hoặc tài khoản chuyển sang phòng khác khi trưởng phòng nhận xác nhận (`service_account_moves`); không gọi `budgets`, khoản cam kết giữ ở `Unit` cũ. Chi tiết ở [spec](../g6-service-account-handover/spec.md#như-đã-xây-và-khác-biệt).
+
+01/11/2026 — `QĐ-93` (Docs `69e8a3d`): AC mới `US-05-21` AC-8 thuộc `qd93-remove-fallback-substitute-approvers` (vế Người duyệt chi) và `qd93-unplaced-employee-first-placement` (vế _chưa xếp phòng_); dòng đổi sang `partial`, AC sở hữu ở đây không đổi.
 
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 

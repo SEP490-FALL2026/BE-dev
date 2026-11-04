@@ -1,4 +1,5 @@
-import type { SuccessorProblem } from './successor-eligibility.service';
+import type { SpendingApproverBlocker } from '../public/identity-access.extension-points';
+import type { AppRole } from '../public/identity-access.types';
 
 export class AccountNotFoundError extends Error {
   constructor() {
@@ -16,8 +17,10 @@ export class SelfChangeForbiddenError extends Error {
 }
 
 export class RoleRequestRefusedError extends Error {
-  constructor(readonly reason: 'ROLE_DERIVED' | 'SUPER_ADMIN_TRANSFER_ONLY') {
-    super(`The role cannot be granted by hand: ${reason}.`);
+  constructor(readonly reason: 'SUPER_ADMIN_TRANSFER_ONLY') {
+    super(
+      'The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.',
+    );
     this.name = 'RoleRequestRefusedError';
   }
 }
@@ -93,9 +96,69 @@ export class RoleNotGrantedError extends Error {
 }
 
 export class RoleCombinationForbiddenError extends Error {
-  constructor() {
+  /** The roles the account holds that stand in the way (empty when only the database could say: a write around the service). */
+  constructor(readonly conflictingRoles: readonly AppRole[] = []) {
     super('This role cannot be combined with the roles the account holds.');
     this.name = 'RoleCombinationForbiddenError';
+  }
+}
+
+/** The periods that keep MANAGER in place, as the refusal shows them (`QĐ-93a`, US-01-01 AC-21). */
+export interface HeadPeriodDetail {
+  departmentId: string;
+  departmentCode: string;
+  validFrom: string;
+  validTo: string | null;
+  timing: 'CURRENT' | 'UPCOMING';
+}
+
+export class ManagerStillHeadingError extends Error {
+  constructor(readonly headPeriods: readonly HeadPeriodDetail[] = []) {
+    super(
+      'The account heads a department, will head one from a later day, or is named as a successor: end or take back that period before revoking MANAGER.',
+    );
+    this.name = 'ManagerStillHeadingError';
+  }
+}
+
+export class SpendingApproverAlreadyAssignedError extends Error {
+  constructor() {
+    super('Another account already holds the SPENDING_APPROVER role.');
+    this.name = 'SpendingApproverAlreadyAssignedError';
+  }
+}
+
+export class SpendingApproverEmployeeNotActiveError extends Error {
+  constructor() {
+    super('The employee has left, is on long leave or is handing over, so cannot be the spending approver.');
+    this.name = 'SpendingApproverEmployeeNotActiveError';
+  }
+}
+
+export class SpendingApproverAccountNotUsableError extends Error {
+  constructor() {
+    super('The account is locked or not activated, so cannot be the spending approver.');
+    this.name = 'SpendingApproverAccountNotUsableError';
+  }
+}
+
+export class SpendingApproverHeadsDepartmentError extends Error {
+  constructor(readonly headPeriods: readonly HeadPeriodDetail[] = []) {
+    super(
+      'The employee heads a department, will head one from a later day, or is named as a successor, so cannot be the spending approver.',
+    );
+    this.name = 'SpendingApproverHeadsDepartmentError';
+  }
+}
+
+/** The person is a party of work that is still open (`QĐ-93d`(3), US-01-03 AC-12, AC-13): the work is listed, up to a limit, and the list says when it was cut. */
+export class SpendingApproverHasOpenWorkError extends Error {
+  constructor(
+    readonly blockers: readonly SpendingApproverBlocker[],
+    readonly truncated: boolean,
+  ) {
+    super('The employee is a party of work that is still open, so cannot be the spending approver yet.');
+    this.name = 'SpendingApproverHasOpenWorkError';
   }
 }
 
@@ -111,15 +174,5 @@ export class InvitationInvalidError extends Error {
   constructor() {
     super('The invitation link is not valid.');
     this.name = 'InvitationInvalidError';
-  }
-}
-
-export type SuperAdminTransferProblem = SuccessorProblem | 'NOT_HOLDER' | 'SUCCESSOR_IS_HOLDER';
-
-/** The transfer cannot happen; nothing was changed and nothing was recorded (US-01-09 AC-3, AC-5). */
-export class SuperAdminTransferRefusedError extends Error {
-  constructor(readonly problem: SuperAdminTransferProblem) {
-    super(`The Super Admin role cannot be transferred: ${problem}.`);
-    this.name = 'SuperAdminTransferRefusedError';
   }
 }

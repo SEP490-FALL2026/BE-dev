@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { leaverAccessAlert, leaverKeepsAccess } from '../../licensing-alerts.policy';
 import { LicensingAlerts } from '../../licensing-alerts.service';
 import type { AccessState } from '../../public/licensing.types';
@@ -18,7 +18,7 @@ export class RevocationLeaverAlert {
   constructor(
     private readonly reasons: ProvisioningTaskReasonRepo,
     private readonly alerts: LicensingAlerts,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /**
@@ -40,7 +40,7 @@ export class RevocationLeaverAlert {
     const sources = [...(task.revocationSource ? [task.revocationSource] : []), ...reasons.map((r) => r.source)];
     if (!leaverKeepsAccess({ accessState: input.accessState, sources })) return 0;
 
-    const openedOn = await this.organization.businessToday(task.createdAt, tx);
+    const openedOn = await this.organizationReads.businessToday(task.createdAt, tx);
     const itAdmin = await this.alerts.itAdminOfPerson(task.assignment.employeeId, [input.today, openedOn], tx);
 
     return this.alerts.tell(

@@ -3,7 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
-import { budgetAuditEvent } from '../budget/budget-support.service';
+import { budgetAuditEvent } from '../budget/budget-facts.service';
 import type { ProposalRecord } from '../budget/proposal.repo';
 import type { VersionRecord } from '../budget/version.repo';
 import { VersionHistoryService } from './version-history.service';
@@ -55,7 +55,12 @@ export class VersionTrail {
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     version: VersionRecord,
-    sent: { record: VersionRecord; proposal: Pick<ProposalRecord, 'submittedByEmployeeId'> | null },
+    sent: {
+      record: VersionRecord;
+      proposal: Pick<ProposalRecord, 'submittedByEmployeeId'> | null;
+      /** The spending approver who works, read with the row of the grant locked before the version was. */
+      approver: string | null;
+    },
   ): Promise<void> {
     await this.audit.record(
       tx,
@@ -66,6 +71,6 @@ export class VersionTrail {
         totalMinor: version.totalMinor.toString(),
       }),
     );
-    await this.notifier.versionSent(tx, sent.record, sent.proposal?.submittedByEmployeeId ?? null);
+    await this.notifier.versionSent(tx, sent.record, sent.proposal?.submittedByEmployeeId ?? null, sent.approver);
   }
 }

@@ -1,14 +1,29 @@
 import { z } from 'zod';
 import { businessDateAt, isBusinessDate, isValidTimeZone } from '../../core/business-date';
 import { InvalidEmailError, normalizeEmail } from '../../core/email';
+import { isDepartmentCodeValid, isEmployeeCodeValid } from '../organization/public/organization-code.policy';
 
 /** Words that mark a value as a stand-in rather than a real one (QĐ-67b: real values only). */
 const PLACEHOLDER = /^(n\/?a|none|null|tbd|todo|test|placeholder|unknown|default|unclassified|chưa phân loại)$/i;
 
-const code = z
+/** The first department and the Super Admin take the code format of every other department and employee (QĐ-93i). */
+const departmentCode = z
   .string()
   .trim()
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/, 'use letters, digits, ".", "_" or "-" (max 32)');
+  .transform((value) => value.toUpperCase())
+  .refine(
+    isDepartmentCodeValid,
+    'use uppercase letters and digits in groups joined by "-", 2 to 20 characters (e.g. HQ)',
+  );
+
+const employeeCode = z
+  .string()
+  .trim()
+  .transform((value) => value.toUpperCase())
+  .refine(
+    isEmployeeCodeValid,
+    'use uppercase letters and digits in groups joined by "-", 3 to 20 characters (e.g. SA-001)',
+  );
 
 const name = z
   .string()
@@ -34,7 +49,7 @@ const email = z
 const employmentType = z.enum(['STAFF', 'CONTRACTOR', 'FREELANCER', 'INTERN']);
 
 const employee = z.strictObject({
-  employeeCode: code,
+  employeeCode,
   fullName: name,
   workEmail: email,
   employmentType,
@@ -51,7 +66,7 @@ export const installationInputSchema = z
     timeZone: z.string().refine(isValidTimeZone, 'must be an IANA zone such as Asia/Ho_Chi_Minh'),
     reportingCurrency: z.string().regex(/^[A-Z]{3}$/, 'must be an ISO 4217 code such as VND'),
     organizationName: name,
-    departmentCode: code,
+    departmentCode,
     departmentName: name,
     superAdmin: employee,
     /** Defaults to the Super Admin's work email. */

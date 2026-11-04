@@ -2,14 +2,12 @@ import { routeNeedStep, type RoutingFacts } from './routing.policy';
 
 const H = 'head';
 const C = 'spending-approver';
-const R0 = 'fallback-approver';
 const E = 'employee';
 
 const facts = (patch: Partial<RoutingFacts> = {}): RoutingFacts => ({
   requesterEmployeeId: E,
   departmentHeadEmployeeId: H,
   spendingApproverEmployeeId: C,
-  fallbackApproverEmployeeId: R0,
   chainHasSpendStep: true,
   ...patch,
 });
@@ -63,71 +61,49 @@ describe('routing of the need step (US-05-03)', () => {
     });
   });
 
-  describe('row 3: the head who sends is the spending approver', () => {
-    it('goes to the fallback approver', () => {
+  describe('the head who sends is the spending approver (the old row 3, removed by QĐ-93b)', () => {
+    it('is not a case any more: the request waits for a valid spending approver and goes to nobody', () => {
+      // `QĐ-93b` makes it impossible to hold both roles; data from before still routes safely — as row 2 with no valid approver.
       expect(routeNeedStep(facts({ requesterEmployeeId: H, spendingApproverEmployeeId: H }))).toEqual({
-        outcome: 'ASSIGNED',
-        row: 3,
-        assigneeEmployeeId: R0,
-        role: 'FALLBACK_APPROVER',
-        samePersonAsSpend: false,
+        outcome: 'WAITING',
+        row: 8,
+        reason: 'NO_SPENDING_APPROVER',
       });
-    });
-
-    it('waits when there is no fallback approver', () => {
-      expect(
-        routeNeedStep(
-          facts({ requesterEmployeeId: H, spendingApproverEmployeeId: H, fallbackApproverEmployeeId: null }),
-        ),
-      ).toEqual({ outcome: 'WAITING', row: 8, reason: 'NO_FALLBACK_APPROVER' });
     });
   });
 
   describe('row 4: a department with no head', () => {
     const headless = { departmentHeadEmployeeId: null };
 
-    it('goes to the fallback approver', () => {
-      expect(routeNeedStep(facts(headless))).toEqual({
-        outcome: 'ASSIGNED',
-        row: 4,
-        assigneeEmployeeId: R0,
-        role: 'FALLBACK_APPROVER',
-        samePersonAsSpend: false,
-      });
+    it('waits with NO_DEPARTMENT_HEAD on row 4 when the department has no head', () => {
+      expect(routeNeedStep(facts(headless))).toEqual({ outcome: 'WAITING', row: 4, reason: 'NO_DEPARTMENT_HEAD' });
     });
 
-    it('waits when the fallback approver is the one who sends, and decides nothing (row 8)', () => {
-      expect(routeNeedStep(facts({ ...headless, requesterEmployeeId: R0 }))).toEqual({
-        outcome: 'WAITING',
-        row: 8,
-        reason: 'FALLBACK_IS_REQUESTER',
-      });
-    });
-
-    it('waits when there is no fallback approver', () => {
-      expect(routeNeedStep(facts({ ...headless, fallbackApproverEmployeeId: null }))).toEqual({
-        outcome: 'WAITING',
-        row: 8,
-        reason: 'NO_FALLBACK_APPROVER',
-      });
+    it('waits for the head whoever sends, and whoever holds the spending approver role', () => {
+      for (const requesterEmployeeId of [E, C]) {
+        for (const spendingApproverEmployeeId of [C, null, requesterEmployeeId]) {
+          expect(routeNeedStep(facts({ ...headless, requesterEmployeeId, spendingApproverEmployeeId }))).toEqual({
+            outcome: 'WAITING',
+            row: 4,
+            reason: 'NO_DEPARTMENT_HEAD',
+          });
+        }
+      }
     });
   });
 
   describe('the guarantees of every row', () => {
-    const people = [E, H, C, R0, null] as const;
+    const people = [E, H, C, null] as const;
     const everyCase = people.flatMap((requester) =>
       people.flatMap((head) =>
         people.flatMap((spender) =>
-          people.flatMap((fallback) =>
-            [true, false].map((chainHasSpendStep) =>
-              facts({
-                requesterEmployeeId: requester ?? E,
-                departmentHeadEmployeeId: head,
-                spendingApproverEmployeeId: spender,
-                fallbackApproverEmployeeId: fallback,
-                chainHasSpendStep,
-              }),
-            ),
+          [true, false].map((chainHasSpendStep) =>
+            facts({
+              requesterEmployeeId: requester ?? E,
+              departmentHeadEmployeeId: head,
+              spendingApproverEmployeeId: spender,
+              chainHasSpendStep,
+            }),
           ),
         ),
       ),
@@ -140,25 +116,32 @@ describe('routing of the need step (US-05-03)', () => {
       }
     });
 
-    it('gives the step only to the head, the spending approver or the fallback approver (AC-11)', () => {
+    it('gives the step only to the head or the spending approver (AC-11), and never routes to a fallback approver', () => {
       for (const input of everyCase) {
         const decision = routeNeedStep(input);
         if (decision.outcome !== 'ASSIGNED') continue;
-        const allowed = [
-          input.departmentHeadEmployeeId,
-          input.spendingApproverEmployeeId,
-          input.fallbackApproverEmployeeId,
-        ];
-        expect(allowed).toContain(decision.assigneeEmployeeId);
+        expect([input.departmentHeadEmployeeId, input.spendingApproverEmployeeId]).toContain(
+          decision.assigneeEmployeeId,
+        );
+        expect(['MANAGER', 'SPENDING_APPROVER']).toContain(decision.role);
+        expect([1, 2]).toContain(decision.row);
       }
     });
 
-    it('either gives the step to exactly one person or waits with a reason (AC-10)', () => {
+    it('either gives the step to exactly one person or waits with NO_DEPARTMENT_HEAD or NO_SPENDING_APPROVER (AC-10)', () => {
       for (const input of everyCase) {
         const decision = routeNeedStep(input);
         if (decision.outcome === 'ASSIGNED') expect(typeof decision.assigneeEmployeeId).toBe('string');
-        else expect(decision.reason).toMatch(/^[A-Z_]+$/);
+        else {
+          expect(['NO_DEPARTMENT_HEAD', 'NO_SPENDING_APPROVER']).toContain(decision.reason);
+          expect(decision.row).toBe(decision.reason === 'NO_DEPARTMENT_HEAD' ? 4 : 8);
+        }
       }
+    });
+
+    it('never routes to a fallback approver: the facts carry none and no outcome names one', () => {
+      expect(Object.keys(facts())).not.toContain('fallbackApproverEmployeeId');
+      expect(JSON.stringify(everyCase.map(routeNeedStep))).not.toMatch(/FALLBACK/);
     });
   });
 });

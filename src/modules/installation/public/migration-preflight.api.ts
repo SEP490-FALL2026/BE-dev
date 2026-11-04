@@ -4,6 +4,7 @@ import {
   historyOf,
   judgeContractGates,
   judgeConversion,
+  judgeDirectRoles,
   withContractGates,
 } from '../migration-preflight/migration-preflight-judgement.policy';
 import { MigrationPreflightRepo } from '../migration-preflight/migration-preflight.repo';
@@ -46,8 +47,9 @@ export class MigrationPreflightApi {
       const conversion = await this.conversion(tx, history);
       // The gates read the schema as it is, whatever the history: they probe before they name an object.
       const gates = judgeContractGates(await this.repo.contractGateFacts(tx));
+      const roles = judgeDirectRoles(await this.repo.directRoleFacts(tx));
 
-      return withContractGates(conversion, gates);
+      return withContractGates(conversion, { ...gates, blockers: [...gates.blockers, ...roles] });
     });
   }
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SpendEntryService } from '../spend/spend-entry.service';
 import {
   AccessRequestNoDepartmentError,
@@ -36,7 +36,6 @@ export interface GroupBody {
   lines: readonly GroupLineInput[];
   businessReason: string;
   termMonths: number;
-  projectLabel?: string;
   expectedSpendOn?: string;
   termConfirmation?: { reason: string };
 }
@@ -63,7 +62,7 @@ export class GroupRequestService {
     private readonly runner: TransactionRunner,
     private readonly facts: GroupSubmissionFactsService,
     private readonly assessment: RequestFactsService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly requests: AccessRequestRepo,
     private readonly entry: SpendEntryService,
     private readonly drafts: RequestDraftRepo,
@@ -76,6 +75,7 @@ export class GroupRequestService {
 
     return this.runner.run(async (tx) => {
       await this.requireSender(tx, actor);
+      await this.facts.requireEligibleSender(tx, actor.employeeId, { lock: false });
       const judged = await this.facts.judge(tx, this.input(actor, body, settings, false));
       const refused = new Map(judged.refused.map((line) => [line.employeeId, line.reason]));
 
@@ -95,7 +95,8 @@ export class GroupRequestService {
   }
 
   /**
-   * Throws AccessRequestSuperAdminCannotRequestError, GroupRequestPlanNotEligibleError, GroupRequestTooManyLinesError,
+   * Throws AccessRequestSuperAdminCannotRequestError, RequestPartyIneligibleError (the sender; a line is a reason of its line),
+   * GroupRequestPlanNotEligibleError, GroupRequestTooManyLinesError,
    * GroupRequestDuplicateLineError, GroupRequestLinesRefusedError, GroupRequestTermConfirmationRequiredError,
    * AccessRequestNoDepartmentError and the errors of assessing a plan. A draft (draftId) is the request being sent: it is locked first,
    * judged again under the lock, and its row becomes the request; AccessRequestNotFoundError and AccessRequestNotDraftError.
@@ -115,6 +116,7 @@ export class GroupRequestService {
         if (verdict === 'NOT_DRAFT') throw new AccessRequestNotDraftError();
       }
       const organizationId = await this.requireSender(tx, actor);
+      await this.facts.requireEligibleSender(tx, actor.employeeId, { lock: true });
       const judged = await this.facts.judge(tx, this.input(actor, body, settings, true));
       this.refuse(judged, body);
 
@@ -157,8 +159,8 @@ export class GroupRequestService {
 
   /** The sender is relied on until commit: they cannot be removed from the company between the check and the write. */
   private async requireSender(tx: DbTx, actor: AuthenticatedPrincipal): Promise<string> {
-    await this.organization.lockEmployeeForShare(tx, actor.employeeId);
-    const employee = await this.organization.getEmployee(actor.employeeId, tx);
+    await this.organizationReads.lockEmployeeForShare(tx, actor.employeeId);
+    const employee = await this.organizationReads.getEmployee(actor.employeeId, tx);
     if (!employee) throw new AccessRequestNoDepartmentError();
 
     return employee.organizationId;

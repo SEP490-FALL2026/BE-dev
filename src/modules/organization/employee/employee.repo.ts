@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { normalizeDisplayName } from '../../../core/display-name';
 import { normalizeEmail } from '../../../core/email';
+import { escapeLikePattern } from '../../../core/search-key';
+import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
@@ -52,9 +54,12 @@ function toEmployeeRecord(row: {
   };
 }
 
-/** Escapes LIKE metacharacters so a search term matches literally (backslash is PostgreSQL's default escape). */
-function escapeLikePattern(term: string): string {
-  return term.replace(/[\\%_]/g, (character) => `\\${character}`);
+/**
+ * The single predicate for an employee having no placements (D-S25).
+ * Kept here so both candidate search and the employee directory evaluate the same SQL condition.
+ */
+export function unplacedEmployeeSql(employeeIdColumn = 'e.id'): Prisma.Sql {
+  return Prisma.sql`NOT EXISTS (SELECT 1 FROM employee_placements any_p WHERE any_p.employee_id = ${Prisma.raw(employeeIdColumn)})`;
 }
 
 /** Employees and their placements: the one writer of both tables, the employee locks and every employee read. */
@@ -110,14 +115,15 @@ export class EmployeeRepo {
         },
         select: { id: true },
       });
-      await tx.employeePlacement.create({
-        data: {
-          organizationId: input.organizationId,
-          employeeId: employee.id,
-          departmentId: input.departmentId,
-          validFrom: toDateColumn(input.memberSince ?? input.hireDate),
-        },
-      });
+      if (input.departmentId !== null)
+        await tx.employeePlacement.create({
+          data: {
+            organizationId: input.organizationId,
+            employeeId: employee.id,
+            departmentId: input.departmentId,
+            validFrom: toDateColumn(input.memberSince ?? input.hireDate),
+          },
+        });
 
       return employee;
     } catch (error) {
@@ -152,6 +158,88 @@ export class EmployeeRepo {
       if (isCheckViolation(error, 'on every open seat')) throw new EmployeeOpenSeatNeedsEndError();
       throw error;
     }
+  }
+
+  async unplacedAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    const rows = await (tx ?? this.prisma).employee.findMany({
+      where: { id: { in: [...employeeIds] }, placements: { none: {} } },
+      select: { id: true },
+    });
+    return new Set(rows.map((row) => row.id));
+  }
+
+  async insertFirstPlacement(
+    tx: DbTx,
+    input: { organizationId: string; employeeId: string; departmentId: string; effectiveFrom: BusinessDate },
+  ): Promise<void> {
+    await tx.employeePlacement.create({
+      data: {
+        organizationId: input.organizationId,
+        employeeId: input.employeeId,
+        departmentId: input.departmentId,
+        validFrom: toDateColumn(input.effectiveFrom),
+      },
+    });
+  }
+
+  async scheduledFirstPlacement(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ placementId: string; departmentId: string; validFrom: BusinessDate } | null> {
+    const client = tx ?? this.prisma;
+    const existing = await client.employeePlacement.findFirst({
+      where: {
+        employeeId,
+        validFrom: { lte: toDateColumn(onDate) },
+      },
+      select: { id: true },
+    });
+    if (existing) return null;
+
+    const future = await client.employeePlacement.findFirst({
+      where: {
+        employeeId,
+        validFrom: { gt: toDateColumn(onDate) },
+      },
+      orderBy: { validFrom: 'asc' },
+      select: { id: true, departmentId: true, validFrom: true },
+    });
+    if (!future) return null;
+
+    return {
+      placementId: future.id,
+      departmentId: future.departmentId,
+      validFrom: fromDateColumn(future.validFrom),
+    };
+  }
+
+  async cancelScheduledFirstPlacement(tx: DbTx, placementId: string): Promise<void> {
+    await tx.employeePlacement.delete({
+      where: { id: placementId },
+    });
+  }
+
+  async restoreFirstPlacement(
+    tx: DbTx,
+    input: {
+      placementId: string;
+      organizationId: string;
+      employeeId: string;
+      departmentId: string;
+      validFrom: BusinessDate;
+    },
+  ): Promise<void> {
+    await tx.employeePlacement.create({
+      data: {
+        id: input.placementId,
+        organizationId: input.organizationId,
+        employeeId: input.employeeId,
+        departmentId: input.departmentId,
+        validFrom: toDateColumn(input.validFrom),
+        validTo: null,
+      },
+    });
   }
 
   /** Locks the employee row so its status cannot change until commit. */
@@ -318,9 +406,16 @@ export class EmployeeRepo {
     const pattern = term ? `%${escapeLikePattern(term)}%` : null;
     const day = fromDateColumn(onDate);
     const rows = await this.prisma.$queryRaw<
-      { id: string; employee_code: string; full_name: string; work_email: string | null; department: string | null }[]
+      {
+        id: string;
+        employee_code: string;
+        full_name: string;
+        work_email: string | null;
+        department: string | null;
+        unplaced: boolean;
+      }[]
     >`
-      SELECT e.id, e.employee_code, e.full_name, e.work_email, placement.department
+      SELECT e.id, e.employee_code, e.full_name, e.work_email, placement.department, ${unplacedEmployeeSql('e.id')} AS unplaced
         FROM employees e
         LEFT JOIN LATERAL (
           SELECT d.name AS department
@@ -347,6 +442,7 @@ export class EmployeeRepo {
       fullName: row.full_name,
       workEmail: row.work_email,
       department: row.department,
+      unplaced: row.unplaced,
     }));
   }
 
@@ -359,6 +455,7 @@ export class EmployeeRepo {
         employeeCode: true,
         fullName: true,
         jobTitle: true,
+        _count: { select: { placements: true } },
         placements: {
           where: { validFrom: { lte: onDate }, OR: [{ validTo: null }, { validTo: { gt: onDate } }] },
           select: { department: { select: { code: true, name: true } } },
@@ -374,6 +471,7 @@ export class EmployeeRepo {
       employeeCode: employee.employeeCode,
       fullName: employee.fullName,
       department: placement?.department ?? null,
+      unplaced: employee._count.placements === 0,
       jobTitle: employee.jobTitle,
     };
   }

@@ -31,7 +31,7 @@ export interface OffboardingRecord {
   id: string;
   organizationId: string;
   employeeId: string;
-  departmentId: string;
+  departmentId: string | null;
   state: OffboardingState;
   abrupt: boolean;
   priorWorkState: PriorWorkState;
@@ -41,6 +41,9 @@ export interface OffboardingRecord {
   grounds: Grounds;
   headHandover: HeadHandoverFacts | null;
   placementClosedId: string | null;
+  cancelledPlacementId: string | null;
+  cancelledPlacementDepartmentId: string | null;
+  cancelledPlacementFrom: BusinessDate | null;
   leftOn: BusinessDate | null;
   leftAt: Date | null;
   leftByAppUserId: string | null;

@@ -2,19 +2,18 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import type { ApprovalRoleHolders } from '../../identity-access/public/identity-access.types';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RoutingFactsService } from '../access-request/routing-facts.service';
 import { routeNeedStep } from '../access-request/routing.policy';
 import { routeFinanceReview, routeSpendStep } from './spend-routing.policy';
 import type { StepTarget } from './reassignment.policy';
 import type { ReassignableRequest, ReassignableStep } from './step-reassignment.repo';
 
-/** What the tables read on one day, once for a pass over many requests: the roles whose holders can act today. */
+/** What the tables read on one day, once for a pass over many requests: the spending approver who can act today. */
 export interface TodayFacts {
   today: BusinessDate;
-  /** The holders of the three approval roles who still work: a role whose holder has left is held by nobody. */
-  roles: ApprovalRoleHolders;
+  /** The spending approver when they still work: a role whose holder has left is held by nobody. */
+  spendingApproverEmployeeId: string | null;
   /** Finance on an account that can act now, or null. */
   financeEmployeeId: string | null;
 }
@@ -29,37 +28,27 @@ export interface TodayFacts {
 @Injectable()
 export class StepTargetService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly routing: RoutingFactsService,
   ) {}
 
-  /** Who holds the three approval roles now, leaving out whoever has left the company. */
-  async usableApprovalRoleHolders(tx: DbTx): Promise<ApprovalRoleHolders> {
-    const holders = await this.identity.getApprovalRoleHolders(tx);
-    const named = [
-      holders.spendingApproverEmployeeId,
-      holders.conflictSubstituteEmployeeId,
-      holders.fallbackApproverEmployeeId,
-    ].filter((id): id is string => id !== null);
-    const working = new Set(
-      (named.length === 0 ? [] : await this.organization.getEmployees(named, tx))
-        .filter((employee) => employee.status === 'ACTIVE')
-        .map((employee) => employee.id),
-    );
-    const whoCanAct = (id: string | null): string | null => (id !== null && working.has(id) ? id : null);
+  /**
+   * The spending approver now, leaving out one who has left the company. With `forShare` the row of the grant is locked until the
+   * transaction ends, which a step that is being opened asks for (`M6`).
+   */
+  async usableSpendingApproverEmployeeId(tx: DbTx, options?: { forShare?: boolean }): Promise<string | null> {
+    const holder = await this.identity.getSpendingApproverEmployeeId(tx, options);
+    if (holder === null) return null;
+    const [found] = await this.organizationReads.getEmployees([holder], tx);
 
-    return {
-      spendingApproverEmployeeId: whoCanAct(holders.spendingApproverEmployeeId),
-      conflictSubstituteEmployeeId: whoCanAct(holders.conflictSubstituteEmployeeId),
-      fallbackApproverEmployeeId: whoCanAct(holders.fallbackApproverEmployeeId),
-    };
+    return found?.status === 'ACTIVE' ? holder : null;
   }
 
   async gatherToday(tx: DbTx, now: Date): Promise<TodayFacts> {
     return {
-      today: await this.organization.businessToday(now, tx),
-      roles: await this.usableApprovalRoleHolders(tx),
+      today: await this.organizationReads.businessToday(now, tx),
+      spendingApproverEmployeeId: await this.usableSpendingApproverEmployeeId(tx),
       financeEmployeeId: await this.identity.findUsableFinanceEmployeeId(tx),
     };
   }
@@ -96,10 +85,7 @@ export class StepTargetService {
           : { assigneeEmployeeId: null, reason: decision.reason };
       }
       case 'SPEND_APPROVAL': {
-        const assignment = routeSpendStep(people, {
-          spendingApproverEmployeeId: facts.roles.spendingApproverEmployeeId,
-          conflictSubstituteEmployeeId: facts.roles.conflictSubstituteEmployeeId,
-        });
+        const assignment = routeSpendStep(people, facts.spendingApproverEmployeeId);
 
         return assignment.outcome === 'ASSIGNED'
           ? { assigneeEmployeeId: assignment.assigneeEmployeeId, routingRow: null }
@@ -114,7 +100,7 @@ export class StepTargetService {
           : { assigneeEmployeeId: null, reason: 'NO_FINANCE_REVIEWER' };
       }
       case 'IT_ASSESSMENT': {
-        const inCharge = await this.organization.getItAdminInCharge(request.requesterEmployeeId, facts.today, tx);
+        const inCharge = await this.organizationReads.getItAdminInCharge(request.requesterEmployeeId, facts.today, tx);
 
         return inCharge?.itAdminEmployeeId
           ? { assigneeEmployeeId: inCharge.itAdminEmployeeId, routingRow: null }
@@ -130,7 +116,7 @@ export class StepTargetService {
    */
   private async needDepartment(tx: DbTx, request: ReassignableRequest, today: BusinessDate): Promise<string> {
     if (request.type === 'SERVICE_ACCOUNT' || request.branch !== 'INTERNAL_FREE') return request.departmentId;
-    const placement = await this.organization.getEmployeePlacement(request.requesterEmployeeId, today, tx);
+    const placement = await this.organizationReads.getEmployeePlacement(request.requesterEmployeeId, today, tx);
 
     return placement?.departmentId ?? request.departmentId;
   }

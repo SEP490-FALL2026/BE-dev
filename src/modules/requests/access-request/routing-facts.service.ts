@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { RoutingFacts } from './routing.policy';
 
 /** What the routing table reads about the department and the approval roles on the day a request is sent. */
@@ -13,14 +13,14 @@ export interface GatheredRouting {
 }
 
 /**
- * Reads who heads the department and who holds the approval roles from the organization and identity-access facades,
+ * Reads who heads the department and who holds the spending approver role from the organization and identity-access facades,
  * and leaves out anyone who has left the company: a person who has left holds no step. Nobody is given a step by this
  * class; the routing table decides (`routing.policy.ts`).
  */
 @Injectable()
 export class RoutingFactsService {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
   ) {}
 
@@ -28,14 +28,12 @@ export class RoutingFactsService {
     tx: DbTx,
     input: { requesterEmployeeId: string; departmentId: string; today: BusinessDate; chainHasSpendStep: boolean },
   ): Promise<GatheredRouting> {
-    const heads = await this.organization.getDepartmentHeads([input.departmentId], input.today, tx);
+    const heads = await this.organizationReads.getDepartmentHeads([input.departmentId], input.today, tx);
     const head = heads.get(input.departmentId)?.employeeId ?? null;
-    const roles = await this.identity.getApprovalRoleHolders(tx);
-    const people = [head, roles.spendingApproverEmployeeId, roles.fallbackApproverEmployeeId].filter(
-      (id): id is string => id !== null,
-    );
+    const spendingApprover = await this.identity.getSpendingApproverEmployeeId(tx);
+    const people = [head, spendingApprover].filter((id): id is string => id !== null);
     const working = new Set(
-      (await this.organization.getEmployees(people, tx)).filter((e) => e.status === 'ACTIVE').map((e) => e.id),
+      (await this.organizationReads.getEmployees(people, tx)).filter((e) => e.status === 'ACTIVE').map((e) => e.id),
     );
     const whoCanAct = (id: string | null): string | null => (id !== null && working.has(id) ? id : null);
 
@@ -44,8 +42,7 @@ export class RoutingFactsService {
       facts: {
         requesterEmployeeId: input.requesterEmployeeId,
         departmentHeadEmployeeId: whoCanAct(head),
-        spendingApproverEmployeeId: whoCanAct(roles.spendingApproverEmployeeId),
-        fallbackApproverEmployeeId: whoCanAct(roles.fallbackApproverEmployeeId),
+        spendingApproverEmployeeId: whoCanAct(spendingApprover),
         chainHasSpendStep: input.chainHasSpendStep,
       },
     };

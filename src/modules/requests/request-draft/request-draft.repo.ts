@@ -3,6 +3,7 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AccessRequestBranchCode } from '../access-request/access-request.policy';
+import { draftPolicyJson, type DraftPolicy } from './request-draft-policy.json';
 import { draftVerdict, type DraftVerdict } from './request-draft.policy';
 
 /** A request being drafted as the draft operations read it. */
@@ -29,9 +30,8 @@ export interface NewDraft {
   departmentId: string;
   businessReason: string;
   termMonths: number;
-  projectLabel: string | null;
   /** The content the draft is sent from (`policy.draft`). */
-  content: Prisma.InputJsonObject;
+  content: DraftPolicy['draft'];
   createdByAppUserId: string;
 }
 
@@ -86,8 +86,7 @@ export class RequestDraftRepo {
         costCenterId: null,
         businessReason: input.businessReason,
         termMonths: input.termMonths,
-        projectLabel: input.projectLabel,
-        policy: { draft: input.content },
+        policy: draftPolicyJson.encode({ draft: input.content }),
         createdByAppUserId: input.createdByAppUserId,
         submittedAt: null,
       },

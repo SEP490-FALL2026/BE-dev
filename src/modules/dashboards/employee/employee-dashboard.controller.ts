@@ -26,7 +26,7 @@ export class EmployeeDashboardController {
   @ApiSuccessResponse(EmployeeDashboardResponseDto, {
     message: 'DASHBOARD.EMPLOYEE_RETRIEVED',
     description:
-      'The sections of the overview of the signed-in Employee on the business day (asOf), about the caller only: the software rights held (K4 included) and those about to end within seven days, counted as the list of my software rights shows them; the SaaS error reports the caller sent that are still open; and the requests of the caller, which say they are not available yet instead of a number. No cost, seat count or data of another person is answered. Each section names the operation that lists its rows.',
+      'The sections of the overview of the signed-in Employee on the business day (asOf), about the caller only: the software rights held (K4 included) and those about to end within seven days, counted as the list of my software rights shows them; the SaaS error reports the caller sent that are still open; and the requests the caller sent that are not over, counted as meAccessRequestList with view=open counts them (a Super Admin sends none, so that section says it is not available, NO_DATA_SOURCE, instead of a number). No cost, seat count or data of another person is answered. Each section names the operation that lists its rows.',
   })
   @ApiErrorResponses(UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE, {
     status: HttpStatus.FORBIDDEN,

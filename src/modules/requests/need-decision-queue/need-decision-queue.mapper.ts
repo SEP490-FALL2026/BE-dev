@@ -1,9 +1,9 @@
 import { formatAmount } from '../../../core/money/money';
 import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { DepartmentBrief } from '../../organization/public/organization.types';
-import type { RequestPolicy } from '../access-request/access-request.policy';
+import { requestPolicyJson } from '../access-request/access-request.json';
 import { deciderRoleOf } from '../access-request/need-decision.policy';
-import type { EmployeeWire } from '../spend/spend-read.service';
+import type { EmployeeWire } from '../spend/spend-wire-view.service';
 import type { NeedQueueItemWire } from './need-decision-queue.dto';
 import { planLineRequiredOf, reasonExcerptOf, termConfirmationRequiredOf } from './need-decision-queue.policy';
 import type { NeedQueueRow } from './need-decision-queue.repo';
@@ -73,7 +73,7 @@ export function needQueueItemOf(row: NeedQueueRow, lookups: NeedQueueLookups): N
     termMonths: request.termMonths,
     termConfirmationRequired: termConfirmationRequiredOf(request),
     pricing: pricingOf(request, lookups.units),
-    planLineRequired: planLineRequiredOf(deciderRole, request.policy as unknown as RequestPolicy),
+    planLineRequired: planLineRequiredOf(deciderRole, requestPolicyJson.decode(request.policy)),
     samePersonAsSpend: row.samePersonAsSpend,
   };
 }

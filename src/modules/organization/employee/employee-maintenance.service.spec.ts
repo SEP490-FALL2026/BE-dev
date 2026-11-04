@@ -1,12 +1,11 @@
 import { Test } from '@nestjs/testing';
-import { HR_BASIS } from '../../../../test/support/hr-basis';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { EmployeeNotFoundError } from '../public/organization.errors';
 import { OrganizationContextService } from '../organization-context.service';
-import { EmployeeDirectoryService } from './employee-directory.service';
+import { EmployeeRecordService } from './employee-record.service';
 import type { EmployeeRecord } from '../public/organization.types';
 import {
   EmployeeForbiddenError,
@@ -28,7 +27,6 @@ describe('EmployeeMaintenanceService', () => {
     sessionId: 'session-1',
     employeeId: 'emp-sa',
     directRoles: ['SUPER_ADMIN'],
-    derivedRoles: [],
     roles: ['SUPER_ADMIN'],
   };
   const itAdmin: AuthenticatedPrincipal = { ...superAdmin, directRoles: ['IT_ADMIN'], roles: ['IT_ADMIN'] };
@@ -76,7 +74,7 @@ describe('EmployeeMaintenanceService', () => {
           useValue: { businessToday: organization.businessToday, findOrganization: organization.getOrganization },
         },
         {
-          provide: EmployeeDirectoryService,
+          provide: EmployeeRecordService,
           useValue: {
             lock: (tx: unknown, id: string) => organization.lockEmployeeForUpdate(tx, id) as Promise<void>,
             find: organization.getEmployee,
@@ -128,7 +126,7 @@ describe('EmployeeMaintenanceService', () => {
   });
 
   it('refuses a caller who is not the Super Admin before reading or writing anything (F13)', async () => {
-    await expect((await service()).update(itAdmin, 'emp-1', { fullName: 'Other', hrBasis: HR_BASIS })).rejects.toThrow(
+    await expect((await service()).update(itAdmin, 'emp-1', { fullName: 'Other' })).rejects.toThrow(
       EmployeeForbiddenError,
     );
 
@@ -137,9 +135,9 @@ describe('EmployeeMaintenanceService', () => {
   });
 
   it('refuses the Super Admin their own record with the self-change refusal, and writes, audits and tells nobody (F11)', async () => {
-    await expect(
-      (await service()).update(superAdmin, 'emp-sa', { jobTitle: 'Chief', hrBasis: HR_BASIS }),
-    ).rejects.toThrow(EmployeeSelfChangeForbiddenError);
+    await expect((await service()).update(superAdmin, 'emp-sa', { jobTitle: 'Chief' })).rejects.toThrow(
+      EmployeeSelfChangeForbiddenError,
+    );
 
     expect(runner.run).not.toHaveBeenCalled();
     expect(organization.updateEmployeeOfficialFields).not.toHaveBeenCalled();
@@ -150,22 +148,18 @@ describe('EmployeeMaintenanceService', () => {
   it('judges the role before whose record it is: an IT Admin on their own record is refused as forbidden, not as a self change', async () => {
     const onOwnRecord = { ...itAdmin, employeeId: 'emp-1' };
 
-    await expect((await service()).update(onOwnRecord, 'emp-1', { jobTitle: 'x', hrBasis: HR_BASIS })).rejects.toThrow(
+    await expect((await service()).update(onOwnRecord, 'emp-1', { jobTitle: 'x' })).rejects.toThrow(
       EmployeeForbiddenError,
     );
   });
 
   it('refuses a body that names no official field', async () => {
-    await expect((await service()).update(superAdmin, 'emp-1', { hrBasis: HR_BASIS })).rejects.toThrow(
-      EmployeeUpdateEmptyError,
-    );
+    await expect((await service()).update(superAdmin, 'emp-1', {})).rejects.toThrow(EmployeeUpdateEmptyError);
     expect(runner.run).not.toHaveBeenCalled();
   });
 
-  it('writes the job title in its display form, audits it with the HR basis and tells the person and the head after it, in one transaction', async () => {
-    const view = await (
-      await service()
-    ).update(superAdmin, 'emp-1', { jobTitle: '  Senior   Designer\t', hrBasis: HR_BASIS });
+  it('writes the job title in its display form, audits it with no HR basis and tells the person and the head after it, in one transaction', async () => {
+    const view = await (await service()).update(superAdmin, 'emp-1', { jobTitle: '  Senior   Designer\t' });
 
     expect(calls).toEqual(['begin', 'lock employee', 'write', 'audit', 'notice', 'notice', 'commit']);
     expect(organization.updateEmployeeOfficialFields).toHaveBeenCalledWith(tx, 'emp-1', {
@@ -180,7 +174,7 @@ describe('EmployeeMaintenanceService', () => {
       resourceType: 'Employee',
       resourceId: 'emp-1',
       before: { employeeCode: 'E-1', jobTitle: 'Developer' },
-      after: { jobTitle: 'Senior Designer', hrBasis: HR_BASIS },
+      after: { jobTitle: 'Senior Designer' },
       correlationId: 'session-1',
     });
     expect(organization.getProfileNotices).toHaveBeenCalledWith(tx, {
@@ -197,7 +191,7 @@ describe('EmployeeMaintenanceService', () => {
       calls = [];
       organization.updateEmployeeOfficialFields.mockClear();
 
-      const view = await (await service()).update(superAdmin, 'emp-1', { jobTitle, hrBasis: HR_BASIS });
+      const view = await (await service()).update(superAdmin, 'emp-1', { jobTitle });
 
       expect(organization.updateEmployeeOfficialFields).toHaveBeenCalledWith(tx, 'emp-1', { jobTitle: null });
       expect(view.jobTitle).toBeNull();
@@ -205,7 +199,7 @@ describe('EmployeeMaintenanceService', () => {
   });
 
   it('refuses a title that is too long as a bad row, and writes, audits and tells nobody', async () => {
-    const refused = (await service()).update(superAdmin, 'emp-1', { jobTitle: 'x'.repeat(256), hrBasis: HR_BASIS });
+    const refused = (await service()).update(superAdmin, 'emp-1', { jobTitle: 'x'.repeat(256) });
 
     await expect(refused).rejects.toBeInstanceOf(EmployeeRowInvalidError);
     await expect(refused).rejects.toMatchObject({ reasons: [{ field: 'jobTitle', code: 'JOB_TITLE_TOO_LONG' }] });
@@ -215,9 +209,7 @@ describe('EmployeeMaintenanceService', () => {
   });
 
   it('writes, audits and tells nobody when nothing it was given differs from the record', async () => {
-    const view = await (
-      await service()
-    ).update(superAdmin, 'emp-1', { fullName: 'An Nguyen', jobTitle: 'Developer', hrBasis: HR_BASIS });
+    const view = await (await service()).update(superAdmin, 'emp-1', { fullName: 'An Nguyen', jobTitle: 'Developer' });
 
     expect(calls).toEqual(['begin', 'lock employee', 'commit']);
     expect(view).toMatchObject({ fullName: 'An Nguyen', jobTitle: 'Developer' });
@@ -227,9 +219,9 @@ describe('EmployeeMaintenanceService', () => {
   it('answers a record that does not exist with the not-found refusal', async () => {
     organization.getEmployee.mockResolvedValue(null);
 
-    await expect(
-      (await service()).update(superAdmin, 'emp-x', { fullName: 'Other', hrBasis: HR_BASIS }),
-    ).rejects.toThrow(EmployeeNotFoundError);
+    await expect((await service()).update(superAdmin, 'emp-x', { fullName: 'Other' })).rejects.toThrow(
+      EmployeeNotFoundError,
+    );
     expect(audit.record).not.toHaveBeenCalled();
   });
 });

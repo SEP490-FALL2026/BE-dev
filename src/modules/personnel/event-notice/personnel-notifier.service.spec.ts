@@ -2,7 +2,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { NotificationsApi } from '../../notifications/public/notifications.api';
 import type { InAppNotificationInput } from '../../notifications/public/notifications.types';
-import type { OrganizationApi } from '../../organization/public/organization.api';
+import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelNotifier } from './personnel-notifier.service';
 
 const TX = {} as DbTx;
@@ -37,7 +37,7 @@ function notifierOf(world: World = {}) {
         new Map(ids.flatMap((id) => (world.heads?.[id] ? [[id, { employeeId: world.heads[id] }] as const] : []))),
       ),
     getItAdminInCharge: () => Promise.resolve({ departmentId: 'd1', itAdminEmployeeId: world.itAdminInCharge ?? null }),
-  } as unknown as OrganizationApi;
+  } as unknown as OrganizationReadApi;
   const identity = {
     getSuperAdminHolder: () => Promise.resolve(world.superAdmin ? { employeeId: world.superAdmin } : null),
     findFirstUsableItAdminEmployeeId: () => Promise.resolve(world.firstUsableItAdmin ?? null),

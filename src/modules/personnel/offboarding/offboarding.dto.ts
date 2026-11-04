@@ -132,7 +132,10 @@ const warningsSchema = z.strictObject({
 });
 
 export const offboardingDetailSchema = offboardingSummarySchema.extend({
-  department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
+  /** Null for a person who had no placement in force when the departure was recorded (unplaced, `QĐ-93g`(5)). */
+  department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
+  /** Only on the answer to the cancellation of a case that had cancelled a first placement: whether it was put back. */
+  firstPlacementRestored: z.boolean().optional(),
   priorWorkState: z.enum(['WORKING', 'ON_LONG_LEAVE']),
   departureEffectiveOn: z.string(),
   /** The basis of the departure. Null in the minimal projection an IT Admin reads. */

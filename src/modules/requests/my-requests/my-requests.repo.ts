@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import type { RequestPolicy } from '../access-request/access-request.policy';
+import { requestPolicyJson } from '../access-request/access-request.json';
 import { hasSpendStep } from '../access-request/access-request.policy';
-import type { NeedStepState } from '../access-request/access-request.types';
-import type { WaitingReason } from '../access-request/routing.policy';
+import type { NeedStepState, ReadableNeedWaitingReason } from '../access-request/access-request.types';
 import { needStepOf } from './my-requests.policy';
 import type { MyRequestFilter, MyRequestRow, SentState } from './my-requests.types';
 
@@ -49,14 +48,14 @@ function toRow(row: Row): MyRequestRow {
     termMonths: row.termMonths,
     submittedAt: row.submittedAt,
     updatedAt: row.updatedAt,
-    hasSpendStep: hasSpendStep(row.policy as unknown as RequestPolicy),
+    hasSpendStep: hasSpendStep(requestPolicyJson.decode(row.policy)),
     beneficiaryEmployeeId: isGroup ? null : (row.beneficiaries[0]?.employeeId ?? null),
     lineCount: row._count.beneficiaries,
     needStepId: step.id,
     needStep: {
       state: step.state as NeedStepState,
       assigneeEmployeeId: step.assigneeEmployeeId,
-      waitingReason: step.waitingReason as WaitingReason | null,
+      waitingReason: step.waitingReason as ReadableNeedWaitingReason | null,
     },
     withdrawal: row.withdrawalRequestedAt === null ? null : { withdrawnAt: row.withdrawnAt },
   };
@@ -91,6 +90,11 @@ export class MyRequestsRepo {
     return { rows: rows.map(toRow), total };
   }
 
+  /** The count of the requests the person sent for the same filter. */
+  async countOf(filter: Omit<MyRequestFilter, 'skip' | 'take'>): Promise<number> {
+    return this.prisma.accessRequest.count({ where: whereOf(filter) });
+  }
+
   /** What the person who proposed software that is not in the catalog called it, by request. */
   async proposalNames(requestIds: readonly string[]): Promise<Map<string, string>> {
     if (requestIds.length === 0) return new Map();
@@ -103,7 +107,7 @@ export class MyRequestsRepo {
   }
 }
 
-function whereOf(filter: MyRequestFilter): Prisma.AccessRequestWhereInput {
+function whereOf(filter: Omit<MyRequestFilter, 'skip' | 'take'>): Prisma.AccessRequestWhereInput {
   const sentAt: Prisma.DateTimeNullableFilter = {
     ...(filter.from === undefined ? {} : { gte: filter.from }),
     ...(filter.to === undefined ? {} : { lt: filter.to }),

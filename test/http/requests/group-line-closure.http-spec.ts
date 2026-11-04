@@ -34,7 +34,7 @@ describe('removing a person who left from a request for a group (e2e, no databas
   ])('refuses %s with 403', async (_name, direct, derived) => {
     const response = await request(app.getHttpServer())
       .post(URL)
-      .set('Authorization', bearer(principal(direct, derived)))
+      .set('Authorization', bearer(principal([...direct, ...derived])))
       .send({ cause: 'BENEFICIARY_LEFT' })
       .expect(403);
 

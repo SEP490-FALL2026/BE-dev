@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type {
+  EmployeeAccountDetail,
+  EmployeeAccountSummary,
+} from '../../organization/public/organization.extension-points';
 import {
   AccountListFilter,
   AccountRecord,
@@ -90,6 +94,18 @@ export class AppUserRepo {
     return rows.length === 1;
   }
 
+  /**
+   * Takes the row lock `FOR SHARE` of the accounts of these people, in the order of their ids (so two callers never wait on each
+   * other), and returns the ids of the accounts it locked. A person with no account locks nothing. Read state in a statement of its own.
+   */
+  async lockAppUsersOfEmployees(tx: DbTx, employeeIds: readonly string[]): Promise<string[]> {
+    if (employeeIds.length === 0) return [];
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM app_users WHERE employee_id = ANY(${[...employeeIds]}::uuid[]) ORDER BY id FOR SHARE`;
+
+    return rows.map((row) => row.id);
+  }
+
   async readAccount(tx: DbTx, appUserId: string): Promise<AccountSnapshot | null> {
     const row = await tx.appUser.findUnique({ where: { id: appUserId }, select: ACCOUNT_SELECT });
 
@@ -111,6 +127,58 @@ export class AppUserRepo {
     const rows = await this.prisma.appUser.findMany({ select: { employeeId: true } });
 
     return rows.map((row) => row.employeeId);
+  }
+
+  /** Summarizes accounts for given employee IDs in one statement, only reading app_users without roles. */
+  async summarizeAccounts(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, EmployeeAccountSummary>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).appUser.findMany({
+      where: { employeeId: { in: [...employeeIds] } },
+      select: {
+        id: true,
+        employeeId: true,
+        status: true,
+        activationState: true,
+        employeeLeftOn: true,
+      },
+    });
+    const result = new Map<string, EmployeeAccountSummary>();
+    for (const row of rows) {
+      result.set(row.employeeId, {
+        id: row.id,
+        status: row.status,
+        activationState: row.activationState,
+        employeeLeft: row.employeeLeftOn !== null,
+      });
+    }
+    return result;
+  }
+
+  /** Describes the account and its effective roles for one employee in one query, unlocked. */
+  async describeAccount(employeeId: string, tx?: DbTx): Promise<EmployeeAccountDetail | null> {
+    const user = await (tx ?? this.prisma).appUser.findUnique({
+      where: { employeeId },
+      select: {
+        id: true,
+        status: true,
+        activationState: true,
+        employeeLeftOn: true,
+        roleGrants: {
+          where: { revokedAt: null },
+          select: { role: true },
+          orderBy: { role: 'asc' },
+        },
+      },
+    });
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      status: user.status,
+      activationState: user.activationState,
+      employeeLeft: user.employeeLeftOn !== null,
+      roles: user.roleGrants.map((rg) => rg.role),
+    };
   }
 
   /** How many accounts are in each status and activation state (states with none are absent). */
@@ -253,6 +321,7 @@ export class AppUserRepo {
 
   async listAccountRecords(filter: AccountListFilter): Promise<{ items: AccountRecord[]; total: number }> {
     const where = {
+      ...(filter.employeeIds === undefined ? {} : { employeeId: { in: filter.employeeIds } }),
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.activationState ? { activationState: filter.activationState } : {}),
       ...(filter.role ? { roleGrants: { some: { role: filter.role, revokedAt: null } } } : {}),

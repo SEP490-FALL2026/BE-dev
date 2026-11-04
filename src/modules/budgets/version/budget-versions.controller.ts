@@ -44,7 +44,7 @@ const FINANCE_ONLY = {
   description: FINANCE_ONLY_DESCRIPTION,
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
-/** The reading routes have no role guard: the service lets Finance, the spending approver and the substitute read. */
+/** The reading routes have no role guard: the service lets Finance and the spending approver read. */
 const READERS_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: VERSION_READERS_DESCRIPTION,
@@ -324,7 +324,7 @@ export class BudgetVersionsController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'The caller is not the spending approver (BUDGET.NOT_SPENDING_APPROVER) or built or sent the version (BUDGET.OWN_VERSION).',
+        'The caller is not the spending approver (BUDGET.NOT_SPENDING_APPROVER), is the spending approver who sent the proposal behind the version, which nobody then decides (BUDGET.CONFLICT_OF_INTEREST), or built or sent the version (BUDGET.OWN_VERSION).',
       examples: [EXAMPLES.NOT_SPENDING_APPROVER, EXAMPLES.CONFLICT_OF_INTEREST, EXAMPLES.OWN_VERSION],
     },
     NOT_FOUND,

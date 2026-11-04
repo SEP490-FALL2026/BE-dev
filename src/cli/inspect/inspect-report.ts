@@ -40,11 +40,10 @@ function recordLines({ bootstrapRecords, changeAnnouncements, superAdmin }: Inst
 }
 
 /** The counts: accounts by state, roles, and the departments without a head or a usable IT Admin. */
-function countLines({ accounts, directRoles, approvalRoles, departments }: InstallationInspection): string[] {
+function countLines({ accounts, directRoles, departments }: InstallationInspection): string[] {
   return [
     `Accounts: ${accounts?.total} (${counts(accounts?.byState ?? {})})`,
     `Direct roles: ${counts(directRoles ?? {})}`,
-    `Approval roles: ${counts(approvalRoles ?? {})}`,
     `Departments: ${departments?.active} active, ${departments?.withoutCurrentHead} without a current head, ` +
       `${departments?.withoutUsableItAdmin} without a usable IT Admin`,
   ];

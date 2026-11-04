@@ -43,7 +43,15 @@ Module nhỏ, chưa chia capability; mọi file ở gốc module.
 
 - Tham số: `operating-parameters.controller.ts` (`GET /operating-parameters`, `PUT /operating-parameters/{key}`,
   `GET /operating-parameters/{key}/history`) → `OperatingParametersApi`, `ParameterChangeService` (đặt giá trị); `parameter-definitions.policy.ts` (danh sách
-  tham số, miền giá trị, mặc định); `operating-parameters.repo.ts`.
+  tham số, miền giá trị, mặc định, nhãn); `operating-parameters.repo.ts`.
+- Nhãn và nhóm: mỗi định nghĩa có `label` (tiếng Việt), `group` (một trong `PARAMETER_GROUPS`, tên tiếng Việt ở
+  `GROUP_LABELS`) và `unitLabel`; shape `enum` thêm `optionLabels` (nhãn từng lựa chọn). `PARAMETER_DEFINITIONS` xếp theo
+  nhóm nên `GET /operating-parameters` trả theo thứ tự nhóm. Wire thêm `label`, `group`, `groupLabel`, `unitLabel`;
+  `constraints` là `oneOf` ba dạng (`int`, `enum` kèm `optionLabels`, `int-list`) phân biệt bằng `kind`. Số lựa chọn của
+  `enum` bị chặn bởi `ENUM_OPTIONS_MAX` (khóa registry `operatingParameterList#constraints.options`, `LD-17`).
+- `constraints` chỉ tả miền của **từng** tham số. Hai luật xuyên tham số chưa có trong `constraints`: khóa
+  `FISCAL_YEAR_START_MONTH` khi đã có phiên bản ngân sách (`ParameterLockedError`) và `INVITATION_WITHDRAW_DAYS` >
+  `INVITATION_REMINDER_DAYS` (`INCONSISTENT`); client vẫn nhận chúng dưới dạng lỗi của `PUT`.
 - Ngày không làm việc: cùng controller (`/non-working-dates*`) → `non-working-dates.service.ts`.
 - Tiền tệ báo cáo: `reporting-currency.controller.ts` (`GET`, `PUT /reporting-currency`) →
   `reporting-currency.service.ts`.

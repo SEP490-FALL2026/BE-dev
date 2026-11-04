@@ -36,7 +36,7 @@ describe('Business Owner routes (e2e, no database)', () => {
   ])('refuses %s the alert that a Business Owner has left with 403', async (_name, direct, derived) => {
     const response = await request(app.getHttpServer())
       .get('/api/v1/business-owner-warnings')
-      .set('Authorization', bearer(principal(direct, derived)))
+      .set('Authorization', bearer(principal([...direct, ...derived])))
       .expect(403);
 
     expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
@@ -49,7 +49,7 @@ describe('Business Owner routes (e2e, no database)', () => {
   ])('refuses %s the history of Business Owners with 403', async (_name, direct, derived) => {
     const response = await request(app.getHttpServer())
       .get(`/api/v1/applications/${ID}/business-owners`)
-      .set('Authorization', bearer(principal(direct, derived)))
+      .set('Authorization', bearer(principal([...direct, ...derived])))
       .expect(403);
 
     expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');

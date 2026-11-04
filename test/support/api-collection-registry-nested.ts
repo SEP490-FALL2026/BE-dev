@@ -243,45 +243,21 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
       'The warnings of the step get a proved maximum or a paginated form; the contract and the future package are not chosen here (LD-16).',
   },
   {
-    key: 'meGet#roles.direct',
+    key: 'meGet#roles',
     classification: 'bounded',
     findings: [],
     owner: 'us-01-bootstrap-login-session',
-    businessMaximum: { maxItems: 4, source: ROLE_GRANTS },
-    rationale: 'The roles granted to the caller and still in force.',
+    businessMaximum: { maxItems: 6, source: ROLE_GRANTS },
+    rationale:
+      'The roles granted to the caller and still in force (QĐ-93a: MANAGER and SPENDING_APPROVER are granted like the others).',
     removeWhen: 'Review when AppRole or the unique index changes.',
-  },
-  {
-    key: 'meGet#roles.derived',
-    classification: 'bounded',
-    findings: [],
-    owner: 'us-01-bootstrap-login-session',
-    businessMaximum: {
-      maxItems: 2,
-      source:
-        'resolveEffectiveRoles in effective-roles.policy.ts derives MANAGER and SPENDING_APPROVER, each at most once',
-    },
-    rationale: 'The roles the caller holds from data.',
-    removeWhen: 'Review when resolveEffectiveRoles derives another role.',
-  },
-  {
-    key: 'meGet#roles.effective',
-    classification: 'bounded',
-    findings: [],
-    owner: 'us-01-bootstrap-login-session',
-    businessMaximum: {
-      maxItems: 6,
-      source: `resolveEffectiveRoles in effective-roles.policy.ts: a set of the direct roles (${ROLE_GRANTS}) and the 2 derived roles`,
-    },
-    rationale: 'Direct plus derived roles: what authorization checks.',
-    removeWhen: 'Review when AppRole, the unique index or resolveEffectiveRoles changes.',
   },
   {
     key: 'appUserList#roles',
     classification: 'bounded',
     findings: [],
     owner: 'us-01-account-invitation-activation',
-    businessMaximum: { maxItems: 4, source: `${ROLE_GRANTS}; effectiveRolesFor reads the effective grants` },
+    businessMaximum: { maxItems: 6, source: `${ROLE_GRANTS}; effectiveRolesFor reads the effective grants` },
     rationale: 'The roles granted to one account.',
     removeWhen: 'Review when AppRole or the unique index changes.',
   },
@@ -290,7 +266,7 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     classification: 'bounded',
     findings: [],
     owner: 'us-01-account-invitation-activation',
-    businessMaximum: { maxItems: 4, source: `${ROLE_GRANTS}; effectiveRolesFor reads the effective grants` },
+    businessMaximum: { maxItems: 6, source: `${ROLE_GRANTS}; effectiveRolesFor reads the effective grants` },
     rationale: 'The roles granted to the account.',
     removeWhen: 'Review when AppRole or the unique index changes.',
   },
@@ -306,18 +282,6 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     },
     rationale: 'The newest grants of the account, with roleHistoryHasMore.',
     removeWhen: 'Review when ROLE_HISTORY_LIMIT changes.',
-  },
-  {
-    key: 'approvalRoleList#history',
-    classification: 'bounded',
-    findings: ['LD-14'],
-    owner: 'g2-approval-roles',
-    businessMaximum: {
-      maxItems: 20,
-      source: 'HISTORY_LIMIT in approval-role.service.ts (take of ApprovalRoleRepo.history)',
-    },
-    rationale: 'The newest holders of one approval role; historyHasMore says there are older ones (LD-14).',
-    removeWhen: 'Review when HISTORY_LIMIT changes.',
   },
   {
     key: 'departmentToolsInUse#data.summary',
@@ -356,6 +320,31 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     rationale:
       'The open Requests of the person who was transferred, information only (F29); the Request list has the rest.',
     removeWhen: 'Review when UNFINISHED_REQUESTS_MAX changes or the review shows the Requests as a paged subresource.',
+  },
+  {
+    key: 'employeeGet#placements',
+    classification: 'bounded',
+    findings: ['LD-14'],
+    owner: 'employee-directory-read',
+    businessMaximum: {
+      maxItems: 50,
+      source:
+        'EMPLOYEE_PLACEMENT_HISTORY_LIMIT in employee-directory.types.ts, the maxItems of the schema in employee-directory.dto.ts: the placement history of the person',
+    },
+    rationale: 'The placement history of the employee; the list is paged.',
+    removeWhen: 'Review when EMPLOYEE_PLACEMENT_HISTORY_LIMIT changes or placement history is paged.',
+  },
+  {
+    key: 'employeeGet#account.roles',
+    classification: 'bounded',
+    findings: ['LD-14'],
+    owner: 'employee-directory-read',
+    businessMaximum: {
+      maxItems: 6,
+      source: `${ROLE_GRANTS}; describeAccount reads the effective direct grants`,
+    },
+    rationale: 'The directly granted roles of the employee account.',
+    removeWhen: 'Review when AppRole changes.',
   },
 ];
 

@@ -4,7 +4,6 @@ import { IdentityAccessApi } from '../../src/modules/identity-access/public/iden
 import { EmailDeliveryApi } from '../../src/modules/notifications/public/email-delivery.api';
 import { bodyOf } from '../support/api-body';
 import { fakeSmtpEnvironment, listenOnLoopback } from '../support/fake-smtp';
-import { HR_BASIS } from '../support/hr-basis';
 import {
   HttpTestApp,
   SEED_PASSWORD,
@@ -85,7 +84,7 @@ describe('a session from the installation to the logout (e2e)', () => {
     const me = await request(server()).get('/api/v1/me').set(bearer(adminToken)).expect(200);
 
     expect(bodyOf(me).data).toMatchObject({ appUserId: seed.superAdmin.appUserId, loginEmail: seed.superAdmin.email });
-    expect((me.body as { data: { roles: { effective: string[] } } }).data.roles.effective).toContain('SUPER_ADMIN');
+    expect((me.body as { data: { roles: string[] } }).data.roles).toContain('SUPER_ADMIN');
   });
 
   it('enters an employee and invites their first account; the mail service of the worker sends the link', async () => {
@@ -93,7 +92,6 @@ describe('a session from the installation to the logout (e2e)', () => {
       .post('/api/v1/employees')
       .set(bearer(adminToken))
       .send({
-        hrBasis: HR_BASIS,
         employeeCode: 'E-IT-FIRST',
         fullName: 'First IT Admin',
         workEmail: EMAIL,

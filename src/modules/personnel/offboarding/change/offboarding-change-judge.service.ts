@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { OrganizationHistoryApi } from '../../../organization/public/organization-history.api';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { TransferGuardService } from '../../transfer/transfer-guard.service';
 import { previousSuccessorChoice } from '../../transfer/transfer.policy';
 import { OffboardingRefusedError } from '../offboarding.errors';
@@ -11,7 +11,6 @@ import { OffboardingPeriodsService } from '../offboarding-periods.service';
 import type { ChangeLastDayInput, OffboardingRecord, SuccessorChoice } from '../offboarding.types';
 import { changeFactsOf } from './offboarding-change.policy';
 
-/** What a move of the last working day was judged on, and so what it is written from. */
 export interface JudgedMove {
   endsOn: BusinessDate;
   leavesAsHead: boolean;
@@ -26,16 +25,16 @@ export interface JudgedMove {
 @Injectable()
 export class OffboardingChangeJudge {
   constructor(
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly periods: OffboardingPeriodsService,
   ) {}
 
   async judge(tx: DbTx, held: OffboardingRecord, today: BusinessDate, input: ChangeLastDayInput): Promise<JudgedMove> {
-    const placementFrom =
-      (held.placementClosedId ? await this.history.getPlacementStart(tx, held.placementClosedId) : null) ?? today;
-    const employee = await this.organization.getEmployee(held.employeeId, tx);
+    this.checkCancelledPlacement(held, input.lastWorkingDay);
+    const placementFrom = await this.getPlacementFrom(tx, held, today);
+    const employee = await this.organizationReads.getEmployee(held.employeeId, tx);
     if (!employee) throw new OffboardingRefusedError('EMPLOYEE_NOT_FOUND');
     const facts = changeFactsOf(held, {
       today,
@@ -47,24 +46,53 @@ export class OffboardingChangeJudge {
     const early = changeLastDayRefusal({ ...facts, successor: null });
     if (early) throw new OffboardingRefusedError(early.code, early.details);
 
-    // The periods go back first so the new day is judged on the department as it was before the handover; a refusal rolls it all back.
-    await this.periods.undo(tx, held);
+    if (held.departmentId !== null) {
+      // The periods go back first so the new day is judged on the department as it was before the handover; a refusal rolls it all back.
+      await this.periods.undo(tx, held);
+    }
     const endsOn = departureEffectiveOn({ lastWorkingDay: input.lastWorkingDay, abrupt: false, today, placementFrom });
-    const lastInOffice = addDays(endsOn, -1);
-    // Read in this transaction, after the periods went back: a read outside it would still see the handover the record wrote.
-    const heads = await this.history.getHeadsOnDates([{ departmentId: held.departmentId, onDate: lastInOffice }], tx);
-    const leavesAsHead = heads.get(`${held.departmentId}|${lastInOffice}`) === held.employeeId;
-    const chosen: SuccessorChoice | undefined = input.successor ?? previousSuccessorChoice(held.headHandover);
-    const refusal = leavesAsHead
-      ? await this.guard.judgeSuccessor(tx, {
-          chosen,
-          leaverId: held.employeeId,
-          departmentId: held.departmentId,
-          day: endsOn,
-        })
-      : null;
-    if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
+    const { leavesAsHead, chosen } = await this.judgeHeadSuccessor(tx, held, endsOn, input.successor);
 
     return { endsOn, leavesAsHead, chosen };
+  }
+
+  private checkCancelledPlacement(held: OffboardingRecord, lastWorkingDay: BusinessDate): void {
+    if (held.cancelledPlacementId && held.cancelledPlacementFrom && lastWorkingDay >= held.cancelledPlacementFrom) {
+      throw new OffboardingRefusedError('PLACEMENT_OVERLAP', {
+        reason: 'FIRST_PLACEMENT_PENDING',
+        validFrom: held.cancelledPlacementFrom,
+      });
+    }
+  }
+
+  private async getPlacementFrom(tx: DbTx, held: OffboardingRecord, today: BusinessDate): Promise<BusinessDate | null> {
+    if (held.departmentId === null) return null;
+    const from = held.placementClosedId ? await this.history.getPlacementStart(tx, held.placementClosedId) : null;
+
+    return from ?? today;
+  }
+
+  private async judgeHeadSuccessor(
+    tx: DbTx,
+    held: OffboardingRecord,
+    endsOn: BusinessDate,
+    successorInput?: SuccessorChoice,
+  ): Promise<{ leavesAsHead: boolean; chosen?: SuccessorChoice }> {
+    if (held.departmentId === null) return { leavesAsHead: false };
+    const lastInOffice = addDays(endsOn, -1);
+    const heads = await this.history.getHeadsOnDates([{ departmentId: held.departmentId, onDate: lastInOffice }], tx);
+    const leavesAsHead = heads.get(`${held.departmentId}|${lastInOffice}`) === held.employeeId;
+    const chosen = successorInput ?? previousSuccessorChoice(held.headHandover);
+    if (leavesAsHead) {
+      const refusal = await this.guard.judgeSuccessor(tx, {
+        chosen,
+        leaverId: held.employeeId,
+        departmentId: held.departmentId,
+        day: endsOn,
+      });
+      if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
+    }
+
+    return { leavesAsHead, chosen };
   }
 }

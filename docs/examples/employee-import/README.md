@@ -1,14 +1,21 @@
-# Employee import examples
+# Mẫu nhập nhân viên
 
-CSV/XLSX files are preserved as reusable examples, not an implemented API contract.
-They predate the G2 import: `/api/v1/employee-imports` (preview, confirm, cancel) now exists and expects the
-columns `employee_code`, `full_name`, `work_email`, `employment_type`, `hire_date`, `department_code`,
-`job_title`. These files still use the old `costCenterCode`/`managerEmployeeCode`/`departmentLabel`
-columns and a `COMPANY` cost center, which is no longer a Cost Center (Docs `72e1480`, QD-86b).
+Tải lên CSV hoặc Excel `.xlsx`, xem kết quả preview rồi xác nhận để tạo các dòng hợp lệ. Sheet đầu tiên của Excel được sử dụng; dòng đầu là tên cột.
 
-- employees-15.csv and employees-15.xlsx: sample inputs.
-- employees-invalid.csv: invalid input examples.
-- expected-results.json: historical expectations; review against the new US before use.
+| Cột | Nội dung |
+| --- | --- |
+| `employee_code` | Mã nhân viên, 3–20 ký tự. |
+| `full_name` | Họ tên nhân viên. |
+| `work_email` | Email công việc, có thể để trống. |
+| `employment_type` | `STAFF`, `CONTRACTOR`, `FREELANCER` hoặc `INTERN`. |
+| `hire_date` | Ngày vào làm theo `YYYY-MM-DD`. |
+| `department_code` | Mã phòng, 2–20 ký tự; để trống nếu chưa xếp phòng. |
+| `job_title` | Chức danh, có thể để trống. |
 
-Do not infer authorization, preview/commit semantics or current response fields from
-these examples. Build the new contract from approved requirements and test it.
+Mã được bỏ khoảng trắng đầu cuối và chuyển thành chữ hoa. Chỉ dùng chữ cái A–Z, chữ số và dấu gạch nối đơn giữa các nhóm, ví dụ `NV-0001`, `DS1-ENG`.
+
+- `employee-template.csv` và `.xlsx`: một dòng ví dụ.
+- `employees-15.csv` và `.xlsx`: 15 dòng hợp lệ, ba người chưa xếp phòng. Các mã phòng dùng dữ liệu demo chung.
+- `employees-invalid.csv` và `.xlsx`: bảy dòng lỗi và một dòng hợp lệ; xem chi tiết trong preview.
+
+Kết quả dự kiến nằm trong `expected-results.json`. Để thử trên FE, khởi tạo demo dataset, tải file, kiểm tra số dòng và lỗi trong preview, sau đó xác nhận. Chạy `node scripts/examples/build-employee-import-examples.mjs` để sinh lại các file Excel từ CSV.

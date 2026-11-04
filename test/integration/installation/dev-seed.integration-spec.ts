@@ -4,7 +4,8 @@ import { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { AuditApi } from '../../../src/modules/audit/public/audit.api';
-import { DevSeedApi, LOCAL_PASSWORD_GENERATOR } from '../../../src/modules/installation/public/dev-seed.api';
+import { LOCAL_PASSWORD_GENERATOR } from '../../../src/modules/installation/dev-seed/dev-seed-credentials.service';
+import { DevSeedApi } from '../../../src/modules/installation/public/dev-seed.api';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import {
   DisposableDatabase,
@@ -61,8 +62,8 @@ describe('dev:seed (integration, real PostgreSQL)', () => {
     database = await provisionDisposableDatabase();
     await migrateDisposableDatabase(database);
     process.env.TEST_DATABASE_URL = database.url;
-    const { DevSeedModule } = await import('../../../src/modules/installation/dev-seed/dev-seed.module');
-    const moduleRef = await Test.createTestingModule({ imports: [DevSeedModule] })
+    const { DevSeedCliModule } = await import('../../../src/modules/installation/dev-seed/dev-seed-cli.module');
+    const moduleRef = await Test.createTestingModule({ imports: [DevSeedCliModule] })
       .overrideProvider(LOCAL_PASSWORD_GENERATOR)
       .useValue(() => `deterministic-password-${++counter}`)
       .compile();
@@ -203,13 +204,12 @@ describe('dev:seed (integration, real PostgreSQL)', () => {
       ]);
     });
 
-    it('keeps the Super Admin, grants no derived role and creates no head period or approval holder', async () => {
+    it('keeps the Super Admin, grants no derived role (no MANAGER, no SPENDING_APPROVER) and creates no head period', async () => {
       const facts = await sql.query(
         `
         SELECT (SELECT count(*)::int FROM role_grants WHERE role = 'SUPER_ADMIN' AND revoked_at IS NULL) AS super_admins,
                (SELECT c.hash FROM password_credentials c WHERE c.app_user_id = $1) AS super_admin_hash,
                (SELECT count(*)::int FROM department_head_periods) AS head_periods,
-               (SELECT count(*)::int FROM approval_role_holders) AS approval_holders,
                (SELECT array_agg(DISTINCT role::text ORDER BY role::text) FROM role_grants) AS roles`,
         [superAdmin.id],
       );
@@ -219,7 +219,6 @@ describe('dev:seed (integration, real PostgreSQL)', () => {
           super_admins: 1,
           super_admin_hash: superAdmin.hash,
           head_periods: 0,
-          approval_holders: 0,
           roles: ['EMPLOYEE', 'FINANCE', 'IT_ADMIN', 'SUPER_ADMIN'],
         },
       ]);

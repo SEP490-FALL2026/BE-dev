@@ -2,14 +2,12 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { normalizeEmail } from '../../../core/email';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { AccountDirectoryService } from '../accounts/account-directory.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccountRecordService } from '../accounts/account-record.service';
 import { ActionLinkService } from '../accounts/action-link.service';
 import { CredentialService } from '../credentials/credential.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
-import { ApprovalRoleHoldersService } from '../approval-roles/approval-role-holders.service';
 import {
-  ApprovalRoleHolders,
   BootstrapSuperAdminInput,
   EmployeeAccountInspection,
   LeaverGrantRole,
@@ -21,12 +19,11 @@ import { employeeHasNotLeft, isActionLinkRedeemable } from '../accounts/account.
 @Injectable()
 export class IdentityAccessApi {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly grants: RoleGrantService,
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
-    private readonly organization: OrganizationApi,
-    private readonly approvalRoles: ApprovalRoleHoldersService,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /**
@@ -72,7 +69,7 @@ export class IdentityAccessApi {
     if (link === null || !isActionLinkRedeemable(link, new Date())) return false;
 
     // Redeeming refuses an employee who has left, so a link to one is dead and must not be mailed.
-    return employeeHasNotLeft(await this.organization.getEmployee(link.appUser.employeeId));
+    return employeeHasNotLeft(await this.organizationReads.getEmployee(link.appUser.employeeId));
   }
 
   /**
@@ -140,11 +137,22 @@ export class IdentityAccessApi {
   }
 
   /**
-   * Who holds the spending approver, the substitute for a conflict of interest and the fallback approver now (an unlocked
-   * read): what the routing of a request needs to name the person who holds a step. A role nobody holds is null.
+   * The employee who holds the spending approver role now — the effective grant, whatever the state of the account or of the
+   * employee, who may have left: a consumer that needs somebody who works filters that itself. Null when nobody holds it. With
+   * `forShare`, in the transaction `tx`, the row of the grant is locked `FOR SHARE` until it ends, so a step opened on this answer
+   * and a revocation of the role take turns (`M6`).
    */
-  getApprovalRoleHolders(tx?: DbTx): Promise<ApprovalRoleHolders> {
-    return this.approvalRoles.current(tx);
+  getSpendingApproverEmployeeId(tx?: DbTx, options?: { forShare?: boolean }): Promise<string | null> {
+    return this.grants.spendingApproverEmployeeId(tx, options);
+  }
+
+  /**
+   * Which of these employees holds the spending approver role, or null: the accounts of all of them are locked `FOR SHARE` first, in the
+   * order of their ids, so a Request that is being created and a grant of the role that is being made meet on the same rows
+   * (`QĐ-93d`(3)). Call it in the transaction of the Request; the lock lasts to its end.
+   */
+  lockSpendingApproverAmong(tx: DbTx, employeeIds: readonly string[]): Promise<string | null> {
+    return this.accounts.lockSpendingApproverAmong(tx, employeeIds);
   }
 
   /** The one account that holds the Super Admin role and what decides whether it can act; null when nobody holds it (an unlocked read). */

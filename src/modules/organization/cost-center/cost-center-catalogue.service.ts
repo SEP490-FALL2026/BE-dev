@@ -25,10 +25,6 @@ export class CostCenterCatalogueService {
     return this.repo.departmentsWithoutCostCenter(tx);
   }
 
-  recordLocalSeedActivation(tx: DbTx, organizationId: string): Promise<boolean> {
-    return this.repo.recordLocalSeedActivation(tx, organizationId);
-  }
-
   findByCode(tx: DbTx, organizationId: string, code: string): Promise<CostCenterRecord | null> {
     return this.repo.findByCode(tx, organizationId, code);
   }

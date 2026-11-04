@@ -1,27 +1,23 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import { DatabaseEnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { AuditApi } from '../../audit/public/audit.api';
-import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LocalDemoAccountApi } from '../../identity-access/public/local-demo-account.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { DEMO_FIXTURE_KEYS, DEMO_PEOPLE_LOOKUP, buildSeedPlan, samePlan } from '../dev-seed/dev-seed-plan.policy';
 import { SeedStateChangedError } from '../dev-seed/dev-seed.errors';
 import { DEMO_COST_CENTER, DEMO_DEPARTMENT, DEMO_HIRE_DATE, DEMO_PEOPLE } from '../dev-seed/dev-seed-fixture.types';
 import { DevSeedRepo } from '../dev-seed/dev-seed.repo';
 import { DevSeedResult, SeedPlan, SeedReportItem } from './dev-seed.types';
 import { checkLocalSeedGuards } from '../dev-seed/local-seed.policy';
-import { PasswordGenerator } from '../dev-seed/local-password.service';
-
-export const LOCAL_PASSWORD_GENERATOR = Symbol('LOCAL_PASSWORD_GENERATOR');
+import { DevSeedCredentialsService, type Credentials } from '../dev-seed/dev-seed-credentials.service';
 
 /** Marks every Audit Trail event of a seed run (`actorKind: OPERATOR`). */
 export const LOCAL_SEED_OPERATOR_REFERENCE = 'LOCAL_SEED';
-
-type Credentials = Map<string, { password: string; hash: string; hashPolicyVersion: number }>;
 
 /**
  * `pnpm dev:seed`: the local demo data, through the owning services and the Audit Trail. The department is written
@@ -37,10 +33,10 @@ export class DevSeedApi {
     private readonly runner: TransactionRunner,
     private readonly repo: DevSeedRepo,
     private readonly organization: OrganizationApi,
-    private readonly identity: IdentityAccessApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly accounts: LocalDemoAccountApi,
     private readonly audit: AuditApi,
-    @Inject(LOCAL_PASSWORD_GENERATOR) private readonly generatePassword: PasswordGenerator,
+    private readonly credentials: DevSeedCredentialsService,
   ) {}
 
   async seed(options: { confirmLocal: boolean }): Promise<DevSeedResult> {
@@ -58,7 +54,7 @@ export class DevSeedApi {
     if (first.items.every((item) => item.action === 'present'))
       return { outcome: 'ALREADY_PRESENT', items: report(first, new Map()) };
 
-    const credentials = await this.prepareCredentials(first);
+    const credentials = await this.credentials.prepare(first);
     try {
       await this.runner.run(async (tx) => {
         await this.repo.lockDevSeed(tx);
@@ -79,14 +75,14 @@ export class DevSeedApi {
 
   /** Null when there is no installation. */
   private async plan(tx: DbTx): Promise<SeedPlan | null> {
-    const organization = await this.organization.getOrganization(tx);
+    const organization = await this.organizationReads.getOrganization(tx);
     if (organization === null) return null;
 
-    const fixture = await this.organization.readLocalSeedFixture(tx, {
+    const fixture = await this.organizationReads.readLocalSeedFixture(tx, {
       organizationId: organization.id,
       ...DEMO_FIXTURE_KEYS,
     });
-    const lookup = await this.organization.lookupForEmployeeImport(DEMO_PEOPLE_LOOKUP, tx);
+    const lookup = await this.organizationReads.lookupForEmployeeImport(DEMO_PEOPLE_LOOKUP, tx);
     const accounts = new Map();
     for (const person of DEMO_PEOPLE) {
       const employee = lookup.employees.find((candidate) => candidate.employeeCode === person.employeeCode);
@@ -102,19 +98,6 @@ export class DevSeedApi {
     }
 
     return buildSeedPlan(organization.id, fixture, lookup, accounts);
-  }
-
-  /** A new password for each account to create, hashed before any lock (lock protocol rule 3). */
-  private async prepareCredentials(plan: SeedPlan): Promise<Credentials> {
-    const credentials: Credentials = new Map();
-    for (const person of DEMO_PEOPLE) {
-      const account = plan.items.find((item) => item.kind === 'ACCOUNT' && item.key === person.employeeCode);
-      if (account?.action !== 'create') continue;
-      const password = this.generatePassword();
-      const { hash, hashPolicyVersion } = await this.identity.prepareCredential(password, person.workEmail);
-      credentials.set(person.employeeCode, { password, hash, hashPolicyVersion });
-    }
-    return credentials;
   }
 
   private async write(tx: DbTx, plan: SeedPlan, credentials: Credentials): Promise<void> {
@@ -166,7 +149,7 @@ export class DevSeedApi {
             workEmail: person.workEmail,
             employmentType: 'STAFF',
             hireDate: DEMO_HIRE_DATE,
-            departmentId: departmentId as string,
+            departmentId,
             jobTitle: null,
           })
         ).id;

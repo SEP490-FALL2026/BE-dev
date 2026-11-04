@@ -10,11 +10,11 @@ import type {
   SeatTargetRef,
 } from './catalog.types';
 import { OnboardingFactsService } from '../subscription/onboarding-facts.service';
-import { ApplicationLookupService } from '../catalog-entry/application-lookup.service';
-import { PlanLookupService } from '../plan/plan-lookup.service';
-import { SubscriptionLookupService } from '../subscription/subscription-lookup.service';
+import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
+import { PlanFactsService } from '../plan/plan-facts.service';
+import { SubscriptionFactsService } from '../subscription/subscription-facts.service';
 import { SeatTargetService } from '../subscription/seat-target.service';
-import { VendorLookupService } from '../vendor/vendor-lookup.service';
+import { VendorFactsService } from '../vendor/vendor-facts.service';
 import {
   InternalSoftwareRegistrationService,
   type InternalRegistration,
@@ -29,11 +29,11 @@ export class CatalogApi {
   constructor(
     private readonly seatTargets: SeatTargetService,
     private readonly onboarding: OnboardingFactsService,
-    private readonly plans: PlanLookupService,
-    private readonly subscriptions: SubscriptionLookupService,
-    private readonly vendors: VendorLookupService,
+    private readonly plans: PlanFactsService,
+    private readonly subscriptions: SubscriptionFactsService,
+    private readonly vendors: VendorFactsService,
     private readonly internalRegistration: InternalSoftwareRegistrationService,
-    private readonly applicationLookup: ApplicationLookupService,
+    private readonly applicationLookup: ApplicationFactsService,
   ) {}
 
   /**

@@ -1,4 +1,4 @@
-export type AppRole = 'SUPER_ADMIN' | 'IT_ADMIN' | 'FINANCE' | 'EMPLOYEE';
+export type AppRole = 'SUPER_ADMIN' | 'IT_ADMIN' | 'FINANCE' | 'EMPLOYEE' | 'MANAGER' | 'SPENDING_APPROVER';
 export type AppUserStatus = 'ACTIVE' | 'LOCKED';
 export type ActivationState = 'INVITED' | 'ACTIVATED';
 export type SessionRevokedReason =
@@ -105,6 +105,7 @@ export interface AccountListFilter {
   status?: AppUserStatus;
   activationState?: ActivationState;
   role?: AppRole;
+  employeeIds?: string[];
   /** True: only the accounts of people who have left; false: only those of people who have not. */
   employeeLeft?: boolean;
   skip: number;
@@ -131,22 +132,12 @@ export interface EmployeeAccountInspection {
   roles: AppRole[];
 }
 
-/** The approval roles a person can hold (US-01-03); who holds them stays inside the module. */
-export type ApprovalRoleKind = 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'FALLBACK_APPROVER';
+/** The approval role a person can hold (`US-01-03`, `QĐ-93b`): a role grant, whose holder stays inside the module. */
+export type ApprovalRoleKind = 'SPENDING_APPROVER';
 
 /**
- * Who holds each approval role now, by employee: a role nobody holds is null. The employee may have left; whether they
- * can still act is the organization's to say (`EmployeeStatus`), not this module's.
- */
-export interface ApprovalRoleHolders {
-  spendingApproverEmployeeId: string | null;
-  conflictSubstituteEmployeeId: string | null;
-  fallbackApproverEmployeeId: string | null;
-}
-
-/**
- * A person took over a role that decides who holds a step of a request, or left it (`FR-3.16`, `US-05-12`): one of the three
- * approval roles the Super Admin sets, or the role of Finance. `id` is made when the change is announced and is what a
+ * A person took over a role that decides who holds a step of a request, or left it (`FR-3.16`, `US-05-12`): the spending approver
+ * the Super Admin grants, or the role of Finance. `id` is made when the change is announced and is what a
  * listener that must not act twice keys on.
  */
 export interface ApprovalRoleChange {
@@ -185,7 +176,6 @@ export interface AccountInventory {
   superAdmin: { holders: number; status: AppUserStatus; activationState: ActivationState; loginEmail: string } | null;
   accountsByState: Record<AccountStateKey, number>;
   directRoles: Record<AppRole, number>;
-  approvalRoles: Record<ApprovalRoleKind, number>;
 }
 
 /** The direct roles a local demo account may hold (`pnpm dev:seed`): never SUPER_ADMIN, never a derived role. */

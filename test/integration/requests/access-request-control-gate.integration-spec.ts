@@ -22,7 +22,7 @@ describe('requests over HTTP: the gate of the assessment (integration, real Post
     ownIt = await h.staff(design, 'DES-IT3', ['IT_ADMIN']);
     itAdmin = { employeeId: h.it1.employeeId, account: h.it1 };
     await h.makeHead(design, head);
-    await h.makeHead(executive, boss);
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);
     await h.setItAdminInCharge(design, itAdmin);
   }, 240000);

@@ -27,6 +27,28 @@
   [containers](../guides/containers.md#backup-before-production-migrations)). Migration không hoàn tác được — ví dụ
   `ALTER TYPE … ADD VALUE`, xóa cột/bảng có dữ liệu — ghi rõ trong spec của hạng mục trước khi merge.
 
+## Cột JSON: một codec, đọc qua `decode`
+
+- Mỗi cột `Json`/`Json?` có **một** codec `<tên>.json.ts` ([từ vựng file](module-structure.md#từ-vựng-file)): schema zod là nơi duy nhất
+  định nghĩa hình dạng (kể cả giá trị mặc định, ví dụ `binding` mặc định `true` của `payment_schedule`), kiểu domain suy từ schema hoặc
+  được schema kiểm bằng `satisfies z.ZodType<…>`, `decode(value: unknown)` và `encode(value)`. Dựng bằng `jsonColumn` /
+  `nullableJsonColumn` ở [json-column.ts](../../src/infrastructure/database/json-column.ts); cột `NULL` được phép thì `decode(null)` trả
+  `null` và `encode(null)` ghi `NULL` của cơ sở dữ liệu (`Prisma.DbNull`).
+- Repo và mapper **đọc mọi cột JSON qua `decode`** và ghi qua `encode`; không `as <Kiểu>` và không `as unknown as` trên giá trị đọc từ cột
+  JSON hay từ `$queryRaw` (kiểu của hàng đến từ generic của câu truy vấn cộng một hàm ánh xạ tường minh).
+- Một cột có **hai hình dạng theo trạng thái của dòng** thì có hai codec và mỗi codec chỉ đọc dòng ở trạng thái của nó: `access_requests.policy`
+  là `{ draft: … }` khi dòng là bản nháp (`request-draft-policy.json.ts`) và `RequestPolicy` khi request đã gửi (`access-request.json.ts`). Chỗ nào
+  đọc dòng chưa biết trạng thái thì kiểm trạng thái trước rồi mới `decode`; không chỗ nào đọc một cột JSON bằng ép kiểu, dù chỉ một cấp
+  (`row.policy as { chain?: … }`).
+- `decode` thất bại ném `JsonColumnShapeError(table, column, issues)`
+  ([json-column.errors.ts](../../src/infrastructure/database/json-column.errors.ts)): lỗi hạ tầng, đi đường lỗi không nhận diện được
+  thành 500 (không có ánh xạ HTTP riêng). Thông báo nêu bảng, cột, vị trí và loại lỗi, **không bao giờ giá trị**: một cột có thể mang tên,
+  số tiền hay địa chỉ. Một bản ghi sai hình dạng là lỗi dữ liệu, ghi thành hạng mục riêng, không nới codec cho vừa. Ngoại lệ có chủ ý: một giá trị mà code đã thôi ghi nhưng dòng cũ còn giữ (một mã lỗi đã bỏ) vào danh sách `RETIRED_…` của chính codec đó, có ngày bỏ trong comment: đọc được, không bao giờ ghi lại, cho tới khi một migration dữ liệu viết lại dòng (ví dụ `RETIRED_SEAT_ROW_ERROR_CODES`).
+- `encode` giữ **đúng hình dạng đã ghi từ trước**: spec của codec có một khẳng định bằng giá trị cụ thể cho điều đó. Đổi hình dạng JSON là
+  đổi schema, không phải đổi codec: cần migration dữ liệu và ghi trong spec của hạng mục.
+- Payload tự do (audit `before`/`after`, `params` của thông báo, `detail` của hồ sơ nghỉ việc …) cũng có codec, chỉ kiểm "một object của
+  giá trị JSON"; khóa của nó không liệt kê.
+
 ## Vai PostgreSQL (H7)
 
 - Production có ba danh tính ([containers](../guides/containers.md#postgresql-roles-h7)): superuser của cluster chỉ khởi

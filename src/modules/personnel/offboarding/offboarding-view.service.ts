@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { LicensingHandoverApi } from '../../licensing/public/licensing-handover.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { EmployeeRecord } from '../../organization/public/organization.types';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
@@ -51,7 +51,7 @@ export class OffboardingViewService {
   constructor(
     private readonly repo: OffboardingRepo,
     private readonly lists: OffboardingListRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly licensing: LicensingApi,
     private readonly licensingHandovers: LicensingHandoverApi,
     private readonly roleDuties: RoleDutiesService,
@@ -64,7 +64,7 @@ export class OffboardingViewService {
     filter: Omit<OffboardingListFilter, 'today' | 'departmentIds'>,
   ): Promise<Paged<OffboardingSummaryWire>> {
     const { departmentIds } = await this.scopeOf(actor);
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const { items, total } = await this.lists.list({ ...filter, ...(departmentIds ? { departmentIds } : {}), today });
     const employees = await this.employeesOf(items.map((item) => item.employeeId));
     const held = await this.licensing.countPersonalSeatsOf(
@@ -90,7 +90,7 @@ export class OffboardingViewService {
   async get(actor: AuthenticatedPrincipal, id: string): Promise<OffboardingDetailWire> {
     const { access, departmentIds } = await this.scopeOf(actor);
     const record = await this.repo.find(id);
-    if (!record || (departmentIds && !departmentIds.includes(record.departmentId)))
+    if (!record || (departmentIds && record.departmentId !== null && !departmentIds.includes(record.departmentId)))
       throw new OffboardingRefusedError('NOT_FOUND');
 
     return this.detail.detailOf(record, access);
@@ -104,9 +104,9 @@ export class OffboardingViewService {
   ): Promise<Paged<OffboardingRightWire>> {
     const { departmentIds } = await this.scopeOf(actor);
     const record = await this.repo.find(id);
-    if (!record || (departmentIds && !departmentIds.includes(record.departmentId)))
+    if (!record || (departmentIds && record.departmentId !== null && !departmentIds.includes(record.departmentId)))
       throw new OffboardingRefusedError('NOT_FOUND');
-    const today = await this.organization.businessToday();
+    const today = await this.organizationReads.businessToday();
     const seats =
       record.state === 'CANCELLED' ? [] : await this.licensing.listPersonalSeatsOf(record.employeeId, today);
     const slice = seats.slice((page.page - 1) * page.pageSize, page.page * page.pageSize);
@@ -156,7 +156,7 @@ export class OffboardingViewService {
       ? { access }
       : {
           access,
-          departmentIds: await this.organization.getItAdminScope(actor.employeeId, (ids) =>
+          departmentIds: await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
             this.identity.findUsableItAdminEmployeeIds(ids),
           ),
         };
@@ -165,6 +165,6 @@ export class OffboardingViewService {
   private async employeesOf(ids: readonly string[]): Promise<Map<string, EmployeeRecord>> {
     const unique = [...new Set(ids)];
 
-    return new Map((await this.organization.getEmployees(unique)).map((employee) => [employee.id, employee]));
+    return new Map((await this.organizationReads.getEmployees(unique)).map((employee) => [employee.id, employee]));
   }
 }

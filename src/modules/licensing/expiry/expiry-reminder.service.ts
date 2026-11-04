@@ -5,7 +5,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { expiryReminderAlert, usableOrNull } from '../licensing-alerts.policy';
 import { LicensingAlerts } from '../licensing-alerts.service';
 import type { ExpiryReminderWire } from './expiry.dto';
@@ -28,7 +28,7 @@ const PASS_BATCH = 200;
 export class ExpiryReminderService {
   constructor(
     private readonly repo: ExpiryReminderRepo,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly runner: TransactionRunner,
     private readonly audit: AuditApi,
@@ -37,14 +37,14 @@ export class ExpiryReminderService {
 
   /** Writes the reminders that are due and returns how many were new in this pass. */
   async noticeDue(now: Date = new Date()): Promise<number> {
-    const today = await this.organization.businessToday(now);
+    const today = await this.organizationReads.businessToday(now);
     const candidates = await this.repo.candidates(reminderRange(today), PASS_BATCH);
     if (candidates.length === 0) return 0;
 
     const departmentOf = await this.departmentsOf(candidates, today);
     const itAdminOf = await this.itAdminsOf(candidates, departmentOf, today);
     const usable = await this.alerts.usableItAdmins([...itAdminOf.values()]);
-    const headOf = await this.organization.getDepartmentHeads([...new Set(departmentOf.values())], today);
+    const headOf = await this.organizationReads.getDepartmentHeads([...new Set(departmentOf.values())], today);
     let told = 0;
     for (const candidate of candidates) {
       const departmentId = departmentOf.get(candidate.employeeId) ?? null;
@@ -84,7 +84,7 @@ export class ExpiryReminderService {
       query.pageSize,
     );
     const [people, plans] = await Promise.all([
-      this.organization.getEmployees([
+      this.organizationReads.getEmployees([
         ...new Set(rows.flatMap((row) => [row.recipientEmployeeId, row.holderEmployeeId])),
       ]),
       this.catalog.getPlanRevocationInfo([...new Set(rows.map((row) => row.planId))]),
@@ -130,7 +130,7 @@ export class ExpiryReminderService {
     candidates: readonly ReminderCandidate[],
     today: BusinessDate,
   ): Promise<Map<string, string>> {
-    const units = await this.organization.getOwningUnits([...new Set(candidates.map((c) => c.employeeId))], today);
+    const units = await this.organizationReads.getOwningUnits([...new Set(candidates.map((c) => c.employeeId))], today);
 
     return new Map([...units].map(([employeeId, unit]) => [employeeId, unit.departmentId]));
   }
@@ -151,7 +151,7 @@ export class ExpiryReminderService {
         async ([departmentId, employeeId]) =>
           [
             departmentId,
-            (await this.organization.getItAdminInCharge(employeeId, today))?.itAdminEmployeeId ?? null,
+            (await this.organizationReads.getItAdminInCharge(employeeId, today))?.itAdminEmployeeId ?? null,
           ] as const,
       ),
     );

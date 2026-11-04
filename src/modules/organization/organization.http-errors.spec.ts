@@ -31,7 +31,6 @@ import {
   EmployeeSelfChangeForbiddenError,
   EmployeeUpdateEmptyError,
 } from './employee/employee.errors';
-import { ProjectForbiddenError, ProjectInvalidError, ProjectNotFoundError } from './project/project.errors';
 import {
   EmployeeCodeTakenError,
   EmployeeNotFoundError,
@@ -41,7 +40,6 @@ import { toCostCenterApiException } from './cost-center/cost-center.http-errors'
 import { toDepartmentApiException } from './department-management/department.http-errors';
 import { toEmployeeApiException } from './employee/employee.http-errors';
 import { toOrganizationApiException } from './organization.http-errors';
-import { toProjectApiException } from './project/project.http-errors';
 
 /**
  * The mapper of the capability whose error it is (each capability answers its own errors and falls back to the one of the module),
@@ -51,7 +49,6 @@ function mapperOwning(error: unknown): (error: unknown) => unknown {
   const name = error instanceof Error ? error.constructor.name : '';
   if (name.startsWith('CostCenter')) return toCostCenterApiException;
   if (name.startsWith('Department') || name === 'HeadAssignmentError') return toDepartmentApiException;
-  if (name.startsWith('Project')) return toProjectApiException;
   if (name.startsWith('Employee') && name !== 'EmployeeNotFoundError') return toEmployeeApiException;
 
   return toOrganizationApiException;
@@ -233,16 +230,6 @@ const CASES: [string, Error, HttpStatus, string, Record<string, unknown> | undef
     'DEPARTMENT.HEAD_SUCCESSOR_ALREADY_NAMED',
     undefined,
   ],
-  ['ProjectNotFoundError', new ProjectNotFoundError(), HttpStatus.NOT_FOUND, 'PROJECT.NOT_FOUND', undefined],
-  ...(['NAME', 'DESCRIPTION', 'DEPARTMENT_NOT_FOUND'] as const).map(
-    (reason): [string, Error, HttpStatus, string, undefined] => [
-      `ProjectInvalidError ${reason}`,
-      new ProjectInvalidError(reason),
-      HttpStatus.UNPROCESSABLE_ENTITY,
-      `PROJECT.INVALID_${reason}`,
-      undefined,
-    ],
-  ),
 ];
 
 describe('toOrganizationApiException (organization HTTP error contract)', () => {
@@ -256,7 +243,6 @@ describe('toOrganizationApiException (organization HTTP error contract)', () => 
   it.each([
     ['DepartmentForbiddenError', new DepartmentForbiddenError()],
     ['CostCenterForbiddenError', new CostCenterForbiddenError()],
-    ['ProjectForbiddenError', new ProjectForbiddenError()],
     ['EmployeeForbiddenError', new EmployeeForbiddenError()],
   ])('answers %s with the same 403 as a route that refuses the role (F13)', (_label, error) => {
     expect(answer(error)).toEqual({ status: HttpStatus.FORBIDDEN, body: { ...FORBIDDEN_ERROR } });

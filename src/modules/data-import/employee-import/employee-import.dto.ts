@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { hrBasisSchema } from '../../../infrastructure/http/dto/hr-basis.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
@@ -15,14 +14,13 @@ export const confirmImportBodySchema = z.strictObject({
   previewVersion: z.number().int().positive(),
   idempotencyKey: z.string().min(8).max(100),
   acknowledgeDuplicateFile: z.boolean().default(false),
-  /** The HR document every person of this file is entered on (`US-02-02` AC-16): required. */
-  hrBasis: hrBasisSchema,
 });
 
 const departmentCount = z.strictObject({ departmentCode: z.string(), count: z.number().int().nonnegative() });
 const departmentRef = z.strictObject({ code: z.string(), name: z.string() });
 
 const summarySchema = z.strictObject({
+  newUnplaced: z.number().int().nonnegative(),
   totalRows: z.number().int().nonnegative(),
   valid: z.number().int().nonnegative(),
   errors: z.number().int().nonnegative(),
@@ -40,6 +38,7 @@ const summarySchema = z.strictObject({
 });
 
 const resultSchema = z.strictObject({
+  newUnplaced: z.number().int().nonnegative(),
   created: z.number().int().nonnegative(),
   existingSame: z.number().int().nonnegative(),
   existingDifferent: z.number().int().nonnegative(),
@@ -69,6 +68,12 @@ const rowsSchema = z.strictObject({
     z.strictObject({
       line: z.number().int().positive(),
       outcome: z.enum(['VALID', 'ERROR', 'EXISTS_SAME', 'EXISTS_DIFFERENT']),
+      unplaced: z
+        .boolean()
+        .nullable()
+        .describe(
+          'Whether a valid new row has no department or an existing employee has no placement; null for an invalid row.',
+        ),
       cells: z.record(z.string(), z.string()),
       errors: z.array(z.strictObject({ column: z.string(), code: z.string() })),
       differences: z

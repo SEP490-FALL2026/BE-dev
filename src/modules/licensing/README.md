@@ -62,6 +62,10 @@ dashboards; gốc `src/app/app.module.ts`.
   sở hữu ngân sách/chi phí (requests/budgets) thêm reader; chưa có thì snapshot đóng băng ghi `NOT_CONNECTED`, không 0.
 - Mở `RenewalUsageContributions` (`licensing.renewal-usage-evidence`, Contributions) — chưa có bên thêm: chủ evidence
   usage (G7) thêm reader; chưa có thì gia hạn nói `usage NOT_AVAILABLE` và xếp ghế không dùng dữ liệu sử dụng.
+- Đăng ký vào `identity-access.approval-role-change-listeners` và `organization.change-listeners` —
+  `subscription-renewal/spending-approver-wait.listener.ts`: mục gia hạn chờ Người duyệt chi (`waitingReason`
+  `NO_SPENDING_APPROVER`, không người thay thế, QĐ-93c) báo Super Admin một `CONTROLLED_WAIT_ALERT` (`subject`
+  `SUBSCRIPTION_RENEWAL`) mỗi đoạn chờ (gửi, thu hồi vai, người giữ vai nghỉ việc).
 - Đăng ký vào: `catalog.seat-occupancy` — `assignment/assignment-seat-occupancy.listener.ts`;
   `organization.department-service-account-reader` — `assignment/assignment-service-account.listener.ts`;
   `organization.department-use-readers` — `provisioning/department-use/department-open-work.listener.ts`.
@@ -90,7 +94,9 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   claim, hoàn tất, báo lỗi; `ProvisioningDecisionService`), `revocation-completion/`
   (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`.
 - `handover/` — xác nhận bàn giao dữ liệu trước khi thu hồi (US-03-09, US-07-09); `handover-duties.controller.ts`;
-  `HandoverService`, `HandoverConfirmationService`; `handover-duty.job.ts` nhắc quá hạn mỗi giờ.
+  `HandoverService`, `HandoverConfirmationService`; `handover-duty.job.ts` nhắc quá hạn mỗi giờ. Người nghỉ việc không phòng
+  (`departmentId` null, `D-S18`): `requirementOf` bỏ nguồn `DEPARTURE`/`ABRUPT_DEPARTURE`, nên không có nghĩa vụ trưởng phòng ở
+  `open` lẫn `openFromTask` và tác vụ thu hồi không bị giữ; nguồn khác (IT, trả về) giữ nguyên.
 - `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts`.
 - `license-key/` — kho key của mua đứt K4 (US-04-12); `license-keys.controller.ts`; `LicenseKeyService`.
 - `my-software/` — "Phần mềm của tôi" (US-12-15 AC-2, US-16-01 AC-1): `my-software.controller.ts`
@@ -110,7 +116,9 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   quyết, mở thu hồi phần vượt/hủy), `outcome/` (IT Admin ghi kết quả, kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
   `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`), `alerts/` (mốc T−15/T−7, chất lượng dữ liệu), `deadline/` (cờ thực hiện trễ, sự cố tự gia
   hạn/đánh dấu hết hạn); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; xếp ghế ở
-  `subscription-renewal-ranking.policy.ts`. Quyết định không tạo khoản cam kết ngân sách (`QĐ-62s`).
+  `subscription-renewal-ranking.policy.ts`. Quyết định không tạo khoản cam kết ngân sách (`QĐ-62s`). Cột JSON
+  `subscription_renewals.decision_snapshot` đi qua codec `subscription-renewal-decision-snapshot.json.ts` (spec cạnh file); audit và thông báo
+  của một quyết định ghi ở `decision/renewal-decision-trail.service.ts`.
 - Gốc module (dùng chung nhiều capability): `licensing-audit-event.mapper.ts`, `licensing.http-errors.ts`;
   `licensing-alerts.policy.ts` + `licensing-alerts.service.ts` (`LicensingAlerts`) — cảnh báo license `FR-5.14` vào hộp thông báo
   (dòng 3 T−7 ở `expiry/`, dòng 12 bàn giao ở `handover/handover-alert.service.ts`, dòng 13 tài khoản dịch vụ ở

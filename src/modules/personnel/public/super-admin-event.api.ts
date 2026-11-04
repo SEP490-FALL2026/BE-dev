@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { PersonnelActor } from './personnel.types';
 import { ProfileCorrectionService } from '../super-admin-event/profile-correction.service';
 import { SuperAdminDepartureEvents } from '../super-admin-event/super-admin-departure-events.service';
@@ -36,7 +36,7 @@ import type {
 export class SuperAdminEventApi {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly tickets: SuperAdminEventRepo,
     private readonly transferEvents: SuperAdminTransferEvents,
@@ -65,9 +65,9 @@ export class SuperAdminEventApi {
     const { context, parameters } = command;
 
     return this.runner.run(async (tx) => {
-      const organization = await this.organization.getOrganization(tx);
+      const organization = await this.organizationReads.getOrganization(tx);
       if (!organization) throw new SuperAdminEventRefusedError('NOT_INSTALLED');
-      const subject = await this.organization.getEmployeeByCode(context.subjectCode, tx);
+      const subject = await this.organizationReads.getEmployeeByCode(context.subjectCode, tx);
       if (!subject) throw new SuperAdminEventRefusedError('SUBJECT_NOT_FOUND');
 
       // A ticket that was recorded is the same run again, or another run under a ticket that is not its own.
@@ -143,7 +143,7 @@ export class SuperAdminEventApi {
         return this.departureEvents.write(tx, actor, subject, parameters, basis);
       case 'profile-correct':
         // No department is locked by this mode, so the protocol is the employee and then the account, here.
-        await this.organization.lockEmployeeForUpdate(tx, subject.id);
+        await this.profile.lockSubject(tx, subject.id);
         if (!(await this.identity.inspectEmployeeAccount(tx, subject.id)).roles.includes('SUPER_ADMIN'))
           throw new SuperAdminEventRefusedError('SUBJECT_NOT_SUPER_ADMIN');
         await this.profile.correct(tx, actor, subject.organizationId, subject.id, parameters, basis);

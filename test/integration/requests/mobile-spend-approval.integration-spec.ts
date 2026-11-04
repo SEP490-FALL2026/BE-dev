@@ -1,6 +1,6 @@
 import request from 'supertest';
 import type { ApiAccount } from '../../support/api-accounts';
-import type { AccessRequestWire, Person } from '../../support/request-harness';
+import type { AccessRequestWire } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
 import { StatusHarness } from '../../support/status-harness';
 
@@ -33,7 +33,6 @@ interface YearWire {
  */
 describe('the spending approver decides on the phone (US-16-03, integration)', () => {
   let plan: string;
-  let fallback: Person;
   let counter = 0;
 
   const headers = (account: ApiAccount, label: Label = MOBILE) => ({ ...h.as(account), ...label });
@@ -77,16 +76,6 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
   const commitments = async (id: string) =>
     (await h.ctx.sql.query<{ state: string }>(`SELECT state::text FROM budget_commitments WHERE request_id = $1`, [id]))
       .rows;
-  const exe = async (): Promise<Unit> => {
-    const { rows } = await h.ctx.sql.query<{ id: string; cost_center_id: string }>(
-      `SELECT d.id, c.id AS cost_center_id FROM departments d
-         JOIN cost_centers c ON c.department_id = d.id AND c.status = 'ACTIVE' WHERE d.code = 'P-EXE'`,
-    );
-    const department = { id: rows[0].id, code: 'P-EXE', unitId: rows[0].cost_center_id };
-
-    return { department, head: h.boss, member: await h.staff(department, 'EXE-E1') };
-  };
-
   beforeAll(async () => {
     await h.start();
     await h.withApprover();
@@ -95,8 +84,6 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
     await h
       .declareTaxProfile((await h.vendorOf(plan)).id, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }])
       .expect(200);
-    fallback = await h.staff(await h.departmentWithUnit('P-FB'), 'FB-R1');
-    await h.setRole('FALLBACK_APPROVER', fallback);
   }, 240000);
 
   afterAll(async () => {
@@ -280,25 +267,29 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
       expect(await commitments(r9.id)).toEqual([{ state: 'HELD' }]);
     });
 
-    it('gives the approver no decision on their own request: the substitute holds the spend step (AC-6)', async () => {
-      const unitOfBoss = await exe();
-      await h.budgetFor(unitOfBoss, { total: 100 * M });
-      const r5 = await h.sent(h.boss, plan, { termMonths: 1 });
-      expect(r5.needStep.assignee?.employeeId).toBe(fallback.employeeId);
-      await h.decide(r5.id, { decision: 'APPROVE' }, fallback.account).expect(200);
-      expect((await h.steps(r5.id, 'SPEND_APPROVAL'))[0]).toMatchObject({
-        assignee_employee_id: h.substitute.employeeId,
+    it('gives the approver no decision on a request they are a party of, and no substitute decides it: the step waits (AC-6, data of before QĐ-93)', async () => {
+      const u = await example();
+      const id = await h.paidRequest(u, plan, { amount: 10 * M });
+      // The approver can no longer send or be given a request (D-S21): this is one of before, with the approver put in by SQL.
+      await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
+        id,
+        h.boss.employeeId,
+      ]);
+      await h.sendOn([id], u.head.account).expect(201);
+      expect((await h.steps(id, 'SPEND_APPROVAL'))[0]).toMatchObject({
+        state: 'WAITING',
+        assignee_employee_id: null,
+        waiting_reason: 'SPENDING_APPROVER_IS_PARTY',
       });
 
-      expect((await queue()).map((row) => row.requestId)).not.toContain(r5.id);
-      await get(`/access-requests/${r5.id}/spend-approval`, h.boss.account).expect(404);
-      const own = await spend(r5.id, { decision: 'APPROVE' }).expect(403);
-      expect(h.codeOf(own)).toBe('SPEND.OWN_REQUEST');
-      expect((await queue(h.substitute.account)).map((row) => row.requestId)).toContain(r5.id);
-      const bySubstitute = await spend(r5.id, { decision: 'APPROVE' }, h.substitute.account, WEB).expect(200);
-      expect(
-        h.dataOf<{ spendApproval: { decision: { bySubstitute: boolean } } }>(bySubstitute).spendApproval.decision,
-      ).toMatchObject({ bySubstitute: true });
+      expect((await queue()).map((row) => row.requestId)).not.toContain(id);
+      expect((await queue(h.bystander.account)).map((row) => row.requestId)).not.toContain(id);
+      await get(`/access-requests/${id}/spend-approval`, h.boss.account).expect(404);
+      expect(h.codeOf(await spend(id, { decision: 'APPROVE' }).expect(403))).toBe('SPEND.OWN_REQUEST');
+      expect(h.codeOf(await spend(id, { decision: 'APPROVE' }, h.bystander.account, WEB).expect(403))).toBe(
+        'SPEND.NOT_THE_ASSIGNEE',
+      );
+      expect(await records(id)).toEqual([expect.objectContaining({ kind: 'NEED' })]);
     });
   });
 

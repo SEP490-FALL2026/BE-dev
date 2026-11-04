@@ -3,6 +3,7 @@
 Mục đích: nhập dữ liệu từ file CSV qua một khung chung upload → preview → xác nhận; loại thứ nhất là file nhân sự
 (`employee-import/`), loại thứ hai là seat baseline của một subscription hoặc một plan nội bộ (`seat-baseline-import/`).
 Story chính: US-02-01, US-02-02, US-02-03, US-02-05; US-02-04 (checklist onboarding đọc qua facade).
+Xác nhận import nhân sự không thu căn cứ HR (QĐ-93f); Audit Trail vẫn ghi người xác nhận, thời điểm và kết quả.
 Tầng: T5 (`scripts/arch/tiers.cjs`). Phụ thuộc: organization, licensing, catalog (chỉ type `SeatTarget`), audit,
 notifications. Được dùng bởi: onboarding; gốc `src/app/app.module.ts`.
 

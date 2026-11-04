@@ -59,7 +59,7 @@ describe('plan terms routes (e2e, no database)', () => {
   ])('refuses %s on every route that records terms or opinions with 403', async (_name, direct, derived) => {
     for (const [route, call] of WRITE_ROUTES) {
       const response = await call(app.getHttpServer())
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
       expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
     }
@@ -75,13 +75,13 @@ describe('plan terms routes (e2e, no database)', () => {
     async (_name, direct: string[], derived: string[]) => {
       const warnings = await request(app.getHttpServer())
         .get('/api/v1/plan-warnings')
-        .set('Authorization', bearer(principal(direct, derived)))
+        .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
       expect(bodyOf(warnings).error.code).toBe('AUTHORIZATION.FORBIDDEN');
       if (!direct.includes('FINANCE')) {
         await request(app.getHttpServer())
           .get(`/api/v1/plans/${ID}/terms`)
-          .set('Authorization', bearer(principal(direct, derived)))
+          .set('Authorization', bearer(principal([...direct, ...derived])))
           .expect(403);
       }
     },

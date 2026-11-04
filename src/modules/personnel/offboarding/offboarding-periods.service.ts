@@ -1,14 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { HeadHandoverRefusedError, PlacementOverlapError } from '../../organization/public/organization.errors';
 import { OffboardingRefusedError } from './offboarding.errors';
 import type { HeadHandoverFacts, OffboardingRecord, SuccessorChoice } from './offboarding.types';
 
 export interface ScheduledDeparture {
   headHandover: HeadHandoverFacts | null;
-  placementClosedId: string;
+  placementClosedId: string | null;
 }
 
 /**
@@ -19,7 +21,11 @@ export interface ScheduledDeparture {
  */
 @Injectable()
 export class OffboardingPeriodsService {
-  constructor(private readonly history: OrganizationHistoryApi) {}
+  constructor(
+    private readonly history: OrganizationHistoryApi,
+    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
+  ) {}
 
   async schedule(
     tx: DbTx,
@@ -42,6 +48,27 @@ export class OffboardingPeriodsService {
         throw new OffboardingRefusedError('PLACEMENT_OVERLAP', { reason: error.reason });
       throw error;
     }
+  }
+
+  /** When cancelling a departure of an employee with a cancelled first placement, restores it if the department is active. */
+  async restoreFirstPlacement(tx: DbTx, held: OffboardingRecord): Promise<boolean | undefined> {
+    if (!held.cancelledPlacementId || !held.cancelledPlacementDepartmentId || !held.cancelledPlacementFrom) {
+      return undefined;
+    }
+    const dept = await this.organizationReads.lockDepartmentShared(tx, held.cancelledPlacementDepartmentId);
+    if (dept && dept.active) {
+      await this.organization.restoreFirstPlacement(tx, {
+        placementId: held.cancelledPlacementId,
+        organizationId: held.organizationId,
+        employeeId: held.employeeId,
+        departmentId: held.cancelledPlacementDepartmentId,
+        validFrom: held.cancelledPlacementFrom,
+      });
+
+      return true;
+    }
+
+    return false;
   }
 
   /** The placement is open again and the head of the department is back where it was, as when the case was not yet written. */

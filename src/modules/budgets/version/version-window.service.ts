@@ -10,7 +10,7 @@ import {
   BudgetWindowBackwardsError,
 } from '../budget/budget.errors';
 import { kindOfChange } from '../budget/budget.policy';
-import { budgetAuditEvent, BudgetSupportService } from '../budget/budget-support.service';
+import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionLineRepo, type VersionLineRecord } from '../budget/version-line.repo';
 import { VersionViewService } from '../budget/version-view.service';
 import type { VersionRecord } from '../budget/version.repo';
@@ -30,7 +30,7 @@ export class VersionWindowService {
     private readonly runner: TransactionRunner,
     private readonly lines: VersionLineRepo,
     private readonly views: VersionViewService,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
     private readonly access: VersionAccessService,
     private readonly history: VersionHistoryService,
     private readonly moved: VersionLineMovedNotifier,
@@ -48,8 +48,8 @@ export class VersionWindowService {
     position: number,
     body: WindowBodyDto,
   ): Promise<VersionLineWire> {
-    this.support.requireFinance(actor);
-    const fiscalStart = await this.support.fiscalYearStartMonth();
+    this.facts.requireFinance(actor);
+    const fiscalStart = await this.facts.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
       const version = await this.access.lockOfOpenYear(tx, id, fiscalStart);
@@ -57,7 +57,7 @@ export class VersionWindowService {
       const line = await this.lines.findLine(id, position, tx);
       if (!line) throw new BudgetLineNotFoundError();
 
-      const amountMinor = body.amount ? await this.support.money(body.amount, version.currency, tx) : undefined;
+      const amountMinor = body.amount ? await this.facts.money(body.amount, version.currency, tx) : undefined;
       const kind = kindOfChange(line, { amountMinor, windowFrom: body.windowFrom, windowTo: body.windowTo });
       if (kind === 'AMOUNT') throw new BudgetRevisionRequiredError();
       if (kind === 'WINDOW') await this.moveWindow(tx, actor, { version, line, position, body });

@@ -17,7 +17,7 @@ export function checkAsk(facts: {
   hasOpenQuestion: boolean;
 }): AskRefusal | null {
   const holder = checkSpendDecider(facts);
-  if (holder) return holder;
+  if (holder !== null) return holder;
 
   return facts.hasOpenQuestion ? 'ALREADY_OPEN' : null;
 }

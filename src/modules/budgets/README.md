@@ -23,7 +23,7 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
 
 - `budget_proposals`, `budget_proposal_lines`, `budget_versions`, `budget_version_lines`,
   `budget_version_line_changes`, `budget_version_decisions`, `budget_version_history`, `budget_commitments`,
-  `budget_commitment_releases` (`prisma/models/budgets.prisma`). Kiểm ngân sách của request
+  `budget_commitment_releases`, `budget_attachments` (`prisma/models/budgets.prisma`). Kiểm ngân sách của request
   (`request_budget_checks`…) thuộc `requests`.
 
 ## Extension point
@@ -33,47 +33,53 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
   Phát từ `version-decision.service.ts`, `version-line.service.ts`, `year-end.service.ts`.
 - Mở `CommitmentReleaseGuardHook` (`budgets.commitment-release-guard`, Hook) — requests
   `spend/commitment-release.listener.ts`. Chưa bind thì nhả phần dư thất bại thay vì cho qua.
+- Đăng ký vào `identity-access.approval-role-change-listeners` và `organization.change-listeners` —
+  `budget/spending-approver-wait.listener.ts`: Super Admin nhận một `CONTROLLED_WAIT_ALERT` (`subject` `BUDGET_VERSION`) mỗi
+  đoạn chờ — khi gửi lúc chưa có người giữ vai, khi vai bị thu hồi, khi người giữ vai nghỉ việc (QĐ-93c, D-S16).
 - Đăng ký vào: `organization.change-listeners` (`budgets.head-change`) —
   `proposal/budget-head-change.listener.ts`; `organization.cost-center-use-readers` (`budgets.commitments`) —
   `commitment/budget-cost-center-use.listener.ts`; `operating-parameters.lock-readers` (`budgets.fiscal-year-start`) —
   `version/fiscal-year-start-lock.listener.ts` (có phiên bản nào thì khóa tháng bắt đầu năm tài chính, US-01-04 AC-8;
   `VersionCreationService` đọc tháng qua `OperatingParametersApi.holdValue` trong transaction tạo phiên bản).
 
-## Capability → file chính
+## Capability và file chính
 
-Một lõi `budget/` và năm capability cùng cấp với nó. Lõi giữ repo, policy, dto, lỗi và notifier dùng chung (`proposal.repo.ts`,
+Một lõi `budget/` và sáu capability cùng cấp với nó. Lõi giữ repo, policy, dto, lỗi và notifier dùng chung (`proposal.repo.ts`,
 `version.repo.ts`, `commitment.repo.ts`, `budget-year-lock.repo.ts`, `budget-facts.repo.ts`, `budget.policy.ts`,
 `budget-notifier.service.ts`, `version-view.service.ts`, `budget.dto.ts`); lõi không import capability nào, mỗi capability chỉ
-import lõi (`pnpm arch:capabilities --module budgets`: năm cạnh, không vòng).
+import lõi (`pnpm arch:capabilities --module budgets`).
 
-- `proposal/` — đề xuất của trưởng phòng: gửi, rút, Finance trả lại, gửi lại (US-06-10);
-  `budget-proposals.controller.ts`; `ProposalService`, `ProposalViewService`.
+- `proposal/` — đề xuất của trưởng phòng: gửi, rút, Finance trả lời, gửi lại (US-06-10);
+  `budget-proposals.controller.ts`; `ProposalService`, `ProposalViewService`, `ProposalSender`.
 - `version/` — version: tạo, sửa dòng, import file dòng, gửi duyệt, quyết định, lịch sử (US-06-09, US-06-11);
   `budget-versions.controller.ts`, `budget-version-lines.controller.ts`; `VersionService`, `VersionLineService`,
-  `VersionDecisionService`, `LineImportService`. `VersionDecisionService` điều phối `VersionDecisionJudge` (xét) và
+  `VersionDecisionService`, `LineImportService`. `VersionDecisionService` điều phối `VersionDecisionJudge` (xAct) và
   `VersionDecisionWriter` (ghi); các bước còn lại tách theo việc: `VersionCreationService`, `VersionRevisionService`,
   `VersionWindowService`, `VersionFigures`, `VersionTrail`, `VersionLineMovedNotifier`, `VersionAccessService` (khóa và
-  kiểm lại). Quyết định, nhả cam kết và đổi dòng là hàm thuần trong `budget/budget.policy.ts`.
+  kiểm lỗi). Quyết định, nhả cam kết và đổi dòng là hàm thuần trong `budget/budget.policy.ts`.
 - `commitment/` — commitment của request, Finance xem và nhả phần dư (US-06-06, US-06-07);
   `budget-commitments.controller.ts`; `CommitmentService`.
-- `budget-view/` — trưởng phòng đọc ngân sách phòng mình, Finance đọc bảng mọi version hiện hành;
+- `budget-view/` — trưởng phòng đọc ngân sách phòng mình và danh sách phiên bản đã gửi (`budgetMineVersionList`), Finance đọc bảng mọi version hiện hành;
   `budgets.controller.ts`; `BudgetViewService`.
 - `year-end/` — đóng ngân sách của năm đã hết (F62, `QĐ-91c`); `year-end.job.ts` chạy mỗi giờ trong tiến
   trình API (ADR-0018), `year-end.service.ts`.
+- `attachment/` — tài liệu đính kèm của đề xuất và phiên bản ngân sách: khai báo, hoàn tất tải lên, kiểm tra chữ ký tệp (`UploadInspection`), gỡ khỏi phiên bản, danh sách và liên kết tải về có thời hạn (US-06-09, US-06-10, QĐ-93j); `budget-attachment-uploads.controller.ts`, `budget-attachment-reads.controller.ts`; `BudgetAttachmentDeclarationService`, `BudgetAttachmentCompletionService`, `BudgetAttachmentRemovalService`, `BudgetAttachmentDiscardService`, `BudgetAttachmentQueryService`, `BudgetAttachmentLinkService`, `ProposalAttachmentBinder`, `BudgetAttachmentRepo`, `budget-attachment.policy.ts`. `BudgetAttachmentExpirySweeper` chạy mỗi giờ quét tệp quá hạn (`BudgetAttachmentExpiryService`).
 
 ## Bất biến quan trọng
 
 - Thứ tự khóa cố định: hàng proposal → hàng version của Cost Center và năm (theo id) → khóa năm, nhiều năm thì năm
-  sớm trước; transaction của request khóa hàng request trước rồi mới khóa năm (`budget-year-lock.repo.ts`, F31).
+  sớm trước; transaction của request khóa hàng request trước rồi mới khóa năm (`budget-year-lock.repo.ts`, F31). Khai báo tài liệu khóa advisory theo uploader; đính kèm khóa dòng tệp theo id tăng dần.
+- Tài liệu đính kèm của đề xuất gắn trong transaction gửi đề xuất và bất biến sau đó. Tài liệu phiên bản chỉ sửa được khi phiên bản ở `DRAFT` hoặc `CHANGES_REQUESTED` chưa detached.
 - Một request giữ tối đa một commitment mỗi năm (`@@unique([requestId, year])`, `BudgetCommitmentExistsError`).
 - Proposal đã gửi không sửa tại chỗ; quyết định version là bản ghi không đổi và không quyết định sau khi năm tài
   chính đã hết (`BUDGET.YEAR_ENDED`, `version-decision.service.ts`).
-- Chỉ Finance dựng version; người quyết định là spending approver hoặc người thay khi approver gửi proposal đó
-  (`budget.policy.ts`, US-06-08 AC-11).
-- `BudgetChangeListeners` chạy trong transaction của thay đổi, listener ném lỗi thì thay đổi bị rollback;
+- Chỉ Finance dựng version; chỉ spending approver quyết định, không ai thay (QĐ-93c, US-06-11 AC-12): chưa ai giữ vai thì
+  phiên bản chờ với `waitingReason` `NO_SPENDING_APPROVER`; phiên bản của đề xuất do chính approver gửi (dữ liệu cũ) không ai
+  quyết, 403 `BUDGET.CONFLICT_OF_INTEREST` (`budget.policy.ts`). Gửi phiên bản đọc grant `FOR SHARE` (M6).
+- `BudgetChangeListeners` chạy trong transaction của thay đổi, listener nào lỗi thì thay đổi bị rollback;
   `LOCK_WAITING` phát trước khi lấy khóa năm.
 
 ## Test
 
-- Unit: `src/modules/budgets/**/*.spec.ts`; HTTP: chưa có `test/http/budgets/`; integration:
+- Unit: `src/modules/budgets/**/*.spec.ts`; HTTP: `test/http/budgets/budget-attachments.http-spec.ts`; integration:
   `test/integration/budgets/`.

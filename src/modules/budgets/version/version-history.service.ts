@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { BudgetSupportService } from '../budget/budget-support.service';
+import { BudgetFactsService } from '../budget/budget-facts.service';
 import {
+  attachmentAdded,
+  attachmentRemoved,
   chunkSnapshots,
   figureChange,
   lineChange,
@@ -24,7 +26,7 @@ import type { VersionRecord } from '../budget/version.repo';
 export class VersionHistoryService {
   constructor(
     private readonly entries: VersionHistoryRepo,
-    private readonly support: BudgetSupportService,
+    private readonly facts: BudgetFactsService,
   ) {}
 
   /** The figures of the version were edited: `before` was read before the edit and `after` is what it wrote. */
@@ -107,8 +109,46 @@ export class VersionHistoryService {
     }
   }
 
+  async attachmentAdded(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    version: VersionRecord,
+    facts: { attachmentId: string; fileName: string; contentType: string; sizeBytes: number },
+  ): Promise<void> {
+    const entry = attachmentAdded(facts);
+    await this.entries.append(tx, {
+      organizationId: version.organizationId,
+      versionId: version.id,
+      kind: 'ATTACHMENT_ADDED',
+      versionState: version.state,
+      before: entry.before,
+      after: entry.after,
+      changedByEmployeeId: actor.employeeId,
+      now: new Date(),
+    });
+  }
+
+  async attachmentRemoved(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    version: VersionRecord,
+    facts: { attachmentId: string; fileName: string; contentType: string; sizeBytes: number },
+  ): Promise<void> {
+    const entry = attachmentRemoved(facts);
+    await this.entries.append(tx, {
+      organizationId: version.organizationId,
+      versionId: version.id,
+      kind: 'ATTACHMENT_REMOVED',
+      versionState: version.state,
+      before: entry.before,
+      after: entry.after,
+      changedByEmployeeId: actor.employeeId,
+      now: new Date(),
+    });
+  }
+
   private async money(currency: string): Promise<(minor: bigint) => string> {
-    const format = await this.support.formatter(currency);
+    const format = await this.facts.formatter(currency);
 
     return (minor) => format(minor).amount;
   }

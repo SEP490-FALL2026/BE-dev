@@ -2,6 +2,7 @@ import type { DemoAccountsApi } from '../../modules/installation/public/demo-acc
 import type { DemoDatasetCommandArguments } from './demo-dataset.arguments';
 import { DemoApiClient, DemoApiError, DemoApiUnreachableError, FetchLike } from './demo-api-client';
 import { businessYearOf, calendarRefusal } from './demo-dataset-calendar';
+import { describeDemoFailure, type DemoRunClock } from './demo-failure';
 import { exitCodeOf, runDemoSteps } from './demo-dataset-runner';
 import type { DemoReport } from './demo-dataset-report';
 import type { DemoSecrets } from './demo-dataset-secrets';
@@ -9,13 +10,16 @@ import { DEMO_FIXTURES, demoSteps } from './demo-dataset-steps';
 import { emptyIds, DemoRunContext } from './demo-run.types';
 import type { DemoFixture } from './fixture/demo-fixture.types';
 
-export type DemoRunOutcome = { refused: string } | { report: DemoReport };
+/** `warnings`: what went wrong after the outcome was known and did not change it (one line each, no secret). */
+export type DemoRunOutcome = ({ refused: string } | { report: DemoReport }) & { warnings?: string[] };
 
 export interface DemoRunInput {
   args: DemoDatasetCommandArguments;
   secrets: DemoSecrets;
   accounts: DemoAccountsApi;
   fetch?: FetchLike;
+  /** Told each phase as the run enters it, so a failure line can place it (demo-failure.ts). */
+  clock?: Pick<DemoRunClock, 'enter'>;
 }
 
 const API_PREFIX = '/api/v1';
@@ -31,19 +35,42 @@ export async function runDemoDataset(input: DemoRunInput): Promise<DemoRunOutcom
   const { args } = input;
   const fixture = DEMO_FIXTURES[args.fixture];
   if (!fixture) return { refused: `Unknown fixture ${args.fixture}; known: ${Object.keys(DEMO_FIXTURES).join(', ')}.` };
+  input.clock?.enter('installation-facts');
   const facts = await installationFacts(input, fixture);
   if ('refused' in facts) return facts;
-  const lock = args.mode === 'apply' ? await input.accounts.holdApplyLock(fixture.id) : null;
-  if (args.mode === 'apply' && !lock) {
+  if (args.mode === 'plan') return runAgainst(input, fixture, facts);
+
+  input.clock?.enter('apply-lock');
+  const lock = await input.accounts.holdApplyLock(fixture.id);
+  if (!lock) {
     return {
       refused: 'Another apply of this fixture is running against this database (its lock is held): nothing written.',
     };
   }
+  // Not a `finally`: a release that throws there replaces the outcome of the run, or its error, by its own (a bare
+  // "Error" when the lock's connection had ended), and the report is never printed.
+  let outcome: DemoRunOutcome;
   try {
-    return await runAgainst(input, fixture, facts);
-  } finally {
-    await lock?.release();
+    outcome = await runAgainst(input, fixture, facts);
+  } catch (error) {
+    await lock.release().catch(() => undefined);
+    throw error;
   }
+  input.clock?.enter('lock-release');
+  const released = await lock.release().then(
+    () => null,
+    (error: unknown) => error,
+  );
+  if (released === null) return outcome;
+
+  return {
+    ...outcome,
+    warnings: [
+      ...(outcome.warnings ?? []),
+      `The apply lock could not be released (${describeDemoFailure(released)}). PostgreSQL frees a session lock ` +
+        'when its connection ends; if that connection ended during the run, a second apply was not kept out from then on.',
+    ],
+  };
 }
 
 type Facts = NonNullable<Awaited<ReturnType<DemoAccountsApi['inspect']>>> & {
@@ -75,8 +102,10 @@ async function runAgainst(input: DemoRunInput, fixture: DemoFixture, facts: Fact
   const { args, secrets } = input;
   const api = new DemoApiClient(`${args.apiUrl}${API_PREFIX}`, { fetch: input.fetch });
   try {
+    input.clock?.enter('api-proof');
     const proven = await proveSameInstallation(api, facts.superAdmin, secrets.superAdminPassword);
     if (proven !== null) return { refused: proven };
+    input.clock?.enter('calendar');
     const calendar = calendarRefusal({
       mode: args.mode,
       today: facts.today,
@@ -84,6 +113,7 @@ async function runAgainst(input: DemoRunInput, fixture: DemoFixture, facts: Fact
       datasetYear: await datasetYear(api, facts, fixture.id),
     });
     if (calendar !== null) return { refused: calendar };
+    input.clock?.enter('steps');
     const steps = await runDemoSteps(context(input, fixture, api, facts), demoSteps(fixture));
 
     return {
@@ -144,7 +174,9 @@ async function proveSameInstallation(
 
     return 'The API at --api-url serves another installation than this database: nothing written.';
   } catch (error) {
-    if (error instanceof DemoApiUnreachableError) return 'The API at --api-url cannot be reached: nothing written.';
+    if (error instanceof DemoApiUnreachableError) {
+      return `The API at --api-url cannot be reached (${error.detail}): nothing written.`;
+    }
     if (error instanceof DemoApiError && error.status === 401) {
       return 'The API refused the Super Admin password (or serves another installation): nothing written.';
     }

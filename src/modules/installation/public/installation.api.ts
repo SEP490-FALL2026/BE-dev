@@ -5,6 +5,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AlreadyInstalledError, InstallationInputError } from './installation.errors';
 import { InstallationInput, installationInputSchema } from '../installation.dto';
 import { InstallationRepo } from '../installation.repo';
@@ -21,7 +22,7 @@ export interface InstallationResult {
  * data in one transaction: the organization, ONE first department with no Cost Center, head or IT Admin in charge, the
  * Super Admin's employee in that department (no job title) and the activated Super Admin account. It creates no Cost Center
  * (Finance creates one for a department that exists, `QĐ-87d`(1)), no job title and no IT employee. Every Audit Trail event
- * it writes carries `installationException: true`: the one set of records written without an HR basis (`QĐ-87b`(1)). A
+ * it writes carries `installationException: true`: the one set of records written outside HTTP, by the installation command (`QĐ-87b`(1)). A
  * second run finds the organization and changes nothing. It never edits an existing account: recovery is a separate,
  * approved procedure (FR-8.10(d)).
  */
@@ -30,6 +31,7 @@ export class InstallationApi {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly audit: AuditApi,
     private readonly repo: InstallationRepo,
@@ -60,7 +62,7 @@ export class InstallationApi {
     return this.runner.run(async (tx) => {
       await this.repo.lockInstallation(tx);
       // Read after the lock: a concurrent installer that finished first is visible now.
-      if (await this.organization.getOrganization(tx)) throw new AlreadyInstalledError();
+      if (await this.organizationReads.getOrganization(tx)) throw new AlreadyInstalledError();
 
       const operator = {
         actorKind: 'OPERATOR' as const,

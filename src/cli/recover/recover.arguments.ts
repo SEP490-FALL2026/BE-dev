@@ -11,7 +11,7 @@ export class RecoveryArgumentError extends Error {
 export const RECOVERY_USAGE = `Usage: pnpm ops:recover <mode> [options]
 
 Recovers the Super Admin role outside the application, under an approved ticket (US-01-09 AC-9 to AC-14). It is the
-only way to change the Super Admin when the holder cannot act; no route of the application does it. Nothing printed here
+only way to change who holds the Super Admin role, planned or urgent; no route of the application does it. Nothing printed here
 is a password or a link: the one-time link goes to a mailbox, and the person sets the password there.
 
 Modes
@@ -22,11 +22,15 @@ Modes
                                        after the link is opened. Refused if another account already uses it.
   unlock              The holder's account is locked and the holder still works. Opens it; changes no role.
       --account-email <login email of the holder>
-  transfer-role       The holder cannot act (left, locked, or nobody holds the role): hand the role to another person.
-                      First run: creates the successor's account (no role) and invites them. After they activate it,
-                      run the same ticket again: the role moves in one step.
+  transfer-role       Hand the role to another person.
+                      Planned transfer (the holder can still act): the successor already has an activated account,
+                      made in the application; the role moves in one step. No account is created, no invitation sent.
+                      The holder cannot act (left, locked, or nobody holds the role): the first run creates the
+                      successor's account (no role) and invites them. After they activate it, run the same ticket
+                      again: the role moves in one step.
       --successor-code <employee code of the successor>
       --holder-email <login email of the current holder>   Required when somebody holds the role; leave out if nobody does.
+                      In SHARED, neither the operator nor the approver is the holder.
 
 Required for every mode
   --ticket <reference>        The approved ticket (for example R-2026-014). The same reference run again does nothing twice.

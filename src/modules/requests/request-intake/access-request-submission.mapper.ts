@@ -9,7 +9,7 @@ import type { Assessment } from '../access-request/request-facts.service';
 export interface SubmittedRequest {
   actor: { employeeId: string; appUserId: string };
   organizationId: string;
-  body: Pick<SubmitBodyDto, 'planId' | 'termMonths' | 'businessReason' | 'projectLabel'>;
+  body: Pick<SubmitBodyDto, 'planId' | 'termMonths' | 'businessReason'>;
   assessed: Pick<Assessment, 'unit' | 'policy' | 'pricing' | 'routing'>;
   now: Date;
   /** The day the access ends, when a renewal was sent after the end of the right. */
@@ -40,7 +40,6 @@ export function newRequestOf(facts: SubmittedRequest): NewAccessRequest {
     costCenterId: unit.costCenter?.id ?? null,
     businessReason: body.businessReason,
     termMonths: body.termMonths,
-    projectLabel: body.projectLabel ?? null,
     expectedEndDate: facts.expectedEndDate ?? null,
     pricing,
     policy,

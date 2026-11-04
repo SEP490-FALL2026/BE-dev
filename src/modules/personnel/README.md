@@ -72,6 +72,11 @@ Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-grap
   `OffboardingPreconditions` (đọc, khóa, kiểm lại sau khóa), `OffboardingEndings` (hủy điều chuyển đang chờ, kết thúc nghỉ dài
   hạn, kỳ trưởng phòng và placement), `OffboardingCaseWriter` (ca, thay đổi đầu tiên, audit, hook, bàn giao, thông báo);
   `OffboardingRevocationService`.
+  Luồng rút gọn cho người chưa xếp phòng (`US-03-04` AC-30, `QĐ-93g`(5), `D-S14`, `D-S17`, `D-S18`, `D-S28`):
+  `offboarding_cases.department_id` có thể null; không placement để kết thúc, không bàn giao trưởng phòng, không nghĩa vụ xác
+  nhận bàn giao của `licensing`; một lần xếp phòng lần đầu chưa hiệu lực mà ngày làm việc cuối đứng trước `validFrom` bị hủy cùng
+  hồ sơ (cột `cancelled_placement_*`, khôi phục khi hủy hồ sơ nếu phòng còn hoạt động); ngày cuối từ `validFrom` ⟹ 409
+  `PLACEMENT_OVERLAP` `FIRST_PLACEMENT_PENDING`. Hồ sơ không phòng hiện cho Super Admin và mọi IT Admin dùng được.
   Con `open-requests/` (`open-requests.controller.ts`), `detail/` (`OffboardingDetailService` dựng chi tiết một ca cho
   controller và `OffboardingViewService`; `offboarding-detail.policy.ts`), `change/` (đổi ngày làm cuối, hủy:
   `OffboardingChangeService` điều phối `OffboardingChangeJudge` (xét) và `OffboardingChangeWriter` (ghi);
@@ -86,7 +91,7 @@ Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-grap
 - `dashboard-facts/` — số đếm cho trang tổng quan theo vai: review sau điều chuyển đang mở của một phòng, ca nghỉ việc đang
   bàn giao của các phòng, thông báo của trưởng phòng chờ xử lý; cùng điều kiện với danh sách tương ứng. Không import capability nào.
 - `event-notice/` — `personnel-file-hooks.service.ts` (chạy file hook), `personnel-notifier.service.ts` (inbox, F17).
-- `super-admin-event/` — Nest module riêng của lệnh, policy, repo ticket, ba service theo họ sự kiện (điều chuyển, nghỉ dài hạn,
+- `super-admin-event/` — Nest module riêng của lệnh (`super-admin-event-cli.module.ts`), policy, repo ticket, ba service theo họ sự kiện (điều chuyển, nghỉ dài hạn,
   thôi việc) và `profile-correction`; tiến trình API và worker không load nó.
 - Gốc module (dùng chung nhiều capability): `personnel-grounds.policy.ts`, `personnel-self-action.policy.ts`,
   `personnel-notice.types.ts` (kiểu thông báo mà `public/personnel.extension-points.ts` và nhiều capability cùng dùng),
@@ -109,3 +114,8 @@ Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-grap
 ## Test
 
 - Unit: `src/modules/personnel/**/*.spec.ts`; HTTP: `test/http/personnel/`; integration: `test/integration/personnel/`.
+- Codec của cột JSON (`.json.ts`): `personnel-head-handover.json.ts` (`head_handover` của `department_transfers` và `offboarding_cases`) và
+  `personnel-change-detail.json.ts` (`detail` của `offboarding_case_changes`) nằm ở gốc module, spec cạnh file (`*.json.spec.ts`); lý do chỗ đặt ở
+  [module structure](../../../docs/rules/module-structure.md).
+
+A successor named in a transfer or departure must hold `MANAGER` and must not hold `SPENDING_APPROVER`; the same refusal reaches notices and the controlled CLI.

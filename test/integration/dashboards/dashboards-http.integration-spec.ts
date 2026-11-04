@@ -1,5 +1,6 @@
 import request from 'supertest';
 import type { ApiAccount } from '../../support/api-accounts';
+import { loginAs } from '../../support/api-accounts';
 import { DashboardHarness, OVERVIEW_PATHS, type OverviewWire, type SectionWire } from '../../support/dashboard-harness';
 import type { Department, Person } from '../../support/request-harness';
 
@@ -124,14 +125,26 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       .send({ subscriptionId: office, keys: ['DASH1-AAAAA-BBBBB-CCCCC-11111', 'DASH2-AAAAA-BBBBB-CCCCC-22222'] })
       .expect(201);
     await h.sentNotice({ employeeId: e3.employeeId, kind: 'DEPARTURE', proposedOn: h.day(5) }, des.head.account);
-  });
+    const k5Plan = await h.plan('K5');
+    await h.sent(e1, k5Plan);
+    // What the overviews must not count: a request of e1 that was withdrawn, a draft of e1, and a request of the head of P-DES
+    // (the spending approver decides it, so it is not a step of the head).
+    const withdrawn = await h.sent(e1, await h.plan('K5'));
+    await h.withdrawRequest(withdrawn.id, { reason: 'No longer needed' }, e1.account).expect(200);
+    await request(h.server())
+      .post('/api/v1/access-requests/drafts')
+      .set(h.as(e1.account))
+      .send({ kind: 'INDIVIDUAL', planId: k5Plan, businessReason: 'Design the new brand', termMonths: 6 })
+      .expect(201);
+    await h.sent(des.head, await h.plan('K5'));
+  }, 300000);
 
   afterAll(async () => {
     await h.stop();
   });
 
   describe('the Employee overview', () => {
-    // US-12-15 AC-2: the software held (K1 to K5), the right about to end, the reports; the requests have no list yet.
+    // US-12-15 AC-2: the software held (K1 to K5), the right about to end, the reports and the open requests.
     it('counts the rights and reports of the caller as their own lists show them', async () => {
       const overview = await overviewOf(OVERVIEW_PATHS.employee, e1.account);
       const rights = await h.itemsOf<{ expiringSoon: boolean }>('/api/v1/me/software-rights', e1.account);
@@ -148,7 +161,12 @@ describe('role overviews (integration, real PostgreSQL)', () => {
         countedAs(await h.totalOf('/api/v1/saas-issues', e1.account, { scope: 'mine' }), 'saasIssueList'),
       );
       expect(overview.sections.saasIssues.count).toBe(1);
-      expect(overview.sections.requests).toEqual(missing('REQUEST_QUEUE_NOT_DELIVERED'));
+      expect(overview.sections.requests).toEqual(
+        countedAs(await h.totalOf('/api/v1/me/access-requests', e1.account, { view: 'open' }), 'meAccessRequestList'),
+      );
+      // One is open; the withdrawn request and the draft of e1 are in no count of it.
+      expect(overview.sections.requests.count).toBe(1);
+      expect(await h.totalOf('/api/v1/me/access-requests', e1.account)).toBe(2);
     });
 
     it('never counts the rights or reports of another person', async () => {
@@ -159,17 +177,36 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       expect(overview.sections.saasIssues.count).toBe(1);
     });
 
-    it('answers true zeros for a person with nothing, and still no number for the requests', async () => {
+    it('answers true zeros for a person with nothing, and zero open requests', async () => {
       const overview = await overviewOf(OVERVIEW_PATHS.employee, e3.account);
 
       expect(overview.sections.softwareRights).toEqual(countedAs(0, 'meSoftwareRightList'));
       expect(overview.sections.saasIssues).toEqual(countedAs(0, 'saasIssueList'));
-      expect(overview.sections.requests).toEqual(missing('REQUEST_QUEUE_NOT_DELIVERED'));
+      expect(overview.sections.requests).toEqual(
+        countedAs(await h.totalOf('/api/v1/me/access-requests', e3.account, { view: 'open' }), 'meAccessRequestList'),
+      );
+      expect(overview.sections.requests.count).toBe(0);
+    });
+
+    it('answers NO_DATA_SOURCE for a Super Admin who has the Employee role', async () => {
+      const { rows } = await h.ctx.sql.query<{ id: string }>(
+        `INSERT INTO role_grants (id, organization_id, app_user_id, role, granted_at)
+         VALUES (gen_random_uuid(), $1, $2, 'EMPLOYEE', now())
+         RETURNING id`,
+        [h.seed.organizationId, h.seed.superAdmin.appUserId],
+      );
+      try {
+        const token = await loginAs(h.ctx.app, h.seed.superAdmin.email, h.seed.superAdmin.password);
+        const overview = await overviewOf(OVERVIEW_PATHS.employee, { ...h.sa, accessToken: token });
+        expect(overview.sections.requests).toEqual(missing('NO_DATA_SOURCE'));
+      } finally {
+        await h.ctx.sql.query(`DELETE FROM role_grants WHERE id = $1`, [rows[0].id]);
+      }
     });
   });
 
   describe('the head overview', () => {
-    // US-12-15 AC-3: the department of the head only; cost, ghost seats and the need queue say they have no source.
+    // US-12-15 AC-3: the department of the head only; cost and ghost seats say they have no source; the need queue is counted.
     it('reads the department H1 heads, counted as its lists show it to H1', async () => {
       const overview = await overviewOf(OVERVIEW_PATHS.manager, des.head.account);
 
@@ -190,7 +227,11 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       expect(overview.sections.transferReviews.count).toBe(1);
       expect(overview.sections.spending).toEqual(missing('FINANCE_FIGURES_NOT_DELIVERED'));
       expect(overview.sections.ghostSeats).toEqual(missing('USAGE_DATA_NOT_DELIVERED'));
-      expect(overview.sections.needApprovals).toEqual(missing('REQUEST_QUEUE_NOT_DELIVERED'));
+      expect(overview.sections.needApprovals).toEqual(
+        countedAs(await h.totalOf('/api/v1/need-decisions', des.head.account), 'needDecisionList'),
+      );
+      // The request of e1 is the one step of H1; H1's own request is the spending approver's.
+      expect(overview.sections.needApprovals.count).toBe(1);
       expect(overview.sections.spendQueue).toEqual({
         state: 'AT_SOURCE',
         count: null,
@@ -209,6 +250,10 @@ describe('role overviews (integration, real PostgreSQL)', () => {
         await h.totalOf(`/api/v1/departments/${eng.department.id}/tools-in-use`, eng.head.account),
       );
       expect(ofEng.sections.departmentSoftware.count).not.toBe(ofDes.sections.departmentSoftware.count);
+      expect(ofEng.sections.needApprovals).toEqual(
+        countedAs(await h.totalOf('/api/v1/need-decisions', eng.head.account), 'needDecisionList'),
+      );
+      expect(ofEng.sections.needApprovals.count).toBe(0);
     });
   });
 

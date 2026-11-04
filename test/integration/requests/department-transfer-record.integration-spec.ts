@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { HR_BASIS } from '../../support/hr-basis';
+import { clearSpendingApprover, setSpendingApprover } from '../../support/builders/account.builder';
 import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
 import { TransferHarness, type TransferWire } from '../../support/transfer-harness';
 import type { Department, Person } from '../../support/request-harness';
@@ -28,7 +28,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
   });
 
   let sequence = 0;
-  const code = (prefix: string) => `${prefix}${(sequence += 1)}`;
+  const code = (prefix: string) => `${prefix}-${(sequence += 1)}`;
   const codeOf = (response: request.Response) => h.codeOf(response);
   const body = (employeeId: string, extra: object = {}) => ({
     employeeId,
@@ -91,7 +91,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
       expect.objectContaining({ department_id: fin.id, valid_from: effectiveOn, valid_to: null }),
     ]);
     const owning = async (day: string) =>
-      (await h.organizationService().getOwningUnits([e1.employeeId], day)).get(e1.employeeId)?.costCenter?.id;
+      (await h.organizationReads().getOwningUnits([e1.employeeId], day)).get(e1.employeeId)?.costCenter?.id;
     expect(await owning(h.day(29))).toBe(des.unitId);
     expect(await owning(effectiveOn)).toBe(fin.unitId);
     expect(await h.auditEventsOf('DEPARTMENT_TRANSFER.RECORDED', wire.id)).toEqual([
@@ -174,7 +174,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
 
     it('hands the department to a member from the day: the head ends the day before and the member begins on it', async () => {
       const { department, head } = await headOf('P-HEAD2');
-      const heir = await h.veteran(department, code('H'));
+      const heir = await h.veteran(department, code('H'), ['MANAGER']);
       const effectiveOn = h.day(30);
 
       const wire = await h.recorded(
@@ -186,6 +186,35 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
         { employee_id: head.employeeId, valid_from: h.today(), valid_to: effectiveOn },
         { employee_id: heir.employeeId, valid_from: effectiveOn, valid_to: null },
       ]);
+    });
+
+    it('refuses a successor without MANAGER or with no account, and the spending approver, and writes nothing (US-03-01 AC-8, US-03-06 AC-23, AC-24)', async () => {
+      const { department, head } = await headOf('P-HEAD6');
+      const withoutRole = await h.veteran(department, code('N'));
+      const approver = await h.veteran(department, code('A'));
+      await setSpendingApprover(h.ctx, h.admin, approver.employeeId);
+      const before = await state(head);
+      const reasonOf = async (employeeId: string) => {
+        const response = await h.recordTransfer(body(head.employeeId, { successor: { kind: 'EMPLOYEE', employeeId } }));
+
+        return [response.status, codeOf(response), h.detailsOf(response)];
+      };
+
+      expect(await reasonOf(withoutRole.employeeId)).toEqual([
+        422,
+        'DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE',
+        { reason: 'MANAGER_ROLE_REQUIRED' },
+      ]);
+      expect(await reasonOf(approver.employeeId)).toEqual([
+        422,
+        'DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE',
+        { reason: 'SPENDING_APPROVER_CANNOT_HEAD' },
+      ]);
+      expect(await state(head)).toEqual(before);
+      expect(await h.headPeriods(department.id)).toEqual([
+        expect.objectContaining({ employee_id: head.employeeId, valid_to: null }),
+      ]);
+      await clearSpendingApprover(h.ctx, h.admin);
     });
 
     it('lets the department be left without a head when that is chosen', async () => {
@@ -221,7 +250,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
       await request(h.server())
         .post('/api/v1/departments')
         .set({ Authorization: `Bearer ${h.admin}` })
-        .send({ code: 'P-BARE', name: 'Department P-BARE', hrBasis: HR_BASIS })
+        .send({ code: 'P-BARE', name: 'Department P-BARE' })
         .expect(201),
     );
     const person = await h.veteran(des, code('E'));
@@ -232,7 +261,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
     expect(wire).toMatchObject({ status: 'PENDING', to: { department: { code: 'P-BARE' } } });
     expect((await h.placements(person.employeeId)).map((row) => row.department_id)).toEqual([des.id, bare.id]);
     const owning = async (day: string) =>
-      (await h.organizationService().getOwningUnits([person.employeeId], day)).get(person.employeeId)?.costCenter?.id;
+      (await h.organizationReads().getOwningUnits([person.employeeId], day)).get(person.employeeId)?.costCenter?.id;
     expect(await owning(h.day(19))).toBe(des.unitId);
   });
 
@@ -341,9 +370,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
     const today = await h.recorded(body(person.employeeId, { effectiveOn: h.today() }));
     expect(today).toMatchObject({ status: 'EFFECTIVE', effectiveOn: h.today() });
     expect(await h.auditEventsOf('DEPARTMENT_TRANSFER.EFFECTIVE', today.id)).toHaveLength(1);
-    expect((await h.organizationService().getEmployeePlacement(person.employeeId, h.today()))?.departmentId).toBe(
-      fin.id,
-    );
+    expect((await h.organizationReads().getEmployeePlacement(person.employeeId, h.today()))?.departmentId).toBe(fin.id);
   });
 
   it('wants a day after the first day of the placement the person has (a person recorded today cannot move today)', async () => {

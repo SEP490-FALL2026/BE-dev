@@ -1,6 +1,6 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
-import { PROJECT_LABEL_MAX_LENGTH, REASON_MAX_LENGTH, TERM_MONTHS_MAX } from '../access-request/access-request.dto';
+import { REASON_MAX_LENGTH, TERM_MONTHS_MAX } from '../access-request/access-request.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** The longest identifier a vendor keeps for an account: the bound of an address, as for any account of a seat. */
@@ -17,7 +17,6 @@ export const serviceAccountSubmitSchema = z.strictObject({
   expectedIdentifier: z.string().trim().min(1).max(IDENTIFIER_MAX_LENGTH),
   businessReason: z.string().trim().min(1).max(REASON_MAX_LENGTH),
   termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
-  projectLabel: z.string().trim().min(1).max(PROJECT_LABEL_MAX_LENGTH).optional(),
   /** The day the money is expected to go out (paid software only); it fixes the budget year. Today when left out. */
   expectedSpendOn: businessDate.optional(),
 });

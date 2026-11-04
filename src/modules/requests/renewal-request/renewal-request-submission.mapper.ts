@@ -14,7 +14,7 @@ export interface RenewalSubmission {
   organizationId: string;
   /** The person who holds the seat and the plan of it. */
   holder: { employeeId: string; planId: string };
-  body: Pick<RenewalBodyDto, 'businessReason' | 'projectLabel'>;
+  body: Pick<RenewalBodyDto, 'businessReason'>;
   termMonths: number;
   newEnd: BusinessDate;
   /** The head of the department sends it for the holder, so the sending confirms the need. */
@@ -70,7 +70,6 @@ export function renewalRequestOf(facts: RenewalSubmission): NewAccessRequest {
     costCenterId: unit.costCenter?.id ?? null,
     businessReason: body.businessReason,
     termMonths: facts.termMonths,
-    projectLabel: body.projectLabel ?? null,
     pricing,
     policy,
     expectedEndDate: facts.newEnd,

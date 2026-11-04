@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import type { PlanRevocationInfo } from '../../catalog/public/catalog.types';
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
-import { OrganizationApi } from '../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { EmployeeRecord } from '../../organization/public/organization.types';
 import { SeatTargetNotFoundError } from '../public/licensing.errors';
 import { HandoverCaseFacts } from './handover-case-facts.service';
@@ -52,7 +52,7 @@ export class HandoverViewService {
     private readonly resolver: HandoverConfirmerResolver,
     private readonly facts: HandoverCaseFacts,
     private readonly history: OrganizationHistoryApi,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
   ) {}
 
@@ -202,7 +202,7 @@ export class HandoverViewService {
   private async namesOf(ids: readonly string[]): Promise<Map<string, EmployeeRecord>> {
     const unique = [...new Set(ids)];
 
-    return new Map((await this.organization.getEmployees(unique)).map((employee) => [employee.id, employee]));
+    return new Map((await this.organizationReads.getEmployees(unique)).map((employee) => [employee.id, employee]));
   }
 
   private async plansOf(ids: readonly string[]): Promise<Map<string, PlanRevocationInfo>> {

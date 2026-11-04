@@ -6,7 +6,7 @@ import { join, relative, sep } from 'node:path';
 import { AppModule } from '../../src/app/app.module';
 import { ACCOUNT_SESSIONS } from '../../src/modules/identity-access/accounts/account-sessions.types';
 import { AccountStatusService } from '../../src/modules/identity-access/accounts/app-users/account-status.service';
-import { SessionDirectoryService } from '../../src/modules/identity-access/auth/session-directory.service';
+import { SessionRecordService } from '../../src/modules/identity-access/auth/session-record.service';
 import { HolderCredentialReset } from '../../src/modules/identity-access/recovery/holder-credential-reset.service';
 import { MailTransport } from '../../src/infrastructure/mail/mail-transport';
 import { AuditController } from '../../src/modules/audit/audit.controller';
@@ -22,17 +22,17 @@ import { PasswordHasher } from '../../src/modules/identity-access/credentials/pa
 import { SessionRepo } from '../../src/modules/identity-access/auth/session.repo';
 import { IdentityAccessApi } from '../../src/modules/identity-access/public/identity-access.api';
 import { IdentityAccessModule } from '../../src/modules/identity-access/identity-access.module';
-import { RecoveryModule } from '../../src/modules/identity-access/recovery.module';
+import { IdentityAccessRecoveryCliModule } from '../../src/modules/identity-access/identity-access-recovery-cli.module';
 import { InstallationModule } from '../../src/modules/installation/installation.module';
-import { InspectionModule } from '../../src/modules/installation/inspect/inspection.module';
-import { DevSeedModule } from '../../src/modules/installation/dev-seed/dev-seed.module';
-import { DemoDatasetModule } from '../../src/modules/installation/demo-dataset/demo-dataset.module';
-import { MigrationPreflightModule } from '../../src/modules/installation/migration-preflight/migration-preflight.module';
-import { SubscriptionOwnerAssignmentModule } from '../../src/modules/catalog/subscription-owner-assignment/subscription-owner-assignment.module';
-import { SubscriptionOwnerAssignmentCliModule } from '../../src/cli/assign-subscription-owner/assign-subscription-owner-cli.module';
-import { CostCenterDirectionCliModule } from '../../src/cli/cost-center-direction/cost-center-direction-cli.module';
-import { SuperAdminEventModule } from '../../src/modules/personnel/super-admin-event/super-admin-event.module';
-import { SuperAdminEventCliModule } from '../../src/cli/record-super-admin-event/record-super-admin-event-cli.module';
+import { InspectionCliModule } from '../../src/modules/installation/inspect/inspection-cli.module';
+import { DevSeedCliModule } from '../../src/modules/installation/dev-seed/dev-seed-cli.module';
+import { DemoDatasetCliModule } from '../../src/modules/installation/demo-dataset/demo-dataset-cli.module';
+import { MigrationPreflightCliModule } from '../../src/modules/installation/migration-preflight/migration-preflight-cli.module';
+import { SubscriptionOwnerAssignmentCliModule } from '../../src/modules/catalog/subscription-owner-assignment/subscription-owner-assignment-cli.module';
+import { AssignSubscriptionOwnerCliModule } from '../../src/cli/assign-subscription-owner/assign-subscription-owner-cli.module';
+import { CostCenterDirectionRootCliModule } from '../../src/cli/cost-center-direction/cost-center-direction-cli.module';
+import { SuperAdminEventCliModule } from '../../src/modules/personnel/super-admin-event/super-admin-event-cli.module';
+import { RecordSuperAdminEventCliModule } from '../../src/cli/record-super-admin-event/record-super-admin-event-cli.module';
 import { IdentityAccessLocalSeedFacadeModule } from '../../src/modules/identity-access/identity-access-local-seed-facade.module';
 import { IdentityAccessInspectionFacadeModule } from '../../src/modules/identity-access/identity-access-inspection-facade.module';
 import { DATABASE_SESSION_OPTIONS } from '../../src/infrastructure/database/read-only-session.module';
@@ -74,6 +74,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // The audited exchange-rate use case the finance HTTP module serves; the raw ledger is not exported.
   'FinanceModule: ExchangeRateService',
   'IdentityAccessFacadeModule: IdentityAccessApi',
+  // D-S21 (qd93-remove-fallback-substitute-approvers): who can never ask for or be given access through a Request, one facade for every route that makes one.
+  'IdentityAccessFacadeModule: RequestPartyEligibilityApi',
   // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the handover
   // duties of a departure, the open grant tasks of a person, the service account duties, and (G4, ADR-0013) the seat baseline the import reads and writes through.
   'LicensingModule: LicensingApi',
@@ -94,12 +96,15 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'LicensingModule: SeatBaselineClosedListeners',
   // H5.5 (identity-access Wave B): the account contracts the API and the recovery command reach the account persistence
   // through; the persistence itself is declared once, here, because every graph needs it.
-  'IdentityAccessFacadeModule: AccountDirectoryService',
+  'IdentityAccessFacadeModule: AccountRecordService',
   'IdentityAccessFacadeModule: ActionLinkService',
   'IdentityAccessFacadeModule: CredentialService',
   // G5 (FR-3.16): where the approval roles and the role of Finance announce that they changed hands, so the account
   // services of the API emit into the one extension point the facade holds and requests listens to.
   'IdentityAccessFacadeModule: ApprovalRoleChangeListeners',
+  // QĐ-93d(3): where the grant of SPENDING_APPROVER asks the modules above it for the open work of a person; requests, budgets and
+  // licensing add a check each from a `*.listener.ts`, so the one point the facade holds is injected by them.
+  'IdentityAccessFacadeModule: SpendingApproverGrantChecks',
   'IdentityAccessFacadeModule: RoleGrantService',
   // H6.1: the read-only account contract of `ops:inspect`, declared only in the inspection graph.
   'IdentityAccessInspectionFacadeModule: IdentityAccessInspectionApi',
@@ -108,20 +113,20 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'IdentityAccessModule: Symbol(ACCESS_TOKEN_VERIFIER)', // port of src/infrastructure/security
   'InstallationModule: InstallationApi',
   // H6.2: the entry service of `pnpm dev:seed`.
-  'DevSeedModule: DevSeedApi',
+  'DevSeedCliModule: DevSeedApi',
   // The in-process part of `pnpm ops:demo-dataset`: the demo accounts of the shared demo dataset (the rest goes through HTTP).
-  'DemoDatasetModule: DemoAccountsApi',
+  'DemoDatasetCliModule: DemoAccountsApi',
   // H6.1: the entry service of `pnpm ops:inspect`.
-  'InspectionModule: InstallationInspectionApi',
+  'InspectionCliModule: InstallationInspectionApi',
   // P28-01 (Prompt 29): the entry service of `pnpm ops:preflight`.
-  'MigrationPreflightModule: MigrationPreflightApi',
+  'MigrationPreflightCliModule: MigrationPreflightApi',
   // F02: the entry service of `pnpm ops:assign-subscription-owner`.
-  'SubscriptionOwnerAssignmentModule: SubscriptionOwnerAssignmentApi',
+  'SubscriptionOwnerAssignmentCliModule: SubscriptionOwnerAssignmentApi',
   // F01: the service `pnpm ops:cost-center-direction` runs and the organization facade asks (whether the link is activated).
-  'CostCenterDirectionModule: CostCenterDirectionApi',
+  'CostCenterDirectionCliModule: CostCenterDirectionApi',
   // F19 (Task 5.5): the controlled procedure for an event about the Super Admin, and the writes of the events it runs with an operator
   // actor (spec L.2): the personnel services of the CLI entry graph, never reached by another module.
-  'SuperAdminEventModule: SuperAdminEventApi',
+  'SuperAdminEventCliModule: SuperAdminEventApi',
   'PersonnelModule: TransferService',
   'PersonnelModule: TransferChangeService',
   'PersonnelModule: LeaveService',
@@ -143,6 +148,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // G8 (US-12-15): the counts of personnel the role overviews read.
   'PersonnelModule: PersonnelDashboardApi',
   'OrganizationModule: OrganizationApi',
+  'OrganizationModule: OrganizationReadApi',
   // The extension points the modules above bind or add to (public/organization.extension-points.ts).
   'OrganizationModule: OrganizationChangeListeners',
   'OrganizationModule: DepartmentUseContributions',
@@ -169,11 +175,13 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'RequestsWorkFacadeModule: RequestDraftRepo',
   // G6 (US-03-04): the facade the personnel context reads the open requests of a person who leaves through.
   'RequestsModule: RequestsApi',
+  // G8 (US-12-15): the counts of requests the role overviews read.
+  'RequestsModule: RequestsDashboardApi',
   // F43: the extension point the personnel context adds its listener of the outcome of a request to (public/requests.extension-points.ts).
   'RequestsModule: RequestOutcomeListeners',
   // The two entry services of `pnpm ops:recover` (Q6; E7): the holder's own account, and the role transfer.
-  'RecoveryModule: HolderRecoveryApi',
-  'RecoveryModule: RoleTransferRecoveryApi',
+  'IdentityAccessRecoveryCliModule: HolderRecoveryApi',
+  'IdentityAccessRecoveryCliModule: RoleTransferRecoveryApi',
 ]);
 
 // The real configuration modules load and validate an env file the moment they are imported. The
@@ -223,18 +231,16 @@ function businessModuleNames(): ReadonlySet<string> {
 
 /**
  * E6 (H5.6): the providers the API and the recovery command both need but the facade does not. Each is declared once
- * in IdentityAccessModule and once in RecoveryModule; the two never meet in one graph, and none is exported.
+ * in IdentityAccessModule and once in IdentityAccessRecoveryCliModule; the two never meet in one graph, and none is exported.
  */
 const DECLARED_FOR_API_AND_RECOVERY = [
   'ActionLinkRevocation',
-  'ApprovalRoleDirectoryService',
-  'ApprovalRoleRepo',
-  'RecoveryRepo',
-  'SessionDirectoryService',
-  'SessionRepo',
-  'SuccessorEligibility',
-  'Symbol(ACCOUNT_SESSIONS)',
+  'ApprovalRoleFactsService',
   'Symbol(APPROVAL_ROLE_HOLDINGS)',
+  'RecoveryRepo',
+  'SessionRecordService',
+  'SessionRepo',
+  'Symbol(ACCOUNT_SESSIONS)',
 ];
 
 /** GATE.2: the one file that declares the session port shared by accounts and recovery (implemented by auth). */
@@ -264,10 +270,10 @@ describe('module graph', () => {
     ['WorkerModule', WorkerModule],
     ['InstallationModule', InstallationModule],
     ['RecoveryCliModule', RecoveryCliModule],
-    ['InspectionModule', InspectionModule],
-    ['DevSeedModule', DevSeedModule],
-    ['DemoDatasetModule', DemoDatasetModule],
-    ['MigrationPreflightModule', MigrationPreflightModule],
+    ['InspectionCliModule', InspectionCliModule],
+    ['DevSeedCliModule', DevSeedCliModule],
+    ['DemoDatasetCliModule', DemoDatasetCliModule],
+    ['MigrationPreflightCliModule', MigrationPreflightCliModule],
   ];
 
   it.each(graphs)('%s declares no provider token in two different modules', (_name, root) => {
@@ -290,7 +296,7 @@ describe('module graph', () => {
     for (const [name, root] of graphs) {
       const graph = collectGraph(root);
       // The preflight (P28-01) reads the database only: no account is in its graph at all.
-      const once = name === 'MigrationPreflightModule' ? 0 : 1;
+      const once = name === 'MigrationPreflightCliModule' ? 0 : 1;
 
       for (const repo of [AppUserRepo, CredentialRepo, RoleGrantRepo, ActionTokenRepo]) {
         expect({ name, repo: repo.name, declarations: declarationsOf(graph, repo).length }).toEqual({
@@ -320,18 +326,20 @@ describe('module graph', () => {
       expect({ name, api: declaredIn(api, name), recovery: declaredIn(recovery, name) }).toEqual({
         name,
         api: ['IdentityAccessModule'],
-        recovery: ['RecoveryModule'],
+        recovery: ['IdentityAccessRecoveryCliModule'],
       });
     }
 
     // No other provider is declared in both modules: the list above is the whole exception, not a pattern.
     const providerNames = (module: Type<unknown>) => metadata(module, 'providers').map((p) => tokenName(tokenOf(p)));
-    const inBoth = providerNames(IdentityAccessModule).filter((name) => providerNames(RecoveryModule).includes(name));
+    const inBoth = providerNames(IdentityAccessModule).filter((name) =>
+      providerNames(IdentityAccessRecoveryCliModule).includes(name),
+    );
     expect(inBoth.sort()).toEqual([...DECLARED_FOR_API_AND_RECOVERY].sort());
   });
 
   // GATE.2
-  it('binds the one ACCOUNT_SESSIONS token to SessionDirectoryService in the API and the recovery command, and injects that token into both consumers', () => {
+  it('binds the one ACCOUNT_SESSIONS token to SessionRecordService in the API and the recovery command, and injects that token into both consumers', () => {
     const declaringFiles = sourceFilesDeclaring("Symbol('ACCOUNT_SESSIONS')");
     expect(declaringFiles).toEqual([ACCOUNT_SESSIONS_OWNER]);
 
@@ -348,8 +356,8 @@ describe('module graph', () => {
         name,
         bindings: [
           {
-            module: name === 'AppModule' ? 'IdentityAccessModule' : 'RecoveryModule',
-            provider: { provide: ACCOUNT_SESSIONS, useExisting: SessionDirectoryService },
+            module: name === 'AppModule' ? 'IdentityAccessModule' : 'IdentityAccessRecoveryCliModule',
+            provider: { provide: ACCOUNT_SESSIONS, useExisting: SessionRecordService },
           },
         ],
       });
@@ -447,7 +455,12 @@ describe('module graph', () => {
   it('applies the export contract to business modules only, not to infrastructure or composition modules', () => {
     const names = businessModuleNames();
 
-    for (const name of ['OrganizationModule', 'IdentityAccessFacadeModule', 'NotificationsModule', 'RecoveryModule']) {
+    for (const name of [
+      'OrganizationModule',
+      'IdentityAccessFacadeModule',
+      'NotificationsModule',
+      'IdentityAccessRecoveryCliModule',
+    ]) {
       expect({ name, isBusiness: names.has(name) }).toEqual({ name, isBusiness: true });
     }
     for (const name of ['DatabaseModule', 'SecurityModule', 'WorkerModule', 'RecoveryCliModule']) {
@@ -536,17 +549,17 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
       expect({
         name,
         mounted: [
-          InspectionModule,
+          InspectionCliModule,
           IdentityAccessInspectionFacadeModule,
-          DevSeedModule,
-          DemoDatasetModule,
+          DevSeedCliModule,
+          DemoDatasetCliModule,
           IdentityAccessLocalSeedFacadeModule,
-          MigrationPreflightModule,
-          SubscriptionOwnerAssignmentModule,
+          MigrationPreflightCliModule,
           SubscriptionOwnerAssignmentCliModule,
-          CostCenterDirectionCliModule,
-          SuperAdminEventModule,
+          AssignSubscriptionOwnerCliModule,
+          CostCenterDirectionRootCliModule,
           SuperAdminEventCliModule,
+          RecordSuperAdminEventCliModule,
         ]
           .filter((module) => modules.includes(module))
           .map((module) => module.name),
@@ -561,13 +574,13 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
       ['WorkerModule', WorkerModule, 0],
       ['InstallationModule', InstallationModule, 0],
       ['RecoveryCliModule', RecoveryCliModule, 0],
-      ['InspectionModule', InspectionModule, 1],
-      ['DevSeedModule', DevSeedModule, 0],
-      ['DemoDatasetModule', DemoDatasetModule, 0],
-      ['MigrationPreflightModule', MigrationPreflightModule, 1],
-      ['SubscriptionOwnerAssignmentCliModule', SubscriptionOwnerAssignmentCliModule, 0],
-      ['CostCenterDirectionCliModule', CostCenterDirectionCliModule, 0],
-      ['SuperAdminEventCliModule', SuperAdminEventCliModule, 0],
+      ['InspectionCliModule', InspectionCliModule, 1],
+      ['DevSeedCliModule', DevSeedCliModule, 0],
+      ['DemoDatasetCliModule', DemoDatasetCliModule, 0],
+      ['MigrationPreflightCliModule', MigrationPreflightCliModule, 1],
+      ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule, 0],
+      ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule, 0],
+      ['RecordSuperAdminEventCliModule', RecordSuperAdminEventCliModule, 0],
     ];
     for (const [name, root, expected] of graphs) {
       expect({ name, readOnly: declarationsOf(collectGraph(root), DATABASE_SESSION_OPTIONS).length }).toEqual({
@@ -579,11 +592,16 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
 
   // rule 1
   it('loads only what the inspection reads: no controller, mail, queue, storage, JWT or API module', () => {
-    const graph = collectGraph(InspectionModule);
+    const graph = collectGraph(InspectionCliModule);
     const modules = graph.map((node) => node.module);
 
     expect(controllersOf(graph)).toEqual([]);
-    for (const forbidden of [NotificationsModule, IdentityAccessModule, RecoveryModule, QueueInfrastructureModule]) {
+    for (const forbidden of [
+      NotificationsModule,
+      IdentityAccessModule,
+      IdentityAccessRecoveryCliModule,
+      QueueInfrastructureModule,
+    ]) {
       expect({ forbidden: forbidden.name, mounted: modules.includes(forbidden) }).toEqual({
         forbidden: forbidden.name,
         mounted: false,
@@ -597,10 +615,15 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
 
   // rule 1, F01
   it('the Cost Center link graph loads the database settings and the audit facade only: no controller, no mail, no queue', () => {
-    const graph = collectGraph(CostCenterDirectionCliModule);
+    const graph = collectGraph(CostCenterDirectionRootCliModule);
 
     expect(controllersOf(graph)).toEqual([]);
-    for (const forbidden of [NotificationsModule, IdentityAccessModule, RecoveryModule, QueueInfrastructureModule]) {
+    for (const forbidden of [
+      NotificationsModule,
+      IdentityAccessModule,
+      IdentityAccessRecoveryCliModule,
+      QueueInfrastructureModule,
+    ]) {
       expect({ forbidden: forbidden.name, mounted: graph.map((node) => node.module).includes(forbidden) }).toEqual({
         forbidden: forbidden.name,
         mounted: false,
@@ -613,10 +636,15 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
 
   // rule 1, F02
   it('the owner-assignment graph loads the database settings, the organization and the audit facades only', () => {
-    const graph = collectGraph(SubscriptionOwnerAssignmentCliModule);
+    const graph = collectGraph(AssignSubscriptionOwnerCliModule);
 
     expect(controllersOf(graph)).toEqual([]);
-    for (const forbidden of [NotificationsModule, IdentityAccessModule, RecoveryModule, QueueInfrastructureModule]) {
+    for (const forbidden of [
+      NotificationsModule,
+      IdentityAccessModule,
+      IdentityAccessRecoveryCliModule,
+      QueueInfrastructureModule,
+    ]) {
       expect({ forbidden: forbidden.name, mounted: graph.map((node) => node.module).includes(forbidden) }).toEqual({
         forbidden: forbidden.name,
         mounted: false,
@@ -630,10 +658,15 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
 
   // rule 1, P28-01
   it('the preflight graph loads the database settings and the database only: no business module', () => {
-    const graph = collectGraph(MigrationPreflightModule);
+    const graph = collectGraph(MigrationPreflightCliModule);
 
     expect(controllersOf(graph)).toEqual([]);
-    for (const forbidden of [NotificationsModule, IdentityAccessModule, RecoveryModule, QueueInfrastructureModule]) {
+    for (const forbidden of [
+      NotificationsModule,
+      IdentityAccessModule,
+      IdentityAccessRecoveryCliModule,
+      QueueInfrastructureModule,
+    ]) {
       expect({ forbidden: forbidden.name, mounted: graph.map((node) => node.module).includes(forbidden) }).toEqual({
         forbidden: forbidden.name,
         mounted: false,
@@ -654,14 +687,14 @@ describe('the local seed graph', () => {
       ['WorkerModule', WorkerModule, 0],
       ['InstallationModule', InstallationModule, 0],
       ['RecoveryCliModule', RecoveryCliModule, 0],
-      ['InspectionModule', InspectionModule, 0],
-      ['DevSeedModule', DevSeedModule, 1],
+      ['InspectionCliModule', InspectionCliModule, 0],
+      ['DevSeedCliModule', DevSeedCliModule, 1],
       // ops:demo-dataset writes its demo accounts through the same contract (one direct role, never a derived one).
-      ['DemoDatasetModule', DemoDatasetModule, 1],
-      ['MigrationPreflightModule', MigrationPreflightModule, 0],
-      ['SubscriptionOwnerAssignmentCliModule', SubscriptionOwnerAssignmentCliModule, 0],
-      ['CostCenterDirectionCliModule', CostCenterDirectionCliModule, 0],
-      ['SuperAdminEventCliModule', SuperAdminEventCliModule, 0],
+      ['DemoDatasetCliModule', DemoDatasetCliModule, 1],
+      ['MigrationPreflightCliModule', MigrationPreflightCliModule, 0],
+      ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule, 0],
+      ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule, 0],
+      ['RecordSuperAdminEventCliModule', RecordSuperAdminEventCliModule, 0],
     ];
     for (const [name, root, expected] of graphs) {
       const modules = collectGraph(root).map((node) => node.module);
@@ -676,8 +709,8 @@ describe('the local seed graph', () => {
   });
 
   it.each([
-    ['DevSeedModule', DevSeedModule],
-    ['DemoDatasetModule', DemoDatasetModule],
+    ['DevSeedCliModule', DevSeedCliModule],
+    ['DemoDatasetCliModule', DemoDatasetCliModule],
   ])(
     '%s loads only what it writes through: no controller, mail, queue, JWT, API module or full configuration',
     (_name, root) => {
@@ -688,7 +721,7 @@ describe('the local seed graph', () => {
       for (const forbidden of [
         NotificationsModule,
         IdentityAccessModule,
-        RecoveryModule,
+        IdentityAccessRecoveryCliModule,
         QueueInfrastructureModule,
         ObjectStorageModule,
       ]) {

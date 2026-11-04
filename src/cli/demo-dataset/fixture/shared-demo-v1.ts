@@ -1,4 +1,5 @@
 import type { DemoFixture } from './demo-fixture.types';
+import { SALES_MARKETING } from './shared-demo-v1-sales-marketing';
 
 /**
  * `shared-demo-v1`: the demo dataset of the shared course VPS, for the FE to connect to the API, test and demonstrate. Every
@@ -14,12 +15,6 @@ export const SHARED_DEMO_V1: DemoFixture = {
   marker: 'DS1',
   emailDomain: 'ds1.slm-demo.example',
   currency: 'VND',
-  basis: {
-    type: 'Quyết định nhân sự (dữ liệu giả lập)',
-    reference: 'DS1-QD-2026-001',
-    issuer: 'Ban Giám đốc (giả lập)',
-    issuedOn: '2026-01-02',
-  },
   departments: [
     {
       code: 'DS1-BOD',
@@ -61,6 +56,7 @@ export const SHARED_DEMO_V1: DemoFixture = {
       itAdmin: 'DS1-ITA1',
       costCenter: { code: 'DS1-CC-ITO', name: 'Phòng Công nghệ thông tin (demo)' },
     },
+    ...SALES_MARKETING.departments,
     {
       code: 'DS1-OPS',
       name: 'Phòng Vận hành (demo, chưa cấu hình xong)',
@@ -183,6 +179,7 @@ export const SHARED_DEMO_V1: DemoFixture = {
       employmentType: 'STAFF',
       account: 'IT_ADMIN',
     },
+    ...SALES_MARKETING.people,
     {
       code: 'DS1-OPS1',
       fullName: 'Tạ Văn Sơn',
@@ -200,7 +197,7 @@ export const SHARED_DEMO_V1: DemoFixture = {
       account: null,
     },
   ],
-  approvalRoles: { SPENDING_APPROVER: 'DS1-CEO', CONFLICT_SUBSTITUTE: 'DS1-DEP', FALLBACK_APPROVER: 'DS1-DEP' },
+  approvalRoles: { SPENDING_APPROVER: 'DS1-CEO' },
   applications: [
     {
       key: 'jira',
@@ -308,23 +305,28 @@ export const SHARED_DEMO_V1: DemoFixture = {
       billingCycle: 'MONTHLY',
       noticePeriodDays: 0,
     },
+    ...SALES_MARKETING.subscriptions,
   ],
   taxProfile: {
     application: 'figma',
     group: 'T2',
     lines: [{ taxType: 'VAT', ratePercent: '10', deductible: true }],
   },
-  budget: {
-    department: 'DS1-ENG',
-    lines: [
-      { description: 'Jira Standard cho cả phòng', plan: 'jira-standard', seats: 20, amount: '48000000' },
-      { description: 'Figma Professional cho nhóm UI', plan: 'figma-professional', seats: 5, amount: '22500000' },
-      { description: 'ChatGPT Plus cho nhóm R&D', plan: 'chatgpt-plus', seats: 5, amount: '30000000' },
-    ],
-    base: '120000000',
-    reserve: '10000000',
-    highValuePercent: 50,
-  },
+  // DS1-DES has no budget on purpose: R9 is checked as NO_ACTIVE_BUDGET and waits for Finance.
+  budgets: [
+    {
+      department: 'DS1-ENG',
+      lines: [
+        { description: 'Jira Standard cho cả phòng', plan: 'jira-standard', seats: 20, amount: '48000000' },
+        { description: 'Figma Professional cho nhóm UI', plan: 'figma-professional', seats: 5, amount: '22500000' },
+        { description: 'ChatGPT Plus cho nhóm R&D', plan: 'chatgpt-plus', seats: 5, amount: '30000000' },
+      ],
+      base: '120000000',
+      reserve: '10000000',
+      highValuePercent: 50,
+    },
+    ...SALES_MARKETING.budgets,
+  ],
   // R1 and R2 are checked against this year's budget: one month from a spend day a week ahead keeps every payment inside
   // the year (a longer term would put payments into next year, which has no budget, and route them to Finance instead).
   requests: [

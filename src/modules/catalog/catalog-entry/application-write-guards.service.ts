@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
-import { OrganizationApi } from '../../organization/public/organization.api';
-import { FunctionalGroupLookupService } from '../functional-group/functional-group-lookup.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { FunctionalGroupFactsService } from '../functional-group/functional-group-facts.service';
 import { VendorDictionaryGroupChangedError, VendorNameHeldByAnotherGroupError } from '../vendor/vendor.errors';
 import {
   ApplicationBusinessOwnerInvalidError,
@@ -22,19 +22,19 @@ import {
 @Injectable()
 export class ApplicationWriteGuards {
   constructor(
-    private readonly organization: OrganizationApi,
-    private readonly functionalGroups: FunctionalGroupLookupService,
+    private readonly organizationReads: OrganizationReadApi,
+    private readonly functionalGroups: FunctionalGroupFactsService,
   ) {}
 
   /** Locks the employee `FOR SHARE` so a departure cannot slip in, then requires them to be still working (`INV-06`). */
   async requireWorkingOwner(tx: DbTx, employeeId: string): Promise<void> {
     try {
-      await this.organization.lockEmployeeForShare(tx, employeeId);
+      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
     } catch (error) {
       if (error instanceof EmployeeNotFoundError) throw new ApplicationBusinessOwnerInvalidError();
       throw error;
     }
-    const employee = await this.organization.getEmployee(employeeId, tx);
+    const employee = await this.organizationReads.getEmployee(employeeId, tx);
     if (!employee || employee.status !== 'ACTIVE') throw new ApplicationBusinessOwnerInvalidError();
   }
 
@@ -56,7 +56,7 @@ export class ApplicationWriteGuards {
   }
 
   async requireOrganizationId(): Promise<string> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The application catalog was used before installation');
 
     return organization.id;

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { ObjectStorageModule } from '../../infrastructure/object-storage/object-storage.module';
 import { AuditModule } from '../audit/audit.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { FinanceModule } from '../finance/finance.module';
@@ -9,11 +10,13 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
 import { OrganizationModule } from '../organization/organization.module';
 import { BudgetCostCenterUseReader } from './commitment/budget-cost-center-use.listener';
 import { BudgetHeadChangeListener } from './proposal/budget-head-change.listener';
+import { BudgetSpendingApproverGrantCheck } from './proposal/spending-approver-grant.listener';
 import { FiscalYearStartLockReader } from './version/fiscal-year-start-lock.listener';
+import { SpendingApproverWaitListener } from './budget/spending-approver-wait.listener';
 import { BudgetFactsRepo } from './budget/budget-facts.repo';
 import { BudgetNotifierService } from './budget/budget-notifier.service';
 import { BudgetProposalsController } from './proposal/budget-proposals.controller';
-import { BudgetSupportService } from './budget/budget-support.service';
+import { BudgetFactsService } from './budget/budget-facts.service';
 import { BudgetYearLockRepo } from './budget/budget-year-lock.repo';
 import { BudgetVersionLinesController } from './version/budget-version-lines.controller';
 import { BudgetVersionsController } from './version/budget-versions.controller';
@@ -28,6 +31,8 @@ import { DecisionRepo } from './budget/decision.repo';
 import { LineImportService } from './version/line-import.service';
 import { ProposalRepo } from './budget/proposal.repo';
 import { ProposalService } from './proposal/proposal.service';
+import { ProposalSender } from './proposal/proposal-sender.service';
+import { ProposalAttachmentBinder } from './attachment/proposal-attachment-binder.service';
 import { ProposalViewService } from './proposal/proposal-view.service';
 import { VersionAccessService } from './version/version-access.service';
 import { VersionHistoryRepo } from './version/version-history.repo';
@@ -49,6 +54,17 @@ import { VersionService } from './version/version.service';
 import { VersionViewService } from './budget/version-view.service';
 import { BudgetYearEndService } from './year-end/year-end.service';
 import { BudgetYearEndSweeper } from './year-end/year-end.job';
+import { BudgetAttachmentUploadsController } from './attachment/budget-attachment-uploads.controller';
+import { BudgetAttachmentReadsController } from './attachment/budget-attachment-reads.controller';
+import { BudgetAttachmentRepo } from './attachment/budget-attachment.repo';
+import { BudgetAttachmentDeclarationService } from './attachment/budget-attachment-declaration.service';
+import { BudgetAttachmentCompletionService } from './attachment/budget-attachment-completion.service';
+import { BudgetAttachmentRemovalService } from './attachment/budget-attachment-removal.service';
+import { BudgetAttachmentDiscardService } from './attachment/budget-attachment-discard.service';
+import { BudgetAttachmentQueryService } from './attachment/budget-attachment-query.service';
+import { BudgetAttachmentLinkService } from './attachment/budget-attachment-link.service';
+import { BudgetAttachmentExpiryService } from './attachment/budget-attachment-expiry.service';
+import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-expiry.job';
 
 /**
  * The budgets context (C5, ADR-0016): the proposals the heads of department send for a Cost Center and a fiscal year, and
@@ -69,6 +85,7 @@ import { BudgetYearEndSweeper } from './year-end/year-end.job';
     CatalogModule,
     NotificationsModule,
     OperatingParametersModule,
+    ObjectStorageModule,
   ],
   controllers: [
     BudgetProposalsController,
@@ -76,6 +93,8 @@ import { BudgetYearEndSweeper } from './year-end/year-end.job';
     BudgetVersionLinesController,
     BudgetsController,
     BudgetCommitmentsController,
+    BudgetAttachmentUploadsController,
+    BudgetAttachmentReadsController,
   ],
   providers: [
     ProposalRepo,
@@ -85,10 +104,12 @@ import { BudgetYearEndSweeper } from './year-end/year-end.job';
     DecisionRepo,
     CommitmentRepo,
     BudgetYearLockRepo,
-    BudgetSupportService,
+    BudgetFactsService,
     BudgetNotifierService,
     ProposalViewService,
     ProposalService,
+    ProposalSender,
+    ProposalAttachmentBinder,
     VersionViewService,
     VersionAccessService,
     VersionHistoryService,
@@ -107,13 +128,24 @@ import { BudgetYearEndSweeper } from './year-end/year-end.job';
     LineImportService,
     BudgetYearEndService,
     BudgetYearEndSweeper,
+    BudgetAttachmentRepo,
+    BudgetAttachmentDeclarationService,
+    BudgetAttachmentCompletionService,
+    BudgetAttachmentRemovalService,
+    BudgetAttachmentDiscardService,
+    BudgetAttachmentQueryService,
+    BudgetAttachmentLinkService,
+    BudgetAttachmentExpiryService,
+    BudgetAttachmentExpirySweeper,
     BudgetViewService,
     BudgetFactsRepo,
     BudgetChangeListeners,
     CommitmentReleaseGuardHook,
     BudgetCostCenterUseReader,
     BudgetHeadChangeListener,
+    BudgetSpendingApproverGrantCheck,
     FiscalYearStartLockReader,
+    SpendingApproverWaitListener,
     CommitmentService,
     BudgetsApi,
   ],

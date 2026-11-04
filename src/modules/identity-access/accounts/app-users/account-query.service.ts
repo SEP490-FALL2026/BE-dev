@@ -3,7 +3,7 @@ import { cutHistory } from '../../../../core/application/pagination';
 import { businessDateAt, toDateColumn } from '../../../../core/business-date';
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
 import { DeliveryState } from '../../../notifications/public/notifications.types';
-import { OrganizationApi } from '../../../organization/public/organization.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { EmployeeCandidate } from '../../../organization/public/organization.types';
 import {
   AccountListFilter,
@@ -14,7 +14,7 @@ import {
   RoleGrantRecord,
 } from '../../public/identity-access.types';
 import { employeeHasNotLeft } from '../account.policy';
-import { AccountDirectoryService } from '../account-directory.service';
+import { AccountRecordService } from '../account-record.service';
 import { AccountNotFoundError } from '../account.errors';
 import { ActionLinkService } from '../action-link.service';
 import { RoleGrantService } from '../role-grant.service';
@@ -59,30 +59,40 @@ export const ROLE_HISTORY_LIMIT = 50;
 @Injectable()
 export class AccountQueryService {
   constructor(
-    private readonly accounts: AccountDirectoryService,
+    private readonly accounts: AccountRecordService,
     private readonly grants: RoleGrantService,
     private readonly links: ActionLinkService,
-    private readonly organization: OrganizationApi,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly notifications: NotificationsApi,
   ) {}
 
   /** Employees who have not left and have no account yet. */
   async listCandidates(search: string | undefined): Promise<EmployeeCandidate[]> {
-    const organization = await this.organization.getOrganization();
+    const organization = await this.organizationReads.getOrganization();
     const today = toDateColumn(businessDateAt(new Date(), organization?.timeZone ?? 'UTC'));
     // Every employee who already has an account, handed to the organization module so it can leave
     // them out in the same query that searches, sorts and limits: no window, no page cap.
     const withAccount = await this.accounts.findEmployeeIdsWithAccount();
 
-    return this.organization.searchActiveEmployees(search, today, CANDIDATE_LIMIT, withAccount);
+    return this.organizationReads.searchActiveEmployees(search, today, CANDIDATE_LIMIT, withAccount);
   }
 
   async listAccounts(
-    filter: Omit<AccountListFilter, 'skip' | 'take'> & { page: number; pageSize: number },
+    filter: Omit<AccountListFilter, 'skip' | 'take' | 'employeeIds'> & {
+      page: number;
+      pageSize: number;
+      departmentId?: string;
+      memberOn?: string;
+    },
   ): Promise<AccountPage> {
-    const { page, pageSize, ...criteria } = filter;
+    const { page, pageSize, departmentId, memberOn, ...criteria } = filter;
+    const employeeIds =
+      departmentId === undefined
+        ? undefined
+        : ((await this.organizationReads.getDepartmentMemberIds(departmentId, memberOn)) ?? []);
     const { items, total } = await this.accounts.listAccountRecords({
       ...criteria,
+      ...(employeeIds === undefined ? {} : { employeeIds }),
       skip: (page - 1) * pageSize,
       take: pageSize,
     });
@@ -103,7 +113,7 @@ export class AccountQueryService {
 
   private async toViews(records: AccountRecord[]): Promise<AccountView[]> {
     const employees = new Map(
-      (await this.organization.getEmployees(records.map((record) => record.employeeId))).map((employee) => [
+      (await this.organizationReads.getEmployees(records.map((record) => record.employeeId))).map((employee) => [
         employee.id,
         employee,
       ]),
@@ -142,7 +152,7 @@ export class AccountQueryService {
           token.consumedAt === null &&
           token.revokedAt === null &&
           token.expiresAt > new Date() &&
-          employeeHasNotLeft(await this.organization.getEmployee(record.employeeId)),
+          employeeHasNotLeft(await this.organizationReads.getEmployee(record.employeeId)),
         expiresAt: token.expiresAt,
       };
     }

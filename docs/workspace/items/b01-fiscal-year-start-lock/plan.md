@@ -13,7 +13,7 @@
   source `operating-parameters.*`, `budget-year-lock.repo.ts`, `version-creation.service.ts`, `organization.extension-points.ts`
   (mẫu `Contributions`), cổng `extension-wiring` và `module-graph`.
 - Hiện trạng trước khi sửa: **chưa có khóa nào**. `OperatingParametersApi.set` đổi `FISCAL_YEAR_START_MONTH` không hỏi ai;
-  `VersionCreationService` đọc tháng **ngoài** transaction (`BudgetSupportService.fiscalYearStartMonth`). Chỉ có khóa năm ngân sách
+  `VersionCreationService` đọc tháng **ngoài** transaction (`BudgetFactsService.fiscalYearStartMonth`). Chỉ có khóa năm ngân sách
   theo (Cost Center, năm), không phục vụ bất biến toàn cục này.
 - Môi trường: PostgreSQL Docker `slm-test-db` (127.0.0.1:55432), mỗi file integration một database riêng; không `.env`, không DB dev.
   Không migration.
@@ -36,7 +36,7 @@
 ### Task 2: reader của budgets và đọc tháng trong transaction tạo phiên bản
 
 - Files: `src/modules/budgets/version/fiscal-year-start-lock.listener.ts`, `…listener.spec.ts`,
-  `src/modules/budgets/budget/version.repo.ts` (`anyExists`), `budget-support.service.ts` (`holdFiscalYearStartMonth`),
+  `src/modules/budgets/budget/version.repo.ts` (`anyExists`), `budget-facts.service.ts` (`holdFiscalYearStartMonth`),
   `src/modules/budgets/version/version-creation.service.ts`, `budgets.module.ts`, `src/modules/budgets/README.md`.
 - Depends on: Task 1.
 - Acceptance: reader trả `BUDGET_VERSION_EXISTS` khi có bất kỳ `budget_versions`; `createFromProposal` lấy khóa chia sẻ của key

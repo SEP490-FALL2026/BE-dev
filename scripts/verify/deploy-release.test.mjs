@@ -66,7 +66,7 @@ const created = [];
  * environment value, as a real log may.
  *
  * Containers: generation 0 is what ran before the deploy (image FAKE_GEN0_IMAGE, none when empty); each successful
- * `up -d --force-recreate api worker caddy` makes the next generation, with the API_IMAGE, the sha256 of the mounted
+ * `up -d --no-deps --force-recreate api` makes the next generation, with the API_IMAGE, the sha256 of the mounted
  * Caddyfile and the generation of the `.env` it was created with. `compose ps -a -q <service>`, `inspect` and `exec`
  * answer for container `fake-<service>-<generation>`. FAKE_BAD_NEW / FAKE_BAD_OLD list `service:behaviour` for containers
  * of the new image / of any other image: notready (readiness not 2xx), image (runs another image), crashloop (restart
@@ -148,20 +148,31 @@ count() {
   echo "$counted" > "$state/$1"
 }
 case "$*" in
+  "logs "*)
+    echo '{"context":"StartupTiming","phase":"imports-loaded","elapsedMs":123}'
+    echo "private application log $FAKE_ENV_VALUE" ;;
   *" caddy caddy validate "*)
     echo "caddy: DOMAIN=$FAKE_ENV_VALUE"
     echo "caddy: DOMAIN=$FAKE_ENV_VALUE" >&2
     if grep -q MALFORMED "\${CADDYFILE_PATH:-$project/Caddyfile}"; then exit 1; fi ;;
   *" pg_dump "*) printf 'PGDMP fake dump' ;;
   *" pg_restore "*) cat > /dev/null ;;
-  *" up -d --force-recreate api worker caddy")
+  *" up -d --no-deps --force-recreate api")
     generation=$((generation + 1))
     printf '%s' "\${API_IMAGE:-}" > "$state/image-$generation"
     sha256sum "\${CADDYFILE_PATH:-$project/Caddyfile}" | cut -d ' ' -f 1 > "$state/caddy-$generation"
     if grep -qx 'ENV_GENERATION=pre-h7' "$project/.env"; then echo pre-h7; else echo h7; fi > "$state/env-$generation"
     echo "$generation" > "$state/generation" ;;
+  *" up -d --no-deps --force-recreate worker") : > "$state/started-worker-$generation" ;;
+  *" up -d --no-deps --force-recreate caddy") : > "$state/started-caddy-$generation" ;;
   *" ps -a -q "*)
+    # Daemon stops answering Compose listings after a candidate exec stalls. Recovery's new generation works.
+    if [ -e "$state/exec-stalled-$generation" ]; then exit 124; fi
     service="\${@: -1}"
+    # Before its staged recreation, worker/Caddy still belong to the preceding generation.
+    if [ "$service" != api ] && [ "$generation" -gt 0 ] && [ ! -e "$state/started-$service-$generation" ]; then
+      generation=$((generation - 1))
+    fi
     image_of "$generation"
     [ -n "$generation_image" ] || exit 0
     behaves "$service" "$generation" missing && exit 0
@@ -191,6 +202,14 @@ case "$*" in
     echo "$image|$status|$restarting|$restarts" ;;
   "exec "*" node -e "*)
     IFS=- read -r _ service container _ <<< "$2"
+    if behaves "$service" "$container" execstall; then
+      count "exec-probes-$container"
+      if [ "$counted" -ge 3 ]; then
+        : > "$state/exec-stalled-$container"
+        exit 124
+      fi
+    fi
+    if behaves "$service" "$container" lostafterworker && [ -e "$state/started-worker-$container" ]; then exit 1; fi
     # What releases/current-attempt said while the release was being checked (it must not have moved yet).
     if [ -f "$FAKE_APP/releases/current-attempt" ]; then
       value_of "$FAKE_APP/releases/current-attempt" ''
@@ -599,7 +618,9 @@ function tree(dir) {
 }
 const marker = (target) => optional(join(target.app, 'releases', 'current-attempt'));
 const markerOf = (attempt) => `releases/${RELEASE}/attempts/${attempt}\n`;
-const recreations = (result) => result.calls.filter((call) => call.includes('--force-recreate'));
+// Each API recreation begins one release generation; worker/Caddy are separate steps in that generation.
+const API_RECREATE = / up -d --no-deps --force-recreate api$/;
+const recreations = (result) => result.calls.filter((call) => API_RECREATE.test(call));
 const step = (result, pattern) => result.calls.findIndex((call) => pattern.test(call));
 const VALIDATE = / run --rm --no-deps -T caddy caddy validate --config \/etc\/caddy\/Caddyfile --adapter caddyfile$/;
 const PROBE = (generation) => new RegExp(`^exec fake-api-${generation} node -e `);
@@ -681,7 +702,7 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
       step(result, / migrate node dist\/migration-preflight-cli\.js$/),
       step(result, / migrate node node_modules\/prisma\/build\/index\.js migrate deploy$/),
       step(result, / migrate node dist\/database-roles-cli\.js reconcile$/),
-      step(result, / up -d --force-recreate api worker caddy$/),
+      step(result, API_RECREATE),
       step(result, PROBE(1)),
     ];
     assert.ok(
@@ -695,7 +716,7 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
     // Everything before the recreation used the candidate; the validation mounted the candidate Caddyfile, the
     // recreation the (now promoted) live one.
     const recreate = order.at(-2);
-    for (const call of result.calls.slice(0, recreate)) {
+    for (const call of result.calls.slice(0, step(result, / stop worker$/))) {
       if (call.startsWith('compose'))
         assert.match(call, new RegExp(`-f \\S*releases/${RELEASE}/docker-compose\\.prod\\.yml`));
     }
@@ -712,8 +733,33 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
       );
     }
     assert.ok(after.filter((call) => PROBE(1).test(call)).length >= 2);
+    const startOrder = [
+      step(result, / stop worker$/),
+      recreate,
+      step(result, PROBE(1)),
+      step(result, / up -d --no-deps --force-recreate worker$/),
+      step(result, / up -d --no-deps --force-recreate caddy$/),
+      result.calls.findLastIndex((call) => PROBE(1).test(call)),
+    ];
+    assert.ok(startOrder.every((index) => index >= 0));
+    assert.deepEqual(
+      startOrder,
+      [...startOrder].sort((a, b) => a - b),
+    );
     assert.ok(after.some((call) => call === 'exec fake-caddy-1 sha256sum /etc/caddy/Caddyfile'));
     assert.match(result.output, /Release [0-9a-f]{40} is live and ready \(attempt 40177719652-2\)/);
+    const timeline = readFileSync(
+      join(target.app, `.deploy-diagnostics-${RELEASE}-${ATTEMPT}`, 'host-timeline.txt'),
+      'utf8',
+    );
+    assert.match(timeline, /phase=before-recreate/);
+    assert.ok((timeline.match(/phase=look/g) ?? []).length >= 2);
+    const startup = readFileSync(
+      join(target.app, `.deploy-diagnostics-${RELEASE}-${ATTEMPT}`, 'api-startup.log'),
+      'utf8',
+    );
+    assert.match(startup, /StartupTiming/);
+    assert.equal(startup.includes(SECRET), false);
     assert.equal(result.output.includes(SECRET), false);
   });
 
@@ -794,11 +840,9 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
 
     assert.equal(result.status, 1, result.output);
     assert.deepEqual(live(target), LIVE);
-    const recreate = result.calls
-      .map((call, index) => [call, index])
-      .filter(([call]) => call.includes('--force-recreate'));
+    const recreate = result.calls.map((call, index) => [call, index]).filter(([call]) => API_RECREATE.test(call));
     assert.equal(recreate.length, 2, result.calls.join('\n'));
-    assert.match(recreate[1][0], / up -d --force-recreate api worker caddy$/);
+    assert.match(recreate[1][0], API_RECREATE);
     assert.match(
       result.environments[recreate[1][1]],
       new RegExp(`API_IMAGE=${PREVIOUS_IMAGE} CADDYFILE_PATH=\\S*/app/Caddyfile$`),
@@ -809,6 +853,106 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
     assert.match(result.output, /RECOVERY: the previous release ghcr\.io\/example\/slm-api:a{40} is ready/);
     assert.match(result.output, /No migration was rolled back.*slm-pre-migrate-/s);
     assert.equal(result.output.includes(SECRET), false);
+  });
+
+  it('captures private candidate diagnostics before rollback, without leaking application logs to Actions', () => {
+    const target = host();
+    const result = deploy(target, { badNew: 'api:notready' });
+    assert.equal(result.status, 1, result.output);
+    const diagnostic = join(target.app, `.deploy-diagnostics-${RELEASE}-${ATTEMPT}`);
+    assert.ok(readFileSync(join(diagnostic, 'api.log'), 'utf8').includes(SECRET));
+    assert.equal(result.output.includes(SECRET), false);
+    assert.match(result.output, /probe exit 1; no output/);
+    const logIndex = result.calls.findIndex((call) => call.includes('logs --timestamps --tail 200 fake-api-1'));
+    const stopIndex = result.calls.findIndex((call) => call.includes(' stop api worker'));
+    assert.ok(logIndex >= 0 && stopIndex > logIndex, result.calls.join('\n'));
+    assert.deepEqual(live(target), LIVE);
+    assert.match(result.output, /RECOVERY: the previous release .* is ready/);
+    if (process.platform !== 'win32') {
+      assert.equal(statSync(diagnostic).mode & 0o777, 0o700);
+      assert.equal(statSync(join(diagnostic, 'api.log')).mode & 0o777, 0o600);
+    }
+  });
+
+  for (const failedStep of [
+    'stop worker',
+    'up -d --no-deps --force-recreate worker',
+    'up -d --no-deps --force-recreate caddy',
+  ]) {
+    it(`recovers the previous release when staged ${failedStep} fails`, () => {
+      const target = host();
+      const result = deploy(target, { fail: failedStep, once: true });
+      assert.equal(result.status, 1, result.output);
+      assert.deepEqual(live(target), LIVE);
+      assert.match(result.output, /RECOVERY: the previous release .* is ready/);
+      assert.equal(marker(target), null);
+    });
+  }
+
+  it('never starts candidate worker/Caddy if the API cannot become ready alone', () => {
+    const target = host();
+    const result = deploy(target, { badNew: 'api:notready' });
+    assert.equal(result.status, 1, result.output);
+    const candidateCalls = result.calls.filter((_, index) =>
+      result.environments[index].includes(`API_IMAGE=${IMAGE} `),
+    );
+    assert.ok(!candidateCalls.some((call) => / up -d --no-deps --force-recreate (worker|caddy)$/.test(call)));
+    assert.match(result.output, /RECOVERY: the previous release .* is ready/);
+  });
+
+  it('still refuses success when the API loses readiness after worker startup', () => {
+    const target = host();
+    const result = deploy(target, { badNew: 'api:lostafterworker' });
+    assert.equal(result.status, 1, result.output);
+    assert.ok(result.calls.some((call) => / up -d --no-deps --force-recreate worker$/.test(call)));
+    assert.match(result.output, /API answers ready; starting worker/);
+    assert.doesNotMatch(result.output, /is live and ready/);
+    assert.match(result.output, /RECOVERY: the previous release .* is ready/);
+  });
+
+  it('continues rollback when diagnostic log collection fails', () => {
+    const target = host();
+    const result = deploy(target, { badNew: 'api:notready', fail: 'logs --timestamps' });
+    assert.equal(result.status, 1, result.output);
+    assert.deepEqual(live(target), LIVE);
+    assert.match(result.output, /RECOVERY: the previous release .* is ready/);
+    assert.match(
+      readFileSync(join(target.app, `.deploy-diagnostics-${RELEASE}-${ATTEMPT}`, 'api-state.txt'), 'utf8'),
+      /logs exit=1/,
+    );
+  });
+
+  it('keeps all candidate logs using cached IDs when Docker listings fail after an exec timeout', () => {
+    const target = host();
+    const result = deploy(target, { badNew: 'api:execstall' });
+    assert.equal(result.status, 1, result.output);
+    assert.match(result.output, /docker exec\/probe exceeded 15 s/);
+    assert.match(result.output, /RECOVERY: the previous release .* is ready/);
+    const dir = join(target.app, `.deploy-diagnostics-${RELEASE}-${ATTEMPT}`);
+    for (const service of ['api', 'worker', 'caddy']) {
+      assert.ok(readFileSync(join(dir, `${service}.log`), 'utf8').includes(SECRET));
+      assert.equal(readFileSync(join(dir, `${service}-id.txt`), 'utf8').trim(), `fake-${service}-1`);
+    }
+    const timeline = readFileSync(join(dir, 'host-timeline.txt'), 'utf8');
+    assert.match(timeline, /phase=before-recreate/);
+    assert.match(timeline, /phase=probe-failed/);
+    assert.match(readFileSync(join(dir, 'host-failure.txt'), 'utf8'), /phase=failure/);
+    assert.ok(Buffer.byteLength(timeline) <= 1048576);
+    assert.equal(result.output.includes(SECRET), false);
+    assert.deepEqual(live(target), LIVE);
+  });
+
+  it('leaves existing diagnostic evidence untouched and still recovers', () => {
+    const target = host();
+    const dir = join(target.app, `.deploy-diagnostics-${RELEASE}-${ATTEMPT}`);
+    mkdirSync(dir);
+    writeFileSync(join(dir, 'host-timeline.txt'), 'existing evidence');
+    const result = deploy(target, { badNew: 'api:notready' });
+    assert.equal(result.status, 1, result.output);
+    assert.match(result.output, /Diagnostics incomplete or unavailable/);
+    assert.match(result.output, /RECOVERY: the previous release .* is ready/);
+    assert.deepEqual(readdirSync(dir), ['host-timeline.txt']);
+    assert.equal(readFileSync(join(dir, 'host-timeline.txt'), 'utf8'), 'existing evidence');
   });
 
   it('reports a recovery step that fails, with the previous release state still restored (H7-OPS-RV-02)', () => {
@@ -846,7 +990,7 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
 
   describe('readiness after the recreation (H7-OPS-RV-04)', () => {
     for (const [what, badNew, reason] of [
-      ['the API never answers ready', 'api:notready', /api: .*did not answer 2xx/],
+      ['the API never answers ready', 'api:notready', /api: readiness probe failed/],
       ['the API runs another image', 'api:image', /api: runs ghcr\.io\/example\/slm-api:b{40}/],
       ['the worker crash-loops', 'worker:crashloop', /worker: restarted/],
       ['the worker keeps restarting', 'worker:restarting', /worker: restarting/],
@@ -1400,7 +1544,7 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
         // Released when the first ended: the next deployment takes the same lock and runs to the end.
         const next = deploy(target, { release: OTHER_SHA, attempt: 'successor-1' });
         assert.equal(next.status, 0, next.output);
-        assert.ok(next.calls.some((call) => / up -d --force-recreate api worker caddy$/.test(call)));
+        assert.ok(next.calls.some((call) => API_RECREATE.test(call)));
         assert.equal(live(target).image, `${OTHER_IMAGE}\n`);
         assert.equal(marker(target), `releases/${OTHER_SHA}/attempts/successor-1\n`);
         // The lock file stays behind, naming its last holder, and carries no credential.

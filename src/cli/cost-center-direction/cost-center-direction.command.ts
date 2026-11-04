@@ -15,7 +15,7 @@ export const costCenterDirectionCommand = defineCommand({
   execute: (parsed) =>
     runInNestContext({
       // The graph validates the database settings only.
-      graph: () => import('./cost-center-direction-cli.module').then((m) => m.CostCenterDirectionCliModule),
+      graph: () => import('./cost-center-direction-cli.module').then((m) => m.CostCenterDirectionRootCliModule),
       work: async (app) => {
         const service = app.get(CostCenterDirectionApi);
 

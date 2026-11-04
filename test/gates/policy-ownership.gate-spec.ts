@@ -53,7 +53,6 @@ const PUBLIC_ROOT_POLICY_FILES: ReadonlyMap<string, PolicyContract> = new Map([
 
 /** The reasons the placement policy decides; written as literals here so the gate does not trust the policy. */
 const PLACEMENT_REASON_CODES: ReadonlySet<string> = new Set([
-  'DEPARTMENT_REQUIRED',
   'DEPARTMENT_NOT_FOUND',
   'DEPARTMENT_INACTIVE',
   'JOB_TITLE_TOO_LONG',
@@ -75,11 +74,6 @@ const OTHER_DECISIONS: ReadonlyMap<string, { codes: readonly string[]; reason: s
     'installation/public/dev-seed.types.ts',
     { codes: ['DEPARTMENT_INACTIVE'], reason: 'the SeedConflict type of the same comparison' },
   ],
-  [
-    'organization/project/project.errors.ts',
-    { codes: ['DEPARTMENT_NOT_FOUND'], reason: 'a project names departments that must exist (ProjectInvalidError)' },
-  ],
-  ['organization/project/project.service.ts', { codes: ['DEPARTMENT_NOT_FOUND'], reason: 'raises that project error' }],
   [
     'organization/public/cost-center-direction.errors.ts',
     {

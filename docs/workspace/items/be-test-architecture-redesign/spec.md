@@ -20,6 +20,15 @@ Actions và job `deploy` phụ thuộc các job đó.
 
 ## Ngân sách thời gian CI (31/10/2026, `OD-R8` = B)
 
+> **Owner chốt 31/10/2026: giữ job integration 40 phút, ngoại lệ có theo dõi.**
+> [CI 41191829114](https://github.com/WDP301-FA26-GR8/BE/actions/runs/41191829114) trên `main`
+> `c14c06a36c6cfa6158bddd0a09b11e210df2605d`: job 34 phút 11 giây; parallel 30 phút 27 giây, timing 56 giây,
+> serial 75 giây; các job quality/HTTP/integration/E2E đều xanh. Giữ nguyên workflow và timeout từng test.
+> Budget này là ngoại lệ Owner của quy tắc p95 + 50% bên dưới, không được báo là đã đạt dự phòng 50% hoặc là p95
+> đáng tin từ một mẫu. Theo dõi các run bình thường kế tiếp; nếu timeout hoặc thường sát budget thì review lại theo
+> số đo, không rerun CI chỉ để benchmark. P7/P8 vẫn waived; nightly chưa có bằng chứng mới. Các đoạn pending/47–48 phút
+> phía dưới là lịch sử trước run này và quyết định mới, không còn là câu hỏi Owner chưa trả lời.
+
 Mục tiêu thiết kế đầu "integration đầy đủ ≤ 15 phút" (P5) **chưa đạt và không còn là mục tiêu của spec này**. Hướng B của
 `OD-R8` (người thực hiện chọn ở phụ lục của `be-architecture-readability-hardening`, chưa có ghi nhận Owner xác nhận): giữ một
 runner 2 vCPU (`OD-T2`), không shard, không tối ưu P7/P8, và ghi mục tiêu theo số đo. Số đo đọc bằng `gh run view` (chỉ đọc) trên `SEP490-FALL2026/BE-dev`:
