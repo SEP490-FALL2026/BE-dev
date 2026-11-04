@@ -218,3 +218,10 @@ Bảng test cũ → mới (điền khi implement):
 - typecheck, lint, arch:check, rules:check passed. Gates: 16 suites / 327 tests; changed unit: 4 suites / 62 tests; HTTP: 2 suites / 23 tests passed. openapi:export and arch:routes completed (311 operations).
 - Integration/e2e fixtures updated, not executed. Generic account fixtures now receive EMPLOYEE; deliberate constraint setup opts out with role:null.
 - Task 3 final script run exposed LF-only template expectations; corrected both env templates and reran the two affected tests (2 passed). Full script rerun remains for unified-seed task.
+
+### Task 5 evidence
+
+- Successor enrolment grants EMPLOYEE and records it. Role handover revokes old SUPER_ADMIN, revokes all successor grants, grants successor SUPER_ADMIN, then grants old holder EMPLOYEE in one transaction; OUT/IN audit uses captured previous roles. Unnamed 23514 maps to HEADS_DEPARTMENT.
+- typecheck, lint (final exit 0), arch:check, rules:check passed. Unit: 2 suites / 26 tests; gates: 16 suites / 327 tests passed.
+- Integration tests added for EMPLOYEE enrolment, exact effective grants/audits, future head and Finance refusal, reset-email redemption retaining SUPER_ADMIN; CLI help asserts EMPLOYEE wording. Not executed.
+- Old no-role preparation assertion replaced by exactly EMPLOYEE; empty transfer audit on rollback retained.

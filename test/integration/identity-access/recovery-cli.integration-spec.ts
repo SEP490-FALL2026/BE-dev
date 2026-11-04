@@ -55,6 +55,8 @@ describe('recovery command (integration, spawned process)', () => {
 
       expect(result.code).toBe(0);
       expect(result.stdout).toContain('Usage: pnpm ops:recover');
+      expect(result.stdout).toContain('account (EMPLOYEE)');
+      expect(result.stdout).not.toContain('no role');
       expect(result.stdout).toMatch(/exit codes/i);
       expect(result.stderr).toBe('');
     },

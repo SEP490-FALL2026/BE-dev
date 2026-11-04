@@ -26,7 +26,7 @@ Modes
                       Planned transfer (the holder can still act): the successor already has an activated account,
                       made in the application; the role moves in one step. No account is created, no invitation sent.
                       The holder cannot act (left, locked, or nobody holds the role): the first run creates the
-                      successor's account (no role) and invites them. After they activate it, run the same ticket
+                      successor's account (EMPLOYEE) and invites them. After they activate it, run the same ticket
                       again: the role moves in one step.
       --successor-code <employee code of the successor>
       --holder-email <login email of the current holder>   Required when somebody holds the role; leave out if nobody does.

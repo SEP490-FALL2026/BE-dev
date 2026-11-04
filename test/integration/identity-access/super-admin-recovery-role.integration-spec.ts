@@ -333,7 +333,7 @@ describe('recovering the Super Admin role outside the application (integration, 
       expect(await holders()).not.toEqual([h.seed.superAdmin.appUserId]);
     });
 
-    it('moves the role in two stages under one ticket: first an account with no role, then, once it is activated, the role', async () => {
+    it('moves the role in two stages under one ticket: first an account with EMPLOYEE, then, once it is activated, the role', async () => {
       await successorEmployee('E-RS1');
       await holderLeaves();
       const ticket = context();
@@ -348,9 +348,14 @@ describe('recovering the Super Admin role outside the application (integration, 
         )
       ).rows[0];
       expect(account).toMatchObject({ activation_state: 'INVITED', status: 'ACTIVE' });
-      expect((await h.ctx.sql.query('SELECT 1 FROM role_grants WHERE app_user_id = $1', [account.id])).rows).toEqual(
-        [],
-      );
+      expect(
+        (
+          await h.ctx.sql.query<{ role: string }>(
+            'SELECT role FROM role_grants WHERE app_user_id = $1 AND revoked_at IS NULL',
+            [account.id],
+          )
+        ).rows,
+      ).toEqual([{ role: 'EMPLOYEE' }]);
       expect(await holders()).toEqual([h.seed.superAdmin.appUserId]);
       expect(await ticketRow(ticket.ticketRef)).toMatchObject({ status: 'AWAITING_ACTIVATION' });
       expect((await mailsFor(ticket.ticketRef)).map((mail) => [mail.recipient, mail.template])).toEqual([
@@ -376,6 +381,15 @@ describe('recovering the Super Admin role outside the application (integration, 
       const second = await h.recovery.transferRole(ticket, input);
 
       expect(second.outcome).toBe('ROLE_TRANSFERRED');
+      const rolesOf = async (id: string) =>
+        (
+          await h.ctx.sql.query<{ role: string }>(
+            'SELECT role FROM role_grants WHERE app_user_id = $1 AND revoked_at IS NULL',
+            [id],
+          )
+        ).rows;
+      expect(await rolesOf(account.id)).toEqual([{ role: 'SUPER_ADMIN' }]);
+      expect(await rolesOf(h.seed.superAdmin.appUserId)).toEqual([{ role: 'EMPLOYEE' }]);
       expect(await holders()).toEqual([account.id]);
       expect(await ticketRow(ticket.ticketRef)).toMatchObject({ status: 'COMPLETED' });
       const events = await auditOf(ticket.ticketRef);
@@ -387,6 +401,17 @@ describe('recovering the Super Admin role outside the application (integration, 
         'SUPER_ADMIN.TRANSFERRED_IN',
         'SUPER_ADMIN.TRANSFERRED_OUT',
       ]);
+      expect(events.find((event) => event.action === 'SUPER_ADMIN.RECOVERY_ACCOUNT_CREATED')?.after).toMatchObject({
+        roles: ['EMPLOYEE'],
+      });
+      expect(events.find((event) => event.action === 'SUPER_ADMIN.TRANSFERRED_OUT')).toMatchObject({
+        before: { roles: ['SUPER_ADMIN'] },
+        after: { roles: ['EMPLOYEE'] },
+      });
+      expect(events.find((event) => event.action === 'SUPER_ADMIN.TRANSFERRED_IN')).toMatchObject({
+        before: { roles: ['EMPLOYEE'] },
+        after: { roles: ['SUPER_ADMIN'] },
+      });
       const moves = events.filter((event) => event.action.startsWith('SUPER_ADMIN.TRANSFERRED_'));
       expect(new Set(moves.map((event) => event.correlation_id)).size).toBe(1);
       expect(await h.recovery.transferRole(ticket, input)).toMatchObject({ outcome: 'ALREADY_COMPLETED' });
@@ -544,11 +569,32 @@ describe('recovering the Super Admin role outside the application (integration, 
         admin: token,
       });
       await setSpendingApprover(h.ctx, token, approver.employeeId);
+      const future = await createActivatedAccount(h.ctx, h.seed, {
+        code: 'E-RM4',
+        email: 'rm4@acme.vn',
+        role: 'MANAGER',
+        admin: token,
+      });
+      const today = await h.ctx.app.get(OrganizationReadApi, { strict: false }).businessToday();
+      const tomorrow = new Date(`${today}T00:00:00Z`);
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+      await assignHead(h.ctx, token, h.seed.departmentId, {
+        employeeId: future.employeeId,
+        effectiveFrom: tomorrow.toISOString().slice(0, 10),
+      });
+      await createActivatedAccount(h.ctx, h.seed, {
+        code: 'E-RM5',
+        email: 'rm5@acme.vn',
+        role: 'FINANCE',
+        admin: token,
+      });
       await holderLeaves();
       for (const [code, expected] of [
         ['E-RM1', 'MANAGER_HELD'],
         ['E-RM2', 'HEADS_DEPARTMENT'],
         ['E-RM3', 'APPROVAL_ROLE_HELD'],
+        ['E-RM4', 'HEADS_DEPARTMENT'],
+        ['E-RM5', 'WORK_ROLE_HELD'],
       ]) {
         expect(
           await refusalOf(() =>
@@ -591,6 +637,35 @@ describe('recovering the Super Admin role outside the application (integration, 
       ).toMatchObject({ outcome: 'LINK_SENT' });
 
       expect(await accountsOf()).toEqual(before);
+      const resetTicket = (
+        await h.ctx.sql.query<{ ticket_ref: string }>(
+          "SELECT ticket_ref FROM recovery_tickets WHERE mode = 'RESET_CREDENTIALS' AND new_login_email = 'rs20.new@acme.vn'",
+        )
+      ).rows[0].ticket_ref;
+      expect(
+        (
+          await h.ctx.sql.query<{ login_email: string }>('SELECT login_email FROM app_users WHERE id = $1', [
+            (await holders())[0],
+          ])
+        ).rows[0].login_email,
+      ).toBe('e-rs20@acme.vn');
+      await h.redeem(await h.linkTokenOf(resetTicket)).expect(200);
+      const currentHolder = (await holders())[0];
+      expect(
+        (
+          await h.ctx.sql.query<{ login_email: string }>('SELECT login_email FROM app_users WHERE id = $1', [
+            currentHolder,
+          ])
+        ).rows[0].login_email,
+      ).toBe('rs20.new@acme.vn');
+      expect(
+        (
+          await h.ctx.sql.query<{ role: string }>(
+            'SELECT role FROM role_grants WHERE app_user_id = $1 AND revoked_at IS NULL',
+            [currentHolder],
+          )
+        ).rows,
+      ).toEqual([{ role: 'SUPER_ADMIN' }]);
     });
 
     it('refuses a successor with no work email to invite', async () => {
