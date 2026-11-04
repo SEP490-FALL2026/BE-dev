@@ -1,4 +1,5 @@
-import { as, listAll, summarize, yearOf } from '../demo-step-kit';
+import { calendarFor } from '../seed-calendar';
+import { as, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoBudget } from '../fixture/demo-fixture.types';
 
@@ -82,9 +83,11 @@ type BudgetMove = { done: boolean; action: string | null };
 /** The budget of the year of every department of the fixture that has one, each through its whole chain. */
 async function budgets(ctx: DemoRunContext): Promise<StepOutcome> {
   const results: Result[] = [];
-  for (const plan of ctx.fixture.budgets) {
-    const outcome = await budget(ctx, plan);
-    results.push({ status: outcome.status, label: `${plan.department}: ${outcome.detail}` });
+  for (const year of calendarFor(ctx).years) {
+    for (const plan of ctx.fixture.budgets) {
+      const outcome = await budget(ctx, plan, year);
+      results.push({ status: outcome.status, label: `${plan.department} ${year}: ${outcome.detail}` });
+    }
   }
 
   return summarize(results);
@@ -95,10 +98,10 @@ async function budgets(ctx: DemoRunContext): Promise<StepOutcome> {
  * the proposal and sends it, the spending approver approves it. Each turn reads where the chain stands and takes the one
  * next action, so a run stopped half-way goes on from there.
  */
-async function budget(ctx: DemoRunContext, plan: DemoBudget): Promise<StepOutcome> {
+async function budget(ctx: DemoRunContext, plan: DemoBudget, year: number): Promise<StepOutcome> {
   let moved = false;
   for (let turn = 0; turn < 6; turn++) {
-    const move = await budgetTurn(ctx, plan);
+    const move = await budgetTurn(ctx, plan, year);
     if (move.done) return { status: moved ? 'done' : 'present', detail: 'ngân sách năm hiện hành đã được duyệt' };
     if (move.action === null)
       return { status: 'conflict', detail: 'chuỗi ngân sách đã đi hướng khác (bị từ chối hoặc trả về)' };
@@ -109,8 +112,7 @@ async function budget(ctx: DemoRunContext, plan: DemoBudget): Promise<StepOutcom
   return { status: 'conflict', detail: 'chuỗi ngân sách không tới được trạng thái hiện hành' };
 }
 
-async function budgetTurn(ctx: DemoRunContext, plan: DemoBudget): Promise<BudgetMove> {
-  const { year } = yearOf(ctx);
+async function budgetTurn(ctx: DemoRunContext, plan: DemoBudget, year: number): Promise<BudgetMove> {
   const head = ctx.fixture.departments.find((department) => department.code === plan.department)?.head ?? '';
   const headEmail = await as(ctx, head);
   const mine = await ctx.api.call<{ budget: { status: string } }>(headEmail, 'GET', `/budgets/mine?year=${year}`);
@@ -166,7 +168,8 @@ function propose(
   plan: DemoBudget,
   to: { headEmail: string; costCenterId: string; year: number },
 ): Promise<unknown> {
-  const { lastDay } = yearOf(ctx);
+  const lastDay = `${to.year}-12-31`;
+  const firstDay = to.year === Number(ctx.today.slice(0, 4)) ? ctx.today : `${to.year}-01-01`;
 
   return ctx.api.call(to.headEmail, 'POST', '/budget-proposals', {
     costCenterId: to.costCenterId,
@@ -176,7 +179,7 @@ function propose(
       planId: ctx.ids.plans.get(line.plan),
       seats: line.seats,
       amount: money(ctx, line.amount),
-      windowFrom: ctx.today,
+      windowFrom: firstDay,
       windowTo: lastDay,
       servicePeriodMonths: 12,
       repeatCycle: 'MONTHLY',

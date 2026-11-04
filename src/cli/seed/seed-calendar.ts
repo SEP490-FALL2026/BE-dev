@@ -1,15 +1,9 @@
 import { businessDateAt } from '../../core/business-date';
 
-/**
- * When a fixture can be applied. The scenarios live in one fiscal year: the subscriptions run from the 1st of January to
- * the 31st of December, the budget of the year is built from today, and the requests checked against it (R1, R2) are
- * priced to be paid a week after the run, inside that year. Late in December, or once the year has turned, the same
- * writes would reach the next year, which has no budget, and the requests would stop at another state than their
- * scenario — so the command refuses before writing instead of reporting a dataset that is not the one described.
- */
-
-/** The last day of the year (`MM-DD`) on which `apply` may write: a payment a week later still falls in the year. */
-export const LAST_APPLY_DAY = '11-30';
+import { addDays } from '../../core/business-date';
+import { addMonths } from '../../core/fiscal-year';
+import { addWorkingDays } from '../../core/working-days';
+import type { DemoRunContext } from './demo-run.types';
 
 export interface CalendarFacts {
   mode: 'plan' | 'apply';
@@ -41,15 +35,32 @@ export function calendarRefusal(facts: CalendarFacts): string | null {
   if (facts.datasetYear !== null && facts.datasetYear !== year) {
     return (
       `The dataset was applied in ${facts.datasetYear}; its subscriptions and budget belong to that year and this is ` +
-      `${year}. Running it again would write into another year: use a new fixture version. Nothing written.`
-    );
-  }
-  if (facts.mode === 'apply' && facts.today > `${year}-${LAST_APPLY_DAY}`) {
-    return (
-      `apply writes from the 1st of January to the ${LAST_APPLY_DAY.slice(3)}th of November only (today is ${facts.today}): ` +
-      'later, the requests priced against this year would be paid in the next one. plan still reads. Nothing written.'
+      `${year}. Running it again would write into another year: run the seed wrapper and choose reset. Nothing written.`
     );
   }
 
   return null;
+}
+
+/** All paid requests share one spend date; only in-plan scenarios determine the required budget window. */
+export function seedCalendar(
+  today: string,
+  termMonths: number,
+  forceNextFiscalYear = false,
+): { spendDay: string; years: number[] } {
+  const year = Number(today.slice(0, 4));
+  const first = addDays(today, 7);
+  const end = addDays(addMonths(first, termMonths), -1);
+  const next = forceNextFiscalYear || end > `${year}-12-31`;
+  return next
+    ? { spendDay: addWorkingDays(`${year}-12-31`, 1, new Set()), years: [year, year + 1] }
+    : { spendDay: first, years: [year] };
+}
+
+export function calendarFor(ctx: DemoRunContext & { forceNextFiscalYear?: boolean }): ReturnType<typeof seedCalendar> {
+  const term = Math.max(
+    0,
+    ...ctx.fixture.requests.filter((request) => request.planLine).map((request) => request.termMonths),
+  );
+  return seedCalendar(ctx.today, term, ctx.forceNextFiscalYear === true);
 }

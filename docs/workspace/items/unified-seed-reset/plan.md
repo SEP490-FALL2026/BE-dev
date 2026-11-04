@@ -204,3 +204,10 @@ Quick set + gates + script tests xanh; Owner chạy full suite một lần, `see
 ### Task 2 resolution
 
 - Owner explicitly approved the public wrapper (04/11/2026 chat). Replaced re-export with a pure function delegating to the existing credential policy; gate unchanged. Final gates: 16 suites / 327 tests passed. Typecheck, arch and rules passed; full lint rerun pending collection. Task 2 stop is resolved.
+
+### Task 3 evidence
+
+- Removed LAST_APPLY_DAY. One shared spend date uses today+7 and maximum in-plan term; if its service end exceeds December 31, use the first working day of next year and create budgets for both years for ENG/MKT/SAL. Existing future-year policy accepts the year; no business policy changed.
+- forceNextFiscalYear is an input only, never a CLI flag, and seed-run only passes it into the context under NODE_ENV=test. No context type file needed changing.
+- Calendar/run unit: 2 suites / 22 tests passed. Typecheck, arch/rules and gates passed (327 tests). Focused lint passed; full lint pending collection. Task 2 final full lint passed.
+- Calendar integration now covers December targets and both budget years, plus the forced branch on the real business date. Written only, not executed. Old December refusal test replaced by December plan/apply tests; cross-year refusal retained.

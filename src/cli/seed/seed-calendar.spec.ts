@@ -1,4 +1,4 @@
-import { businessYearOf, calendarRefusal } from './seed-calendar';
+import { businessYearOf, calendarRefusal, seedCalendar } from './seed-calendar';
 
 const facts = (mode: 'plan' | 'apply', today: string, datasetYear: number | null = null, fiscalYearStartMonth = 1) => ({
   mode,
@@ -14,9 +14,9 @@ describe('the calendar of the demo dataset', () => {
     expect(calendarRefusal(facts('apply', '2026-10-30', 2026))).toBeNull();
   });
 
-  it('refuses apply in December, when a payment a week later could fall in the next year', () => {
-    expect(calendarRefusal(facts('apply', '2026-12-01'))).toMatch(/30th of November only/);
-    expect(calendarRefusal(facts('apply', '2026-12-31', 2026))).toMatch(/Nothing written/);
+  it('allows apply throughout December', () => {
+    expect(calendarRefusal(facts('apply', '2026-12-01'))).toBeNull();
+    expect(calendarRefusal(facts('apply', '2026-12-31', 2026))).toBeNull();
   });
 
   it('lets plan read any day of the year the dataset was applied in', () => {
@@ -38,5 +38,24 @@ describe('the calendar of the demo dataset', () => {
 
   it('refuses a fiscal year that does not begin in January', () => {
     expect(calendarRefusal(facts('apply', '2026-05-10', null, 4))).toMatch(/FISCAL_YEAR_START_MONTH/);
+  });
+});
+
+describe('shared paid-request budget calendar', () => {
+  it.each([
+    ['2026-01-01', '2026-01-08', [2026]],
+    ['2026-06-15', '2026-06-22', [2026]],
+    ['2026-11-24', '2026-12-01', [2026]],
+    ['2026-11-25', '2027-01-01', [2026, 2027]],
+    ['2026-11-30', '2027-01-01', [2026, 2027]],
+    ['2026-12-01', '2027-01-01', [2026, 2027]],
+    ['2026-12-25', '2027-01-01', [2026, 2027]],
+    ['2026-12-31', '2027-01-01', [2026, 2027]],
+    ['2027-12-10', '2028-01-03', [2027, 2028]],
+  ] as const)('dates %s with a one-month in-plan term', (today, spendDay, years) => {
+    expect(seedCalendar(today, 1)).toEqual({ spendDay, years });
+  });
+  it('can force the next-year branch for a test on any day', () => {
+    expect(seedCalendar('2026-01-01', 1, true)).toEqual({ spendDay: '2027-01-01', years: [2026, 2027] });
   });
 });

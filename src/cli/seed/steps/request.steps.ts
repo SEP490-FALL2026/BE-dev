@@ -1,4 +1,5 @@
-import { addDays, as, listAll, tag, yearOf } from '../demo-step-kit';
+import { calendarFor } from '../seed-calendar';
+import { as, listAll, tag } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoRequestScenario } from '../fixture/demo-fixture.types';
 import { nextScenarioAction, ScenarioAction } from './scenario-path';
@@ -80,12 +81,8 @@ async function submit(ctx: DemoRunContext, scenario: DemoRequestScenario): Promi
   return created.request;
 }
 
-/** A week from today, inside the budget year of the dataset. */
 function spendDay(ctx: DemoRunContext): string {
-  const day = addDays(ctx.today, 7);
-  const { lastDay } = yearOf(ctx);
-
-  return day <= lastDay ? day : lastDay;
+  return calendarFor(ctx).spendDay;
 }
 
 async function scenarioStep(ctx: DemoRunContext, scenario: DemoRequestScenario): Promise<StepOutcome> {
