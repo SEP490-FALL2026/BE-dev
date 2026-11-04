@@ -43,7 +43,13 @@ function failingWith(error: Error): AppUsersController {
   return new AppUsersController(
     { listCandidates: fail, listAccounts: fail, getAccount: fail } as unknown as AccountQueryService,
     { createAccount: fail, resendInvitation: fail } as unknown as AccountInvitationService,
-    { lock: fail, unlock: fail, grantRole: fail, revokeRole: fail } as unknown as AccountStatusService,
+    {
+      lock: fail,
+      unlock: fail,
+      grantRole: fail,
+      revokeRole: fail,
+      changeRole: fail,
+    } as unknown as AccountStatusService,
   );
 }
 
@@ -55,6 +61,7 @@ const routes = {
   resendInvitation: (c: AppUsersController) => c.resendInvitation(actor, { id }),
   lock: (c: AppUsersController) => c.lock(actor, { id }, { reason: 'Ticket 42' }),
   unlock: (c: AppUsersController) => c.unlock(actor, { id }, { reason: 'Ticket 42' }),
+  changeRole: (c: AppUsersController) => c.changeRole(actor, { id }, { role: 'FINANCE' } as never),
   grantRole: (c: AppUsersController) => c.grantRole(actor, { id }, { role: 'FINANCE' } as never),
   revokeRole: (c: AppUsersController) => c.revokeRole(actor, { id, role: 'FINANCE' } as never),
 };

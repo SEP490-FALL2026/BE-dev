@@ -65,6 +65,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   accountCandidatesList: 'APP_USER.CANDIDATES_LISTED',
   appUserCreate: 'APP_USER.CREATED',
   appUserGet: 'APP_USER.RETRIEVED',
+  appUserChangeRole: 'ROLE.CHANGED',
   appUserGrantRole: 'ROLE.GRANTED',
   appUserList: 'APP_USER.LISTED',
   appUserLock: 'APP_USER.LOCKED',

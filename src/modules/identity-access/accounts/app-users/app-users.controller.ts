@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -23,6 +23,7 @@ import {
   AppUserIdParamDto,
   AppUserRoleParamDto,
   CreateAppUserBodyDto,
+  ChangeRoleBodyDto,
   GrantRoleBodyDto,
   ListAppUsersQueryDto,
 } from '../account-management.dto';
@@ -306,6 +307,57 @@ export class AppUsersController {
     try {
       await this.status.unlock(actor, params.id, body.reason);
 
+      return toDetailWire(await this.queries.getAccount(params.id));
+    } catch (error) {
+      throw toAccountApiException(error);
+    }
+  }
+
+  @Put('app-users/:id/role')
+  @ApiOperation({ operationId: 'appUserChangeRole', summary: 'Change the role of an account' })
+  @ApiSuccessResponse(AccountDetailResponseDto, {
+    message: 'ROLE.CHANGED',
+    description:
+      'Replaces the current role atomically. The same role is a no-op; changes take effect on the next request.',
+  })
+  @ApiErrorResponses(
+    ...COMMON_ERRORS,
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'No account has this identifier.',
+      examples: [ACCOUNT_ERROR_EXAMPLES.NOT_FOUND],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'Self change, a Manager still heading a department, an occupied Finance or spending approver role, or open work blocking the spending approver.',
+      examples: [
+        ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN,
+        ACCOUNT_ERROR_EXAMPLES.MANAGER_STILL_HEADING,
+        ACCOUNT_ERROR_EXAMPLES.FINANCE_ALREADY_ASSIGNED,
+        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_ALREADY_ASSIGNED,
+        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_HAS_OPEN_WORK,
+      ],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'Invalid input, the Super Admin role changes only outside the application, or the spending approver account or employee is not usable.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_TRANSFER_ONLY,
+        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE,
+        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_ACCOUNT_NOT_USABLE,
+      ],
+    },
+  )
+  async changeRole(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: AppUserIdParamDto,
+    @Body() body: ChangeRoleBodyDto,
+  ) {
+    try {
+      await this.status.changeRole(actor, params.id, body.role);
       return toDetailWire(await this.queries.getAccount(params.id));
     } catch (error) {
       throw toAccountApiException(error);

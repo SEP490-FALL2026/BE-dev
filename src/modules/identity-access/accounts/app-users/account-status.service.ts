@@ -104,6 +104,60 @@ export class AccountStatusService {
 
   // --- role grants ------------------------------------------------------------------
 
+  /** Replaces the sole effective role under the approval-role, employee and account locks, in that order. */
+  async changeRole(actor: AuthenticatedPrincipal, appUserId: string, role: RequestedRole): Promise<void> {
+    if (isSelfChange(actor.appUserId, appUserId)) throw new SelfChangeForbiddenError();
+    const violation = checkRoleRequest(role);
+    if (violation) throw new RoleRequestRefusedError(violation);
+    let employeeId: string | null = null;
+    await this.runner
+      .run(async (tx) => {
+        await this.grants.lockApprovalRolesForChange(tx);
+        const known = await this.accounts.readAccount(tx, appUserId);
+        if (!known) throw new AccountNotFoundError();
+        await this.organizationReads.lockEmployeeForShare(tx, known.employeeId);
+        const account = await this.accounts.lockAndReadAccount(tx, appUserId);
+        if (!account) throw new AccountNotFoundError();
+        employeeId = account.employeeId;
+        const held = await this.grants.effectiveRoles(appUserId, tx);
+        if (held.includes('SUPER_ADMIN')) throw new RoleRequestRefusedError('SUPER_ADMIN_TRANSFER_ONLY');
+        if (held.length !== 1) throw new Error('Changing a role requires exactly one effective grant');
+        const previous = held[0];
+        if (previous === role) return;
+        await this.checkRoleReplacement(tx, account, previous, role);
+        await this.grants.revokeRole(tx, { appUserId, role: previous, revokedBy: actor.appUserId, now: new Date() });
+        await this.grants.grantRole(tx, {
+          organizationId: account.organizationId,
+          appUserId,
+          role,
+          grantedBy: actor.appUserId,
+        });
+        await this.audit.record(
+          tx,
+          accountAuditEvent(actor, account.organizationId, 'ROLE.CHANGED', appUserId, { role: previous }, { role }),
+        );
+      })
+      .catch(async (error: unknown) => {
+        throw await this.translateRoleWriteError(error, employeeId);
+      });
+  }
+
+  private async checkRoleReplacement(
+    tx: DbTx,
+    account: AccountRecord,
+    previous: AppRole,
+    role: AppRole,
+  ): Promise<void> {
+    if (previous === 'MANAGER') {
+      const periods = await this.organizationReads.headPeriodsFrom(account.employeeId, undefined, tx);
+      if (periods.length > 0) throw new ManagerStillHeadingError(periods);
+    }
+    if (role === 'FINANCE' && (await this.grants.financeIsHeld(tx, account.organizationId))) {
+      throw new FinanceAlreadyAssignedError();
+    }
+    if (role === 'SPENDING_APPROVER') await this.spendingApprover.check(tx, account);
+  }
+
   /**
    * Locks the account for a grant or a revoke. SPENDING_APPROVER first takes the advisory key of the approval roles, then the
    * employee, then the account, so the rules of the grant (rules 6 to 10) are checked one writer at a time.

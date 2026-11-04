@@ -18,6 +18,7 @@ export const createAppUserBodySchema = z.strictObject({
 });
 
 export const grantRoleBodySchema = z.strictObject({ role: requestedRoleSchema });
+export const changeRoleBodySchema = z.strictObject({ role: requestedRoleSchema });
 
 /** Lock and unlock both require one reason or authority reference; it is stored trimmed in the Audit Trail. */
 export const accountStatusChangeBodySchema = z.strictObject({
@@ -112,6 +113,7 @@ const activatedSchema = z.strictObject({ activated: z.literal(true) });
 
 export class CreateAppUserBodyDto extends createZodDto(createAppUserBodySchema) {}
 export class GrantRoleBodyDto extends createZodDto(grantRoleBodySchema) {}
+export class ChangeRoleBodyDto extends createZodDto(changeRoleBodySchema) {}
 export class AccountStatusChangeBodyDto extends createZodDto(accountStatusChangeBodySchema) {}
 export class AppUserIdParamDto extends createZodDto(appUserIdParamSchema) {}
 export class AppUserRoleParamDto extends createZodDto(appUserRoleParamSchema) {}

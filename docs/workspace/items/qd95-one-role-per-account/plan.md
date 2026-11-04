@@ -175,6 +175,16 @@ Bảng test cũ → mới (điền khi implement):
 - `pnpm arch:check`, `pnpm rules:check`, `pnpm openapi:export` đã gọi; lint đang chờ kết quả cuối.
 - Integration/e2e chỉ sửa, không chạy. Các test gán/thu hồi và helper đổi vai vẫn chuyển tiếp ở Task 2–4 theo plan; chưa xác nhận checkpoint integration.
 
+### Bằng chứng Task 2 — 04/11/2026
+
+- Thêm `PUT /app-users/{id}/role`, message `ROLE.CHANGED`, khóa mọi thay đổi theo approval-role → employee → account, kiểm vai rời/nhận trước ghi, thu hồi trước cấp, một audit before/after. Hai route cũ còn tới Task 4.
+- Chuyển seam Manager/Người duyệt chi sang thay vai; Finance reviewer chuyển vai qua seam đó.
+- Unit service/controller: 2 suites, 59 tests pass. HTTP route mới + API inventory: 2 suites, 20 tests pass.
+- Gates sau giảm trần nợ lint: 16 suites, 327 tests pass. Typecheck pass; route generator ghi 313 operations.
+- Integration mới có thay vai, idempotent, hiệu lực request kế tiếp, từ chối, Manager hiện tại/tương lai/kế nhiệm và đua Finance/Người duyệt chi; chỉ viết, chưa chạy.
+- Lint Task 1 phát hiện suppression của hàm tạo tài khoản đã thừa sau khi bỏ vòng lặp: gỡ đúng một suppression và giảm trần `max-lines-per-function` 51 → 50, tổng 107 → 106 trong gate (bổ sung Files bắt buộc để giữ gate chặt hơn).
+- Lint Task 2 lần đầu có lỗi format và `expect.any(String)` cần kiểu string; đã sửa, đang chạy lại. Không chạy integration/e2e.
+
 - [ ] AC trong scope có bằng chứng; thay đổi hợp đồng đã báo FE/mobile.
 - [ ] Spec/plan phản ánh implementation cuối.
 - [ ] Giao Owner review; cập nhật roadmap.

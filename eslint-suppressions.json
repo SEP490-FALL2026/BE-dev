@@ -62,11 +62,6 @@
       "count": 1
     }
   },
-  "src/modules/identity-access/accounts/app-users/account-invitation.service.ts": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/modules/identity-access/accounts/invitation-redemption.service.ts": {
     "complexity": {
       "count": 1

@@ -87,7 +87,7 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       await assignHead(department.id, member.employeeId).expect(200);
       const heading = await meOf(member);
 
-      expect(before).toMatchObject({ roles: [], managerScope: null });
+      expect(before).toMatchObject({ roles: ['EMPLOYEE'], managerScope: null });
       // MANAGER held, heading nothing yet: a role, so not selfServiceOnly, and no scope.
       expect(granted).toMatchObject({ roles: ['MANAGER'], managerScope: null });
       expect(heading).toMatchObject({
@@ -106,7 +106,7 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
         [h.seed.organizationId, department.id, member.employeeId, today()],
       );
 
-      expect(await meOf(member)).toMatchObject({ roles: [], managerScope: null });
+      expect(await meOf(member)).toMatchObject({ roles: ['EMPLOYEE'], managerScope: null });
       await api().get(`/api/v1/departments/${department.id}`).set(as(member)).expect(403);
       await h.ctx.sql.query('DELETE FROM department_head_periods WHERE employee_id = $1', [member.employeeId]);
     });
