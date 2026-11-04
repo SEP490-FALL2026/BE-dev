@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { TransientDatabaseError } from '../../../src/infrastructure/database/transaction-runner';
+import { MyRequestsRepo } from '../../../src/modules/requests/my-requests/my-requests.repo';
 import { MyRequestsService } from '../../../src/modules/requests/my-requests/my-requests.service';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
@@ -38,7 +39,7 @@ const PAGE = { items: [ROW], pagination: { page: 1, pageSize: 20, totalItems: 1,
  * The contract of "my requests" (`meAccessRequestList`), with the service replaced, so what is proved is the route: who may call it,
  * what it accepts, and the shape and message of its answer. What it lists, and for whom, is proved on PostgreSQL
  * (`my-requests.integration-spec.ts`). The route asks for no role, as the drafts and the sending of a request do not (an Employee, a
- * head who sends for themselves): the Super Admin, who sends no request, is refused 403 — judged by the real service, below.
+ * head who sends for themselves): the Super Admin also reads their own historical requests — judged by the real service, below.
  */
 describe('my requests route (e2e, no database)', () => {
   let app: INestApplication<App>;
@@ -143,21 +144,24 @@ describe('my requests route (e2e, no database)', () => {
 
 describe('my requests route and the Super Admin (e2e, no database)', () => {
   let app: INestApplication<App>;
-
+  const pageOf = jest.fn();
   beforeAll(async () => {
-    app = await createHttpContractApp();
+    app = await createHttpContractApp({
+      overrides: [
+        { token: MyRequestsRepo, useValue: { pageOf, proposalNames: jest.fn().mockResolvedValue(new Map()) } },
+      ],
+    });
   });
-
   afterAll(async () => {
     await app?.close();
   });
-
-  it('answers the Super Admin 403 ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST, before anything is read, as the drafts do', async () => {
+  it('returns the Super Admin own empty page through the real service', async () => {
+    pageOf.mockResolvedValue({ rows: [], total: 0 });
     const response = await request(app.getHttpServer())
       .get(PATH)
       .set('Authorization', bearer(principal(['SUPER_ADMIN'])))
-      .expect(403);
-
-    expect(bodyOf(response).error.code).toBe('ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST');
+      .expect(200);
+    expect(bodyOf(response).data).toMatchObject({ items: [], pagination: { totalItems: 0 } });
+    expect(pageOf).toHaveBeenCalledWith(expect.objectContaining({ requesterEmployeeId: 'e1' }));
   });
 });

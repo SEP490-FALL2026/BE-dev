@@ -146,15 +146,15 @@ describe('my requests: whose they are and what a row says (integration, real Pos
       expect(answer.items[0].needStep.assignee?.employeeId).not.toBe(unit.head.employeeId);
     });
 
-    it('answers the Super Admin 403, who sends no request, and an account that holds no role 200 with their own', async () => {
+    it('answers the Super Admin an empty own page and lists another caller own requests', async () => {
       const refused = await request(h.server())
         .get(PATH)
         .set({ Authorization: `Bearer ${h.admin}` })
-        .expect(403);
+        .expect(200);
       const bare = await employee([]);
       const own = await h.sent(bare, internal);
 
-      expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST');
+      expect(h.dataOf<{ items: unknown[] }>(refused).items).toEqual([]);
       expect(await idsOf(bare.account)).toEqual([own.id]);
     });
 

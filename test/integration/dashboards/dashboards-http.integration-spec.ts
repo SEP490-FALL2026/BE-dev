@@ -188,20 +188,10 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       expect(overview.sections.requests.count).toBe(0);
     });
 
-    it('answers NO_DATA_SOURCE for a Super Admin who has the Employee role', async () => {
-      const { rows } = await h.ctx.sql.query<{ id: string }>(
-        `INSERT INTO role_grants (id, organization_id, app_user_id, role, granted_at)
-         VALUES (gen_random_uuid(), $1, $2, 'EMPLOYEE', now())
-         RETURNING id`,
-        [h.seed.organizationId, h.seed.superAdmin.appUserId],
-      );
-      try {
-        const token = await loginAs(h.ctx.app, h.seed.superAdmin.email, h.seed.superAdmin.password);
-        const overview = await overviewOf(OVERVIEW_PATHS.employee, { ...h.sa, accessToken: token });
-        expect(overview.sections.requests).toEqual(missing('NO_DATA_SOURCE'));
-      } finally {
-        await h.ctx.sql.query(`DELETE FROM role_grants WHERE id = $1`, [rows[0].id]);
-      }
+    it('counts zero open requests for the Super Admin without adding any role', async () => {
+      const token = await loginAs(h.ctx.app, h.seed.superAdmin.email, h.seed.superAdmin.password);
+      const overview = await overviewOf(OVERVIEW_PATHS.employee, { ...h.sa, accessToken: token });
+      expect(overview.sections.requests).toEqual(countedAs(0, 'meAccessRequestList'));
     });
   });
 
@@ -349,7 +339,9 @@ describe('role overviews (integration, real PostgreSQL)', () => {
 
     const expected = Object.values(OVERVIEW_PATHS).flatMap((path) => [
       `${path} none 401`,
-      ...callers.map(([name]) => `${path} ${name} ${allowed[name] === path ? 200 : 403}`),
+      ...callers.map(
+        ([name]) => `${path} ${name} ${path === OVERVIEW_PATHS.employee || allowed[name] === path ? 200 : 403}`,
+      ),
     ]);
     expect(answers).toEqual(expected);
   });

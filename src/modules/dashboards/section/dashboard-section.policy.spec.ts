@@ -36,8 +36,8 @@ describe('dashboard section', () => {
   });
 
   it('lets a caller who holds the role through and refuses one who does not', () => {
-    expect(() => assertHoldsRole(['IT_ADMIN', 'EMPLOYEE'], 'EMPLOYEE')).not.toThrow();
-    expect(() => assertHoldsRole(['IT_ADMIN'], 'EMPLOYEE')).toThrow(DashboardRefusedError);
+    expect(() => assertHoldsRole(['IT_ADMIN'], 'IT_ADMIN')).not.toThrow();
+    expect(() => assertHoldsRole(['EMPLOYEE'], 'IT_ADMIN')).toThrow(DashboardRefusedError);
     expect(() => assertHoldsRole([], 'SUPER_ADMIN')).toThrow(DashboardRefusedError);
   });
 });

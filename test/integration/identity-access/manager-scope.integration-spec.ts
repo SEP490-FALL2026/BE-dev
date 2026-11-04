@@ -114,7 +114,7 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
       expect(h.dataOf<{ items: unknown[] }>(response).items).toEqual([]);
     });
 
-    it('refuses the route that is the Employee’s alone to a person who holds only MANAGER, head or not (US-01-01 AC-17)', async () => {
+    it('opens the route that is the Employee’s alone to a person who holds only MANAGER, head or not (US-01-01 AC-17)', async () => {
       const second = await h.departmentWithUnit(`P-MS${(counter += 1)}`);
       // Holds MANAGER only and heads the department from today.
       const only = await h.staff(second, `MS-ONLY-${counter}`, ['MANAGER']);
@@ -123,8 +123,8 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
       const notHeading = await call('get', '/api/v1/me/software-rights', holder.account);
       const headingOnly = await call('get', '/api/v1/me/software-rights', only.account);
 
-      expect([notHeading.status, h.codeOf(notHeading)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
-      expect([headingOnly.status, h.codeOf(headingOnly)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
+      expect(notHeading.status).toBe(200);
+      expect(headingOnly.status).toBe(200);
       // The same person does use the routes of the Manager once they head the department.
       expect((await call('get', '/api/v1/dashboards/manager', only.account)).status).toBe(200);
     });

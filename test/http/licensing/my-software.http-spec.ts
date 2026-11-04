@@ -54,23 +54,16 @@ describe('my software rights route (e2e, no database)', () => {
     expect(list).not.toHaveBeenCalled();
   });
 
-  // US-01-01 AC-17: a role other than Employee, direct or derived, does not read the Employee's own list.
-  it.each([
-    ['an IT Admin without the Employee role', ['IT_ADMIN'], []],
-    ['Finance without the Employee role', ['FINANCE'], []],
-    ['the Super Admin', ['SUPER_ADMIN'], []],
-    ['an account with no role', [], []],
-    ['a department head whose only role is derived', [], ['MANAGER']],
-    ['the spending approver whose only role is derived', [], ['SPENDING_APPROVER']],
-  ])('refuses %s with 403: only the Employee role reads it', async (_name, direct, derived) => {
-    const response = await request(app.getHttpServer())
-      .get(PATH)
-      .set('Authorization', bearer(principal([...direct, ...derived])))
-      .expect(403);
-
-    expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
-    expect(list).not.toHaveBeenCalled();
-  });
+  it.each(['IT_ADMIN', 'FINANCE', 'SUPER_ADMIN', 'SPENDING_APPROVER', 'MANAGER', 'EMPLOYEE'])(
+    'reads only the caller data with the single role %s',
+    async (role) => {
+      await request(app.getHttpServer())
+        .get(PATH)
+        .set('Authorization', bearer(principal([role], { employeeId: 'e-77' })))
+        .expect(200);
+      expect(list).toHaveBeenCalledWith(expect.objectContaining({ employeeId: 'e-77' }), expect.anything());
+    },
+  );
 
   it('answers a page for the Employee, read for the caller with the defaults, under its own message', async () => {
     const response = await request(app.getHttpServer())

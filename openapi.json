@@ -36373,7 +36373,7 @@
         ],
         "responses": {
           "200": {
-            "description": "One page of the personal software rights of the signed-in person and nobody else: by default those held on the business day of the organization or starting later, oldest start first; with view ended, those no longer held, latest end first; then by assignment id. Each names the application and plan, the kind of provisioning (K1 to K5), its status on that day (asOf), the day a time-limited right is expected to end and whether that is within seven days, and the day it stops being held when that is set. A right that a renewal continues names the record that takes over. A grant that failed or was cancelled never held anything and is not listed. No price, cost, Cost Center, account identifier, license key or other person is answered: a K4 right shows that the software is granted, never its key. A start that is only the day of recording has a label and no grant date.",
+            "description": "Available to every signed-in account. One page of the personal software rights of the signed-in person and nobody else: by default those held on the business day of the organization or starting later, oldest start first; with view ended, those no longer held, latest end first; then by assignment id. Each names the application and plan, the kind of provisioning (K1 to K5), its status on that day (asOf), the day a time-limited right is expected to end and whether that is within seven days, and the day it stops being held when that is set. A right that a renewal continues names the record that takes over. A grant that failed or was cancelled never held anything and is not listed. No price, cost, Cost Center, account identifier, license key or other person is answered: a K4 right shows that the software is granted, never its key. A start that is only the day of recording has a label and no grant date.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36409,27 +36409,6 @@
                       "error": {
                         "code": "INVALID_ACCESS_TOKEN",
                         "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller does not hold the Employee role; other roles do not read this list.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
                         "requestId": "req_example"
                       }
                     }
@@ -49358,11 +49337,22 @@
             }
           },
           "403": {
-            "description": "The caller is neither the holder nor the head of the department of the holder (RETURN_REQUEST.NOT_HOLDER), or heads another department (RETURN_REQUEST.OUTSIDE_DEPARTMENT).",
+            "description": "The Super Admin cannot send a return (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST). The caller is neither the holder nor the head of the department of the holder (RETURN_REQUEST.NOT_HOLDER), or heads another department (RETURN_REQUEST.OUTSIDE_DEPARTMENT).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST": {
+                    "summary": "The Super Admin does not send requests for access.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST",
+                        "message": "The Super Admin does not send requests for access.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "RETURN_REQUEST.NOT_HOLDER": {
                     "summary": "The return of the seat is refused: NOT_HOLDER.",
                     "value": {
@@ -54096,27 +54086,6 @@
                       "error": {
                         "code": "INVALID_ACCESS_TOKEN",
                         "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The Super Admin sends no request, so has none to list (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST": {
-                    "summary": "The Super Admin does not send requests for access.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST",
-                        "message": "The Super Admin does not send requests for access.",
                         "requestId": "req_example"
                       }
                     }
@@ -72781,7 +72750,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "The sections of the overview of the signed-in Employee on the business day (asOf), about the caller only: the software rights held (K4 included) and those about to end within seven days, counted as the list of my software rights shows them; the SaaS error reports the caller sent that are still open; and the requests the caller sent that are not over, counted as meAccessRequestList with view=open counts them (a Super Admin sends none, so that section says it is not available, NO_DATA_SOURCE, instead of a number). No cost, seat count or data of another person is answered. Each section names the operation that lists its rows.",
+            "description": "The sections of the overview of every signed-in account on the business day (asOf), about the caller only: the software rights held (K4 included) and those about to end within seven days, counted as the list of my software rights shows them; the SaaS error reports the caller sent that are still open (saasIssueList with scope=mine); and the requests the caller sent that are not over, counted as meAccessRequestList with view=open counts them (including a count of zero when none were sent). No cost, seat count or data of another person is answered. Each section names the operation that lists its rows.",
             "content": {
               "application/json": {
                 "schema": {
@@ -72817,27 +72786,6 @@
                       "error": {
                         "code": "INVALID_ACCESS_TOKEN",
                         "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller does not hold the Employee role; other roles read their own overview.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
                         "requestId": "req_example"
                       }
                     }
