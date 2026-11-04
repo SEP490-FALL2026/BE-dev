@@ -323,3 +323,17 @@ Quick set + gates + script tests xanh; Owner chạy full suite một lần, `see
 - Final scoped unit: 15 suites / 145 tests passed. Full scripts Task 7: 297 total / 295 passed / 2 skipped / 0 failed (exit 0); final targeted VPS/retention rerun 19 passed. Full lint Task 6/7/8 passed; typecheck/arch/rules/format and gates (325 tests) passed. The late Task 2 integration additions also passed typecheck and focused lint; never executed.
 - Task 9 has not started: its plan requires Owner VPS seed, which this session did not perform. Docs repo remains read-only and uncommitted. No checkpoint requiring integration/e2e or real reset is marked accepted.
 - All implementation commits remain local; no push, merge, PR, deploy, SSH or shared database access.
+
+### Review audit 04/11/2026 (nhánh `fix/qd95-seed-audit`, commit local)
+
+- Sửa theo review: `seed.sh` khóa deploy như `deploy-release.sh` (file thường, không truncate, dòng người giữ), so `POSTGRES_DB`
+  với container `postgres`, `NOT_MIGRATED` chạy migrate → reconcile → `up -d --force-recreate` → ready, `check` exit 1 chỉ cho reset
+  khi dòng `SECRETS ok`, chạy tiếp đòi `ENVIRONMENT=SHARED`, trap phục hồi chỉ khi reset chưa xong (kể cả tín hiệu), xóa `.partial`,
+  báo cáo có dòng đầu, stderr và `exit <mã>`.
+- `seed-local.mjs`: DB đã cài mà `ENVIRONMENT` khác `LOCAL_TEST` bị từ chối cả reset lẫn chạy tiếp (tunnel loopback); `check` exit 1
+  chỉ reset khi `SECRETS ok`; lỗi bước con có tên bước; stderr con hiện ra; mật khẩu không vào môi trường con; nhận `--`; Ctrl+C exit 130.
+  Đây là bổ sung so với bước 4 của spec (trước chỉ từ chối `SHARED` khi reset).
+- CLI: dòng `SECRETS` in trước graph; `--allow-bootstrap` kiểm `GET /api/v1/health/ready` trước khi ghi; từ chối sau bootstrap trả exit 1.
+- Giữ nguyên: `planLine` của R2 (đúng `OD-S5`), `holders: 1` (index một Super Admin), literal năm của `seed-calendar` (Date giả).
+- Bằng chứng: run `w1` (full) và `w2` (file đỏ + file sửa) trong `NOTE MD/qd95-logs/`; integration seed, serial `seed-check-runtime`,
+  script tests seed/seed-local xanh. Lượt reset thật local/VPS vẫn chờ Owner.

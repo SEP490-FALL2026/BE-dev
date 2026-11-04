@@ -86,3 +86,11 @@
 
 - `pnpm test:scripts` ngoài sandbox: 275 tests, 273 pass, 2 skip, 0 fail, exit 0 (`ci-scripts-final.log`). Chỉ mock Docker/SSH và thư mục tạm; không kết nối VPS/database thật.
 - Task 3 có commit `f7156cc` trên `ci-trial/deploy-gate`, chưa push/chạy. Dùng `workflow_dispatch` để chạy đủ e2e và ALL trước khi xét probe đỏ/xanh. Nhánh triển khai không chứa test đỏ/probe.
+
+### Review audit 04/11/2026 (nhánh `fix/qd95-seed-audit`, commit local)
+
+- `concurrency`: chỉ run PR thay nhau; mỗi run push/dispatch có group riêng (không bỏ run push đang chờ).
+- `select`: base không có trong clone thì chạy hết; output `timing` mới, job in-band chỉ chạy khi có `*.timing-spec.ts` được chọn hoặc
+  `SERIAL`; bỏ `fetch-depth: 0` ở shard/in-band; `SKIP_DEPLOY_DEV` chỉ áp cho push.
+- `check-script-order.test.mjs` kiểm `needs: select`, cổng `run`, concurrency, bộ lọc PR `dev`, biểu thức base, cổng timing.
+- Run đỏ/xanh trên GitHub và số đo hai run `main` vẫn chờ Owner (không push).

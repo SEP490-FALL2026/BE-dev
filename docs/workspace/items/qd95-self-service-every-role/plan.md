@@ -96,3 +96,12 @@ Quick set + `pnpm test:http` + integration các file đổi xanh; tự review di
 
 - [ ] AC trong scope có bằng chứng; báo FE/mobile.
 - [ ] Giao Owner review; cập nhật roadmap.
+
+### Review audit 04/11/2026 (nhánh `fix/qd95-seed-audit`, commit local)
+
+- `requests-dashboard-facts`: Super Admin đếm `0` (không còn `null`). Mô tả section `requests` không còn hứa `NO_DATA_SOURCE` cho
+  Super Admin; `saasIssues` nêu `saasIssueList` `scope=mine`; `openapi.json` sinh lại (không mã nội bộ trong mô tả).
+- `RequestsDashboardApi.openRequestsSentBy(employeeId)` bỏ tham số vai không dùng.
+- Test ma trận: danh sách phần mềm chỉ của người gọi; IT Admin thấy `requests` 1 và `softwareRights` ≥ 1 (US-12-15 AC-27).
+- README `dashboards`, `licensing`, `requests` cập nhật theo `QĐ-95d`.
+- Bằng chứng: run `w2` (`self-service-every-role`, `requests-dashboard-facts`, `dashboards-http`, http dashboards/my-software/my-requests).

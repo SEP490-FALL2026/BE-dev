@@ -239,3 +239,15 @@ Bảng test cũ → mới (điền khi implement):
 - Integration/e2e checkpoints are pending review; never marked green from unit or HTTP evidence.
 
 - Task 7 arch:docs:check and rules:check passed. First rules:format found formatting in the three added superseded notes; formatted those notes and reran. No changes outside Changes and acceptance in historical specs.
+
+### Review audit 04/11/2026 (nhánh `fix/qd95-seed-audit`, commit local)
+
+- Test: 28 kỳ vọng cấp phát `201` bị đổi thành `200` đã trả lại `201`; body `roles[]` → `role`; test trigger tổ hợp vai đổi sang vi phạm
+  `role_grants_one_role_per_account` (23505); usage `recover unlock` không còn chữ "no role".
+- Code: đổi vai và chuyển Super Admin ghi `revoked_at` của vai cũ và `granted_at` của vai mới cùng một thời điểm (lịch sử không chồng,
+  không hở).
+- Bổ sung test AC-23: `IT_ADMIN`/`FINANCE` bị từ chối làm trưởng phòng và người kế nhiệm (`MANAGER_ROLE_REQUIRED`); tạo `MANAGER` không
+  sinh kỳ trưởng phòng; `FINANCE` thứ hai 409; body `roles` 422.
+- Giữ `SpendingApproverHeadsDepartmentError` làm mapping của trigger `role_grants_spending_approver_not_head` (lưới an toàn).
+- Bằng chứng: run `w2` 40 suite integration xanh (gồm `account-role-change`, `account-creation-http`, `department-head-http`,
+  `super-admin-recovery-role`).
