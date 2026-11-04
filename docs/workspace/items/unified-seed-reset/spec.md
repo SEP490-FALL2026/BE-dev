@@ -60,7 +60,7 @@ README mô tả từng bản ghi.
 - Ba đường seed hiện có: `ops:bootstrap` (tổ chức, phòng đầu tiên, Super Admin — [guide](../../../guides/bootstrap-installation.md)),
   `dev:seed` (DB loopback, 3 tài khoản `DEMO-IT`/`DEMO-FIN`/`DEMO-EMP`), `ops:demo-dataset` (fixture có phiên bản, ghi qua HTTP API,
   chạy lại không trùng, không xóa — [guide](../../../guides/demo-dataset.md)).
-- Lịch hiện tại ([demo-dataset-calendar.ts](../../../../src/cli/demo-dataset/demo-dataset-calendar.ts)): `LAST_APPLY_DAY = '11-30'`,
+- Lịch hiện tại ([demo-dataset-calendar.ts](../../../../src/cli/seed/seed-calendar.ts)): `LAST_APPLY_DAY = '11-30'`,
   từ chối `FISCAL_YEAR_START_MONTH ≠ 1` và dataset đã nạp ở năm khác. Audit `occurredAt` lấy `now()` của DB nên integration không
   giả được ngày (`demo-dataset-calendar.integration-spec.ts:10-12`).
 - Ngày: mọi Request trả phí dùng chung `spendDay` (`steps/request.steps.ts:76`, hàm ở `:84-89`, hôm nay + 7 cắt ở 31/12);

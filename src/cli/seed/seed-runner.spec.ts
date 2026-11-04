@@ -1,8 +1,8 @@
 import { Prisma } from '../../generated/prisma/client';
 import { toTransientError } from '../../infrastructure/database/transaction-runner';
 import { DemoApiError, DemoApiUnreachableError } from './demo-api-client';
-import { exitCodeOf, runDemoSteps } from './demo-dataset-runner';
-import { formatDemoReport } from './demo-dataset-report';
+import { exitCodeOf, runDemoSteps } from './seed-runner';
+import { formatDemoReport } from './seed-report';
 import type { DemoRunContext, DemoStep, StepOutcome } from './demo-run.types';
 
 const ctx = (mode: 'plan' | 'apply') => ({ mode }) as DemoRunContext;

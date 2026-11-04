@@ -1,4 +1,4 @@
-import { runDemoSteps } from './demo-dataset-runner';
+import { runDemoSteps } from './seed-runner';
 import type { DemoRunContext } from './demo-run.types';
 import { DemoInventoryIncompleteError, listAll, MAX_PAGES } from './demo-step-kit';
 

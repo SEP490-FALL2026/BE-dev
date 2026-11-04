@@ -1,5 +1,5 @@
 /**
- * The HTTP side of `pnpm ops:demo-dataset`: it calls the public API of the running installation exactly as the FE does
+ * The HTTP side of `pnpm ops:seed`: it calls the public API of the running installation exactly as the FE does
  * (`/api/v1`, Bearer access token, the success and error envelopes), so every demo record is written by the business
  * rules and the actor they name. Passwords and tokens stay in memory and are never printed: an error names the method,
  * the path, the status and the error code only.

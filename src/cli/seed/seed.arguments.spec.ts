@@ -1,4 +1,4 @@
-import { DemoDatasetArgumentError, parseDemoDatasetArguments } from './demo-dataset.arguments';
+import { SeedArgumentError, parseSeedArguments } from './seed.arguments';
 
 const valid = [
   'plan',
@@ -15,9 +15,9 @@ const valid = [
   '--secrets-stdin',
 ];
 
-describe('ops:demo-dataset arguments', () => {
+describe('ops:seed arguments', () => {
   it('reads the mode and every option, and keeps the API origin only', () => {
-    expect(parseDemoDatasetArguments(valid)).toEqual({
+    expect(parseSeedArguments(valid)).toEqual({
       help: false,
       command: {
         mode: 'plan',
@@ -32,15 +32,11 @@ describe('ops:demo-dataset arguments', () => {
   });
 
   it('answers --help without asking for anything else', () => {
-    expect(parseDemoDatasetArguments(['--help'])).toEqual({ help: true });
+    expect(parseSeedArguments(['--help'])).toEqual({ help: true });
   });
 
   it('ignores the -- pnpm forwards and reads --json', () => {
-    const parsed = parseDemoDatasetArguments([
-      '--',
-      ...valid.map((word) => (word === 'plan' ? 'apply' : word)),
-      '--json',
-    ]);
+    const parsed = parseSeedArguments(['--', ...valid.map((word) => (word === 'plan' ? 'apply' : word)), '--json']);
     expect(parsed).toMatchObject({ command: { mode: 'apply', json: true } });
   });
 
@@ -63,14 +59,14 @@ describe('ops:demo-dataset arguments', () => {
     ['a URL of another scheme', valid.map((word) => (word.startsWith('http') ? 'ftp://api' : word)), 'http or https'],
     ['an unknown option', [...valid, '--password', 'x'], 'Unknown option'],
   ])('refuses %s', (_case, argv, message) => {
-    expect(() => parseDemoDatasetArguments(argv)).toThrow(DemoDatasetArgumentError);
-    expect(() => parseDemoDatasetArguments(argv)).toThrow(message);
+    expect(() => parseSeedArguments(argv)).toThrow(SeedArgumentError);
+    expect(() => parseSeedArguments(argv)).toThrow(message);
   });
 
   it('never prints a positional back: a password typed as one is not echoed', () => {
     let message = '';
     try {
-      parseDemoDatasetArguments(['s3cret-typed-by-mistake', ...valid.slice(1)]);
+      parseSeedArguments(['s3cret-typed-by-mistake', ...valid.slice(1)]);
     } catch (error) {
       message = (error as Error).message;
     }

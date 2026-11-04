@@ -1,13 +1,13 @@
 import { parseArgs } from 'node:util';
 
-export class DemoDatasetArgumentError extends Error {
+export class SeedArgumentError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'DemoDatasetArgumentError';
+    this.name = 'SeedArgumentError';
   }
 }
 
-export const DEMO_DATASET_USAGE = `Usage: pnpm ops:demo-dataset <plan|apply> --fixture <id> --organization <name> --api-url <url> --operator <reference> --environment LOCAL_TEST|SHARED --secrets-stdin [--json]
+export const SEED_USAGE = `Usage: pnpm ops:seed <plan|apply> --fixture <id> --organization <name> --api-url <url> --operator <reference> --environment LOCAL_TEST|SHARED --secrets-stdin [--json]
 
 Writes a versioned demo dataset (made-up people, departments, catalog, budget and requests) next to the data of an
 installation, for a shared demo or test server. Every record is written through the HTTP API of the running installation,
@@ -54,7 +54,7 @@ const OPTIONS = {
   help: { type: 'boolean' },
 } as const;
 
-export interface DemoDatasetCommandArguments {
+export interface SeedCommandArguments {
   mode: 'plan' | 'apply';
   fixture: string;
   organization: string;
@@ -64,7 +64,7 @@ export interface DemoDatasetCommandArguments {
   json: boolean;
 }
 
-export type ParsedDemoDatasetArguments = { help: true } | { help: false; command: DemoDatasetCommandArguments };
+export type ParsedSeedArguments = { help: true } | { help: false; command: SeedCommandArguments };
 
 /** An http(s) origin with no credentials, path, query or fragment; the API prefix is added by the command. */
 function apiUrlOf(value: string): string {
@@ -72,47 +72,46 @@ function apiUrlOf(value: string): string {
   try {
     url = new URL(value);
   } catch {
-    throw new DemoDatasetArgumentError('--api-url must be a URL such as http://slm-api:3000.');
+    throw new SeedArgumentError('--api-url must be a URL such as http://slm-api:3000.');
   }
-  if (!['http:', 'https:'].includes(url.protocol))
-    throw new DemoDatasetArgumentError('--api-url must be http or https.');
-  if (url.username || url.password) throw new DemoDatasetArgumentError('--api-url must not carry credentials.');
+  if (!['http:', 'https:'].includes(url.protocol)) throw new SeedArgumentError('--api-url must be http or https.');
+  if (url.username || url.password) throw new SeedArgumentError('--api-url must not carry credentials.');
   if ((url.pathname !== '/' && url.pathname !== '') || url.search || url.hash) {
-    throw new DemoDatasetArgumentError('--api-url is the origin only (no path, query or fragment).');
+    throw new SeedArgumentError('--api-url is the origin only (no path, query or fragment).');
   }
 
   return url.origin;
 }
 
-export function parseDemoDatasetArguments(argv: readonly string[]): ParsedDemoDatasetArguments {
+export function parseSeedArguments(argv: readonly string[]): ParsedSeedArguments {
   const args = argv[0] === '--' ? argv.slice(1) : [...argv];
   let parsed: ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>>;
   try {
     parsed = parseArgs({ args, options: OPTIONS, allowPositionals: true, strict: true });
   } catch (error) {
-    throw new DemoDatasetArgumentError(error instanceof Error ? error.message : String(error));
+    throw new SeedArgumentError(error instanceof Error ? error.message : String(error));
   }
   const { values, positionals } = parsed;
   if (values.help) return { help: true };
   // Never echo a positional: an operator who types a password as one must not see it printed back.
   if (positionals.length !== 1 || !['plan', 'apply'].includes(positionals[0])) {
-    throw new DemoDatasetArgumentError('Name exactly one mode: plan or apply.');
+    throw new SeedArgumentError('Name exactly one mode: plan or apply.');
   }
   if (!values['secrets-stdin']) {
-    throw new DemoDatasetArgumentError('--secrets-stdin is required: the passwords are read from standard input only.');
+    throw new SeedArgumentError('--secrets-stdin is required: the passwords are read from standard input only.');
   }
   const text = (name: 'fixture' | 'organization' | 'api-url' | 'operator' | 'environment'): string => {
     const value = values[name];
-    if (typeof value !== 'string' || value.trim() === '') throw new DemoDatasetArgumentError(`--${name} is required.`);
+    if (typeof value !== 'string' || value.trim() === '') throw new SeedArgumentError(`--${name} is required.`);
 
     return value.trim();
   };
   const environment = text('environment');
   if (environment !== 'LOCAL_TEST' && environment !== 'SHARED') {
-    throw new DemoDatasetArgumentError('--environment must be LOCAL_TEST or SHARED.');
+    throw new SeedArgumentError('--environment must be LOCAL_TEST or SHARED.');
   }
   const operator = text('operator');
-  if (operator.length > 100) throw new DemoDatasetArgumentError('--operator is at most 100 characters.');
+  if (operator.length > 100) throw new SeedArgumentError('--operator is at most 100 characters.');
 
   return {
     help: false,

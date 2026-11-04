@@ -5,7 +5,7 @@ Super Admin), dữ liệu demo cho database local, tài khoản của dataset de
 đọc). Không controller, không bảng riêng. Nguồn yêu cầu: FR-9.8, `QĐ-87f`(1), `QĐ-87d`(1) (cài đặt); H6.1, H6.2,
 P28-01 (lệnh vận hành).
 Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: organization, identity-access, finance, audit. Được dùng bởi: không
-module nào; chỉ lệnh trong `src/cli/` (bootstrap, dev-seed, demo-dataset, inspect, preflight).
+module nào; chỉ lệnh trong `src/cli/` (bootstrap, dev-seed, seed, inspect, preflight).
 
 ## Lệnh CLI → public API
 
@@ -13,7 +13,7 @@ Lệnh nằm ở `src/cli/<lệnh>/` (bảng lệnh: `src/cli/commands.ts`) và 
 
 - `pnpm ops:bootstrap` (`src/cli/bootstrap/bootstrap.command.ts`) → `InstallationApi.install`.
 - `pnpm dev:seed` (`src/cli/dev-seed/dev-seed.command.ts`) → `DevSeedApi.seed`.
-- `pnpm ops:demo-dataset` (`src/cli/demo-dataset/demo-dataset.command.ts`) → `DemoAccountsApi` (`inspect`,
+- `pnpm ops:seed` (`src/cli/seed/seed.command.ts`) → `DemoAccountsApi` (`inspect`,
   `findEmployees`, `describe`, `create`); mọi bản ghi khác của dataset đi qua HTTP API đang chạy, không qua module này.
 - `pnpm ops:inspect` (`src/cli/inspect/inspect.command.ts`) → `InstallationInspectionApi.inspect`.
 - `pnpm ops:preflight` (`src/cli/preflight/preflight.command.ts`) → `MigrationPreflightApi.judge`, hoặc `recoveryTarget`
@@ -55,7 +55,7 @@ Lệnh nằm ở `src/cli/<lệnh>/` (bảng lệnh: `src/cli/commands.ts`) và 
   `installation.repo.ts` (advisory lock để hai lần cài chạy nối tiếp).
 - `dev-seed/` — `dev-seed-cli.module.ts` (graph của `dev:seed`), `dev-seed-plan.policy.ts`, `local-seed.policy.ts` (ba guard local),
   `dev-seed.repo.ts`, `local-password.service.ts`.
-- `demo-dataset/` — `demo-dataset-cli.module.ts` (graph của `ops:demo-dataset`: organization, identity-access facade và
+- `seed/` — `seed-cli.module.ts` (graph của `ops:seed`: organization, identity-access facade và
   local seed facade, audit, `RuntimeDatabaseRoleModule` — production chỉ chạy bằng runtime role; không guard local vì mọi
   dữ liệu nghiệp vụ đi qua API).
 - `inspect/` — `inspection-cli.module.ts` (graph của `ops:inspect`, mọi session read-only), `inspection-facts.policy.ts`, `migration-state.repo.ts`.
@@ -80,5 +80,5 @@ Lệnh nằm ở `src/cli/<lệnh>/` (bảng lệnh: `src/cli/commands.ts`) và 
 
 ## Test
 
-- Unit: `src/modules/installation/**/*.spec.ts` và `src/cli/{bootstrap,dev-seed,demo-dataset,inspect,preflight}/**/*.spec.ts`; HTTP:
+- Unit: `src/modules/installation/**/*.spec.ts` và `src/cli/{bootstrap,dev-seed,seed,inspect,preflight}/**/*.spec.ts`; HTTP:
   không có (không route); integration: `test/integration/installation/`.

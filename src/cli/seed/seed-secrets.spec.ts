@@ -1,11 +1,11 @@
 import { PassThrough } from 'node:stream';
-import { DemoSecretsError, parseDemoSecrets, readDemoSecrets } from './demo-dataset-secrets';
+import { DemoSecretsError, parseDemoSecrets, readDemoSecrets } from './seed-secrets';
 
 const record = (text: string) => Buffer.from(text, 'utf8');
 const SA = 'a super admin passphrase';
 const DEMO = 'the demo account password';
 
-describe('ops:demo-dataset secrets record', () => {
+describe('ops:seed secrets record', () => {
   it('reads the two named passwords, as written (spaces kept), in any order', () => {
     expect(parseDemoSecrets(record(`DEMO_ACCOUNT_PASSWORD= ${DEMO} \nSUPER_ADMIN_PASSWORD=${SA}\n`))).toEqual({
       superAdminPassword: SA,

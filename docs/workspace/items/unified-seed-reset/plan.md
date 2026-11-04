@@ -171,3 +171,15 @@ Quick set + gates + script tests xanh; Owner chạy full suite một lần, `see
 - [ ] AC trong scope có bằng chứng.
 - [ ] Spec/plan/guide phản ánh implementation cuối.
 - [ ] Giao Owner review; cập nhật roadmap.
+
+### Owner clarification before implementation
+
+- 04/11/2026 chat: Owner chose to KEEP --allow-bootstrap per spec. Task 2 Files parenthesis saying to remove it is superseded by this clarification. Both wrappers pass the explicit flag; direct apply on EMPTY still requires it. Record this discrepancy in the implementation report.
+
+- Owner also approved correcting only the historical calendar link target at spec.md:63 after the folder move (outside Changes and acceptance); displayed historical label retained. Restored the legacy guide anchor in the redirect page so older specs still resolve.
+
+### Task 1 evidence
+
+- Renamed command/graph and imports to seed, removed old wrappers/templates and aliases from command table, split unchanged v2 fixture into organization/catalog/finance/requests/extras/index. Updated apply lock prefix at its owner DemoAccountsApi (necessary companion to the command move).
+- typecheck passed; seed unit: 10 suites / 81 tests; gates: 16 suites / 327 tests passed. arch:check passed. rules:check initially found the moved calendar link and legacy guide anchor; Owner approved link correction, anchor restored.
+- Build passed; dist/seed-cli.js exists and dist/demo-dataset-cli.js does not. Full lint and script tests running; integration files renamed and updated, not run.

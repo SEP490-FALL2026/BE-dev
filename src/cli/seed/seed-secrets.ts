@@ -1,7 +1,7 @@
 import type { Readable } from 'node:stream';
 
 /**
- * The two passwords of `ops:demo-dataset --secrets-stdin`, read from standard input only (never an argument, an environment
+ * The two passwords of `ops:seed --secrets-stdin`, read from standard input only (never an argument, an environment
  * variable or a file the command opens): the Super Admin's, to sign in and drive the API as the role the business rules
  * name, and the one every demo account gets. The operator wrapper writes them from its private file through a pipe.
  */

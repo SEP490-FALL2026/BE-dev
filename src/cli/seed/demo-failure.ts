@@ -2,7 +2,7 @@ import { pgConnectivityMessage, TransientDatabaseError } from '../../infrastruct
 import { describeForOperator } from '../../infrastructure/observability/operator-error';
 
 /**
- * A failure of `ops:demo-dataset` as the operator reads it: the kind of error, its code or SQLSTATE and whether trying
+ * A failure of `ops:seed` as the operator reads it: the kind of error, its code or SQLSTATE and whether trying
  * again can help (describeForOperator), plus the fixed message node-postgres writes for a connectivity failure
  * ("Query read timeout", "Connection terminated unexpectedly", …). A Prisma call outside TransactionRunner throws such a
  * failure as a plain `Error`, so without that message the line said only "Error". Never the message of any other error,
@@ -20,7 +20,7 @@ export function describeDemoFailure(error: unknown): string {
  * - `startup`: opening the command's Nest graph; in production this is where the runtime-role check
  *   (RuntimeDatabaseRoleGuard) runs the first database query, outside TransactionRunner.
  * - `installation-facts`, `apply-lock`, `api-proof`, `calendar`, `steps`, `lock-release`: the run itself
- *   (demo-dataset-run.ts).
+ *   (seed-run.ts).
  */
 export type DemoRunPhase =
   'secrets' | 'startup' | 'installation-facts' | 'apply-lock' | 'api-proof' | 'calendar' | 'steps' | 'lock-release';

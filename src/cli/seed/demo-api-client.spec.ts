@@ -17,7 +17,7 @@ function client(responses: Array<() => Response | Promise<Response>>) {
   return { api: new DemoApiClient('http://api:3000/api/v1', { fetch, sleep }), calls, sleep };
 }
 
-describe('the HTTP client of ops:demo-dataset', () => {
+describe('the HTTP client of ops:seed', () => {
   it('signs in once, sends the Bearer token and answers the data of the envelope', async () => {
     const { api, calls } = client([
       () => json(200, tokens),

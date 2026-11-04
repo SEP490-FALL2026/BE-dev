@@ -1,4 +1,4 @@
-import { businessYearOf, calendarRefusal } from './demo-dataset-calendar';
+import { businessYearOf, calendarRefusal } from './seed-calendar';
 
 const facts = (mode: 'plan' | 'apply', today: string, datasetYear: number | null = null, fiscalYearStartMonth = 1) => ({
   mode,

@@ -1,5 +1,5 @@
 /**
- * The shape of a demo dataset of `pnpm ops:demo-dataset`. A fixture is data only: who exists, what the catalog holds and
+ * The shape of a demo dataset of `pnpm ops:seed`. A fixture is data only: who exists, what the catalog holds and
  * which business scenarios to bring to which state. Every write goes through the HTTP API as the actor the business rules
  * name (and the demo accounts through the demo account contract), so a fixture can never say "put this row in that state".
  */

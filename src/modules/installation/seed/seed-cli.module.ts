@@ -9,7 +9,7 @@ import { OrganizationModule } from '../../organization/organization.module';
 import { DemoAccountsApi } from '../public/demo-accounts.api';
 
 /**
- * The in-process graph of `pnpm ops:demo-dataset`: database settings only and the owning services the demo accounts are
+ * The in-process graph of `pnpm ops:seed`: database settings only and the owning services the demo accounts are
  * written through (the rest of the dataset goes through the HTTP API). In production it checks, before any work, that it
  * connects as the runtime role (RuntimeDatabaseRoleModule, as the API does): the command writes what the API would and
  * never as an owner of the database. Never imported by the API, the worker or another command (module-graph gate,
@@ -28,4 +28,4 @@ import { DemoAccountsApi } from '../public/demo-accounts.api';
   providers: [DemoAccountsApi],
   exports: [DemoAccountsApi],
 })
-export class DemoDatasetCliModule {}
+export class SeedCliModule {}

@@ -1,8 +1,8 @@
 import type { DemoAccountsApi } from '../../modules/installation/public/demo-accounts.api';
 import { DemoApiUnreachableError, FetchLike } from './demo-api-client';
 import { DemoRunClock } from './demo-failure';
-import { runDemoDataset } from './demo-dataset-run';
-import type { DemoDatasetCommandArguments } from './demo-dataset.arguments';
+import { runSeed } from './seed-run';
+import type { SeedCommandArguments } from './seed.arguments';
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -16,7 +16,7 @@ const facts = {
   superAdmin: { appUserId: 'sa-1', employeeId: 'e-1', loginEmail: 'sa@acme.example' },
 };
 
-const args = (mode: 'plan' | 'apply'): DemoDatasetCommandArguments => ({
+const args = (mode: 'plan' | 'apply'): SeedCommandArguments => ({
   mode,
   fixture: 'shared-demo-v2',
   organization: 'Acme',
@@ -52,9 +52,9 @@ const signedIn = {
 
 const brokenLock = () => Promise.reject(new Error('Connection terminated unexpectedly'));
 
-describe('a run of ops:demo-dataset', () => {
+describe('a run of ops:seed', () => {
   it('keeps the outcome of an apply when releasing its lock fails, and warns that the lock connection broke', async () => {
-    const outcome = await runDemoDataset({
+    const outcome = await runSeed({
       args: args('apply'),
       secrets,
       accounts: accounts({ release: brokenLock }),
@@ -70,7 +70,7 @@ describe('a run of ops:demo-dataset', () => {
   });
 
   it('reports the failure of the run, not the failure of releasing the lock after it', async () => {
-    const run = runDemoDataset({
+    const run = runSeed({
       args: args('apply'),
       secrets,
       accounts: accounts({ release: brokenLock }),
@@ -86,7 +86,7 @@ describe('a run of ops:demo-dataset', () => {
 
   it('says which request could not reach the API, how and after how long, without the address', async () => {
     const refused = Object.assign(new Error('connect ECONNREFUSED 172.18.0.4:3000'), { code: 'ECONNREFUSED' });
-    const outcome = await runDemoDataset({
+    const outcome = await runSeed({
       args: args('plan'),
       secrets,
       accounts: accounts(),
@@ -101,7 +101,7 @@ describe('a run of ops:demo-dataset', () => {
 
   it('tells the clock which phase it is in, so a database failure is placed', async () => {
     const clock = new DemoRunClock();
-    const failure = await runDemoDataset({
+    const failure = await runSeed({
       args: args('plan'),
       secrets,
       accounts: accounts({ inspect: () => Promise.reject(new Error('Query read timeout')) }),

@@ -1,23 +1,23 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { AddressInfo, Server } from 'node:net';
-import type { DemoDatasetCommandArguments } from '../../../src/cli/demo-dataset/demo-dataset.arguments';
-import { runDemoDataset, type DemoRunOutcome } from '../../../src/cli/demo-dataset/demo-dataset-run';
-import type { FetchLike } from '../../../src/cli/demo-dataset/demo-api-client';
-import { SHARED_DEMO_V2 } from '../../../src/cli/demo-dataset/fixture/shared-demo-v2';
+import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
+import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
+import type { FetchLike } from '../../../src/cli/seed/demo-api-client';
+import { SHARED_DEMO_V2 } from '../../../src/cli/seed/fixture/shared-demo-v2';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD, seedInstallation } from '../../support/http-test-app';
 import { PgRelay } from '../../support/pg-relay';
 
 /**
- * A-04 (RA-08): `ops:demo-dataset` run again and again while its own database connections are slow, as through the SSH
+ * A-04 (RA-08): `ops:seed` run again and again while its own database connections are slow, as through the SSH
  * tunnel of the local path (runbook, path B) or on a loaded host. The API listens directly on a disposable PostgreSQL; the
  * command's Nest graph (demo accounts, apply lock) reaches the same database through a relay that delays every chunk, with
  * the production transaction budget (`DB_TRANSACTION_TIMEOUT_MS` 10 s). Before A-04 the demo accounts were described and
  * written in one transaction whose work grew with the fixture (about 60 sequential statements to describe 14 accounts on
  * a rerun, about 165 to write them): a 100 ms round trip made the first apply fail with `TransientDatabaseError` (P2028).
  */
-describe('ops:demo-dataset reruns over a slow database connection (A-04, real API and PostgreSQL)', () => {
+describe('ops:seed reruns over a slow database connection (A-04, real API and PostgreSQL)', () => {
   /** One way; a round trip costs twice this. */
   const ONE_WAY_DELAY_MS = 50;
   /** Generous: one demo account's transaction needs at most about 18; the old single transaction needed about 165. */
@@ -31,7 +31,7 @@ describe('ops:demo-dataset reruns over a slow database connection (A-04, real AP
   let baseUrl: string;
   let statements: string[] = [];
 
-  const args = (mode: 'plan' | 'apply'): DemoDatasetCommandArguments => ({
+  const args = (mode: 'plan' | 'apply'): SeedCommandArguments => ({
     mode,
     fixture: 'shared-demo-v2',
     organization: 'Acme',
@@ -41,7 +41,7 @@ describe('ops:demo-dataset reruns over a slow database connection (A-04, real AP
     json: false,
   });
   const run = (mode: 'plan' | 'apply', fetch?: FetchLike): Promise<DemoRunOutcome> =>
-    runDemoDataset({ args: args(mode), secrets, accounts: demo.get(DemoAccountsApi), fetch });
+    runSeed({ args: args(mode), secrets, accounts: demo.get(DemoAccountsApi), fetch });
   const reportOf = (outcome: DemoRunOutcome) => {
     if ('refused' in outcome) throw new Error(`refused: ${outcome.refused}`);
     return outcome.report;
@@ -63,7 +63,7 @@ describe('ops:demo-dataset reruns over a slow database connection (A-04, real AP
 
   async function heldAdvisoryLocks(): Promise<number> {
     const { rows } = await ctx.sql.query<{ n: string }>(
-      `WITH k AS (SELECT hashtextextended('demo-dataset:shared-demo-v2:apply', 0) AS v)
+      `WITH k AS (SELECT hashtextextended('seed:shared-demo-v2:apply', 0) AS v)
        SELECT count(*) AS n FROM pg_locks, k
         WHERE locktype = 'advisory' AND granted AND objsubid = 1
           AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
@@ -98,9 +98,8 @@ describe('ops:demo-dataset reruns over a slow database connection (A-04, real AP
     const directUrl = process.env.TEST_DATABASE_URL;
     process.env.TEST_DATABASE_URL = relayed.toString();
     try {
-      const { DemoDatasetCliModule } =
-        await import('../../../src/modules/installation/demo-dataset/demo-dataset-cli.module');
-      demo = await NestFactory.createApplicationContext(DemoDatasetCliModule, { logger: false });
+      const { SeedCliModule } = await import('../../../src/modules/installation/seed/seed-cli.module');
+      demo = await NestFactory.createApplicationContext(SeedCliModule, { logger: false });
     } finally {
       process.env.TEST_DATABASE_URL = directUrl;
     }

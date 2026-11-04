@@ -1,12 +1,12 @@
 import type { DemoAccountsApi } from '../../modules/installation/public/demo-accounts.api';
-import type { DemoDatasetCommandArguments } from './demo-dataset.arguments';
+import type { SeedCommandArguments } from './seed.arguments';
 import { DemoApiClient, DemoApiError, DemoApiUnreachableError, FetchLike } from './demo-api-client';
-import { businessYearOf, calendarRefusal } from './demo-dataset-calendar';
+import { businessYearOf, calendarRefusal } from './seed-calendar';
 import { describeDemoFailure, type DemoRunClock } from './demo-failure';
-import { exitCodeOf, runDemoSteps } from './demo-dataset-runner';
-import type { DemoReport } from './demo-dataset-report';
-import type { DemoSecrets } from './demo-dataset-secrets';
-import { DEMO_FIXTURES, demoSteps } from './demo-dataset-steps';
+import { exitCodeOf, runDemoSteps } from './seed-runner';
+import type { DemoReport } from './seed-report';
+import type { DemoSecrets } from './seed-secrets';
+import { DEMO_FIXTURES, demoSteps } from './seed-steps';
 import { emptyIds, DemoRunContext } from './demo-run.types';
 import type { DemoFixture } from './fixture/demo-fixture.types';
 
@@ -14,7 +14,7 @@ import type { DemoFixture } from './fixture/demo-fixture.types';
 export type DemoRunOutcome = ({ refused: string } | { report: DemoReport }) & { warnings?: string[] };
 
 export interface DemoRunInput {
-  args: DemoDatasetCommandArguments;
+  args: SeedCommandArguments;
   secrets: DemoSecrets;
   accounts: DemoAccountsApi;
   fetch?: FetchLike;
@@ -25,13 +25,13 @@ export interface DemoRunInput {
 const API_PREFIX = '/api/v1';
 
 /**
- * One run of `ops:demo-dataset`. Before anything is written it proves the target: the database holds an installation of
+ * One run of `ops:seed`. Before anything is written it proves the target: the database holds an installation of
  * the organization named on the command line, priced in the fixture's currency, and the API at `--api-url` serves that
  * very database (its Super Admin, signed in with the password given, is the holder this database records). It then checks
- * the calendar (`demo-dataset-calendar.ts`) and, for `apply`, holds the apply lock of the fixture on this database, so a
+ * the calendar (`seed-calendar.ts`) and, for `apply`, holds the apply lock of the fixture on this database, so a
  * second `apply` at the same time is refused. Any doubt is a refusal, with no record of the dataset written.
  */
-export async function runDemoDataset(input: DemoRunInput): Promise<DemoRunOutcome> {
+export async function runSeed(input: DemoRunInput): Promise<DemoRunOutcome> {
   const { args } = input;
   const fixture = DEMO_FIXTURES[args.fixture];
   if (!fixture) return { refused: `Unknown fixture ${args.fixture}; known: ${Object.keys(DEMO_FIXTURES).join(', ')}.` };

@@ -9,7 +9,7 @@ const prismaError = (code: string, meta?: Record<string, unknown>) =>
     meta,
   });
 
-describe('the failure line of ops:demo-dataset', () => {
+describe('the failure line of ops:seed', () => {
   // A failure reported by its name alone cannot tell a transaction over its time budget from a connection that stopped answering.
   it('names the Prisma code of a transaction that ran out of time, never its message', () => {
     const wrapped = toTransientError(prismaError('P2028'));

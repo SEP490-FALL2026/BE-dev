@@ -26,7 +26,7 @@ import { IdentityAccessRecoveryCliModule } from '../../src/modules/identity-acce
 import { InstallationModule } from '../../src/modules/installation/installation.module';
 import { InspectionCliModule } from '../../src/modules/installation/inspect/inspection-cli.module';
 import { DevSeedCliModule } from '../../src/modules/installation/dev-seed/dev-seed-cli.module';
-import { DemoDatasetCliModule } from '../../src/modules/installation/demo-dataset/demo-dataset-cli.module';
+import { SeedCliModule } from '../../src/modules/installation/seed/seed-cli.module';
 import { MigrationPreflightCliModule } from '../../src/modules/installation/migration-preflight/migration-preflight-cli.module';
 import { SubscriptionOwnerAssignmentCliModule } from '../../src/modules/catalog/subscription-owner-assignment/subscription-owner-assignment-cli.module';
 import { AssignSubscriptionOwnerCliModule } from '../../src/cli/assign-subscription-owner/assign-subscription-owner-cli.module';
@@ -114,8 +114,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'InstallationModule: InstallationApi',
   // H6.2: the entry service of `pnpm dev:seed`.
   'DevSeedCliModule: DevSeedApi',
-  // The in-process part of `pnpm ops:demo-dataset`: the demo accounts of the shared demo dataset (the rest goes through HTTP).
-  'DemoDatasetCliModule: DemoAccountsApi',
+  // The in-process part of `pnpm ops:seed`: the demo accounts of the shared demo dataset (the rest goes through HTTP).
+  'SeedCliModule: DemoAccountsApi',
   // H6.1: the entry service of `pnpm ops:inspect`.
   'InspectionCliModule: InstallationInspectionApi',
   // P28-01 (Prompt 29): the entry service of `pnpm ops:preflight`.
@@ -272,7 +272,7 @@ describe('module graph', () => {
     ['RecoveryCliModule', RecoveryCliModule],
     ['InspectionCliModule', InspectionCliModule],
     ['DevSeedCliModule', DevSeedCliModule],
-    ['DemoDatasetCliModule', DemoDatasetCliModule],
+    ['SeedCliModule', SeedCliModule],
     ['MigrationPreflightCliModule', MigrationPreflightCliModule],
   ];
 
@@ -552,7 +552,7 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
           InspectionCliModule,
           IdentityAccessInspectionFacadeModule,
           DevSeedCliModule,
-          DemoDatasetCliModule,
+          SeedCliModule,
           IdentityAccessLocalSeedFacadeModule,
           MigrationPreflightCliModule,
           SubscriptionOwnerAssignmentCliModule,
@@ -576,7 +576,7 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
       ['RecoveryCliModule', RecoveryCliModule, 0],
       ['InspectionCliModule', InspectionCliModule, 1],
       ['DevSeedCliModule', DevSeedCliModule, 0],
-      ['DemoDatasetCliModule', DemoDatasetCliModule, 0],
+      ['SeedCliModule', SeedCliModule, 0],
       ['MigrationPreflightCliModule', MigrationPreflightCliModule, 1],
       ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule, 0],
       ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule, 0],
@@ -689,8 +689,8 @@ describe('the local seed graph', () => {
       ['RecoveryCliModule', RecoveryCliModule, 0],
       ['InspectionCliModule', InspectionCliModule, 0],
       ['DevSeedCliModule', DevSeedCliModule, 1],
-      // ops:demo-dataset writes its demo accounts through the same contract (one direct role, never a derived one).
-      ['DemoDatasetCliModule', DemoDatasetCliModule, 1],
+      // ops:seed writes its demo accounts through the same contract (one direct role, never a derived one).
+      ['SeedCliModule', SeedCliModule, 1],
       ['MigrationPreflightCliModule', MigrationPreflightCliModule, 0],
       ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule, 0],
       ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule, 0],
@@ -710,7 +710,7 @@ describe('the local seed graph', () => {
 
   it.each([
     ['DevSeedCliModule', DevSeedCliModule],
-    ['DemoDatasetCliModule', DemoDatasetCliModule],
+    ['SeedCliModule', SeedCliModule],
   ])(
     '%s loads only what it writes through: no controller, mail, queue, JWT, API module or full configuration',
     (_name, root) => {

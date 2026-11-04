@@ -1,17 +1,17 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { AddressInfo, Server } from 'node:net';
-import type { DemoDatasetCommandArguments } from '../../../src/cli/demo-dataset/demo-dataset.arguments';
-import { runDemoDataset, type DemoRunOutcome } from '../../../src/cli/demo-dataset/demo-dataset-run';
+import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
+import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD, seedInstallation } from '../../support/http-test-app';
 
 /**
- * `pnpm ops:demo-dataset` at the edges of the year, on a controlled clock: only `Date` is faked (the API and the command
+ * `pnpm ops:seed` at the edges of the year, on a controlled clock: only `Date` is faked (the API and the command
  * share this process, so both read the same business day); timers stay real so the database driver and the HTTP stack
  * work as usual. The database keeps its own clock, which no rule of the scenarios reads.
  */
-describe('ops:demo-dataset at the edges of the year (integration, real API and PostgreSQL, controlled date)', () => {
+describe('ops:seed at the edges of the year (integration, real API and PostgreSQL, controlled date)', () => {
   let ctx: HttpTestApp;
   let demo: INestApplicationContext;
   let baseUrl: string;
@@ -19,7 +19,7 @@ describe('ops:demo-dataset at the edges of the year (integration, real API and P
   const at = (instant: string) => jest.setSystemTime(new Date(instant));
 
   const run = (mode: 'plan' | 'apply') =>
-    runDemoDataset({
+    runSeed({
       args: {
         mode,
         fixture: 'shared-demo-v2',
@@ -28,7 +28,7 @@ describe('ops:demo-dataset at the edges of the year (integration, real API and P
         operator: 'TEST-CALENDAR',
         environment: 'LOCAL_TEST',
         json: false,
-      } satisfies DemoDatasetCommandArguments,
+      } satisfies SeedCommandArguments,
       secrets,
       accounts: demo.get(DemoAccountsApi),
     });
@@ -79,9 +79,8 @@ describe('ops:demo-dataset at the edges of the year (integration, real API and P
     ctx = await createHttpTestApp();
     await seedInstallation(ctx.app);
     baseUrl = `http://127.0.0.1:${((ctx.app.getHttpServer() as unknown as Server).address() as AddressInfo).port}`;
-    const { DemoDatasetCliModule } =
-      await import('../../../src/modules/installation/demo-dataset/demo-dataset-cli.module');
-    demo = await NestFactory.createApplicationContext(DemoDatasetCliModule, { logger: false });
+    const { SeedCliModule } = await import('../../../src/modules/installation/seed/seed-cli.module');
+    demo = await NestFactory.createApplicationContext(SeedCliModule, { logger: false });
   }, 300000);
 
   afterAll(async () => {

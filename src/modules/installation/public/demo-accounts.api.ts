@@ -41,7 +41,7 @@ export class DemoAccountsApi {
    * process ends, so a run that dies leaves no stale lock.
    */
   holdApplyLock(fixtureId: string): Promise<HeldSessionLock | null> {
-    return trySessionAdvisoryLock(this.config.get('DATABASE_URL', { infer: true }), `demo-dataset:${fixtureId}:apply`);
+    return trySessionAdvisoryLock(this.config.get('DATABASE_URL', { infer: true }), `seed:${fixtureId}:apply`);
   }
 
   /** Null when the database holds no installation. */

@@ -2,30 +2,27 @@ import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { AddressInfo, Server } from 'node:net';
 import request from 'supertest';
-import type { DemoDatasetCommandArguments } from '../../../src/cli/demo-dataset/demo-dataset.arguments';
-import { runDemoDataset, type DemoRunOutcome } from '../../../src/cli/demo-dataset/demo-dataset-run';
-import type { FetchLike } from '../../../src/cli/demo-dataset/demo-api-client';
-import { SHARED_DEMO_V2 } from '../../../src/cli/demo-dataset/fixture/shared-demo-v2';
+import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
+import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
+import type { FetchLike } from '../../../src/cli/seed/demo-api-client';
+import { SHARED_DEMO_V2 } from '../../../src/cli/seed/fixture/shared-demo-v2';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD, seedInstallation } from '../../support/http-test-app';
 
 /**
- * `pnpm ops:demo-dataset` against a real installation: the whole application listens on a disposable PostgreSQL, the
+ * `pnpm ops:seed` against a real installation: the whole application listens on a disposable PostgreSQL, the
  * command talks to it over HTTP as it does on the VPS, and writes its demo accounts through its own Nest graph on the same
  * database. Proves what a mock cannot: every record passes the real routes as the role they name, the requests reach their
  * states, a rerun writes nothing twice, a run stopped half-way goes on, and a plan writes no record of the dataset.
  */
-describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
+describe('ops:seed (integration, real API and PostgreSQL)', () => {
   let ctx: HttpTestApp;
   let demo: INestApplicationContext;
   let baseUrl: string;
   const demoAccounts = SHARED_DEMO_V2.people.filter((person) => person.account !== null).length;
   const secrets = { superAdminPassword: SEED_PASSWORD, demoAccountPassword: 'a demo password for the tests' };
 
-  const args = (
-    mode: 'plan' | 'apply',
-    extra: Partial<DemoDatasetCommandArguments> = {},
-  ): DemoDatasetCommandArguments => ({
+  const args = (mode: 'plan' | 'apply', extra: Partial<SeedCommandArguments> = {}): SeedCommandArguments => ({
     mode,
     fixture: 'shared-demo-v2',
     organization: 'Acme',
@@ -35,11 +32,8 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
     json: false,
     ...extra,
   });
-  const run = (
-    mode: 'plan' | 'apply',
-    options: { args?: Partial<DemoDatasetCommandArguments>; fetch?: FetchLike } = {},
-  ) =>
-    runDemoDataset({
+  const run = (mode: 'plan' | 'apply', options: { args?: Partial<SeedCommandArguments>; fetch?: FetchLike } = {}) =>
+    runSeed({
       args: args(mode, options.args),
       secrets,
       accounts: demo.get(DemoAccountsApi),
@@ -68,7 +62,7 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
   /** Sessions holding the apply lock of the fixture: an apply that ended, however it ended, leaves none. */
   async function heldAdvisoryLocks(): Promise<number> {
     const { rows } = await ctx.sql.query<{ n: string }>(
-      `WITH k AS (SELECT hashtextextended('demo-dataset:shared-demo-v2:apply', 0) AS v)
+      `WITH k AS (SELECT hashtextextended('seed:shared-demo-v2:apply', 0) AS v)
        SELECT count(*) AS n FROM pg_locks, k
         WHERE locktype = 'advisory' AND granted AND objsubid = 1
           AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
@@ -90,9 +84,8 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
     ctx = await createHttpTestApp();
     await seedInstallation(ctx.app);
     baseUrl = `http://127.0.0.1:${((ctx.app.getHttpServer() as unknown as Server).address() as AddressInfo).port}`;
-    const { DemoDatasetCliModule } =
-      await import('../../../src/modules/installation/demo-dataset/demo-dataset-cli.module');
-    demo = await NestFactory.createApplicationContext(DemoDatasetCliModule, { logger: false });
+    const { SeedCliModule } = await import('../../../src/modules/installation/seed/seed-cli.module');
+    demo = await NestFactory.createApplicationContext(SeedCliModule, { logger: false });
   }, 300000);
 
   afterAll(async () => {
@@ -103,7 +96,7 @@ describe('ops:demo-dataset (integration, real API and PostgreSQL)', () => {
   it('refuses another organization, a wrong Super Admin password, an unknown fixture or an unreachable API, writing nothing', async () => {
     const before = await businessRows();
     expect(refusalOf(await run('apply', { args: { organization: 'Other Co' } }))).toContain('wrong database');
-    const wrongPassword = await runDemoDataset({
+    const wrongPassword = await runSeed({
       args: args('apply'),
       secrets: { ...secrets, superAdminPassword: 'not the super admin password' },
       accounts: demo.get(DemoAccountsApi),
