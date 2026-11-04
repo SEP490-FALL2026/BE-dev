@@ -24,7 +24,7 @@ PostgreSQL riêng và inventory OpenAPI.
 ## Sizing decision
 
 - Container: G1 (giao việc `QĐ-93` của Owner 01/11/2026) — container giao việc, không phải ranh giới hạng mục.
-- Mode: `grouped-stories`.
+- Mode: `single-story`
 - Outcome and owner: đổi người giữ vai Super Admin chỉ còn qua lệnh vận hành; capability `identity-access/accounts`
   (gỡ `super-admin-transfers/`) và `identity-access/recovery` (`TRANSFER_ROLE` nhận ca có kế hoạch).
 - Boundaries: lệnh `transfer-role` giữ một transaction và giao thức khóa hiện có (nhân viên → tài khoản theo id); khi người
@@ -41,10 +41,12 @@ PostgreSQL riêng và inventory OpenAPI.
 
 ## Primary Story/AC
 
-| Story    | AC                            | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                     |
-| -------- | ----------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-01-01 | AC-13                         | partial  | AC-4, AC-12, AC-16, AC-17, AC-21: `qd93-direct-manager-spending-approver-roles`; AC-22: `qd93-unplaced-employee-first-placement`; AC còn lại giao trước GOV.1 ở `us-01-account-invitation-activation`, `us-01-bootstrap-login-session` |
-| US-01-09 | AC-1, AC-2, AC-6, AC-7, AC-16 | partial  | AC-3: `qd93-direct-manager-spending-approver-roles`; AC còn lại giao trước GOV.1 ở `us-01-09-super-admin-transfer-recovery`                                                                                                            |
+| Story    | AC                      | Coverage | Phần còn lại thuộc                                                                                                                                           |
+| -------- | ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| US-01-09 | AC-2, AC-6, AC-7, AC-16 | partial  | AC-1, AC-3, AC-12: `qd95-one-role-per-account` (AC-1 chuyển 04/11/2026 theo `QĐ-95`); AC còn lại giao trước GOV.1 ở `us-01-09-super-admin-transfer-recovery` |
+
+Mode đổi từ `grouped-stories` sang `single-story` ngày 04/11/2026: `US-01-01` AC-13 (không tự đổi vai) thuộc `qd95-one-role-per-account` từ ngày đó (`QĐ-95`c): thao tác tự đổi bị chặn ở route đổi vai mới; vế
+_không có chuyển giao trong ứng dụng_ của hạng mục này vẫn là bằng chứng hồi quy ở đó.
 
 ## Supporting references
 

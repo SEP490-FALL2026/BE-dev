@@ -28,10 +28,9 @@ Kiểm bằng ba file test mới và bảng ánh xạ ở [mobile-contract.md](m
 
 ## Primary Story/AC
 
-| Story    | AC              | Coverage | Phần còn lại thuộc                                                                                                                                             |
-| -------- | --------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-16-04 | AC-1→AC-3, AC-6 | partial  | AC-4, AC-7: không có phần BE, là hành vi của ứng dụng native của dev Mobile ([giải thích](./spec.md#explicit-out-of-scope))                                    |
-| US-16-04 | AC-5            | partial  | deferred về chính `a09-mobile-auth-inbox-contract`: `DEF-A09-01` — route Employee của `requests` chưa đòi vai `EMPLOYEE`; chờ B-10 (Dev B) và quyết định Owner |
+| Story    | AC        | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                  |
+| -------- | --------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-16-04 | AC-1→AC-3 | partial  | AC-5, AC-6: `qd95-self-service-every-role` (chuyển 04/11/2026 theo `QĐ-95`d — AC-5 thay `DEF-A09-01` đã hết đối tượng); AC-4, AC-7: không có phần BE, là hành vi của ứng dụng native của dev Mobile ([giải thích](./spec.md#explicit-out-of-scope)) |
 
 `US-16-04` AC-4 (mất mạng: không thao tác, không lưu tạm) và AC-7 (không biometrics, không tải tệp) là hành vi của ứng
 dụng native; BE không có phần nào để chứng minh ngoài việc không có route/bảng tương ứng, nên chỉ ghi các bằng chứng phủ
