@@ -15,7 +15,7 @@ const employeeDashboardSchema = z.strictObject({
     }),
     requests: dashboardSectionSchema.meta({
       description:
-        'The requests the caller sent that are not over, as meAccessRequestList with view=open counts them; drafts and requests sent on their behalf are not counted. Counted for every account, zero when none is open: a Super Admin sends none (QĐ-95d), so only requests sent before the current role can count. The results are read from the list with view=ended, not from here.',
+        'The requests the caller sent that are not over, as meAccessRequestList with view=open counts them; drafts and requests sent on their behalf are not counted. Counted for every account, zero when none is open: a Super Admin sends none, so only requests sent before the current role can count. The results are read from the list with view=ended, not from here.',
     }),
     saasIssues: dashboardSectionSchema.meta({
       description:
