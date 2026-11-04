@@ -109,7 +109,7 @@ describe('a paid request from the employee to the seat (e2e, D-1)', () => {
   });
 
   it('the IT Admin grants, takes and completes the task: the employee holds the seat and the request is completed', async () => {
-    task = h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId }).expect(201)).task;
+    task = h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId }).expect(200)).task;
     expect(task).toMatchObject({ kind: 'GRANT', status: 'QUEUED', requestId });
     expect((await requestOf(requestId)).state).toBe('EXECUTING');
 

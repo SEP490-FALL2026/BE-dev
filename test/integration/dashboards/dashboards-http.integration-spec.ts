@@ -78,7 +78,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
     it1 = h.it1;
     des = await h.departmentWithHead('P-DES');
     eng = await h.departmentWithHead('P-ENG');
-    it2 = await h.staff(eng.department, 'G-IT2', ['IT_ADMIN']);
+    it2 = await h.staff(eng.department, 'G-IT2', 'IT_ADMIN');
     await h.setItAdminInCharge(des.department, { employeeId: it1.employeeId, account: it1 });
     await h.setItAdminInCharge(eng.department, it2);
     // A department nobody heads and nobody is in charge of.

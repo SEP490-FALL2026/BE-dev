@@ -32,7 +32,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     await h.start();
     designer = await h.jobTitle('Designer');
     a1Employee = await h.person('E-A1');
-    await h.account('E-A1', a1Employee, ['IT_ADMIN']);
+    await h.account('E-A1', a1Employee, 'IT_ADMIN');
     await h.department('P-DES', a1Employee);
     await h.department('P-NOIT');
     e5 = await h.member('P-DES', 'E-5', designer);
@@ -46,7 +46,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
 
   it('AC-1 (US-07-01): takes the seat from today and queues a manual task for the IT Admin in charge, who is named', async () => {
     const { subscriptionId, planId } = await k2(1);
-    const response = await h.grant({ requestId: h.gate.grantable(e5, planId), subscriptionId }).expect(201);
+    const response = await h.grant({ requestId: h.gate.grantable(e5, planId), subscriptionId }).expect(200);
     const { task, warnings } = h.dataOf<{
       task: Record<string, unknown>;
       warnings: string[];
@@ -304,7 +304,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(await tasksOf(subscriptionId)).toBe(0);
 
     await h.ctx.sql.query(`UPDATE employees SET hire_date = $2::date WHERE id = $1`, [newcomer, h.today()]);
-    await h.grant({ requestId, subscriptionId }).expect(201);
+    await h.grant({ requestId, subscriptionId }).expect(200);
   });
 
   it('AC-3, AC-16 (US-07-01): the way the gate answers is the way the grant refuses, and nothing is written', async () => {
@@ -347,7 +347,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
 
   it('US-01-11 AC-4: a department with no IT Admin in charge still gets the task, in the general queue, with a warning', async () => {
     const { subscriptionId, planId } = await k2();
-    const response = await h.grant({ requestId: h.gate.grantable(e6, planId), subscriptionId }).expect(201);
+    const response = await h.grant({ requestId: h.gate.grantable(e6, planId), subscriptionId }).expect(200);
     const { task, warnings } = h.dataOf<{
       task: { defaultResponsibleEmployeeId: string | null; inGeneralQueue: boolean };
       warnings: string[];

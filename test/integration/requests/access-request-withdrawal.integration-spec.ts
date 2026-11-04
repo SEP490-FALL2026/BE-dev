@@ -129,7 +129,7 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       )
     ).rows;
   const granted = async (requestId: string) =>
-    h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId }).expect(201)).task;
+    h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId }).expect(200)).task;
   /** The seat of a request sits on the subscription its own department owns, not on the seeded department's (`QĐ-89a`). */
   const ownOf = (u: Unit): string => h.owned.subscriptionFor(subscriptionId, u.department.id);
 

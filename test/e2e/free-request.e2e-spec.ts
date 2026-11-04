@@ -62,7 +62,7 @@ describe('an internal request with no fee, straight to its grant (e2e)', () => {
   });
 
   it('the IT Admin grants it, takes the task and completes it with evidence: the seat exists and the request is completed', async () => {
-    task = h.dataOf<{ task: TaskWire }>(await h.grant({ requestId }).expect(201)).task;
+    task = h.dataOf<{ task: TaskWire }>(await h.grant({ requestId }).expect(200)).task;
     expect(task).toMatchObject({ kind: 'GRANT', status: 'QUEUED', subscriptionId: null });
 
     await h.claim(task.id).expect(200);

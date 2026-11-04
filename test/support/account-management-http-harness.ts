@@ -52,6 +52,7 @@ export class AccountManagementHttpHarness {
   as = (token: string) => ({ Authorization: `Bearer ${token}` });
 
   admin = {
+    put: (path: string, body?: object) => request(this.server()).put(path).set(this.as(this.adminToken)).send(body),
     post: (path: string, body?: object) => request(this.server()).post(path).set(this.as(this.adminToken)).send(body),
     get: (path: string) => request(this.server()).get(path).set(this.as(this.adminToken)),
     delete: (path: string) => request(this.server()).delete(path).set(this.as(this.adminToken)),

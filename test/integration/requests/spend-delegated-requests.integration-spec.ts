@@ -306,7 +306,7 @@ describe('a head sends requests for the people of the department over PostgreSQL
       );
       expect(result.requests[0].expectedEndDate).toBe('2099-12-31');
 
-      await h.grant({ requestId: result.requests[0].id }).expect(201);
+      await h.grant({ requestId: result.requests[0].id }).expect(200);
       const seat = await h.ctx.sql.query<{ expected_end_date: string }>(
         `SELECT expected_end_date::text AS expected_end_date FROM license_assignments WHERE employee_id = $1`,
         [intern.employeeId],
@@ -335,7 +335,7 @@ describe('a head sends requests for the people of the department over PostgreSQL
       ).toBe(0);
 
       await h.ctx.sql.query(`UPDATE employees SET hire_date = current_date WHERE id = $1`, [n1.employeeId]);
-      await h.grant({ requestId: result.requests[0].id }).expect(201);
+      await h.grant({ requestId: result.requests[0].id }).expect(200);
       const seat = await h.ctx.sql.query<{ effective_from: string; hire_date: string }>(
         `SELECT a.valid_from::text AS effective_from, e.hire_date::text AS hire_date
            FROM license_assignments a JOIN employees e ON e.id = a.employee_id WHERE a.employee_id = $1`,

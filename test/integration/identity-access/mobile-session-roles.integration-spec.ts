@@ -49,7 +49,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
   const person = (roles: string[] = []) => {
     counter += 1;
 
-    return h.staff(department, `MOB-${counter}`, roles);
+    return h.staff(department, `MOB-${counter}`, roles[0] ?? 'EMPLOYEE');
   };
   const passwordOf = () => ACCOUNT_PASSWORD;
 
@@ -311,25 +311,21 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       expect(['PENDING', 'WAITING_CONTROLLED']).toContain(state);
     });
 
-    it('applies a grant and a revocation of a direct role to the next call, and keeps EMPLOYEE only for who holds it', async () => {
+    it('changes the web role and applies it to the next mobile call without changing the session', async () => {
       const it2 = await person(['IT_ADMIN']);
       const token = it2.account.accessToken;
       await get('/api/v1/provisioning-tasks', token).expect(200);
-      expect((await meOf(token)).roles).toEqual(['IT_ADMIN']);
-
-      await h.grantRoleTo(it2.account.appUserId, 'EMPLOYEE').expect(201);
-      expect((await meOf(token)).roles).toEqual(['EMPLOYEE', 'IT_ADMIN']);
-
-      await h.revokeRoleFrom(it2.account.appUserId, 'IT_ADMIN').expect(200);
+      await h.changeRoleOf(it2.account.appUserId, 'EMPLOYEE').expect(200);
       await get('/api/v1/provisioning-tasks', token).expect(403);
-      const afterwards = await meOf(token);
-      expect(afterwards.roles).toEqual(['EMPLOYEE']);
-      expect(afterwards).not.toHaveProperty('selfServiceOnly');
-
-      await h.revokeRoleFrom(it2.account.appUserId, 'EMPLOYEE').expect(200);
-      expect(await meOf(token)).not.toHaveProperty('selfServiceOnly');
-      // Revoking the last role leaves the account signed in: the inbox and /me are self-service, open to every account.
-      await get('/api/v1/notifications', token).expect(200);
+      expect((await meOf(token)).roles).toEqual(['EMPLOYEE']);
+      for (const path of [
+        '/api/v1/notifications',
+        '/api/v1/me/software-rights',
+        '/api/v1/me/access-requests',
+        '/api/v1/dashboards/employee',
+      ]) {
+        await get(path, token).expect(200);
+      }
     });
   });
 
@@ -444,7 +440,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
 
   it('gives a mobile MANAGER the need queue and own self-service without EMPLOYEE, and routes their request away', async () => {
     const own = await h.departmentWithUnit(`P-MSELF${++counter}`);
-    const head = await h.staff(own, `MOB-SELF${counter}`, ['MANAGER']);
+    const head = await h.staff(own, `MOB-SELF${counter}`, 'MANAGER');
     await h.makeHead(own, head);
     const token = head.account.accessToken;
     expect((await meOf(token)).roles).toEqual(['MANAGER']);
@@ -474,7 +470,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
 
       await h.clearRole('SPENDING_APPROVER');
 
-      expect((await meOf(token)).roles).toEqual([]);
+      expect((await meOf(token)).roles).toEqual(['EMPLOYEE']);
     });
   });
 

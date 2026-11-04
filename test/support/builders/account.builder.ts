@@ -129,7 +129,7 @@ export async function buildActivatedAccount(
 
 /*
  * The one place a suite gives a person `MANAGER` or `SPENDING_APPROVER` as a precondition, or reads who holds the second
- * (QĐ-93b). Both are role grants (QĐ-93a), given through the service of the route (`POST /app-users/{id}/role-grants`) so every
+ * (QĐ-93b). Both are role grants (QĐ-93a), given through the service of the route (`PUT /app-users/{id}/role`) so every
  * rule of the grant holds for a fixture too. No spec reaches for the role tables itself.
  */
 
@@ -140,20 +140,12 @@ export async function buildActivatedAccount(
 export async function changeRoleTo(
   ctx: HttpTestApp,
   adminToken: string,
-  appUserId: string,
+  employeeId: string,
   role: AppRole,
 ): Promise<void> {
   await ctx.app
     .get(AccountStatusService, { strict: false })
-    .changeRole(await principalOf(ctx, adminToken), appUserId, role);
-}
-
-export async function ensureManagerGrant(ctx: HttpTestApp, adminToken: string, employeeId: string): Promise<void> {
-  const actor = await principalOf(ctx, adminToken);
-  const appUserId = await appUserOf(ctx, employeeId);
-  const held = await ctx.app.get(RoleGrantService, { strict: false }).effectiveRoles(appUserId);
-  if (held.includes('MANAGER')) return;
-  await ctx.app.get(AccountStatusService, { strict: false }).changeRole(actor, appUserId, 'MANAGER');
+    .changeRole(await principalOf(ctx, adminToken), await appUserOf(ctx, employeeId), role);
 }
 
 async function appUserOf(ctx: HttpTestApp, employeeId: string): Promise<string> {

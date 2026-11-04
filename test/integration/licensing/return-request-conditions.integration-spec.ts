@@ -106,7 +106,7 @@ describe('which seat may be returned, and what the return leaves behind over Pos
       const sentRequest = await h.sent(granting.member, internalPlan, { termMonths: 1 });
       await h.decide(sentRequest.id, { decision: 'APPROVE' }, granting.head.account).expect(200);
       const granted = h.dataOf<{ task: { id: string; assignmentId: string } }>(
-        await h.grant({ requestId: sentRequest.id }).expect(201),
+        await h.grant({ requestId: sentRequest.id }).expect(200),
       ).task;
       const before = await counts();
 
@@ -134,7 +134,7 @@ describe('which seat may be returned, and what the return leaves behind over Pos
       const sent = await h.sent(unit.member, internalPlan, { termMonths: 1 });
       await h.decide(sent.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
       const task = h.dataOf<{ task: { id: string; assignmentId: string } }>(
-        await h.grant({ requestId: sent.id }).expect(201),
+        await h.grant({ requestId: sent.id }).expect(200),
       ).task;
       await h.claim(task.id).expect(200);
       await h.complete(task.id, { evidence: 'Granted in the internal portal' }).expect(200);

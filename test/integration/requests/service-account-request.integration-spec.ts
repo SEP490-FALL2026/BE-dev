@@ -138,7 +138,7 @@ describe('a request for a service account after the installation over PostgreSQL
     ).rows[0];
   const granted = async (requestId: string, identifier: string, extra: object = {}, account?: ApiAccount) =>
     h.dataOf<{ task: TaskWire }>(
-      await h.grant({ requestId, subscriptionId, accountIdentifier: identifier, ...extra }, account).expect(201),
+      await h.grant({ requestId, subscriptionId, accountIdentifier: identifier, ...extra }, account).expect(200),
     ).task;
   const codeOf = (response: Parameters<typeof h.codeOf>[0]) => h.codeOf(response);
 
@@ -408,7 +408,7 @@ describe('a request for a service account after the installation over PostgreSQL
       const id = await h.approvedInternalService(u, u.member, internalPlan);
       await h.reviewService(id, { decision: 'ACCEPT' }).expect(200);
 
-      await h.grant({ requestId: id, accountIdentifier: 'internal-svc' }).expect(201);
+      await h.grant({ requestId: id, accountIdentifier: 'internal-svc' }).expect(200);
 
       expect(await assignmentOf(id)).toMatchObject({
         kind: 'SERVICE',
@@ -480,7 +480,7 @@ describe('a request for a service account after the installation over PostgreSQL
 
   describe('one identifier on one subscription (AC-5)', () => {
     it('lets two IT Admins grant the same identifier at once to one request only, whatever its case and spaces', async () => {
-      const second = await h.staff(await h.departmentWithUnit('P-S-IT2'), 'SA-IT2', ['IT_ADMIN']);
+      const second = await h.staff(await h.departmentWithUnit('P-S-IT2'), 'SA-IT2', 'IT_ADMIN');
       otherItAdmins.push(second.account);
       // An identifier is one under one subscription, and a request is granted on the subscription of its own department (F20): the
       // two requests are of one department, so that they meet on one subscription.
@@ -520,7 +520,7 @@ describe('a request for a service account after the installation over PostgreSQL
   describe('an IT Admin who answers for the account (AC-6)', () => {
     it('leaves both the verdict and the grant to another IT Admin while one can act, then does them alone and says so', async () => {
       const unit = await example();
-      const a1 = await h.staff(unit.department, 'SA-A1', ['IT_ADMIN']);
+      const a1 = await h.staff(unit.department, 'SA-A1', 'IT_ADMIN');
       const itAdmins = [h.it1, ...otherItAdmins];
       const requests: string[] = [];
       for (let index = 0; index < 2; index += 1) {

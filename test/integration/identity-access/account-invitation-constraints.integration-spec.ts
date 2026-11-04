@@ -26,11 +26,16 @@ describe('account invitation constraints (integration, real PostgreSQL)', () => 
     await ctx?.close();
   });
 
-  const grant = (appUserId: string, role: string) =>
-    ctx.sql.query(
+  const grant = async (appUserId: string, role: string) => {
+    await ctx.sql.query(
+      "UPDATE role_grants SET revoked_at = now() WHERE app_user_id = $1 AND role = 'EMPLOYEE' AND revoked_at IS NULL",
+      [appUserId],
+    );
+    return ctx.sql.query(
       `INSERT INTO role_grants (id, organization_id, app_user_id, role) VALUES ($1, $2, $3, $4::"AppRole")`,
       [randomUUID(), seed.organizationId, appUserId, role],
     );
+  };
   const revokeAll = (appUserId: string, role: string) =>
     ctx.sql.query('UPDATE role_grants SET revoked_at = now() WHERE app_user_id = $1 AND role = $2::"AppRole"', [
       appUserId,

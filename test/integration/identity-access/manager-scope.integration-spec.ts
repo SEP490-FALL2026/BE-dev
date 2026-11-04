@@ -23,8 +23,8 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
     await h.start();
     await h.withApprover();
     unit = await h.departmentWithHead('P-MS1');
-    holder = await h.staff(unit.department, 'MS-HOLD', ['MANAGER']);
-    holderWhoIsItAdmin = await h.staff(unit.department, 'MS-HOLD-IT', ['IT_ADMIN']);
+    holder = await h.staff(unit.department, 'MS-HOLD', 'MANAGER');
+    holderWhoIsItAdmin = await h.staff(unit.department, 'MS-HOLD-IT', 'IT_ADMIN');
   }, 240000);
 
   afterAll(async () => {
@@ -117,7 +117,7 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
     it('opens the route that is the Employee’s alone to a person who holds only MANAGER, head or not (US-01-01 AC-17)', async () => {
       const second = await h.departmentWithUnit(`P-MS${(counter += 1)}`);
       // Holds MANAGER only and heads the department from today.
-      const only = await h.staff(second, `MS-ONLY-${counter}`, ['MANAGER']);
+      const only = await h.staff(second, `MS-ONLY-${counter}`, 'MANAGER');
       await h.makeHead(second, only);
 
       const notHeading = await call('get', '/api/v1/me/software-rights', holder.account);

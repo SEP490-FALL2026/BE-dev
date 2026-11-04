@@ -26,9 +26,9 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
     designer = await h.staff(design, 'DES-E1');
     boss = await h.staff(executive, 'EXE-C1');
     noItHead = await h.staff(noItInCharge, 'HR-H1');
-    otherIt = await h.staff(noItInCharge, 'HR-IT2', ['IT_ADMIN']);
+    otherIt = await h.staff(noItInCharge, 'HR-IT2', 'IT_ADMIN');
     itInCharge = { employeeId: h.it1.employeeId, account: h.it1 };
-    itPerson = await h.staff(design, 'DES-IT3', ['IT_ADMIN']);
+    itPerson = await h.staff(design, 'DES-IT3', 'IT_ADMIN');
     await h.makeHead(design, head);
     await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)
     await h.setRole('SPENDING_APPROVER', boss);

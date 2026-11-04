@@ -52,7 +52,7 @@ export class LocalDemoAccountApi {
         account.activationState === 'ACTIVATED' &&
         normalizeEmail(account.loginEmail) === loginEmail &&
         roles.length === 1 &&
-        [input.initialRole, input.finalRole].includes(roles[0]);
+        [input.initialRole, input.finalRole].some((role) => role === roles[0]);
 
       return asWanted ? { state: 'present' } : { state: 'conflict', reason: 'ACCOUNT_DIFFERS' };
     }

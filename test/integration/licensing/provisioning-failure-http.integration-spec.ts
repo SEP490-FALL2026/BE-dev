@@ -34,7 +34,7 @@ describe('what a failed try of the connector leads to, over HTTP (integration, r
     await h.start();
     const designer = await h.jobTitle('Designer');
     const a1Employee = await h.person('E-A1');
-    await h.account('E-A1', a1Employee, ['IT_ADMIN']);
+    await h.account('E-A1', a1Employee, 'IT_ADMIN');
     await h.department('P-DES', a1Employee);
     e5 = await h.member('P-DES', 'E-5', designer);
     e7 = await h.member('P-DES', 'E-7', designer);

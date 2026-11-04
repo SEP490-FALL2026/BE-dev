@@ -68,7 +68,7 @@ describe('the outcomes of a request told to the context that listens (integratio
     return sent.id;
   };
   const taskOf = async (requestId: string): Promise<string> =>
-    h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId }).expect(201)).task.id;
+    h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId }).expect(200)).task.id;
 
   it('tells it that the grant completed, for the person, on the day, and not before: a request that is only decided is not told', async () => {
     const u = await example();

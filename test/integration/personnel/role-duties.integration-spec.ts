@@ -390,7 +390,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       }
       // The commitment was written when the request was approved: nothing waits for the approver or for Finance to carry it out.
       const task = h.dataOf<{ task: { id: string } }>(
-        await h.grant({ requestId: sent.id, subscriptionId }).expect(201),
+        await h.grant({ requestId: sent.id, subscriptionId }).expect(200),
       ).task;
       await h.claim(task.id).expect(200);
       expect(await h.state(sent.id)).toBe('EXECUTING');
@@ -452,7 +452,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
 
       // Even while the Super Admin hands over, nobody is given the role in the application (US-01-01 AC-15).
       const refusedGrant = await request(h.server())
-        .post(`/api/v1/app-users/${h.employee.appUserId}/role-grants`)
+        .put(`/api/v1/app-users/${h.employee.appUserId}/role`)
         .set(h.as(superAdmin()))
         .send({ role: 'SUPER_ADMIN' })
         .expect(422);

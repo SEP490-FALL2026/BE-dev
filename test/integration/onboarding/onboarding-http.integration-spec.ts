@@ -7,7 +7,7 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../../support/http-test-app';
-import { ensureManagerGrant } from '../../support/builders/account.builder';
+import { changeRoleTo } from '../../support/builders/account.builder';
 
 interface Step {
   step: number;
@@ -154,7 +154,7 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
       role: 'EMPLOYEE',
       admin,
     });
-    await ensureManagerGrant(ctx, admin, head.employeeId);
+    await changeRoleTo(ctx, admin, head.employeeId, 'MANAGER');
     await request(server())
       .post(`/api/v1/departments/${seed.departmentId}/head-assignments`)
       .set({ Authorization: `Bearer ${admin}` })

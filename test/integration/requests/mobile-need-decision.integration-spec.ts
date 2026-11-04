@@ -39,7 +39,7 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
     request(h.server()).post(`/api/v1/access-requests/${id}/need-decision`).set(headers(account, label)).send(body);
   const sentBy = async (unit: Unit, planId: string, extra: Record<string, unknown> = {}) => {
     counter += 1;
-    const member = await h.staff(unit.department, `${unit.department.code}-M${counter}`, ['EMPLOYEE']);
+    const member = await h.staff(unit.department, `${unit.department.code}-M${counter}`, 'EMPLOYEE');
 
     return { member, request: await h.sent(member, planId, { termMonths: 1, ...extra }) };
   };

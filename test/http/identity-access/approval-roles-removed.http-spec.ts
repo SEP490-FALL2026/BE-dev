@@ -11,9 +11,17 @@ type Call = (server: App) => request.Test;
 /**
  * The configuration of the two approval roles is gone (`qd93-remove-fallback-substitute-approvers`, `QĐ-93b`, `US-12-15` AC-25):
  * the routes answer as a route that does not exist, to a caller who holds the Super Admin role as to one who holds none. The spending
- * approver is a role grant (`POST /app-users/{id}/role-grants`), which these routes never gave.
+ * approver is selected through `PUT /app-users/{id}/role`.
  */
 const ROUTES: Array<[string, Call]> = [
+  [
+    'POST /app-users/{id}/role-grants',
+    (server) => request(server).post(`/api/v1/app-users/${ID}/role-grants`).send({ role: 'IT_ADMIN' }),
+  ],
+  [
+    'DELETE /app-users/{id}/role-grants/{role}',
+    (server) => request(server).delete(`/api/v1/app-users/${ID}/role-grants/IT_ADMIN`),
+  ],
   ['GET /approval-roles', (server) => request(server).get('/api/v1/approval-roles')],
   [
     'PUT /approval-roles/CONFLICT_SUBSTITUTE',

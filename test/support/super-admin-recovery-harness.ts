@@ -153,13 +153,25 @@ export class SuperAdminRecoveryHarness {
 
   /** Puts the seeded Super Admin back as the one working holder: the tests below change it on purpose. */
   restoreHolder = async () => {
+    const former = await this.ctx.sql.query<{ app_user_id: string }>(
+      `UPDATE role_grants SET revoked_at = now() WHERE role = 'SUPER_ADMIN' AND revoked_at IS NULL RETURNING app_user_id`,
+    );
     await this.ctx.sql.query(
-      `UPDATE role_grants SET revoked_at = now() WHERE role = 'SUPER_ADMIN' AND revoked_at IS NULL`,
+      'UPDATE role_grants SET revoked_at = now() WHERE app_user_id = $1 AND revoked_at IS NULL',
+      [this.seed.superAdmin.appUserId],
     );
     await this.ctx.sql.query(
       `INSERT INTO role_grants (id, organization_id, app_user_id, role) VALUES (gen_random_uuid(), $1, $2, 'SUPER_ADMIN')`,
       [this.seed.organizationId, this.seed.superAdmin.appUserId],
     );
+    for (const row of former.rows.filter((candidate) => candidate.app_user_id !== this.seed.superAdmin.appUserId)) {
+      await this.ctx.sql.query(
+        `INSERT INTO role_grants (id, organization_id, app_user_id, role)
+         SELECT gen_random_uuid(), $1, $2, 'EMPLOYEE'
+         WHERE NOT EXISTS (SELECT 1 FROM role_grants WHERE app_user_id = $2 AND revoked_at IS NULL)`,
+        [this.seed.organizationId, row.app_user_id],
+      );
+    }
     await this.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [this.seed.superAdmin.employeeId]);
     await this.ctx.sql.query(
       `UPDATE app_users SET status = 'ACTIVE', login_email = $2, normalized_login_email = $2,

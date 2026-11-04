@@ -64,7 +64,7 @@ describe('closing a request because its person was transferred (integration, rea
   /** A seat is taken on the subscription the department of the request owns (F20), which the harness gives every department. */
   const ownOf = (u: Unit): string => h.owned.subscriptionFor(subscriptionId, u.department.id);
   const granted = async (requestId: string): Promise<string> =>
-    h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId }).expect(201)).task.id;
+    h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId }).expect(200)).task.id;
   const commitmentOf = async (requestId: string) =>
     (
       await h.ctx.sql.query<{ state: string; amount_minor: string; released_minor: string }>(

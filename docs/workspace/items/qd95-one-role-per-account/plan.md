@@ -191,6 +191,15 @@ Bảng test cũ → mới (điền khi implement):
 - Task 3 tạm dừng trước mọi sửa: spec yêu cầu đổi `SeedReportItem.role` (`dev-seed.types.ts:46`) thành `initialRole`, nhưng `src/cli/dev-seed/dev-seed-report.ts:29` và spec cạnh nó còn tiêu thụ trường `role`; hai file không thuộc Files của Task 3. Đã hỏi Owner bổ sung Files, chưa tự mở rộng.
 - Task 4–7 chưa làm vì phụ thuộc Task 3; chưa có migration một vai và chưa tuyên bố checkpoint integration xanh.
 
+### Bảng thay test trước Task 4
+
+| Test cũ                                                   | Test thay thế                                                                            |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Policy/lỗi tổ hợp, vai đã có/vai chưa có                  | Bỏ cùng tính năng thêm/bớt vai; DTO một vai, PUT no-op, lịch sử thay vai và route cũ 404 |
+| Gán/thu hồi MANAGER và đua grant                          | PUT rời/nhận MANAGER, giữ từ chối trưởng phòng hiện tại/tương lai/kế nhiệm và đồng thời  |
+| Gán Người duyệt chi, blocker bên Request, đua Request–vai | PUT thay vai; giữ singleton, tài khoản/nhân viên dùng được, open-work và tính nguyên tử  |
+| Thu hồi vai cuối để roles rỗng                            | PUT về EMPLOYEE, vẫn đăng nhập/tự phục vụ; không còn đường để tài khoản không vai        |
+
 ### Task 3 — tiếp tục theo xác nhận Owner
 
 - Owner xác nhận trong chat 04/11/2026: bổ sung `src/cli/dev-seed/dev-seed-report.ts` và `dev-seed-report.spec.ts` vào Files; điểm dừng ở trên đã được gỡ.
@@ -202,3 +211,10 @@ Bảng test cũ → mới (điền khi implement):
 - [ ] AC trong scope có bằng chứng; thay đổi hợp đồng đã báo FE/mobile.
 - [ ] Spec/plan phản ánh implementation cuối.
 - [ ] Giao Owner review; cập nhật roadmap.
+
+### Task 4 evidence
+
+- Removed POST/DELETE role-grants; PUT is the only account role mutation route. Updated callers, SQL fixtures and the collection registry (maxItems remains 6).
+- typecheck, lint, arch:check, rules:check passed. Gates: 16 suites / 327 tests; changed unit: 4 suites / 62 tests; HTTP: 2 suites / 23 tests passed. openapi:export and arch:routes completed (311 operations).
+- Integration/e2e fixtures updated, not executed. Generic account fixtures now receive EMPLOYEE; deliberate constraint setup opts out with role:null.
+- Task 3 final script run exposed LF-only template expectations; corrected both env templates and reran the two affected tests (2 passed). Full script rerun remains for unified-seed task.

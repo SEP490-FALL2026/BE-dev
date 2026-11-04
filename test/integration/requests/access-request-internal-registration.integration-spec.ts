@@ -20,7 +20,7 @@ describe('requests over HTTP: registering internal software (integration, real P
     designer = await h.staff(design, 'DES-E1');
     owner = await h.staff(design, 'DES-BO');
     gone = await h.staff(design, 'DES-GONE');
-    ownIt = await h.staff(design, 'DES-IT3', ['IT_ADMIN']);
+    ownIt = await h.staff(design, 'DES-IT3', 'IT_ADMIN');
     itAdmin = { employeeId: h.it1.employeeId, account: h.it1 };
     await h.makeHead(design, head);
     await h.setItAdminInCharge(design, itAdmin);

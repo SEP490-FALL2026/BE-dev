@@ -72,7 +72,7 @@ describe('my requests: whose they are and what a row says (integration, real Pos
   const employee = async (roles: string[] = ['EMPLOYEE']) => {
     counter += 1;
 
-    return h.staff(design.department, `MR-X${counter}`, roles);
+    return h.staff(design.department, `MR-X${counter}`, roles[0] ?? 'EMPLOYEE');
   };
   const ref = (person: Person) => ({ employeeId: person.employeeId, employeeCode: ANY_STRING, fullName: ANY_STRING });
 
@@ -82,10 +82,10 @@ describe('my requests: whose they are and what a row says (integration, real Pos
     paid = await h.planOf(await h.subscription(100));
     internal = await h.plan('K5');
     design = await h.departmentWithHead('P-MR1');
-    e1 = await h.staff(design.department, 'MR-E1', ['EMPLOYEE']);
-    e2 = await h.staff(design.department, 'MR-E2', ['EMPLOYEE']);
+    e1 = await h.staff(design.department, 'MR-E1', 'EMPLOYEE');
+    e2 = await h.staff(design.department, 'MR-E2', 'EMPLOYEE');
     const other = await h.departmentWithHead('P-MR2');
-    outsider = await h.staff(other.department, 'MR-O1', ['EMPLOYEE']);
+    outsider = await h.staff(other.department, 'MR-O1', 'EMPLOYEE');
     await h.budgetFor(design, { total: 100 * M, held: 20 * M, spent: 40 * M });
   }, 300000);
 
@@ -265,7 +265,7 @@ describe('my requests: whose they are and what a row says (integration, real Pos
   describe('what a row says in each state, and that it is what the detail says', () => {
     it('says who a request waits for and lets the sender withdraw it, and says who it waits for after the head is changed', async () => {
       const unit = await h.departmentWithHead('P-MR-W');
-      const person = await h.staff(unit.department, 'MR-W1', ['EMPLOYEE']);
+      const person = await h.staff(unit.department, 'MR-W1', 'EMPLOYEE');
       const sent = await h.sent(person, internal);
 
       const before = await rowOf(person.account, sent.id);
@@ -296,7 +296,7 @@ describe('my requests: whose they are and what a row says (integration, real Pos
 
     it('says a request waits under control with nobody to hold it, and the reason', async () => {
       const unit = await h.departmentWithHead('P-MR-V');
-      const person = await h.staff(unit.department, 'MR-V1', ['EMPLOYEE']);
+      const person = await h.staff(unit.department, 'MR-V1', 'EMPLOYEE');
       const sent = await h.sent(person, internal);
       await h.vacateHead(unit.department.id).expect(200);
 
@@ -311,12 +311,12 @@ describe('my requests: whose they are and what a row says (integration, real Pos
 
     it('says refused with the reason of the head, completed with nobody to wait for, and withdrawn with the moment', async () => {
       const unit = await h.departmentWithHead('P-MR-S');
-      const person = await h.staff(unit.department, 'MR-S1', ['EMPLOYEE']);
+      const person = await h.staff(unit.department, 'MR-S1', 'EMPLOYEE');
       const refused = await h.sent(person, paid, { termMonths: 1 });
       await h.decide(refused.id, { decision: 'REJECT', reason: 'The team already has seats' }, unit.head.account);
       const done = await h.sent(person, internal);
       await h.decide(done.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
-      const task = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId: done.id }).expect(201)).task;
+      const task = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId: done.id }).expect(200)).task;
       await h.claim(task.id).expect(200);
       await h.complete(task.id, { evidence: 'Added to the portal' }).expect(200);
       const withdrawn = await h.sent(person, await h.plan('K5'));

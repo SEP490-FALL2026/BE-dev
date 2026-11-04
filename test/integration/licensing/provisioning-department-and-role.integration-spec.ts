@@ -194,7 +194,7 @@ describe('the grant of a seat and the work on a task: the department of the seat
 
     beforeAll(async () => {
       selfEmployee = await h.person('E-SELF');
-      selfAccount = await h.account('E-SELF', selfEmployee, ['IT_ADMIN']);
+      selfAccount = await h.account('E-SELF', selfEmployee, 'IT_ADMIN');
     });
 
     it('does not mark or tell anything while another IT Admin can do the work, and the work is refused', async () => {

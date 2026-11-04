@@ -17,9 +17,9 @@ describe('self-service belongs to every account, with one role per account', () 
     await h.start();
     await h.withApprover();
     unit = await h.departmentWithHead('P-SS');
-    manager = await h.staff(unit.department, 'SS-M2', ['MANAGER']);
-    employee = await h.staff(unit.department, 'SS-U3', ['EMPLOYEE']);
-    unplaced = await h.unplacedStaff('SS-E10', ['EMPLOYEE']);
+    manager = await h.staff(unit.department, 'SS-M2', 'MANAGER');
+    employee = await h.staff(unit.department, 'SS-U3', 'EMPLOYEE');
+    unplaced = await h.unplacedStaff('SS-E10', 'EMPLOYEE');
     internal = await h.plan('K5');
     accounts = [
       h.it1,
@@ -69,7 +69,7 @@ describe('self-service belongs to every account, with one role per account', () 
       { employeeId: h.finance.employeeId, account: h.finance },
       unit.head,
       manager,
-      await h.staff(unit.department, 'SS-U4', ['EMPLOYEE']),
+      await h.staff(unit.department, 'SS-U4', 'EMPLOYEE'),
     ];
     for (const person of people) {
       const sent = await h.sent(person, internal);

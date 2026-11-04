@@ -48,7 +48,7 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
   const employeeOf = async (u: Unit): Promise<Person> => {
     number += 1;
 
-    return h.staff(u.department, `${u.department.code}-X${number}`, ['EMPLOYEE']);
+    return h.staff(u.department, `${u.department.code}-X${number}`, 'EMPLOYEE');
   };
   /** A K5 plan of its own, so that one person can send, and be granted, as many requests as a test needs. */
   const freshInternal = () => h.plan('K5');
@@ -73,7 +73,7 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
     internal = await h.plan('K5');
     design = await h.departmentWithHead('P-RDF1');
     engineering = await h.departmentWithHead('P-RDF2');
-    e1 = await h.staff(design.department, 'RDF-E1', ['EMPLOYEE']);
+    e1 = await h.staff(design.department, 'RDF-E1', 'EMPLOYEE');
 
     await h.budgetFor(design, { total: 100 * M, held: 20 * M, spent: 40 * M });
     await h.budgetFor(engineering, { total: 100 * M, held: 20 * M, spent: 40 * M });
@@ -129,7 +129,7 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
         .expect(200);
       const done = await h.sent(person, await freshInternal());
       await h.decide(done.id, { decision: 'APPROVE' }, u.head.account).expect(200);
-      const task = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId: done.id }).expect(201)).task;
+      const task = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId: done.id }).expect(200)).task;
       await h.claim(task.id).expect(200);
       await h.complete(task.id, { evidence: 'Added to the portal' }).expect(200);
       const withdrawn = await h.sent(person, await freshInternal());

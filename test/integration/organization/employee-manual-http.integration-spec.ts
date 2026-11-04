@@ -595,7 +595,8 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
     it('is entered by hand by the Super Admin, given an account and the FINANCE role by them, and signs in', async () => {
       // An installation holds one Finance officer (QĐ-52d). The one this suite made to prove a refusal steps down.
       await request(server())
-        .delete(`/api/v1/app-users/${finance.appUserId}/role-grants/FINANCE`)
+        .put(`/api/v1/app-users/${finance.appUserId}/role`)
+        .send({ role: 'EMPLOYEE' })
         .set({ Authorization: `Bearer ${admin}` })
         .expect(200);
       const entered = await enter(

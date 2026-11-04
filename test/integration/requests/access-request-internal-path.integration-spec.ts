@@ -47,7 +47,7 @@ describe('requests over HTTP: from an approved request to a granted seat (integr
       )
     ).rows;
   const taskOf = async (id: string) =>
-    h.dataOf<{ task: { id: string; status: string } }>(await h.grant({ requestId: id }).expect(201)).task;
+    h.dataOf<{ task: { id: string; status: string } }>(await h.grant({ requestId: id }).expect(200)).task;
 
   describe('an internal tool with no fee (US-05-20 AC-1, AC-2, AC-7)', () => {
     it('goes from the approval of the head straight to the IT Admin: no spend step, no seat question', async () => {

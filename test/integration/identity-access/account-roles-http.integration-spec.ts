@@ -25,56 +25,45 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
   });
 
   describe('role grants (US-01-01 AC-2, AC-4, AC-7, AC-12, AC-14, AC-16, AC-17, AC-18)', () => {
-    it('adds EMPLOYEE, then revoking IT_ADMIN stops IT routes at the next request while EMPLOYEE keeps working', async () => {
+    it('changes IT_ADMIN to EMPLOYEE and stops IT access at the next request', async () => {
       const user = await activatedAccount(['IT_ADMIN']);
       const { token } = await signIn(user.email, user.password);
-      await h.admin.post(`/api/v1/app-users/${user.appUserId}/role-grants`, { role: 'EMPLOYEE' }).expect(201);
       await request(server()).get('/api/v1/probe/it').set(as(token)).expect(200);
-      await request(server()).get('/api/v1/probe/employee').set(as(token)).expect(200);
-
-      const revoked = await h.admin.delete(`/api/v1/app-users/${user.appUserId}/role-grants/IT_ADMIN`).expect(200);
-
-      expect(bodyOf(revoked).message).toBe('ROLE.REVOKED');
+      const changed = await h.admin.put(`/api/v1/app-users/${user.appUserId}/role`, { role: 'EMPLOYEE' }).expect(200);
+      expect(bodyOf(changed).message).toBe('ROLE.CHANGED');
       await request(server()).get('/api/v1/probe/it').set(as(token)).expect(403);
       await request(server()).get('/api/v1/probe/employee').set(as(token)).expect(200);
     });
 
-    it('allows revoking the last role: the account then only reaches self-service routes', async () => {
+    it('keeps EMPLOYEE on a repeated change instead of permitting an account with no role', async () => {
       const user = await activatedAccount(['EMPLOYEE']);
       const { token } = await signIn(user.email, user.password);
-
-      await h.admin.delete(`/api/v1/app-users/${user.appUserId}/role-grants/EMPLOYEE`).expect(200);
-
-      await request(server()).get('/api/v1/probe/employee').set(as(token)).expect(403);
-      const me = await request(server()).get('/api/v1/me').set(as(token)).expect(200);
-      expect(dataOf(me)).not.toHaveProperty('selfServiceOnly');
+      await h.admin.put(`/api/v1/app-users/${user.appUserId}/role`, { role: 'EMPLOYEE' }).expect(200);
+      await request(server()).get('/api/v1/probe/employee').set(as(token)).expect(200);
+      const me = dataOf(await request(server()).get('/api/v1/me').set(as(token)).expect(200));
+      expect(me.roles).toEqual(['EMPLOYEE']);
+      expect(me).not.toHaveProperty('selfServiceOnly');
     });
 
     it('keeps the history of grants and revocations on the account detail', async () => {
       const user = await activatedAccount(['IT_ADMIN']);
-      await h.admin.delete(`/api/v1/app-users/${user.appUserId}/role-grants/IT_ADMIN`).expect(200);
-      await h.admin.post(`/api/v1/app-users/${user.appUserId}/role-grants`, { role: 'IT_ADMIN' }).expect(201);
+      await h.admin.put(`/api/v1/app-users/${user.appUserId}/role`).send({ role: 'EMPLOYEE' }).expect(200);
+      await h.admin.put(`/api/v1/app-users/${user.appUserId}/role`, { role: 'IT_ADMIN' }).expect(200);
 
       const detail = dataOf(await h.admin.get(`/api/v1/app-users/${user.appUserId}`).expect(200));
 
       expect(detail.roles).toEqual(['IT_ADMIN']);
       expect(detail.roleHistory?.filter((entry) => entry.role === 'IT_ADMIN')).toHaveLength(2);
-      expect(detail.roleHistory?.filter((entry) => entry.revokedAt !== null)).toHaveLength(1);
+      expect(detail.roleHistory?.filter((entry) => entry.revokedAt !== null)).toHaveLength(2);
     });
 
-    it('refuses transfer-only, repeated and missing roles with their own codes', async () => {
+    it('refuses the transfer-only role and treats the same role as an idempotent change', async () => {
       const user = await activatedAccount(['IT_ADMIN']);
-      const grant = (role: string) => h.admin.post(`/api/v1/app-users/${user.appUserId}/role-grants`, { role });
-
-      // MANAGER and SPENDING_APPROVER are granted like IT_ADMIN and FINANCE since QĐ-93a (their rules: direct-approval-roles).
-      expect(errorCode(await grant('SUPER_ADMIN').expect(422))).toBe('APP_USER.SUPER_ADMIN_TRANSFER_ONLY');
-      expect(errorCode(await grant('IT_ADMIN').expect(409))).toBe('APP_USER.ROLE_ALREADY_GRANTED');
       expect(
-        errorCode(await h.admin.delete(`/api/v1/app-users/${user.appUserId}/role-grants/FINANCE`).expect(404)),
-      ).toBe('APP_USER.ROLE_NOT_GRANTED');
-      expect(
-        errorCode(await h.admin.delete(`/api/v1/app-users/${user.appUserId}/role-grants/SUPER_ADMIN`).expect(422)),
+        errorCode(await h.admin.put(`/api/v1/app-users/${user.appUserId}/role`, { role: 'SUPER_ADMIN' }).expect(422)),
       ).toBe('APP_USER.SUPER_ADMIN_TRANSFER_ONLY');
+      await h.admin.put(`/api/v1/app-users/${user.appUserId}/role`, { role: 'IT_ADMIN' }).expect(200);
+      expect(await countAudit('ROLE.CHANGED', user.appUserId)).toBe(0);
     });
 
     it('says the Super Admin role changes only by the operations command outside the application, and the holder cannot change their own account (US-01-09 AC-7, US-01-01 AC-13)', async () => {
@@ -83,15 +72,12 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
         h.ctx.sql.query(`SELECT app_user_id FROM role_grants WHERE role = 'SUPER_ADMIN' AND revoked_at IS NULL`);
       const before = (await holders()).rows;
 
-      const grant = await h.admin
-        .post(`/api/v1/app-users/${user.appUserId}/role-grants`, { role: 'SUPER_ADMIN' })
-        .expect(422);
-      const revoke = await h.admin.delete(`/api/v1/app-users/${user.appUserId}/role-grants/SUPER_ADMIN`).expect(422);
+      const grant = await h.admin.put(`/api/v1/app-users/${user.appUserId}/role`, { role: 'SUPER_ADMIN' }).expect(422);
       const own = await h.admin
-        .post(`/api/v1/app-users/${h.seed.superAdmin.appUserId}/role-grants`, { role: 'EMPLOYEE' })
+        .put(`/api/v1/app-users/${h.seed.superAdmin.appUserId}/role`, { role: 'EMPLOYEE' })
         .expect(409);
 
-      for (const refused of [grant, revoke]) {
+      for (const refused of [grant]) {
         expect(errorCode(refused)).toBe('APP_USER.SUPER_ADMIN_TRANSFER_ONLY');
         expect(bodyOf(refused).error.message).toBe(
           'The Super Admin role cannot be granted or revoked in the application; it changes only by the operations command outside it.',
@@ -111,24 +97,18 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
         await h.admin.post('/api/v1/app-users', { employeeId: second.employeeId, role: 'EMPLOYEE' }).expect(201),
       );
 
-      const whileInvited = await h.admin
-        .post(`/api/v1/app-users/${other.id}/role-grants`, { role: 'FINANCE' })
-        .expect(409);
+      const whileInvited = await h.admin.put(`/api/v1/app-users/${other.id}/role`, { role: 'FINANCE' }).expect(409);
       await h.admin
         .post(`/api/v1/app-users/${invited.id}/lock`, { reason: 'A locked Finance holder keeps the place' })
         .expect(200);
-      const whileLocked = await h.admin
-        .post(`/api/v1/app-users/${other.id}/role-grants`, { role: 'FINANCE' })
-        .expect(409);
-      await h.admin.delete(`/api/v1/app-users/${invited.id}/role-grants/FINANCE`).expect(200);
-      const afterRevoke = await h.admin
-        .post(`/api/v1/app-users/${other.id}/role-grants`, { role: 'FINANCE' })
-        .expect(201);
+      const whileLocked = await h.admin.put(`/api/v1/app-users/${other.id}/role`, { role: 'FINANCE' }).expect(409);
+      await h.admin.put(`/api/v1/app-users/${invited.id}/role`).send({ role: 'EMPLOYEE' }).expect(200);
+      const afterRevoke = await h.admin.put(`/api/v1/app-users/${other.id}/role`, { role: 'FINANCE' }).expect(200);
 
       expect(errorCode(whileInvited)).toBe('APP_USER.FINANCE_ALREADY_ASSIGNED');
       expect(errorCode(whileLocked)).toBe('APP_USER.FINANCE_ALREADY_ASSIGNED');
-      expect(bodyOf(afterRevoke).message).toBe('ROLE.GRANTED');
-      await h.admin.delete(`/api/v1/app-users/${other.id}/role-grants/FINANCE`).expect(200);
+      expect(bodyOf(afterRevoke).message).toBe('ROLE.CHANGED');
+      await h.admin.put(`/api/v1/app-users/${other.id}/role`).send({ role: 'EMPLOYEE' }).expect(200);
     });
 
     it('lets exactly one of two simultaneous Finance grants through', async () => {
@@ -144,16 +124,17 @@ describe('account management over HTTP (integration, real PostgreSQL): role gran
       );
 
       const results = await Promise.all([
-        h.admin.post(`/api/v1/app-users/${first.id}/role-grants`, { role: 'FINANCE' }),
-        h.admin.post(`/api/v1/app-users/${second.id}/role-grants`, { role: 'FINANCE' }),
+        h.admin.put(`/api/v1/app-users/${first.id}/role`, { role: 'FINANCE' }),
+        h.admin.put(`/api/v1/app-users/${second.id}/role`, { role: 'FINANCE' }),
       ]);
 
-      expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+      expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
       const held = await h.ctx.sql.query<{ n: number }>(
         "SELECT count(*)::int AS n FROM role_grants WHERE role = 'FINANCE' AND revoked_at IS NULL",
       );
       expect(held.rows[0].n).toBe(1);
-      await h.ctx.sql.query("UPDATE role_grants SET revoked_at = now() WHERE role = 'FINANCE' AND revoked_at IS NULL");
+      const winner = results[0].status === 200 ? first : second;
+      await h.admin.put(`/api/v1/app-users/${winner.id}/role`, { role: 'EMPLOYEE' }).expect(200);
     });
   });
 

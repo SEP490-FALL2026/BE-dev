@@ -305,8 +305,6 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/app-users/{id}/lock',
   'POST /api/v1/app-users/{id}/unlock',
   'PUT /api/v1/app-users/{id}/role',
-  'POST /api/v1/app-users/{id}/role-grants',
-  'DELETE /api/v1/app-users/{id}/role-grants/{role}',
   'POST /api/v1/auth/invitations/redeem',
   'POST /api/v1/auth/login',
   'POST /api/v1/auth/logout',

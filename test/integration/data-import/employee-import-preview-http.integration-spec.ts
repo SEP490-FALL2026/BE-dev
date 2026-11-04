@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { createActivatedAccount } from '../../support/api-accounts';
 import { EmployeeImportHttpHarness, type ImportWire, HEADER, today } from '../../support/employee-import-http-harness';
-import { ensureManagerGrant } from '../../support/builders/account.builder';
+import { changeRoleTo } from '../../support/builders/account.builder';
 
 describe('importing people from a file over HTTP (integration, real PostgreSQL): upload, preview, the file and the rows that are wrong, and who may import', () => {
   const h = new EmployeeImportHttpHarness();
@@ -345,7 +345,7 @@ describe('importing people from a file over HTTP (integration, real PostgreSQL):
         role: 'EMPLOYEE',
         admin: h.admin,
       });
-      await ensureManagerGrant(h.ctx, h.admin, head.employeeId);
+      await changeRoleTo(h.ctx, h.admin, head.employeeId, 'MANAGER');
       await request(server())
         .post(`/api/v1/departments/${h.seed.departmentId}/head-assignments`)
         .set(asSuper())

@@ -1,7 +1,7 @@
 import { findPlacementCoverageViolations } from './placement-coverage';
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from './api-accounts';
-import { ensureManagerGrant } from './builders/account.builder';
+import { changeRoleTo } from './builders/account.builder';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from './http-test-app';
 import { UseFacts, registerUseReaders } from './organization-use-readers';
 
@@ -160,7 +160,7 @@ export class DepartmentHarness {
   /** `MANAGER` is granted by the Super Admin before a person is named head (QĐ-93a); a person with no account has none to give. */
   grantManager = async (employeeId: string): Promise<void> => {
     const { rowCount } = await this.ctx.sql.query('SELECT 1 FROM app_users WHERE employee_id = $1', [employeeId]);
-    if (rowCount === 1) await ensureManagerGrant(this.ctx, this.admin, employeeId);
+    if (rowCount === 1) await changeRoleTo(this.ctx, this.admin, employeeId, 'MANAGER');
   };
 
   /** The call of the route as it is, with no grant given first: what the specs of the refusals send. */

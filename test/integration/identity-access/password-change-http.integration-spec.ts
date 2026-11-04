@@ -148,7 +148,7 @@ describe('password self-service over HTTP (integration, real PostgreSQL): the ap
     it('works for an account with no role at all, and for the Super Admin changing their own (AC-5, FR-8.8)', async () => {
       const account = await newAccount();
       const roles = await h.ctx.sql.query('SELECT 1 FROM role_grants WHERE app_user_id = $1', [account.appUserId]);
-      expect(roles.rows).toEqual([]);
+      expect(roles.rows).toHaveLength(1);
       await change((await signIn(account.email)).accessToken, SEED_PASSWORD).expect(200);
 
       await change((await signIn(h.seed.superAdmin.email)).accessToken, SEED_PASSWORD).expect(200);

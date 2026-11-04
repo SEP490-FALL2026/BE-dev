@@ -51,10 +51,10 @@ describe('mobile channel: sign in, list, act, inbox, sign out (e2e)', () => {
   beforeAll(async () => {
     await h.start();
     design = await h.departmentWithUnit('P-MOB');
-    head = await h.staff(design, 'MOB-H1', []);
+    head = await h.staff(design, 'MOB-H1', 'EMPLOYEE');
     await h.makeHead(design, head);
-    employee = await h.staff(design, 'MOB-E1', ['EMPLOYEE']);
-    colleague = await h.staff(design, 'MOB-E2', ['EMPLOYEE']);
+    employee = await h.staff(design, 'MOB-E1', 'EMPLOYEE');
+    colleague = await h.staff(design, 'MOB-E2', 'EMPLOYEE');
     // An internal application (K5): no price and no spend step, the shortest chain a request has.
     planId = await h.plan('K5');
   }, 180000);

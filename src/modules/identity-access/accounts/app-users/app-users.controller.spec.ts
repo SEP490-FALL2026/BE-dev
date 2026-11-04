@@ -15,9 +15,6 @@ import {
   LoginEmailRequiredError,
   LoginEmailTakenError,
   ManagerStillHeadingError,
-  RoleAlreadyGrantedError,
-  RoleCombinationForbiddenError,
-  RoleNotGrantedError,
   RoleRequestRefusedError,
   SelfChangeForbiddenError,
   SpendingApproverAccountNotUsableError,
@@ -62,8 +59,6 @@ const routes = {
   lock: (c: AppUsersController) => c.lock(actor, { id }, { reason: 'Ticket 42' }),
   unlock: (c: AppUsersController) => c.unlock(actor, { id }, { reason: 'Ticket 42' }),
   changeRole: (c: AppUsersController) => c.changeRole(actor, { id }, { role: 'FINANCE' } as never),
-  grantRole: (c: AppUsersController) => c.grantRole(actor, { id }, { role: 'FINANCE' } as never),
-  revokeRole: (c: AppUsersController) => c.revokeRole(actor, { id, role: 'FINANCE' } as never),
 };
 type Route = keyof typeof routes;
 const allRoutes = Object.keys(routes) as Route[];
@@ -213,26 +208,7 @@ describe('AppUsersController — error answers (status, code, message)', () => {
       () => new SuperAdminHolderNotLockableError(),
       refused(409, 'APP_USER.SUPER_ADMIN_HOLDER_NOT_LOCKABLE', 'The account holding SUPER_ADMIN cannot be locked.'),
     ],
-    [
-      'a role already held',
-      () => new RoleAlreadyGrantedError(),
-      refused(409, 'APP_USER.ROLE_ALREADY_GRANTED', 'The account already holds this role.'),
-    ],
-    [
-      'a role not held',
-      () => new RoleNotGrantedError(),
-      refused(404, 'APP_USER.ROLE_NOT_GRANTED', 'The account does not hold this role.'),
-    ],
-    [
-      'a forbidden combination, with the roles in the way',
-      () => new RoleCombinationForbiddenError(['IT_ADMIN', 'MANAGER']),
-      refused(
-        409,
-        'APP_USER.ROLE_COMBINATION_FORBIDDEN',
-        'This role cannot be combined with the roles the account holds.',
-        { conflictingRoles: ['IT_ADMIN', 'MANAGER'] },
-      ),
-    ],
+
     [
       'a MANAGER role that still heads a department, with the periods',
       () =>

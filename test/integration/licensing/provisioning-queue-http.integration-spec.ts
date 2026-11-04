@@ -69,8 +69,8 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
     await h.start();
     designer = await h.jobTitle('Designer');
     a1Employee = await h.person('E-A1');
-    a1 = await h.account('E-A1', a1Employee, ['IT_ADMIN']);
-    a3 = await h.account('E-A3', await h.person('E-A3'), ['IT_ADMIN']);
+    a1 = await h.account('E-A1', a1Employee, 'IT_ADMIN');
+    a3 = await h.account('E-A3', await h.person('E-A3'), 'IT_ADMIN');
     await h.department('P-DES', a1Employee);
     await h.department('P-NOIT');
     e5 = await h.member('P-DES', 'E-5', designer);
@@ -263,7 +263,7 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
 
   it('US-01-11 AC-8: when the IT Admin in charge has left, the tasks go to the general queue and the audit keeps who was in charge', async () => {
     const a4Employee = await h.person('E-A4');
-    await h.account('E-A4', a4Employee, ['IT_ADMIN']);
+    await h.account('E-A4', a4Employee, 'IT_ADMIN');
     await h.department('P-OLD', a4Employee);
     const e8 = await h.member('P-OLD', 'E-8', designer);
     const { task: made } = await fresh(e8);
@@ -288,9 +288,9 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
 
   it('US-01-11 AC-7: a change of the IT Admin in charge of a department reaches the tasks made after it, and leaves the earlier ones with who was in charge', async () => {
     const owner = await h.person('E-A5');
-    const ownerAccount = await h.account('E-A5', owner, ['IT_ADMIN']);
+    const ownerAccount = await h.account('E-A5', owner, 'IT_ADMIN');
     const next = await h.person('E-A6');
-    const nextAccount = await h.account('E-A6', next, ['IT_ADMIN']);
+    const nextAccount = await h.account('E-A6', next, 'IT_ADMIN');
     const department = await h.department('P-SWAP', owner);
     const before = await h.member('P-SWAP', 'E-9', designer);
     const after = await h.member('P-SWAP', 'E-10', designer);

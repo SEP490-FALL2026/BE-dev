@@ -60,13 +60,13 @@ describe('the Employee on the phone: own software, own requests, send and withdr
   const employee = async () => {
     counter += 1;
 
-    return h.staff(design, `DES-M${counter}`, ['EMPLOYEE']);
+    return h.staff(design, `DES-M${counter}`, 'EMPLOYEE');
   };
   /** The internal request of the person approved by the head on the web, granted by the IT Admin and, unless told, taken. */
   const approvedAndGranted = async (person: Person, options: { take?: boolean } = {}) => {
     const asked = await sent(person, internalPlan);
     await h.decide(asked.id, { decision: 'APPROVE' }, head.account).expect(200);
-    const task = h.dataOf<{ task: TaskWire }>(await h.grant({ requestId: asked.id }).expect(201)).task;
+    const task = h.dataOf<{ task: TaskWire }>(await h.grant({ requestId: asked.id }).expect(200)).task;
     if (options.take !== false) await h.claim(task.id).expect(200);
 
     return { id: asked.id, task };
@@ -81,8 +81,8 @@ describe('the Employee on the phone: own software, own requests, send and withdr
     design = await h.departmentWithUnit('P-DES');
     head = await h.staff(design, 'DES-H1');
     await h.makeHead(design, head);
-    e1 = await h.staff(design, 'DES-E1', ['EMPLOYEE']);
-    e2 = await h.staff(design, 'DES-E2', ['EMPLOYEE']);
+    e1 = await h.staff(design, 'DES-E1', 'EMPLOYEE');
+    e2 = await h.staff(design, 'DES-E2', 'EMPLOYEE');
   }, 240000);
 
   afterAll(async () => {
