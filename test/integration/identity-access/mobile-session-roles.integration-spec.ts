@@ -377,7 +377,14 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       ['MANAGER', 'GET', '/api/v1/spend-queue'],
       ['SUPER_ADMIN', 'GET', '/api/v1/app-users'],
     ];
-    const SELF_SERVICE = ['/api/v1/me', '/api/v1/notifications', '/api/v1/notifications/unread-count'];
+    const SELF_SERVICE = [
+      '/api/v1/me',
+      '/api/v1/notifications',
+      '/api/v1/notifications/unread-count',
+      '/api/v1/me/software-rights',
+      '/api/v1/me/access-requests',
+      '/api/v1/dashboards/employee',
+    ];
 
     it.each([
       ['an account with no role', async () => (await person()).account.accessToken, []],
@@ -416,6 +423,47 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
         for (const path of SELF_SERVICE) await get(path, token).expect(200);
       },
     );
+  });
+
+  it('lets IT Admin and Finance send and withdraw through mobile labels', async () => {
+    const planId = await h.plan('K5');
+    for (const account of [(await person(['IT_ADMIN'])).account, h.finance]) {
+      const sent = await request(h.server())
+        .post('/api/v1/access-requests')
+        .set(bearer(account.accessToken))
+        .send(h.form(planId))
+        .expect(201);
+      const id = h.dataOf<{ request: { id: string } }>(sent).request.id;
+      await request(h.server())
+        .post(`/api/v1/access-requests/${id}/withdraw`)
+        .set(bearer(account.accessToken))
+        .send({ reason: 'Mobile request cancelled' })
+        .expect(200);
+    }
+  });
+
+  it('gives a mobile MANAGER the need queue and own self-service without EMPLOYEE, and routes their request away', async () => {
+    const own = await h.departmentWithUnit(`P-MSELF${++counter}`);
+    const head = await h.staff(own, `MOB-SELF${counter}`, ['MANAGER']);
+    await h.makeHead(own, head);
+    const token = head.account.accessToken;
+    expect((await meOf(token)).roles).toEqual(['MANAGER']);
+    for (const path of [
+      '/api/v1/need-decisions',
+      '/api/v1/me/software-rights',
+      '/api/v1/me/access-requests',
+      '/api/v1/dashboards/employee',
+    ]) {
+      await get(path, token).expect(200);
+    }
+    const sent = await request(h.server())
+      .post('/api/v1/access-requests')
+      .set(bearer(token))
+      .send(h.form(await h.plan('K5')))
+      .expect(201);
+    const wire = h.dataOf<{ request: { needStep: { assignee: { employeeId: string } | null } } }>(sent).request;
+    expect(wire.needStep.assignee?.employeeId).toBe(h.boss.employeeId);
+    expect(wire.needStep.assignee?.employeeId).not.toBe(head.employeeId);
   });
 
   describe('the roles that unlock the approver tasks follow the data as well (US-16-04 AC-6; US-01-03 AC-2)', () => {

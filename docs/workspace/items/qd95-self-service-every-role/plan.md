@@ -83,5 +83,14 @@ Quick set + `pnpm test:http` + integration các file đổi xanh; tự review di
 | Super Admin my-requests 403 / dashboard NO_DATA_SOURCE | Trang riêng rỗng 200 / COUNTED 0, không thêm grant EMPLOYEE |
 | Super Admin không gửi Request, chưa xét hoàn trả | Thêm hoàn trả seat đang giữ: 403 và không thêm return/task/audit |
 
+### Bằng chứng Task 2 — 04/11/2026
+
+- Viết `self-service-every-role.integration-spec.ts`: tám tài khoản đọc dữ liệu riêng; các vai được gửi/rút/hoàn trả/báo lỗi; giới hạn gửi và phân biệt báo lỗi đã gửi với báo lỗi được giao.
+- Mobile: thêm ba route vào ma trận self-service; thêm IT/Finance gửi-rút và MANAGER chỉ một vai gửi cho mình, bước nhu cầu giao Người duyệt chi.
+- `pnpm typecheck`: pass sau sửa lời gọi harness. `pnpm arch:check` và `pnpm rules:check`: pass.
+- `pnpm test:gates`: 16 suites / 327 tests pass. Unit policy section: 7 tests pass.
+- `pnpm lint`: hai lỗi format trong file mới; đã format và gọi lại, chờ kết quả cuối.
+- Integration chỉ viết, chưa chạy. Dùng `DashboardHarness` (kế thừa `RequestHarness`) để tái sử dụng import quyền, báo lỗi và đọc overview, không thêm harness.
+
 - [ ] AC trong scope có bằng chứng; báo FE/mobile.
 - [ ] Giao Owner review; cập nhật roadmap.
