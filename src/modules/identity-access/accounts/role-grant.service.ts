@@ -31,7 +31,7 @@ export class RoleGrantService {
   /** Granting FINANCE or SPENDING_APPROVER tells the modules that act on who holds a step (`FR-3.16`), in this transaction. */
   async grantRole(
     tx: DbTx,
-    input: { organizationId: string; appUserId: string; role: AppRole; grantedBy?: string },
+    input: { organizationId: string; appUserId: string; role: AppRole; grantedBy?: string; grantedAt?: Date },
   ): Promise<{ id: string }> {
     const granted = await this.grants.grantRole(tx, input);
     if (input.role === 'FINANCE' || input.role === 'SPENDING_APPROVER') {

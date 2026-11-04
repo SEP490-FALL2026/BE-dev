@@ -11,9 +11,10 @@ const APPROVAL_ROLES_LOCK_KEY = 7_300_001;
 export class RoleGrantRepo {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** `grantedAt` (default: the database's transaction time) lets a replacement start exactly when the role it replaces ended. */
   async grantRole(
     tx: DbTx,
-    input: { organizationId: string; appUserId: string; role: AppRole; grantedBy?: string },
+    input: { organizationId: string; appUserId: string; role: AppRole; grantedBy?: string; grantedAt?: Date },
   ): Promise<{ id: string }> {
     return tx.roleGrant.create({ data: input, select: { id: true } });
   }

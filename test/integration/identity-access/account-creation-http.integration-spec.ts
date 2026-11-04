@@ -102,6 +102,43 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
       expect(account.roles).toEqual(['EMPLOYEE']);
     });
 
+    it('creates MANAGER and FINANCE as the one role, never a head period; refuses a second Finance and a roles array (US-01-01 AC-23)', async () => {
+      const appUsers = async () =>
+        (await h.ctx.sql.query<{ n: number }>('SELECT count(*)::int AS n FROM app_users')).rows[0].n;
+      const manager = await newEmployee();
+      const made = dataOf(
+        await h.admin.post('/api/v1/app-users', { employeeId: manager.employeeId, role: 'MANAGER' }).expect(201),
+      );
+      expect(made.roles).toEqual(['MANAGER']);
+      expect(
+        (await h.ctx.sql.query('SELECT 1 FROM department_head_periods WHERE employee_id = $1', [manager.employeeId]))
+          .rowCount,
+      ).toBe(0);
+
+      const finance = await newEmployee();
+      const firstFinance = dataOf(
+        await h.admin.post('/api/v1/app-users', { employeeId: finance.employeeId, role: 'FINANCE' }).expect(201),
+      );
+      expect(firstFinance.roles).toEqual(['FINANCE']);
+      const other = await newEmployee();
+      const before = await appUsers();
+      const second = await h.admin
+        .post('/api/v1/app-users', { employeeId: other.employeeId, role: 'FINANCE' })
+        .expect(409);
+      expect(errorCode(second)).toBe('APP_USER.FINANCE_ALREADY_ASSIGNED');
+      const array = await h.admin
+        .post('/api/v1/app-users', { employeeId: other.employeeId, roles: ['EMPLOYEE'] })
+        .expect(422);
+      expect(errorCode(array)).toBe('VALIDATION_ERROR');
+      expect(await appUsers()).toEqual(before);
+      // The Finance seat is free again for the rest of the file.
+      await request(server())
+        .put(`/api/v1/app-users/${firstFinance.id}/role`)
+        .set(as(h.adminToken))
+        .send({ role: 'EMPLOYEE' })
+        .expect(200);
+    });
+
     it('accepts a separate login email, which must be unique (AC-8)', async () => {
       const first = await newEmployee();
       const second = await newEmployee();

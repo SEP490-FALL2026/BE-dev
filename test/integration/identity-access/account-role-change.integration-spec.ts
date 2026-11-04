@@ -43,6 +43,14 @@ describe('atomic change of the sole account role', () => {
       [user.appUserId],
     );
     expect(events.rows).toEqual([{ before: { role: 'EMPLOYEE' }, after: { role: 'MANAGER' } }]);
+    // The replaced role ends at the very instant the new one starts: no overlap, no gap in the history.
+    const rows = await h.ctx.sql.query<{ role: string; granted_at: Date; revoked_at: Date | null }>(
+      'SELECT role::text, granted_at, revoked_at FROM role_grants WHERE app_user_id = $1',
+      [user.appUserId],
+    );
+    const ended = rows.rows.find((row) => row.role === 'EMPLOYEE');
+    const started = rows.rows.find((row) => row.role === 'MANAGER');
+    expect(ended?.revoked_at?.getTime()).toBe(started?.granted_at.getTime());
     await change(user.appUserId, 'EMPLOYEE').expect(200);
     expect(await held(user.appUserId)).toEqual(['EMPLOYEE']);
   });

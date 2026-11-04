@@ -143,7 +143,7 @@ export class DepartmentHarness {
     return { employeeId: (response.body as { data: { id: string } }).data.id, code, email: body.workEmail };
   };
 
-  /** A member of the department with an account that holds no role. */
+  /** A member of the department with an activated account holding the default role EMPLOYEE (no MANAGER, so no head). */
   accountIn = async (departmentCode: string): Promise<ApiAccount & { code: string }> => {
     const person = await this.enter(departmentCode);
     const account = await createActivatedAccount(this.ctx, this.seed, {

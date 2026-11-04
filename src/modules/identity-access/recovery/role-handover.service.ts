@@ -54,6 +54,7 @@ export class RoleHandover {
         organizationId,
         appUserId: successorAccountId,
         role: 'SUPER_ADMIN',
+        grantedAt: now,
       });
     } catch (error) {
       if (readSqlState(error) === '23514') throw new RecoveryRefusedError('HEADS_DEPARTMENT');
@@ -61,7 +62,7 @@ export class RoleHandover {
     }
     await this.tickets.setStatus(tx, ticket.id, 'COMPLETED', now);
     if (holderId) {
-      await this.grants.grantRole(tx, { organizationId, appUserId: holderId, role: 'EMPLOYEE' });
+      await this.grants.grantRole(tx, { organizationId, appUserId: holderId, role: 'EMPLOYEE', grantedAt: now });
       await this.audit.record(
         tx,
         operatorEvent(

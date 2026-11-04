@@ -121,12 +121,15 @@ export class AccountStatusService {
         const previous = held[0];
         if (previous === role) return;
         await this.checkRoleReplacement(tx, account, previous, role);
-        await this.grants.revokeRole(tx, { appUserId, role: previous, revokedBy: actor.appUserId, now: new Date() });
+        // One instant for both rows: the history never shows two effective roles, nor a moment without one.
+        const now = new Date();
+        await this.grants.revokeRole(tx, { appUserId, role: previous, revokedBy: actor.appUserId, now });
         await this.grants.grantRole(tx, {
           organizationId: account.organizationId,
           appUserId,
           role,
           grantedBy: actor.appUserId,
+          grantedAt: now,
         });
         await this.audit.record(
           tx,
