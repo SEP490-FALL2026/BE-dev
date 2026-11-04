@@ -304,3 +304,10 @@ Quick set + gates + script tests xanh; Owner chạy full suite một lần, `see
 - 35 script tests passed (local guard/confirmation/order/continuation/NOT_MIGRATED/SHARED refusal/password refusal/build freshness/timeout/SIGINT cleanup). Gates: 16 suites / 325 tests passed; typecheck/arch/rules passed. Full test:scripts running with fake Docker/SSH only.
 - Task 5 build passed (9 aliases, dev-seed-cli absent). Full lint found DepartmentStatus unused after deleting LocalSeedFixtureFacts; removed the import and amended Task 5. Focused lint rerun; final full lint follows. Earlier failing lint is retained as evidence, not labeled pre-existing.
 - No real reset, migrate, API/worker or database process was started by local-wrapper tests. Real local seed remains waiting Owner.
+
+### Task 7 evidence
+
+- Added owner-run seed.sh: deploy lock, immutable image/protocol, password check before destructive decisions, reset opt-in and exact database confirmation, verified custom dump before stop, recreate/provision/migrate/reconcile/up/ready, owner-only report. Failure after recreation stops API/worker and prints dump recovery commands. CD never invokes or copies it.
+- Retention now handles pre-migrate and pre-reseed names with ten newest per kind plus all younger than thirty days.
+- Bash syntax checks passed. Targeted fake-Docker/retention: 19 tests passed (exit 0). Quick gates: 16 suites / 325 tests passed; typecheck/arch/rules passed. Full scripts and lint pending collection.
+- Task 6 full scripts finished: 288 total / 286 passed / 2 skipped / 0 failed, exit 0. Real local/VPS reset still waiting Owner.
