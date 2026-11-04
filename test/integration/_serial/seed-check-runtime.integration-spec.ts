@@ -39,6 +39,8 @@ async function productionApplyDriver(apiUrl: string): Promise<void> {
     '--environment',
     'SHARED',
     '--allow-bootstrap',
+    '--super-admin-email',
+    'Owner.Runtime@Example.com',
     '--api-url',
     apiUrl,
     '--operator-reference',
@@ -165,6 +167,15 @@ if (process.argv[2] === '--runtime-seed-driver') {
           )
         ).rowCount,
       ).toBe(0);
+      // The chosen address is the Super Admin's login and work email; the fixture default is not used.
+      expect(
+        (
+          await ctx.sql.query<{ login_email: string; work_email: string }>(
+            `SELECT u.login_email, e.work_email FROM role_grants g JOIN app_users u ON u.id = g.app_user_id
+               JOIN employees e ON e.id = u.employee_id WHERE g.role = 'SUPER_ADMIN' AND g.revoked_at IS NULL`,
+          )
+        ).rows,
+      ).toEqual([{ login_email: 'Owner.Runtime@Example.com', work_email: 'Owner.Runtime@Example.com' }]);
       expect((await invoke()).code).toBe(2);
     }, 1200000);
   });

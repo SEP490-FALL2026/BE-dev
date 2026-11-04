@@ -1,6 +1,6 @@
 import { InstallationInspectionApi } from '../../modules/installation/public/installation-inspection.api';
 import { InstallationApi } from '../../modules/installation/public/installation.api';
-import { INSTALLATION } from './fixture/shared-demo-v2/installation';
+import { INSTALLATION, installationWith } from './fixture/shared-demo-v2/installation';
 import type { SeedCommandArguments } from './seed.arguments';
 import type { DemoSecrets } from './seed-secrets';
 import { DemoAccountsApi } from '../../modules/installation/public/demo-accounts.api';
@@ -26,7 +26,7 @@ export const seedCommand = defineCommand({
     let secrets;
     try {
       secrets = args.secretsStdin ? await readDemoSecrets(process.stdin) : undefined;
-      const problem = secrets ? seedSecretsProblem(secrets) : null;
+      const problem = secrets ? seedSecretsProblem(secrets, args.superAdminEmail) : null;
       if (problem) {
         process.stdout.write(`REFUSED\tSECRETS\t${problem}\n`);
         return REFUSED;
@@ -80,7 +80,7 @@ async function bootstrap(args: SeedCommandArguments, secrets: DemoSecrets): Prom
     work: async (app) => {
       await app.get(InstallationApi).install(
         {
-          ...INSTALLATION,
+          ...installationWith(args.superAdminEmail),
           environment: args.environment,
           operatorReference: `SEED:${args.fixture}:${args.operator}`,
         },

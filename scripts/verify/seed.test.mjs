@@ -25,7 +25,7 @@ function world(options = {}) {
   const config = join(root, 'private.env');
   writeFileSync(
     config,
-    `SEED_OPERATOR_REFERENCE=TEST-OPS\nSEED_SUPER_ADMIN_PASSWORD=${canary}\nSEED_DEMO_ACCOUNT_PASSWORD=${canary}-demo\nSEED_ALLOW_RESET=${options.allowReset === false ? 'false' : 'true'}\n`,
+    `SEED_OPERATOR_REFERENCE=TEST-OPS\nSEED_SUPER_ADMIN_PASSWORD=${canary}\nSEED_DEMO_ACCOUNT_PASSWORD=${canary}-demo\nSEED_ALLOW_RESET=${options.allowReset === false ? 'false' : 'true'}\n${options.email === undefined ? '' : `SEED_SUPER_ADMIN_EMAIL=${options.email}\n`}`,
   );
   const log = join(root, 'commands.jsonl'),
     fake = join(root, 'docker.mjs'),
@@ -149,6 +149,18 @@ test('the database .env names must be the one the postgres container serves, and
   rmSync(join(missing.app, 'releases/current-image'));
   assert.equal(missing.run([]).status, 3);
   assert.equal(missing.calls().length, 0);
+});
+test('the chosen Super Admin email reaches every seed call; none keeps the fixture default', () => {
+  const chosen = world({ email: 'owner@example.com' });
+  assert.equal(chosen.run(['--continue']).status, 0);
+  const seedCalls = lines(chosen).filter((line) => / seed (check|apply)/.test(line));
+  assert.equal(seedCalls.length, 2);
+  for (const line of seedCalls) assert(line.includes('--super-admin-email owner@example.com'), line);
+  for (const email of [undefined, '']) {
+    const plain = world({ email });
+    assert.equal(plain.run(['--continue']).status, 0);
+    assert(!lines(plain).some((line) => line.includes('--super-admin-email')));
+  }
 });
 test('reset needs opt-in and exact database confirmation; Enter exits', () => {
   assert.equal(world({ allowReset: false }).run().status, 3);

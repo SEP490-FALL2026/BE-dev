@@ -42,7 +42,7 @@ export async function runSeed(input: DemoRunInput): Promise<DemoRunOutcome> {
   const { args } = input;
   const fixture = DEMO_FIXTURES[args.fixture];
   if (!fixture) return { refused: `Unknown fixture ${args.fixture}; known: ${Object.keys(DEMO_FIXTURES).join(', ')}.` };
-  const secretProblem = seedSecretsProblem(input.secrets);
+  const secretProblem = seedSecretsProblem(input.secrets, args.superAdminEmail);
   if (secretProblem) return { refused: `SECRETS ${secretProblem}` };
   if (args.mode === 'check') return { refused: 'check uses the inspection graph.' };
   if (args.mode === 'plan') {
