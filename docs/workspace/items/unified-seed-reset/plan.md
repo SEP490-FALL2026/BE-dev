@@ -290,3 +290,10 @@ Quick set + gates + script tests xanh; Owner chạy full suite một lần, `see
 - Completed record-by-record audit above and fixture README covering every department/person/account/plan/subscription/budget line/request/extra, separate DS1-ADMIN/Super Admin, future candidates and known next-year/renewal limits. No new type or record added.
 - Found R2 missing its approved in-plan binding; added planLine 2 (ENG Figma line). R1 line 1 and R7 offPlan retained. Other audited records satisfy the current implemented contracts.
 - Unit fixture/README table: 5 tests passed after normalizing Markdown padding in the table comparison. Typecheck/arch/rules and gates passed (327 tests). Full lint pending collection. Integration exact final-role table and Request-party check added, not run.
+
+### Task 5 evidence
+
+- Removed dev-seed command, graph, API/types, unit and integration tests; seed is the sole demo command. Removed readLocalSeedFixture/LocalSeedFixtureFacts and moved unchanged toBrief into organization-brief.mapper.ts.
+- Updated graph/operational/policy-ownership gates, docs and comments naming retired commands. Removed two obsolete suppression entries and lowered lint-debt gate ceilings (complexity 56 to 55, lines 50 to 49, total 106 to 104), a necessary companion to the planned suppression removal; no gate weakened.
+- typecheck, arch/rules and gates passed: 16 suites / 324 tests. Full lint and build running. No unit files changed except deleted feature tests; replacement coverage is seed bootstrap/check/fixture tests and wrapper matrices in Tasks 6/7.
+- Task 4 full lint overlapped Task 5 removal of suppression configuration while its initial file inventory still included old dev-seed files; it reported the two retired suppressions. Final Task 5 lint is the current-tree verification, not a claim that the earlier command passed.

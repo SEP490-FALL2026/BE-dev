@@ -26,9 +26,9 @@ import { DemoAccountsChangedError } from './installation.errors';
 type Credential = { hash: string; hashPolicyVersion: number };
 
 /**
- * The one part of `pnpm ops:demo-dataset` that is not driven through the HTTP API: the sign-in accounts of the demo people.
+ * The one part of `pnpm ops:seed` that is not driven through the HTTP API: the sign-in accounts of the demo people.
  * An invitation would mail a link to a demo mailbox that does not exist, so the accounts are created activated with the
- * password the operator chose, through the same demo account contract as `pnpm dev:seed` (one direct role, and any fixture-declared direct roles, never SUPER_ADMIN; operational-commands rule 6) and audited as an operator action. The employees themselves are
+ * password the operator chose, through the same demo account contract as `pnpm ops:seed` (one direct role, and any fixture-declared direct roles, never SUPER_ADMIN; operational-commands rule 6) and audited as an operator action. The employees themselves are
  * created by the Super Admin through the API before this runs; this never creates or changes an employee.
  */
 @Injectable()

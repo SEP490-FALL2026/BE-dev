@@ -10,9 +10,8 @@ architecture gate, không copy layout của một module cụ thể.
 Employee, mời/kích hoạt, khóa/mở và gán/thu hồi vai, đổi/đặt lại mật khẩu, tra cứu Audit Trail, danh mục chức vụ/Cost
 Center, phòng và trưởng phòng (vai Manager suy ra), Người duyệt chi, tham số vận hành, import nhân sự CSV, checklist khởi
 tạo, lệnh ngoài HTTP đổi người giữ vai Super Admin và khôi phục `pnpm ops:recover --help`, lệnh kiểm trạng thái chỉ đọc
-`pnpm ops:inspect`, lệnh tách vai PostgreSQL production `pnpm ops:db-roles`, lệnh dữ liệu demo chỉ local
-`pnpm dev:seed -- --confirm-local` và lệnh nạp dataset demo dùng chung qua API `pnpm ops:demo-dataset`
-([runbook](docs/guides/demo-dataset.md)) (các lệnh ngoài HTTP cần
+`pnpm ops:inspect`, lệnh tách vai PostgreSQL production `pnpm ops:db-roles`, và `pnpm ops:seed`
+([runbook](docs/guides/seed.md)) (các lệnh ngoài HTTP cần
 `pnpm build`; rule: [operational commands](docs/rules/operational-commands.md)).
 Từ PR #14 (21/10/2026) có thêm route HTTP của G3/G4 ở ba ngữ cảnh `catalog`, `finance`, `licensing`
 ([ADR-0013](docs/decisions/0013-catalog-finance-licensing-contexts.md)): danh mục ứng dụng, gói, nhà cung cấp, hồ sơ thuế,
@@ -20,7 +19,7 @@ thuê bao, hợp đồng, phân bổ chi phí, bộ công cụ chuẩn, hiện t
 phần code đã giao lệch baseline Docs `72e1480` (`QĐ-82` → `QĐ-86`) — xem
 [ma trận tác động](docs/workspace/items/business-baseline-impact-2026-10-22/spec.md#ma-trận-tác-động-ae). Health là public.
 Không có tài khoản mặc định trong repository: tạo Super Admin bằng lệnh khởi tạo trên database mới; tài khoản demo
-local (IT Admin, Finance, Employee) do `pnpm dev:seed` tạo với mật khẩu sinh ngẫu nhiên, in một lần.
+dùng fixture seed v2 và mật khẩu do người vận hành cung cấp qua stdin.
 
 Có trong code không có nghĩa đã review hoặc nghiệm thu; một lát có thể mới phủ một phần Story. Trạng thái từng lát,
 revision/PR và kết quả kiểm chứng nằm ở [roadmap](docs/roadmap.md), bằng chứng ở
@@ -50,7 +49,7 @@ Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
    `.env.example` và đặt vào `.env` (mỗi máy tự sinh, không chép từ máy khác; kiểm theo **tên**, không in giá trị:
    `grep -cE '^(AUTH_ACCESS_TOKEN_SECRET|AUTH_THROTTLE_PEPPER|OUTBOX_PAYLOAD_KEY|OUTBOX_PAYLOAD_KEY_ID|LICENSE_KEY_VAULT_KEY|LICENSE_KEY_VAULT_KEY_ID|LICENSE_KEY_FINGERPRINT_PEPPER)=' .env`
    phải ra `7`). Thiếu thì API, worker và `ops:recover` dừng với danh sách biến thiếu; `ops:inspect`, `ops:bootstrap` và
-   `dev:seed` chỉ cần cấu hình database nên vẫn chạy. Giá trị công
+   `ops:seed` chỉ cần cấu hình database nên vẫn chạy. Giá trị công
    khai trong repository (fallback của test, mặc định development cũ) bị từ chối ở development và production. Copy
    `.env.example` **chưa** đủ cho production: validator production còn từ chối thiếu biến `@production-required`. Biến đã bỏ (ví dụ `AUTH_COOKIE_SECURE`, bỏ khi refresh token chuyển sang body) bị bỏ
    qua âm thầm — tự xóa khỏi tệp env của bạn; không có lệnh nào đọc hay sửa tệp env chứa secret.
@@ -60,11 +59,7 @@ Cần Node.js 22 hoặc 24, pnpm 11.1.3, Docker Compose.
 5. Khởi tạo một lần bằng `pnpm ops:bootstrap --help`, điền tham số theo help và nhập mật khẩu ở terminal.
 6. Kiểm bằng `pnpm ops:inspect` (chỉ đọc; `--json` cho máy đọc): thoát 0 khi đã cài và nhất quán, 2 khi chưa cài hoặc
    dở dang, 1 khi lỗi. Chỉ in số liệu và email Super Admin đã che.
-7. Tùy chọn, dữ liệu demo local: `pnpm dev:seed -- --confirm-local` — chỉ khi `NODE_ENV` là `development`/`test` và host
-   database là `localhost`/`127.x.x.x`/`::1`; tạo một phòng, một chức vụ và ba tài khoản demo đã kích hoạt
-   (`IT_ADMIN`, `FINANCE`, `EMPLOYEE`, email `@demo.slm.test`), in mật khẩu mới **một lần**. Chạy lại không tạo trùng, không
-   đặt lại mật khẩu (thoát 2); dữ liệu khác fixture bị từ chối, không sửa (thoát 3). Vai Manager/Người duyệt chi là vai suy
-   ra, không seed: gán qua API như dữ liệu thật.
+7. Tùy chọn, dữ liệu demo: xem [seed](docs/guides/seed.md); wrapper local ở Task 6.
 8. Chạy `pnpm start:dev`; chạy worker ở terminal riêng nếu cần gửi thư mời.
 
 CLI khởi tạo chỉ xác thực `NODE_ENV` và cấu hình database; không yêu cầu secret JWT, SMTP hoặc khóa outbox của

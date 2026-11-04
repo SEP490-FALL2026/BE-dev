@@ -108,8 +108,7 @@ first run committed). Check the state without writing anything:
 `docker compose -f docker-compose.prod.yml run --rm --no-deps migrate node dist/inspect-cli.js` (it reads
 `_prisma_migrations`, which the runtime role may not; its sessions stay read-only) (`--json` for a machine; exit 0
 installed and consistent, 2 not installed or incomplete, 1 error). It reads the database settings only and opens every
-session read-only; it prints counts and the Super Admin email masked. `dev-seed-cli.js` is in the image too, but it
-refuses with exit 3 unless `NODE_ENV` is development or test and the database host is loopback: never point it at a
+session read-only; it prints counts and the Super Admin email masked. The unified `seed` command and wrappers are documented in [seed](seed.md).
 shared database ([operational commands](../rules/operational-commands.md)).
 The installation command needs a terminal (`-it`) because the Super Admin password is typed at a hidden prompt; by default it
 refuses to read it from arguments, the environment or a pipe. The one exception is the explicit switch `--password-stdin`

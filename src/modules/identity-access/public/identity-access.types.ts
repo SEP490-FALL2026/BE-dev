@@ -178,7 +178,7 @@ export interface AccountInventory {
   directRoles: Record<AppRole, number>;
 }
 
-/** The direct roles a local demo account may hold (`pnpm dev:seed`): never SUPER_ADMIN, never a derived role. */
+/** The direct roles a local demo account may hold (`pnpm ops:seed`): never SUPER_ADMIN, never a derived role. */
 export type DemoAccountRole = 'IT_ADMIN' | 'FINANCE' | 'EMPLOYEE' | 'MANAGER';
 
 /** Whether a demo account can be created, is already there as the fixture wants it, or conflicts with real data. */

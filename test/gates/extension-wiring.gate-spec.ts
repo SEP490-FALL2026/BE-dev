@@ -51,7 +51,6 @@ const NO_HTTP_GRAPHS = [
   'RecoveryCliModule',
   'InspectionCliModule',
   'AssignSubscriptionOwnerCliModule',
-  'DevSeedCliModule',
   'SeedCliModule',
 ] as const;
 
@@ -107,7 +106,6 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'RecoveryCliModule',
       'InspectionCliModule',
       'AssignSubscriptionOwnerCliModule',
-      'DevSeedCliModule',
       'SeedCliModule',
     ],
     point: 'OrganizationChangeListeners',
@@ -132,7 +130,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
     users: ['RoleGrantService'],
     reason:
       'The point is emitted by RoleGrantService.grantRole / revokeRole and ApprovalRoleService.set, reached in all of src only from controllers ' +
-      'of the API and the commands bootstrap, dev-seed, seed and recover; `ops:inspect` reads and never changes a role.',
+      'of the API and the commands bootstrap, seed and recover; `ops:inspect` reads and never changes a role.',
   },
   {
     graphs: ['InstallationModule', 'RecoveryCliModule'],
@@ -157,7 +155,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'starts here and HEAD_PERIOD_START is not emitted: there is no held notice to hand over.',
   },
   {
-    graphs: ['DevSeedCliModule', 'SeedCliModule'],
+    graphs: ['SeedCliModule'],
     point: 'ApprovalRoleChangeListeners',
     binders: ['RequestsApprovalRoleListener', 'SpendingApproverWaitListener', 'RenewalSpendingApproverWaitListener'],
     users: ['RoleGrantService'],
@@ -177,7 +175,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
     users: ['RoleGrantService'],
     reason:
       'The point is emitted by RoleGrantService.grantRole / revokeRole, reached in all of src only from controllers of the API and the commands ' +
-      'bootstrap, dev-seed, seed and recover; the worker declares none of them and its loops grant and revoke no role. The listeners ' +
+      'bootstrap, seed and recover; the worker declares none of them and its loops grant and revoke no role. The listeners ' +
       '(qd93-remove-fallback-substitute-approvers) only tell the Super Admin that a budget version or a renewal waits for a spending approver ' +
       'when the role is taken back; the sending of the version and the proposal of the renewal tell it themselves in the API.',
   },

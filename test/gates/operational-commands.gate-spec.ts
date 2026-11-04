@@ -22,7 +22,6 @@ const COMMAND_FOLDERS = [
   // Everything under src/cli/ is command code: entries, arguments, reports, the password prompt, the CLI Nest modules.
   'cli',
   'modules/installation/inspect',
-  'modules/installation/dev-seed',
   'modules/installation/seed',
   'modules/installation/migration-preflight',
   'modules/catalog/subscription-owner-assignment',
@@ -38,7 +37,6 @@ const COMMAND_ONLY_FILES = [
   'modules/identity-access/identity-access-inspection-facade.module.ts',
   'modules/installation/inspect/inspection-cli.module.ts',
   'modules/identity-access/identity-access-local-seed-facade.module.ts',
-  'modules/installation/dev-seed/dev-seed-cli.module.ts',
   'modules/installation/seed/seed-cli.module.ts',
   'modules/installation/migration-preflight/migration-preflight-cli.module.ts',
   'cli/assign-subscription-owner/assign-subscription-owner-cli.module.ts',
@@ -176,20 +174,12 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
   });
 
   // rule 2
-  it('the seed checks its three local guards before it opens any transaction', () => {
-    // The seed runs in the facade public/dev-seed.api.ts (OD-A6); its guards are the pure local-seed.policy.ts.
-    const service = readFileSync(join(installationRoot, 'public', 'dev-seed.api.ts'), 'utf8');
-    const guard = readFileSync(join(installationRoot, 'dev-seed', 'local-seed.policy.ts'), 'utf8');
-    const seedBody = service.slice(service.indexOf('async seed('));
-
-    expect(seedBody.indexOf('checkLocalSeedGuards(')).toBeGreaterThan(-1);
-    expect(seedBody.indexOf('checkLocalSeedGuards(')).toBeLessThan(seedBody.indexOf('this.runner.run('));
-    expect(seedBody.indexOf('if (refusal !== null) return')).toBeLessThan(seedBody.indexOf('this.runner.run('));
-    // Each guard is its own check on a parsed value, not a substring of the URL.
-    expect(guard).toMatch(/LOCAL_ENVIRONMENTS\.has\(input\.nodeEnv\)/);
-    expect(guard).toMatch(/classifyDatabaseUrl\(input\.databaseUrl\)/);
-    expect(guard).toMatch(/input\.confirmLocal \? null/);
-    expect(guard).not.toMatch(/\.includes\(['"]localhost/);
+  it('keeps database destruction out of Nest command and installation code', () => {
+    const files = [...listFiles(cliRoot, isSource), ...listFiles(installationRoot, isSource)];
+    const findings = files.filter((file) =>
+      /migrate\s+reset|DROP\s+DATABASE|\bdropdb\b/i.test(readFileSync(file, 'utf8')),
+    );
+    expect(findings.map(toPath)).toEqual([]);
   });
 
   // rule 5
@@ -267,8 +257,8 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
         .filter(([, script]) => /\bdist\/cli\b/.test(script))
         .map(([key, script]) => ({ key, command: /^node dist\/cli ([a-z][a-z0-9-]*)$/.exec(script)?.[1] }));
       expect(viaCli.filter(({ command }) => command === undefined || !names.includes(command))).toEqual([]);
-      // `pnpm ops:<name>` (`pnpm dev:seed`) runs exactly its command; the names of the scripts did not change.
-      const scriptOf = (name: string): string => (name === 'dev-seed' ? 'dev:seed' : `ops:${name}`);
+      // `pnpm ops:<name>` (`pnpm ops:seed`) runs exactly its command; the names of the scripts did not change.
+      const scriptOf = (name: string): string => `ops:${name}`;
       expect(names.map((name) => [scriptOf(name), scripts[scriptOf(name)]])).toEqual(
         names.map((name) => [scriptOf(name), `node dist/cli ${name}`]),
       );

@@ -275,8 +275,7 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   `child_process` ở test khác. Không để assertion trong helper.
 - Lệnh vận hành H6.1/H6.2: `inspect.integration-spec.ts` (tiến trình thật qua các trạng thái chưa migrate/chưa cài/đã
   cài/dở dang, fingerprint mọi bảng trước/sau, ghi thử qua đồ thị inspect bị PostgreSQL từ chối `25006`),
-  `dev-seed.integration-spec.ts` (trong tiến trình, generator mật khẩu cố định: rollback, audit, credential thật, vai,
-  chạy lại, conflict), `dev-seed-cli.integration-spec.ts` (ma trận chốt, lần tạo và lần chạy lại),
+  Seed coverage: `seed-bootstrap.integration-spec.ts`, `seed.integration-spec.ts`, and `_serial/seed-check-runtime.integration-spec.ts`; wrapper safety tests use fake processes.
   `installation-bootstrap-facts.integration-spec.ts` (characterization bản ghi cài đặt).
 - Test đua khóa (`auth-concurrency.integration-spec.ts`) giữ khóa dòng ở một kết nối `pg` riêng và chờ
   `pg_locks` báo có tiến trình đang chờ trước khi nhả khóa; không dùng `sleep` để ép thứ tự.

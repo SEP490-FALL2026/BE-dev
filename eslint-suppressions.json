@@ -93,19 +93,9 @@
       "count": 1
     }
   },
-  "src/modules/installation/dev-seed/dev-seed-plan.policy.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/installation/migration-preflight/migration-preflight-judgement.policy.ts": {
     "complexity": {
       "count": 2
-    }
-  },
-  "src/modules/installation/public/dev-seed.api.ts": {
-    "max-lines-per-function": {
-      "count": 1
     }
   },
   "src/modules/installation/public/installation-inspection.api.ts": {

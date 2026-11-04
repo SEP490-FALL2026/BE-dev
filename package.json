@@ -28,7 +28,6 @@
     "ops:cost-center-direction": "node dist/cli cost-center-direction",
     "ops:db-roles": "node dist/cli db-roles",
     "ops:seed": "node dist/cli seed",
-    "dev:seed": "node dist/cli dev-seed",
     "lint": "eslint \"{src,test,scripts}/**/*.ts\"",
     "lint:prune": "eslint \"{src,test,scripts}/**/*.ts\" --prune-suppressions",
     "lint:fix": "eslint \"{src,test,scripts}/**/*.ts\" --fix",

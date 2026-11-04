@@ -17,7 +17,7 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
   thì inject cả hai, tên trường `organization` và `organizationReads`.
   - `OrganizationReadApi` ([public/organization-read.api.ts](public/organization-read.api.ts)), 37 phương thức đọc:
     - Chung: `businessToday` — hôm nay theo múi giờ của tổ chức; `getOrganization`, `getOrganizationShared` (`FOR SHARE`),
-      `getCompanyEmailDomains`, `readLocalSeedFixture` (cho `dev:seed`), `countUnmarkedChangesAsOf` (cho `ops:inspect`).
+      `getCompanyEmailDomains`, `countUnmarkedChangesAsOf` (cho `ops:inspect`).
     - Phòng ban: `getDepartmentBrief(s)`, `lockDepartmentShared`, `lockDepartmentForEntry`, `getDepartmentMemberIds`,
       `getDepartmentHeads`, `getHeadedDepartment`, `isDepartmentHead`, `departmentsWithoutHead`; IT Admin phụ trách:
       `getItAdminInCharge`, `getItAdminInChargeOfDepartment`, `getItAdminScope`, `getDepartmentIdsInChargeOf`.
@@ -29,7 +29,6 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
   - `OrganizationApi` ([public/organization.api.ts](public/organization.api.ts)), 10 phương thức ghi, khóa ghi và bộ đọc "đang dùng":
     - Ghi: `createOrganization`, `setReportingCurrency`, `createDepartment`, `createUnitCostCenter`,
       `createEmployeeWithPlacement` (cách duy nhất tạo nhân viên), `updateEmployeeOfficialFields`, `emitChange` (báo thay đổi).
-      (`activateCostCenterDirectionForLocalSeed` — không còn người gọi từ khi `dev:seed` thôi ghi dòng kích hoạt — Owner cho xóa 31/10/2026.)
     - Khóa ghi: `lockEmployeeForUpdate` (`FOR UPDATE`).
     - Đang dùng: `getDepartmentUse`, `getCostCenterUse` (hỏi các extension point bên dưới).
 - `OrganizationHistoryApi` ([public/organization-history.api.ts](public/organization-history.api.ts)): ghi lịch sử cho

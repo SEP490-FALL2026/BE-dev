@@ -33,8 +33,7 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
 - `HolderRecoveryApi`, `RoleTransferRecoveryApi` (`public/holder-recovery.api.ts`, `role-transfer-recovery.api.ts`) —
   khôi phục và đổi người giữ vai Super Admin (ca có kế hoạch lẫn khẩn cấp), chỉ lệnh `pnpm ops:recover` (qua
   `identity-access-recovery-cli.module.ts`).
-- `IdentityAccessInspectionApi` — chỉ `pnpm ops:inspect`; `LocalDemoAccountApi` — chỉ `pnpm dev:seed` và
-  `pnpm ops:demo-dataset` (qua `DemoAccountsApi` của installation).
+- `IdentityAccessInspectionApi` — chỉ `pnpm ops:inspect`; `LocalDemoAccountApi` — chỉ `pnpm ops:seed` (qua `DemoAccountsApi` của installation).
 - Type/lỗi: `identity-access.types.ts`, `identity-access.errors.ts`, `recovery.types.ts`, `recovery.errors.ts`.
 
 ## Bảng sở hữu
