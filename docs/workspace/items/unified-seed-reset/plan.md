@@ -297,3 +297,10 @@ Quick set + gates + script tests xanh; Owner chạy full suite một lần, `see
 - Updated graph/operational/policy-ownership gates, docs and comments naming retired commands. Removed two obsolete suppression entries and lowered lint-debt gate ceilings (complexity 56 to 55, lines 50 to 49, total 106 to 104), a necessary companion to the planned suppression removal; no gate weakened.
 - typecheck, arch/rules and gates passed: 16 suites / 324 tests. Full lint and build running. No unit files changed except deleted feature tests; replacement coverage is seed bootstrap/check/fixture tests and wrapper matrices in Tasks 6/7.
 - Task 4 full lint overlapped Task 5 removal of suppression configuration while its initial file inventory still included old dev-seed files; it reported the two retired suppressions. Final Task 5 lint is the current-tree verification, not a claim that the earlier command passed.
+
+### Task 6 evidence
+
+- Added seed:local, private .env.seed.local template, parsed loopback helper and fake command/HTTP tests. Environment/host checks precede build/check or any child. Consent is removed from child environments; the test supplies a simulated parent object without setting the real process environment variable.
+- 35 script tests passed (local guard/confirmation/order/continuation/NOT_MIGRATED/SHARED refusal/password refusal/build freshness/timeout/SIGINT cleanup). Gates: 16 suites / 325 tests passed; typecheck/arch/rules passed. Full test:scripts running with fake Docker/SSH only.
+- Task 5 build passed (9 aliases, dev-seed-cli absent). Full lint found DepartmentStatus unused after deleting LocalSeedFixtureFacts; removed the import and amended Task 5. Focused lint rerun; final full lint follows. Earlier failing lint is retained as evidence, not labeled pre-existing.
+- No real reset, migrate, API/worker or database process was started by local-wrapper tests. Real local seed remains waiting Owner.

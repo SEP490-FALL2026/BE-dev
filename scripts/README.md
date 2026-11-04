@@ -72,3 +72,5 @@ và rule chuyên đề liên quan. AGENTS áp dụng toàn repo, bao gồm scrip
 - Không tạo công cụ trace/spec phụ thuộc một kế hoạch dự án đã bỏ.
 
 Seed command: `pnpm ops:seed`; local and VPS wrappers will be documented in Tasks 6/7. See [seed guide](../docs/guides/seed.md).
+
+`dev/seed-local.mjs` (`pnpm seed:local`) reads private .env.seed.local, checks development/loopback before spawning, checks passwords, confirms reset or continuation, migrates, starts API/worker, applies seed and stops children. `dev/local-database-host.mjs` parses PostgreSQL host safety. Script tests use fake commands/HTTP only. Real reset: Owner only.

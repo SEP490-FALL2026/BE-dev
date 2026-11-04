@@ -182,6 +182,14 @@ describe('operational commands (docs/rules/operational-commands.md)', () => {
     expect(findings.map(toPath)).toEqual([]);
   });
 
+  it('checks local environment and loopback host before any seed-local spawn', () => {
+    const script = readFileSync(join(projectRoot, 'scripts/dev/seed-local.mjs'), 'utf8');
+    expect(script.indexOf('const settings = validateLocalSettings(')).toBeGreaterThan(-1);
+    expect(script.indexOf('const settings = validateLocalSettings(')).toBeLessThan(script.indexOf('spawnChild('));
+    expect(script).toContain("settings.NODE_ENV !== 'development'");
+    expect(script).toContain("classifyDatabaseUrl(settings.DATABASE_URL) !== 'loopback'");
+  });
+
   // rule 5
   it('commits no password literal in command code, and no known weak default anywhere it could ship', () => {
     const commandFiles = [
