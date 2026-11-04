@@ -84,3 +84,29 @@ test('CI shard matrix covers exactly the denominator of its Jest shard command',
   assert.match(job, /name: test-timings-integration-\$\{\{ matrix\.shard \}\}/);
   assert.match(ciWorkflow, /needs: \[quality, http-contract, integration, integration-inband, e2e-smoke\]/);
 });
+
+test('CI gates every test job on the selection and keeps the minute-saving choices of the Owner (OD-CI2, OD-CI3, OD-CI5)', () => {
+  const jobs = new Map(
+    [...ciWorkflow.matchAll(/^  ([a-z][a-z0-9-]*):\r?\n([\s\S]*?)(?=^  [a-z][a-z0-9-]*:|$(?![\s\S]))/gm)].map(
+      ([, name, body]) => [name, body],
+    ),
+  );
+  for (const name of ['quality', 'http-contract', 'integration', 'integration-inband', 'e2e-smoke']) {
+    const body = jobs.get(name);
+    assert.ok(body, `${name} job must exist`);
+    assert.match(body, /needs: select/, `${name} must wait for the selection`);
+    assert.match(body, /needs\.select\.outputs\.run == 'true'/, `${name} must skip when the selection says so`);
+  }
+  assert.match(
+    ciWorkflow,
+    /group: \$\{\{ github\.event_name == 'pull_request' && format\('ci-pr-\{0\}', github\.ref\) \|\| format\('ci-run-\{0\}', github\.run_id\) \}\}/,
+  );
+  assert.match(ciWorkflow, /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
+  assert.match(ciWorkflow, /pull_request:\r?\n\s+branches: \[dev\]/);
+  assert.match(
+    ciWorkflow,
+    /BASE: \$\{\{ github\.event_name == 'pull_request' && github\.event\.pull_request\.base\.sha \|\| github\.event\.before \}\}/,
+  );
+  assert.match(ciWorkflow, /github\.ref == 'refs\/heads\/dev' && github\.event_name == 'push'/);
+  assert.match(jobs.get('integration-inband'), /needs\.select\.outputs\.timing == 'TIMING'/);
+});

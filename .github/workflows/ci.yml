@@ -57,8 +57,10 @@ permissions:
   contents: read
   packages: write
 
+# OD-CI2: only pull-request runs replace each other (their suites come from the PR base). Every push and manual run has a
+# group of its own: a queued push run must never be dropped, because the next push only tests the commits after it.
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.ref }}
+  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.ref) || format('ci-run-{0}', github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -68,6 +70,7 @@ jobs:
     outputs:
       paths: ${{ steps.select.outputs.paths }}
       serial: ${{ steps.select.outputs.serial }}
+      timing: ${{ steps.select.outputs.timing }}
       run: ${{ steps.select.outputs.run }}
     steps:
       - name: Check out repository
@@ -83,20 +86,34 @@ jobs:
       - name: Choose the integration suites
         id: select
         env:
-          SKIP_DEPLOY_DEV: ${{ github.repository == 'WDP301-FA26-GR8/BE' && github.ref == 'refs/heads/dev' }}
+          SKIP_DEPLOY_DEV: ${{ github.repository == 'WDP301-FA26-GR8/BE' && github.ref == 'refs/heads/dev' && github.event_name == 'push' }}
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           if [ "$SKIP_DEPLOY_DEV" = "true" ]; then
-            printf 'run=false\npaths=NONE\nserial=NO-SERIAL\n' >> "$GITHUB_OUTPUT"
+            printf 'run=false\npaths=NONE\nserial=NO-SERIAL\ntiming=NO-TIMING\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           printf 'run=true\n' >> "$GITHUB_OUTPUT"
           if [ "$GITHUB_REF" = "refs/heads/main" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            printf 'paths=ALL\nserial=SERIAL\n' >> "$GITHUB_OUTPUT"
+            PATHS=ALL
+            SERIAL=SERIAL
           else
+            # A base this clone does not have (force push, rewritten history) counts as unknown: run everything.
+            if [ -n "$BASE" ] && ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then BASE=0000000000000000000000000000000000000000; fi
             node scripts/ci/affected-modules.mjs "$BASE" "$GITHUB_SHA" > "$RUNNER_TEMP/affected.txt"
-            printf 'paths=%s\nserial=%s\n' "$(sed -n 1p "$RUNNER_TEMP/affected.txt")" "$(sed -n 2p "$RUNNER_TEMP/affected.txt")" >> "$GITHUB_OUTPUT"
+            PATHS="$(sed -n 1p "$RUNNER_TEMP/affected.txt")"
+            SERIAL="$(sed -n 2p "$RUNNER_TEMP/affected.txt")"
           fi
+          # Start the in-band job for *.timing-spec.ts only when a selected folder holds one.
+          TIMING=NO-TIMING
+          if [ "$PATHS" = "ALL" ]; then
+            TIMING=TIMING
+          elif [ "$PATHS" != "NONE" ]; then
+            for dir in $PATHS; do
+              if git ls-files -- "$dir" | grep -q '\.timing-spec\.ts$'; then TIMING=TIMING; fi
+            done
+          fi
+          printf 'paths=%s\nserial=%s\ntiming=%s\n' "$PATHS" "$SERIAL" "$TIMING" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
   quality:
@@ -216,9 +233,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          # the affected-module selection diffs against the previous commit of the branch or the PR base
-          fetch-depth: 0
 
       - name: Set up the backend
         uses: ./.github/actions/setup
@@ -250,7 +264,7 @@ jobs:
 
   integration-inband:
     needs: select
-    if: needs.select.outputs.run == 'true' && (needs.select.outputs.paths != 'NONE' || needs.select.outputs.serial == 'SERIAL')
+    if: needs.select.outputs.run == 'true' && (needs.select.outputs.timing == 'TIMING' || needs.select.outputs.serial == 'SERIAL')
     runs-on: ubuntu-latest
     # Keep initial headroom until two main runs provide shard measurements.
     timeout-minutes: 70
@@ -259,9 +273,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          # the affected-module selection diffs against the previous commit of the branch or the PR base
-          fetch-depth: 0
 
       - name: Set up the backend
         uses: ./.github/actions/setup
@@ -277,7 +288,7 @@ jobs:
 
       # The same modules' *.timing-spec.ts: their wall-clock bounds hold only with no other file running.
       - name: Run integration tests that bound wall-clock time (in band)
-        if: needs.select.outputs.paths != 'NONE'
+        if: needs.select.outputs.timing == 'TIMING'
         env:
           PATHS: ${{ needs.select.outputs.paths }}
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres

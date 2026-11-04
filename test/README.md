@@ -136,8 +136,10 @@ it('refuses an employee with 403', async () => {
 | Chủ nhật 02:00 VN (`dev`) | integration đầy đủ + timing + serial + E2E + `pnpm test:mutation`, lưu báo cáo thời gian                                                 |
 
 PR chỉ chạy khi đích là `dev`; push `main` vẫn chạy đầy đủ. Push `dev` ở repo deploy `WDP301-FA26-GR8/BE` chỉ chạy
-`select` rồi bỏ qua các job test; repo phát triển vẫn chạy bình thường. Chỉ run PR cũ bị hủy khi có run PR mới; push và
-`workflow_dispatch` không bị hủy. Ba shard và job in-band có artifact thời gian riêng; deploy đợi tất cả xanh.
+`select` rồi bỏ qua các job test; repo phát triển vẫn chạy bình thường. Chỉ run PR cũ bị hủy khi có run PR mới; mỗi run
+push và `workflow_dispatch` có nhóm `concurrency` riêng nên không bao giờ bị hủy hay bỏ khỏi hàng đợi. Job in-band chỉ khởi
+động khi thư mục được chọn có `*.timing-spec.ts` hoặc cần `_serial`. Ba shard và job in-band có artifact thời gian riêng;
+deploy đợi tất cả xanh.
 Timeout shard tạm giữ 70 phút, chờ ít nhất hai run `main` để đặt theo số đo của
 [ci-integration-shards](../docs/workspace/items/ci-integration-shards/plan.md).
 
