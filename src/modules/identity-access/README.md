@@ -98,3 +98,9 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
   `test/integration/identity-access/`.
 
 `MANAGER` and `SPENDING_APPROVER` are direct grants; the latter is unique and cannot be a department head. Account listing can filter department membership on a date.
+
+## Migration QD-95
+
+`20261104120000_identity_one_role_per_account` refuses accounts with `MULTIPLE_ROLES` or `NO_ROLE`, listing employee codes before any schema change. It does not backfill or repair data. Rebuild the database and seed again as instructed by the Owner. A failed `migrate deploy` leaves a failed Prisma history row: after correcting/rebuilding data, the Owner runs `prisma migrate resolve --rolled-back 20261104120000_identity_one_role_per_account` before retrying deployment.
+
+The partial unique index limits effective grants to one per account; all application creation and replacement paths supply that role. Historical revoked grants remain.

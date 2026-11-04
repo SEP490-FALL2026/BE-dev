@@ -225,3 +225,10 @@ Bảng test cũ → mới (điền khi implement):
 - typecheck, lint (final exit 0), arch:check, rules:check passed. Unit: 2 suites / 26 tests; gates: 16 suites / 327 tests passed.
 - Integration tests added for EMPLOYEE enrolment, exact effective grants/audits, future head and Finance refusal, reset-email redemption retaining SUPER_ADMIN; CLI help asserts EMPLOYEE wording. Not executed.
 - Old no-role preparation assertion replaced by exactly EMPLOYEE; empty transfer audit on rollback retained.
+
+### Task 6 evidence
+
+- Added 20261104120000_identity_one_role_per_account after the current last migration. Guard lists every NO_ROLE / MULTIPLE_ROLES account and raises P0001 without repair. Adds partial unique account index and removes only the superseded per-role index and combination trigger/function.
+- prisma:validate, typecheck, arch:check, rules:check and gates passed (16 suites / 327 tests). Full lint running; focused lint for the new migration test passed. No unit file changed.
+- New one-role-per-account-migration.integration-spec.ts covers guard/deploy refusal, unchanged rows, empty deployment, retained singleton/head objects and direct unique violation with history replacement. Written only, not run.
+- README records failed Prisma row recovery via Owner migrate resolve --rolled-back after correction/rebuild. No database command executed.
