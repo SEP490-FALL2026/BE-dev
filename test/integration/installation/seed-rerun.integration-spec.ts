@@ -1,3 +1,5 @@
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v2/installation';
+import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { AddressInfo, Server } from 'node:net';
@@ -6,7 +8,7 @@ import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
 import type { FetchLike } from '../../../src/cli/seed/demo-api-client';
 import { SHARED_DEMO_V2 } from '../../../src/cli/seed/fixture/shared-demo-v2';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
-import { createHttpTestApp, HttpTestApp, SEED_PASSWORD, seedInstallation } from '../../support/http-test-app';
+import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
 import { PgRelay } from '../../support/pg-relay';
 
 /**
@@ -34,11 +36,12 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
   const args = (mode: 'plan' | 'apply'): SeedCommandArguments => ({
     mode,
     fixture: 'shared-demo-v2',
-    organization: 'Acme',
     apiUrl: baseUrl,
     operator: 'TEST-A04',
     environment: 'LOCAL_TEST',
     json: false,
+    allowBootstrap: false,
+    secretsStdin: true,
   });
   const run = (mode: 'plan' | 'apply', fetch?: FetchLike): Promise<DemoRunOutcome> =>
     runSeed({ args: args(mode), secrets, accounts: demo.get(DemoAccountsApi), fetch });
@@ -85,7 +88,17 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
 
   beforeAll(async () => {
     ctx = await createHttpTestApp();
-    await seedInstallation(ctx.app);
+    const install = await NestFactory.createApplicationContext(
+      (await import('../../../src/modules/installation/installation.module')).InstallationModule,
+      { logger: false },
+    );
+    try {
+      await install
+        .get(InstallationApi)
+        .install({ ...INSTALLATION, environment: 'LOCAL_TEST', operatorReference: 'TEST-SEED' }, SEED_PASSWORD);
+    } finally {
+      await install.close();
+    }
     baseUrl = `http://127.0.0.1:${((ctx.app.getHttpServer() as unknown as Server).address() as AddressInfo).port}`;
 
     const direct = new URL(ctx.database.url);

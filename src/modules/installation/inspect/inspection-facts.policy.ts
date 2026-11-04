@@ -35,6 +35,24 @@ export const BOOTSTRAP_ACTIONS: readonly string[] = Object.keys(CURRENT_INSTALLA
 /** The Cost Center event tells which set an installation is: it exists in the earlier one only. */
 const COST_CENTER_ACTION = 'INSTALLATION.COST_CENTER_CREATED';
 
+export type SeedState = 'NOT_MIGRATED' | 'EMPTY' | 'INSTALLED' | 'INCOMPLETE';
+
+/** Unlike ops:inspect this judgement needs no access to Prisma's migration history. */
+export function seedStateOf(facts: {
+  organization: boolean;
+  bootstrapMismatches: readonly string[];
+  superAdmin: { holders: number; status: string; activationState: string } | null;
+}): SeedState {
+  if (!facts.organization) return 'EMPTY';
+  const holder = facts.superAdmin;
+  return facts.bootstrapMismatches.length === 0 &&
+    holder?.holders === 1 &&
+    holder.status === 'ACTIVE' &&
+    holder.activationState === 'ACTIVATED'
+    ? 'INSTALLED'
+    : 'INCOMPLETE';
+}
+
 /**
  * Committed folders against what `prisma migrate deploy` recorded. A migration is applied when one of its rows
  * finished and was not rolled back; failed when its only live row never finished; pending when neither.

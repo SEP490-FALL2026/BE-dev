@@ -4,11 +4,9 @@ const valid = [
   'plan',
   '--fixture',
   'shared-demo-v2',
-  '--organization',
-  'Acme Software',
   '--api-url',
   'http://slm-api:3000',
-  '--operator',
+  '--operator-reference',
   'CHG-42',
   '--environment',
   'SHARED',
@@ -22,13 +20,23 @@ describe('ops:seed arguments', () => {
       command: {
         mode: 'plan',
         fixture: 'shared-demo-v2',
-        organization: 'Acme Software',
         apiUrl: 'http://slm-api:3000',
         operator: 'CHG-42',
         environment: 'SHARED',
         json: false,
+        allowBootstrap: false,
+        secretsStdin: true,
       },
     });
+  });
+
+  it('checks without API credentials and keeps explicit bootstrap authorization', () => {
+    expect(parseSeedArguments(['check', '--environment', 'LOCAL_TEST'])).toMatchObject({
+      command: { mode: 'check', fixture: 'shared-demo-v2', secretsStdin: false },
+    });
+    expect(parseSeedArguments([...valid, '--allow-bootstrap'])).toMatchObject({ command: { allowBootstrap: true } });
+    expect(() => parseSeedArguments([...valid, '--organization', 'Other'])).toThrow('Unknown option');
+    expect(() => parseSeedArguments([...valid, '--operator', 'Old'])).toThrow('Unknown option');
   });
 
   it('answers --help without asking for anything else', () => {

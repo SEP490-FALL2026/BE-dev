@@ -183,3 +183,24 @@ Quick set + gates + script tests xanh; Owner chạy full suite một lần, `see
 - Renamed command/graph and imports to seed, removed old wrappers/templates and aliases from command table, split unchanged v2 fixture into organization/catalog/finance/requests/extras/index. Updated apply lock prefix at its owner DemoAccountsApi (necessary companion to the command move).
 - typecheck passed; seed unit: 10 suites / 81 tests; gates: 16 suites / 327 tests passed. arch:check passed. rules:check initially found the moved calendar link and legacy guide anchor; Owner approved link correction, anchor restored.
 - Build passed; dist/seed-cli.js exists and dist/demo-dataset-cli.js does not. Full lint and script tests running; integration files renamed and updated, not run.
+
+### Task 1 final verification
+
+- Full lint passed (exit 0). test:scripts passed: 253 total / 251 passed / 2 skipped / 0 failed, exit 0. Build passed, seed alias present, old alias absent. rules:check passed after approved link/anchor repair.
+
+### Task 2 evidence (in progress)
+
+- Kept --allow-bootstrap under Owner clarification; check does not require API credentials, supports optional stdin preflight, prints fixed tab protocol. Both passwords checked before graph/database work.
+- Added seedStateOf, runtime-role-safe seedCheck and audit firstAfterField. Apply obtains the session lock before reading state, rejects incomplete/other organizations, optionally installs fixture bootstrap through InstallationModule, then resumes HTTP steps.
+- Unit: 7 suites / 74 tests passed. New integration files seed-bootstrap and _serial/seed-check-runtime written, not executed; existing seed integration uses real InstallationApi bootstrap events.
+- Full quick checks running.
+
+### Task 2 stop: spec/gate conflict
+
+- Full lint passed (exit 0), typecheck/arch/rules passed; 74 unit tests passed. Gates fail because spec.md:155-156 explicitly requests a re-export, while architecture-boundaries.gate-spec.ts:546-552 forbids all business-module re-exports. The failure identifies identity-access/public/password.policy.ts.
+- Asked Owner to authorize public function wrappers delegating to the existing canonical credential policy, without changing or weakening the gate. Awaiting answer; Task 2 remains uncommitted and Tasks 3-8 dependent work has not started.
+- New integration/e2e verification is deliberately not executed.
+
+### Task 2 resolution
+
+- Owner explicitly approved the public wrapper (04/11/2026 chat). Replaced re-export with a pure function delegating to the existing credential policy; gate unchanged. Final gates: 16 suites / 327 tests passed. Typecheck, arch and rules passed; full lint rerun pending collection. Task 2 stop is resolved.

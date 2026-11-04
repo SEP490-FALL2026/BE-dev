@@ -1,3 +1,5 @@
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v2/installation';
+import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { AddressInfo, Server } from 'node:net';
@@ -7,7 +9,7 @@ import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
 import type { FetchLike } from '../../../src/cli/seed/demo-api-client';
 import { SHARED_DEMO_V2 } from '../../../src/cli/seed/fixture/shared-demo-v2';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
-import { createHttpTestApp, HttpTestApp, SEED_PASSWORD, seedInstallation } from '../../support/http-test-app';
+import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
 
 /**
  * `pnpm ops:seed` against a real installation: the whole application listens on a disposable PostgreSQL, the
@@ -25,11 +27,12 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
   const args = (mode: 'plan' | 'apply', extra: Partial<SeedCommandArguments> = {}): SeedCommandArguments => ({
     mode,
     fixture: 'shared-demo-v2',
-    organization: 'Acme',
     apiUrl: baseUrl,
     operator: 'TEST-DEMO-1',
     environment: 'LOCAL_TEST',
     json: false,
+    allowBootstrap: false,
+    secretsStdin: true,
     ...extra,
   });
   const run = (mode: 'plan' | 'apply', options: { args?: Partial<SeedCommandArguments>; fetch?: FetchLike } = {}) =>
@@ -82,7 +85,17 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
 
   beforeAll(async () => {
     ctx = await createHttpTestApp();
-    await seedInstallation(ctx.app);
+    const install = await NestFactory.createApplicationContext(
+      (await import('../../../src/modules/installation/installation.module')).InstallationModule,
+      { logger: false },
+    );
+    try {
+      await install
+        .get(InstallationApi)
+        .install({ ...INSTALLATION, environment: 'LOCAL_TEST', operatorReference: 'TEST-SEED' }, SEED_PASSWORD);
+    } finally {
+      await install.close();
+    }
     baseUrl = `http://127.0.0.1:${((ctx.app.getHttpServer() as unknown as Server).address() as AddressInfo).port}`;
     const { SeedCliModule } = await import('../../../src/modules/installation/seed/seed-cli.module');
     demo = await NestFactory.createApplicationContext(SeedCliModule, { logger: false });
@@ -95,7 +108,9 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
 
   it('refuses another organization, a wrong Super Admin password, an unknown fixture or an unreachable API, writing nothing', async () => {
     const before = await businessRows();
-    expect(refusalOf(await run('apply', { args: { organization: 'Other Co' } }))).toContain('wrong database');
+    await ctx.sql.query("UPDATE organizations SET name = 'Other Co'");
+    expect(refusalOf(await run('apply'))).toContain('wrong database');
+    await ctx.sql.query('UPDATE organizations SET name = $1', [INSTALLATION.organizationName]);
     const wrongPassword = await runSeed({
       args: args('apply'),
       secrets: { ...secrets, superAdminPassword: 'not the super admin password' },

@@ -1,3 +1,10 @@
+import { Prisma } from '../../../generated/prisma/client';
+import {
+  BOOTSTRAP_ACTIONS,
+  bootstrapMismatches,
+  seedStateOf,
+  type SeedState,
+} from '../inspect/inspection-facts.policy';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
@@ -42,6 +49,25 @@ export class DemoAccountsApi {
    */
   holdApplyLock(fixtureId: string): Promise<HeldSessionLock | null> {
     return trySessionAdvisoryLock(this.config.get('DATABASE_URL', { infer: true }), `seed:${fixtureId}:apply`);
+  }
+
+  async seedState(): Promise<SeedState> {
+    try {
+      return await this.runner.run(async (tx) => {
+        const organization = await this.organizationReads.getOrganization(tx);
+        if (!organization) return 'EMPTY';
+        const holder = await this.identity.getSuperAdminHolder(tx);
+        const counts = await this.audit.countByAction(tx, BOOTSTRAP_ACTIONS);
+        return seedStateOf({
+          organization: true,
+          bootstrapMismatches: bootstrapMismatches(counts),
+          superAdmin: holder ? { ...holder, holders: 1 } : null,
+        });
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') return 'NOT_MIGRATED';
+      throw error;
+    }
   }
 
   /** Null when the database holds no installation. */

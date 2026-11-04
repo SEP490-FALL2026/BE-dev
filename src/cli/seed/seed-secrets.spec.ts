@@ -1,3 +1,5 @@
+import { seedSecretsProblem } from './seed-secrets';
+import { INSTALLATION } from './fixture/shared-demo-v2/installation';
 import { PassThrough } from 'node:stream';
 import { DemoSecretsError, parseDemoSecrets, readDemoSecrets } from './seed-secrets';
 
@@ -61,5 +63,16 @@ describe('ops:seed secrets record', () => {
     const silent = new PassThrough();
     await expect(readDemoSecrets(silent, { timeoutMs: 20 })).rejects.toThrow('Timed out');
     silent.destroy();
+  });
+});
+
+describe('seed password preflight', () => {
+  const good = { superAdminPassword: 'long enough test password', demoAccountPassword: 'long demo test password' };
+  it('checks both passwords without hashing or database work', () => {
+    expect(seedSecretsProblem(good)).toBeNull();
+    expect(seedSecretsProblem({ ...good, superAdminPassword: 'short' })).toBe('TOO_SHORT');
+    expect(seedSecretsProblem({ ...good, superAdminPassword: 'x'.repeat(129) })).toBe('TOO_LONG');
+    expect(seedSecretsProblem({ ...good, superAdminPassword: INSTALLATION.loginEmail })).toBe('EQUALS_LOGIN_EMAIL');
+    expect(seedSecretsProblem({ ...good, demoAccountPassword: 'short' })).toBe('DEMO_LENGTH');
   });
 });

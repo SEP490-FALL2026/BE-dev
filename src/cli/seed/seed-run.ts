@@ -1,3 +1,5 @@
+import { INSTALLATION } from './fixture/shared-demo-v2/installation';
+import { seedSecretsProblem } from './seed-secrets';
 import type { DemoAccountsApi } from '../../modules/installation/public/demo-accounts.api';
 import type { SeedCommandArguments } from './seed.arguments';
 import { DemoApiClient, DemoApiError, DemoApiUnreachableError, FetchLike } from './demo-api-client';
@@ -20,6 +22,7 @@ export interface DemoRunInput {
   fetch?: FetchLike;
   /** Told each phase as the run enters it, so a failure line can place it (demo-failure.ts). */
   clock?: Pick<DemoRunClock, 'enter'>;
+  bootstrap?: () => Promise<void>;
 }
 
 const API_PREFIX = '/api/v1';
@@ -35,10 +38,13 @@ export async function runSeed(input: DemoRunInput): Promise<DemoRunOutcome> {
   const { args } = input;
   const fixture = DEMO_FIXTURES[args.fixture];
   if (!fixture) return { refused: `Unknown fixture ${args.fixture}; known: ${Object.keys(DEMO_FIXTURES).join(', ')}.` };
-  input.clock?.enter('installation-facts');
-  const facts = await installationFacts(input, fixture);
-  if ('refused' in facts) return facts;
-  if (args.mode === 'plan') return runAgainst(input, fixture, facts);
+  const secretProblem = seedSecretsProblem(input.secrets);
+  if (secretProblem) return { refused: `SECRETS ${secretProblem}` };
+  if (args.mode === 'check') return { refused: 'check uses the inspection graph.' };
+  if (args.mode === 'plan') {
+    const facts = await installationFacts(input, fixture);
+    return 'refused' in facts ? facts : runAgainst(input, fixture, facts);
+  }
 
   input.clock?.enter('apply-lock');
   const lock = await input.accounts.holdApplyLock(fixture.id);
@@ -51,7 +57,7 @@ export async function runSeed(input: DemoRunInput): Promise<DemoRunOutcome> {
   // "Error" when the lock's connection had ended), and the report is never printed.
   let outcome: DemoRunOutcome;
   try {
-    outcome = await runAgainst(input, fixture, facts);
+    outcome = await applyAgainst(input, fixture);
   } catch (error) {
     await lock.release().catch(() => undefined);
     throw error;
@@ -73,19 +79,30 @@ export async function runSeed(input: DemoRunInput): Promise<DemoRunOutcome> {
   };
 }
 
+async function applyAgainst(input: DemoRunInput, fixture: DemoFixture): Promise<DemoRunOutcome> {
+  const { args } = input;
+  const state = await input.accounts.seedState();
+  if (state === 'EMPTY' && args.allowBootstrap && input.bootstrap) await input.bootstrap();
+  else if (state === 'EMPTY') return { refused: 'EMPTY: use --allow-bootstrap or ops:bootstrap.' };
+  else if (state !== 'INSTALLED') return { refused: `${state}: seed requires a complete installation.` };
+  const facts = await installationFacts(input, fixture);
+  return 'refused' in facts ? facts : await runAgainst(input, fixture, facts);
+}
+
 type Facts = NonNullable<Awaited<ReturnType<DemoAccountsApi['inspect']>>> & {
   superAdmin: { appUserId: string; employeeId: string; loginEmail: string };
 };
 
 /** The installation the database holds, refused unless it is the one named, in the fixture's currency, with a Super Admin. */
 async function installationFacts(input: DemoRunInput, fixture: DemoFixture): Promise<Facts | { refused: string }> {
+  input.clock?.enter('installation-facts');
   const length = [...input.secrets.demoAccountPassword].length;
   if (length < 12 || length > 128) return { refused: 'DEMO_ACCOUNT_PASSWORD must be 12 to 128 characters.' };
   const facts = await input.accounts.inspect();
   if (!facts) return { refused: 'The database holds no installation: bootstrap it first.' };
-  if (facts.organizationName !== input.args.organization) {
+  if (facts.organizationName !== INSTALLATION.organizationName) {
     return {
-      refused: 'The installed organization is not the one named by --organization: wrong database, nothing written.',
+      refused: 'The installed organization is not the one named by the fixture: wrong database, nothing written.',
     };
   }
   if (facts.reportingCurrency !== fixture.currency) {
@@ -107,7 +124,7 @@ async function runAgainst(input: DemoRunInput, fixture: DemoFixture, facts: Fact
     if (proven !== null) return { refused: proven };
     input.clock?.enter('calendar');
     const calendar = calendarRefusal({
-      mode: args.mode,
+      mode: args.mode === 'apply' ? 'apply' : 'plan',
       today: facts.today,
       fiscalYearStartMonth: await fiscalYearStartMonth(api, facts.superAdmin.loginEmail),
       datasetYear: await datasetYear(api, facts, fixture.id),
@@ -119,11 +136,11 @@ async function runAgainst(input: DemoRunInput, fixture: DemoFixture, facts: Fact
     return {
       report: {
         fixture: fixture.id,
-        mode: args.mode,
+        mode: args.mode === 'apply' ? 'apply' : 'plan',
         organization: facts.organizationName,
         today: facts.today,
         steps,
-        exitCode: exitCodeOf(args.mode, steps),
+        exitCode: exitCodeOf(args.mode === 'apply' ? 'apply' : 'plan', steps),
       },
     };
   } finally {
@@ -196,7 +213,7 @@ function context(
   };
 
   return {
-    mode: input.args.mode,
+    mode: input.args.mode === 'apply' ? 'apply' : 'plan',
     fixture,
     api,
     today: facts.today,

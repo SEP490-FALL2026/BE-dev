@@ -9,7 +9,7 @@ const json = (status: number, body: unknown) =>
 
 const facts = {
   organizationId: 'org-1',
-  organizationName: 'Acme',
+  organizationName: 'SLM Demo',
   reportingCurrency: 'VND',
   today: '2026-10-31',
   timeZone: 'Asia/Ho_Chi_Minh',
@@ -19,17 +19,19 @@ const facts = {
 const args = (mode: 'plan' | 'apply'): SeedCommandArguments => ({
   mode,
   fixture: 'shared-demo-v2',
-  organization: 'Acme',
   apiUrl: 'http://slm-api:4000',
   operator: 'CHG-1',
   environment: 'SHARED',
   json: false,
+  allowBootstrap: false,
+  secretsStdin: true,
 });
 
 const secrets = { superAdminPassword: 'sa-password-123', demoAccountPassword: 'demo-password-123' };
 
 function accounts(options: { release?: () => Promise<void>; inspect?: () => Promise<unknown> } = {}) {
   return {
+    seedState: () => Promise.resolve('INSTALLED'),
     inspect: options.inspect ?? (() => Promise.resolve(facts)),
     holdApplyLock: () => Promise.resolve({ release: options.release ?? (() => Promise.resolve()) }),
   } as unknown as DemoAccountsApi;
@@ -111,5 +113,40 @@ describe('a run of ops:seed', () => {
     expect(clock.failureLine(failure)).toMatch(
       /^The demo dataset run failed in phase installation-facts after \d+ ms \(run \d+ ms\): Error retryable=true pg="Query read timeout"$/,
     );
+  });
+  it('validates secrets before even taking the lock or reading installation state', async () => {
+    const lock = jest.fn();
+    const state = jest.fn();
+    const outcome = await runSeed({
+      args: args('apply'),
+      secrets: { ...secrets, superAdminPassword: 'short' },
+      accounts: { holdApplyLock: lock, seedState: state } as unknown as DemoAccountsApi,
+    });
+    expect(outcome).toEqual({ refused: 'SECRETS TOO_SHORT' });
+    expect(lock).not.toHaveBeenCalled();
+    expect(state).not.toHaveBeenCalled();
+  });
+
+  it('locks before reading EMPTY and releases after refusing missing bootstrap authorization', async () => {
+    const order: string[] = [];
+    const port = {
+      holdApplyLock: () => {
+        order.push('lock');
+        return Promise.resolve({
+          release: () => {
+            order.push('release');
+            return Promise.resolve();
+          },
+        });
+      },
+      seedState: () => {
+        order.push('state');
+        return Promise.resolve('EMPTY');
+      },
+    };
+    expect(await runSeed({ args: args('apply'), secrets, accounts: port as unknown as DemoAccountsApi })).toEqual({
+      refused: 'EMPTY: use --allow-bootstrap or ops:bootstrap.',
+    });
+    expect(order).toEqual(['lock', 'state', 'release']);
   });
 });

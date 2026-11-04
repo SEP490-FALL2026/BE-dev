@@ -1,10 +1,12 @@
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v2/installation';
+import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { AddressInfo, Server } from 'node:net';
 import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
 import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
-import { createHttpTestApp, HttpTestApp, SEED_PASSWORD, seedInstallation } from '../../support/http-test-app';
+import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
 
 /**
  * `pnpm ops:seed` at the edges of the year, on a controlled clock: only `Date` is faked (the API and the command
@@ -23,11 +25,12 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
       args: {
         mode,
         fixture: 'shared-demo-v2',
-        organization: 'Acme',
         apiUrl: baseUrl,
         operator: 'TEST-CALENDAR',
         environment: 'LOCAL_TEST',
         json: false,
+        allowBootstrap: false,
+        secretsStdin: true,
       } satisfies SeedCommandArguments,
       secrets,
       accounts: demo.get(DemoAccountsApi),
@@ -77,7 +80,17 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
       now: new Date('2026-12-01T03:00:00Z'),
     });
     ctx = await createHttpTestApp();
-    await seedInstallation(ctx.app);
+    const install = await NestFactory.createApplicationContext(
+      (await import('../../../src/modules/installation/installation.module')).InstallationModule,
+      { logger: false },
+    );
+    try {
+      await install
+        .get(InstallationApi)
+        .install({ ...INSTALLATION, environment: 'LOCAL_TEST', operatorReference: 'TEST-SEED' }, SEED_PASSWORD);
+    } finally {
+      await install.close();
+    }
     baseUrl = `http://127.0.0.1:${((ctx.app.getHttpServer() as unknown as Server).address() as AddressInfo).port}`;
     const { SeedCliModule } = await import('../../../src/modules/installation/seed/seed-cli.module');
     demo = await NestFactory.createApplicationContext(SeedCliModule, { logger: false });
