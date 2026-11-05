@@ -11,7 +11,6 @@ import { costEstimateSchema, employeeRef, pricingSchema, submitBodySchema } from
 export const previewBodySchema = submitBodySchema.pick({
   planId: true,
   termMonths: true,
-  expectedSpendOn: true,
 });
 
 const chainStepSchema = z.strictObject({
@@ -41,10 +40,8 @@ const previewSchema = z.strictObject({
    * department has none in use and the request is free internal software, which is judged without it (`QĐ-87g(2)`).
    */
   costCenter: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
-  requirements: z.strictObject({
-    /** The head must confirm the term in so many words with a reason; the chain gains no step. */
-    termConfirmationByHead: z.boolean(),
-  }),
+  /** The longest term the plan takes from today: a year, and for a flexible plan not past the end of the fiscal year (`endsBy`). */
+  termLimit: z.strictObject({ maxMonths: z.number().int().positive(), endsBy: z.string().nullable() }),
   /** The seat the person already holds of the plan; when present, the request cannot be sent. */
   existingAccess: z
     .strictObject({ assignmentId: z.uuid(), effectiveFrom: z.string(), validUntil: z.string().nullable() })
@@ -61,7 +58,6 @@ const previewSchema = z.strictObject({
     })
     .nullable(),
   canSubmit: z.boolean(),
-  expectedSpendOn: z.string().nullable(),
   budgetYear: z.number().int().nullable(),
   pricing: pricingSchema,
   /** The estimated tax of a priced request; null with no price or no vendor. Never a budget figure. */

@@ -156,7 +156,7 @@ describe('the service accounts of a person who is transferred or leaves (integra
     const { person, ci } = await owner();
     await transferOf(person);
     const left = await h.worker(des, code());
-    await h.recordedCase(left, { abrupt: true, lastWorkingDay: h.today() });
+    await h.recordedCase(left, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.today() });
     const handing = await h.worker(des, code());
     await h.recordedCase(handing);
     const foreign = await h.worker(fin, code());
@@ -241,7 +241,7 @@ describe('the service accounts of a person who is transferred or leaves (integra
       const rights = h.dataOf<{ items: { assignmentId: string }[] }>(await h.rightsOf(wire.id).expect(200)).items;
       expect(rights.map((right) => right.assignmentId)).not.toEqual(expect.arrayContaining([ci]));
 
-      await h.markLeft(wire.id).expect(200);
+      await h.leaveOnLastDay(wire.id).expect(200);
       await h.lockAccount(wire.id, LOCK).expect(200);
       expect(h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200)).blockers).toEqual({
         SERVICE_ACCOUNT_UNASSIGNED: 2,
@@ -267,7 +267,7 @@ describe('the service accounts of a person who is transferred or leaves (integra
 
     it('is told as overdue once for each account when its day passes without a person, and nothing is changed (AC-5)', async () => {
       const { person, ci, release } = await owner();
-      const wire = await h.recordedCase(person, { abrupt: true, lastWorkingDay: h.today() });
+      const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.today() });
       expect(wire.state).toBe('LEFT');
       await h.lockAccount(wire.id, LOCK).expect(200);
       const later = new Date(`${h.day(3)}T05:00:00.000Z`);

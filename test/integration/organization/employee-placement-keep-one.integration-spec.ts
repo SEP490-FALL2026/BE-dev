@@ -232,10 +232,10 @@ describe('employee_placements_keep_one trigger (INV-20) (integration, real Postg
         `INSERT INTO offboarding_cases (
            id, organization_id, employee_id, department_id, prior_work_state,
            last_working_day, departure_effective_on, handover_due_on, grounds_type, grounds_reference,
-           grounds_issuer, grounds_issued_on, head_handover
+           grounds_issuer, grounds_issued_on, access_block_mode, head_handover
          ) VALUES (
            gen_random_uuid(), $1, $2, NULL, 'WORKING',
-           $3::date, $3::date, $3::date, 'RESIGNATION', 'REF-1', 'Issuer', $3::date, '{"head": true}'::jsonb
+           $3::date, $3::date, $3::date, 'RESIGNATION', 'REF-1', 'Issuer', $3::date, 'WITH_LAST_DAY', '{"head": true}'::jsonb
          )`,
         [h.seed.organizationId, emp.id, today],
       );
@@ -269,10 +269,10 @@ describe('employee_placements_keep_one trigger (INV-20) (integration, real Postg
         `INSERT INTO offboarding_cases (
            id, organization_id, employee_id, department_id, prior_work_state,
            last_working_day, departure_effective_on, handover_due_on, grounds_type, grounds_reference,
-           grounds_issuer, grounds_issued_on, cancelled_placement_id, cancelled_placement_department_id
+           grounds_issuer, grounds_issued_on, access_block_mode, cancelled_placement_id, cancelled_placement_department_id
          ) VALUES (
            gen_random_uuid(), $1, $2, NULL, 'WORKING',
-           $3::date, $3::date, $3::date, 'RESIGNATION', 'REF-2', 'Issuer', $3::date, $4::uuid, $5::uuid
+           $3::date, $3::date, $3::date, 'RESIGNATION', 'REF-2', 'Issuer', $3::date, 'WITH_LAST_DAY', $4::uuid, $5::uuid
          )`,
         [h.seed.organizationId, emp.id, today, fakePlacementId, dept.id],
       );
@@ -284,10 +284,10 @@ describe('employee_placements_keep_one trigger (INV-20) (integration, real Postg
         `INSERT INTO offboarding_cases (
            id, organization_id, employee_id, department_id, prior_work_state,
            last_working_day, departure_effective_on, handover_due_on, grounds_type, grounds_reference,
-           grounds_issuer, grounds_issued_on, cancelled_placement_id, cancelled_placement_department_id, cancelled_placement_from
+           grounds_issuer, grounds_issued_on, access_block_mode, cancelled_placement_id, cancelled_placement_department_id, cancelled_placement_from
          ) VALUES (
            gen_random_uuid(), $1, $2, $5::uuid, 'WORKING',
-           $3::date, $3::date, $3::date, 'RESIGNATION', 'REF-3', 'Issuer', $3::date, $4::uuid, $5::uuid, $3::date
+           $3::date, $3::date, $3::date, 'RESIGNATION', 'REF-3', 'Issuer', $3::date, 'WITH_LAST_DAY', $4::uuid, $5::uuid, $3::date
          )`,
         [h.seed.organizationId, emp.id, today, fakePlacementId, dept.id],
       );
@@ -332,11 +332,11 @@ describe('employee_placements_keep_one trigger (INV-20) (integration, real Postg
         `INSERT INTO offboarding_cases (
            id, organization_id, employee_id, department_id, prior_work_state,
            last_working_day, departure_effective_on, handover_due_on, grounds_type, grounds_reference,
-           grounds_issuer, grounds_issued_on, cancelled_placement_id, cancelled_placement_department_id, cancelled_placement_from,
+           grounds_issuer, grounds_issued_on, access_block_mode, cancelled_placement_id, cancelled_placement_department_id, cancelled_placement_from,
            recorded_by_app_user_id
          ) VALUES (
            gen_random_uuid(), $1, $2, NULL, 'WORKING',
-           $3::date, $3::date + 1, $3::date, 'RESIGNATION', 'REF-4', 'Issuer', $3::date, $4::uuid, $5::uuid, $6::date,
+           $3::date, $3::date + 1, $3::date, 'RESIGNATION', 'REF-4', 'Issuer', $3::date, 'WITH_LAST_DAY', $4::uuid, $5::uuid, $6::date,
            $7::uuid
          ) RETURNING id`,
         [h.seed.organizationId, emp.id, today, placementId, dept.id, futureFrom, h.seed.superAdmin.appUserId],
@@ -390,11 +390,11 @@ describe('employee_placements_keep_one trigger (INV-20) (integration, real Postg
           `INSERT INTO offboarding_cases (
              id, organization_id, employee_id, department_id, prior_work_state,
              last_working_day, departure_effective_on, handover_due_on, grounds_type, grounds_reference,
-             grounds_issuer, grounds_issued_on, cancelled_placement_id, cancelled_placement_department_id, cancelled_placement_from,
+             grounds_issuer, grounds_issued_on, access_block_mode, cancelled_placement_id, cancelled_placement_department_id, cancelled_placement_from,
              recorded_by_app_user_id
            ) VALUES (
              gen_random_uuid(), $1, $2, NULL, 'WORKING',
-             $3::date, $3::date + 1, $3::date, 'RESIGNATION', 'REF-NF', 'Issuer', $3::date, $4::uuid, $5::uuid, $3::date + $6::int,
+             $3::date, $3::date + 1, $3::date, 'RESIGNATION', 'REF-NF', 'Issuer', $3::date, 'WITH_LAST_DAY', $4::uuid, $5::uuid, $3::date + $6::int,
              $7::uuid
            )`,
           [h.seed.organizationId, emp.id, today, placementId, dept.id, offset, h.seed.superAdmin.appUserId],
@@ -440,11 +440,11 @@ describe('employee_placements_keep_one trigger (INV-20) (integration, real Postg
         `INSERT INTO offboarding_cases (
            id, organization_id, employee_id, department_id, state, prior_work_state,
            last_working_day, departure_effective_on, handover_due_on, grounds_type, grounds_reference,
-           grounds_issuer, grounds_issued_on, cancelled_placement_id, cancelled_placement_department_id, cancelled_placement_from,
+           grounds_issuer, grounds_issued_on, access_block_mode, cancelled_placement_id, cancelled_placement_department_id, cancelled_placement_from,
            cancelled_at, cancelled_by_app_user_id, cancel_reason, recorded_by_app_user_id
          ) VALUES (
            gen_random_uuid(), $1, $2, NULL, 'CANCELLED', 'WORKING',
-           $3::date, $3::date + 1, $3::date, 'RESIGNATION', 'REF-5', 'Issuer', $3::date, $4::uuid, $5::uuid, $6::date,
+           $3::date, $3::date + 1, $3::date, 'RESIGNATION', 'REF-5', 'Issuer', $3::date, 'WITH_LAST_DAY', $4::uuid, $5::uuid, $6::date,
            now(), $7::uuid, 'Reason for cancellation', $7::uuid
          )`,
         [h.seed.organizationId, emp.id, today, placementId, dept.id, futureFrom, h.seed.superAdmin.appUserId],

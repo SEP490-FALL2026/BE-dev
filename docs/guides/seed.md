@@ -1,6 +1,6 @@
 # Seed demo local và VPS
 
-Một lệnh Nest `seed` dùng [fixture shared-demo-v2](../../src/cli/seed/fixture/shared-demo-v2/README.md). Nó có thể bootstrap tổ chức demo rồi ghi dữ liệu qua HTTP API bằng đúng vai. Reset chỉ nằm ở hai wrapper; không có endpoint seed và CI/CD không tự seed.
+Một lệnh Nest `seed` dùng [fixture shared-demo-v3](../../src/cli/seed/fixture/shared-demo-v3/README.md). Nó có thể bootstrap tổ chức demo rồi ghi dữ liệu qua HTTP API bằng đúng vai. Reset chỉ nằm ở hai wrapper; không có endpoint seed và CI/CD không tự seed.
 
 Các lệnh cũ `dev-seed`, `demo-dataset` và alias đã bỏ theo OD-S3. Cài đặt thật cho khách hàng vẫn dùng [bootstrap](bootstrap-installation.md).
 
@@ -8,7 +8,7 @@ Các lệnh cũ `dev-seed`, `demo-dataset` và alias đã bỏ theo OD-S3. Cài 
 
 ```text
 node dist/cli.js seed <check|plan|apply> --environment LOCAL_TEST|SHARED
-  [--fixture shared-demo-v2] [--api-url <origin>]
+  [--fixture shared-demo-v3] [--api-url <origin>]
   [--operator-reference <reference>] [--allow-bootstrap] [--super-admin-email <email>] [--secrets-stdin] [--json]
 ```
 
@@ -85,7 +85,7 @@ scp scripts/ops/seed.sh .env.seed.example <demo-host>:/opt/slm/backend/
 
 Trên VPS, copy template thành `.env.seed`, điền operator reference và hai mật khẩu, đặt quyền 600. `SEED_SUPER_ADMIN_EMAIL`
 (tùy chọn, Owner 04/11/2026) là email đăng nhập và email công việc của Super Admin mà lượt bootstrap tạo trên DB trống; để
-trống thì dùng `system.admin@slm-demo.example` của fixture. Mật khẩu Super Admin phải khác email này. DB đã cài giữ nguyên
+trống thì dùng `system.admin@saoviet.example` của fixture. Mật khẩu Super Admin phải khác email này. DB đã cài giữ nguyên
 Super Admin đang có (đổi email sau đó: `ops:recover reset-credentials --new-login-email`). Wrapper local đọc cùng khóa từ
 `.env.seed.local`. `SEED_ALLOW_RESET=false` là mặc định; chỉ đổi thành `true` khi Owner chủ động cho phép reset DB demo. Script đọc file như dữ liệu, không `source` hay thực thi giá trị.
 
@@ -193,16 +193,16 @@ cp .env.seed.example .env.seed && chmod 600 .env.seed
 bash /opt/slm/backend/seed.sh --app-dir /opt/slm/backend --config /opt/slm/backend/.env.seed
 ```
 
-DB `EMPTY` nên script không hỏi gì: kiểm protocol và mật khẩu, bootstrap tổ chức `SLM Demo` (phòng gốc `DS1-ADMIN`, Super Admin
-theo `SEED_SUPER_ADMIN_EMAIL`, trống thì `system.admin@slm-demo.example`) rồi nạp dataset qua API. Exit `0` là xong; `2` là không còn gì cần ghi; `3` bị từ chối trước khi ghi
+DB `EMPTY` nên script không hỏi gì: kiểm protocol và mật khẩu, bootstrap tổ chức `Công ty Cổ phần Công nghệ Sao Việt` (phòng gốc `ADMIN`, Super Admin
+theo `SEED_SUPER_ADMIN_EMAIL`, trống thì `system.admin@saoviet.example`) rồi nạp dataset qua API. Exit `0` là xong; `2` là không còn gì cần ghi; `3` bị từ chối trước khi ghi
 (đọc dòng `refused:`); `4` xung đột dataset; `1` lỗi. Báo cáo: `seed-reports/<UTC>-apply.txt` (dòng đầu, toàn bộ output, dòng
 `exit <mã>`).
 
 ### Bước 4 — Kiểm tra sau seed
 
-- Đăng nhập Super Admin (`SEED_SUPER_ADMIN_EMAIL`, hoặc `system.admin@slm-demo.example` khi để trống) bằng
+- Đăng nhập Super Admin (`SEED_SUPER_ADMIN_EMAIL`, hoặc `system.admin@saoviet.example` khi để trống) bằng
   `SEED_SUPER_ADMIN_PASSWORD`; `/me.roles` = `["SUPER_ADMIN"]`.
-- Đăng nhập vài tài khoản demo bằng `SEED_DEMO_ACCOUNT_PASSWORD` (email, vai, phòng ở [README fixture](../../src/cli/seed/fixture/shared-demo-v2/README.md));
+- Đăng nhập vài tài khoản demo bằng `SEED_DEMO_ACCOUNT_PASSWORD` (email, vai, phòng ở [README fixture](../../src/cli/seed/fixture/shared-demo-v3/README.md));
   mỗi tài khoản có đúng một vai.
 - Chạy lại bước 3 với `--continue`: exit `2` (không ghi thêm).
 
@@ -228,9 +228,9 @@ Kiểm ready và dữ liệu phục hồi trước khi nhả khóa. Không gọi
 
 ## Lịch và giới hạn dataset
 
-Seed được mọi ngày, nhưng năm tài chính phải bắt đầu tháng 1. Các Request trả phí dùng chung ngày chi; khi kỳ dịch vụ của R1/R2 vượt cuối năm, ngày chi là ngày làm việc đầu năm sau và ENG/MKT/SAL có cả hai năm ngân sách. Dataset đã được nạp ở năm khác bị từ chối; dùng wrapper và chọn reset.
+Seed được mọi ngày, nhưng năm tài chính phải bắt đầu tháng 1. ENG/MKT/SAL luôn có ngân sách đã duyệt của năm hiện tại và năm sau (qua luồng đề xuất → phiên bản → Người duyệt chi), nên Request 1–12 tháng bắt đầu hôm nay đi thẳng tới duyệt chi; Thiết kế không có ngân sách nào, để R9 chờ Finance rà soát. Dataset đã được nạp ở năm khác bị từ chối; dùng wrapper và chọn reset.
 
-R1 ở nhánh năm sau vẫn cấp từ thuê bao năm hiện tại, hết hạn 31/12. Seed cuối tháng 11/tháng 12 có thể tạo sự kiện gia hạn cho mốc đã qua. Không cam kết luôn có thuê bao trong cửa sổ cảnh báo 15/7 ngày (OD-S6). Mục đích từng bản ghi, bảng tài khoản, ứng viên dữ liệu tương lai và cách mở rộng nằm trong README fixture.
+R1 cấp từ thuê bao năm hiện tại. Seed cuối tháng 11/tháng 12 có thể tạo sự kiện gia hạn cho mốc đã qua. Không cam kết luôn có thuê bao trong cửa sổ cảnh báo 15/7 ngày (OD-S6). Mục đích từng bản ghi, bảng tài khoản, ứng viên dữ liệu tương lai và cách mở rộng nằm trong README fixture.
 
 ## Bằng chứng và việc Owner còn phải chạy
 

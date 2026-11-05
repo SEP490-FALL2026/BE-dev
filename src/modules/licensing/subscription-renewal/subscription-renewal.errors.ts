@@ -13,12 +13,16 @@ export type RenewalProblem =
   | 'QUANTITY_INVALID'
   /** The caller is not the person who decides this renewal now (`FR-3.13`, `SoD-3`). */
   | 'NOT_DECIDER'
+  /** The Business Owner's head proposes: the head confirms, so another IT Admin proposes (`SoD-3`). */
+  | 'PROPOSER_IS_OWNER_HEAD'
   /** The case is not waiting for a decision (already decided). */
   | 'NOT_AWAITING_DECISION'
   /** A cancellation while seats are in use must be confirmed after the warning (`US-11-02` AC-2). */
   | 'ACTIVE_USERS_NOT_ACKNOWLEDGED'
   /** The seats chosen to take back are not exactly the excess, or not seats in use of this subscription (`US-11-02` AC-20). */
   | 'EXCESS_SELECTION_INVALID'
+  /** The seats the IT Admin proposed to take back are no longer exactly the excess of the day of the confirmation. */
+  | 'PROPOSAL_STALE'
   /** Reducing within the paid period is only for a subscription that allows a reduction mid-term. */
   | 'MID_TERM_NOT_ALLOWED'
   /** The case is not waiting for its outcome (not decided yet, or recorded already). */

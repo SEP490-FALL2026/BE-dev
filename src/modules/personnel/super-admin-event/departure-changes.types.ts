@@ -1,5 +1,6 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { ChangeLastDayInput } from '../offboarding/offboarding.types';
+import type { GroundsInput } from '../personnel-grounds.policy';
 import type { PersonnelActor } from '../public/personnel.types';
 
 /**
@@ -16,5 +17,10 @@ export abstract class DepartureChanges {
     outer: DbTx,
   ): Promise<{ id: string }>;
 
-  abstract cancel(actor: PersonnelActor, id: string, input: { reason: string }, outer: DbTx): Promise<{ id: string }>;
+  abstract cancel(
+    actor: PersonnelActor,
+    id: string,
+    input: { reason: string; grounds?: GroundsInput | undefined },
+    outer: DbTx,
+  ): Promise<{ id: string }>;
 }

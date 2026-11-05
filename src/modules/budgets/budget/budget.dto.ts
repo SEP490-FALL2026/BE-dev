@@ -2,13 +2,12 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { LINE_DESCRIPTION_MAX, REASON_MAX } from './budget.policy';
-import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
-const money = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
+/** An amount a person gives: always in the reporting currency, which the system knows (`QĐ-98`). */
+const money = z.strictObject({ amount: z.string().max(40) });
 const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
 const year = z.number().int().min(2000).max(2200);
-const cycle = z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'ONE_TIME']);
 export const LINES_MAX = 200;
 
 /**
@@ -16,21 +15,23 @@ export const LINES_MAX = 200;
  * serves and how it repeats. The window, the service period and the cycle may be left out here so that a form that
  * lacks them is told which line and which fields (`US-06-10` AC-2), not simply refused.
  */
-const lineBody = z.strictObject({
-  description: text(LINE_DESCRIPTION_MAX),
+const lineBodyShape = z.strictObject({
   planId: z.uuid().optional(),
+  description: text(LINE_DESCRIPTION_MAX).optional(),
   seats: z.number().int().min(1).max(100000).optional(),
   amount: money,
-  windowFrom: businessDate.optional(),
-  windowTo: businessDate.optional(),
-  servicePeriodMonths: z.number().int().min(1).max(120).optional(),
-  repeatCycle: cycle.optional(),
-  quoteValidUntil: businessDate.optional(),
   note: text(REASON_MAX).optional(),
 });
+const lineBody = lineBodyShape
+  .refine((line) => line.planId !== undefined || line.description !== undefined, {
+    message: 'Give the plan or a description of the line.',
+    path: ['description'],
+  })
+  .meta({
+    description: 'A line is a plan or a description, the seats, the amount of the year and a note.',
+  });
 
 export const proposalBodySchema = z.strictObject({
-  costCenterId: z.uuid(),
   year,
   lines: z.array(lineBody).min(1).max(LINES_MAX),
   attachmentIds: z
@@ -80,10 +81,8 @@ const quarters = z.strictObject({ q1: money, q2: money, q3: money, q4: money });
 const versionFigures = {
   base: money,
   reserve: money,
-  /** A line is high value when it is over this share of what is left of the year, in whole percent (`US-06-12`). */
-  highValuePercent: z.number().int().min(0).max(100),
-  /** The other way a line is high value: over this amount whatever is left; null sets none (`QĐ-82c`). */
-  highValueAmount: money.nullable(),
+  /** Why the reserve is not the default share of the base; asked when the version is sent (`US-06-09` AC-30). */
+  reserveReason: text(REASON_MAX),
   /** A forecast by quarter, never a limit: the four add up to the total or it is not saved (`US-06-09` AC-6). */
   quarters: quarters.nullable(),
 };
@@ -91,30 +90,17 @@ const versionFigures = {
 export const versionBodySchema = z.strictObject({
   proposalId: z.uuid(),
   base: versionFigures.base,
-  reserve: versionFigures.reserve,
-  highValuePercent: versionFigures.highValuePercent,
-  highValueAmount: versionFigures.highValueAmount.optional(),
-  quarters: versionFigures.quarters.optional(),
-});
-/** A change of the current budget: a new version that is current only once the spending approver approves it. */
-export const revisionBodySchema = z.strictObject({
-  costCenterId: z.uuid(),
-  year,
-  base: versionFigures.base.optional(),
   reserve: versionFigures.reserve.optional(),
-  highValuePercent: versionFigures.highValuePercent.optional(),
-  highValueAmount: versionFigures.highValueAmount.optional(),
+  reserveReason: versionFigures.reserveReason.optional(),
   quarters: versionFigures.quarters.optional(),
-  reason: text(REASON_MAX).optional(),
 });
 export const versionPatchSchema = z
   .strictObject({
     base: versionFigures.base,
     reserve: versionFigures.reserve,
-    highValuePercent: versionFigures.highValuePercent,
-    highValueAmount: versionFigures.highValueAmount,
+    /** `null` takes the reason away: the reserve is the default share again, or is sent with another reason. */
+    reserveReason: versionFigures.reserveReason.nullable(),
     quarters: versionFigures.quarters,
-    reason: text(REASON_MAX).nullable(),
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
@@ -125,11 +111,6 @@ export const linePatchSchema = z
     planId: z.uuid().nullable(),
     seats: z.number().int().min(1).max(100000).nullable(),
     amount: money,
-    windowFrom: businessDate,
-    windowTo: businessDate,
-    servicePeriodMonths: z.number().int().min(1).max(120),
-    repeatCycle: cycle,
-    quoteValidUntil: businessDate.nullable(),
     financeComment: text(REASON_MAX).nullable(),
     adjustmentReason: text(REASON_MAX).nullable(),
   })
@@ -137,18 +118,6 @@ export const linePatchSchema = z
   .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
   .meta({ minProperties: 1, description: 'Give at least one field.' });
 export const addLinesBodySchema = z.strictObject({ lines: z.array(lineBody).min(1).max(LINES_MAX) });
-/** A move of the purchase window of a line of the current budget, with its reason; an amount is given only to be refused. */
-export const windowBodySchema = z
-  .strictObject({
-    windowFrom: businessDate.optional(),
-    windowTo: businessDate.optional(),
-    amount: money.optional(),
-    reason: text(REASON_MAX).optional(),
-  })
-  .refine((body) => body.windowFrom !== undefined || body.windowTo !== undefined || body.amount !== undefined, {
-    message: 'Give the new window.',
-  })
-  .meta({ description: 'Give at least one of windowFrom, windowTo and amount.' });
 
 export const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -160,7 +129,7 @@ export const proposalListQuerySchema = z.strictObject({
   ...pageQuery,
 });
 export const versionListQuerySchema = z.strictObject({
-  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']).optional(),
+  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'EXPIRED']).optional(),
   year: z.coerce.number().int().min(2000).max(2200).optional(),
   ...pageQuery,
 });
@@ -225,11 +194,6 @@ const proposalLineSchema = z.strictObject({
   planId: z.uuid().nullable(),
   seats: z.number().int().nullable(),
   amount: moneyView,
-  windowFrom: z.string(),
-  windowTo: z.string(),
-  servicePeriodMonths: z.number().int(),
-  repeatCycle: cycle,
-  quoteValidUntil: z.string().nullable(),
   note: z.string().nullable(),
 });
 const versionSchema = z.strictObject({
@@ -240,18 +204,18 @@ const versionSchema = z.strictObject({
   kind: z.enum(['INITIAL', 'REVISION']),
   state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
   proposalId: z.uuid().nullable(),
-  basedOnVersionId: z.uuid().nullable(),
   /** The refused version this one follows when it is made again from the same proposal; set by the system. */
   rejectedPredecessorId: z.uuid().nullable(),
   base: moneyView,
   reserve: moneyView,
+  /** The share of the base the reserve defaults to when the version was made; null for a version made before `QĐ-98`. */
+  reservePercent: z.number().int().nullable(),
+  /** The reserve the share gives for the base now; Finance sees it and may differ, with a reason. */
+  defaultReserve: moneyView.nullable(),
+  reserveReason: z.string().nullable(),
   total: moneyView,
-  highValuePercent: z.number().int(),
-  highValueAmount: moneyView.nullable(),
   quarters: z.strictObject({ q1: moneyView, q2: moneyView, q3: moneyView, q4: moneyView }).nullable(),
   reason: z.string().nullable(),
-  /** The current budget this revision replaces, as it is: what the approver compares the total with. */
-  previousTotal: moneyView.nullable(),
   /** Set while the version was sent and nobody who works holds the role of the spending approver: nobody else decides it (`QĐ-93d`(1)). */
   waitingReason: z.enum(['NO_SPENDING_APPROVER']).nullable(),
   /** The latest decision of the spending approver on it. */
@@ -292,21 +256,8 @@ const versionLineSchema = z.strictObject({
   planId: z.uuid().nullable(),
   seats: z.number().int().nullable(),
   amount: moneyView,
-  windowFrom: z.string(),
-  windowTo: z.string(),
-  servicePeriodMonths: z.number().int(),
-  repeatCycle: cycle,
-  quoteValidUntil: z.string().nullable(),
   financeComment: z.string().nullable(),
   adjustmentReason: z.string().nullable(),
-  overdue: z.boolean(),
-});
-const lineChangeSchema = z.strictObject({
-  before: z.strictObject({ windowFrom: z.string(), windowTo: z.string() }),
-  after: z.strictObject({ windowFrom: z.string(), windowTo: z.string() }),
-  reason: z.string(),
-  changedBy: employeeRef.nullable(),
-  changedAt: z.iso.datetime(),
 });
 /** What a head of department sees of the budget of the department: the lines of the current budget, never what is left. */
 const mineSchema = z.strictObject({
@@ -351,11 +302,9 @@ export class ResubmissionBodyDto extends createZodDto(resubmissionBodySchema) {}
 export class BudgetProposalReturnBodyDto extends createZodDto(returnBodySchema) {}
 export class DecisionBodyDto extends createZodDto(decisionBodySchema) {}
 export class VersionBodyDto extends createZodDto(versionBodySchema) {}
-export class RevisionBodyDto extends createZodDto(revisionBodySchema) {}
 export class VersionPatchDto extends createZodDto(versionPatchSchema) {}
 export class LinePatchDto extends createZodDto(linePatchSchema) {}
 export class AddLinesBodyDto extends createZodDto(addLinesBodySchema) {}
-export class WindowBodyDto extends createZodDto(windowBodySchema) {}
 export class ProposalListQueryDto extends createZodDto(proposalListQuerySchema) {}
 export class VersionListQueryDto extends createZodDto(versionListQuerySchema) {}
 export class PageQueryDto extends createZodDto(pageQuerySchema) {}
@@ -377,7 +326,6 @@ export class VersionResponseDto extends createZodDto(
 export class VersionPageResponseDto extends createZodDto(page(versionSummarySchema)) {}
 export class VersionLinePageResponseDto extends createZodDto(page(versionLineSchema)) {}
 export class LineResponseDto extends createZodDto(successEnvelopeSchema(z.strictObject({ line: versionLineSchema }))) {}
-export class LineChangePageResponseDto extends createZodDto(page(lineChangeSchema)) {}
 export class MineResponseDto extends createZodDto(successEnvelopeSchema(z.strictObject({ budget: mineSchema }))) {}
 export class MineLinePageResponseDto extends createZodDto(page(versionLineSchema)) {}
 export class MineVersionPageResponseDto extends createZodDto(page(mineVersionSummarySchema)) {}
@@ -392,7 +340,6 @@ export type VersionSummaryWire = z.infer<typeof versionSummarySchema>;
 export type ProposalLineWire = z.infer<typeof proposalLineSchema>;
 export type VersionWire = z.infer<typeof versionSchema>;
 export type VersionLineWire = z.infer<typeof versionLineSchema>;
-export type LineChangeWire = z.infer<typeof lineChangeSchema>;
 export type MineWire = z.infer<typeof mineSchema>;
 export type MineVersionSummaryWire = z.infer<typeof mineVersionSummarySchema>;
 export type TableRowWire = z.infer<typeof tableRowSchema>;

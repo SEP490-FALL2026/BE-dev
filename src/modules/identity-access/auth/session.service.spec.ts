@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccessBlockService } from '../access-block/access-block.service';
 import { AccountRecordService } from '../accounts/account-record.service';
 import { RefreshTokenSnapshot, SessionSnapshot } from '../public/identity-access.types';
 import { SessionInvalidError } from './auth.errors';
@@ -50,7 +51,7 @@ interface World {
   token: RefreshTokenSnapshot;
 }
 
-function setUp(world: World) {
+function setUp(world: World, blockedFrom: string | null = null) {
   const runner = new CommitTrackingRunner();
   const config = new ConfigService({
     AUTH_SESSION_IDLE_SECONDS: IDLE_SECONDS,
@@ -94,7 +95,11 @@ function setUp(world: World) {
         activationState: 'ACTIVATED',
       }),
   };
-  const organization = { getEmployee: () => Promise.resolve({ status: 'ACTIVE' }) };
+  const organization = {
+    getEmployee: () => Promise.resolve({ status: 'ACTIVE' }),
+    businessToday: () => Promise.resolve('2026-11-10'),
+  };
+  const accessBlocks = { find: () => Promise.resolve(blockedFrom ? { blockedFrom } : null) };
   const audit = {
     record: (tx: unknown, event: { action: string }) => {
       pendingOf(tx).push({ kind: 'audit', action: event.action });
@@ -103,6 +108,7 @@ function setUp(world: World) {
   };
   const service = new SessionService(
     accounts as unknown as AccountRecordService,
+    accessBlocks as unknown as AccessBlockService,
     sessions as unknown as SessionRepo,
     organization as unknown as OrganizationReadApi,
     audit as unknown as AuditApi,
@@ -200,6 +206,23 @@ describe('SessionService.refresh — the refresh-token state machine', () => {
     await expect(service.refresh(PRESENTED)).rejects.toBeInstanceOf(SessionInvalidError);
 
     expect(runner.committed).toEqual([]);
+  });
+
+  it.each([
+    ['on its first day', '2026-11-10'],
+    ['since earlier', '2026-11-01'],
+  ])('refuses a refresh when a departure block is in force %s, and writes nothing', async (_label, blockedFrom) => {
+    const { service, runner } = setUp(openWorld(), blockedFrom);
+
+    await expect(service.refresh(PRESENTED)).rejects.toBeInstanceOf(SessionInvalidError);
+
+    expect(runner.committed).toEqual([]);
+  });
+
+  it('still refreshes on the last working day, when the block starts tomorrow', async () => {
+    const { service } = setUp(openWorld(), '2026-11-11');
+
+    await expect(service.refresh(PRESENTED)).resolves.toBeDefined();
   });
 
   it.each([

@@ -29,7 +29,9 @@ describe('what the database refuses about the notices of the heads (integration,
   };
   const recorded = async (): Promise<{ person: Person; wire: NoticeWire }> => {
     const made = await waiting();
-    await h.recordNotice(made.wire.id, h.recording({ lastWorkingDay: h.day(6) })).expect(201);
+    await h
+      .recordNotice(made.wire.id, h.recording({ lastWorkingDay: h.day(6), accessBlockMode: 'WITH_LAST_DAY' }))
+      .expect(201);
 
     return made;
   };

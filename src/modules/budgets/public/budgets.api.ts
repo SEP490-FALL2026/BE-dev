@@ -6,8 +6,6 @@ import type {
   CommitmentHoldInput,
   CommitmentReleaseInput,
   HeldCommitment,
-  PlanLineFacts,
-  PlanLineSummary,
   ReleasedCommitment,
   YearBudgetFacts,
 } from './budgets.types';
@@ -28,26 +26,6 @@ export class BudgetsApi {
   /** The current budget of each of the years; a year without one is absent from the map, which is not a budget of nothing. */
   yearFacts(costCenterId: string, years: readonly number[], tx?: DbTx): Promise<Map<number, YearBudgetFacts>> {
     return this.facts.yearFacts(costCenterId, years, tx);
-  }
-
-  /** The line a request names, read from the current version of its Cost Center and year; null when it is not there. */
-  planLine(versionId: string, position: number, tx?: DbTx): Promise<PlanLineFacts | null> {
-    return this.facts.planLine(versionId, position, tx);
-  }
-
-  /** The line at the position in the current version of the Cost Center and year, or null (`US-05-04` AC-12). */
-  currentLine(costCenterId: string, year: number, position: number, tx?: DbTx): Promise<PlanLineFacts | null> {
-    return this.facts.currentLine(costCenterId, year, position, tx);
-  }
-
-  /** One page of the lines of the current plan of the Cost Center and year, or null when the year has no budget. */
-  currentLines(
-    costCenterId: string,
-    year: number,
-    skip: number,
-    take: number,
-  ): Promise<{ currency: string; items: PlanLineSummary[]; total: number } | null> {
-    return this.facts.currentLines(costCenterId, year, skip, take);
   }
 
   /**

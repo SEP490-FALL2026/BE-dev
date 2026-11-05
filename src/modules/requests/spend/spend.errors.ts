@@ -19,7 +19,6 @@ export type AnswerRefusal =
 /** Why a Finance review may not end as asked (`US-06-13`); the rules that judge it are in `finance-review`. */
 export type ReviewRefusal =
   /** The plan line is still overdue: Finance moves it on the line, or gives the request back (`AC-4`). */
-  | 'PLAN_LINE_NOT_UPDATED'
   /** There is no budget to make: no year lacks one or has too little, or this is neither of the two (`AC-11`). */
   | 'NO_BUDGET_TO_MAKE'
   /** Nobody heads the department, so nobody can propose the budget (`AC-11`). */

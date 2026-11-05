@@ -18,7 +18,6 @@ import {
   BudgetCostCenterNotFoundError,
   BudgetCurrencyError,
   BudgetDecisionRefusedError,
-  BudgetDepartmentHasNoHeadError,
   BudgetNotAHistoryReaderError,
   BudgetNotAReaderError,
   BudgetNotFinanceError,
@@ -27,20 +26,15 @@ import {
   BudgetCurrentExistsError,
   BudgetImportFileInvalidError,
   BudgetLineNotFoundError,
-  BudgetNoCurrentError,
   BudgetNotYourCostCenterError,
-  BudgetProposalIncompleteError,
   BudgetProposalNotFoundError,
   BudgetProposalOpenError,
   BudgetProposalStateError,
   BudgetQuartersMismatchError,
   BudgetReasonRequiredError,
-  BudgetRevisionRequiredError,
   BudgetVersionInFlightError,
-  BudgetVersionNotCurrentError,
   BudgetVersionNotEditableError,
   BudgetVersionNotFoundError,
-  BudgetWindowBackwardsError,
   BudgetYearEndedError,
 } from './budget.errors';
 
@@ -105,9 +99,6 @@ export function toBudgetApiException(error: unknown): unknown {
   if (error instanceof FinanceSetupIncompleteError) {
     return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
   }
-  if (error instanceof BudgetDepartmentHasNoHeadError) {
-    return refuse(HttpStatus.CONFLICT, 'BUDGET.DEPARTMENT_HAS_NO_HEAD', error.message);
-  }
   if (error instanceof BudgetVersionNumberTakenError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET.VERSION_NUMBER_TAKEN', error.message);
   }
@@ -121,12 +112,6 @@ export function toBudgetApiException(error: unknown): unknown {
   }
   if (error instanceof BudgetYearEndedError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.YEAR_ENDED', error.message, { year: error.year });
-  }
-  if (error instanceof BudgetProposalIncompleteError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.PROPOSAL_INCOMPLETE', error.message, { lines: error.lines });
-  }
-  if (error instanceof BudgetWindowBackwardsError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.WINDOW_BACKWARDS', error.message, { lines: error.lines });
   }
   if (error instanceof BudgetCurrencyError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CURRENCY_NOT_REPORTING', error.message, {
@@ -160,14 +145,6 @@ export function toBudgetApiException(error: unknown): unknown {
   }
   if (error instanceof BudgetCurrentExistsError)
     return refuse(HttpStatus.CONFLICT, 'BUDGET.CURRENT_EXISTS', error.message);
-  if (error instanceof BudgetNoCurrentError)
-    return refuse(HttpStatus.CONFLICT, 'BUDGET.NO_CURRENT_BUDGET', error.message);
-  if (error instanceof BudgetRevisionRequiredError) {
-    return refuse(HttpStatus.CONFLICT, 'BUDGET.REVISION_REQUIRED', error.message);
-  }
-  if (error instanceof BudgetVersionNotCurrentError) {
-    return refuse(HttpStatus.CONFLICT, 'BUDGET.VERSION_NOT_CURRENT', error.message);
-  }
   // A race between two writers of the same Cost Center and year is stopped by the partial unique indexes. The loser
   // answers exactly what the check before the write answers: one code, one message (Owner, Prompt 02, 26/10/2026).
   // A unique violation names the index (in the message of the driver) and, with the pg adapter, its columns. An index is recognised by
@@ -246,21 +223,15 @@ export const BUDGET_ERROR_EXAMPLES = {
   NOT_A_READER: example(new BudgetNotAReaderError()),
   NOT_A_HISTORY_READER: example(new BudgetNotAHistoryReaderError()),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
-  DEPARTMENT_HAS_NO_HEAD: example(new BudgetDepartmentHasNoHeadError('<department-id>')),
   PLAN_NOT_FOUND: example(new BudgetPlanNotFoundError(['<plan-id>'])),
   // Not shown in the routes: the year lock lets two writers of a Cost Center and year take the number one after the other.
   VERSION_NUMBER_TAKEN: example(new BudgetVersionNumberTakenError()),
   NOT_YOUR_COST_CENTER: example(new BudgetNotYourCostCenterError()),
   YEAR_ENDED: example(new BudgetYearEndedError(2025)),
-  PROPOSAL_INCOMPLETE: example(
-    new BudgetProposalIncompleteError([{ line: 1, fields: ['servicePeriodMonths', 'repeatCycle'] }]),
-  ),
-  WINDOW_BACKWARDS: example(new BudgetWindowBackwardsError([1])),
   CURRENCY_NOT_REPORTING: example(new BudgetCurrencyError('USD', 'VND')),
   QUARTERS_MISMATCH: example(new BudgetQuartersMismatchError()),
-  REVISION_REASON_REQUIRED: example(new BudgetReasonRequiredError('REVISION')),
+  RESERVE_REASON_REQUIRED: example(new BudgetReasonRequiredError('RESERVE')),
   ADJUSTMENT_REASON_REQUIRED: example(new BudgetReasonRequiredError('ADJUSTMENT')),
-  WINDOW_REASON_REQUIRED: example(new BudgetReasonRequiredError('WINDOW')),
   IMPORT_FILE_INVALID: example(new BudgetImportFileInvalidError('MISSING_COLUMNS', 'cost_center_code')),
   // Not shown yet: two writers at once answer the same code with the message given for the unique index above.
   PROPOSAL_ALREADY_OPEN: example(new BudgetProposalOpenError()),
@@ -270,9 +241,6 @@ export const BUDGET_ERROR_EXAMPLES = {
   PROPOSAL_NOT_SUBMITTED: example(new BudgetProposalStateError('REVIEW', 'WITHDRAWN')),
   VERSION_NOT_EDITABLE: example(new BudgetVersionNotEditableError('SENT')),
   VERSION_IN_FLIGHT: example(new BudgetVersionInFlightError()),
-  NO_CURRENT_BUDGET: example(new BudgetNoCurrentError()),
-  REVISION_REQUIRED: example(new BudgetRevisionRequiredError()),
-  VERSION_NOT_CURRENT: example(new BudgetVersionNotCurrentError()),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
   CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),

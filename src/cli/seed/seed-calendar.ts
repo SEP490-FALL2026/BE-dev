@@ -1,8 +1,4 @@
 import { businessDateAt } from '../../core/business-date';
-
-import { addDays } from '../../core/business-date';
-import { addMonths } from '../../core/fiscal-year';
-import { addWorkingDays } from '../../core/working-days';
 import type { DemoRunContext } from './demo-run.types';
 
 export interface CalendarFacts {
@@ -42,25 +38,17 @@ export function calendarRefusal(facts: CalendarFacts): string | null {
   return null;
 }
 
-/** All paid requests share one spend date; only in-plan scenarios determine the required budget window. */
-export function seedCalendar(
-  today: string,
-  termMonths: number,
-  forceNextFiscalYear = false,
-): { spendDay: string; years: number[] } {
+/**
+ * The business years the budgets are written for: the year of today and the next one, always. A Request of 2 to 12 months started
+ * today can end in the next year, and the check of the budget reads every year the term touches, so without the budget of the next
+ * year such a Request would wait for review instead of reaching the spending approver.
+ */
+export function seedCalendar(today: string): { years: number[] } {
   const year = Number(today.slice(0, 4));
-  const first = addDays(today, 7);
-  const end = addDays(addMonths(first, termMonths), -1);
-  const next = forceNextFiscalYear || end > `${year}-12-31`;
-  return next
-    ? { spendDay: addWorkingDays(`${year}-12-31`, 1, new Set()), years: [year, year + 1] }
-    : { spendDay: first, years: [year] };
+
+  return { years: [year, year + 1] };
 }
 
-export function calendarFor(ctx: DemoRunContext & { forceNextFiscalYear?: boolean }): ReturnType<typeof seedCalendar> {
-  const term = Math.max(
-    0,
-    ...ctx.fixture.requests.filter((request) => request.planLine).map((request) => request.termMonths),
-  );
-  return seedCalendar(ctx.today, term, ctx.forceNextFiscalYear === true);
+export function calendarFor(ctx: DemoRunContext): ReturnType<typeof seedCalendar> {
+  return seedCalendar(ctx.today);
 }

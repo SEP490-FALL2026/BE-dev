@@ -8,7 +8,11 @@ import { TransferChangeService } from '../transfer/transfer-change.service';
 import { OffboardingRefusedError } from './offboarding.errors';
 import type { DepartureHeld, DepartureSeen } from './offboarding-preconditions.service';
 import { OffboardingPeriodsService, type ScheduledDeparture } from './offboarding-periods.service';
+import { leavesAtOnce } from './offboarding.policy';
 import type { RecordOffboardingInput } from './offboarding.types';
+
+/** The standard reason a transfer that waits is cancelled for when the person leaves before it takes effect (`QĐ-77j`). */
+export const DEPARTURE_BEFORE_TRANSFER = 'DEPARTURE_BEFORE_TRANSFER';
 
 /**
  * What a recorded departure ends, in this order (`US-03-04` AC-8, AC-14, AC-19, `US-03-03` AC-6): the transfer that would still wait
@@ -46,7 +50,15 @@ export class OffboardingEndings {
           successor: input.successor,
         })
       : { placementClosedId: null, headHandover: null };
-    if (!input.abrupt) await this.history.setEmployeeWorkState(tx, input.employeeId, 'HANDING_OVER');
+    // A departure that is `LEFT` the moment it is recorded never passes through the handover.
+    if (
+      !leavesAtOnce({
+        accessBlockMode: input.accessBlockMode,
+        lastWorkingDay: input.lastWorkingDay as BusinessDate,
+        today,
+      })
+    )
+      await this.history.setEmployeeWorkState(tx, input.employeeId, 'HANDING_OVER');
 
     return scheduled;
   }
@@ -63,7 +75,7 @@ export class OffboardingEndings {
       tx,
       actor,
       transferId,
-      { reason: input.pendingTransferCancellation?.reason ?? '', grounds: input.grounds },
+      { reason: DEPARTURE_BEFORE_TRANSFER, grounds: input.grounds },
       today,
     );
     if (refused) throw new OffboardingRefusedError('PENDING_EVENT_EXISTS', { kind: 'TRANSFER', reason: refused.code });

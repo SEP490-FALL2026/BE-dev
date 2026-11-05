@@ -1,3 +1,4 @@
+import { effectiveEndOf } from '../../../src/core/term-limit';
 import { GroupHarness } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
 
@@ -130,42 +131,46 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     ).toEqual(expect.arrayContaining(['NEED', 'SPEND_DECISION', 'GRANT']));
   });
 
-  it('keeps the end day of a person who is not staff on their line and on their seat (AC-8)', async () => {
+  it('gives a person who is not staff no end day of the sender: the line has none, sending one is refused, and the seat ends with the term (AC-8, Q-03, R-15)', async () => {
     const u = await unit();
     const subscription = await h.subscription(10);
     const plan = await h.planOf(subscription);
     const [e1, e2] = await h.colleagues(u, 2);
     await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN' WHERE id = $1`, [e2.employeeId]);
+    const withDay = {
+      ...h.groupBody(plan, [e1, e2]),
+      lines: [{ employeeId: e1.employeeId }, { employeeId: e2.employeeId, expectedEndDate: '2099-12-31' }],
+    };
+
+    const refused = await h.submitGroup(withDay, u.head.account).expect(422);
     const sent = h.dataOf<{ request: { id: string } }>(
-      await h
-        .submitGroup(
-          h.groupBody(plan, [e1, e2], {
-            lines: [{ employeeId: e1.employeeId }, { employeeId: e2.employeeId, expectedEndDate: '2099-12-31' }],
-          }),
-          u.head.account,
-        )
-        .expect(201),
+      await h.submitGroup(h.groupBody(plan, [e1, e2]), u.head.account).expect(201),
     ).request;
-    await h.setPlanLine(sent.id, { offPlan: true }, u.head.account).expect(200);
+
+    expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
+    expect((await h.lineRows(sent.id)).map((line) => line.expected_end_date)).toEqual([null, null]);
+
     await h.sendOn([sent.id], u.head.account).expect(201);
     await h
       .decideSpendLines(sent.id, { lines: [approve(e1.employeeId), approve(e2.employeeId)] }, h.boss.account)
       .expect(200);
-
-    await h
-      .grantLine({ requestId: sent.id, beneficiaryEmployeeId: e2.employeeId, subscriptionId: subscription }, h.it1)
-      .expect(201);
-    await h
-      .grantLine({ requestId: sent.id, beneficiaryEmployeeId: e1.employeeId, subscriptionId: subscription }, h.it1)
-      .expect(201);
-
+    for (const person of [e2, e1]) {
+      await h
+        .grantLine(
+          { requestId: sent.id, beneficiaryEmployeeId: person.employeeId, subscriptionId: subscription },
+          h.it1,
+        )
+        .expect(201);
+    }
+    // Nobody gave the seat a day: it ends with the term the request asked for (12 months for a group), as the intern's does.
     const seats = await h.ctx.sql.query<{ employee_id: string; expected_end_date: string | null }>(
       `SELECT employee_id, expected_end_date::text FROM license_assignments WHERE employee_id = ANY($1::uuid[])`,
       [[e1.employeeId, e2.employeeId]],
     );
+    const end = effectiveEndOf({ start: h.today(), months: 12, flexible: false, fiscalYearStartMonth: 1 });
     expect(Object.fromEntries(seats.rows.map((row) => [row.employee_id, row.expected_end_date]))).toEqual({
-      [e1.employeeId]: null,
-      [e2.employeeId]: '2099-12-31',
+      [e1.employeeId]: end,
+      [e2.employeeId]: end,
     });
   });
 
@@ -180,10 +185,7 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     const attempt = await h
       .decideLines(
         id,
-        {
-          lines: [approve(e1.employeeId), approve(e2.employeeId), approve(u.head.employeeId)],
-          spend: { offPlan: true },
-        },
+        { lines: [approve(e1.employeeId), approve(e2.employeeId), approve(u.head.employeeId)] },
         u.head.account,
       )
       .expect(422);
@@ -200,14 +202,14 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     const u = await h.departmentWithHead(`P-Y${counter}`);
     const plan = await h.planOf(await h.subscription(100));
     const people = await h.colleagues(u, 2);
-    const version = await h.budgetFor(u, { total: 1_000_000 * M, percent: 1 });
-    const following = await h.budgetFor(u, { total: 1_000_000 * M, percent: 1, year: h.next });
+    const version = await h.budgetFor(u, { total: 1_000_000 * M });
+    const following = await h.budgetFor(u, { total: 1_000_000 * M, year: h.next });
     const id = await h.groupWaiting(u, plan, people);
     const spent = await h.steps(id, 'SPEND_APPROVAL');
     expect(spent).toHaveLength(1);
-    // Money is held against the budget after the request was sent on, so the check made again is not an ordinary one any more.
-    await h.commit(u, version.id, h.year, 999_000 * M, 'HELD');
-    await h.commit(u, following.id, h.next, 999_000 * M, 'HELD');
+    // All the money is held against the budget after the request was sent on, so the check made again is not an ordinary one any more.
+    await h.commit(u, version.id, h.year, 1_000_000 * M, 'HELD');
+    await h.commit(u, following.id, h.next, 1_000_000 * M, 'HELD');
 
     const bounced = await h
       .decideSpendLines(id, { lines: people.map((person) => approve(person.employeeId)) }, h.boss.account)

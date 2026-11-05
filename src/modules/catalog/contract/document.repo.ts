@@ -15,6 +15,8 @@ export interface DocumentRecord {
   finalObjectKey: string | null;
   uploadedByAppUserId: string;
   contractId: string | null;
+  /** The person who signed a `SIGNATURE_RECORD`; null for every other file. */
+  signerEmployeeId: string | null;
   attachedAt: Date | null;
   createdAt: Date;
 }
@@ -82,6 +84,14 @@ export class DocumentRepo {
     await tx.documentAttachment.update({
       where: { id },
       data: { status: 'READY', contractId, attachedAt: now },
+    });
+  }
+
+  /** A signed record belongs to the person who signed it, in the transaction of the caller. */
+  async markAttachedToSigner(tx: DbTx, id: string, signerEmployeeId: string, now: Date): Promise<void> {
+    await tx.documentAttachment.update({
+      where: { id },
+      data: { status: 'READY', signerEmployeeId, attachedAt: now },
     });
   }
 }

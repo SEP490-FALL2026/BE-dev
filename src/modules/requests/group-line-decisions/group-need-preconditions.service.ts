@@ -26,10 +26,9 @@ export interface GroupNeedDecidable {
   approves: boolean;
 }
 
-/** What the person decides with: the verdict of each of their people, and the reason they give for a term longer than a year. */
+/** What the person decides with: the verdict of each of their people. */
 interface LineNeedVerdicts {
   lines: readonly LineVerdict[];
-  termConfirmationReason?: string;
 }
 
 /**
@@ -67,9 +66,7 @@ export class GroupNeedPreconditions {
       stepEmployeeIds: own.map((line) => line.employeeId),
       assigneeEmployeeId: step.assigneeEmployeeId,
       stepState: step.state,
-      termMonths: request.termMonths,
       approves,
-      confirmed: (input.termConfirmationReason ?? '').trim() !== '',
     });
     if (refusal) throw new AccessRequestDecisionRefusedError(refusal);
 

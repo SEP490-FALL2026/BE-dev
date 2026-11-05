@@ -8,6 +8,7 @@ import { offboardingChangeDetailJson, type ChangeDetail } from '../personnel-cha
 import type { Grounds } from '../personnel-grounds.policy';
 import { offboardingHeadHandoverJson } from '../personnel-head-handover.json';
 import type {
+  AccessBlockMode,
   HeadHandoverFacts,
   OffboardingChangeKind,
   OffboardingChangeRecord,
@@ -26,7 +27,7 @@ export function toRecord(row: CaseRow): OffboardingRecord {
     employeeId: row.employeeId,
     departmentId: row.departmentId,
     state: row.state,
-    abrupt: row.abrupt,
+    accessBlockMode: row.accessBlockMode,
     priorWorkState: row.priorWorkState as PriorWorkState,
     lastWorkingDay: fromDateColumn(row.lastWorkingDay),
     departureEffectiveOn: fromDateColumn(row.departureEffectiveOn),
@@ -64,7 +65,7 @@ export interface NewOffboarding {
   organizationId: string;
   employeeId: string;
   departmentId: string | null;
-  abrupt: boolean;
+  accessBlockMode: AccessBlockMode;
   priorWorkState: PriorWorkState;
   lastWorkingDay: BusinessDate;
   departureEffectiveOn: BusinessDate;
@@ -103,7 +104,7 @@ export class OffboardingRepo {
         employeeId: input.employeeId,
         departmentId: input.departmentId ?? null,
         state,
-        abrupt: input.abrupt,
+        accessBlockMode: input.accessBlockMode,
         priorWorkState: input.priorWorkState,
         lastWorkingDay: toDateColumn(input.lastWorkingDay),
         departureEffectiveOn: toDateColumn(input.departureEffectiveOn),
@@ -167,7 +168,7 @@ export class OffboardingRepo {
     to: {
       lastWorkingDay: BusinessDate;
       departureEffectiveOn: BusinessDate;
-      handoverDueOn: BusinessDate;
+      handoverDueOn: BusinessDate | null;
       headHandover: HeadHandoverFacts | null;
       placementClosedId: string | null;
       cancelledPlacementId?: string | null;
@@ -180,7 +181,7 @@ export class OffboardingRepo {
       data: {
         lastWorkingDay: toDateColumn(to.lastWorkingDay),
         departureEffectiveOn: toDateColumn(to.departureEffectiveOn),
-        handoverDueOn: toDateColumn(to.handoverDueOn),
+        handoverDueOn: to.handoverDueOn ? toDateColumn(to.handoverDueOn) : null,
         headHandover: offboardingHeadHandoverJson.encode(to.headHandover),
         placementClosedId: to.placementClosedId,
       },
@@ -220,7 +221,7 @@ export class OffboardingRepo {
   /** Writes the lock of the account once; false when it was written meanwhile. */
   async recordAccountLock(tx: DbTx, id: string, by: { appUserId: string; note: string }): Promise<boolean> {
     const done = await tx.offboardingCase.updateMany({
-      where: { id, state: 'LEFT', accountLockAt: null },
+      where: { id, state: { in: ['HANDING_OVER', 'LEFT'] }, accountLockAt: null },
       data: { accountLockAt: new Date(), accountLockByAppUserId: by.appUserId, accountLockNote: by.note },
     });
 

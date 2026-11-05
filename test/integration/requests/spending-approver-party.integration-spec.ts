@@ -108,7 +108,7 @@ describe('the spending approver is no party of a Request, on every way to make o
   describe('the renewal of a seat (US-05-14 AC-6)', () => {
     it('refuses the spending approver who renews their own seat, and the head who renews the seat of the spending approver', async () => {
       const before = await written();
-      const body = { assignmentId: renewalSeat, newExpectedEndDate: h.inDays(90), businessReason: 'Still needed' };
+      const body = { assignmentId: renewalSeat, extensionMonths: 3, businessReason: 'Still needed' };
 
       const own = await h.renew(body, h.boss.account);
       const byHead = await h.renew(body, h.executiveHead.account);
@@ -116,9 +116,9 @@ describe('the spending approver is no party of a Request, on every way to make o
       expect(own.status).toBe(422);
       expect(h.codeOf(own)).toBe('REQUEST_PARTY.INELIGIBLE');
       expect(h.detailsOf(own)).toEqual(refusal('REQUESTER', h.boss.employeeId));
-      expect(byHead.status).toBe(422);
-      expect(h.codeOf(byHead)).toBe('REQUEST_PARTY.INELIGIBLE');
-      expect(h.detailsOf(byHead)).toEqual(refusal('BENEFICIARY', h.boss.employeeId));
+      // Only the holder asks to keep a right (`QĐ-100t`): the head is refused as a non-holder before the party is looked at.
+      expect(byHead.status).toBe(403);
+      expect(h.codeOf(byHead)).toBe('RENEWAL_REQUEST.NOT_HOLDER');
       expect(await written()).toEqual(before);
     });
   });
@@ -246,16 +246,10 @@ describe('the spending approver is no party of a Request, on every way to make o
   describe('a request is no step for the spending approver (US-05-03 AC-15)', () => {
     it('never gives the spending approver a step of a request they are a party of, because no such request is made', async () => {
       const u = await unit();
+      const colleague = await h.staff(u.department, `AP-C${counter}`);
       await h.submit(h.form(paidPlan), h.boss.account);
-      await h.sendDelegated(
-        {
-          beneficiaryEmployeeIds: [h.boss.employeeId],
-          items: [{ planId: paidPlan }],
-          businessReason: 'The new designer needs the tools',
-          termMonths: 6,
-        },
-        u.head.account,
-      );
+      const group = await h.submitForPeople(paidPlan, [colleague, h.boss], u.head.account, { termMonths: 6 });
+      expect(group.status).toBe(422);
 
       expect(
         (

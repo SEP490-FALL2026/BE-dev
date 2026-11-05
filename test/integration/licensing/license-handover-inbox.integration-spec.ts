@@ -169,7 +169,7 @@ describe('the inbox alerts of handovers and of rights that run on (integration, 
       const { person, ci, release } = await owner();
       const successor = await h.worker(des, code('S'));
       await h.changeResponsibleOf(release, { employeeId: successor.employeeId, effectiveFrom: h.today() }).expect(200);
-      const wire = await h.recordedCase(person, { abrupt: true, lastWorkingDay: h.today() });
+      const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.today() });
       await h.lockAccount(wire.id, LOCK).expect(200);
       const later = new Date(`${h.day(3)}T05:00:00.000Z`);
 
@@ -185,7 +185,7 @@ describe('the inbox alerts of handovers and of rights that run on (integration, 
       const { person, ci, release } = await owner();
       await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = NULL WHERE id = $1`, [des.id]);
       try {
-        const wire = await h.recordedCase(person, { abrupt: true, lastWorkingDay: h.today() });
+        const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.today() });
         await h.lockAccount(wire.id, LOCK).expect(200);
         await h.sweepOverdue(new Date(`${h.day(3)}T05:00:00.000Z`));
 

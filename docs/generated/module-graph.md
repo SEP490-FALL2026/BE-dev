@@ -25,12 +25,14 @@ flowchart BT
     budgets["budgets"]
     requests["requests"]
     data_import["data-import"]
+    devices["devices"]
   end
   subgraph T6["T6"]
     personnel["personnel"]
     onboarding["onboarding"]
     installation["installation"]
     ai_assist["ai-assist"]
+    usage["usage"]
   end
   subgraph T7["T7"]
     dashboards["dashboards"]
@@ -39,7 +41,7 @@ flowchart BT
   ai_assist -->|2| operating_parameters
   ai_assist -->|4| organization
   ai_assist -->|4| requests
-  budgets -->|18| audit
+  budgets -->|17| audit
   budgets -->|2| catalog
   budgets -->|3| finance
   budgets -->|5| identity_access
@@ -61,22 +63,26 @@ flowchart BT
   data_import -->|9| licensing
   data_import -->|2| notifications
   data_import -->|11| organization
+  devices -->|10| audit
+  devices -->|3| catalog
+  devices -->|2| identity_access
+  devices -->|12| organization
   finance -->|4| audit
   finance -->|4| organization
   identity_access -->|16| audit
   identity_access -->|10| notifications
-  identity_access -->|34| organization
+  identity_access -->|35| organization
   installation -->|6| audit
   installation -->|2| finance
   installation -->|11| identity_access
   installation -->|8| organization
   licensing -->|29| audit
-  licensing -->|48| catalog
+  licensing -->|49| catalog
   licensing -->|2| finance
-  licensing -->|10| identity_access
+  licensing -->|8| identity_access
   licensing -->|6| notifications
   licensing -->|6| operating_parameters
-  licensing -->|57| organization
+  licensing -->|53| organization
   onboarding -->|2| catalog
   onboarding -->|2| data_import
   onboarding -->|2| identity_access
@@ -89,21 +95,26 @@ flowchart BT
   organization -->|5| notifications
   personnel -->|24| audit
   personnel -->|7| catalog
-  personnel -->|13| identity_access
-  personnel -->|29| licensing
+  personnel -->|2| devices
+  personnel -->|17| identity_access
+  personnel -->|30| licensing
   personnel -->|5| notifications
   personnel -->|4| operating_parameters
-  personnel -->|84| organization
-  personnel -->|5| requests
-  requests -->|60| audit
-  requests -->|16| budgets
+  personnel -->|87| organization
+  personnel -->|6| requests
+  requests -->|55| audit
+  requests -->|14| budgets
   requests -->|25| catalog
   requests -->|7| finance
-  requests -->|30| identity_access
+  requests -->|29| identity_access
   requests -->|40| licensing
   requests -->|7| notifications
   requests -->|10| operating_parameters
-  requests -->|78| organization
+  requests -->|75| organization
+  usage -->|3| audit
+  usage -->|3| catalog
+  usage -->|14| devices
+  usage -->|3| organization
 ```
 
-69 module edges.
+78 module edges.

@@ -276,6 +276,7 @@ model Employee {
   returnHandoversConfirmed        ReturnRequest[]                     @relation("ReturnRequestHandoverConfirmer")
   handoverDutiesAbout             HandoverDuty[]                      @relation("HandoverDutyEmployee")
   handoverDutiesFixedTo           HandoverDuty[]                      @relation("HandoverDutyConfirmer")
+  deviceRegistrationsHeld         DeviceRegistration[]
   handoverDutiesConfirmed         HandoverDuty[]                      @relation("HandoverDutyConfirmedBy")
   accessRequestBeneficiaries      AccessRequestBeneficiary[]
   accessRequestLinesEnded         AccessRequestLine[]                 @relation("AccessRequestLineEnder")
@@ -310,6 +311,7 @@ model Employee {
   @@unique([organizationId, employeeCode])
   @@unique([organizationId, normalizedWorkEmail])
   @@map("employees")
+  accessBlock EmployeeAccessBlock?
 }
 
 // Effective-dated placement (ADR-04). [validFrom, validTo) — validTo null means open.

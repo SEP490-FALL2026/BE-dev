@@ -47,7 +47,9 @@ describe('verifying and recording the notices of the heads (integration, real Po
       const wire = await notice(e1, 'DEPARTURE').then((sent) => h.dataOf<NoticeWire>(sent));
 
       const recorded = h.dataOf<NoticeWire>(
-        await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) })).expect(201),
+        await h
+          .recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6), accessBlockMode: 'WITH_LAST_DAY' }))
+          .expect(201),
       );
 
       expect(recorded.handledAt).not.toBeNull();
@@ -90,7 +92,9 @@ describe('verifying and recording the notices of the heads (integration, real Po
       const e1 = await h.worker(des, code());
       const wire = h.dataOf<NoticeWire>(await notice(e1, 'DEPARTURE', { proposedOn: h.day(5) }));
 
-      await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(12) })).expect(201);
+      await h
+        .recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(12), accessBlockMode: 'WITH_LAST_DAY' }))
+        .expect(201);
 
       const [row] = await h.noticeRows(e1.employeeId);
       expect(await h.caseRow(row.recorded_event_id as string)).toMatchObject({ last_working_day: h.day(12) });
@@ -163,7 +167,7 @@ describe('verifying and recording the notices of the heads (integration, real Po
 
       const attempts = [
         await h.rejectNotice(wire.id, { reason: 'x' }),
-        await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) })),
+        await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6), accessBlockMode: 'WITH_LAST_DAY' })),
         await h.linkNotice(wire.id, { eventId: wire.id, verification: h.verification }),
       ];
 
@@ -190,7 +194,7 @@ describe('verifying and recording the notices of the heads (integration, real Po
       const refused = await h.recordTransfer(body);
       const recorded = await h.recorded({ ...body, grounds: h.grounds });
 
-      expect([refused.status, h.codeOf(refused)]).toEqual([422, 'DEPARTMENT_TRANSFER.GROUNDS_REQUIRED']);
+      expect([refused.status, h.codeOf(refused)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(recorded.status).toBe('PENDING');
       expect(await h.noticeCount()).toBe(before.notices);
       expect(await verificationTotal()).toBe(before.verifications);
@@ -205,14 +209,19 @@ describe('verifying and recording the notices of the heads (integration, real Po
       const wire = h.dataOf<NoticeWire>(await notice(e1, 'ABRUPT_DEPARTURE', { proposedOn: h.today() }));
       await me(e1).expect(200);
 
-      await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.today() })).expect(201);
+      await h
+        .recordNotice(wire.id, h.recording({ lastWorkingDay: h.today(), accessBlockMode: 'BLOCK_NOW' }))
+        .expect(201);
 
       expect(await h.workState(e1.employeeId)).toBe('TERMINATED/LEFT');
       expect(await h.employeeLeftOn(e1.employeeId)).toBe(h.today());
       await me(e1).expect(401);
       const [row] = await h.noticeRows(e1.employeeId);
       expect(row.status).toBe('RECORDED');
-      expect(await h.caseRow(row.recorded_event_id as string)).toMatchObject({ state: 'LEFT', abrupt: true });
+      expect(await h.caseRow(row.recorded_event_id as string)).toMatchObject({
+        state: 'LEFT',
+        access_block_mode: 'BLOCK_NOW',
+      });
     });
 
     it('waits with nothing changed while there is no document, and the Super Admin can still lock the sign-in with a reason', async () => {
@@ -221,19 +230,65 @@ describe('verifying and recording the notices of the heads (integration, real Po
 
       const without = await h.recordNotice(wire.id, {
         verification: h.verification,
-        event: { lastWorkingDay: h.today() },
+        event: { lastWorkingDay: h.today(), accessBlockMode: 'BLOCK_NOW' },
       });
       const locked = await request(h.server())
         .post(`/api/v1/app-users/${e1.account.appUserId}/lock`)
         .set(h.as(superAdmin()))
         .send({ reason: 'Contain the account while the document of the departure is awaited' });
 
-      expect([without.status, h.codeOf(without)]).toEqual([422, 'PERSONNEL_NOTICE.GROUNDS_REQUIRED']);
+      expect([without.status, h.codeOf(without)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(await stillWaiting(e1)).toBe(true);
       expect(await h.workState(e1.employeeId)).toBe('ACTIVE/WORKING');
       expect(locked.status).toBe(200);
       expect(await stillWaiting(e1)).toBe(true);
       expect(await h.eventCounts(e1.employeeId)).toEqual({ transfers: 0, leaves: 0, cases: 0 });
+    });
+  });
+
+  describe('how the access is blocked (D8, QĐ-96c)', () => {
+    it('is required with a departure of either kind and nothing is saved without it', async () => {
+      const e1 = await h.worker(des, code());
+      const planned = h.dataOf<NoticeWire>(await notice(e1, 'DEPARTURE', { proposedOn: h.day(6) }));
+
+      const missing = await h.recordNotice(planned.id, h.recording({ lastWorkingDay: h.day(6) }));
+
+      expect([missing.status, h.codeOf(missing)]).toEqual([422, 'PERSONNEL_NOTICE.EVENT_INVALID']);
+      expect(h.detailsOf(missing)).toEqual({ missing: ['accessBlockMode'], notAllowed: [] });
+      expect(await stillWaiting(e1)).toBe(true);
+      expect(await h.eventCounts(e1.employeeId)).toEqual({ transfers: 0, leaves: 0, cases: 0 });
+    });
+
+    it('is refused with a long leave', async () => {
+      const e1 = await h.worker(des, code());
+      const leave = h.dataOf<NoticeWire>(await notice(e1, 'LONG_LEAVE'));
+
+      const given = await h.recordNotice(
+        leave.id,
+        h.recording({ startedOn: h.day(2), approvedReturnOn: h.day(30), accessBlockMode: 'BLOCK_NOW' }),
+      );
+
+      expect([given.status, h.codeOf(given)]).toEqual([422, 'PERSONNEL_NOTICE.EVENT_INVALID']);
+      expect(h.detailsOf(given)).toEqual({ missing: [], notAllowed: ['accessBlockMode'] });
+      expect(await stillWaiting(e1)).toBe(true);
+    });
+
+    it('lets a departure notice block now with a last working day ahead: the person is refused at once and still handing over', async () => {
+      const e1 = await h.worker(des, code());
+      const wire = h.dataOf<NoticeWire>(await notice(e1, 'DEPARTURE', { proposedOn: h.day(20) }));
+      await me(e1).expect(200);
+
+      await h
+        .recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(20), accessBlockMode: 'BLOCK_NOW' }))
+        .expect(201);
+
+      await me(e1).expect(401);
+      const [row] = await h.noticeRows(e1.employeeId);
+      expect(await h.caseRow(row.recorded_event_id as string)).toMatchObject({
+        state: 'HANDING_OVER',
+        access_block_mode: 'BLOCK_NOW',
+      });
+      expect(await h.workState(e1.employeeId)).toBe('ACTIVE/HANDING_OVER');
     });
   });
 
@@ -243,7 +298,10 @@ describe('verifying and recording the notices of the heads (integration, real Po
       const existing = await h.recordedCase(e1);
       const first = h.dataOf<NoticeWire>(await notice(e1, 'DEPARTURE'));
 
-      const second = await h.recordNotice(first.id, h.recording({ lastWorkingDay: h.day(10) }));
+      const second = await h.recordNotice(
+        first.id,
+        h.recording({ lastWorkingDay: h.day(10), accessBlockMode: 'WITH_LAST_DAY' }),
+      );
 
       expect([second.status, h.codeOf(second)]).toEqual([409, 'PERSONNEL_NOTICE.DUPLICATE_EVENT']);
       expect(await stillWaiting(e1)).toBe(true);
@@ -367,7 +425,11 @@ describe('verifying and recording the notices of the heads (integration, real Po
 
       const attempts = [
         await h.rejectNotice(wire.id, { reason: 'x' }, who()),
-        await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) }), who()),
+        await h.recordNotice(
+          wire.id,
+          h.recording({ lastWorkingDay: h.day(6), accessBlockMode: 'WITH_LAST_DAY' }),
+          who(),
+        ),
         await h.linkNotice(wire.id, { eventId: wire.id, verification: h.verification }, who()),
       ];
 
@@ -383,7 +445,9 @@ describe('verifying and recording the notices of the heads (integration, real Po
       const e1 = await h.worker(des, code());
       const wire = h.dataOf<NoticeWire>(await notice(e1, 'DEPARTURE'));
 
-      await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) })).expect(201);
+      await h
+        .recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6), accessBlockMode: 'WITH_LAST_DAY' }))
+        .expect(201);
 
       const [event] = await h.auditEventsOf('PERSONNEL_NOTICE.RECORDED', wire.id);
       expect(event.actor_app_user_id).toBe(h.sa.appUserId);
@@ -398,11 +462,17 @@ describe('verifying and recording the notices of the heads (integration, real Po
         await h.sendNotice({ employeeId: a2.employeeId, kind: 'DEPARTURE', proposedOn: h.day(5) }, h2.account),
       );
 
-      const own = await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) }), a2.account);
+      const own = await h.recordNotice(
+        wire.id,
+        h.recording({ lastWorkingDay: h.day(6), accessBlockMode: 'WITH_LAST_DAY' }),
+        a2.account,
+      );
 
       expect([own.status, h.codeOf(own)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
       expect(await stillWaiting(a2)).toBe(true);
-      await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) })).expect(201);
+      await h
+        .recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6), accessBlockMode: 'WITH_LAST_DAY' }))
+        .expect(201);
     });
 
     it('is refused to the Super Admin when it is about themselves: 403 PERSONNEL.SELF_CHANGE_FORBIDDEN on all three routes, and the notice keeps waiting', async () => {
@@ -417,7 +487,7 @@ describe('verifying and recording the notices of the heads (integration, real Po
 
       const attempts = [
         await h.rejectNotice(wire.id, { reason: 'x' }),
-        await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) })),
+        await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6), accessBlockMode: 'WITH_LAST_DAY' })),
         await h.linkNotice(wire.id, { eventId: wire.id, verification: h.verification }),
       ];
 
@@ -437,19 +507,19 @@ describe('verifying and recording the notices of the heads (integration, real Po
         h.recordNotice(wire.id, {
           verification: h.verification,
           ...(grounds ? { grounds } : {}),
-          event: { lastWorkingDay: h.day(6) },
+          event: { lastWorkingDay: h.day(6), accessBlockMode: 'WITH_LAST_DAY' },
         });
 
       const ownCode = await record({ ...h.resignation, reference: wire.code });
       const otherCode = await record({ ...h.resignation, reference: other.code });
-      const noIssuer = await record({ type: 'RESIGNATION_LETTER', reference: 'DN-31/2026', issuedOn: '2026-10-20' });
+      const noIssuer = await record({ type: 'APPROVED_APPLICATION', reference: 'DN-31/2026', issuedOn: '2026-10-20' });
       const none = await record(undefined);
 
       expect([ownCode.status, h.codeOf(ownCode)]).toEqual([422, 'PERSONNEL_NOTICE.GROUNDS_IS_NOTICE']);
       expect([otherCode.status, h.codeOf(otherCode)]).toEqual([422, 'PERSONNEL_NOTICE.GROUNDS_IS_NOTICE']);
-      expect([noIssuer.status, h.codeOf(noIssuer)]).toEqual([422, 'PERSONNEL_NOTICE.GROUNDS_INCOMPLETE']);
-      expect(h.detailsOf(noIssuer)).toEqual({ missing: ['issuer'] });
-      expect([none.status, h.codeOf(none)]).toEqual([422, 'PERSONNEL_NOTICE.GROUNDS_REQUIRED']);
+      expect([noIssuer.status, h.codeOf(noIssuer)]).toEqual([422, 'VALIDATION_ERROR']);
+      expect(JSON.stringify(h.detailsOf(noIssuer))).toContain('grounds.issuer');
+      expect([none.status, h.codeOf(none)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(await stillWaiting(e1)).toBe(true);
       expect(await h.eventCounts(e1.employeeId)).toEqual({ transfers: 0, leaves: 0, cases: 0 });
     });
@@ -461,11 +531,13 @@ describe('verifying and recording the notices of the heads (integration, real Po
       const unchecked = await h.recordNotice(wire.id, {
         verification: { method: 'DIRECT_CONTACT', reference: '  ' },
         grounds: h.resignation,
-        event: { lastWorkingDay: h.day(6) },
+        event: { lastWorkingDay: h.day(6), accessBlockMode: 'WITH_LAST_DAY' },
       });
       expect([unchecked.status, h.codeOf(unchecked)]).toEqual([422, 'PERSONNEL_NOTICE.VERIFICATION_REQUIRED']);
 
-      await h.recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6) })).expect(201);
+      await h
+        .recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(6), accessBlockMode: 'WITH_LAST_DAY' }))
+        .expect(201);
 
       const [row] = await h.noticeRows(e1.employeeId);
       const stored = await h.caseRow(row.recorded_event_id as string);

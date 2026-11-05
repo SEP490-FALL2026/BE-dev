@@ -85,11 +85,10 @@ describe('requests over HTTP: the preview before sending (integration, real Post
           'termMonths',
           'department',
           'costCenter',
-          'requirements',
+          'termLimit',
           'existingAccess',
           'blockedBy',
           'canSubmit',
-          'expectedSpendOn',
           'budgetYear',
           'pricing',
           'costEstimate',
@@ -110,7 +109,6 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         branch: 'INTERNAL_FREE',
         pricing: { status: 'NOT_APPLICABLE', amount: null },
         costEstimate: null,
-        expectedSpendOn: null,
         budgetYear: null,
         spendSubmission: 'NOT_NEEDED',
         possibleExtraSteps: [],
@@ -151,15 +149,15 @@ describe('requests over HTTP: the preview before sending (integration, real Post
   });
 
   describe('a term over twelve months (AC-4)', () => {
-    it('says the head must confirm it, and adds no step to the chain', async () => {
-      const long = await h.previewed(designer, paidPlan, { termMonths: 18 });
+    it('is refused by the body (422), and a year or less shows the limit of the plan', async () => {
       const edge = await h.previewed(designer, paidPlan, { termMonths: 12 });
       const short = await h.previewed(designer, paidPlan, { termMonths: 6 });
 
-      expect(long.requirements.termConfirmationByHead).toBe(true);
-      expect(edge.requirements.termConfirmationByHead).toBe(false);
-      expect(short.requirements.termConfirmationByHead).toBe(false);
-      expect(kinds(long)).toEqual(kinds(short));
+      const over = await h.previewRequest({ planId: paidPlan, termMonths: 13 }, designer.account).expect(422);
+      expect(h.codeOf(over)).toBe('VALIDATION_ERROR');
+      expect(edge.termLimit.maxMonths).toBe(12);
+      expect(edge.canSubmit).toBe(true);
+      expect(kinds(edge)).toEqual(kinds(short));
     });
   });
 
@@ -208,7 +206,7 @@ describe('requests over HTTP: the preview before sending (integration, real Post
       const sent = await h.sent(designer, paidPlan);
 
       expect(Object.keys(preview)).not.toContain('outsideStandard');
-      expect(preview.requirements).toEqual({ termConfirmationByHead: false });
+      expect(preview.termLimit.maxMonths).toBe(12);
       expect([old.status, h.codeOf(old)]).toEqual([422, 'VALIDATION_ERROR']);
       expect([bare.status, h.codeOf(bare)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(await h.requestRows()).toBe(rows + 1);
@@ -287,14 +285,14 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         .items.map((item) => item.id);
 
     it('with no tax profile uses the default, says so, still shows the price, and Finance sees the vendor to declare (AC-12)', async () => {
-      const preview = await h.previewed(designer, plan, { termMonths: 20 });
-      const route = h.dataOf<Record<string, string>>(await estimateRoute('20000000').expect(200));
+      const preview = await h.previewed(designer, plan, { termMonths: 10 });
+      const route = h.dataOf<Record<string, string>>(await estimateRoute('10000000').expect(200));
 
-      expect(preview.pricing).toMatchObject({ status: 'PRICED', amount: { amount: '20000000' } });
+      expect(preview.pricing).toMatchObject({ status: 'PRICED', amount: { amount: '10000000' } });
       expect(preview.costEstimate).toMatchObject({
         label: 'ESTIMATE_NO_PROFILE',
         basis: 'DEFAULT_NO_PROFILE',
-        preTax: { amount: '20000000', currency: 'VND' },
+        preTax: { amount: '10000000', currency: 'VND' },
         tax: { amount: route.taxAmount },
         estimatedCost: { amount: route.estimatedCost },
       });
@@ -309,17 +307,17 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         ])
         .expect(200);
 
-      const preview = await h.previewed(designer, plan, { termMonths: 20 });
+      const preview = await h.previewed(designer, plan, { termMonths: 10 });
 
       expect(preview.costEstimate).toMatchObject({
         label: 'ESTIMATE',
         basis: 'PROFILE',
-        preTax: { amount: '20000000', currency: 'VND' },
-        tax: { amount: '3000000' },
-        deductibleTax: { amount: '2000000' },
-        nonDeductibleTax: { amount: '1000000' },
-        estimatedCost: { amount: '21000000' },
-        totalPayable: { amount: '23000000' },
+        preTax: { amount: '10000000', currency: 'VND' },
+        tax: { amount: '1500000' },
+        deductibleTax: { amount: '1000000' },
+        nonDeductibleTax: { amount: '500000' },
+        estimatedCost: { amount: '10500000' },
+        totalPayable: { amount: '11500000' },
       });
       expect(await missingForFinance()).not.toContain(vendor.id);
     });
@@ -353,16 +351,18 @@ describe('requests over HTTP: the preview before sending (integration, real Post
   });
 
   describe('the spend date', () => {
-    it('is shown with its budget year, and internal software takes none', async () => {
-      const year = Number(h.today().slice(0, 4)) + 1;
+    it('is not asked: the budget year is worked out from today, and internal software takes none (QĐ-98)', async () => {
+      const year = Number(h.today().slice(0, 4));
 
-      const preview = await h.previewed(designer, paidPlan, { expectedSpendOn: `${year}-01-05`, termMonths: 1 });
+      const preview = await h.previewed(designer, paidPlan, { termMonths: 1 });
+      const internal = await h.previewed(designer, internalPlan, { termMonths: 6 });
       const refused = await h
-        .previewRequest({ planId: internalPlan, termMonths: 6, expectedSpendOn: h.today() }, designer.account)
+        .previewRequest({ planId: paidPlan, termMonths: 1, expectedSpendOn: `${year + 1}-01-05` }, designer.account)
         .expect(422);
 
-      expect(preview).toMatchObject({ expectedSpendOn: `${year}-01-05`, budgetYear: year });
-      expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE');
+      expect(preview.budgetYear).toBe(year);
+      expect(internal.budgetYear).toBeNull();
+      expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
     });
   });
 
@@ -380,7 +380,6 @@ describe('requests over HTTP: the preview before sending (integration, real Post
       expect(sent).toMatchObject({
         branch: preview.branch,
         pricing: preview.pricing,
-        expectedSpendOn: preview.expectedSpendOn,
         budgetYear: preview.budgetYear,
         costCenter: { id: preview.costCenter?.id, code: preview.costCenter?.code },
         policy: {

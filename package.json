@@ -53,6 +53,7 @@
     "test:gates": "jest --config ./test/config/jest.gates.cjs",
     "test:http": "jest --config ./test/config/jest.http.cjs",
     "test:e2e": "jest --config ./test/config/jest.e2e.cjs --runInBand",
+    "test:flows": "node scripts/verify/run-flows.mjs",
     "test:integration": "jest --config ./test/config/jest.integration.cjs",
     "test:integration:serial": "jest --config ./test/config/jest.integration-serial.cjs --runInBand",
     "test:integration:timing": "jest --config ./test/config/jest.integration-timing.cjs --runInBand --passWithNoTests",

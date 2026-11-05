@@ -21,9 +21,12 @@ export interface VersionRecord {
   reserveMinor: bigint;
   totalMinor: bigint;
   currency: string;
-  highValuePercent: number;
-  /** The amount over which a line is high value, whatever is left; null when the version sets none. */
+  /** Kept for the versions written before `QĐ-97c`; no version sets a threshold now. */
+  highValuePercent: number | null;
   highValueAmountMinor: bigint | null;
+  /** The share of the base the reserve defaulted to when the version was made; null before `QĐ-98`. */
+  reservePercent: number | null;
+  reserveReason: string | null;
   quarters: [bigint, bigint, bigint, bigint] | null;
   reason: string | null;
   createdByEmployeeId: string;
@@ -50,8 +53,8 @@ export interface NewVersion {
   baseMinor: bigint;
   reserveMinor: bigint;
   currency: string;
-  highValuePercent: number;
-  highValueAmountMinor: bigint | null;
+  reservePercent: number | null;
+  reserveReason: string | null;
   quarters: [bigint, bigint, bigint, bigint] | null;
   reason: string | null;
   createdByEmployeeId: string;
@@ -63,8 +66,7 @@ export interface NewVersion {
 export interface VersionPatch {
   baseMinor?: bigint;
   reserveMinor?: bigint;
-  highValuePercent?: number;
-  highValueAmountMinor?: bigint | null;
+  reserveReason?: string | null;
   quarters?: [bigint, bigint, bigint, bigint] | null;
   reason?: string | null;
 }
@@ -85,6 +87,8 @@ const toRecord = (row: Prisma.BudgetVersionGetPayload<object>): VersionRecord =>
   currency: row.currency,
   highValuePercent: row.highValuePercent,
   highValueAmountMinor: row.highValueAmountMinor,
+  reservePercent: row.reservePercent,
+  reserveReason: row.reserveReason,
   quarters:
     row.q1Minor === null || row.q2Minor === null || row.q3Minor === null || row.q4Minor === null
       ? null
@@ -155,8 +159,10 @@ export class VersionRepo {
         reserveMinor: input.reserveMinor,
         totalMinor: total,
         currency: input.currency,
-        highValuePercent: input.highValuePercent,
-        highValueAmountMinor: input.highValueAmountMinor,
+        highValuePercent: null,
+        highValueAmountMinor: null,
+        reservePercent: input.reservePercent,
+        reserveReason: input.reserveReason,
         ...quarterColumns(input.quarters),
         reason: input.reason,
         createdByEmployeeId: input.createdByEmployeeId,
@@ -346,10 +352,8 @@ export class VersionRepo {
         baseMinor: nextBase,
         reserveMinor: nextReserve,
         totalMinor: nextBase + nextReserve,
-        ...(patch.highValuePercent !== undefined ? { highValuePercent: patch.highValuePercent } : {}),
-        ...(patch.highValueAmountMinor !== undefined ? { highValueAmountMinor: patch.highValueAmountMinor } : {}),
         ...(patch.quarters !== undefined ? quarterColumns(patch.quarters) : {}),
-        ...(patch.reason !== undefined ? { reason: patch.reason } : {}),
+        ...(patch.reserveReason !== undefined ? { reserveReason: patch.reserveReason } : {}),
       },
     });
   }

@@ -1,4 +1,4 @@
-import { checkNewEnd, checkRenewable, checkRenewalSender, monthsBetween, routeRenewal } from './renewal-request.policy';
+import { checkRenewable, checkRenewalSender, monthsBetween, routeRenewal } from './renewal-request.policy';
 
 describe('the months of a renewal, rounded up (US-05-14 AC-1, AC-3)', () => {
   it('counts a whole month for a part of one', () => {
@@ -25,27 +25,18 @@ describe('the months of a renewal, rounded up (US-05-14 AC-1, AC-3)', () => {
   });
 });
 
-describe('who asks for the renewal of a right (US-05-14 AC-1)', () => {
-  const facts = {
-    actorEmployeeId: 'e1',
-    holderEmployeeId: 'e1',
-    holderDepartmentId: 'd-eng',
-    actorHeadedDepartmentId: null as string | null,
-  };
+describe('who asks for the renewal of a right (US-05-14 AC-1, QĐ-100t)', () => {
+  const facts = { actorEmployeeId: 'e1', holderEmployeeId: 'e1' };
 
-  it('lets the holder ask for themselves and the head of their department ask for them', () => {
-    expect(checkRenewalSender(facts)).toEqual({ ok: true, byHead: false });
-    expect(checkRenewalSender({ ...facts, actorEmployeeId: 'h1', actorHeadedDepartmentId: 'd-eng' })).toEqual({
-      ok: true,
-      byHead: true,
-    });
+  it('lets only the holder ask for themselves', () => {
+    expect(checkRenewalSender(facts)).toEqual({ ok: true });
   });
 
-  it('refuses anyone else, and tells the head of another department apart', () => {
+  it('refuses anyone else, the head of the department of the holder included', () => {
     expect(checkRenewalSender({ ...facts, actorEmployeeId: 'e2' })).toEqual({ ok: false, refusal: 'NOT_HOLDER' });
-    expect(checkRenewalSender({ ...facts, actorEmployeeId: 'h2', actorHeadedDepartmentId: 'd-ops' })).toEqual({
+    expect(checkRenewalSender({ ...facts, actorEmployeeId: 'head-of-holder-department' })).toEqual({
       ok: false,
-      refusal: 'OUTSIDE_DEPARTMENT',
+      refusal: 'NOT_HOLDER',
     });
   });
 });
@@ -72,29 +63,6 @@ describe('which right may be renewed (US-05-14)', () => {
     expect(checkRenewable({ ...renewable, expectedEndDate: null, grant: 'NOT_COMPLETED' })).toBe('NO_END_DATE');
     expect(checkRenewable({ ...renewable, grant: 'NOT_COMPLETED', revocationLive: true })).toBe('GRANT_NOT_COMPLETED');
     expect(checkRenewable({ ...renewable, revocationLive: true })).toBe('REVOCATION_PENDING');
-  });
-});
-
-describe('the end a renewal asks for (US-05-14 AC-1, AC-2, AC-5)', () => {
-  const facts = { today: '2026-09-25', previousEnd: '2026-09-30', newEnd: '2026-12-31', maxTermMonths: 120 };
-
-  it('is later than the end the right has', () => {
-    expect(checkNewEnd(facts)).toBeNull();
-    expect(checkNewEnd({ ...facts, newEnd: '2026-09-30' })).toBe('END_NOT_AFTER');
-    expect(checkNewEnd({ ...facts, newEnd: '2026-09-01' })).toBe('END_NOT_AFTER');
-  });
-
-  it('is later than today when the right has ended, which is a request for the tool and not a renewal', () => {
-    const ended = { ...facts, today: '2026-10-02' };
-
-    expect(checkNewEnd(ended)).toBeNull();
-    expect(checkNewEnd({ ...ended, newEnd: '2026-10-02' })).toBe('END_NOT_AFTER');
-    expect(checkNewEnd({ ...ended, newEnd: '2026-10-01' })).toBe('END_NOT_AFTER');
-  });
-
-  it('is not further than any request may ask for', () => {
-    expect(checkNewEnd({ ...facts, newEnd: '2036-09-30' })).toBeNull();
-    expect(checkNewEnd({ ...facts, newEnd: '2036-10-31' })).toBe('END_TOO_FAR');
   });
 });
 

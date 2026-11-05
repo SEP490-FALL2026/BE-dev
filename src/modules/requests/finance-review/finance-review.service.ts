@@ -71,7 +71,7 @@ export class FinanceReviewService {
       const heads = await this.organizationReads.getDepartmentHeads([request.departmentId], today);
       const refusal = open
         ? checkReviewOutcome(body.outcome, { check, departmentHasHead: heads.has(request.departmentId) })
-        : checkWaitingOutcome(body.outcome, check);
+        : checkWaitingOutcome(body.outcome);
       if (refusal) throw new SpendReviewRefusedError(refusal);
 
       const now = new Date();

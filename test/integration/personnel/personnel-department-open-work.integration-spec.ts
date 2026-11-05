@@ -100,7 +100,7 @@ describe('what the personnel context keeps a department in use for (integration,
       const cancelled = await world();
       const leaving = await depart(left.member);
       const staying = await depart(cancelled.member);
-      await h.markLeft(leaving.id).expect(200);
+      await h.leaveOnLastDay(leaving.id).expect(200);
       await h.cancelCase(staying.id, { reason: 'The person stays' }).expect(200);
 
       expect(await openWork(left.department.id)).toEqual({ items: [], total: 0 });
@@ -149,7 +149,9 @@ describe('what the personnel context keeps a department in use for (integration,
       const { department, head, member } = await world();
       const notice = await leaveNotice(member, head);
 
-      await h.recordNotice(notice.id, h.recording({ lastWorkingDay: h.day(12) })).expect(201);
+      await h
+        .recordNotice(notice.id, h.recording({ lastWorkingDay: h.day(12), accessBlockMode: 'WITH_LAST_DAY' }))
+        .expect(201);
 
       const use = await openWork(department.id);
       expect(use.items.map((item) => item.kind)).toEqual(['OFFBOARDING_CASE']);
@@ -166,7 +168,12 @@ describe('what the personnel context keeps a department in use for (integration,
           employeeId: member.employeeId,
           startedOn: h.day(-1),
           approvedReturnOn: h.day(40),
-          grounds: { type: 'LEAVE_APPROVAL', reference: 'DN-05/2026', issuer: 'HR Department', issuedOn: '2026-05-25' },
+          grounds: {
+            type: 'APPROVED_APPLICATION',
+            reference: 'DN-05/2026',
+            issuer: 'HR Department',
+            issuedOn: '2026-05-25',
+          },
         })
         .expect(201);
 

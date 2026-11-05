@@ -678,11 +678,11 @@ describe('the controlled procedure for an event about the Super Admin (integrati
       const abrupt = await run({ mode: 'abrupt-departure-record', lastWorkingDay: h.day(-2) });
 
       expect(abrupt.outcome).toBe('RECORDED');
-      const { rows } = await h.ctx.sql.query<{ by_user: string | null; by_ticket: string | null; abrupt: boolean }>(
-        `SELECT recorded_by_app_user_id AS by_user, recorded_by_ticket_id AS by_ticket, abrupt FROM offboarding_cases WHERE id = $1`,
+      const { rows } = await h.ctx.sql.query<{ by_user: string | null; by_ticket: string | null; mode: string }>(
+        `SELECT recorded_by_app_user_id AS by_user, recorded_by_ticket_id AS by_ticket, access_block_mode::text AS mode FROM offboarding_cases WHERE id = $1`,
         [abrupt.recordId],
       );
-      expect(rows[0]).toMatchObject({ by_user: null, abrupt: true });
+      expect(rows[0]).toMatchObject({ by_user: null, mode: 'BLOCK_NOW' });
       expect(rows[0].by_ticket).not.toBeNull();
     });
   });

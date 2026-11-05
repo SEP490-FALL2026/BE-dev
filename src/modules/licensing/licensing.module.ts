@@ -117,7 +117,6 @@ import { RenewalDecisionTrail } from './subscription-renewal/decision/renewal-de
 import { RenewalDecisionService } from './subscription-renewal/decision/renewal-decision.service';
 import { RenewalOutcomeService } from './subscription-renewal/outcome/renewal-outcome.service';
 import { RenewalProposalService } from './subscription-renewal/proposal/renewal-proposal.service';
-import { RenewalSpendingApproverWaitListener } from './subscription-renewal/spending-approver-wait.listener';
 import { RenewalNotifier } from './subscription-renewal/subscription-renewal-notifier.service';
 import { RenewalPartiesService } from './subscription-renewal/subscription-renewal-parties.service';
 import { RenewalRankingService } from './subscription-renewal/subscription-renewal-ranking.service';
@@ -239,7 +238,6 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     RenewalPartiesService,
     RenewalRankingService,
     RenewalNotifier,
-    RenewalSpendingApproverWaitListener,
     RenewalProposalService,
     RenewalDecisionTrail,
     RenewalDecisionService,

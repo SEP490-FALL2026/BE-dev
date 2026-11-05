@@ -353,7 +353,7 @@ describe('the check and the review (integration, PostgreSQL constraints)', () =>
 
   describe('the threshold of a version (US-06-12 AC-3)', () => {
     it('takes none or an amount, and refuses an amount of nothing', async () => {
-      const version = await h.budgetFor(unit, { total: 1_000_000, year: 2029, amountThreshold: 500_000 });
+      const version = await h.budgetFor(unit, { total: 1_000_000, year: 2029 });
 
       expect(
         await sqlState(`UPDATE budget_versions SET high_value_amount_minor = NULL WHERE id = $1`, [version.id]),

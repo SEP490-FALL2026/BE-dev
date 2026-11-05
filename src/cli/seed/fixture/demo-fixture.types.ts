@@ -71,9 +71,8 @@ export interface DemoBudgetLine {
 export interface DemoBudget {
   department: string;
   lines: DemoBudgetLine[];
+  /** The base of the year; the reserve is the default share of it (10 %) the server works out (`QĐ-101`, step 11). */
   base: string;
-  reserve: string;
-  highValuePercent: number;
 }
 
 /** The states a scenario request is brought to, each by the actions of the people the routing names. */
@@ -96,8 +95,6 @@ export interface DemoRequestScenario {
   proposal?: { softwareName: string; homepageUrl: string; dataDescription: string; expectedUsers: number };
   termMonths: number;
   target: DemoRequestTarget;
-  /** How the head approves a request that costs money: the line of the plan of the budget, or outside the plan. */
-  planLine?: number;
   /** For COMPLETED: the subscription the IT Admin grants the seat from. */
   grantFrom?: string;
   summary: string;

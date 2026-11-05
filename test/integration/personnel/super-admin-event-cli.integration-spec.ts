@@ -14,7 +14,7 @@ const COMMON = [
   '--subject-code',
   'E-SA',
   '--basis-type',
-  'DECISION',
+  'HR_DECISION',
   '--basis-reference',
   'QD-31/2026',
   '--basis-issuer',

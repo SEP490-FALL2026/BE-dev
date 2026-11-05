@@ -111,18 +111,17 @@ describe('the review of Finance over PostgreSQL (US-06-13)', () => {
       expect(await h.state(id)).toBe('AWAITING_FINANCE_REVIEW');
     });
 
-    it('sends a high value that has enough money straight on with the opinion, and needs no override (AC-12)', async () => {
+    it('sends a large share of what is left straight to the approver when the money is there: there is no high-value review any more (AC-12, QĐ-97c)', async () => {
       const u = await unit();
       await h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M });
       const id = await h.paidRequest(u, plan, { amount: 25 * M });
+
       await h.route(id, u.head.account);
 
-      await h
-        .completeReview(id, { ...opinion('RECOMMEND_APPROVE'), opinion: 'Reviewed, enough money: approve' })
-        .expect(200);
-
       expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
-      expect((await reviewOf(id)).check.primaryCode).toBe('HIGH_VALUE');
+      expect(await h.steps(id, 'FINANCE_REVIEW')).toEqual([]);
+      const check = h.dataOf<{ budgetCheck: { primaryCode: string } }>(await h.checkOf(id, h.boss.account).expect(200));
+      expect(check.budgetCheck.primaryCode).toBe('BUDGET_OK');
     });
   });
 
@@ -158,7 +157,7 @@ describe('the review of Finance over PostgreSQL (US-06-13)', () => {
     it('is nobody and is flagged when Finance is the one the request is for (AC-5)', async () => {
       const u = await unit();
       await h.budgetFor(u, { total: 100 * M });
-      const id = await h.paidRequest(u, plan, { amount: 90 * M });
+      const id = await h.paidRequest(u, plan, { amount: 150 * M });
       await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
         id,
         h.finance.employeeId,
@@ -178,7 +177,7 @@ describe('the review of Finance over PostgreSQL (US-06-13)', () => {
       const check = h.dataOf<{ budgetCheck: { noIndependentReview: boolean; primaryCode: string } }>(
         await h.checkOf(id, h.boss.account).expect(200),
       ).budgetCheck;
-      expect(check).toMatchObject({ noIndependentReview: true, primaryCode: 'HIGH_VALUE' });
+      expect(check).toMatchObject({ noIndependentReview: true, primaryCode: 'INSUFFICIENT_BUDGET' });
     });
 
     describe('with nobody holding the role of Finance (AC-6)', () => {
@@ -266,7 +265,6 @@ describe('the review of Finance over PostgreSQL (US-06-13)', () => {
       expect(item).toMatchObject({
         state: 'PENDING',
         primaryCode: 'INSUFFICIENT_BUDGET',
-        planLineOverdue: false,
         amount: { amount: String(45 * M), currency: 'VND' },
       });
       expect(Object.keys(item ?? {})).not.toEqual(expect.arrayContaining(['remaining', 'budget', 'held']));

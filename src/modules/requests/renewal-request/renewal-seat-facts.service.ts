@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { CatalogApi } from '../../catalog/public/catalog.api';
 import { RequestPartyEligibilityApi } from '../../identity-access/public/request-party-eligibility.api';
 import { AssignmentNotFoundError } from '../../licensing/public/licensing.errors';
 import { LicensingRenewalApi } from '../../licensing/public/licensing-renewal.api';
@@ -18,10 +19,21 @@ export class RenewalSeatFactsService {
     private readonly licensingRenewals: LicensingRenewalApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly requestParties: RequestPartyEligibilityApi,
+    private readonly catalog: CatalogApi,
   ) {}
+
+  /** Whether the subscription the seat is taken on can be cut mid-term: a renewal of it ends at the fiscal year (`QĐ-98`, R-15). */
+  async isFlexible(tx: DbTx, subscriptionId: string | null): Promise<boolean> {
+    if (subscriptionId === null) return false;
+
+    return (await this.catalog.findSeatTarget({ subscriptionId }, tx))?.allowsMidTermReduction ?? false;
+  }
 
   /** Throws RenewalRequestRefusedError (the seat is not there) and RequestPartyIneligibleError. */
   async lockedFactsOf(tx: DbTx, senderEmployeeId: string, assignmentId: string): Promise<AssignmentFacts> {
+    // Only the holder asks (`QĐ-100t`): somebody else is told so before any row is locked, and learns nothing of who may not be a party.
+    const seen = await this.readFacts(tx, assignmentId);
+    if (seen.employeeId !== senderEmployeeId) throw new RenewalRequestRefusedError('NOT_HOLDER');
     const facts = await this.lockedFacts(tx, assignmentId);
     await this.organizationReads.lockEmployeeForShare(tx, senderEmployeeId);
     await this.requestParties.assertEligible(tx, {
@@ -32,9 +44,17 @@ export class RenewalSeatFactsService {
     return facts;
   }
 
-  private async lockedFacts(tx: DbTx, assignmentId: string): Promise<AssignmentFacts> {
+  private readFacts(tx: DbTx, assignmentId: string): Promise<AssignmentFacts> {
+    return this.facts(tx, assignmentId, false);
+  }
+
+  private lockedFacts(tx: DbTx, assignmentId: string): Promise<AssignmentFacts> {
+    return this.facts(tx, assignmentId, true);
+  }
+
+  private async facts(tx: DbTx, assignmentId: string, lock: boolean): Promise<AssignmentFacts> {
     try {
-      return await this.licensingRenewals.getAssignmentFacts(tx, assignmentId, { lock: true });
+      return await this.licensingRenewals.getAssignmentFacts(tx, assignmentId, { lock });
     } catch (error) {
       if (error instanceof AssignmentNotFoundError) throw new RenewalRequestRefusedError('ASSIGNMENT_NOT_FOUND');
       throw error;

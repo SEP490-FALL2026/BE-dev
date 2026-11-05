@@ -1,13 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import {
-  PLAN_LINE_CHOICE_DESCRIPTION,
-  oneChoice,
-  planLineChoiceFields,
-  requestStateSchema,
-} from '../access-request/access-request.dto';
-import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
+import { requestStateSchema } from '../access-request/access-request.dto';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 const money = z.strictObject({ amount: z.string(), currency: z.string() });
@@ -15,11 +9,6 @@ const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: z.strin
 
 /** The most requests a head sends on at once: a bound against a typo, not a business rule. */
 export const BATCH_MAX = 50;
-
-export const planLineBodySchema = z
-  .strictObject(planLineChoiceFields)
-  .superRefine(oneChoice)
-  .meta({ description: PLAN_LINE_CHOICE_DESCRIPTION });
 
 export const submitBatchBodySchema = z.strictObject({
   requestIds: z
@@ -32,24 +21,16 @@ export const submitBatchBodySchema = z.strictObject({
 
 export const supplementBodySchema = z
   .strictObject({
-    /** The other day the money is expected to go out; the budget year and the price follow from it. */
-    expectedSpendOn: businessDate.optional(),
     /** People of a request for a group the head leaves out; the price is made again for those who remain. */
     dropEmployeeIds: z
       .array(z.uuid())
       .min(1)
       .max(100)
       .refine((ids) => new Set(ids).size === ids.length, { message: 'A person is named once.' })
-      .meta({ uniqueItems: true })
-      .optional(),
+      .meta({ uniqueItems: true }),
     reason: text(1000),
   })
-  .superRefine((body, ctx) => {
-    if (body.expectedSpendOn === undefined && body.dropEmployeeIds === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['expectedSpendOn'], message: 'Change the day or leave people out.' });
-    }
-  })
-  .meta({ description: 'Give at least one of expectedSpendOn and dropEmployeeIds.' });
+  .meta({ description: 'The people of the group the head leaves out, and why.' });
 
 const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -81,16 +62,11 @@ const queueItemSchema = z.strictObject({
   /** How many people the request is for. */
   lineCount: z.number().int().positive(),
   amount: money.nullable(),
-  expectedSpendOn: z.string().nullable(),
   budgetYear: z.number().int().nullable(),
   stage: stageSchema,
   blockedReason: blockedReasonSchema.nullable(),
   financeReturnReason: z.string().nullable(),
-  /** The head chose "outside the plan". */
-  offPlan: z.boolean(),
-  /** The request is attached to a line of the plan. */
-  planLineAttached: z.boolean(),
-  /** A line or "outside the plan" is chosen, and the price is there: it can be sent on. */
+  /** The price is there: it can be sent on. */
   readyToSubmit: z.boolean(),
   updatedAt: z.iso.datetime(),
   /** When the request last entered the queue; null for a request that entered it before the moment was kept. */
@@ -116,13 +92,7 @@ const batchItemSchema = z.strictObject({
   position: z.number().int().positive(),
   outcome: z.enum(['SENT_TO_APPROVER', 'SENT_TO_FINANCE', 'STOPPED']),
   stopReason: z
-    .enum([
-      'PLAN_LINE_REQUIRED',
-      'STALE_COST_EVIDENCE',
-      'CLOSED_OR_EXPIRED_BUDGET_PERIOD',
-      'PRICE_MISSING',
-      'RATE_MISSING',
-    ])
+    .enum(['STALE_COST_EVIDENCE', 'CLOSED_OR_EXPIRED_BUDGET_PERIOD', 'PRICE_MISSING', 'RATE_MISSING'])
     .nullable(),
   leftReason: z
     .enum(['RETURNED_BY_FINANCE', 'CONFLICT_OF_INTEREST', 'REQUEST_WITHDRAWN', 'REQUEST_CANCELLED'])
@@ -133,40 +103,17 @@ const batchItemSchema = z.strictObject({
 });
 
 /** A line of the current plan the request may be attached to. */
-const suggestionSchema = z.strictObject({
-  position: z.number().int().positive(),
-  description: z.string(),
-  plan: z.strictObject({ planId: z.uuid(), planName: z.string() }).nullable(),
-  amount: money,
-  windowFrom: z.string(),
-  windowTo: z.string(),
-  /** The window has gone by: attaching the line needs the head to confirm it is still needed. */
-  overdue: z.boolean(),
-  /** The line is for the plan the request asks for. */
-  suggested: z.boolean(),
-});
-
 const supplementSchema = z.strictObject({
   number: z.number().int().positive(),
   reason: z.string(),
   changedBy: employeeRef,
   createdAt: z.iso.datetime(),
-  expectedSpendOn: z.strictObject({ before: z.string(), after: z.string() }),
   budgetYear: z.strictObject({ before: z.number().int(), after: z.number().int() }),
   amount: z.strictObject({ before: money, after: money }),
   /** How many people of a request for a group the file left out (who they are: the lines that ended as DROPPED); 0 for any other file. */
   droppedCount: z.number().int().nonnegative(),
 });
 
-const planLineStateSchema = z.strictObject({
-  requestId: z.uuid(),
-  offPlan: z.boolean(),
-  planLineAttached: z.boolean(),
-  /** The head confirmed that a line whose window has gone by is still needed. */
-  stillNeeded: z.boolean(),
-});
-
-export class PlanLineBodyDto extends createZodDto(planLineBodySchema) {}
 export class SubmitBatchBodyDto extends createZodDto(submitBatchBodySchema) {}
 export class SupplementBodyDto extends createZodDto(supplementBodySchema) {}
 export class PageQueryDto extends createZodDto(pageQuerySchema) {}
@@ -174,19 +121,12 @@ export class IdParamDto extends createZodDto(idParamSchema) {}
 export class QueueResponseDto extends createZodDto(page(queueItemSchema)) {}
 export class BatchResponseDto extends createZodDto(successEnvelopeSchema(z.strictObject({ batch: batchSchema }))) {}
 export class BatchItemListResponseDto extends createZodDto(page(batchItemSchema)) {}
-export class SuggestionListResponseDto extends createZodDto(page(suggestionSchema)) {}
 export class SupplementResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ supplement: supplementSchema })),
 ) {}
 export class SupplementListResponseDto extends createZodDto(page(supplementSchema)) {}
-export class PlanLineResponseDto extends createZodDto(
-  successEnvelopeSchema(z.strictObject({ planLine: planLineStateSchema })),
-) {}
 
 export type QueueItemWire = z.infer<typeof queueItemSchema>;
 export type BatchWire = z.infer<typeof batchSchema>;
 export type BatchItemWire = z.infer<typeof batchItemSchema>;
-export type SuggestionWire = z.infer<typeof suggestionSchema>;
 export type SupplementWire = z.infer<typeof supplementSchema>;
-export type PlanLineStateWire = z.infer<typeof planLineStateSchema>;
-export type PlanLineBody = z.infer<typeof planLineBodySchema>;

@@ -203,7 +203,7 @@ describe('the rights that ended and the IT Admin queue (integration, real Postgr
       expect((await reader.pendingRenewalsOf([assignmentId])).size).toBe(0);
       const { request } = await h.renewed(unit.member.account, {
         assignmentId,
-        newExpectedEndDate: h.inDays(60),
+        extensionMonths: 2,
         businessReason: 'The work goes on',
       });
       expect((await reader.pendingRenewalsOf([assignmentId])).get(assignmentId)).toMatchObject({
@@ -224,7 +224,7 @@ describe('the rights that ended and the IT Admin queue (integration, real Postgr
 
       const late = await h.renewed(unit.member.account, {
         assignmentId,
-        newExpectedEndDate: h.inDays(60),
+        extensionMonths: 2,
         businessReason: 'The work goes on',
       });
 

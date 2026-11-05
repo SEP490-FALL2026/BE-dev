@@ -53,7 +53,7 @@ describe('the departure of a person and the revocation of their seats (e2e, D-3)
   });
 
   it('the Super Admin records that the person has left: every call of theirs is refused from now on', async () => {
-    const left = h.dataOf<CaseWire>(await h.markLeft(caseId).expect(200));
+    const left = h.dataOf<CaseWire>(await h.leaveOnLastDay(caseId).expect(200));
 
     expect(left).toMatchObject({ state: 'LEFT', left: { leftOn: h.today() }, heldRights: 2 });
     expect(await h.workState(leaver.employeeId)).toBe('TERMINATED/LEFT');
@@ -61,11 +61,7 @@ describe('the departure of a person and the revocation of their seats (e2e, D-3)
   });
 
   it('the IT Admin records the lock of the account and opens the revocation of every right', async () => {
-    const opened = h.dataOf<CaseWire>(
-      await h
-        .revokeRights(caseId, { count: 2, reason: 'The person left; every right is taken back', accountLock: LOCK })
-        .expect(200),
-    );
+    const opened = h.dataOf<CaseWire>(await h.revokeRights(caseId, { accountLock: LOCK }).expect(200));
 
     expect(opened.revocations).toEqual({ created: 2, reasonAdded: 0 });
     expect(opened.checklist).toMatchObject({ accountLock: { state: 'DONE' }, revokeAccess: { state: 'IN_PROGRESS' } });

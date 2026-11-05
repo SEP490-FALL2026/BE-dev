@@ -8,6 +8,7 @@ import {
 } from '../../http/errors/access-errors';
 import { ApiException } from '../../http/errors/api.exception';
 import { describeForOperator } from '../../observability/operator-error';
+import { IS_DEVICE_AUTHENTICATED_METADATA } from '../decorators/device-authenticated.decorator';
 import { IS_PUBLIC_METADATA } from '../decorators/public.decorator';
 import { AUTHENTICATED_IDENTITY } from '../models/current-principal';
 import {
@@ -38,6 +39,12 @@ export class AuthenticationGuard implements CanActivate {
       context.getClass(),
     ]);
     if (isPublic) return true;
+    // A device route is authenticated by the device guard with a credential of its own; a user token is never tried on it.
+    const isDevice = this.reflector.getAllAndOverride<unknown>(IS_DEVICE_AUTHENTICATED_METADATA, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isDevice !== undefined) return true;
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = extractBearerToken(request.header('authorization'));

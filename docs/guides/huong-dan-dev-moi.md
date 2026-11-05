@@ -272,4 +272,4 @@ build), rồi `pnpm test:http`, rồi integration của module bạn đụng, v�
 
 ## Dataset demo
 
-Use [seed local/VPS](seed.md) and the [fixture inventory](../../src/cli/seed/fixture/shared-demo-v2/README.md). `pnpm seed:local` reads private settings and checks development/loopback before offering reset/continue/exit. Real reset belongs to the Owner; Nest does not delete databases. Accounts have one role, department heads hold MANAGER, and self-service follows the current limits. Mock script success is not integration or VPS verification.
+Use [seed local/VPS](seed.md) and the [fixture inventory](../../src/cli/seed/fixture/shared-demo-v3/README.md). `pnpm seed:local` reads private settings and checks development/loopback before offering reset/continue/exit. Real reset belongs to the Owner; Nest does not delete databases. Accounts have one role, department heads hold MANAGER, and self-service follows the current limits. Mock script success is not integration or VPS verification.

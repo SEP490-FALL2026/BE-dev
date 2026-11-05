@@ -12,7 +12,7 @@ import { SpendBatchRepo, type NewBatchItem } from '../spend/spend-batch.repo';
 import { SpendHeadService } from './spend-head.service';
 import { SpendNotInQueueError } from '../spend/spend.errors';
 import { SpendRoutingService } from '../spend/spend-routing.service';
-import { submissionStop, type StopReason } from '../spend/spend-submission.policy';
+import type { StopReason } from '../spend/spend-submission.policy';
 
 const stopped = (requestId: string, reason: StopReason): NewBatchItem => ({
   requestId,
@@ -99,9 +99,6 @@ export class SpendBatchService {
     request: AccessRequestRecord,
     now: Date,
   ): Promise<NewBatchItem> {
-    const gate = submissionStop({ hasPlanLine: request.planLine !== null, offPlan: request.offPlan });
-    if (gate) return stopped(request.id, gate);
-
     const outcome = await this.routing.route(tx, actor, request, 'SUBMISSION', now);
     if (outcome.status === 'NOT_CHECKABLE') return stopped(request.id, outcome.reason);
     if (outcome.route === 'BLOCKED') {

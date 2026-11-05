@@ -88,7 +88,6 @@ describe('what the people of a group are told, each of what became of them alone
         id,
         {
           lines: [approve(e1.employeeId), approve(e2.employeeId), refuse(e3.employeeId, 'No longer needed')],
-          spend: { offPlan: true },
         },
         u.head.account,
       )

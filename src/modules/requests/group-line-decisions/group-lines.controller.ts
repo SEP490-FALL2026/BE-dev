@@ -105,16 +105,8 @@ export class GroupLinesController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal without its reason, a person twice); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who); a term over twelve months is approved without its confirmation (ACCESS_REQUEST.TERM_CONFIRMATION_REQUIRED); the head who approves gives no line of the plan or outside the plan (ACCESS_REQUEST.PLAN_LINE_REQUIRED). Nothing is saved.',
-      examples: [
-        VALIDATION_EXAMPLE,
-        GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH,
-        GROUP_REQUEST_ERROR_EXAMPLES.NEED_TERM_CONFIRMATION_REQUIRED,
-        GROUP_REQUEST_ERROR_EXAMPLES.PLAN_LINE_REQUIRED,
-        GROUP_REQUEST_ERROR_EXAMPLES.SPEND_NOT_APPLICABLE,
-        GROUP_REQUEST_ERROR_EXAMPLES.PLAN_LINE_NOT_FOUND,
-        GROUP_REQUEST_ERROR_EXAMPLES.STILL_NEEDED_REQUIRED,
-      ],
+        'The body is invalid (VALIDATION_ERROR: a refusal without its reason, a person twice); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who). Nothing is saved.',
+      examples: [VALIDATION_EXAMPLE, GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH],
     },
   )
   async decideNeed(
@@ -125,17 +117,6 @@ export class GroupLinesController {
     try {
       const record = await this.needs.decide(actor, params.id, {
         lines: body.lines,
-        termConfirmationReason: body.termConfirmation?.reason,
-        ...(body.spend
-          ? {
-              spend: {
-                planLine: body.spend.planLine
-                  ? { position: body.spend.planLine.position, stillNeeded: body.spend.planLine.stillNeeded ?? false }
-                  : null,
-                expectedSpendOn: body.spend.expectedSpendOn,
-              },
-            }
-          : {}),
       });
 
       return { request: toWire(await this.queries.view(record)) };
@@ -150,7 +131,7 @@ export class GroupLinesController {
   @ApiSuccessResponse(ApprovalDetailResponseDto, {
     message: 'SPEND_APPROVAL.LINES_DECIDED',
     description:
-      'The person the spend step is given to decides all the people whose need is confirmed at once, approving some and refusing others, each refusal with its reason. The request is checked again on the people approved and the decision is made on that check, which is kept with it; an approval of a request that has less money than it costs, or none, is an override with its reason and the years it names. One commitment is held for each year, the sum of the part of the people approved, and each person stands for a share of it. A request that turned out to be an exception since it was sent goes back to Finance, and one whose data is at fault goes back to its head; nobody is decided then.',
+      'The person the spend step is given to decides all the people whose need is confirmed at once, approving some and refusing others, each refusal with its reason. The request is checked again on the people approved and the decision is made on that check, which is kept with it; a request that has less money than it costs in a year of the budget, or none, cannot be approved. One commitment is held for each year, the sum of the part of the people approved, and each person stands for a share of it. A request that turned out to be an exception since it was sent goes back to Finance, and one whose data is at fault goes back to its head; nobody is decided then.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -176,13 +157,11 @@ export class GroupLinesController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal without its reason); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the override is missing or names other years than the ones that need it (SPEND.OVERRIDE_REQUIRED, SPEND.OVERRIDE_MISMATCH, with the years) or has nothing to accept (SPEND.OVERRIDE_NOT_NEEDED).',
+        'The body is invalid (VALIDATION_ERROR: a refusal without its reason); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); a year of the budget has less money than the request costs, or none (SPEND.OVERRIDE_REQUIRED, with the years): it cannot be approved.',
       examples: [
         VALIDATION_EXAMPLE,
         GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH,
         GROUP_REQUEST_ERROR_EXAMPLES.OVERRIDE_REQUIRED,
-        GROUP_REQUEST_ERROR_EXAMPLES.OVERRIDE_MISMATCH,
-        GROUP_REQUEST_ERROR_EXAMPLES.OVERRIDE_NOT_NEEDED,
       ],
     },
   )

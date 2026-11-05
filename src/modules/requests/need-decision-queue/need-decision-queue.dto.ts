@@ -58,14 +58,11 @@ const needQueueItemSchema = z.strictObject({
   businessReasonExcerpt: z.string(),
   termMonths: z.number().int().positive(),
   /** Approving needs the caller to confirm the term in so many words (a term over twelve months). */
-  termConfirmationRequired: z.boolean(),
   /** What this request costs, as the request itself says; never what is left of a budget. */
   pricing: z.strictObject({
     status: z.enum(['NOT_APPLICABLE', 'PRICED', 'MISSING']),
     amount: moneySchema.nullable(),
   }),
-  /** Approving also chooses the line of the plan of the budget, or says the spend is outside it. */
-  planLineRequired: z.boolean(),
   /** The same person holds this step and the spend step of the request. */
   samePersonAsSpend: z.boolean(),
 });

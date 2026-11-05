@@ -99,7 +99,8 @@ describe('budget version attachments (integration, real PostgreSQL)', () => {
         sizeBytes: 0,
       })
       .expect(422);
-    expect(h.errorOf(emptyRes).code).toBe('BUDGET_ATTACHMENT.FILE_INVALID');
+    // A size below one byte is refused by the body itself (QĐ-98: `sizeBytes ≥ 1`).
+    expect(h.errorOf(emptyRes).code).toBe('VALIDATION_ERROR');
   });
 
   it('refuses declaring attachments on a non-editable version', async () => {
@@ -297,10 +298,7 @@ describe('budget version attachments (integration, real PostgreSQL)', () => {
     await h.uploaded(SAMPLE_XLSX, h.finance, { versionId: version.id });
     expect(await lines()).toBe(before);
 
-    const csv = [
-      'cost_center_code,description,amount,window_from,window_to,service_period_months,repeat_cycle',
-      `${version.costCenter.code},Imported one,1000,${h.next}-05-01,${h.next}-05-31,12,ANNUAL`,
-    ].join('\n');
+    const csv = ['cost_center_code,description,amount', `${version.costCenter.code},Imported one,1000`].join('\n');
     await h.importLines(version.id, csv).expect(201);
     expect(await lines()).toBe(before + 1);
   });

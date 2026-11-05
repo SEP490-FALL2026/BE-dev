@@ -9,8 +9,8 @@ import { RenewalPartiesService } from '../subscription-renewal-parties.service';
 import type { ReleasedSeat, RenewalRecord } from '../subscription-renewal.types';
 
 /**
- * The transaction and the trail of a decision: the audit event with what was decided and seen, and the notice to the IT Admin who
- * carries it out (the one who proposed it and the one in charge of the owner department).
+ * The transaction and the trail of a decision: the audit event with what was decided and seen, and the notice of the result to the
+ * IT Admin who carries it out (the one who proposed it and the one in charge of the owner department) and to Finance (`QĐ-94d`(2)).
  */
 @Injectable()
 export class RenewalDecisionTrail {
@@ -23,6 +23,31 @@ export class RenewalDecisionTrail {
 
   run<T>(work: (tx: DbTx) => Promise<T>): Promise<T> {
     return this.runner.run(work);
+  }
+
+  /** The proposal was out of date when the head confirmed it and is closed (A-H2): the audit event says what was seen. */
+  async closedStale(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    record: RenewalRecord,
+    details: Record<string, string | number | boolean | null>,
+  ): Promise<void> {
+    await this.audit.record(
+      tx,
+      licensingAuditEvent(
+        actor,
+        record.organizationId,
+        'SUBSCRIPTION_RENEWAL.CLOSED_STALE',
+        'SubscriptionRenewal',
+        record.id,
+        null,
+        {
+          subscriptionId: record.subscriptionId,
+          required: details.required ?? null,
+          stillHeld: details.stillHeld ?? null,
+        },
+      ),
+    );
   }
 
   async told(
@@ -60,9 +85,10 @@ export class RenewalDecisionTrail {
       ),
     );
     const itAdmin = await this.parties.itAdminOf(period.ownerDepartmentId, tx);
+    const finance = await this.parties.financeOf(tx);
     await this.notifier.tell(tx, {
       organizationId: decided.organizationId,
-      recipients: [decided.proposedByEmployeeId, ...(itAdmin ? [itAdmin] : [])],
+      recipients: [decided.proposedByEmployeeId, ...(itAdmin ? [itAdmin] : []), ...(finance ? [finance] : [])],
       code: 'SUBSCRIPTION_RENEWAL_DECIDED',
       subject: { type: 'SUBSCRIPTION_RENEWAL', id: decided.id },
       params: {

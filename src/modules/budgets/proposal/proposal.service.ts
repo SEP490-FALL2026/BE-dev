@@ -44,7 +44,6 @@ export class ProposalService {
 
     return this.runner.run(async (tx) => {
       const id = await this.sender.send(tx, actor, {
-        costCenterId: body.costCenterId,
         year: body.year,
         lines: body.lines,
         previous: null,
@@ -71,7 +70,6 @@ export class ProposalService {
       if (yearHasEnded(previous.year, today, fiscalStart)) throw new BudgetYearEndedError(previous.year);
       if (!canResubmit(previous.state)) throw new BudgetProposalStateError('RESUBMIT', previous.state);
       const created = await this.sender.send(tx, actor, {
-        costCenterId: previous.costCenterId,
         year: previous.year,
         lines,
         previous: previous.id,

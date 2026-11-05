@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
-import type { BusinessDate } from '../../../core/business-date';
+
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { BudgetCostCenterNotFoundError, BudgetLineNotFoundError, BudgetVersionNotFoundError } from './budget.errors';
-import { isOverdue, versionWaitingReason } from './budget.policy';
+import { BudgetCostCenterNotFoundError, BudgetVersionNotFoundError } from './budget.errors';
+import { defaultReserveOf, versionWaitingReason } from './budget.policy';
 import { BudgetFactsService } from './budget-facts.service';
 import { DecisionRepo, type DecisionRecord } from './decision.repo';
-import { VersionLineRepo, type LineChangeRecord, type VersionLineRecord } from './version-line.repo';
+import { VersionLineRepo, type VersionLineRecord } from './version-line.repo';
 import { VersionRepo, type VersionRecord, type VersionState } from './version.repo';
-import type { LineChangeWire, VersionLineWire, VersionSummaryWire, VersionWire } from './budget.dto';
+import type { VersionLineWire, VersionSummaryWire, VersionWire } from './budget.dto';
 
 /** A version and its lines as a reader sees them: amounts in the currency of the version, people and Cost Centers by name. */
 @Injectable()
@@ -60,38 +60,12 @@ export class VersionViewService {
     return pageOf(await this.lineWires(version.currency, items), total, query.page, query.pageSize);
   }
 
-  async changes(
-    actor: AuthenticatedPrincipal,
-    id: string,
-    position: number,
-    query: { page: number; pageSize: number },
-  ): Promise<Page<LineChangeWire>> {
-    await this.facts.requireVersionReader(actor);
-    await this.require(id);
-    if (!(await this.lineRepo.findLine(id, position))) throw new BudgetLineNotFoundError();
-    const { items, total } = await this.lineRepo.pageLineChanges(
-      id,
-      position,
-      (query.page - 1) * query.pageSize,
-      query.pageSize,
-    );
-    const people = await this.facts.people(items.map((change) => change.changedByEmployeeId));
-
-    return pageOf(
-      items.map((change) => toChangeWire(change, people.get(change.changedByEmployeeId) ?? null)),
-      total,
-      query.page,
-      query.pageSize,
-    );
-  }
-
   async lineWire(version: VersionRecord, line: VersionLineRecord): Promise<VersionLineWire> {
     return (await this.lineWires(version.currency, [line]))[0];
   }
 
   async lineWires(currency: string, lines: readonly VersionLineRecord[]): Promise<VersionLineWire[]> {
     const money = await this.facts.formatter(currency);
-    const today: BusinessDate = await this.facts.today(new Date());
 
     return lines.map((line) => ({
       position: line.position,
@@ -100,14 +74,8 @@ export class VersionViewService {
       planId: line.planId,
       seats: line.seats,
       amount: money(line.amountMinor),
-      windowFrom: line.windowFrom,
-      windowTo: line.windowTo,
-      servicePeriodMonths: line.servicePeriodMonths,
-      repeatCycle: line.repeatCycle,
-      quoteValidUntil: line.quoteValidUntil,
       financeComment: line.financeComment,
       adjustmentReason: line.adjustmentReason,
-      overdue: isOverdue(line, today),
     }));
   }
 
@@ -116,11 +84,8 @@ export class VersionViewService {
   }
 
   async wires(versions: readonly VersionRecord[]): Promise<VersionWire[]> {
-    const [latest, previous, centers] = await Promise.all([
+    const [latest, centers] = await Promise.all([
       this.decisions.latestOf(versions.map((version) => version.id)),
-      this.versions.totalsOf(
-        versions.flatMap((version) => (version.basedOnVersionId ? [version.basedOnVersionId] : [])),
-      ),
       this.facts.costCenters(versions.map((version) => version.costCenterId)),
     ]);
     // Read once for the page, and only when some version waits for a decision.
@@ -147,19 +112,19 @@ export class VersionViewService {
           kind: version.kind,
           state: version.state,
           proposalId: version.proposalId,
-          basedOnVersionId: version.basedOnVersionId,
           rejectedPredecessorId: version.rejectedPredecessorId,
           base: money(version.baseMinor),
           reserve: money(version.reserveMinor),
+          reservePercent: version.reservePercent,
+          defaultReserve:
+            version.reservePercent === null ? null : money(defaultReserveOf(version.baseMinor, version.reservePercent)),
+          reserveReason: version.reserveReason,
           total: money(version.totalMinor),
-          highValuePercent: version.highValuePercent,
-          highValueAmount: version.highValueAmountMinor === null ? null : money(version.highValueAmountMinor),
           quarters:
             q1 === undefined || q2 === undefined || q3 === undefined || q4 === undefined
               ? null
               : { q1: money(q1), q2: money(q2), q3: money(q3), q4: money(q4) },
           reason: version.reason,
-          previousTotal: version.basedOnVersionId ? money(previous.get(version.basedOnVersionId) ?? 0n) : null,
           waitingReason: versionWaitingReason(version.state, approver),
           decision: toDecisionWire(latest.get(version.id), people),
           createdBy: people.get(version.createdByEmployeeId) ?? null,
@@ -197,15 +162,4 @@ const summaryOf = (version: VersionWire): VersionSummaryWire => ({
   total: version.total,
   createdAt: version.createdAt,
   sentAt: version.sentAt,
-});
-
-const toChangeWire = (
-  change: LineChangeRecord,
-  by: { employeeId: string; employeeCode: string; fullName: string } | null,
-): LineChangeWire => ({
-  before: change.before,
-  after: change.after,
-  reason: change.reason,
-  changedBy: by,
-  changedAt: change.changedAt.toISOString(),
 });

@@ -2,23 +2,19 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { REASON_MAX_LENGTH, requestSchema } from '../access-request/access-request.dto';
-import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 const reason = z.string().trim().min(1).max(REASON_MAX_LENGTH);
 
 /**
- * What the holder of a right that ends on a day, or the head of their department, sends to renew it (`US-05-14` AC-1): the seat,
+ * What the holder of a right that ends on a day sends to renew it (`US-05-14` AC-1): the seat,
  * the end it asks for and why. The end the right has now is not edited: the request is judged like any other, and approval writes
- * the record that follows. `termConfirmation` is for a head who sends it and asks for more than twelve months in all, as the head
- * who decides would confirm it.
+ * the record that follows. Only the holder sends it (`QĐ-100t`).
  */
 export const renewalSubmitSchema = z.strictObject({
   assignmentId: z.uuid(),
-  newExpectedEndDate: businessDate,
+  /** How many months more the holder wants; the new end day is worked out from the day the right ends (`QĐ-98`). */
+  extensionMonths: z.number().int().min(1).max(12),
   businessReason: reason,
-  /** The day the money is expected to go out (paid software only); it fixes the budget year. Today when left out. */
-  expectedSpendOn: businessDate.optional(),
-  termConfirmation: z.strictObject({ reason }).optional(),
 });
 
 export class RenewalBodyDto extends createZodDto(renewalSubmitSchema) {}

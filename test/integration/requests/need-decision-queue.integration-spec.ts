@@ -23,9 +23,7 @@ interface QueueItem {
   requester: { employeeId: string };
   department: { id: string; code: string };
   termMonths: number;
-  termConfirmationRequired: boolean;
   pricing: { status: string; amount: { amount: string; currency: string } | null };
-  planLineRequired: boolean;
   samePersonAsSpend: boolean;
 }
 interface QueuePage {
@@ -118,11 +116,12 @@ describe('the queue of the need steps of the person who holds them (integration,
         beneficiary: { employeeId: design.member.employeeId },
         department: { id: design.department.id, code: design.department.code },
         termMonths: 6,
-        termConfirmationRequired: false,
-        planLineRequired: true,
         samePersonAsSpend: false,
         pricing: { status: 'PRICED' },
       });
+      // The head confirms the need alone: no line of the plan is asked, and no term needs a confirmation (QĐ-101n, QĐ-98).
+      expect(item).not.toHaveProperty('planLineRequired');
+      expect(item).not.toHaveProperty('termConfirmationRequired');
       expect(item.pricing.amount?.currency).toMatch(/^[A-Z]{3}$/);
       expect(Number.isNaN(Date.parse(item.openedAt))).toBe(false);
       expect(item.dueOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -131,17 +130,12 @@ describe('the queue of the need steps of the person who holds them (integration,
       await request(h.server()).get(`/api/v1/access-requests/${r1.id}`).set(h.as(design.head.account)).expect(200);
     });
 
-    it('asks no line of the plan and no price for free software, and the confirmation of a term over twelve months', async () => {
-      const free = await h.sent(design.member, internal, { termMonths: 18 });
+    it('shows no price for free software, and the longest term a request may ask for', async () => {
+      const free = await h.sent(design.member, internal, { termMonths: 12 });
 
       const item = (await queue(design.head.account)).find((row) => row.requestId === free.id);
 
-      expect(item).toMatchObject({
-        planLineRequired: false,
-        termMonths: 18,
-        termConfirmationRequired: true,
-        pricing: { status: 'NOT_APPLICABLE', amount: null },
-      });
+      expect(item).toMatchObject({ termMonths: 12, pricing: { status: 'NOT_APPLICABLE', amount: null } });
     });
 
     it('carries no figure of a budget, no use of the software and no judgement against a standard set', async () => {
@@ -209,7 +203,6 @@ describe('the queue of the need steps of the person who holds them (integration,
       expect(row).toMatchObject({
         stepKind: 'NEED',
         deciderRole: 'SPENDING_APPROVER',
-        planLineRequired: false,
         requester: { employeeId: design.head.employeeId },
       });
       expect(await idsOf(design.member.account)).not.toContain(own.id);
@@ -272,7 +265,6 @@ describe('the queue of the need steps of the person who holds them (integration,
               { employeeId: e2.employeeId, decision: 'REJECT', reason: 'Not needed' },
               { employeeId: e3.employeeId, decision: 'APPROVE' },
             ],
-            spend: { offPlan: true },
           },
           u.head.account,
         )

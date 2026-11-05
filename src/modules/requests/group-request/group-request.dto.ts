@@ -10,7 +10,6 @@ import {
   requestSchema,
 } from '../access-request/access-request.dto';
 import { LINE_STATES } from '../access-request/group-request.types';
-import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /**
  * The most people the body of a request for a group may carry: a bound against abuse, far above what a head may name. The limit of
@@ -28,13 +27,11 @@ const reason = z.string().trim().min(1).max(REASON_MAX_LENGTH);
 export const groupBodySchema = z.strictObject({
   planId: z.uuid(),
   lines: z
-    .array(z.strictObject({ employeeId: z.uuid(), expectedEndDate: businessDate.optional() }))
+    .array(z.strictObject({ employeeId: z.uuid() }))
     .min(1)
     .max(GROUP_BODY_LINES_MAX),
   businessReason: reason,
   termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
-  expectedSpendOn: businessDate.optional(),
-  termConfirmation: z.strictObject({ reason }).optional(),
 });
 
 const LINE_REASONS = [
@@ -42,8 +39,6 @@ const LINE_REASONS = [
   'OUTSIDE_DEPARTMENT',
   'NOT_ACTIVE',
   'EMAIL_REQUIRED',
-  'END_DATE_REQUIRED',
-  'END_DATE_TOO_EARLY',
   'HAS_ACCESS',
   'HAS_OPEN_REQUEST',
 ] as const;
@@ -56,6 +51,11 @@ const checkSchema = z.strictObject({
   }),
   /** The most people the sender may name, when they named more. */
   tooManyLines: z.strictObject({ max: z.number().int().positive() }).nullable(),
+  /** The fewest different people a request for a group names, when fewer were named. */
+  tooFewLines: z.strictObject({ min: z.number().int().positive() }).nullable(),
+  /** The longest term the plan takes from today, and whether the term asked for is beyond it. */
+  termLimit: z.strictObject({ maxMonths: z.number().int().positive(), endsBy: z.string().nullable() }),
+  termBeyondLimit: z.boolean(),
   lines: z.array(
     z.strictObject({
       employeeId: z.uuid(),

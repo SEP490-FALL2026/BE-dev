@@ -1,11 +1,10 @@
 import { formatAmount } from '../../../core/money/money';
 import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { DepartmentBrief } from '../../organization/public/organization.types';
-import { requestPolicyJson } from '../access-request/access-request.json';
 import { deciderRoleOf } from '../access-request/need-decision.policy';
 import type { EmployeeWire } from '../spend/spend-wire-view.service';
 import type { NeedQueueItemWire } from './need-decision-queue.dto';
-import { planLineRequiredOf, reasonExcerptOf, termConfirmationRequiredOf } from './need-decision-queue.policy';
+import { reasonExcerptOf } from './need-decision-queue.policy';
 import type { NeedQueueRow } from './need-decision-queue.repo';
 
 type PlanSummary = Awaited<ReturnType<CatalogApi['getPlanSummaries']>>[number];
@@ -71,9 +70,7 @@ export function needQueueItemOf(row: NeedQueueRow, lookups: NeedQueueLookups): N
     department: { id: department.id, code: department.code, name: department.name },
     businessReasonExcerpt: reasonExcerptOf(request.businessReason),
     termMonths: request.termMonths,
-    termConfirmationRequired: termConfirmationRequiredOf(request),
     pricing: pricingOf(request, lookups.units),
-    planLineRequired: planLineRequiredOf(deciderRole, requestPolicyJson.decode(request.policy)),
     samePersonAsSpend: row.samePersonAsSpend,
   };
 }

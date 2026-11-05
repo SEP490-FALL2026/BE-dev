@@ -6,7 +6,6 @@ const h = new GroupHarness();
 interface SupplementWire {
   number: number;
   reason: string;
-  expectedSpendOn: { before: string; after: string };
   amount: { before: { amount: string }; after: { amount: string } };
   droppedCount: number;
 }
@@ -64,7 +63,7 @@ describe('the head leaves people of a group out of the supplementary file over P
       droppedCount: 1,
       amount: { before: { amount: '60000000' }, after: { amount: '48000000' } },
     });
-    expect(file.expectedSpendOn.before).toBe(file.expectedSpendOn.after);
+    expect(file).not.toHaveProperty('expectedSpendOn');
     expect(await h.lineStates(id)).toEqual([
       'NEED_CONFIRMED',
       'NEED_CONFIRMED',
@@ -90,7 +89,6 @@ describe('the head leaves people of a group out of the supplementary file over P
     await h
       .addSupplement(id, { dropEmployeeIds: [people[4].employeeId], reason: 'Left the team' }, u.head.account)
       .expect(201);
-    await h.setPlanLine(id, { offPlan: true }, u.head.account).expect(200);
     await h.sendOn([id], u.head.account).expect(201);
 
     const four = people.slice(0, 4).map((person) => ({ employeeId: person.employeeId, decision: 'APPROVE' }));
@@ -107,22 +105,27 @@ describe('the head leaves people of a group out of the supplementary file over P
     expect(await h.state(id)).toBe('AWAITING_EXECUTION');
   });
 
-  it('changes the day and leaves a person out in one file', async () => {
+  it('takes no day to change, since the day is not asked any more, and leaves a person out in a file of its own', async () => {
     const { u, people, id } = await queued(3);
     const today = h.today();
     const later = `${Number(today.slice(0, 4)) + 1}-${today.slice(5)}`;
 
+    const withDay = await h
+      .addSupplement(
+        id,
+        { expectedSpendOn: later, dropEmployeeIds: [people[2].employeeId], reason: 'Moved and smaller' },
+        u.head.account,
+      )
+      .expect(422);
+    expect(h.codeOf(withDay)).toBe('VALIDATION_ERROR');
+    expect(await amountOf(id, u.head.account)).toBe('36000000');
+
     const file = supplement(
       await h
-        .addSupplement(
-          id,
-          { expectedSpendOn: later, dropEmployeeIds: [people[2].employeeId], reason: 'Moved and smaller' },
-          u.head.account,
-        )
+        .addSupplement(id, { dropEmployeeIds: [people[2].employeeId], reason: 'Smaller' }, u.head.account)
         .expect(201),
     );
 
-    expect(file.expectedSpendOn.after).toBe(later);
     expect(file.droppedCount).toBe(1);
     expect(await amountOf(id, u.head.account)).toBe('24000000');
   });
@@ -181,7 +184,7 @@ describe('the head leaves people of a group out of the supplementary file over P
       expect(h.codeOf(refused)).toBe('SUPPLEMENT.DROP_NOT_FOR_GROUP');
     });
 
-    it('wants a change: the day or a person', async () => {
+    it('wants a person to leave out', async () => {
       const { u, id } = await queued(2);
 
       const none = await h.addSupplement(id, { reason: 'nothing' }, u.head.account).expect(422);

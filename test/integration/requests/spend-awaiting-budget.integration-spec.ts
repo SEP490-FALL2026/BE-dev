@@ -45,10 +45,9 @@ describe('the request that waits for a version of the budget (integration, real 
 
     return id;
   };
-  const purchaseWindow = { windowFrom: `${h.year}-12-01`, windowTo: `${h.year}-12-31`, quoteValidUntil: undefined };
   /** A version Finance builds from a proposal of the head and sends, left for the approver to decide. */
   const sentVersion = async (u: Unit) => {
-    const proposal = await h.budgetProposed(u.head, u.department.unitId, [h.line(purchaseWindow)], h.year);
+    const proposal = await h.budgetProposed(u.head, u.department.unitId, [h.line()], h.year);
     const version = await h.built(proposal.id, { base: h.money(100 * M), reserve: h.money(0) });
     await h.sendVersion(version.id).expect(200);
 
@@ -243,27 +242,6 @@ describe('the request that waits for a version of the budget (integration, real 
       expect(h.codeOf(again)).toBe('SPEND.REVIEW_NOT_OPEN');
       expect(await reviews(id)).toHaveLength(2);
     });
-
-    it('refuses an opinion while the plan line is overdue, as on a review, and leaves it waiting', async () => {
-      const u = await unit();
-      const id = await waiting(u);
-      // The checks are append-only (INV-05): the newest check of the request is a new one, as a check made again is, with the line overdue.
-      await h.ctx.sql.query(
-        `INSERT INTO request_budget_checks (id, organization_id, request_id, number, trigger, route, stale_cost_evidence,
-                                            plan_line_overdue, period_closed, off_plan, currency, binding_total_minor)
-         SELECT gen_random_uuid(), organization_id, request_id, number + 1, 'PLAN_LINE_MOVED'::"BudgetCheckTrigger", route,
-                stale_cost_evidence, true, period_closed, off_plan, currency, binding_total_minor
-           FROM request_budget_checks WHERE request_id = $1 ORDER BY number DESC LIMIT 1`,
-        [id],
-      );
-
-      const refused = await h
-        .completeReview(id, { outcome: 'ASSESSED', opinion: 'Over', direction: 'RECOMMEND_APPROVE' })
-        .expect(409);
-
-      expect(h.codeOf(refused)).toBe('SPEND.PLAN_LINE_NOT_UPDATED');
-      expect(await h.state(id)).toBe('AWAITING_BUDGET');
-    });
   });
 
   describe('who may end the review (F65, F32, SoD-8)', () => {
@@ -333,45 +311,6 @@ describe('the request that waits for a version of the budget (integration, real 
       const refused = await h.completeReview(noHead, { outcome: 'NEEDS_BUDGET', reason: 'A revision' }).expect(409);
 
       expect(h.codeOf(refused)).toBe('SPEND.NO_HEAD_TO_PROPOSE');
-    });
-
-    it('is refused for a year that is only of high value', async () => {
-      const u = await unit();
-      await h.budgetFor(u, { total: 100 * M, percent: 10 });
-      const id = await h.paidRequest(u, plan, { amount: 30 * M });
-      await h.route(id, u.head.account);
-
-      const refused = await h.completeReview(id, { outcome: 'NEEDS_BUDGET', reason: 'Nothing to make' }).expect(409);
-
-      expect(h.codeOf(refused)).toBe('SPEND.NO_BUDGET_TO_MAKE');
-    });
-
-    it('checks again a request that waits for a revision, when the revision of the year is approved, by what Finance recorded and not by the code of the check', async () => {
-      const u = await unit();
-      await h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M });
-      const id = await h.paidRequest(u, plan, { amount: 45 * M });
-      await h.route(id, u.head.account);
-      await h.completeReview(id, { outcome: 'NEEDS_BUDGET', reason: 'A revision will cover it' }).expect(200);
-      const revision = h.dataOf<{ version: { id: string } }>(
-        await h
-          .createRevision({
-            costCenterId: u.department.unitId,
-            year: h.year,
-            base: h.money(200 * M),
-            reserve: h.money(0),
-            reason: 'Growth of the team',
-          })
-          .expect(201),
-      ).version;
-      await h.sendVersion(revision.id).expect(200);
-
-      await h.decideVersion(revision.id, { decision: 'APPROVE' }, h.deciderOf()).expect(200);
-
-      expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
-      expect((await checks(id)).map((check) => [check.number, check.trigger, check.route])).toEqual([
-        [1, 'SUBMISSION', 'FINANCE_REVIEW'],
-        [2, 'BUDGET_VERSION_APPROVED', 'SPEND_APPROVAL'],
-      ]);
     });
   });
 

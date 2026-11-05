@@ -18,9 +18,7 @@ interface CheckWire {
   route: string;
   primaryCode: string | null;
   staleCostEvidence: boolean;
-  planLineOverdue: boolean;
   periodClosed: boolean;
-  offPlan: boolean;
   noIndependentReview: boolean;
   bindingTotal: { amount: string };
   yearCount: number;
@@ -57,7 +55,7 @@ describe('the check of the budget of a request over PostgreSQL (US-06-12)', () =
 
     return h.departmentWithHead(`P-K${counter}`);
   };
-  /** The budget of the example of the stories: 100 million, 20 held, 40 spent, so 40 left, high value over half of it. */
+  /** The budget of the example of the stories: 100 million, 20 held, 40 spent, so 40 left. */
   const example = (u: Unit, extra: Record<string, number> = {}) =>
     h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M, ...extra });
   const checked = async (requestId: string, u: Unit): Promise<Extract<RoutingOutcome, { status: 'ROUTED' }>> => {
@@ -120,34 +118,32 @@ describe('the check of the budget of a request over PostgreSQL (US-06-12)', () =
       expect(await approvals(over)).toBe(1);
     });
 
-    it('is HIGH_VALUE over the share of what is left even when the money is there, and the approver has no step yet (AC-2)', async () => {
+    it('is BUDGET_OK however large the share of what is left, when the money is there: there is no high-value route any more (AC-2, QĐ-97c)', async () => {
       const u = await unit();
       await example(u);
       const id = await h.paidRequest(u, plan, { amount: 25 * M });
 
       const outcome = await checked(id, u);
 
-      expect(outcome.route).toBe('FINANCE_REVIEW');
-      expect(await h.state(id)).toBe('AWAITING_FINANCE_REVIEW');
-      expect(await h.steps(id, 'FINANCE_REVIEW')).toEqual([
-        expect.objectContaining({ state: 'PENDING', assignee_employee_id: h.finance.employeeId }),
+      expect(outcome.route).toBe('SPEND_APPROVAL');
+      expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
+      expect(await h.steps(id, 'FINANCE_REVIEW')).toEqual([]);
+      expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([
+        expect.objectContaining({ state: 'PENDING', assignee_employee_id: h.boss.employeeId }),
       ]);
-      expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([]);
-      expect(await checkWire(id)).toMatchObject({ primaryCode: 'HIGH_VALUE' });
-      expect((await years(id))[0]).toMatchObject({ code: 'HIGH_VALUE', shareBasisPoints: 6250 });
-      // The spending approver has nothing of this request to open, nor to refuse (INF-12).
-      await h.checkOf(id, h.boss.account).expect(404);
+      expect(await checkWire(id)).toMatchObject({ route: 'SPEND_APPROVAL', primaryCode: 'BUDGET_OK' });
+      expect((await years(id))[0]).toMatchObject({ code: 'BUDGET_OK', shareBasisPoints: 6250 });
     });
 
-    it('is HIGH_VALUE over the amount of the version, whatever the share (AC-3)', async () => {
+    it('is BUDGET_OK however large the share of the budget of the year, when the money is there (AC-3)', async () => {
       const u = await unit();
-      await h.budgetFor(u, { total: 100 * M, percent: 50, amountThreshold: 20 * M });
+      await h.budgetFor(u, { total: 100 * M });
       const id = await h.paidRequest(u, plan, { amount: 22 * M });
 
       await checked(id, u);
 
-      expect((await years(id))[0]).toMatchObject({ code: 'HIGH_VALUE', shareBasisPoints: 2200 });
-      expect(await h.state(id)).toBe('AWAITING_FINANCE_REVIEW');
+      expect((await years(id))[0]).toMatchObject({ code: 'BUDGET_OK', shareBasisPoints: 2200 });
+      expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
     });
 
     it('is INSUFFICIENT_BUDGET over what is left, which is no hard stop: it goes to Finance (AC-4)', async () => {
@@ -173,46 +169,17 @@ describe('the check of the budget of a request over PostgreSQL (US-06-12)', () =
       ]);
     });
 
-    it('sends a plan line whose window has gone by to Finance although the money is there (AC-6)', async () => {
-      const u = await unit();
-      const version = await example(u);
-      const id = await h.paidRequest(u, plan, { amount: 10 * M });
-      await h.attachLine(id, version.id, 1);
-      await h.ctx.sql.query(
-        `UPDATE budget_version_lines SET window_from = $2::date, window_to = $3::date WHERE version_id = $1 AND position = 1`,
-        [version.id, `${h.year}-01-01`, `${h.year}-03-31`],
-      );
-
-      await checked(id, u);
-
-      expect(await checkWire(id)).toMatchObject({
-        route: 'FINANCE_REVIEW',
-        planLineOverdue: true,
-        primaryCode: 'PLAN_LINE_OVERDUE',
-      });
-      expect((await years(id))[0].code).toBe('BUDGET_OK');
-    });
-
-    it('does not send a plan line whose window is still to come anywhere', async () => {
-      const u = await unit();
-      const version = await example(u);
-      const id = await h.paidRequest(u, plan, { amount: 10 * M });
-      await h.attachLine(id, version.id, 1);
-
-      await checked(id, u);
-
-      expect(await checkWire(id)).toMatchObject({ route: 'SPEND_APPROVAL', planLineOverdue: false });
-    });
-
-    it('treats a request outside the plan as information only (AC-10)', async () => {
+    it('looks only at the money: no line of the plan to be overdue and no "outside the plan" flag are kept (AC-6, AC-10, QĐ-101n)', async () => {
       const u = await unit();
       await example(u);
       const id = await h.paidRequest(u, plan, { amount: 10 * M });
-      await h.ctx.sql.query(`UPDATE access_requests SET off_plan = true WHERE id = $1`, [id]);
 
       await checked(id, u);
 
-      expect(await checkWire(id)).toMatchObject({ route: 'SPEND_APPROVAL', offPlan: true, primaryCode: 'BUDGET_OK' });
+      const wire = await checkWire(id);
+      expect(wire).toMatchObject({ route: 'SPEND_APPROVAL', primaryCode: 'BUDGET_OK' });
+      expect(wire).not.toHaveProperty('planLineOverdue');
+      expect(wire).not.toHaveProperty('offPlan');
       expect(await h.steps(id, 'FINANCE_REVIEW')).toEqual([]);
     });
   });

@@ -74,28 +74,4 @@ describe('a budget version from the proposal to the version in force (e2e)', () 
       version: { number: 1 },
     });
   });
-
-  it('a revision Finance sends and the approver approves replaces it as the version in force', async () => {
-    const revision = h.dataOf<{ version: VersionWire }>(
-      await h
-        .createRevision({
-          costCenterId: department.unitId,
-          year: h.next,
-          base: h.money(80 * M),
-          reserve: h.money(20 * M),
-          reason: 'Growth of the team',
-        })
-        .expect(201),
-    ).version;
-    await h.sendVersion(revision.id).expect(200);
-    await h.decideVersion(revision.id, { decision: 'APPROVE' }, boss.account).expect(200);
-
-    expect((await versionOf(first.id)).state).toBe('SUPERSEDED');
-    expect(await versionOf(revision.id)).toMatchObject({ kind: 'REVISION', number: 2, state: 'APPROVED' });
-    expect(await myBudget()).toMatchObject({
-      status: 'ACTIVE',
-      total: { amount: String(100 * M) },
-      version: { number: 2 },
-    });
-  });
 });

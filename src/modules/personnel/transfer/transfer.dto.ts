@@ -2,17 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
-
-/**
- * The basis a change rests on. Every part is optional here and judged after: a basis that is empty or lacks a part has its own
- * answer, and so has a reference that is the code of a notice (`BM-09`), which is not the document that ends the process.
- */
-const groundsBodySchema = z.strictObject({
-  type: z.string().max(100).nullish(),
-  reference: z.string().max(200).nullish(),
-  issuer: z.string().max(200).nullish(),
-  issuedOn: z.string().max(10).nullish(),
-});
+import { groundsBodySchema } from '../personnel-grounds.dto';
 
 const successorBodySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('EMPLOYEE'), employeeId: z.uuid() }),
@@ -24,20 +14,20 @@ const recordBodySchema = z.strictObject({
   employeeId: z.uuid(),
   toDepartmentId: z.uuid(),
   effectiveOn: businessDay,
-  grounds: groundsBodySchema.optional(),
+  grounds: groundsBodySchema,
   successor: successorBodySchema.optional(),
 });
 
 const rescheduleBodySchema = z.strictObject({
   newEffectiveOn: businessDay,
-  reason: z.string().max(1000).optional(),
-  grounds: groundsBodySchema.optional(),
+  reason: z.string().trim().min(1).max(1000),
+  grounds: groundsBodySchema,
   successor: successorBodySchema.optional(),
 });
 
 const cancelBodySchema = z.strictObject({
-  reason: z.string().max(1000).optional(),
-  grounds: groundsBodySchema.optional(),
+  reason: z.string().trim().min(1).max(1000),
+  grounds: groundsBodySchema,
 });
 
 const listQuerySchema = z.strictObject({
@@ -108,7 +98,7 @@ export const transferDetailSchema = transferSummarySchema.extend({
 });
 
 const warningSchema = z.strictObject({
-  code: z.enum(['BUSINESS_OWNER_REPLACEMENT_NEEDED']),
+  code: z.enum(['BUSINESS_OWNER_KEEP_OR_CHANGE']),
   applications: z.array(z.strictObject({ id: z.uuid(), name: z.string() })).max(20),
   totalApplications: z.number().int().positive(),
 });

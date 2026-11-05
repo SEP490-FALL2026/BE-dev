@@ -147,7 +147,6 @@ describe('the spend step of one request and what surrounds it (US-06-01 AC-3, AC
       beneficiary: person('emp-2'),
       lineCount: 1,
       costCenter: { id: 'cc-1', code: 'CC-01' },
-      planLineAttached: false,
     });
     expect(wire.need).toEqual({ decidedBy: person('emp-4'), decidedAt: '2026-10-02T00:00:00.000Z', reason: null });
     expect([wire.assessment, wire.decision]).toEqual([null, null]);
@@ -166,16 +165,14 @@ describe('the spend step of one request and what surrounds it (US-06-01 AC-3, AC
         decision: {
           decision: 'APPROVED',
           reason: null,
-          overrideReason: null,
           decidedByEmployeeId: 'emp-3',
           decidedAt: new Date('2026-10-03T00:00:00Z'),
-          bySubstitute: false,
         },
       }),
     );
 
     expect(wire.assessment).toMatchObject({ equivalentTool: { planId: 'plan-2', planName: 'Free' } });
-    expect(wire.decision).toMatchObject({ decision: 'APPROVED', decidedBy: person('emp-3'), bySubstitute: false });
+    expect(wire.decision).toMatchObject({ decision: 'APPROVED', decidedBy: person('emp-3') });
   });
 
   it('has no assignee for a step nobody holds, and no one person it is for when it is a group', () => {

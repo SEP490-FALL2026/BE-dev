@@ -27,12 +27,9 @@ import { routeDtos, type RouteDtos } from '../../support/openapi-semantics';
 
 /** The arrays that must hold distinct scalars (the one of objects unique by `planId` has no keyword and is described). */
 const UNIQUE_ARRAYS: readonly (readonly [operationId: string, path: readonly string[]])[] = [
-  ['delegatedRequestSend', ['beneficiaryEmployeeIds']],
   ['spendBatchSubmit', ['requestIds']],
   ['accessRequestSupplementAdd', ['dropEmployeeIds']],
   ['spendBatchDecide', ['requestIds']],
-  ['spendApprovalDecide', ['override', 'years']],
-  ['spendApprovalLineDecide', ['override', 'years']],
 ];
 
 /** The bodies that need at least one field, whatever the field. */
@@ -75,7 +72,7 @@ describe('what the document says of the rules of a request (F01)', () => {
   it('gives `format: date` and its description to every date a request carries, in a body, a query and a path', () => {
     const leaves = dateNodes();
 
-    expect(leaves.length).toBeGreaterThanOrEqual(91);
+    expect(leaves.length).toBeGreaterThanOrEqual(55);
     expect(nodesWithoutKeyword(leaves, 'format', 'date')).toEqual([]);
     expect(leaves.filter(({ node }) => typeof node?.description !== 'string').map(({ where }) => where)).toEqual([]);
     expect(leaves.filter(({ node }) => node?.pattern !== undefined).map(({ where }) => where)).toEqual([]);
@@ -105,14 +102,7 @@ describe('what the document says of the rules of a request (F01)', () => {
     ).toEqual([]);
   });
 
-  it('reaches the dates of a draft that may be any of three requests: each branch of the union carries them', () => {
-    const draft = dateNodes().filter(({ where }) => where.startsWith('accessRequestDraftSave Body'));
-
-    expect(draft.map(({ where }) => where)).toEqual(expect.arrayContaining([expect.stringContaining('|')]));
-    expect(nodesWithoutKeyword(draft, 'format', 'date')).toEqual([]);
-  });
-
-  it('states `uniqueItems: true` on the six arrays of distinct scalars', () => {
+  it('states `uniqueItems: true` on the four arrays of distinct scalars', () => {
     const found = UNIQUE_ARRAYS.map(([operationId, path]) => {
       const route = routes.find((candidate) => candidate.operationId === operationId);
       const root = requestRoots(document, route as RouteDtos).find((entry) => entry.input === 'Body');

@@ -9,7 +9,7 @@ import {
 
 const year = (code: string | null, y = 2026) => ({ year: y, code }) as ReviewFacts['check']['years'][number];
 const facts = (codes: (string | null)[], extra: Partial<ReviewFacts> = {}): ReviewFacts => ({
-  check: { years: codes.map((code, index) => year(code, 2026 + index)), planLineOverdue: false },
+  check: { years: codes.map((code, index) => year(code, 2026 + index)) },
   departmentHasHead: true,
   ...extra,
 });
@@ -44,26 +44,13 @@ describe('how a review of Finance may end (US-06-13, F33)', () => {
       expect([...BUDGET_LACKING_CODES].sort()).toEqual(['INSUFFICIENT_BUDGET', 'NO_ACTIVE_BUDGET']);
     });
   });
-
-  it('refuses an opinion while the plan line is overdue, and lets the request be given back whatever the check says', () => {
-    const overdue = facts(['BUDGET_OK'], { check: { years: [year('BUDGET_OK')], planLineOverdue: true } });
-
-    expect(checkReviewOutcome('ASSESSED', overdue)).toBe('PLAN_LINE_NOT_UPDATED');
-    expect(checkReviewOutcome('RETURN_TO_HEAD', overdue)).toBeNull();
-    expect(checkReviewOutcome('ASSESSED', facts(['HIGH_VALUE']))).toBeNull();
-  });
 });
 
 describe('what Finance may do for a request that waits for a version and has no review open (J.3, F65)', () => {
   it('gives it back or gives an opinion, and never asks for a budget again', () => {
-    expect(checkWaitingOutcome('RETURN_TO_HEAD', { planLineOverdue: false })).toBeNull();
-    expect(checkWaitingOutcome('ASSESSED', { planLineOverdue: false })).toBeNull();
-    expect(checkWaitingOutcome('NEEDS_BUDGET', { planLineOverdue: false })).toBe('ALREADY_AWAITING_BUDGET');
-  });
-
-  it('refuses an opinion while the plan line is overdue, as on a review', () => {
-    expect(checkWaitingOutcome('ASSESSED', { planLineOverdue: true })).toBe('PLAN_LINE_NOT_UPDATED');
-    expect(checkWaitingOutcome('RETURN_TO_HEAD', { planLineOverdue: true })).toBeNull();
+    expect(checkWaitingOutcome('RETURN_TO_HEAD')).toBeNull();
+    expect(checkWaitingOutcome('ASSESSED')).toBeNull();
+    expect(checkWaitingOutcome('NEEDS_BUDGET')).toBe('ALREADY_AWAITING_BUDGET');
   });
 });
 

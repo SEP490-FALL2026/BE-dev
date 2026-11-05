@@ -4,6 +4,7 @@ import {
   DocumentFileInvalidError,
   DocumentNotReadyToAttachError,
   DocumentPurposeForbiddenError,
+  DocumentPurposeMismatchError,
   DocumentPurposeNotAvailableError,
   DocumentTooLargeError,
   DocumentTypeNotAllowedError,
@@ -34,8 +35,11 @@ const PURPOSE_ROLES: Record<DocumentPurpose, readonly string[]> = {
   COST_STATEMENT: ['FINANCE'],
 };
 
-/** The purposes whose file is attached to a contract, the only record there is to attach to today. */
+/** The purposes whose file is attached to a contract. */
 const ATTACHES_TO_CONTRACT: ReadonlySet<DocumentPurpose> = new Set(['CONTRACT_ATTACHMENT', 'PURCHASE_DOCUMENT']);
+
+/** A signed record belongs to the person who signed it, not to a contract (`BM-06`). */
+const ATTACHES_TO_SIGNER: ReadonlySet<DocumentPurpose> = new Set(['SIGNATURE_RECORD']);
 
 /** What is kept: each type with the extensions that go with it. A name that says otherwise is refused. */
 const ALLOWED_TYPES: Record<string, readonly string[]> = {
@@ -51,7 +55,15 @@ export function assertMayChoosePurpose(purpose: DocumentPurpose, roles: readonly
 
 /** The purposes with nowhere to be attached yet are refused, after the role is checked. Throws DocumentPurposeNotAvailableError. */
 export function assertPurposeAvailable(purpose: DocumentPurpose): void {
-  if (!ATTACHES_TO_CONTRACT.has(purpose)) throw new DocumentPurposeNotAvailableError(purpose);
+  if (!ATTACHES_TO_CONTRACT.has(purpose) && !ATTACHES_TO_SIGNER.has(purpose)) {
+    throw new DocumentPurposeNotAvailableError(purpose);
+  }
+}
+
+/** A file is attached to what its purpose names and to nothing else. Throws DocumentPurposeMismatchError. */
+export function assertPurposeAttachesTo(purpose: DocumentPurpose, target: 'CONTRACT' | 'SIGNER'): void {
+  const fits = target === 'CONTRACT' ? ATTACHES_TO_CONTRACT.has(purpose) : ATTACHES_TO_SIGNER.has(purpose);
+  if (!fits) throw new DocumentPurposeMismatchError();
 }
 
 /**
@@ -120,12 +132,15 @@ export type OpenDecision = 'OPEN' | 'HIDDEN' | 'FORBIDDEN';
  * quarantined or whose upload never came is for nobody. The role is the one held now, so a role taken away takes the right with it.
  */
 export function mayOpen(input: {
+  purpose: DocumentPurpose;
   status: DocumentStatus;
   uploaderAppUserId: string;
   actorAppUserId: string;
   roles: readonly string[];
 }): OpenDecision {
   if (!input.roles.some((role) => role === 'IT_ADMIN' || role === 'FINANCE')) return 'FORBIDDEN';
+  // A signed record of a person is the IT Admin's to open; Finance has no business with it.
+  if (input.purpose === 'SIGNATURE_RECORD' && !input.roles.includes('IT_ADMIN')) return 'FORBIDDEN';
   if (input.status === 'READY') return 'OPEN';
   if (input.status === 'PENDING_ATTACH') return input.uploaderAppUserId === input.actorAppUserId ? 'OPEN' : 'HIDDEN';
 

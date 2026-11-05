@@ -1,3 +1,4 @@
+import { Client } from 'pg';
 import { SpendHarness, Unit } from '../../support/spend-harness';
 
 const h = new SpendHarness();
@@ -21,14 +22,14 @@ interface DetailWire {
     noIndependentReview: boolean;
     assignee: { employeeId: string } | null;
   };
-  request: { state: string; offPlan: boolean };
+  request: { state: string };
   need: { decidedBy: { employeeId: string } } | null;
   cost: {
     estimatedCost: { amount: string };
     deductibleTax: { amount: string };
     nonDeductibleTax: { amount: string };
   } | null;
-  decision: { decision: string; reason: string | null; overrideReason: string | null; bySubstitute: boolean } | null;
+  decision: { decision: string; reason: string | null } | null;
 }
 
 describe('the decision of the spending approver over PostgreSQL (US-06-01)', () => {
@@ -61,8 +62,8 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
 
     return h.departmentWithHead(`P-A${counter}`);
   };
-  /** The example of the stories: 100 million, 20 held, 40 spent, so 40 left, high value over half of it. */
-  const example = async (extra: { held?: number; spent?: number; percent?: number } = {}) => {
+  /** The example of the stories: 100 million, 20 held, 40 spent, so 40 left. */
+  const example = async (extra: { held?: number; spent?: number } = {}) => {
     const u = await unit();
     const version = await h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M, ...extra });
 
@@ -130,7 +131,7 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
     });
 
     it('shows the cost that falls on the company, with the tax that is deducted apart, and counts that cost as waiting (AC-14)', async () => {
-      const { u } = await example({ percent: 100 });
+      const { u } = await example();
       const first = await h.waitingForApprover(u, taxedPlan, { amount: 20 * M });
       const second = await h.waitingForApprover(u, taxedPlan, { amount: 5 * M });
 
@@ -148,7 +149,7 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
     it('is closed to those who do not hold the step, and nothing of a request that waits for Finance is open to the approver (AC-8, AC-17)', async () => {
       const { u } = await example();
       const id = await h.waitingForApprover(u, plan, { amount: 15 * M });
-      const waiting = await h.waitingForApprover(u, plan, { amount: 30 * M }); // 75 % of 40 left: high value
+      const waiting = await h.waitingForApprover(u, plan, { amount: 50 * M }); // more than the 40 left: an exception
 
       for (const account of [h.finance, u.head.account, h.it1, u.member.account]) {
         await h.approvalOf(id, account).expect(404);
@@ -198,8 +199,12 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
       expect(h.dataOf<{ spendApproval: DetailWire }>(response).spendApproval).toMatchObject({
         step: { state: 'APPROVED' },
         request: { state: 'AWAITING_EXECUTION' },
-        decision: { decision: 'APPROVED', overrideReason: null, bySubstitute: false },
+        decision: { decision: 'APPROVED' },
       });
+      // Nobody decides in place of the approver and no exception is accepted past the budget (QĐ-93, QĐ-97c).
+      expect(h.dataOf<{ spendApproval: DetailWire }>(response).spendApproval.decision).not.toHaveProperty(
+        'overrideReason',
+      );
       expect(await records(id)).toEqual([
         expect.objectContaining({ decision: 'APPROVED', decider_role: 'SPENDING_APPROVER', reason: null }),
       ]);
@@ -319,7 +324,7 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
     });
   });
 
-  describe('an exception is accepted by an override (AC-3, AC-5, AC-16, AC-21)', () => {
+  describe('an exception is not approved past the budget (AC-3, AC-5, AC-21, QĐ-97c)', () => {
     /** A request of 45 million against 40 left: it went to Finance, who advised, and now waits for the approver. */
     const exception = async (extra: { amount?: number } = {}) => {
       const { u } = await example();
@@ -328,7 +333,7 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
       await h
         .completeReview(id, {
           outcome: 'ASSESSED',
-          opinion: 'Over by 5 million: accepted',
+          opinion: 'Over by 5 million',
           direction: 'RECOMMEND_OVERRIDE',
         })
         .expect(200);
@@ -336,59 +341,52 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
       return { u, id };
     };
 
-    it('needs the override and its reason for a request that costs more than what is left, and keeps both (AC-5, AC-16)', async () => {
+    it('refuses a request that costs more than what is left, names the year, and takes no override to get past it (AC-5)', async () => {
       const { id } = await exception();
 
       const missing = await approve(id).expect(422);
-      const blank = await approve(id, { override: { reason: ' ', years: [h.year] } }).expect(422);
-      const response = await approve(id, { override: { reason: 'Revision next month', years: [h.year] } }).expect(200);
+      const withOverride = await approve(id, { override: { reason: 'Revision next month', years: [h.year] } }).expect(
+        422,
+      );
 
       expect(h.codeOf(missing)).toBe('SPEND.OVERRIDE_REQUIRED');
       expect(h.detailsOf(missing)).toMatchObject({ years: [h.year] });
-      expect(h.codeOf(blank)).toBe('VALIDATION_ERROR');
-      expect(h.dataOf<{ spendApproval: DetailWire }>(response).spendApproval.decision).toMatchObject({
-        decision: 'APPROVED',
-        overrideReason: 'Revision next month',
-      });
-      expect(await decided(id)).toEqual([
-        expect.objectContaining({ override_years: [h.year], override_reason: 'Revision next month' }),
-      ]);
+      // The exception is gone: a body that carries one is not a body.
+      expect(h.codeOf(withOverride)).toBe('VALIDATION_ERROR');
+      expect(await records(id)).toEqual([]);
+      expect(await decided(id)).toEqual([]);
       expect(await years(id)).toEqual([
         expect.objectContaining({
           code: 'INSUFFICIENT_BUDGET',
-          overridden: true,
           remaining: { amount: String(40 * M), currency: 'VND' },
         }),
       ]);
     });
 
-    it('does not take an override that names other years, or one when there is nothing to override', async () => {
-      const { id } = await exception();
+    it('takes no override either when nothing is lacking: the key is not part of the body', async () => {
       const { u } = await example();
       const ok = await h.waitingForApprover(u, plan, { amount: 15 * M });
 
-      const mismatch = await approve(id, { override: { reason: 'Why', years: [h.next] } }).expect(422);
       const needless = await approve(ok, { override: { reason: 'Why', years: [h.year] } }).expect(422);
 
-      expect(h.codeOf(mismatch)).toBe('SPEND.OVERRIDE_MISMATCH');
-      expect(h.codeOf(needless)).toBe('SPEND.OVERRIDE_NOT_NEEDED');
-      expect(await records(id)).toEqual([]);
+      expect(h.codeOf(needless)).toBe('VALIDATION_ERROR');
       expect(await records(ok)).toEqual([]);
     });
 
-    it('takes a year with no budget the same way, and says it has none and not that it has nothing (AC-3)', async () => {
+    it('refuses a year with no budget the same way, and says it has none and not that it has nothing (AC-3)', async () => {
       const u = await unit();
       const id = await h.paidRequest(u, plan, { amount: 30 * M });
       await h.sendOn([id], u.head.account).expect(201);
       await h
-        .completeReview(id, { outcome: 'ASSESSED', opinion: 'No budget: accepted', direction: 'RECOMMEND_OVERRIDE' })
+        .completeReview(id, { outcome: 'ASSESSED', opinion: 'No budget', direction: 'RECOMMEND_OVERRIDE' })
         .expect(200);
 
       const view = (await years(id))[0];
-      await approve(id).expect(422);
-      await approve(id, { override: { reason: 'The budget comes in March', years: [h.year] } }).expect(200);
+      const refused = await approve(id).expect(422);
 
+      expect(h.codeOf(refused)).toBe('SPEND.OVERRIDE_REQUIRED');
       expect(view).toMatchObject({ code: 'NO_ACTIVE_BUDGET', budget: null, remaining: null });
+      expect(await records(id)).toEqual([]);
     });
 
     it('names, for a request over several years, the year that has no budget and no other, and marks it on the years (AC-21)', async () => {
@@ -409,16 +407,38 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
         })
         .expect(200);
 
-      const wrongYear = await approve(id, { override: { reason: 'Why', years: [h.year] } }).expect(422);
       const missing = await approve(id).expect(422);
-      await approve(id, { override: { reason: 'The budget of next year is being made', years: [h.next] } }).expect(200);
 
-      expect(h.codeOf(wrongYear)).toBe('SPEND.OVERRIDE_MISMATCH');
+      expect(h.codeOf(missing)).toBe('SPEND.OVERRIDE_REQUIRED');
       expect(h.detailsOf(missing)).toMatchObject({ years: [h.next] });
-      expect((await years(id)).map((year) => [year.year, year.code, year.overridden])).toEqual([
-        [h.year, 'BUDGET_OK', false],
-        [h.next, 'NO_ACTIVE_BUDGET', true],
+      expect((await years(id)).map((year) => [year.year, year.code])).toEqual([
+        [h.year, 'BUDGET_OK'],
+        [h.next, 'NO_ACTIVE_BUDGET'],
       ]);
+    });
+  });
+
+  describe('who may decide is judged before the row of the request is locked (R-D2)', () => {
+    it('answers a request with no spend step at once, even while another transaction holds the row of the request', async () => {
+      const { u } = await example();
+      const id = await h.paidRequest(u, plan, { amount: 45 * M });
+      await h.sendOn([id], u.head.account).expect(201);
+      expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([]);
+      const holder = new Client({ connectionString: h.ctx.database.url });
+      await holder.connect();
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM access_requests WHERE id = $1 FOR UPDATE', [id]);
+      try {
+        const answer = await Promise.race([
+          approve(id).then((response) => response.status),
+          new Promise<string>((resolve) => setTimeout(() => resolve('waited for the lock'), 4000)),
+        ]);
+
+        expect(answer).toBe(409);
+      } finally {
+        await holder.query('ROLLBACK');
+        await holder.end();
+      }
     });
   });
 
@@ -438,14 +458,16 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
       expect(await h.state(id)).toBe('AWAITING_FINANCE_REVIEW');
 
       await h
-        .completeReview(id, { outcome: 'ASSESSED', opinion: 'Over now: accepted', direction: 'RECOMMEND_OVERRIDE' })
+        .completeReview(id, { outcome: 'ASSESSED', opinion: 'Over now', direction: 'RECOMMEND_OVERRIDE' })
         .expect(200);
 
       expect((await years(id))[0]).toMatchObject({
         code: 'INSUFFICIENT_BUDGET',
         remaining: { amount: String(15 * M) },
       });
-      await approve(id, { override: { reason: 'Accepted after the review', years: [h.year] } }).expect(200);
+      // The review advises; it does not make room: the approver still cannot approve past the budget.
+      expect(h.codeOf(await approve(id).expect(422))).toBe('SPEND.OVERRIDE_REQUIRED');
+      expect(await records(id)).toEqual([]);
     });
 
     it('goes back to its head, with nothing decided, when its data is at fault now', async () => {
@@ -469,25 +491,6 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
       expect(await records(id)).toEqual([]);
       expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([expect.objectContaining({ state: 'CLOSED' })]);
       expect(await h.state(id)).toBe('AWAITING_SPEND_SUBMISSION');
-    });
-
-    it('is not accepted by an override, whatever the approver says, when the data is at fault', async () => {
-      const { u } = await example();
-      const id = await h.staleRequest(u);
-      await h.ctx.sql.query(
-        `UPDATE access_request_assessments SET quote_valid_until = current_date + 1 WHERE request_id = $1`,
-        [id],
-      );
-      await h.sendOn([id], u.head.account).expect(201);
-      await h.ctx.sql.query(
-        `UPDATE access_request_assessments SET quote_valid_until = current_date - 1 WHERE request_id = $1`,
-        [id],
-      );
-
-      const response = await approve(id, { override: { reason: 'Never mind', years: [h.year] } }).expect(409);
-
-      expect(h.codeOf(response)).toBe('SPEND.RECHECKED_RETURNED_TO_HEAD');
-      expect(await records(id)).toEqual([]);
     });
   });
 });

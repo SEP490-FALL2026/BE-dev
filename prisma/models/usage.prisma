@@ -1,0 +1,156 @@
+// What the collectors on company machines send: the allowlist of tools they may report, the usage of an AI tool day by day, the
+// snapshot of its login and quota, and the reasons a request was refused. The device, the registration, the credential and the
+// application are values, not foreign keys: usage has a life and a retention of its own. Append-only triggers are SQL (ADR-0005).
+
+enum AiToolKey {
+  CLAUDE_CODE
+  CODEX
+  ANTIGRAVITY_CLI
+}
+
+enum UsageCoverage {
+  COVERED
+  PARTIAL
+  NOT_OBSERVABLE
+}
+
+enum CollectorAllowlistEntryKind {
+  AI_TOOL
+}
+
+enum ToolAuthStatus {
+  LOGGED_IN
+  LOGGED_OUT
+  UNKNOWN
+  NOT_SUPPORTED
+}
+
+enum ToolQuotaStatus {
+  OK
+  NOT_SUPPORTED
+  FAILED
+}
+
+enum ToolQuotaWindowCode {
+  PRIMARY
+  SECONDARY
+  SESSION
+  WEEKLY_ALL
+  WEEKLY_MODEL
+  FIVE_HOUR
+  DAILY
+  WEEKLY
+}
+
+enum IntakeEndpoint {
+  AI_USAGE_BATCH
+  AI_TOOL_STATUS_SNAPSHOT
+}
+
+enum IntakeRejectionReason {
+  NOT_ACKNOWLEDGED
+  COLLECTION_STOPPED
+  TOOL_STATUS_NOT_ACKNOWLEDGED
+  OUTSIDE_WINDOW
+  NOT_IN_ALLOWLIST
+  FUTURE_GENERATED_AT
+  FUTURE_OBSERVED_AT
+  INVALID_COVERAGE
+  INVALID_QUOTA
+}
+
+model CollectorAllowlistVersion {
+  id                   String   @id @default(uuid(7)) @db.Uuid
+  organizationId       String   @map("organization_id") @db.Uuid
+  versionNumber        Int      @map("version_number")
+  reason               String
+  publishedByAppUserId String   @map("published_by_app_user_id") @db.Uuid
+  publishedAt          DateTime @default(now()) @map("published_at") @db.Timestamptz(3)
+
+  entries CollectorAllowlistEntry[]
+
+  @@unique([organizationId, versionNumber])
+  @@map("collector_allowlist_versions")
+}
+
+model CollectorAllowlistEntry {
+  id            String                      @id @default(uuid(7)) @db.Uuid
+  versionId     String                      @map("version_id") @db.Uuid
+  kind          CollectorAllowlistEntryKind
+  key           String
+  applicationId String                      @map("application_id") @db.Uuid
+
+  version CollectorAllowlistVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+
+  @@unique([versionId, kind, key])
+  @@unique([versionId, applicationId])
+  @@map("collector_allowlist_entries")
+}
+
+// One row for each (registration, tool, day): the build made last wins, so several credentials of one registration merge.
+model AiUsageDay {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  deviceId       String        @map("device_id") @db.Uuid
+  registrationId String        @map("registration_id") @db.Uuid
+  credentialId   String        @map("credential_id") @db.Uuid
+  tool           AiToolKey
+  applicationId  String        @map("application_id") @db.Uuid
+  usageDate      DateTime      @map("usage_date") @db.Date
+  coverage       UsageCoverage
+  responses      Int
+  totalTokens    BigInt        @map("total_tokens")
+  generatedAt    DateTime      @map("generated_at") @db.Timestamptz(3)
+  contentHash    String        @map("content_hash")
+  receivedAt     DateTime      @default(now()) @map("received_at") @db.Timestamptz(3)
+
+  @@unique([registrationId, tool, usageDate])
+  @@index([deviceId, usageDate])
+  @@map("ai_usage_days")
+}
+
+model ToolStatusSnapshot {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  deviceId       String          @map("device_id") @db.Uuid
+  registrationId String          @map("registration_id") @db.Uuid
+  credentialId   String          @map("credential_id") @db.Uuid
+  tool           AiToolKey
+  observedAt     DateTime        @map("observed_at") @db.Timestamptz(3)
+  authStatus     ToolAuthStatus  @map("auth_status")
+  quotaStatus    ToolQuotaStatus @map("quota_status")
+  receivedAt     DateTime        @default(now()) @map("received_at") @db.Timestamptz(3)
+
+  windows ToolStatusWindow[]
+
+  @@unique([registrationId, tool, observedAt])
+  @@index([deviceId, tool, observedAt])
+  @@map("tool_status_snapshots")
+}
+
+model ToolStatusWindow {
+  snapshotId  String              @map("snapshot_id") @db.Uuid
+  code        ToolQuotaWindowCode
+  usedPercent Int                 @map("used_percent") @db.SmallInt
+  resetsAt    DateTime?           @map("resets_at") @db.Timestamptz(3)
+
+  snapshot ToolStatusSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@id([snapshotId, code])
+  @@map("tool_status_windows")
+}
+
+model IntakeRejection {
+  id             String                @id @default(uuid(7)) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  deviceId       String                @map("device_id") @db.Uuid
+  registrationId String?               @map("registration_id") @db.Uuid
+  credentialId   String                @map("credential_id") @db.Uuid
+  endpoint       IntakeEndpoint
+  usageDate      DateTime?             @map("usage_date") @db.Date
+  reasonCode     IntakeRejectionReason @map("reason_code")
+  rejectedAt     DateTime              @default(now()) @map("rejected_at") @db.Timestamptz(3)
+
+  @@index([deviceId, rejectedAt])
+  @@map("intake_rejections")
+}

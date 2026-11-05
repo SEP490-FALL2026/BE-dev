@@ -8,10 +8,13 @@ export interface CaseWire {
   id: string;
   employee: { id: string; employeeCode: string; fullName: string };
   state: 'HANDING_OVER' | 'LEFT' | 'CANCELLED';
+  accessBlockMode: 'WITH_LAST_DAY' | 'BLOCK_NOW';
   abrupt: boolean;
   lastWorkingDay: string;
   handoverDueOn: string | null;
   pastLastDay: boolean;
+  accessBlocked: boolean;
+  accessBlockedFrom: string | null;
   heldRights: number;
   accountLockMissing: boolean;
   closed: boolean;
@@ -67,7 +70,7 @@ export interface RightWire {
 export interface CaseRow {
   id: string;
   state: string;
-  abrupt: boolean;
+  access_block_mode: string;
   prior_work_state: string;
   last_working_day: string;
   departure_effective_on: string;
@@ -87,8 +90,12 @@ export class OffboardingHarness extends HandoverHarness {
   /** The working day before `day`, with no day off in the calendar of a test installation. */
   dueBefore = (day: string): string => subtractWorkingDays(day, 1, new Set());
 
+  /** A record; the mode defaults to the planned one, and a test that wants it missing passes `accessBlockMode: undefined`. */
   recordCase = (body: object, account: ApiAccount = this.sa) =>
-    request(this.server()).post('/api/v1/offboarding-cases').set(this.as(account)).send(body);
+    request(this.server())
+      .post('/api/v1/offboarding-cases')
+      .set(this.as(account))
+      .send({ accessBlockMode: 'WITH_LAST_DAY', ...body });
   readCase = (id: string, account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/offboarding-cases/${id}`).set(this.as(account));
   listCases = (query = '', account: ApiAccount = this.sa) =>
@@ -97,12 +104,47 @@ export class OffboardingHarness extends HandoverHarness {
     request(this.server()).get(`/api/v1/offboarding-cases/${id}/rights${query}`).set(this.as(account));
   caseChanges = (id: string, query = '', account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/offboarding-cases/${id}/changes${query}`).set(this.as(account));
+  /** The basis is given with every move and every cancellation (`S-10`); a test that wants it missing passes `grounds: undefined`. */
   changeLastDay = (id: string, body: object, account: ApiAccount = this.sa) =>
-    request(this.server()).post(`/api/v1/offboarding-cases/${id}/last-day-changes`).set(this.as(account)).send(body);
+    request(this.server())
+      .post(`/api/v1/offboarding-cases/${id}/last-day-changes`)
+      .set(this.as(account))
+      .send({ grounds: this.grounds, ...body });
   cancelCase = (id: string, body: object, account: ApiAccount = this.sa) =>
-    request(this.server()).post(`/api/v1/offboarding-cases/${id}/cancellation`).set(this.as(account)).send(body);
+    request(this.server())
+      .post(`/api/v1/offboarding-cases/${id}/cancellation`)
+      .set(this.as(account))
+      .send({ grounds: this.grounds, ...body });
   markLeft = (id: string, body: object = {}, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/departure`).set(this.as(account)).send(body);
+  /**
+   * The Super Admin marks the person left on their last working day (Q-04 B): a handover that has its last day ahead is first brought to
+   * today, since the person cannot leave before it. Awaited, or chained with `.expect(status)` like a request.
+   */
+  leaveOnLastDay = (
+    id: string,
+    body: object = {},
+    account: ApiAccount = this.sa,
+  ): Promise<request.Response> & { expect: (status: number) => Promise<request.Response> } => {
+    const done = (async () => {
+      await this.ctx.sql.query(
+        `UPDATE offboarding_cases SET last_working_day = $2::date WHERE id = $1 AND state = 'HANDING_OVER' AND last_working_day > $2::date`,
+        [id, this.today()],
+      );
+
+      return this.markLeft(id, body, account);
+    })();
+
+    return Object.assign(done, {
+      expect: async (status: number) => {
+        const response = await done;
+        if (response.status !== status)
+          throw new Error(`mark left: expected ${status}, got ${response.status} ${JSON.stringify(response.body)}`);
+
+        return response;
+      },
+    });
+  };
   lockAccount = (id: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/account-lock`).set(this.as(account)).send(body);
   revokeRights = (id: string, body: object, account: ApiAccount = this.it1) =>
@@ -127,6 +169,7 @@ export class OffboardingHarness extends HandoverHarness {
   body = (person: Person, extra: object = {}) => ({
     employeeId: person.employeeId,
     lastWorkingDay: this.day(10),
+    accessBlockMode: 'WITH_LAST_DAY',
     grounds: this.grounds,
     ...extra,
   });
@@ -175,7 +218,7 @@ export class OffboardingHarness extends HandoverHarness {
 
   async caseRow(id: string): Promise<CaseRow> {
     const { rows } = await this.ctx.sql.query<CaseRow>(
-      `SELECT id, state::text AS state, abrupt, prior_work_state::text AS prior_work_state,
+      `SELECT id, state::text AS state, access_block_mode::text AS access_block_mode, prior_work_state::text AS prior_work_state,
               to_char(last_working_day, 'YYYY-MM-DD') AS last_working_day,
               to_char(departure_effective_on, 'YYYY-MM-DD') AS departure_effective_on,
               to_char(handover_due_on, 'YYYY-MM-DD') AS handover_due_on, placement_closed_id,

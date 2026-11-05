@@ -118,7 +118,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
   /** The person has left: the departure is recorded and the day arrives. */
   const left = async (person: Person): Promise<CaseWire> => {
     const wire = await h.recordedCase(person);
-    await h.markLeft(wire.id).expect(200);
+    await h.leaveOnLastDay(wire.id).expect(200);
 
     return wire;
   };
@@ -206,7 +206,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
       expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.BENEFICIARY_NOT_LEFT');
 
       // The person has left and still nobody closed anything: what is open stays open and can now be closed.
-      await h.markLeft(wired.id).expect(200);
+      await h.leaveOnLastDay(wired.id).expect(200);
       const after = await openRequests(wired.id);
       expect(after.items.map((item) => [item.requestId, item.cancellable])).toEqual([
         [waiting, true],

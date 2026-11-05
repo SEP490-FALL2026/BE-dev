@@ -2,11 +2,13 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { RenewalFinancialSnapshot } from '../public/licensing-subscription-renewal.types';
 
 export type RenewalChoice = 'RENEW' | 'REDUCE' | 'CANCEL';
-export type RenewalState = 'PROPOSED' | 'DECIDED' | 'OUTCOME_RECORDED';
+/** `STALE`: a proposal closed because it was out of date when the head confirmed it; the IT Admin proposes again. */
+export type RenewalState = 'PROPOSED' | 'DECIDED' | 'OUTCOME_RECORDED' | 'STALE';
 export type ExecutionPoint = 'AS_PLANNED' | 'MID_TERM' | 'NEXT_RENEWAL';
 export type RenewalOutcomeKind = 'AS_DECIDED' | 'VENDOR_REFUSED' | 'DIFFERENT' | 'UNCONFIRMED';
 export type NoticeBasis = 'DECLARED' | 'INFERRED_UNCONFIRMED' | 'BY_END_DATE';
-export type DeciderRole = 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE';
+/** `SPENDING_APPROVER` and `CONFLICT_SUBSTITUTE` are historical: a decision of before `QĐ-94d`(2); none is written now. */
+export type DeciderRole = 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'OWNER_DEPARTMENT_HEAD';
 export type DeadlineOutcome = 'AUTO_RENEWAL_INCIDENT' | 'EXPIRY_MARKED';
 /** The order a seat is offered in when a reduction goes below the seats in use (`QĐ-66x`). */
 export type SeatRankGroup = 'REVOCATION_DECIDED' | 'HOLDER_LEFT' | 'USAGE_FLAGGED' | 'OTHER';

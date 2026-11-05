@@ -1,5 +1,3 @@
-import type { BusinessDate } from '../../../core/business-date';
-
 /**
  * What the history of the edits of a version keeps (`QĐ-91d`), as pure decisions: which fields an edit changed,
  * with their values before and after written as text (an amount as a decimal in the currency of the version, a date as
@@ -22,10 +20,9 @@ export interface FigureFacts {
   baseMinor: bigint;
   reserveMinor: bigint;
   totalMinor: bigint;
-  highValuePercent: number;
-  highValueAmountMinor: bigint | null;
   quarters: readonly [bigint, bigint, bigint, bigint] | null;
-  reason: string | null;
+  /** Why the reserve is not the default share of the base. */
+  reserveReason: string | null;
 }
 
 export interface LineFacts {
@@ -33,11 +30,6 @@ export interface LineFacts {
   planId: string | null;
   seats: number | null;
   amountMinor: bigint;
-  windowFrom: BusinessDate;
-  windowTo: BusinessDate;
-  servicePeriodMonths: number;
-  repeatCycle: string;
-  quoteValidUntil: BusinessDate | null;
   financeComment: string | null;
   adjustmentReason: string | null;
 }
@@ -47,22 +39,17 @@ const FIELD_ORDER: readonly string[] = [
   'base',
   'reserve',
   'total',
-  'highValuePercent',
-  'highValueAmount',
   'q1',
   'q2',
   'q3',
   'q4',
+  // An entry written before QĐ-97b can still carry the reason of a revision.
   'reason',
+  'reserveReason',
   'description',
   'planId',
   'seats',
   'amount',
-  'windowFrom',
-  'windowTo',
-  'servicePeriodMonths',
-  'repeatCycle',
-  'quoteValidUntil',
   'financeComment',
   'adjustmentReason',
   'fileName',
@@ -100,13 +87,11 @@ export function figureChange(
     ['base', amount(before.baseMinor), amount(after.baseMinor)],
     ['reserve', amount(before.reserveMinor), amount(after.reserveMinor)],
     ['total', amount(before.totalMinor), amount(after.totalMinor)],
-    ['highValuePercent', text(before.highValuePercent), text(after.highValuePercent)],
-    ['highValueAmount', amount(before.highValueAmountMinor), amount(after.highValueAmountMinor)],
     ['q1', quarter(before, 0), quarter(after, 0)],
     ['q2', quarter(before, 1), quarter(after, 1)],
     ['q3', quarter(before, 2), quarter(after, 2)],
     ['q4', quarter(before, 3), quarter(after, 3)],
-    ['reason', before.reason, after.reason],
+    ['reserveReason', before.reserveReason, after.reserveReason],
   ]);
 }
 
@@ -121,11 +106,6 @@ export function lineChange(
     ['planId', before.planId, after.planId],
     ['seats', text(before.seats), text(after.seats)],
     ['amount', money(before.amountMinor), money(after.amountMinor)],
-    ['windowFrom', before.windowFrom, after.windowFrom],
-    ['windowTo', before.windowTo, after.windowTo],
-    ['servicePeriodMonths', text(before.servicePeriodMonths), text(after.servicePeriodMonths)],
-    ['repeatCycle', before.repeatCycle, after.repeatCycle],
-    ['quoteValidUntil', before.quoteValidUntil, after.quoteValidUntil],
     ['financeComment', before.financeComment, after.financeComment],
     ['adjustmentReason', before.adjustmentReason, after.adjustmentReason],
   ]);
@@ -143,11 +123,6 @@ export function lineSnapshot(
     planId: line.planId,
     seats: text(line.seats),
     amount: money(line.amountMinor),
-    windowFrom: line.windowFrom,
-    windowTo: line.windowTo,
-    servicePeriodMonths: text(line.servicePeriodMonths),
-    repeatCycle: line.repeatCycle,
-    quoteValidUntil: line.quoteValidUntil,
     financeComment: line.financeComment,
     adjustmentReason: line.adjustmentReason,
   };

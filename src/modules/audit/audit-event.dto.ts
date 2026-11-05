@@ -49,7 +49,7 @@ export const listAuditEventsQuerySchema = z
 const auditEventSchema = z.strictObject({
   id: z.uuid(),
   occurredAt: z.iso.datetime(),
-  actorKind: z.enum(['USER', 'SYSTEM', 'OPERATOR']),
+  actorKind: z.enum(['USER', 'SYSTEM', 'OPERATOR', 'DEVICE']),
   actorAppUserId: z.uuid().nullable(),
   actorRoles: z.array(z.string()),
   action: z.string(),

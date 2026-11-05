@@ -20,6 +20,9 @@ dashboards; gốc `src/app/app.module.ts`.
     - `listPersonalSeatsOf`, `countPersonalSeatsOf`, `getSeatsHeldInPlans`, `listTerminatingAccess`,
       `listRevocationsOpenedFor` — đọc ghế của người; `selfExecutionMode` — IT Admin có được làm việc cho chính mình
       không (`QĐ-77m`).
+    - `pageHeldSoftwareOf` — phần mềm người đó đang giữ hôm nay (ghế cá nhân đã bắt đầu, chưa hỏng/hủy/hết), một trang và
+      tổng, cùng snapshot `RepeatableRead`, 3 câu lệnh dù bao nhiêu ghế; trưởng phòng đọc một thành viên
+      (`personnel/department-member`).
   - `LicensingHandoverApi` ([public/licensing-handover.api.ts](public/licensing-handover.api.ts)) — bàn giao:
     `openHandoverDuties`, `reconcileHandoverDuties`, `cancelHandoverDuties`, `getHandoverDutiesOf`.
   - `LicensingRenewalApi` ([public/licensing-renewal.api.ts](public/licensing-renewal.api.ts)) — trả ghế và gia hạn
@@ -62,10 +65,8 @@ dashboards; gốc `src/app/app.module.ts`.
   sở hữu ngân sách/chi phí (requests/budgets) thêm reader; chưa có thì snapshot đóng băng ghi `NOT_CONNECTED`, không 0.
 - Mở `RenewalUsageContributions` (`licensing.renewal-usage-evidence`, Contributions) — chưa có bên thêm: chủ evidence
   usage (G7) thêm reader; chưa có thì gia hạn nói `usage NOT_AVAILABLE` và xếp ghế không dùng dữ liệu sử dụng.
-- Đăng ký vào `identity-access.approval-role-change-listeners` và `organization.change-listeners` —
-  `subscription-renewal/spending-approver-wait.listener.ts`: mục gia hạn chờ Người duyệt chi (`waitingReason`
-  `NO_SPENDING_APPROVER`, không người thay thế, QĐ-93c) báo Super Admin một `CONTROLLED_WAIT_ALERT` (`subject`
-  `SUBSCRIPTION_RENEWAL`) mỗi đoạn chờ (gửi, thu hồi vai, người giữ vai nghỉ việc).
+- Gia hạn không còn listener chờ Người duyệt chi (`QĐ-94d`(2)): người xác nhận là trưởng phòng của phòng sở hữu thuê bao vào ngày
+  quyết; phòng chưa có trưởng phòng ⟹ hồ sơ `waitingReason = NO_HEAD`, Super Admin nhận một `CONTROLLED_WAIT_ALERT` lúc đề xuất.
 - Đăng ký vào: `catalog.seat-occupancy` — `assignment/assignment-seat-occupancy.listener.ts`;
   `organization.department-service-account-reader` — `assignment/assignment-service-account.listener.ts`;
   `organization.department-use-readers` — `provisioning/department-use/department-open-work.listener.ts`.
@@ -112,8 +113,9 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 - `saas-issue/` — báo lỗi quyền SaaS (BM-11, US-07-10, US-07-11); `saas-issues.controller.ts`; `SaasIssueService`,
   `SaasIssueHandlingService`; `saas-issue.job.ts`.
 - `subscription-renewal/` — gia hạn subscription theo kỳ (EP-11): `subscription-renewals.controller.ts`
-  (`/subscription-renewals*`, `/subscription-deadline-events`); nhóm `proposal/` (IT Admin đề xuất), `decision/` (Người duyệt chi
-  quyết, mở thu hồi phần vượt/hủy), `outcome/` (IT Admin ghi kết quả, kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
+  (`/subscription-renewals*`, `/subscription-deadline-events`); nhóm `proposal/` (IT Admin đề xuất, kèm danh sách ghế thu hồi),
+  `decision/` (trưởng phòng sở hữu xác nhận `CONFIRM` đề xuất đúng như đã lập, mở thu hồi; Finance chỉ đọc; đọc theo vai ở
+  `subscription-renewal-view.service.ts` + `readScopeOf`), `outcome/` (IT Admin ghi kết quả, kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
   `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`), `alerts/` (mốc T−15/T−7, chất lượng dữ liệu), `deadline/` (cờ thực hiện trễ, sự cố tự gia
   hạn/đánh dấu hết hạn); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; xếp ghế ở
   `subscription-renewal-ranking.policy.ts`. Quyết định không tạo khoản cam kết ngân sách (`QĐ-62s`). Cột JSON

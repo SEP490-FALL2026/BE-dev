@@ -10,9 +10,9 @@ import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { OffboardingAuditService } from './offboarding-audit.service';
 import { OffboardingRefusedError } from './offboarding.errors';
 import { OffboardingFrame } from './offboarding-frame.service';
-import { accountLockRefusal, markLeftRefusal } from './offboarding.policy';
+import { accountLockRefusal, isBlocked, markLeftRefusal, ownBlock } from './offboarding.policy';
 import { OffboardingRepo } from './offboarding.repo';
-import type { AccountLockInput, MarkLeftInput, OffboardingRecord } from './offboarding.types';
+import type { AccountLockInput, OffboardingRecord } from './offboarding.types';
 
 /**
  * The person becomes `LEFT` and the lock of their company account is written (`US-03-04` AC-3, AC-9, AC-10, AC-18, `QĐ-77i`). The
@@ -36,15 +36,15 @@ export class OffboardingLeftService {
    * Turns a handover under way into the departure: an event of the person, which only the Super Admin records and never about
    * themselves. Throws OffboardingRefusedError and PersonnelAccessRefusedError.
    */
-  markLeft(actor: PersonnelActor, id: string, input: MarkLeftInput, outer?: DbTx): Promise<OffboardingRecord> {
-    return this.frame.runEvent(actor, id, { outer }, async (tx, { held, today, recordedOn }) => {
-      const refusal = markLeftRefusal({ state: held.state, today, departedOn: input.departedOn, recordedOn });
+  markLeft(actor: PersonnelActor, id: string, outer?: DbTx): Promise<OffboardingRecord> {
+    return this.frame.runEvent(actor, id, { outer }, async (tx, { held, today }) => {
+      const refusal = markLeftRefusal({ state: held.state, today, lastWorkingDay: held.lastWorkingDay });
       if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
-      const leftOn = input.departedOn ?? today;
+      // The person left on their last working day, whenever the Super Admin marks it; the lock of the account is the IT Admin's step.
+      const leftOn = held.lastWorkingDay;
       const account = await this.guard.standIn(tx, actor);
       const left = await this.repo.markLeft(tx, held.id, { appUserId: account.appUserId, leftOn });
       await this.leaveInTx(tx, actor, left, leftOn, 'HANDING_OVER');
-      if (input.accountLock) await this.writeAccountLock(tx, account, left, input.accountLock);
 
       return (await this.repo.find(held.id, tx)) ?? left;
     });
@@ -63,7 +63,7 @@ export class OffboardingLeftService {
     await this.repo.insertChange(tx, {
       caseId: record.id,
       kind: 'MARKED_LEFT',
-      detail: { leftOn, abrupt: record.abrupt, from },
+      detail: { leftOn, accessBlockMode: record.accessBlockMode, from },
       changedByAppUserId: actorColumns(actor).appUserId,
       changedByTicketId: actorColumns(actor).ticketId,
     });
@@ -74,7 +74,13 @@ export class OffboardingLeftService {
       record,
       'OFFBOARDING_CASE.LEFT',
       { state: from === 'HANDING_OVER' ? 'HANDING_OVER' : null },
-      { state: 'LEFT', leftOn, abrupt: record.abrupt, lastWorkingDay: record.lastWorkingDay, alert: 'VERY_HIGH' },
+      {
+        state: 'LEFT',
+        leftOn,
+        accessBlockMode: record.accessBlockMode,
+        lastWorkingDay: record.lastWorkingDay,
+        alert: 'VERY_HIGH',
+      },
     );
     await this.audit.accountLockReminder(tx, record);
     await this.hooks.onLeft(tx, {
@@ -87,8 +93,12 @@ export class OffboardingLeftService {
 
   /** Writes who locked the company account, when and what was done, once (`QĐ-77i`). Throws OffboardingRefusedError. */
   recordAccountLock(actor: AuthenticatedPrincipal, id: string, input: AccountLockInput): Promise<OffboardingRecord> {
-    return this.frame.runTechnical(actor, id, {}, async (tx, { held }) => {
-      const refusal = accountLockRefusal({ state: held.state, locked: held.accountLockAt !== null });
+    return this.frame.runTechnical(actor, id, {}, async (tx, { held, today }) => {
+      const block = await this.identity.findDepartureBlock(held.employeeId, tx);
+      const refusal = accountLockRefusal({
+        blocked: isBlocked(held, ownBlock(block, held.id), today),
+        locked: held.accountLockAt !== null,
+      });
       if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
       await this.writeAccountLock(tx, actor, held, input);
 
@@ -109,13 +119,13 @@ export class OffboardingLeftService {
     await this.repo.insertChange(tx, {
       caseId: record.id,
       kind: 'ACCOUNT_LOCK_RECORDED',
-      detail: { urgent: record.abrupt },
+      detail: { urgent: record.accessBlockMode === 'BLOCK_NOW' },
       changedByAppUserId: actor.appUserId,
       changedByTicketId: null,
     });
     await this.audit.changed(tx, userActor(actor), record, 'OFFBOARDING_CASE.ACCOUNT_LOCK_RECORDED', null, {
       employeeId: record.employeeId,
-      urgent: record.abrupt,
+      urgent: record.accessBlockMode === 'BLOCK_NOW',
     });
   }
 }

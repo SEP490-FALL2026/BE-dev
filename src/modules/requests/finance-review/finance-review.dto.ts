@@ -12,7 +12,6 @@ const codeSchema = z.enum([
   'NO_ACTIVE_BUDGET',
   'CLOSED_OR_EXPIRED_BUDGET_PERIOD',
   'STALE_COST_EVIDENCE',
-  'PLAN_LINE_OVERDUE',
 ]);
 
 /**
@@ -80,8 +79,6 @@ const reviewSummarySchema = z.strictObject({
   amount: money.nullable(),
   /** The first code the check gave, the most pressing. */
   primaryCode: codeSchema.nullable(),
-  planLineOverdue: z.boolean(),
-  offPlan: z.boolean(),
 });
 
 const checkSchema = z.strictObject({
@@ -97,10 +94,7 @@ const checkSchema = z.strictObject({
   route: z.enum(['BLOCKED', 'FINANCE_REVIEW', 'SPEND_APPROVAL']),
   primaryCode: codeSchema.nullable(),
   staleCostEvidence: z.boolean(),
-  planLineOverdue: z.boolean(),
   periodClosed: z.boolean(),
-  /** The head chose "outside the plan": information only, never an exception (`US-06-12` AC-10). */
-  offPlan: z.boolean(),
   /** The spend step has no independent review, because Finance is the one the request is for (`US-06-13` AC-5). */
   noIndependentReview: z.boolean(),
   /** What binds the company in all, in the reporting currency; it is never compared with the budget of one year. */
@@ -151,8 +145,6 @@ const yearSchema = z.strictObject({
   shareBasisPoints: z.number().int().nonnegative().nullable(),
   /** What the other requests of the Cost Center that wait to be decided cost in the year; null for a year that has ended. */
   pending: money.nullable(),
-  /** The spending approver accepted the exception of this year in their decision (`US-06-01` AC-21). */
-  overridden: z.boolean(),
 });
 
 export class ReviewBodyDto extends createZodDto(reviewBodySchema) {}

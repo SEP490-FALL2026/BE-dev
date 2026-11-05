@@ -9,7 +9,7 @@ export class SeedArgumentError extends Error {
 }
 
 export const SEED_USAGE = `SEED_PROTOCOL 1
-Usage: pnpm ops:seed <check|plan|apply> --environment LOCAL_TEST|SHARED [--fixture shared-demo-v2]
+Usage: pnpm ops:seed <check|plan|apply> --environment LOCAL_TEST|SHARED [--fixture shared-demo-v3]
   [--api-url <origin>] [--operator-reference <reference>] [--allow-bootstrap] [--super-admin-email <email>]
   [--secrets-stdin] [--json]
 
@@ -116,7 +116,7 @@ function commandOf(
   }
   const operator = mode === 'check' ? (values['operator-reference'] ?? '') : text('operator-reference');
   const superAdminEmail = superAdminEmailOf(values['super-admin-email']);
-  const fixture = values.fixture?.trim() || 'shared-demo-v2';
+  const fixture = values.fixture?.trim() || 'shared-demo-v3';
   const maxReference = 100 - `SEED:${fixture}:`.length;
   if (operator.length > maxReference)
     throw new SeedArgumentError(`--operator-reference is at most ${maxReference} characters for this fixture.`);

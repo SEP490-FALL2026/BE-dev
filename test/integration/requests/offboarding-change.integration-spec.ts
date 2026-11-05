@@ -75,7 +75,7 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
       ];
 
       expect(responses.map((response) => [response.status, h.codeOf(response)])).toEqual([
-        [422, 'OFFBOARDING_CASE.REASON_REQUIRED'],
+        [422, 'VALIDATION_ERROR'],
         [422, 'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID'],
         [422, 'OFFBOARDING_CASE.NO_CHANGE'],
       ]);
@@ -101,7 +101,7 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
 
       const other = await leaver();
       const left = await h.recordedCase(other.person);
-      await h.markLeft(left.id).expect(200);
+      await h.leaveOnLastDay(left.id).expect(200);
       const response = await h.changeLastDay(left.id, { lastWorkingDay: h.day(20), reason: 'Đã nghỉ' });
       expect([response.status, h.codeOf(response)]).toEqual([409, 'OFFBOARDING_CASE.CASE_LEFT']);
     });
@@ -210,14 +210,14 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
       const wire = await h.recordedCase(head, { successor: { kind: 'EMPLOYEE', employeeId: next.employeeId } });
 
       const none = await h.cancelCase(wire.id, {});
-      expect([none.status, h.codeOf(none)]).toEqual([422, 'OFFBOARDING_CASE.REASON_REQUIRED']);
+      expect([none.status, h.codeOf(none)]).toEqual([422, 'VALIDATION_ERROR']);
       await h.cancelCase(wire.id, { reason: 'Ở lại' }).expect(200);
 
       expect(await h.headPeriods(department.id)).toEqual([
         expect.objectContaining({ employee_id: head.employeeId, valid_to: null }),
       ]);
       const left = await h.recordedCase((await leaver()).person);
-      await h.markLeft(left.id).expect(200);
+      await h.leaveOnLastDay(left.id).expect(200);
       const response = await h.cancelCase(left.id, { reason: 'Muộn' });
       expect([response.status, h.codeOf(response)]).toEqual([409, 'OFFBOARDING_CASE.CASE_LEFT']);
     });
@@ -229,7 +229,12 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
           employeeId: person.employeeId,
           startedOn: h.day(-30),
           approvedReturnOn: returnOn,
-          grounds: { type: 'LEAVE_APPROVAL', reference: 'DN-05/2026', issuer: 'HR Department', issuedOn: '2026-05-25' },
+          grounds: {
+            type: 'APPROVED_APPLICATION',
+            reference: 'DN-05/2026',
+            issuer: 'HR Department',
+            issuedOn: '2026-05-25',
+          },
         })
         .expect(201);
 

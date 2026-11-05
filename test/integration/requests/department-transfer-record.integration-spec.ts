@@ -299,7 +299,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
     expect(wire.status).toBe('PENDING');
     expect(wire.warnings).toEqual([
       {
-        code: 'BUSINESS_OWNER_REPLACEMENT_NEEDED',
+        code: 'BUSINESS_OWNER_KEEP_OR_CHANGE',
         applications: [expect.objectContaining({ name: expect.any(String) as unknown })],
         totalApplications: 1,
       },
@@ -432,9 +432,9 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
         body(person.employeeId, { grounds: { ...h.grounds, reference: 'BM09-2026-000042' } }),
       );
 
-      expect([none.status, codeOf(none)]).toEqual([422, 'DEPARTMENT_TRANSFER.GROUNDS_REQUIRED']);
-      expect([partial.status, codeOf(partial)]).toEqual([422, 'DEPARTMENT_TRANSFER.GROUNDS_INCOMPLETE']);
-      expect(h.detailsOf(partial)).toEqual({ missing: ['issuer'] });
+      expect([none.status, codeOf(none)]).toEqual([422, 'VALIDATION_ERROR']);
+      expect([partial.status, codeOf(partial)]).toEqual([422, 'VALIDATION_ERROR']);
+      expect(JSON.stringify(h.detailsOf(partial))).toContain('grounds.issuer');
       expect([notice.status, codeOf(notice)]).toEqual([422, 'DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE']);
       expect(await state(person)).toEqual(before);
     });

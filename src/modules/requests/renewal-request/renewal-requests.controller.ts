@@ -23,12 +23,8 @@ const SUBMIT_ERRORS = [
   {
     status: HttpStatus.FORBIDDEN,
     description:
-      'The caller is neither the holder nor the head of the department of the holder (RENEWAL_REQUEST.NOT_HOLDER), heads another department (RENEWAL_REQUEST.OUTSIDE_DEPARTMENT), or is the Super Admin, who sends no request (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST).',
-    examples: [
-      RENEWAL_ERROR_EXAMPLES.NOT_HOLDER,
-      RENEWAL_ERROR_EXAMPLES.OUTSIDE_DEPARTMENT,
-      RENEWAL_ERROR_EXAMPLES.SUPER_ADMIN_CANNOT_REQUEST,
-    ],
+      'The caller is not the holder of the seat, a head of the department included (RENEWAL_REQUEST.NOT_HOLDER), or is the Super Admin, who sends no request (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST).',
+    examples: [RENEWAL_ERROR_EXAMPLES.NOT_HOLDER, RENEWAL_ERROR_EXAMPLES.SUPER_ADMIN_CANNOT_REQUEST],
   },
   {
     status: HttpStatus.NOT_FOUND,
@@ -38,11 +34,10 @@ const SUBMIT_ERRORS = [
   {
     status: HttpStatus.CONFLICT,
     description:
-      'The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), the head asks after the end (RENEWAL_REQUEST.END_PASSED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). Nothing is written.',
+      'The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). Nothing is written.',
     examples: [
       RENEWAL_ERROR_EXAMPLES.ASSIGNMENT_NOT_RENEWABLE,
       RENEWAL_ERROR_EXAMPLES.ALREADY_REQUESTED,
-      RENEWAL_ERROR_EXAMPLES.END_PASSED,
       RENEWAL_ERROR_EXAMPLES.APPLICATION_RETIRED,
       RENEWAL_ERROR_EXAMPLES.ALREADY_HOLDS_ACCESS,
       RENEWAL_ERROR_EXAMPLES.NO_DEPARTMENT,
@@ -52,20 +47,13 @@ const SUBMIT_ERRORS = [
   {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The form is incomplete or invalid (VALIDATION_ERROR). The end is not after the end the right has, or after today (RENEWAL_REQUEST.END_NOT_AFTER), the term is too long (RENEWAL_REQUEST.END_TOO_FAR), a head who sends it for more than twelve months gives no confirmation (RENEWAL_REQUEST.TERM_CONFIRMATION_REQUIRED), or the sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.',
-    examples: [
-      VALIDATION_EXAMPLE,
-      RENEWAL_ERROR_EXAMPLES.END_NOT_AFTER,
-      RENEWAL_ERROR_EXAMPLES.END_TOO_FAR,
-      RENEWAL_ERROR_EXAMPLES.TERM_CONFIRMATION_REQUIRED,
-      RENEWAL_ERROR_EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE,
-      RENEWAL_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE,
-    ],
+      'The form is incomplete or invalid (VALIDATION_ERROR): the seat, the months more (1 to 12) and the reason are required, and nothing else is taken. The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.',
+    examples: [VALIDATION_EXAMPLE, RENEWAL_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE],
   },
 ] as const;
 
 /**
- * The renewal of a right that ends on a day: the holder, or the head of their department, asks for a later end. The request is the
+ * The renewal of a right that ends on a day: the holder asks for a later end. The request is the
  * same as any other (it is read, withdrawn and decided through the routes of requests); this makes it. Nothing here edits the end
  * a right has.
  */

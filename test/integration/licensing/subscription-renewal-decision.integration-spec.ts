@@ -10,7 +10,12 @@ interface DetailWire {
   usage: { status: string };
   period: { seatsInUse: number };
   waitingReason: string | null;
-  proposal: { choice: string; quantity: number | null; businessOwnerOpinion: string | null };
+  proposal: {
+    choice: string;
+    quantity: number | null;
+    businessOwnerOpinion: string | null;
+    releasedSeatCount: number;
+  };
   decision: {
     choice: string;
     deciderRole: string;
@@ -18,17 +23,17 @@ interface DetailWire {
     executionPoint: string;
     seatsInUseAtDecision: number;
     releasedSeatCount: number;
-    snapshot: { source: string };
+    snapshot: { source: string } | null;
   } | null;
 }
 
 /**
- * EP-11 on real PostgreSQL: the proposal of the IT Admin (`US-11-05`) and the decision of the person who decides spending
- * (`US-11-02`) — who may do what (SoD), the queue, a cancellation in use, a reduction below the seats in use with the seats chosen
- * from the ranked list, the finance gate of a department without a Cost Center, the execution point of a late decision, the
- * frozen decision, and no budget commitment.
+ * EP-11 on real PostgreSQL: the proposal of the IT Admin with the seats to take back (`US-11-05`) and the confirmation of the head
+ * of the department that owns the subscription (`QĐ-94d`(2), `US-11-02`) — who may do and read what (SoD), the queue, a department
+ * with no head, a cancellation in use, a reduction below the seats in use, no wait for a Cost Center, the execution point of a late
+ * confirmation, the frozen decision, and no budget commitment.
  */
-describe('the proposal and the decision of a renewal (integration, real PostgreSQL)', () => {
+describe('the proposal and the confirmation of a renewal (integration, real PostgreSQL)', () => {
   let unit: RenewalUnit;
 
   beforeAll(async () => {
@@ -41,36 +46,54 @@ describe('the proposal and the decision of a renewal (integration, real PostgreS
     await h.stop();
   });
 
-  const detail = async (id: string) => h.dataOf<{ renewal: DetailWire }>(await h.read(id).expect(200)).renewal;
+  const detail = async (id: string, account = h.it1) =>
+    h.dataOf<{ renewal: DetailWire }>(await h.read(id, account).expect(200)).renewal;
+  const alertsOf = async (renewalId: string) =>
+    (
+      await h.ctx.sql.query<{ recipient_employee_id: string; params: Record<string, unknown>; event_key: string }>(
+        `SELECT recipient_employee_id, params, event_key FROM in_app_notifications
+          WHERE code = 'CONTROLLED_WAIT_ALERT' AND subject_id = $1 ORDER BY created_at, id`,
+        [renewalId],
+      )
+    ).rows;
 
   describe('the proposal (US-11-05 AC-1, AC-3, AC-5 → AC-8, AC-15)', () => {
-    it('puts the case in the queue of the decider, who is told, with the opinion the IT Admin recorded', async () => {
-      const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10 });
+    it('puts the case in the queue of the head of the owner department, who is told, with the seats to take back and the opinion recorded', async () => {
+      const reduceUnit = await h.unit(3);
+      const { subscriptionId, seats } = await h.termWithSeats(reduceUnit, 20, { quantity: 5 });
 
       const response = await h
         .propose({
           subscriptionId,
           choice: 'REDUCE',
-          proposedQuantity: 8,
-          businessOwnerOpinion: 'Keep eight seats',
+          proposedQuantity: 1,
+          releasedAssignmentIds: [seats[2], seats[0]],
+          businessOwnerOpinion: 'Keep one seat',
         })
         .expect(201);
       const renewal = h.dataOf<{ renewal: DetailWire }>(response).renewal;
 
       expect(renewal).toMatchObject({
         state: 'PROPOSED',
+        waitingReason: null,
         milestone: { basis: 'DECLARED', baseDate: h.inDays(20) },
         usage: { status: 'NOT_AVAILABLE' },
         period: { seatsInUse: 3 },
-        proposal: { choice: 'REDUCE', quantity: 8, businessOwnerOpinion: 'Keep eight seats' },
+        proposal: { choice: 'REDUCE', quantity: 1, businessOwnerOpinion: 'Keep one seat', releasedSeatCount: 2 },
         decision: null,
       });
-      const told = await h.notices('SUBSCRIPTION_RENEWAL_PROPOSED', renewal.id);
-      expect(told.map((row) => row.recipient_employee_id)).toEqual([h.boss.employeeId]);
+      expect(
+        (await h.notices('SUBSCRIPTION_RENEWAL_PROPOSED', renewal.id)).map((row) => row.recipient_employee_id),
+      ).toEqual([reduceUnit.head.employeeId]);
       const queue = h.dataOf<{ items: { id: string }[] }>(
-        await h.renewals(`?state=PROPOSED&subscriptionId=${subscriptionId}`, h.boss.account).expect(200),
+        await h.renewals(`?state=PROPOSED&subscriptionId=${subscriptionId}`, reduceUnit.head.account).expect(200),
       );
       expect(queue.items.map((item) => item.id)).toEqual([renewal.id]);
+      const { rows: stored } = await h.ctx.sql.query<{ assignment_id: string }>(
+        `SELECT assignment_id FROM subscription_renewal_released_seats WHERE renewal_id = $1 ORDER BY position`,
+        [renewal.id],
+      );
+      expect(stored.map((row) => row.assignment_id).sort()).toEqual([seats[0], seats[2]].sort());
       expect(await h.auditOf('SubscriptionRenewal', renewal.id)).toEqual(
         expect.arrayContaining([expect.objectContaining({ action: 'SUBSCRIPTION_RENEWAL.PROPOSED' })]),
       );
@@ -79,31 +102,21 @@ describe('the proposal and the decision of a renewal (integration, real PostgreS
       );
     });
 
-    it('keeps the renewal out of the spend-approval queue of the phone: it is read and decided only through /subscription-renewals (US-16-03 AC-5, a08)', async () => {
-      const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10 });
-      const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
-      const mobile = { ...h.as(h.boss.account), 'User-Agent': 'SLM-Mobile/1.0 (iOS 19)', 'X-Client': 'mobile' };
-      const spendQueue = async () =>
-        h.dataOf<{ items: { requestId: string }[] }>(
-          await request(h.server()).get('/api/v1/spend-approvals').query({ pageSize: 100 }).set(mobile).expect(200),
-        ).items;
+    it('refuses seats that are not exactly the excess, seats on a renewal or a cancellation, and writes nothing', async () => {
+      const { subscriptionId, seats } = await h.termWithSeats(await h.unit(3), 20, { quantity: 5 });
+      const before = await h.count('subscription_renewals');
 
-      const before = (await spendQueue()).map((item) => item.requestId);
-      expect(before).not.toContain(id);
-      expect(before).not.toContain(subscriptionId);
-      const { rows: requests } = await h.ctx.sql.query<{ id: string }>(
-        `SELECT id FROM access_requests WHERE id = ANY($1::uuid[])`,
-        [before],
-      );
-      expect(requests).toHaveLength(before.length);
-      const proposed = h.dataOf<{ items: { id: string }[] }>(
-        await h.renewals(`?state=PROPOSED&subscriptionId=${subscriptionId}`, h.boss.account).expect(200),
-      );
-      expect(proposed.items.map((item) => item.id)).toEqual([id]);
-
-      await h.decideRenewal(id, { choice: 'RENEW' }, h.boss.account).expect(200);
-      expect((await spendQueue()).map((item) => item.requestId)).not.toContain(id);
-      expect((await detail(id)).state).toBe('DECIDED');
+      const short = await h
+        .propose({ subscriptionId, choice: 'REDUCE', proposedQuantity: 1, releasedAssignmentIds: [seats[0]] })
+        .expect(422);
+      expect(h.codeOf(short)).toBe('SUBSCRIPTION_RENEWAL.EXCESS_SELECTION_INVALID');
+      expect(h.detailsOf(short)).toEqual({ required: 2, selected: 1 });
+      for (const choice of ['RENEW', 'CANCEL']) {
+        expect(
+          h.codeOf(await h.propose({ subscriptionId, choice, releasedAssignmentIds: [seats[0]] }).expect(422)),
+        ).toBe('SUBSCRIPTION_RENEWAL.EXCESS_SELECTION_INVALID');
+      }
+      expect(await h.count('subscription_renewals')).toBe(before);
     });
 
     it('refuses a period with no milestone, guessing none, and a draft or a reduction that is not one', async () => {
@@ -120,7 +133,6 @@ describe('the proposal and the decision of a renewal (integration, real PostgreS
       expect(
         h.codeOf(await h.propose({ subscriptionId: dated, choice: 'REDUCE', proposedQuantity: 10 }).expect(422)),
       ).toBe('SUBSCRIPTION_RENEWAL.QUANTITY_INVALID');
-      expect(await h.count('subscription_renewals')).toBeGreaterThanOrEqual(1);
     });
 
     it('keeps one case per period when two proposals race', async () => {
@@ -138,53 +150,228 @@ describe('the proposal and the decision of a renewal (integration, real PostgreS
       expect(rows).toHaveLength(1);
     });
 
-    it('lets neither the decider, Finance nor an employee propose, and keeps the cases from a head and an employee (SoD-2)', async () => {
+    it('waits for a head when the owner department has none, and tells the Super Admin once (QĐ-93c, US-11-05 AC-23)', async () => {
+      const bare = await h.bareDepartment();
+      const subscriptionId = await h.term({ ownerDepartmentId: bare.id, noticeDeadline: h.inDays(21), quantity: 10 });
+
+      const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
+
+      expect(await detail(id)).toMatchObject({ state: 'PROPOSED', waitingReason: 'NO_HEAD' });
+      const alerts = await alertsOf(id);
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].recipient_employee_id).toBe(h.seed.superAdmin.employeeId);
+      expect(alerts[0].params).toEqual({
+        renewalId: id,
+        subscriptionId,
+        waitingReason: 'NO_HEAD',
+        configurationHint: 'ASSIGN_DEPARTMENT_HEAD',
+      });
+      expect(alerts[0].event_key).toMatch(new RegExp(`^CONTROLLED_WAIT_ALERT:SUBSCRIPTION_RENEWAL:${id}:sent:\\d+$`));
+      expect(await h.notices('SUBSCRIPTION_RENEWAL_PROPOSED', id)).toEqual([]);
+      // Nobody takes the place of the head: the spending approver and the IT Admin who proposed are refused, and role changes tell nothing.
+      for (const account of [h.boss.account, h.it1, h.finance]) {
+        expect(h.codeOf(await h.confirmRenewal(id, account).expect(403))).toBe('SUBSCRIPTION_RENEWAL.NOT_DECIDER');
+      }
+      await h.clearRole('SPENDING_APPROVER');
+      await h.setRole('SPENDING_APPROVER', h.boss);
+      expect(await alertsOf(id)).toHaveLength(1);
+    });
+  });
+
+  describe('who reads the cases (QĐ-94d(2), SoD-2)', () => {
+    it('gives the IT Admin and Finance every case, a head only the cases of their department, and the others none', async () => {
+      const mine = await h.termWithSeats(unit, 26);
+      const other = await h.unit(1);
+      const theirs = await h.termWithSeats(other, 26);
+      const mineId = await h.proposedRenewal({ subscriptionId: mine.subscriptionId, choice: 'RENEW' });
+      const theirsId = await h.proposedRenewal({ subscriptionId: theirs.subscriptionId, choice: 'RENEW' });
+      const idsOf = async (account: typeof h.it1) =>
+        h
+          .dataOf<{ items: { id: string }[] }>(await h.renewals('?pageSize=100', account).expect(200))
+          .items.map((item) => item.id);
+
+      expect(await idsOf(h.it1)).toEqual(expect.arrayContaining([mineId, theirsId]));
+      expect(await idsOf(h.finance)).toEqual(expect.arrayContaining([mineId, theirsId]));
+      const headSees = await idsOf(unit.head.account);
+      expect(headSees).toContain(mineId);
+      expect(headSees).not.toContain(theirsId);
+      await h.read(mineId, unit.head.account).expect(200);
+      expect(h.codeOf(await h.read(theirsId, unit.head.account).expect(404))).toBe('SUBSCRIPTION_RENEWAL.NOT_FOUND');
+      for (const account of [h.boss.account, h.employee, unit.members[0].account, h.bystander.account]) {
+        expect(h.codeOf(await h.renewals('', account).expect(403))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
+        expect(h.codeOf(await h.read(mineId, account).expect(403))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
+      }
+    });
+
+    it('shows the head the holder by code and name, the seats proposed, the last activity when there is one, and no email; Finance does not read the seats', async () => {
+      const seatUnit = await h.unit(3);
+      const { subscriptionId, seats } = await h.termWithSeats(seatUnit, 27, { quantity: 5 });
+      const id = await h.proposedRenewal({
+        subscriptionId,
+        choice: 'REDUCE',
+        proposedQuantity: 1,
+        releasedAssignmentIds: [seats[0], seats[1]],
+      });
+      type Ranking = {
+        items: {
+          assignmentId: string;
+          employee: Record<string, unknown>;
+          lastActivityOn: string | null;
+          inProposal: boolean;
+        }[];
+        pagination: { totalItems: number };
+      };
+
+      const all = h.dataOf<Ranking>(await h.ranking(id, seatUnit.head.account).expect(200));
+      const proposed = h.dataOf<Ranking>(await h.ranking(id, seatUnit.head.account, '?proposedOnly=true').expect(200));
+
+      expect(all.pagination.totalItems).toBe(3);
+      expect(
+        all.items
+          .filter((item) => item.inProposal)
+          .map((item) => item.assignmentId)
+          .sort(),
+      ).toEqual([seats[0], seats[1]].sort());
+      expect(proposed.items.map((item) => item.assignmentId).sort()).toEqual([seats[0], seats[1]].sort());
+      expect(proposed.pagination.totalItems).toBe(2);
+      for (const item of all.items) {
+        expect(Object.keys(item.employee).sort()).toEqual(['employeeCode', 'fullName', 'id']);
+        expect(item.lastActivityOn).toBeNull();
+      }
+      expect(JSON.stringify(all)).not.toMatch(/@acme\.vn/);
+      expect(h.codeOf(await h.ranking(id, h.finance).expect(403))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
+      const otherHead = (await h.unit(1)).head.account;
+      expect(h.codeOf(await h.ranking(id, otherHead).expect(404))).toBe('SUBSCRIPTION_RENEWAL.NOT_FOUND');
+    });
+
+    it('lets neither the spending approver, Finance nor an employee propose', async () => {
       const subscriptionId = await h.term({ ownerDepartmentId: unit.department.id, noticeDeadline: h.inDays(25) });
 
       expect((await h.propose({ subscriptionId, choice: 'RENEW' }, h.boss.account)).status).toBe(403);
       expect((await h.propose({ subscriptionId, choice: 'RENEW' }, h.finance)).status).toBe(403);
-      expect(h.codeOf(await h.renewals('', unit.head.account).expect(403))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
-      expect(h.codeOf(await h.renewals('', h.employee).expect(403))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
-      await h.renewals('', h.finance).expect(200);
+      expect((await h.propose({ subscriptionId, choice: 'RENEW' }, unit.head.account)).status).toBe(403);
     });
   });
 
-  describe('the decision (US-11-02)', () => {
-    it('is the decider’s alone, written once with its snapshot, and holds no budget commitment (AC-3, AC-6, AC-9, AC-14, AC-17)', async () => {
+  describe('the confirmation (US-11-02, QĐ-94d(2))', () => {
+    it('is the head’s alone, written once with its role and snapshot, tells the IT Admin and Finance, and holds no budget commitment', async () => {
       const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 15);
       const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
       const commitmentsBefore = await h.count('budget_commitments');
 
-      for (const account of [h.it1, h.finance, h.employee, unit.head.account]) {
-        expect(h.codeOf(await h.decideRenewal(id, { choice: 'RENEW' }, account).expect(403))).toBe(
-          'SUBSCRIPTION_RENEWAL.NOT_DECIDER',
-        );
+      for (const account of [h.boss.account, h.it1, h.finance, h.employee]) {
+        expect(h.codeOf(await h.confirmRenewal(id, account).expect(403))).toBe('SUBSCRIPTION_RENEWAL.NOT_DECIDER');
       }
-      const decided = h.dataOf<{ renewal: DetailWire }>(
-        await h.decideRenewal(id, { choice: 'RENEW', reason: 'Still used by the team' }, h.boss.account).expect(200),
+      // The head of another department finds no such case (A-M2).
+      expect(h.codeOf(await h.confirmRenewal(id, (await h.unit(1)).head.account).expect(404))).toBe(
+        'SUBSCRIPTION_RENEWAL.NOT_FOUND',
+      );
+      const confirmed = h.dataOf<{ renewal: DetailWire }>(
+        await h.confirmRenewal(id, unit.head.account, { reason: 'Still used by the team' }).expect(200),
       ).renewal;
 
-      expect(decided.decision).toMatchObject({
+      expect(confirmed.decision).toMatchObject({
         choice: 'RENEW',
-        deciderRole: 'SPENDING_APPROVER',
+        deciderRole: 'OWNER_DEPARTMENT_HEAD',
         decidedAfterDeadline: false,
         executionPoint: 'AS_PLANNED',
         snapshot: { source: 'NOT_CONNECTED' },
       });
+      // The IT Admin does not read the money the head saw.
+      expect((await detail(id, h.it1)).decision?.snapshot).toBeNull();
+      expect((await detail(id, h.finance)).decision?.snapshot).toMatchObject({ source: 'NOT_CONNECTED' });
       expect(await h.count('budget_commitments')).toBe(commitmentsBefore);
-      expect(await h.count('subscriptions')).toBeGreaterThan(0);
-      expect(h.codeOf(await h.decideRenewal(id, { choice: 'CANCEL' }, h.boss.account).expect(409))).toBe(
+      expect(h.codeOf(await h.confirmRenewal(id, unit.head.account).expect(409))).toBe(
         'SUBSCRIPTION_RENEWAL.NOT_AWAITING_DECISION',
       );
       await expect(
         h.ctx.sql.query(`UPDATE subscription_renewals SET decided_choice = 'CANCEL' WHERE id = $1`, [id]),
       ).rejects.toMatchObject({ constraint: 'subscription_renewals_decision_is_final' });
-      expect((await h.outcome(id, { outcome: 'UNCONFIRMED' }, h.boss.account)).status).toBe(403);
+      expect((await h.outcome(id, { outcome: 'UNCONFIRMED' }, unit.head.account)).status).toBe(403);
       const told = await h.notices('SUBSCRIPTION_RENEWAL_DECIDED', id);
-      expect(told.map((row) => row.recipient_employee_id)).toEqual([h.it1.employeeId]);
+      expect(told.map((row) => row.recipient_employee_id).sort()).toEqual(
+        [h.it1.employeeId, h.finance.employeeId].sort(),
+      );
       expect(await h.auditOf('SubscriptionRenewal', id)).toEqual(
         expect.arrayContaining([expect.objectContaining({ action: 'SUBSCRIPTION_RENEWAL.DECIDED' })]),
       );
+      const { rows } = await h.ctx.sql.query<{ decider_role: string }>(
+        `SELECT decider_role FROM subscription_renewals WHERE id = $1`,
+        [id],
+      );
+      expect(rows).toEqual([{ decider_role: 'OWNER_DEPARTMENT_HEAD' }]);
+    });
+
+    it('opens the revocations of the seats the IT Admin proposed when it confirms a reduction (F26)', async () => {
+      const reduceUnit = await h.unit(3);
+      const { subscriptionId, seats } = await h.termWithSeats(reduceUnit, 16, { quantity: 5 });
+      await h.left(reduceUnit.members[2]);
+      const chosen = [seats[2], seats[0]];
+      const id = await h.proposedRenewal({
+        subscriptionId,
+        choice: 'REDUCE',
+        proposedQuantity: 1,
+        releasedAssignmentIds: chosen,
+      });
+
+      const confirmed = h.dataOf<{ renewal: DetailWire }>(
+        await h.confirmRenewal(id, reduceUnit.head.account).expect(200),
+      ).renewal;
+
+      expect(confirmed.decision).toMatchObject({
+        choice: 'REDUCE',
+        deciderRole: 'OWNER_DEPARTMENT_HEAD',
+        releasedSeatCount: 2,
+        seatsInUseAtDecision: 3,
+      });
+      const reasons = await h.revocationReasons(seats);
+      expect(reasons.map((row) => row.assignment_id).sort()).toEqual([...chosen].sort());
+      expect(reasons.every((row) => row.source === 'SUBSCRIPTION_REDUCTION' && row.reference_id === id)).toBe(true);
+    });
+
+    it('closes a proposal that is out of date as STALE and lets the IT Admin propose again: a seat that was not proposed ended before the confirmation (PROPOSAL_STALE, A-H2)', async () => {
+      const staleUnit = await h.unit(3);
+      const { subscriptionId, seats } = await h.termWithSeats(staleUnit, 17, { quantity: 5 });
+      const id = await h.proposedRenewal({
+        subscriptionId,
+        choice: 'REDUCE',
+        proposedQuantity: 1,
+        releasedAssignmentIds: [seats[0], seats[1]],
+      });
+      await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = $2::date WHERE id = $1`, [
+        seats[2],
+        h.today(),
+      ]);
+
+      const stale = await h.confirmRenewal(id, staleUnit.head.account).expect(409);
+
+      expect(h.codeOf(stale)).toBe('SUBSCRIPTION_RENEWAL.PROPOSAL_STALE');
+      expect(h.detailsOf(stale)).toEqual({ required: 1, stillHeld: 2 });
+      // Nothing is revoked, but the case is no dead end: it is closed and the period is free for a new proposal.
+      expect((await h.caseRow(id)).state).toBe('STALE');
+      expect(await h.revocationReasons(seats)).toEqual([]);
+      expect(h.codeOf(await h.confirmRenewal(id, staleUnit.head.account).expect(409))).toBe(
+        'SUBSCRIPTION_RENEWAL.NOT_AWAITING_DECISION',
+      );
+      const again = await h.proposedRenewal({
+        subscriptionId,
+        choice: 'REDUCE',
+        proposedQuantity: 1,
+        releasedAssignmentIds: [seats[0]],
+      });
+      expect(again).not.toBe(id);
+      expect((await h.caseRow(again)).state).toBe('PROPOSED');
+      expect(h.codeOf(await h.propose({ subscriptionId, choice: 'RENEW' }).expect(409))).toBe(
+        'SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED',
+      );
+      await h.confirmRenewal(again, staleUnit.head.account).expect(200);
+      const listed = await h.renewals(`?subscriptionId=${subscriptionId}`, staleUnit.head.account).expect(200);
+      expect(
+        h
+          .dataOf<{ items: { state: string }[] }>(listed)
+          .items.map((item) => item.state)
+          .sort(),
+      ).toEqual(['DECIDED', 'STALE']);
     });
 
     it('warns of the people using a cancelled subscription and opens their revocations once confirmed (AC-2)', async () => {
@@ -192,80 +379,35 @@ describe('the proposal and the decision of a renewal (integration, real PostgreS
       const { subscriptionId, seats } = await h.termWithSeats(cancelUnit, 18);
       const id = await h.proposedRenewal({ subscriptionId, choice: 'CANCEL' });
 
-      const warned = await h.decideRenewal(id, { choice: 'CANCEL' }, h.boss.account).expect(409);
+      const warned = await h.confirmRenewal(id, cancelUnit.head.account).expect(409);
       expect(h.codeOf(warned)).toBe('SUBSCRIPTION_RENEWAL.ACTIVE_USERS_NOT_ACKNOWLEDGED');
       expect(h.detailsOf(warned)).toEqual({ seatsInUse: 2 });
       expect(await h.revocationReasons(seats)).toEqual([]);
 
-      await h.decideRenewal(id, { choice: 'CANCEL', acknowledgeActiveUsers: true }, h.boss.account).expect(200);
+      await h.confirmRenewal(id, cancelUnit.head.account, { acknowledgeActiveUsers: true }).expect(200);
 
       const reasons = await h.revocationReasons(seats);
       expect(reasons).toHaveLength(2);
       expect(reasons.every((row) => row.source === 'SUBSCRIPTION_CANCELLATION' && row.reference_id === id)).toBe(true);
     });
 
-    it('takes back exactly the seats the decider chose from the ranked list when reducing below them (AC-13, AC-20)', async () => {
-      const reduceUnit = await h.unit(3);
-      const { subscriptionId, seats } = await h.termWithSeats(reduceUnit, 16, { quantity: 5 });
-      await h.left(reduceUnit.members[2]);
-      const id = await h.proposedRenewal({ subscriptionId, choice: 'REDUCE', proposedQuantity: 1 });
-
-      const ranking = h.dataOf<{
-        usage: { status: string };
-        seatsInUse: number;
-        items: { assignmentId: string; group: string }[];
-      }>(await h.ranking(id, h.boss.account).expect(200));
-      expect(ranking.usage.status).toBe('NOT_AVAILABLE');
-      expect(ranking.seatsInUse).toBe(3);
-      expect(ranking.items[0]).toMatchObject({ assignmentId: seats[2], group: 'HOLDER_LEFT' });
-      expect(ranking.items.slice(1).every((item) => item.group === 'OTHER')).toBe(true);
-
-      const short = await h
-        .decideRenewal(id, { choice: 'REDUCE', quantity: 1, releasedAssignmentIds: [seats[2]] }, h.boss.account)
-        .expect(422);
-      expect(h.codeOf(short)).toBe('SUBSCRIPTION_RENEWAL.EXCESS_SELECTION_INVALID');
-      expect(h.detailsOf(short)).toEqual({ required: 2, selected: 1 });
-
-      const chosen = [seats[2], seats[0]];
-      const decided = h.dataOf<{ renewal: DetailWire }>(
-        await h
-          .decideRenewal(id, { choice: 'REDUCE', quantity: 1, releasedAssignmentIds: chosen }, h.boss.account)
-          .expect(200),
-      ).renewal;
-
-      expect(decided.decision?.releasedSeatCount).toBe(2);
-      const { rows: stored } = await h.ctx.sql.query<{ assignment_id: string; rank_group: string }>(
-        `SELECT assignment_id, rank_group FROM subscription_renewal_released_seats WHERE renewal_id = $1 ORDER BY position`,
-        [id],
-      );
-      expect(stored).toEqual([
-        { assignment_id: seats[2], rank_group: 'HOLDER_LEFT' },
-        { assignment_id: seats[0], rank_group: 'OTHER' },
-      ]);
-      expect(decided.decision?.seatsInUseAtDecision).toBe(3);
-      const reasons = await h.revocationReasons(seats);
-      expect(reasons.map((row) => row.assignment_id).sort()).toEqual([...chosen].sort());
-      expect(reasons.every((row) => row.source === 'SUBSCRIPTION_REDUCTION')).toBe(true);
-    });
-
-    it('blocks what owes more for a department without a Cost Center and lets a cancellation through (AC-22)', async () => {
+    it('does not wait for a Cost Center: a department without one keeps what it pays for, and cancels (QĐ-94m(2))', async () => {
       const bare = await h.bareDepartment();
+      const department = { ...bare, unitId: '' };
+      const head = await h.staff(department, 'BARE-H1');
+      await h.makeHead(department, head);
       const renew = await h.term({ ownerDepartmentId: bare.id, noticeDeadline: h.inDays(14), quantity: 10 });
       const cancel = await h.term({ ownerDepartmentId: bare.id, noticeDeadline: h.inDays(14), quantity: 10 });
       const renewId = await h.proposedRenewal({ subscriptionId: renew, choice: 'RENEW' });
       const cancelId = await h.proposedRenewal({ subscriptionId: cancel, choice: 'CANCEL' });
 
-      expect(h.codeOf(await h.decideRenewal(renewId, { choice: 'RENEW' }, h.boss.account).expect(409))).toBe(
-        'FINANCE.SETUP_INCOMPLETE',
-      );
-      expect(
-        h.codeOf(await h.decideRenewal(renewId, { choice: 'REDUCE', quantity: 8 }, h.boss.account).expect(409)),
-      ).toBe('FINANCE.SETUP_INCOMPLETE');
-      await h.decideRenewal(renewId, { choice: 'REDUCE', quantity: 0 }, h.boss.account).expect(200);
-      await h.decideRenewal(cancelId, { choice: 'CANCEL' }, h.boss.account).expect(200);
+      await h.confirmRenewal(renewId, head.account).expect(200);
+      await h.confirmRenewal(cancelId, head.account).expect(200);
+
+      expect((await detail(renewId)).state).toBe('DECIDED');
     });
 
-    it('never voids a decision after the milestone: mid-term where allowed, else at the next renewal (AC-10, AC-19)', async () => {
+    it('never voids a confirmation after the milestone: mid-term where allowed, else at the next renewal (AC-10, AC-19)', async () => {
       const yearly = await h.term({
         ownerDepartmentId: unit.department.id,
         noticeDeadline: h.inDays(-3),
@@ -280,8 +422,8 @@ describe('the proposal and the decision of a renewal (integration, real PostgreS
       const yearlyId = await h.proposedRenewal({ subscriptionId: yearly, choice: 'CANCEL' });
       const monthlyId = await h.proposedRenewal({ subscriptionId: monthly, choice: 'CANCEL' });
 
-      await h.decideRenewal(yearlyId, { choice: 'CANCEL' }, h.boss.account).expect(200);
-      await h.decideRenewal(monthlyId, { choice: 'CANCEL' }, h.boss.account).expect(200);
+      await h.confirmRenewal(yearlyId, unit.head.account).expect(200);
+      await h.confirmRenewal(monthlyId, unit.head.account).expect(200);
 
       expect((await detail(yearlyId)).decision).toMatchObject({
         decidedAfterDeadline: true,
@@ -292,131 +434,35 @@ describe('the proposal and the decision of a renewal (integration, real PostgreS
         executionPoint: 'MID_TERM',
       });
     });
-  });
 
-  describe('who decides a renewal when the spending approver is away (US-11-02 AC-23, QĐ-93d(1))', () => {
-    it('a renewal waits for the spending approver and nobody else may decide', async () => {
-      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 18);
+    it('lets one of two confirmations at the same time through and refuses the other (race)', async () => {
+      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 28);
       const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
-      await h.clearRole('SPENDING_APPROVER');
-      try {
-        expect(await detail(id)).toMatchObject({ state: 'PROPOSED', waitingReason: 'NO_SPENDING_APPROVER' });
-        // Nobody takes the place of the approver, and the person who held the old role of the substitute does not even read the cases.
-        for (const account of [h.it1, h.finance, h.employee, unit.head.account]) {
-          expect(h.codeOf(await h.decideRenewal(id, { choice: 'RENEW' }, account).expect(403))).toBe(
-            'SUBSCRIPTION_RENEWAL.NOT_DECIDER',
-          );
-        }
-        expect(h.codeOf(await h.read(id, h.bystander.account).expect(403))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
-        expect((await detail(id)).state).toBe('PROPOSED');
-      } finally {
-        await h.setRole('SPENDING_APPROVER', h.boss);
-      }
 
-      expect(await detail(id)).toMatchObject({ state: 'PROPOSED', waitingReason: null });
-      await h.decideRenewal(id, { choice: 'RENEW' }, h.boss.account).expect(200);
-      expect(await detail(id)).toMatchObject({ state: 'DECIDED', waitingReason: null });
-    });
+      const answers = await Promise.all([
+        h.confirmRenewal(id, unit.head.account),
+        h.confirmRenewal(id, unit.head.account),
+      ]);
 
-    it('writes only the spending approver as the role of a decision', async () => {
-      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 19);
-      const id = await h.proposedRenewal({ subscriptionId, choice: 'CANCEL' });
-
-      await h.decideRenewal(id, { choice: 'CANCEL' }, h.boss.account).expect(200);
-
-      const { rows } = await h.ctx.sql.query<{ decider_role: string }>(
-        `SELECT decider_role FROM subscription_renewals WHERE id = $1`,
-        [id],
+      expect(answers.map((answer) => answer.status).sort()).toEqual([200, 409]);
+      expect(h.codeOf(answers.find((answer) => answer.status === 409) as request.Response)).toBe(
+        'SUBSCRIPTION_RENEWAL.NOT_AWAITING_DECISION',
       );
-      expect(rows).toEqual([{ decider_role: 'SPENDING_APPROVER' }]);
-    });
-  });
-
-  describe('the Super Admin is told when a renewal waits for a spending approver (D-S16, M7, US-11-02 AC-23)', () => {
-    interface AlertRow {
-      recipient_employee_id: string;
-      params: Record<string, unknown>;
-      event_key: string;
-    }
-    const alertsOf = async (renewalId: string) =>
-      (
-        await h.ctx.sql.query<AlertRow>(
-          `SELECT recipient_employee_id, params, event_key FROM in_app_notifications
-            WHERE code = 'CONTROLLED_WAIT_ALERT' AND subject_id = $1 ORDER BY created_at, id`,
-          [renewalId],
-        )
-      ).rows;
-
-    it('tells the Super Admin once when a renewal is proposed while nobody holds the role', async () => {
-      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 21);
-      await h.clearRole('SPENDING_APPROVER');
-      try {
-        const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
-
-        const alerts = await alertsOf(id);
-        expect(alerts).toHaveLength(1);
-        expect(alerts[0].params).toEqual({
-          renewalId: id,
-          subscriptionId,
-          waitingReason: 'NO_SPENDING_APPROVER',
-          configurationHint: 'CONFIGURE_SPENDING_APPROVER',
-        });
-        expect(alerts[0].event_key).toMatch(new RegExp(`^CONTROLLED_WAIT_ALERT:SUBSCRIPTION_RENEWAL:${id}:sent:\\d+$`));
-        // Nobody holds the role to be told that the case is in their queue, and nobody else is told in their place.
-        expect(await h.notices('SUBSCRIPTION_RENEWAL_PROPOSED', id)).toEqual([]);
-      } finally {
-        await h.setRole('SPENDING_APPROVER', h.boss);
-      }
+      expect(await h.notices('SUBSCRIPTION_RENEWAL_DECIDED', id)).toHaveLength(2);
     });
 
-    it('tells once when the role is taken back with a case still waiting, and not before', async () => {
-      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 22);
-      const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
-      expect(await alertsOf(id)).toEqual([]);
-
-      await h.clearRole('SPENDING_APPROVER');
-      try {
-        const alerts = await alertsOf(id);
-        expect(alerts).toHaveLength(1);
-        expect(alerts[0].event_key).toMatch(new RegExp(`^CONTROLLED_WAIT_ALERT:SUBSCRIPTION_RENEWAL:${id}:role:`));
-      } finally {
-        await h.setRole('SPENDING_APPROVER', h.boss);
-      }
-    });
-
-    it('tells the Super Admin once when the spending approver leaves while a renewal waits', async () => {
-      const departing = await h.staff(await h.departmentWithUnit('P-LVR'), 'LVR-C9');
-      await h.setRole('SPENDING_APPROVER', departing);
-      try {
-        const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 23);
-        const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
-        expect(await alertsOf(id)).toEqual([]);
-
-        await h.leaveCompany(departing);
-
-        const alerts = await alertsOf(id);
-        expect(alerts).toHaveLength(1);
-        expect(alerts[0].event_key).toMatch(new RegExp(`^CONTROLLED_WAIT_ALERT:SUBSCRIPTION_RENEWAL:${id}:left:`));
-        expect(await detail(id)).toMatchObject({ state: 'PROPOSED', waitingReason: 'NO_SPENDING_APPROVER' });
-      } finally {
-        await h.setRole('SPENDING_APPROVER', h.boss);
-      }
-    });
-
-    it('tells again for a new stretch of waiting after the role was given and taken back', async () => {
-      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 24);
+    it('is the head of the day of the decision who confirms: a head named in their place takes over (QĐ-93c)', async () => {
+      const handover = await h.unit(1);
+      const successor = await h.staff(handover.department, 'SUC-H1');
+      const { subscriptionId } = await h.termWithSeats({ ...handover, members: [] }, 29);
       const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
 
-      await h.clearRole('SPENDING_APPROVER');
-      await h.setRole('SPENDING_APPROVER', h.boss);
-      await h.clearRole('SPENDING_APPROVER');
-      try {
-        const keys = (await alertsOf(id)).map((alert) => alert.event_key);
-        expect(keys).toHaveLength(2);
-        expect(new Set(keys).size).toBe(2);
-      } finally {
-        await h.setRole('SPENDING_APPROVER', h.boss);
-      }
+      await h.makeHead(handover.department, successor);
+
+      expect(h.codeOf(await h.confirmRenewal(id, handover.head.account).expect(403))).toBe(
+        'SUBSCRIPTION_RENEWAL.NOT_DECIDER',
+      );
+      await h.confirmRenewal(id, successor.account).expect(200);
     });
   });
 });

@@ -93,7 +93,7 @@ export class SpendApprovalsController {
   @ApiSuccessResponse(ApprovalDetailResponseDto, {
     message: 'SPEND_APPROVAL.DECIDED',
     description:
-      'The person the step is given to approves it or refuses it with a reason. The request is checked again as it is decided and the decision is made on that check, which is kept with it. An approval of a request that has less money than it costs, or none, is an override with its reason and the years it names. A request that turned out to be an exception since it was sent goes back to Finance, and one whose data is at fault goes back to its head; nothing is decided then.',
+      'The person the step is given to approves it or refuses it with a reason. The request is checked again as it is decided and the decision is made on that check, which is kept with it. A request that has less money than it costs in a year of the budget, or none, cannot be approved. A request that turned out to be an exception since it was sent goes back to Finance, and one whose data is at fault goes back to its head; nothing is decided then.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -121,13 +121,8 @@ export class SpendApprovalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal without a reason), or the override is missing or names other years than the ones that need it (SPEND.OVERRIDE_REQUIRED, SPEND.OVERRIDE_MISMATCH, with the years) or has nothing to accept (SPEND.OVERRIDE_NOT_NEEDED).',
-      examples: [
-        VALIDATION_EXAMPLE,
-        SPEND_ERROR_EXAMPLES.OVERRIDE_REQUIRED,
-        SPEND_ERROR_EXAMPLES.OVERRIDE_MISMATCH,
-        SPEND_ERROR_EXAMPLES.OVERRIDE_NOT_NEEDED,
-      ],
+        'The body is invalid (VALIDATION_ERROR: a refusal without a reason), or a year of the budget has less money than the request costs, or none (SPEND.OVERRIDE_REQUIRED, with the years): it cannot be approved.',
+      examples: [VALIDATION_EXAMPLE, SPEND_ERROR_EXAMPLES.OVERRIDE_REQUIRED],
     },
   )
   async decide(

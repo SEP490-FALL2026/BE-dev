@@ -177,8 +177,21 @@ describe('the event a notice is recorded as', () => {
     ['a transfer with the department', 'DEPARTMENT_TRANSFER_IN', { effectiveOn: '2026-11-01', toDepartmentId: 'd' }],
     // Retired (QĐ-87e): a notice of this kind that was sent before is read and rejected; recording it needs only a day.
     ['a retired change of title with its day', 'JOB_TITLE_CHANGE', { effectiveOn: '2026-11-01' }],
-    ['a departure with the last working day', 'DEPARTURE', { lastWorkingDay: '2026-10-31' }],
-    ['a sudden departure with the day', 'ABRUPT_DEPARTURE', { lastWorkingDay: '2026-10-24' }],
+    [
+      'a departure with the last working day and the mode',
+      'DEPARTURE',
+      { lastWorkingDay: '2026-10-31', accessBlockMode: 'WITH_LAST_DAY' },
+    ],
+    [
+      'a sudden departure with the day and the mode',
+      'ABRUPT_DEPARTURE',
+      { lastWorkingDay: '2026-10-24', accessBlockMode: 'BLOCK_NOW' },
+    ],
+    [
+      'a departure that blocks now with a last day ahead',
+      'DEPARTURE',
+      { lastWorkingDay: '2026-12-31', accessBlockMode: 'BLOCK_NOW' },
+    ],
     ['a long leave with its days', 'LONG_LEAVE', { startedOn: '2026-10-01', approvedReturnOn: '2026-12-01' }],
   ] as const)('accepts %s', (_name, kind, event) => {
     expect(eventShapeRefusal(kind, event)).toBeNull();
@@ -196,9 +209,37 @@ describe('the event a notice is recorded as', () => {
     [
       'a departure with a transfer day',
       'DEPARTURE',
-      { lastWorkingDay: '2026-10-31', effectiveOn: '2026-11-01' },
+      { lastWorkingDay: '2026-10-31', accessBlockMode: 'WITH_LAST_DAY', effectiveOn: '2026-11-01' },
       [],
       ['effectiveOn'],
+    ],
+    [
+      'a departure that does not say how the access is blocked (D8)',
+      'DEPARTURE',
+      { lastWorkingDay: '2026-10-31' },
+      ['accessBlockMode'],
+      [],
+    ],
+    [
+      'a sudden departure that does not say how the access is blocked (D8)',
+      'ABRUPT_DEPARTURE',
+      { lastWorkingDay: '2026-10-24' },
+      ['accessBlockMode'],
+      [],
+    ],
+    [
+      'a long leave that says how the access is blocked',
+      'LONG_LEAVE',
+      { startedOn: '2026-10-01', approvedReturnOn: '2026-12-01', accessBlockMode: 'BLOCK_NOW' },
+      [],
+      ['accessBlockMode'],
+    ],
+    [
+      'a transfer that says how the access is blocked',
+      'DEPARTMENT_TRANSFER_OUT',
+      { effectiveOn: '2026-11-01', accessBlockMode: 'WITH_LAST_DAY' },
+      [],
+      ['accessBlockMode'],
     ],
     ['a long leave with only the start', 'LONG_LEAVE', { startedOn: '2026-10-01' }, ['approvedReturnOn'], []],
   ] as const)('refuses %s', (_name, kind, event, missing, notAllowed) => {

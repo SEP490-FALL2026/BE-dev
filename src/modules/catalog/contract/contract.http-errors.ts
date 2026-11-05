@@ -12,6 +12,7 @@ import {
   DocumentNotFoundError,
   DocumentNotReadyToAttachError,
   DocumentPurposeForbiddenError,
+  DocumentPurposeMismatchError,
   DocumentPurposeNotAvailableError,
   DocumentTooLargeError,
   DocumentTypeNotAllowedError,
@@ -37,6 +38,9 @@ export function toContractApiException(error: unknown): unknown {
   if (error instanceof DocumentAccessForbiddenError) return refuse(FORBIDDEN, 'AUTHORIZATION.FORBIDDEN', error.message);
   if (error instanceof DocumentPurposeForbiddenError) {
     return refuse(FORBIDDEN, 'DOCUMENT.PURPOSE_FORBIDDEN', error.message);
+  }
+  if (error instanceof DocumentPurposeMismatchError) {
+    return refuse(UNPROCESSABLE, 'DOCUMENT.PURPOSE_MISMATCH', error.message);
   }
   if (error instanceof DocumentPurposeNotAvailableError) {
     return refuse(CONFLICT, 'DOCUMENT.PURPOSE_NOT_AVAILABLE', error.message, { purpose: error.purpose });
@@ -74,6 +78,7 @@ export const CONTRACT_ERROR_EXAMPLES = {
   NAME_REQUIRED: example(new ContractNameRequiredError()),
   DOCUMENT_NOT_FOUND: example(new DocumentNotFoundError()),
   PURPOSE_FORBIDDEN: example(new DocumentPurposeForbiddenError()),
+  PURPOSE_MISMATCH: example(new DocumentPurposeMismatchError()),
   PURPOSE_NOT_AVAILABLE: example(new DocumentPurposeNotAvailableError('TAX_PAYMENT_PROOF')),
   TYPE_NOT_ALLOWED: example(new DocumentTypeNotAllowedError()),
   TOO_LARGE: example(new DocumentTooLargeError(EXAMPLE_MAX_BYTES)),

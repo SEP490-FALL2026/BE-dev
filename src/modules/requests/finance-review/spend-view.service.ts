@@ -80,8 +80,6 @@ export class SpendViewService {
             ? { amount: formatAmount(amountMinor, units.get(amountCurrency) ?? 2), currency: amountCurrency }
             : null,
         primaryCode: check ? (codesOf(check)[0] ?? null) : null,
-        planLineOverdue: check?.planLineOverdue ?? false,
-        offPlan: check?.offPlan ?? false,
       };
     });
 
@@ -149,9 +147,7 @@ export class SpendViewService {
       route: check.route,
       primaryCode: codesOf(check)[0] ?? null,
       staleCostEvidence: check.staleCostEvidence,
-      planLineOverdue: check.planLineOverdue,
       periodClosed: check.periodClosed,
-      offPlan: check.offPlan,
       noIndependentReview: spend?.noIndependentReview ?? false,
       bindingTotal: money(check.bindingTotalMinor),
       yearCount: check.years.length,

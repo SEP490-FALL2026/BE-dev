@@ -384,4 +384,13 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     'added',
     '2026-11-04',
   ),
+  boundedNested(
+    'deviceSessionGet#allowlist.entries',
+    'AI_TOOL_KEYS',
+    'LD-14',
+    'g7-ai-usage-intake',
+    'The session of a collector lists the tools it is told to report, at most one for each AI tool (AI_TOOL_KEYS); the Owner agreed on 05/11/2026 because it lists at most three tools and needs no pages.',
+    'added',
+    '2026-11-05',
+  ),
 ];

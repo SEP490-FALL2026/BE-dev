@@ -63,8 +63,6 @@ const YEAR_ENDED = {
 } as const;
 /** What sending the lines refuses after the request validation: a first proposal and one sent again alike. */
 const SEND_EXAMPLES = [
-  EXAMPLES.PROPOSAL_INCOMPLETE,
-  EXAMPLES.WINDOW_BACKWARDS,
   EXAMPLES.PLAN_NOT_FOUND,
   EXAMPLES.YEAR_ENDED,
   EXAMPLES.CURRENCY_NOT_REPORTING,

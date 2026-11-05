@@ -63,24 +63,20 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       expect(await count('budget_proposals')).toBe(before);
     });
 
-    it('has no version made by Finance, first or revised: 409 FINANCE.SETUP_INCOMPLETE and nothing is written', async () => {
+    it('has no version made by Finance for a Cost Center that was retired: 409 FINANCE.SETUP_INCOMPLETE and nothing is written', async () => {
       const w = await waiting();
-      const current = await waiting();
-      await h.current(current.proposal.id);
       await deactivate(w.department.unitId);
-      await deactivate(current.department.unitId);
       const before = await count('budget_versions');
 
       const first = await h.createVersion({
         proposalId: w.proposal.id,
         base: h.money(1),
         reserve: h.money(0),
-        highValuePercent: 10,
+        reserveReason: 'Test reserve',
       });
-      const revision = await h.createRevision({ costCenterId: current.department.unitId, year: h.next, reason: 'Cut' });
 
-      expect([first.status, revision.status]).toEqual([409, 409]);
-      expect([h.codeOf(first), h.codeOf(revision)]).toEqual(['FINANCE.SETUP_INCOMPLETE', 'FINANCE.SETUP_INCOMPLETE']);
+      expect(first.status).toBe(409);
+      expect(h.codeOf(first)).toBe('FINANCE.SETUP_INCOMPLETE');
       expect(await count('budget_versions')).toBe(before);
     });
 
@@ -171,34 +167,6 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
 
       return { version, requestId: (await queueBoth(first, w.department.unitId, version.id)).requestId };
     };
-    /** A current version of a Cost Center and year, and a revision of it that was sent and waits for the decision (F31). */
-    const revising = async () => {
-      const w = await waiting();
-      const current = await h.current(w.proposal.id);
-      const revision = h.dataOf<{ version: VersionWire }>(
-        await h
-          .createRevision({
-            costCenterId: w.department.unitId,
-            year: h.next,
-            base: h.money(80_000_000),
-            reserve: h.money(20_000_000),
-            reason: 'Growth of the team',
-          })
-          .expect(201),
-      ).version;
-      await h.sendVersion(revision.id).expect(200);
-
-      return { w, current, revision };
-    };
-    const stateOf = async (versionId: string) =>
-      h.dataOf<{ version: VersionWire }>(await h.versionOf(versionId).expect(200)).version.state;
-    const decidedAt = async (versionId: string) =>
-      (
-        await h.ctx.sql.query<{ decided_at: Date }>(
-          `SELECT decided_at FROM budget_version_decisions WHERE version_id = $1`,
-          [versionId],
-        )
-      ).rows[0].decided_at;
 
     it('holds the commitment first and the decision then attaches it: no commitment waits for a budget that was approved', async () => {
       const { version, requestId } = await meet('HOLD');
@@ -211,64 +179,37 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
 
       expect(await attachedTo(requestId)).toEqual([{ attached_version_id: version.id, unattached_reason: null }]);
     });
+  });
 
-    // The decision of a REVISION replaces the version that is current, so it holds the rows of every version of the year while the
-    // request side writes a commitment against the current one. Both locks are of a kind that lets the other go on (`FOR NO KEY UPDATE`
-    // against the share the foreign key takes), or each would wait for the other.
-    it('lets the request side that holds its row and the year write against the current version while the decision of a revision queues: no deadlock, the request first and the decision after it', async () => {
-      const { w, current, revision } = await revising();
-      const requestId = await h.fixtureRequestId();
-      const requestSide = new Client({ connectionString: h.ctx.database.url });
-      await requestSide.connect();
-      await requestSide.query('BEGIN');
-      // The order of the request side: the row of its request first, then the lock of the Cost Center and the year.
-      await requestSide.query('SELECT id FROM access_requests WHERE id = $1 FOR UPDATE', [requestId]);
-      await requestSide.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
-        budgetYearLockKey(w.department.unitId, h.next),
-      ]);
-      const decided = h.decideVersion(revision.id, { decision: 'APPROVE' }, boss.account).then((response) => response);
-      let committedAt = Number.POSITIVE_INFINITY;
-      try {
-        await waitForLockWaiters(h.ctx.sql, 1);
-        // The decision holds the rows of the versions of the year and waits for the lock. The commitment of the request names the
-        // version that is current: the share of its row that takes is not refused by the decision, or the two would deadlock.
-        await requestSide.query(
-          `INSERT INTO budget_commitments
-             (id, organization_id, request_id, cost_center_id, year, amount_minor, currency, state, attached_version_id, attached_at)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4, 1000, $5, 'HELD'::"CommitmentState", $6, now())`,
-          [h.seed.organizationId, requestId, w.department.unitId, h.next, h.reporting, current.id],
-        );
-        committedAt = Date.now();
-      } finally {
-        await requestSide.query('COMMIT');
-        await requestSide.end();
-      }
+  describe('a revision that an older release left (B-M2, QĐ-97b)', () => {
+    /** A version of the older kind: the revision is gone from the API, but the row may still be in a database. */
+    const asRevision = (versionId: string) =>
+      h.ctx.sql.query(
+        `UPDATE budget_versions SET kind = 'REVISION', reason = 'Left by an older release', based_on_version_id = id, proposal_id = NULL WHERE id = $1`,
+        [versionId],
+      );
 
-      expect((await decided).status).toBe(200);
-      expect(await attachedTo(requestId)).toEqual([{ attached_version_id: current.id, unattached_reason: null }]);
-      expect([await stateOf(current.id), await stateOf(revision.id)]).toEqual(['SUPERSEDED', 'APPROVED']);
-      // In the order they queued: the decision took the lock only once the request side had let it go.
-      expect((await decidedAt(revision.id)).getTime()).toBeGreaterThanOrEqual(committedAt);
+    it('is not sent: 409 BUDGET.VERSION_NOT_EDITABLE', async () => {
+      const w = await waiting();
+      const draft = await h.built(w.proposal.id);
+      await asRevision(draft.id);
+
+      const refused = await h.sendVersion(draft.id).expect(409);
+
+      expect(h.codeOf(refused)).toBe('BUDGET.VERSION_NOT_EDITABLE');
+      expect(await count(`budget_versions WHERE id = '${draft.id}' AND state = 'DRAFT'`)).toBe(1);
     });
 
-    it('holds the commitment first and then the revision is approved: the request keeps the version that was current when it was held', async () => {
-      const { w, current, revision } = await revising();
+    it('is not decided: 409 BUDGET.VERSION_NOT_EDITABLE, and the version stays sent', async () => {
+      const w = await waiting();
+      const draft = await h.built(w.proposal.id);
+      await h.sendVersion(draft.id).expect(200);
+      await asRevision(draft.id);
 
-      const { requestId, decisionStatus } = await queueBoth('HOLD', w.department.unitId, revision.id);
+      const refused = await h.decideVersion(draft.id, { decision: 'APPROVE' }, boss.account).expect(409);
 
-      expect(decisionStatus).toBe(200);
-      expect(await attachedTo(requestId)).toEqual([{ attached_version_id: current.id, unattached_reason: null }]);
-      expect([await stateOf(current.id), await stateOf(revision.id)]).toEqual(['SUPERSEDED', 'APPROVED']);
-    });
-
-    it('approves the revision first and then the commitment is held against it: the revision is the current budget', async () => {
-      const { w, current, revision } = await revising();
-
-      const { requestId, decisionStatus } = await queueBoth('DECISION', w.department.unitId, revision.id);
-
-      expect(decisionStatus).toBe(200);
-      expect(await attachedTo(requestId)).toEqual([{ attached_version_id: revision.id, unattached_reason: null }]);
-      expect([await stateOf(current.id), await stateOf(revision.id)]).toEqual(['SUPERSEDED', 'APPROVED']);
+      expect(h.codeOf(refused)).toBe('BUDGET.VERSION_NOT_EDITABLE');
+      expect(await count(`budget_versions WHERE id = '${draft.id}' AND state = 'SENT'`)).toBe(1);
     });
   });
 
@@ -276,10 +217,7 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
     it('is detached and stays a draft: it is neither changed nor sent nor deleted, and a new version can be made', async () => {
       const w = await waiting();
       const draft = await h.built(w.proposal.id);
-      const csv = [
-        'cost_center_code,description,amount,window_from,window_to,service_period_months,repeat_cycle',
-        `${draft.costCenter.code},Imported,1000,${h.next}-05-01,${h.next}-05-31,12,ANNUAL`,
-      ].join('\n');
+      const csv = ['cost_center_code,description,amount', `${draft.costCenter.code},Imported,1000`].join('\n');
 
       await h.withdraw(w.proposal.id, w.head.account).expect(200);
 
@@ -287,7 +225,7 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       expect(wire).toMatchObject({ state: 'DRAFT' });
       expect(wire.detachedAt).not.toBeNull();
       const refused = [
-        await h.updateVersion(draft.id, { highValuePercent: 10 }),
+        await h.updateVersion(draft.id, { base: h.money(1) }),
         await h.updateLine(draft.id, 1, { financeComment: 'late' }),
         await h.addLines(draft.id, [h.line()]),
         await h.importLines(draft.id, csv),
@@ -305,7 +243,7 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
         proposalId: next.id,
         base: h.money(1),
         reserve: h.money(0),
-        highValuePercent: 10,
+        reserveReason: 'Test reserve',
       });
       expect(made.status).toBe(201);
     });
@@ -321,29 +259,12 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
 
       expect(h.codeOf(await h.sendVersion(draft.id).expect(409))).toBe('BUDGET.VERSION_NOT_EDITABLE');
       await h
-        .createVersion({ proposalId: again.id, base: h.money(1), reserve: h.money(0), highValuePercent: 10 })
+        .createVersion({ proposalId: again.id, base: h.money(1), reserve: h.money(0), reserveReason: 'Test reserve' })
         .expect(201);
     });
   });
 
   describe('the answers that were a 500 (F37, F39)', () => {
-    it('refuses to take the reason of a revision away: 422 BUDGET.REVISION_REASON_REQUIRED', async () => {
-      const w = await waiting();
-      await h.current(w.proposal.id);
-      const revision = h.dataOf<{ version: VersionWire }>(
-        await h
-          .createRevision({ costCenterId: w.department.unitId, year: h.next, reason: 'Cut to the plan' })
-          .expect(201),
-      ).version;
-
-      const refused = await h.updateVersion(revision.id, { reason: null }).expect(422);
-
-      expect(h.codeOf(refused)).toBe('BUDGET.REVISION_REASON_REQUIRED');
-      expect(h.dataOf<{ version: VersionWire }>(await h.versionOf(revision.id).expect(200)).version.reason).toBe(
-        'Cut to the plan',
-      );
-    });
-
     it('refuses a plan that does not exist, on a proposal and on a line: 422 BUDGET.PLAN_NOT_FOUND', async () => {
       const w = await waiting();
       const draft = await h.built(w.proposal.id);
@@ -389,7 +310,7 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
         proposalId: w.proposal.id,
         base: h.money(1),
         reserve: h.money(0),
-        highValuePercent: 10,
+        reserveReason: 'Test reserve',
       });
       numbers.mockRestore();
 
@@ -407,9 +328,7 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       const versions = h.ctx.app.get(VersionService, { strict: false });
 
       await expect(proposals.giveBack(head, w.proposal.id, 'No')).rejects.toBeInstanceOf(BudgetNotFinanceError);
-      await expect(versions.update(head, version.id, { highValuePercent: 10 })).rejects.toBeInstanceOf(
-        BudgetNotFinanceError,
-      );
+      await expect(versions.update(head, version.id, { quarters: null })).rejects.toBeInstanceOf(BudgetNotFinanceError);
       await expect(versions.send(head, version.id)).rejects.toBeInstanceOf(BudgetNotFinanceError);
       expect(await count(`budget_proposals WHERE id = '${w.proposal.id}' AND state = 'SUBMITTED'`)).toBe(1);
     });

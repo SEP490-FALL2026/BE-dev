@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { PersonnelGroundsDateService } from '../personnel-grounds-date.service';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -47,7 +48,7 @@ const NOT_PENDING = {
 } as const;
 
 const GROUNDS_REFUSALS =
-  'the basis of the event is empty or lacks a part (PERSONNEL_NOTICE.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is only the code of a notice (GROUNDS_IS_NOTICE)';
+  'the basis of the event is only the code of a notice (PERSONNEL_NOTICE.GROUNDS_IS_NOTICE) or is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR';
 
 /**
  * The notices of the heads of department about a change coming for one of their people, and what the Super Admin does with them. A
@@ -63,6 +64,7 @@ export class NoticesController {
     private readonly notices: NoticeService,
     private readonly handling: NoticeHandlingService,
     private readonly query: NoticeQueryService,
+    private readonly groundsDate: PersonnelGroundsDateService,
   ) {}
 
   @Post()
@@ -254,9 +256,8 @@ export class NoticesController {
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.VERIFICATION_REQUIRED,
-        EXAMPLES.GROUNDS_REQUIRED,
-        EXAMPLES.GROUNDS_INCOMPLETE,
         EXAMPLES.GROUNDS_IS_NOTICE,
+        PERSONNEL_ACCESS_ERROR_EXAMPLES.GROUNDS_ISSUED_ON_FUTURE,
         EXAMPLES.EVENT_INVALID,
       ],
     },
@@ -266,6 +267,7 @@ export class NoticesController {
     @Param() params: NoticeIdParamDto,
     @Body() body: RecordNoticeBodyDto,
   ) {
+    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       return await this.query.detailOf(actor, await this.handling.record(userActor(actor), params.id, body));
     } catch (error) {

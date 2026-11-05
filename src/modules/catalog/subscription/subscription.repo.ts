@@ -219,15 +219,21 @@ export class SubscriptionRepo {
     unitPriceMinor: bigint;
     currency: string;
     billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+    allowsMidTermReduction: boolean;
   } | null> {
     const row = await (tx ?? this.prisma).subscription.findFirst({
       where: { planId, ...pricedOf(ownerDepartmentId) },
       orderBy: PRICED_FIRST,
-      select: { unitPriceMinor: true, unitPriceCurrency: true, billingCycle: true },
+      select: { unitPriceMinor: true, unitPriceCurrency: true, billingCycle: true, allowsMidTermReduction: true },
     });
     if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null || row.billingCycle === null) return null;
 
-    return { unitPriceMinor: row.unitPriceMinor, currency: row.unitPriceCurrency, billingCycle: row.billingCycle };
+    return {
+      unitPriceMinor: row.unitPriceMinor,
+      currency: row.unitPriceCurrency,
+      billingCycle: row.billingCycle,
+      allowsMidTermReduction: row.allowsMidTermReduction,
+    };
   }
 
   /**

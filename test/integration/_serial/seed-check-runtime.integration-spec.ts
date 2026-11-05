@@ -9,7 +9,7 @@ import {
 } from '../../../src/infrastructure/database/roles/database-role-provisioning';
 import { readProvisionSettings } from '../../../src/infrastructure/database/roles/database-role-settings';
 import { CURRENT_INSTALLATION_RECORDS } from '../../../src/modules/installation/inspect/inspection-facts.policy';
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v2/installation';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
 import {
   CLI_COLD_START_MS,
   cliWorkingDirectory,

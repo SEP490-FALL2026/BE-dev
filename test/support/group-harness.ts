@@ -207,11 +207,11 @@ export class GroupHarness extends StatusHarness {
 
   /** Approves the budget of the unit for this year and the next, with room for a group of any size a test makes. */
   async roomFor(unit: Unit, total = 100_000_000_000): Promise<void> {
-    await this.budgetFor(unit, { total, percent: 100 });
-    await this.budgetFor(unit, { total, percent: 100, year: this.next });
+    await this.budgetFor(unit, { total });
+    await this.budgetFor(unit, { total, year: this.next });
   }
 
-  /** A group the head sent for these people, attached outside the plan and sent on, so that its spend step waits for the approver. */
+  /** A group the head sent for these people and sent on, so that its spend step waits for the approver. */
   async groupWaiting(
     unit: Unit,
     planId: string,
@@ -221,7 +221,6 @@ export class GroupHarness extends StatusHarness {
     const sent = this.dataOf<{ request: { id: string } }>(
       await this.submitGroup(this.groupBody(planId, people, extra), unit.head.account).expect(201),
     ).request;
-    await this.setPlanLine(sent.id, { offPlan: true }, unit.head.account).expect(200);
     await this.sendOn([sent.id], unit.head.account).expect(201);
 
     return sent.id;

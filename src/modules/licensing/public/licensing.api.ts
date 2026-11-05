@@ -14,6 +14,7 @@ import { RevocationService } from '../provisioning/revocation.service';
 import type {
   AssignmentRecord,
   GrantCancellation,
+  HeldSoftware,
   OpenedRevocation,
   OpenRevocationInput,
   PersonalSeat,
@@ -57,6 +58,20 @@ export class LicensingApi {
    */
   listPersonalSeatsOf(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<PersonalSeat[]> {
     return this.revocationView.personalSeatsOf(employeeId, onDate, tx);
+  }
+
+  /**
+   * The software a person holds on `onDate` (personal seats begun, not failed, not cancelled, not ended), oldest first, with how many
+   * there are in all: what a department head reads of a member. The page and the count share a snapshot, and the number of
+   * statements does not grow with the page.
+   */
+  pageHeldSoftwareOf(
+    employeeId: string,
+    onDate: BusinessDate,
+    page: { skip: number; take: number },
+    tx?: DbTx,
+  ): Promise<{ items: HeldSoftware[]; total: number }> {
+    return this.revocationView.heldSoftwareOf(employeeId, onDate, page, tx);
   }
 
   /** How many personal seats each of these people holds on `onDate` or will, in one statement (the people with none are absent). */

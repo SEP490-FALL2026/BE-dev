@@ -19,12 +19,11 @@ export class RenewalNotifier {
   constructor(private readonly notifications: NotificationsApi) {}
 
   /**
-   * A case waits for a spending approver nobody holds who works: the Super Admin is told with the alert of the steps that wait under
-   * control (line 27, `D-S16`), once for each stretch of waiting. `source` is what began the stretch — `sent:<ms>`, `role:<id of the
-   * change>` or `left:<id of the change>` — so a change that is heard twice writes one notice, and a role given and taken back again
-   * begins a new stretch with a new notice. The notice names the case and the subscription, never an amount.
+   * A case waits for a head of the department that owns the subscription, and it has none today: the Super Admin is told with the
+   * alert of the steps that wait under control (line 27), once for the proposal. `source` is what began the wait (`sent:<ms>`), so a
+   * proposal that is told twice writes one notice. The notice names the case and the subscription, never an amount.
    */
-  async waitingForSpendingApprover(
+  async waitingForHead(
     tx: DbTx,
     renewal: WaitingRenewal,
     superAdminEmployeeId: string | null,
@@ -38,8 +37,8 @@ export class RenewalNotifier {
       params: {
         renewalId: renewal.id,
         subscriptionId: renewal.subscriptionId,
-        waitingReason: 'NO_SPENDING_APPROVER',
-        configurationHint: 'CONFIGURE_SPENDING_APPROVER',
+        waitingReason: 'NO_HEAD',
+        configurationHint: 'ASSIGN_DEPARTMENT_HEAD',
       },
       eventKey: `CONTROLLED_WAIT_ALERT:SUBSCRIPTION_RENEWAL:${renewal.id}:${source}`,
     });

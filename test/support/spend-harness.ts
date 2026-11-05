@@ -34,10 +34,6 @@ export interface BudgetSpec {
   year?: number;
   /** The lines of the plan; one line of the last month of the year when not given. */
   lines?: object[];
-  /** Whole percent of what is left above which a request is high value. */
-  percent?: number;
-  /** An amount above which a request is high value, whatever is left. */
-  amountThreshold?: number;
   /** What the attached commitments hold, and what has become an expense. */
   held?: number;
   spent?: number;
@@ -157,17 +153,15 @@ export class SpendHarness extends BudgetHarness {
    */
   async budgetFor(unit: Unit, spec: BudgetSpec): Promise<VersionWire> {
     const year = spec.year ?? this.year;
-    const window = { windowFrom: `${year}-12-01`, windowTo: `${year}-12-31`, quoteValidUntil: undefined };
     const version = await approvedBudget<VersionWire>(this.ctx, {
       headToken: unit.head.account.accessToken,
       financeToken: this.finance.accessToken,
       deciderToken: this.deciderOf().accessToken,
-      proposal: this.proposalBody(unit.department.unitId, spec.lines ?? [this.line(window)], year),
+      proposal: this.proposalBody(unit.department.unitId, spec.lines ?? [this.line()], year),
       version: {
         base: this.money(spec.total),
         reserve: this.money(0),
-        highValuePercent: spec.percent ?? 50,
-        ...(spec.amountThreshold ? { highValueAmount: this.money(spec.amountThreshold) } : {}),
+        reserveReason: 'The budget of the test keeps no reserve',
       },
     });
     if (spec.held) await this.commit(unit, version.id, year, spec.held, 'HELD');
@@ -247,13 +241,6 @@ export class SpendHarness extends BudgetHarness {
     request(this.server()).get(`/api/v1/spend-batches/${id}`).set(this.as(account));
   batchItems = (id: string, account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get(`/api/v1/spend-batches/${id}/items`).query(query).set(this.as(account));
-  setPlanLine = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).put(`/api/v1/access-requests/${id}/plan-line`).set(this.as(account)).send(body);
-  suggestions = (id: string, account: ApiAccount, query: Record<string, string | number> = {}) =>
-    request(this.server())
-      .get(`/api/v1/access-requests/${id}/plan-line-suggestions`)
-      .query(query)
-      .set(this.as(account));
   addSupplement = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/access-requests/${id}/supplements`).set(this.as(account)).send(body);
   supplements = (id: string, account: ApiAccount, query: Record<string, string | number> = {}) =>
@@ -267,8 +254,44 @@ export class SpendHarness extends BudgetHarness {
     request(this.server()).post(`/api/v1/access-requests/${id}/spend-approval`).set(this.as(account)).send(body);
   withdrawRequest = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/access-requests/${id}/withdraw`).set(this.as(account)).send(body);
-  sendDelegated = (body: object, account: ApiAccount) =>
-    request(this.server()).post('/api/v1/delegated-requests').set(this.as(account)).send(body);
+  /**
+   * The request for a group of people, two at least, as the account sends it: the one way left to send a request for others, since
+   * the route that sent one request for each person is gone (`QĐ-96`). The people start today, as the group of a request needs.
+   */
+  async submitForPeople(
+    planId: string,
+    people: readonly Person[],
+    account: ApiAccount,
+    extra: Record<string, unknown> = {},
+  ): Promise<request.Response> {
+    await this.ctx.sql.query(`UPDATE employees SET hire_date = current_date WHERE id = ANY($1::uuid[])`, [
+      people.map((person) => person.employeeId),
+    ]);
+
+    return request(this.server())
+      .post('/api/v1/group-requests')
+      .set(this.as(account))
+      .send({
+        planId,
+        lines: people.map((person) => ({ employeeId: person.employeeId })),
+        businessReason: 'The new designers need the tool',
+        termMonths: 1,
+        ...extra,
+      });
+  }
+
+  /** The id of the request for a group that `submitForPeople` made, failing on anything but 201. */
+  async sentForPeople(
+    planId: string,
+    people: readonly Person[],
+    account: ApiAccount,
+    extra: Record<string, unknown> = {},
+  ): Promise<string> {
+    const response = await this.submitForPeople(planId, people, account, extra);
+    if (response.status !== 201) throw new Error(`group submit: ${response.status} ${JSON.stringify(response.body)}`);
+
+    return this.dataOf<{ request: { id: string } }>(response).request.id;
+  }
   grantQueue = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/grant-queue').query(query).set(this.as(account));
   departmentEmployees = (departmentId: string, account: ApiAccount) =>

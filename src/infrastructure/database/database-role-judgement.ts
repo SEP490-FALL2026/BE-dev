@@ -23,6 +23,15 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   // added to and never changed or deleted (their triggers refuse it first).
   super_admin_event_tickets: ['INSERT', 'SELECT'],
   budget_version_history: ['INSERT', 'SELECT'],
+  // The notice, the signed record and the acknowledgement of a machine are evidence: added to and never changed.
+  monitoring_notice_versions: ['INSERT', 'SELECT'],
+  device_acknowledgements: ['INSERT', 'SELECT'],
+  device_signature_records: ['INSERT', 'SELECT'],
+  // Which credential an enrollment produced is evidence too.
+  device_enrollment_uses: ['INSERT', 'SELECT'],
+  // Which tools a collector may report, version by version: what was allowed on a day stays knowable.
+  collector_allowlist_versions: ['INSERT', 'SELECT'],
+  collector_allowlist_entries: ['INSERT', 'SELECT'],
 };
 
 /** Sequence privileges the runtime role holds on every sequence of `public`: drawing numbers (`nextval`) and `currval`. */

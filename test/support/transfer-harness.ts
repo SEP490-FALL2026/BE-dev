@@ -52,7 +52,7 @@ export class TransferHarness extends ReassignmentHarness {
     };
   }
 
-  readonly grounds = { type: 'DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-10-01' };
+  readonly grounds = { type: 'HR_DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-10-01' };
 
   /**
    * The row of the employee is held `FOR UPDATE` in a separate connection, the calls are sent one by one, each only after the one

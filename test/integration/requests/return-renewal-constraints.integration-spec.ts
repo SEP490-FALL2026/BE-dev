@@ -221,7 +221,7 @@ describe('what the database refuses about a return and a renewal (US-05-13, US-0
       const assignmentId = await h.seatOf(unit.member, { planId: internal }, { expectedEndDate: h.inDays(5) });
       const { request } = await h.renewed(unit.member.account, {
         assignmentId,
-        newExpectedEndDate: h.inDays(95),
+        extensionMonths: 3,
         businessReason: 'The work goes on',
       });
 

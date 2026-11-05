@@ -104,8 +104,10 @@ export interface NoticeEventInput {
   toDepartmentId?: string | undefined;
   effectiveOn?: BusinessDate | undefined;
   lastWorkingDay?: BusinessDate | undefined;
+  /** How the access is blocked: required with a departure of either kind, refused with any other (`QĐ-96c`, D8). */
+  accessBlockMode?: 'WITH_LAST_DAY' | 'BLOCK_NOW' | undefined;
   successor?: { kind: 'EMPLOYEE'; employeeId: string } | { kind: 'NONE' } | undefined;
-  pendingTransferCancellation?: { reason: string } | undefined;
+  cancelPendingTransfer?: true | undefined;
   startedOn?: BusinessDate | undefined;
   approvedReturnOn?: BusinessDate | undefined;
 }

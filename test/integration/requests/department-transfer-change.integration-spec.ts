@@ -84,8 +84,8 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
       const same = await move({ newEffectiveOn: h.day(30) });
       const past = await move({ newEffectiveOn: h.day(-2) });
 
-      expect([noReason.status, h.codeOf(noReason)]).toEqual([422, 'DEPARTMENT_TRANSFER.REASON_REQUIRED']);
-      expect([noGrounds.status, h.codeOf(noGrounds)]).toEqual([422, 'DEPARTMENT_TRANSFER.GROUNDS_REQUIRED']);
+      expect([noReason.status, h.codeOf(noReason)]).toEqual([422, 'VALIDATION_ERROR']);
+      expect([noGrounds.status, h.codeOf(noGrounds)]).toEqual([422, 'VALIDATION_ERROR']);
       expect([same.status, h.codeOf(same)]).toEqual([422, 'DEPARTMENT_TRANSFER.NO_CHANGE']);
       expect([past.status, h.codeOf(past)]).toEqual([422, 'DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST']);
       expect(h.dataOf<TransferWire>(await h.readTransfer(wire.id).expect(200)).effectiveOn).toBe(h.day(30));
@@ -224,8 +224,8 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
 
       const noReason = await h.cancelTransfer(wire.id, { grounds: h.grounds });
       const noGrounds = await h.cancelTransfer(wire.id, { reason: 'Not needed' });
-      expect([noReason.status, h.codeOf(noReason)]).toEqual([422, 'DEPARTMENT_TRANSFER.REASON_REQUIRED']);
-      expect([noGrounds.status, h.codeOf(noGrounds)]).toEqual([422, 'DEPARTMENT_TRANSFER.GROUNDS_REQUIRED']);
+      expect([noReason.status, h.codeOf(noReason)]).toEqual([422, 'VALIDATION_ERROR']);
+      expect([noGrounds.status, h.codeOf(noGrounds)]).toEqual([422, 'VALIDATION_ERROR']);
       await h.cancelTransfer(wire.id, why).expect(200);
       const again = await h.cancelTransfer(wire.id, why);
       expect([again.status, h.codeOf(again)]).toEqual([409, 'DEPARTMENT_TRANSFER.ALREADY_CANCELLED']);

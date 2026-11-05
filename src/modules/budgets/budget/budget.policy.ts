@@ -7,64 +7,10 @@ import { fiscalYearOf } from '../../../core/fiscal-year';
  * to a line of the current budget is a move of its window and which is a new version.
  */
 
-export type RepeatCycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'ONE_TIME';
-
 /** The longest reason, comment or note of a line or an edit, in characters: the form and the file import judge the same. */
 export const REASON_MAX = 1000;
 /** The longest description of a line, in characters: the form and the file import judge the same. */
 export const LINE_DESCRIPTION_MAX = 200;
-
-/** A line as the head or Finance gives it; the fields `QĐ-82d` asks of every line may still be missing. */
-export interface LineDraft {
-  description: string;
-  amountMinor: bigint;
-  windowFrom?: BusinessDate | undefined;
-  windowTo?: BusinessDate | undefined;
-  servicePeriodMonths?: number | undefined;
-  repeatCycle?: RepeatCycle | undefined;
-}
-
-export interface CompleteLine {
-  windowFrom: BusinessDate;
-  windowTo: BusinessDate;
-  servicePeriodMonths: number;
-  repeatCycle: RepeatCycle;
-}
-
-/** The fields of a line still to give: where it is bought, for how long it serves, and how it repeats (`QĐ-82d`). */
-export function missingLineFields(
-  line: Pick<LineDraft, 'windowFrom' | 'windowTo' | 'servicePeriodMonths' | 'repeatCycle'>,
-): string[] {
-  const missing: string[] = [];
-  if (line.windowFrom === undefined) missing.push('windowFrom');
-  if (line.windowTo === undefined) missing.push('windowTo');
-  if (line.servicePeriodMonths === undefined) missing.push('servicePeriodMonths');
-  if (line.repeatCycle === undefined) missing.push('repeatCycle');
-
-  return missing;
-}
-
-export interface IncompleteLine {
-  /** The line, counted from one. */
-  line: number;
-  fields: string[];
-}
-
-/** Every line that lacks something, so the sender learns all of it at once (`US-06-10` AC-2). */
-export function incompleteLines(lines: readonly LineDraft[]): IncompleteLine[] {
-  return lines.flatMap((line, index) => {
-    const fields = missingLineFields(line);
-
-    return fields.length > 0 ? [{ line: index + 1, fields }] : [];
-  });
-}
-
-/** The lines that end before they begin: the purchase window runs forwards. */
-export function backwardLines(lines: readonly Pick<LineDraft, 'windowFrom' | 'windowTo'>[]): number[] {
-  return lines.flatMap((line, index) =>
-    line.windowFrom !== undefined && line.windowTo !== undefined && line.windowTo < line.windowFrom ? [index + 1] : [],
-  );
-}
 
 /**
  * Whether a fiscal year still takes a proposal or a version: the year that is running and the years to come do, a year
@@ -106,28 +52,6 @@ export const canResubmit = (state: ProposalState): boolean => state === 'RETURNE
 export const isEditable = (state: VersionStateName, detached = false): boolean =>
   !detached && (state === 'DRAFT' || state === 'CHANGES_REQUESTED');
 
-export interface LineChange {
-  amountMinor?: bigint | undefined;
-  windowFrom?: BusinessDate | undefined;
-  windowTo?: BusinessDate | undefined;
-}
-
-/**
- * What a change to a line of the current budget amounts to (`US-06-09` AC-17): moving the purchase window keeps the money
- * and is recorded with its reason; changing the amount, even only to update a price, is a new version that goes the whole
- * way to the spending approver again (`INV-21`).
- */
-export function kindOfChange(
-  line: { amountMinor: bigint; windowFrom: BusinessDate; windowTo: BusinessDate },
-  change: LineChange,
-): 'NONE' | 'WINDOW' | 'AMOUNT' {
-  if (change.amountMinor !== undefined && change.amountMinor !== line.amountMinor) return 'AMOUNT';
-  const movesFrom = change.windowFrom !== undefined && change.windowFrom !== line.windowFrom;
-  const movesTo = change.windowTo !== undefined && change.windowTo !== line.windowTo;
-
-  return movesFrom || movesTo ? 'WINDOW' : 'NONE';
-}
-
 export type DecisionRefusal = 'NOT_SPENDING_APPROVER' | 'CONFLICT_OF_INTEREST' | 'OWN_VERSION' | 'NOT_SENT';
 
 /**
@@ -154,9 +78,6 @@ export function checkVersionDecision(facts: {
 
   return facts.state === 'SENT' ? null : 'NOT_SENT';
 }
-
-/** A line is overdue when the window it was planned to be bought in has gone by. */
-export const isOverdue = (line: { windowTo: BusinessDate }, today: BusinessDate): boolean => line.windowTo < today;
 
 /**
  * Who decides a version now, as `decide` finds it (`QĐ-93d`(1)): the spending approver who works, and nobody else — no substitute
@@ -272,11 +193,6 @@ export interface LineFields {
   planId: string | null;
   seats: number | null;
   amountMinor: bigint;
-  windowFrom: string;
-  windowTo: string;
-  servicePeriodMonths: number;
-  repeatCycle: string;
-  quoteValidUntil: string | null;
 }
 
 const ADJUSTABLE_FIELDS = [
@@ -284,11 +200,6 @@ const ADJUSTABLE_FIELDS = [
   'planId',
   'seats',
   'amountMinor',
-  'windowFrom',
-  'windowTo',
-  'servicePeriodMonths',
-  'repeatCycle',
-  'quoteValidUntil',
 ] as const satisfies readonly (keyof LineFields)[];
 
 /** Whether the patch changes what the line of the proposal said: its words, its money, its window, its service or its cycle. */
@@ -297,17 +208,12 @@ export function patchChangesLine(line: LineFields, patch: Partial<LineFields>): 
 }
 
 /** The line of a version made from a line before it (of a proposal, or of the current budget): where it came from, and none of the work on it. */
-export function copiedLineOf<R extends string>(
+export function copiedLineOf(
   line: {
     description: string;
     planId: string | null;
     seats: number | null;
     amountMinor: bigint;
-    windowFrom: string;
-    windowTo: string;
-    servicePeriodMonths: number;
-    repeatCycle: R;
-    quoteValidUntil: string | null;
   },
   origin: { proposalId: string | null; proposalPosition: number | null },
 ) {
@@ -318,11 +224,6 @@ export function copiedLineOf<R extends string>(
     planId: line.planId,
     seats: line.seats,
     amountMinor: line.amountMinor,
-    windowFrom: line.windowFrom,
-    windowTo: line.windowTo,
-    servicePeriodMonths: line.servicePeriodMonths,
-    repeatCycle: line.repeatCycle,
-    quoteValidUntil: line.quoteValidUntil,
     financeComment: null,
     adjustmentReason: null,
   };
@@ -341,3 +242,18 @@ export function quartersMismatchAfter(
 
   return quarters !== null && !quartersMatch(total, quarters);
 }
+
+/** The reserve a version has when Finance gives none: `percent` of the base, rounded to the nearest minor unit (`QĐ-98`). */
+export const defaultReserveOf = (baseMinor: bigint, percent: number): bigint =>
+  (baseMinor * BigInt(percent) + 50n) / 100n;
+
+/** A version whose reserve is not the default share of its base, and says not why (`US-06-09` AC-30); one made before the share was kept asks nothing. */
+export const reserveReasonMissing = (version: {
+  baseMinor: bigint;
+  reserveMinor: bigint;
+  reservePercent: number | null;
+  reserveReason: string | null;
+}): boolean =>
+  version.reservePercent !== null &&
+  version.reserveMinor !== defaultReserveOf(version.baseMinor, version.reservePercent) &&
+  !version.reserveReason;

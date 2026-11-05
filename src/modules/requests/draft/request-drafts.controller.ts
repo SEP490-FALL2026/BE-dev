@@ -13,7 +13,7 @@ import {
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { toGroupRequestApiException } from '../group-request/group-request.http-errors';
+import { GROUP_REQUEST_ERROR_EXAMPLES, toGroupRequestApiException } from '../group-request/group-request.http-errors';
 import { toServiceAccountApiException } from '../service-account-request/service-account-request.http-errors';
 import {
   ACCESS_REQUEST_ERROR_EXAMPLES as EXAMPLES,
@@ -167,8 +167,14 @@ export class RequestDraftsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The id is invalid (VALIDATION_ERROR), an expected spend date is saved for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing changes.',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE, EXAMPLES.REQUEST_PARTY_INELIGIBLE],
+        'The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with a term of more than 12 months, which no request may ask for any more: ACCESS_REQUEST.TERM_BEYOND_LIMIT (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxMonths, endsBy }. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. Nothing changes: the draft stays, to be saved again with a shorter term.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.REQUEST_PARTY_INELIGIBLE,
+        EXAMPLES.TERM_BEYOND_LIMIT,
+        GROUP_REQUEST_ERROR_EXAMPLES.TERM_BEYOND_LIMIT,
+        GROUP_REQUEST_ERROR_EXAMPLES.TOO_FEW_LINES,
+      ],
     },
   )
   async submit(

@@ -64,6 +64,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
     documentAttach: {
       '404': ['CONTRACT.NOT_FOUND', 'DOCUMENT.NOT_FOUND'],
       '409': ['DOCUMENT.ALREADY_ATTACHED', 'DOCUMENT.NOT_READY_TO_ATTACH'],
+      '422': ['DOCUMENT.PURPOSE_MISMATCH'],
     },
     documentComplete: {
       '404': ['DOCUMENT.NOT_FOUND'],

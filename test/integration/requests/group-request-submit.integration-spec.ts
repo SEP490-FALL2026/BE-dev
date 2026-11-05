@@ -140,24 +140,23 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       });
     }, 120000);
 
-    it('asks the head who sends a term over twelve months to confirm it in so many words', async () => {
+    it('takes no term over twelve months, and no confirmation in words that would lift the limit (QĐ-98)', async () => {
       const u = await unit();
-      const [e1] = await h.colleagues(u, 1);
+      const [e1, e2] = await h.colleagues(u, 2);
       const rows = await h.requestRows();
 
-      const refused = await h.submitGroup(h.groupBody(paid, [e1], { termMonths: 18 }), u.head.account).expect(422);
-      expect(h.codeOf(refused)).toBe('GROUP_REQUEST.TERM_CONFIRMATION_REQUIRED');
-      expect(await h.requestRows()).toBe(rows);
+      const long = await h.submitGroup(h.groupBody(paid, [e1, e2], { termMonths: 13 }), u.head.account).expect(422);
+      const confirmed = await h
+        .submitGroup(
+          h.groupBody(paid, [e1, e2], { termMonths: 12, termConfirmation: { reason: 'A long project' } }),
+          u.head.account,
+        )
+        .expect(422);
 
-      const confirmed = await sent(
-        u.head.account,
-        h.groupBody(paid, [e1], { termMonths: 18, termConfirmation: { reason: 'A long project' } }),
-      );
-      const record = await h.ctx.sql.query<{ term_confirmation_reason: string | null }>(
-        `SELECT term_confirmation_reason FROM approval_records WHERE request_id = $1`,
-        [confirmed.id],
-      );
-      expect(record.rows[0].term_confirmation_reason).toBe('A long project');
+      expect(h.codeOf(long)).toBe('VALIDATION_ERROR');
+      expect(h.codeOf(confirmed)).toBe('VALIDATION_ERROR');
+      expect(await h.requestRows()).toBe(rows);
+      expect((await sent(u.head.account, h.groupBody(paid, [e1, e2], { termMonths: 12 }))).type).toBe('GROUP_GRANT');
     });
   });
 
@@ -195,14 +194,16 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       expect(await h.lineStates(request.id)).toEqual(['NEED_CONFIRMED', 'AWAITING_NEED']);
     });
 
-    it('sends a request of the head alone as a line of their own, decided by the spending approver, with no step for others', async () => {
+    it('refuses a request of the head alone: a group names two people at least, and the request of one is an individual one (QĐ-100aa)', async () => {
       const u = await unit();
+      const rows = await h.requestRows();
 
-      const request = await sent(u.head.account, h.groupBody(paid, [u.head]));
+      const refused = await h.submitGroup(h.groupBody(paid, [u.head]), u.head.account).expect(422);
 
-      expect(request.state).toBe('PENDING');
-      expect((await h.needSteps(request.id)).map((step) => [step.state, step.routing_row])).toEqual([['PENDING', 2]]);
-      expect(await h.lineStates(request.id)).toEqual(['AWAITING_NEED']);
+      expect(refused.body as Refused).toMatchObject({
+        error: { code: 'GROUP_REQUEST.TOO_FEW_LINES', details: { min: 2 } },
+      });
+      expect(await h.requestRows()).toBe(rows);
     });
   });
 
@@ -274,7 +275,8 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       expect(checked.lines.map((line) => [line.employeeId, line.ok, line.reason])).toEqual([
         [e1.employeeId, true, null],
         [outsider.employeeId, false, 'OUTSIDE_DEPARTMENT'],
-        [e2.employeeId, false, 'END_DATE_REQUIRED'],
+        // An intern is taken like anyone: the end day is not the sender's to give (`QĐ-98`, `Q-03`).
+        [e2.employeeId, true, null],
         [e3.employeeId, false, 'EMAIL_REQUIRED'],
       ]);
       expect(refused.body as Refused).toMatchObject({
@@ -283,7 +285,6 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
           details: {
             lines: [
               { employeeId: outsider.employeeId, reason: 'OUTSIDE_DEPARTMENT' },
-              { employeeId: e2.employeeId, reason: 'END_DATE_REQUIRED' },
               { employeeId: e3.employeeId, reason: 'EMAIL_REQUIRED' },
             ],
           },
@@ -292,25 +293,36 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       expect(await h.requestRows()).toBe(rows);
     });
 
-    it('gives the intern a day of their own, which the line and the seat keep', async () => {
+    it('takes no end day of an intern from the sender: the line has none, and sending one is refused (Q-03)', async () => {
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
       await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN' WHERE id = $1`, [e2.employeeId]);
+      const withDay = {
+        ...h.groupBody(paid, [e1, e2]),
+        lines: [{ employeeId: e1.employeeId }, { employeeId: e2.employeeId, expectedEndDate: '2099-12-31' }],
+      };
 
-      const request = await sent(
-        u.head.account,
-        h.groupBody(paid, [e1, e2], {
-          lines: [{ employeeId: e1.employeeId }, { employeeId: e2.employeeId, expectedEndDate: '2099-12-31' }],
-        }),
-      );
+      const refused = await h.submitGroup(withDay, u.head.account).expect(422);
+      const request = await sent(u.head.account, h.groupBody(paid, [e1, e2]));
 
-      expect((await h.lineRows(request.id)).map((line) => line.expected_end_date)).toEqual([null, '2099-12-31']);
+      expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
+      expect((await h.lineRows(request.id)).map((line) => line.expected_end_date)).toEqual([null, null]);
     });
 
     it('names a person twice, and refuses a plan that is not for a group by what it grants and never by its name', async () => {
       const u = await unit();
-      const [e1] = await h.colleagues(u, 1);
+      const [e1, e2] = await h.colleagues(u, 2);
       const dupe = await h
+        .submitGroup(
+          {
+            ...h.groupBody(paid, [e1, e2]),
+            lines: [{ employeeId: e1.employeeId }, { employeeId: e2.employeeId }, { employeeId: e2.employeeId }],
+          },
+          u.head.account,
+        )
+        .expect(422);
+      // One person named twice is one person: fewer than the two a group needs.
+      const twiceOnly = await h
         .submitGroup(
           { ...h.groupBody(paid, [e1]), lines: [{ employeeId: e1.employeeId }, { employeeId: e1.employeeId }] },
           u.head.account,
@@ -319,31 +331,34 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       const single = await h.planOf(await h.subscription(10, 'K1'));
       const internal = await h.plan('K5');
 
-      const k1 = await h.submitGroup(h.groupBody(single, [e1]), u.head.account).expect(422);
-      const free = await h.submitGroup(h.groupBody(internal, [e1]), u.head.account).expect(422);
+      const k1 = await h.submitGroup(h.groupBody(single, [e1, e2]), u.head.account).expect(422);
+      const free = await h.submitGroup(h.groupBody(internal, [e1, e2]), u.head.account).expect(422);
 
       expect(dupe.body as Refused).toMatchObject({
-        error: { code: 'GROUP_REQUEST.DUPLICATE_LINE', details: { employeeIds: [e1.employeeId] } },
+        error: { code: 'GROUP_REQUEST.DUPLICATE_LINE', details: { employeeIds: [e2.employeeId] } },
       });
+      expect(twiceOnly.body as Refused).toMatchObject({ error: { code: 'GROUP_REQUEST.TOO_FEW_LINES' } });
       expect(k1.body as Refused).toMatchObject({
         error: { code: 'GROUP_REQUEST.PLAN_NOT_ELIGIBLE', details: { reason: 'KIND_NOT_MULTI_SEAT' } },
       });
       expect(free.body as Refused).toMatchObject({
         error: { code: 'GROUP_REQUEST.PLAN_NOT_ELIGIBLE', details: { reason: 'NOT_PAID_SOFTWARE' } },
       });
-      const checked = h.dataOf<CheckWire>(await h.checkGroup(h.groupBody(single, [e1]), u.head.account).expect(200));
+      const checked = h.dataOf<CheckWire>(
+        await h.checkGroup(h.groupBody(single, [e1, e2]), u.head.account).expect(200),
+      );
       expect(checked.plan).toEqual({ eligible: false, reason: 'KIND_NOT_MULTI_SEAT' });
     });
 
     it('refuses a person who holds a seat of the plan and one for whom a request for it is open', async () => {
       const u = await unit();
-      const [e1, e2, e3] = await h.colleagues(u, 3);
+      const [e1, e2, e3, e4] = await h.colleagues(u, 4);
       const subscription = await h.subscription(10);
       const plan = await h.planOf(subscription);
       await h.written({ subscriptionId: subscription }, [
         { employee_code: e1.code, account_identifier: `${e1.code.toLowerCase()}@acme.vn` },
       ]);
-      await sent(u.head.account, h.groupBody(plan, [e3]));
+      await sent(u.head.account, h.groupBody(plan, [e3, e4]));
 
       const checked = h.dataOf<CheckWire>(
         await h.checkGroup(h.groupBody(plan, [e1, e2, e3]), u.head.account).expect(200),
@@ -475,9 +490,9 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
     });
 
     it('refuses the group the spending approver sends, in the check and in the sending, with the answer of every other route', async () => {
-      const [e1] = await h.colleagues(await unit(), 1);
+      const [e1, e2] = await h.colleagues(await unit(), 2);
       const rows = await h.requestRows();
-      const body = h.groupBody(paid, [e1]);
+      const body = h.groupBody(paid, [e1, e2]);
 
       for (const refused of [await h.checkGroup(body, h.boss.account), await h.submitGroup(body, h.boss.account)]) {
         expect(refused.status).toBe(422);
@@ -495,10 +510,10 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
   describe('the plan of a group is read from the plan, whatever it is called (AC-14)', () => {
     it('takes a plan of the kind of grant that gives each person an account, renamed or not', async () => {
       const u = await unit();
-      const [e1] = await h.colleagues(u, 1);
+      const [e1, e2] = await h.colleagues(u, 2);
       await h.ctx.sql.query(`UPDATE plans SET name = 'Anything else entirely' WHERE id = $1`, [paid]);
 
-      const request = await sent(u.head.account, h.groupBody(paid, [e1]));
+      const request = await sent(u.head.account, h.groupBody(paid, [e1, e2]));
 
       expect(request.type).toBe('GROUP_GRANT');
     });

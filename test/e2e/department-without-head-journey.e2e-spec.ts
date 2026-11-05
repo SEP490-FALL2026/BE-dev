@@ -82,7 +82,7 @@ describe('a paid request of a department with no head: it waits, goes to the new
 
   it('the new head approves the need and, with a budget in force, sends it on in a batch that the check routes to the approver', async () => {
     const unit: Unit = { department, head: newHead, member };
-    await w.decide(requestId, { decision: 'APPROVE', spend: { offPlan: true } }, newHead.account).expect(200);
+    await w.decide(requestId, { decision: 'APPROVE' }, newHead.account).expect(200);
     expect(await requestOf()).toMatchObject({
       state: 'AWAITING_SPEND_SUBMISSION',
       needDecision: { decision: 'APPROVED', decidedBy: { employeeId: newHead.employeeId }, deciderRole: 'MANAGER' },

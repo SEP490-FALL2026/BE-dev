@@ -211,7 +211,12 @@ describe('the approval tickets of Super Admin events (integration, PostgreSQL)',
           employeeId: away.employeeId,
           startedOn: h.day(-1),
           approvedReturnOn: h.day(40),
-          grounds: { type: 'LEAVE_APPROVAL', reference: 'DN-07/2026', issuer: 'HR Department', issuedOn: '2026-05-25' },
+          grounds: {
+            type: 'APPROVED_APPLICATION',
+            reference: 'DN-07/2026',
+            issuer: 'HR Department',
+            issuedOn: '2026-05-25',
+          },
         })
         .expect(201);
       leaveChange = await idOf('employee_leave_changes', `recorded_by_app_user_id IS NOT NULL`);
@@ -233,7 +238,9 @@ describe('the approval tickets of Super Admin events (integration, PostgreSQL)',
         );
       waitingNotice = { table: 'personnel_notices', id: (await noticeOf('N1')).id };
       const handled = await noticeOf('N2');
-      await h.recordNotice(handled.id, h.recording({ lastWorkingDay: h.day(12) })).expect(201);
+      await h
+        .recordNotice(handled.id, h.recording({ lastWorkingDay: h.day(12), accessBlockMode: 'WITH_LAST_DAY' }))
+        .expect(201);
       recordedNotice = { table: 'personnel_notices', id: handled.id };
       verification = await idOf('personnel_notice_verifications', `notice_id = '${handled.id}'`);
     }, 300000);

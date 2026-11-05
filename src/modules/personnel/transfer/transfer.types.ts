@@ -96,7 +96,7 @@ export interface ChangeTransferInput {
 
 /** A warning the answer carries and that does not stop the transfer: the person owns applications that need another owner. */
 export interface TransferWarning {
-  code: 'BUSINESS_OWNER_REPLACEMENT_NEEDED';
+  code: 'BUSINESS_OWNER_KEEP_OR_CHANGE';
   applications: { id: string; name: string }[];
   totalApplications: number;
 }

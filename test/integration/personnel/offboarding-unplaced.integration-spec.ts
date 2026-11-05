@@ -385,12 +385,10 @@ describe('unplaced employee offboarding and first placement (integration, real P
       expect(await h.dutyRows(assignmentId)).toEqual([]);
 
       expect(await h.workState(person.employeeId)).toBe('ACTIVE/HANDING_OVER');
-      await h.markLeft(wire.id).expect(200);
+      await h.leaveOnLastDay(wire.id).expect(200);
       await h.lockAccount(wire.id, LOCK).expect(200);
       expect(h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200)).accountLock).toMatchObject({ note: LOCK.note });
-      const opened = h.dataOf<CaseWire>(
-        await h.revokeRights(wire.id, { count: 1, reason: 'Thu hồi quyền của người nghỉ không phòng' }).expect(200),
-      );
+      const opened = h.dataOf<CaseWire>(await h.revokeRights(wire.id, {}).expect(200));
       expect(opened.revocations).toEqual({ created: 1, reasonAdded: 0 });
 
       // openFromTask ran for the task: still no duty (a head would be asked for this plan), no wait on the claim.
@@ -414,11 +412,11 @@ describe('unplaced employee offboarding and first placement (integration, real P
     it('8b. does the same for an abrupt departure: the person is LEFT at once and the revocation of the seat is not held', async () => {
       const { person, assignmentId } = await unplacedWithSeat();
 
-      const wire = await h.recordedCase(person, { abrupt: true, lastWorkingDay: h.today() });
+      const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.today() });
 
-      expect(wire).toMatchObject({ state: 'LEFT', abrupt: true });
+      expect(wire).toMatchObject({ state: 'LEFT', accessBlockMode: 'BLOCK_NOW', abrupt: true });
       expect(await h.dutyRows(assignmentId)).toEqual([]);
-      await h.revokeRights(wire.id, { count: 1, reason: 'Nghỉ đột ngột', accountLock: LOCK }).expect(200);
+      await h.revokeRights(wire.id, { accountLock: LOCK }).expect(200);
       const [right] = await rightsOf(wire.id);
       expect(right.revocation?.source).toBe('ABRUPT_DEPARTURE');
       expect(await h.dutyRows(assignmentId)).toEqual([]);

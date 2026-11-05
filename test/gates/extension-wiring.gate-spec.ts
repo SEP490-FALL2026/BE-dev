@@ -52,8 +52,7 @@ const NO_HTTP_GRAPHS = [
   'InspectionCliModule',
   'AssignSubscriptionOwnerCliModule',
   'AiPurgeCliModule',
-  'DevSeedCliModule',
-  'DemoDatasetCliModule',
+  'SeedCliModule',
 ] as const;
 
 const DEACTIVATION_ONLY =
@@ -95,7 +94,6 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'TransferEffectiveListener',
       'TransferReviewListener',
       'SpendingApproverWaitListener',
-      'RenewalSpendingApproverWaitListener',
     ],
     users: ['OrganizationChangeService'],
     reason:
@@ -109,8 +107,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'InspectionCliModule',
       'AssignSubscriptionOwnerCliModule',
       'AiPurgeCliModule',
-      'DevSeedCliModule',
-      'DemoDatasetCliModule',
+      'SeedCliModule',
     ],
     point: 'OrganizationChangeListeners',
     binders: [
@@ -120,7 +117,6 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'TransferReviewListener',
       'RequestsOrganizationChangeListener',
       'SpendingApproverWaitListener',
-      'RenewalSpendingApproverWaitListener',
     ],
     users: ['OrganizationChangeService'],
     reason:
@@ -130,7 +126,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
   {
     graphs: ['InspectionCliModule'],
     point: 'ApprovalRoleChangeListeners',
-    binders: ['RequestsApprovalRoleListener', 'SpendingApproverWaitListener', 'RenewalSpendingApproverWaitListener'],
+    binders: ['RequestsApprovalRoleListener', 'SpendingApproverWaitListener'],
     users: ['RoleGrantService'],
     reason:
       'The point is emitted by RoleGrantService.grantRole / revokeRole and ApprovalRoleService.set, reached in all of src only from controllers ' +
@@ -139,7 +135,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
   {
     graphs: ['InstallationModule', 'RecoveryCliModule'],
     point: 'ApprovalRoleChangeListeners',
-    binders: ['RequestsApprovalRoleListener', 'SpendingApproverWaitListener', 'RenewalSpendingApproverWaitListener'],
+    binders: ['RequestsApprovalRoleListener', 'SpendingApproverWaitListener'],
     users: ['RoleGrantService'],
     reason:
       'RoleGrantService.grantRole / revokeRole emit only for the role FINANCE (the branch `input.role === "FINANCE"`). The only calls these ' +
@@ -161,27 +157,27 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
   {
     graphs: ['SeedCliModule'],
     point: 'ApprovalRoleChangeListeners',
-    binders: ['RequestsApprovalRoleListener', 'SpendingApproverWaitListener', 'RenewalSpendingApproverWaitListener'],
+    binders: ['RequestsApprovalRoleListener', 'SpendingApproverWaitListener'],
     users: ['RoleGrantService'],
     reason:
       'Owner 30/10/2026. These commands only create demo accounts, and granting FINANCE (RoleGrantService.grantRole via ' +
       'LocalDemoAccountApi.createDemoAccount) emits the approval-role change that this listener answers by re-trying the steps that wait for Finance. ' +
       'On the databases they target no request step waits for Finance, and a step that is already waiting is NOT re-tried by these commands (the ' +
       'API path would re-try it). The limitation is documented in docs/guides/seed.md and docs/rules/operational-commands.md. ' +
-      'The two listeners of qd93-remove-fallback-substitute-approvers (SpendingApproverWaitListener, RenewalSpendingApproverWaitListener) answer ' +
-      'only the role SPENDING_APPROVER taken back with nobody after it, and tell the Super Admin of a budget version or a renewal that waits; ' +
-      'these commands create accounts and never take that role back, and no version or renewal waits on the databases they target.',
+      'The listener of qd93-remove-fallback-substitute-approvers (SpendingApproverWaitListener) answers ' +
+      'only the role SPENDING_APPROVER taken back with nobody after it, and tells the Super Admin of a budget version that waits; ' +
+      'these commands create accounts and never take that role back, and no version waits on the databases they target.',
   },
   {
     graphs: ['WorkerModule'],
     point: 'ApprovalRoleChangeListeners',
-    binders: ['SpendingApproverWaitListener', 'RenewalSpendingApproverWaitListener'],
+    binders: ['SpendingApproverWaitListener'],
     users: ['RoleGrantService'],
     reason:
       'The point is emitted by RoleGrantService.grantRole / revokeRole, reached in all of src only from controllers of the API and the commands ' +
       'bootstrap, seed and recover; the worker declares none of them and its loops grant and revoke no role. The listeners ' +
-      '(qd93-remove-fallback-substitute-approvers) only tell the Super Admin that a budget version or a renewal waits for a spending approver ' +
-      'when the role is taken back; the sending of the version and the proposal of the renewal tell it themselves in the API.',
+      '(qd93-remove-fallback-substitute-approvers) only tell the Super Admin that a budget version waits for a spending approver ' +
+      'when the role is taken back; the sending of the version tells it itself in the API.',
   },
 ];
 

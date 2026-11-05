@@ -1,4 +1,4 @@
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v2/installation';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -7,7 +7,7 @@ import request from 'supertest';
 import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
 import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
 import type { FetchLike } from '../../../src/cli/seed/demo-api-client';
-import { SHARED_DEMO_V2 } from '../../../src/cli/seed/fixture/shared-demo-v2';
+import { SHARED_DEMO_V3 } from '../../../src/cli/seed/fixture/shared-demo-v3';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
 
@@ -21,12 +21,12 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
   let ctx: HttpTestApp;
   let demo: INestApplicationContext;
   let baseUrl: string;
-  const demoAccounts = SHARED_DEMO_V2.people.filter((person) => person.account !== null).length;
+  const demoAccounts = SHARED_DEMO_V3.people.filter((person) => person.account !== null).length;
   const secrets = { superAdminPassword: SEED_PASSWORD, demoAccountPassword: 'a demo password for the tests' };
 
   const args = (mode: 'plan' | 'apply', extra: Partial<SeedCommandArguments> = {}): SeedCommandArguments => ({
     mode,
-    fixture: 'shared-demo-v2',
+    fixture: 'shared-demo-v3',
     apiUrl: baseUrl,
     operator: 'TEST-DEMO-1',
     environment: 'LOCAL_TEST',
@@ -65,7 +65,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
   /** Sessions holding the apply lock of the fixture: an apply that ended, however it ended, leaves none. */
   async function heldAdvisoryLocks(): Promise<number> {
     const { rows } = await ctx.sql.query<{ n: string }>(
-      `WITH k AS (SELECT hashtextextended('seed:shared-demo-v2:apply', 0) AS v)
+      `WITH k AS (SELECT hashtextextended('seed:shared-demo-v3:apply', 0) AS v)
        SELECT count(*) AS n FROM pg_locks, k
         WHERE locktype = 'advisory' AND granted AND objsubid = 1
           AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
@@ -76,9 +76,9 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
 
   async function requestStates(): Promise<Record<string, string>> {
     const { rows } = await ctx.sql.query<{ marker: string; state: string }>(
-      `SELECT substring(coalesce(p.purpose, r.business_reason) from '^\\[DS1-(R[0-9]+)\\]') AS marker, r.state::text AS state
+      `SELECT substring(coalesce(p.purpose, r.business_reason) from '^\\[SV-(R[0-9]+)\\]') AS marker, r.state::text AS state
          FROM access_requests r LEFT JOIN access_request_proposals p ON p.request_id = r.id
-        WHERE coalesce(p.purpose, r.business_reason) LIKE '[DS1-R%'`,
+        WHERE coalesce(p.purpose, r.business_reason) LIKE '[SV-R%'`,
     );
     return Object.fromEntries(rows.map((row) => [row.marker, row.state]));
   }
@@ -134,7 +134,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
 
   it('refuses a second apply while another holds the lock of the fixture, writing nothing and leaving no lock', async () => {
     const before = await businessRows();
-    const other = await demo.get(DemoAccountsApi).holdApplyLock('shared-demo-v2');
+    const other = await demo.get(DemoAccountsApi).holdApplyLock('shared-demo-v3');
     expect(other).not.toBeNull();
     try {
       expect(await heldAdvisoryLocks()).toBe(1);
@@ -159,7 +159,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     expect(stopped.steps.find((step) => step.key === 'org.accounts')?.status).toBe('done');
     const prepared = await ctx.sql.query<{ role: string }>(
       `SELECT g.role::text FROM role_grants g JOIN app_users u ON u.id = g.app_user_id
-       JOIN employees e ON e.id = u.employee_id WHERE e.employee_code = 'DS1-CEO' AND g.revoked_at IS NULL`,
+       JOIN employees e ON e.id = u.employee_id WHERE e.employee_code = 'NV-CEO' AND g.revoked_at IS NULL`,
     );
     expect(prepared.rows).toEqual([{ role: 'EMPLOYEE' }]);
     expect(await heldAdvisoryLocks()).toBe(0);
@@ -178,54 +178,59 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
       R8: 'AWAITING_IT_ASSESSMENT',
       R9: 'AWAITING_FINANCE_REVIEW',
     });
-    // Three departments hold an approved budget of the year (QĐ-93 demo: ENG, MKT, SAL); Design has none, for R9.
+    // Three departments hold an approved budget of this year and of the next one (ENG, MKT, SAL); Design has none, for R9.
     const approved = await ctx.sql.query<{ code: string }>(
       `SELECT c.code FROM budget_versions v JOIN cost_centers c ON c.id = v.cost_center_id
-        WHERE v.state = 'APPROVED' AND c.code LIKE 'DS1-%' ORDER BY c.code`,
+        WHERE v.state = 'APPROVED' AND c.code LIKE 'CC-%' ORDER BY c.code, v.year`,
     );
-    expect(approved.rows.map((row) => row.code)).toEqual(['DS1-CC-ENG', 'DS1-CC-MKT', 'DS1-CC-SAL']);
+    // Every budget of both years is the approved, current one of its Cost Center and year (INV-21).
+    expect(
+      (await ctx.sql.query<{ n: number }>("SELECT count(*)::int AS n FROM budget_versions WHERE state <> 'APPROVED'"))
+        .rows[0].n,
+    ).toBe(0);
+    expect(approved.rows.map((row) => row.code)).toEqual(['CC-ENG', 'CC-ENG', 'CC-MKT', 'CC-MKT', 'CC-SAL', 'CC-SAL']);
     // Heads hold MANAGER as a direct grant and the spending approver holds SPENDING_APPROVER, nothing derived (QĐ-93a).
     const grants = await ctx.sql.query<{ code: string; role: string }>(
       `SELECT e.employee_code AS code, g.role::text AS role FROM role_grants g
          JOIN app_users u ON u.id = g.app_user_id JOIN employees e ON e.id = u.employee_id
-        WHERE g.revoked_at IS NULL AND g.role IN ('MANAGER', 'SPENDING_APPROVER') AND e.employee_code LIKE 'DS1-%'
+        WHERE g.revoked_at IS NULL AND g.role IN ('MANAGER', 'SPENDING_APPROVER') AND e.employee_code LIKE 'NV-%'
         ORDER BY e.employee_code, g.role`,
     );
     expect(grants.rows).toEqual([
-      { code: 'DS1-CEO', role: 'SPENDING_APPROVER' },
-      { code: 'DS1-DEP', role: 'MANAGER' },
-      { code: 'DS1-DESH', role: 'MANAGER' },
-      { code: 'DS1-ENGH', role: 'MANAGER' },
-      { code: 'DS1-FINH', role: 'MANAGER' },
-      { code: 'DS1-ITOH', role: 'MANAGER' },
-      { code: 'DS1-MKTH', role: 'MANAGER' },
-      { code: 'DS1-SALH', role: 'MANAGER' },
+      { code: 'NV-CEO', role: 'SPENDING_APPROVER' },
+      { code: 'NV-DEP', role: 'MANAGER' },
+      { code: 'NV-DESH', role: 'MANAGER' },
+      { code: 'NV-ENGH', role: 'MANAGER' },
+      { code: 'NV-FINH', role: 'MANAGER' },
+      { code: 'NV-ITOH', role: 'MANAGER' },
+      { code: 'NV-MKTH', role: 'MANAGER' },
+      { code: 'NV-SALH', role: 'MANAGER' },
     ]);
     const invalid = await ctx.sql.query(
       `SELECT u.id FROM app_users u JOIN employees e ON e.id = u.employee_id
        LEFT JOIN role_grants g ON g.app_user_id = u.id AND g.revoked_at IS NULL
-       WHERE e.employee_code LIKE 'DS1-%' GROUP BY u.id HAVING count(g.id) <> 1`,
+       WHERE e.employee_code LIKE 'NV-%' GROUP BY u.id HAVING count(g.id) <> 1`,
     );
     expect(invalid.rows).toEqual([]);
   }, 600000);
 
   it('matches the audited one-role account table and keeps the spending approver outside all Request parties', async () => {
     const rows = await ctx.sql.query<{ code: string; role: string }>(
-      `SELECT e.employee_code AS code, g.role FROM employees e JOIN app_users u ON u.employee_id = e.id JOIN role_grants g ON g.app_user_id = u.id AND g.revoked_at IS NULL WHERE e.employee_code LIKE 'DS1-%' ORDER BY e.employee_code`,
+      `SELECT e.employee_code AS code, g.role FROM employees e JOIN app_users u ON u.employee_id = e.id JOIN role_grants g ON g.app_user_id = u.id AND g.revoked_at IS NULL WHERE e.employee_code LIKE 'NV-%' ORDER BY e.employee_code`,
     );
-    const wanted = SHARED_DEMO_V2.people
+    const wanted = SHARED_DEMO_V3.people
       .filter((person) => person.account)
       .map((person) => ({
         code: person.code,
-        role: person.code === SHARED_DEMO_V2.approvalRoles.SPENDING_APPROVER ? 'SPENDING_APPROVER' : person.account,
+        role: person.code === SHARED_DEMO_V3.approvalRoles.SPENDING_APPROVER ? 'SPENDING_APPROVER' : person.account,
       }))
-      .concat([{ code: 'DS1-SA', role: 'SUPER_ADMIN' as const }])
+      .concat([{ code: 'NV-SA', role: 'SUPER_ADMIN' as const }])
       .sort((a, b) => a.code.localeCompare(b.code));
     expect(rows.rows).toEqual(wanted);
     expect(
       (
         await ctx.sql.query(
-          "SELECT r.id FROM access_requests r JOIN employees e ON e.id = r.requester_employee_id WHERE e.employee_code = 'DS1-CEO'",
+          "SELECT r.id FROM access_requests r JOIN employees e ON e.id = r.requester_employee_id WHERE e.employee_code = 'NV-CEO'",
         )
       ).rowCount,
     ).toBe(0);
@@ -239,7 +244,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     expect(await businessRows()).toEqual(before);
     const accounts = await ctx.sql.query<{ hash: string }>(
       `SELECT c.hash FROM password_credentials c JOIN app_users u ON u.id = c.app_user_id
-        WHERE u.normalized_login_email LIKE '%@ds1.slm-demo.example'`,
+        WHERE u.normalized_login_email LIKE '%@saoviet.example' AND u.normalized_login_email <> '${INSTALLATION.loginEmail}'`,
     );
     expect(accounts.rows).toHaveLength(demoAccounts);
     expect(
@@ -247,11 +252,11 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     ).toBe(true);
     const audit = await ctx.sql.query<{ n: string }>(
       `SELECT count(*) AS n FROM audit_events WHERE action = 'DEMO_DATASET.ACCOUNT_CREATED' AND operator_reference = $1`,
-      ['DEMO_DATASET:shared-demo-v2:TEST-DEMO-1'],
+      ['DEMO_DATASET:shared-demo-v3:TEST-DEMO-1'],
     );
     expect(Number(audit.rows[0].n)).toBe(demoAccounts);
     const doubled = await ctx.sql.query(
-      `SELECT business_reason FROM access_requests WHERE business_reason LIKE '[DS1-%' GROUP BY business_reason HAVING count(*) > 1`,
+      `SELECT business_reason FROM access_requests WHERE business_reason LIKE '[SV-%' GROUP BY business_reason HAVING count(*) > 1`,
     );
     expect(doubled.rows).toEqual([]);
   }, 300000);
@@ -260,9 +265,9 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     // Finance changes the tax profile of the demo vendor: the dataset's record no longer matches the fixture.
     const finance = await request(ctx.app.getHttpServer())
       .post('/api/v1/auth/login')
-      .send({ email: 'phuc.trinh@ds1.slm-demo.example', password: secrets.demoAccountPassword });
+      .send({ email: 'phuc.trinh@saoviet.example', password: secrets.demoAccountPassword });
     const financeToken = (finance.body as { data: { accessToken: string } }).data.accessToken;
-    const vendor = await ctx.sql.query<{ id: string }>(`SELECT id FROM vendors WHERE name = 'Figma (demo)'`);
+    const vendor = await ctx.sql.query<{ id: string }>(`SELECT id FROM vendors WHERE name = 'Figma'`);
     await request(ctx.app.getHttpServer())
       .put(`/api/v1/vendors/${vendor.rows[0].id}/tax-profile`)
       .set('Authorization', `Bearer ${financeToken}`)
@@ -285,7 +290,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
       .post('/api/v1/auth/login')
       .send({ email: INSTALLATION.loginEmail, password: SEED_PASSWORD });
     const token = (login.body as { data: { accessToken: string } }).data.accessToken;
-    const { rows } = await ctx.sql.query<{ id: string }>(`SELECT id FROM departments WHERE code = 'DS1-OPS'`);
+    const { rows } = await ctx.sql.query<{ id: string }>(`SELECT id FROM departments WHERE code = 'OPS'`);
     await request(ctx.app.getHttpServer())
       .patch(`/api/v1/departments/${rows[0].id}`)
       .set('Authorization', `Bearer ${token}`)
@@ -296,9 +301,9 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     expect(report.exitCode).toBe(4);
     const departments = report.steps.find((step) => step.key === 'org.departments');
     expect(departments?.status).toBe('conflict');
-    expect(departments?.detail).toContain('DS1-OPS');
+    expect(departments?.detail).toContain('OPS');
     expect(report.steps.find((step) => step.key === 'org.employees')).toMatchObject({ status: 'blocked' });
-    const kept = await ctx.sql.query<{ name: string }>(`SELECT name FROM departments WHERE code = 'DS1-OPS'`);
+    const kept = await ctx.sql.query<{ name: string }>(`SELECT name FROM departments WHERE code = 'OPS'`);
     expect(kept.rows[0].name).toBe('Vận hành (đổi tay)');
   }, 300000);
 });

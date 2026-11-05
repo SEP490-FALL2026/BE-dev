@@ -70,7 +70,6 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
         decidedBy: { employeeId: head.employeeId },
         deciderRole: 'MANAGER',
         reason: null,
-        termConfirmationReason: null,
       });
       const events = await h.auditEvents('ACCESS_REQUEST_STEP', sent.needStep.id);
       const approved = events.find((e) => e.action === 'ACCESS_REQUEST.NEED_APPROVED');
@@ -179,40 +178,40 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
     });
   });
 
-  describe('a term of more than twelve months (AC-6)', () => {
-    it('is approved only with a confirmation, and adds no step', async () => {
-      const sent = await h.sent(designer, internalPlan, { termMonths: 18 });
+  describe('a term of more than twelve months (QĐ-98)', () => {
+    it('is not taken when the request is sent: a request asks for a year at most, and nothing is written', async () => {
+      const before = await h.requestRows();
 
-      expect(h.codeOf(await h.decide(sent.id, approve, head.account).expect(422))).toBe(
-        'ACCESS_REQUEST.TERM_CONFIRMATION_REQUIRED',
-      );
-      const after = await decided(
-        sent.id,
-        { decision: 'APPROVE', termConfirmation: { reason: 'The project runs eighteen months' } },
-        head.account,
-      );
-
-      expect(after.state).toBe('AWAITING_EXECUTION');
-      expect(after.needDecision?.termConfirmationReason).toBe('The project runs eighteen months');
-      expect(await stepsOf(sent.id)).toBe(1);
-    });
-
-    it('needs no confirmation at twelve months, or to be refused', async () => {
-      const twelve = await h.sent(designer, internalPlan, { termMonths: 12 });
-      const long = await h.sent(designer, internalPlan, { termMonths: 36 });
-
-      expect((await decided(twelve.id, approve, head.account)).state).toBe('AWAITING_EXECUTION');
-      expect((await decided(long.id, { decision: 'REJECT', reason: 'Too long' }, head.account)).state).toBe('REJECTED');
-    });
-
-    it('does not take a confirmation with a refusal', async () => {
-      const sent = await h.sent(designer, internalPlan, { termMonths: 18 });
-
-      const response = await h
-        .decide(sent.id, { decision: 'REJECT', reason: 'No', termConfirmation: { reason: 'Long' } }, head.account)
-        .expect(422);
+      const response = await h.submit(h.form(internalPlan, { termMonths: 13 }), designer.account).expect(422);
 
       expect(h.codeOf(response)).toBe('VALIDATION_ERROR');
+      expect(await h.requestRows()).toBe(before);
+    });
+
+    it('needs no confirmation at twelve months, or to be refused, and adds no step', async () => {
+      const twelve = await h.sent(designer, internalPlan, { termMonths: 12 });
+      const refused = await h.sent(designer, internalPlan, { termMonths: 12 });
+
+      expect((await decided(twelve.id, approve, head.account)).state).toBe('AWAITING_EXECUTION');
+      expect(await stepsOf(twelve.id)).toBe(1);
+      expect((await decided(refused.id, { decision: 'REJECT', reason: 'Too long' }, head.account)).state).toBe(
+        'REJECTED',
+      );
+    });
+
+    it('does not take a confirmation in words with an approval or a refusal: nothing lifts the limit', async () => {
+      const sent = await h.sent(designer, internalPlan, { termMonths: 12 });
+      const confirmation = { termConfirmation: { reason: 'Long' } };
+
+      const approved = await h.decide(sent.id, { ...approve, ...confirmation }, head.account).expect(422);
+      const refused = await h
+        .decide(sent.id, { decision: 'REJECT', reason: 'No', ...confirmation }, head.account)
+        .expect(422);
+
+      expect(h.codeOf(approved)).toBe('VALIDATION_ERROR');
+      expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
+      const after = h.dataOf<{ request: AccessRequestWire }>(await h.fetch(sent.id, head.account).expect(200)).request;
+      expect(after.state).toBe('PENDING');
     });
   });
 

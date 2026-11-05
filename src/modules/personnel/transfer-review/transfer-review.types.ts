@@ -4,7 +4,8 @@ export type ReviewStatus = 'OPEN' | 'COMPLETED' | 'SUPERSEDED';
 
 /** What the head of the department may decide about a tool; `PENDING` is the state before a decision. */
 export type ReviewDecision = 'PENDING' | 'STILL_NEEDED' | 'NOT_NEEDED' | 'NEEDS_NEW_TOOL';
-export type HeadDecision = Exclude<ReviewDecision, 'PENDING'>;
+/** What a head may decide today; `NEEDS_NEW_TOOL` is kept in `ReviewDecision` only so the lines written before it was retired can be read. */
+export type HeadDecision = Extract<ReviewDecision, 'STILL_NEEDED' | 'NOT_NEEDED'>;
 
 /** Why nobody can decide a review yet: the department it was opened for has no head today. */
 export type WaitingReason = 'NO_HEAD';
@@ -47,6 +48,7 @@ export interface ReviewItemRecord {
   decidedByEmployeeId: string | null;
   decidedAt: Date | null;
   newToolNote: string | null;
+  reason: string | null;
   revocationTaskId: string | null;
 }
 
@@ -108,5 +110,5 @@ export interface StillNeededLine {
 export interface DecisionInput {
   assignmentId: string;
   decision: HeadDecision;
-  newToolNote?: string;
+  reason: string;
 }

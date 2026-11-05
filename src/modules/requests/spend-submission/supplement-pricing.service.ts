@@ -24,17 +24,17 @@ export class SupplementPricing {
   async repriceFor(
     tx: DbTx,
     request: AccessRequestRecord,
-    input: { expectedSpendOn: string | undefined; dropped: readonly string[]; fiscalYearStartMonth: number; now: Date },
+    input: { dropped: readonly string[]; fiscalYearStartMonth: number; now: Date },
   ): Promise<{ repriced: PricingRecord; change: NonNullable<ReturnType<typeof supplementChangeOf>> }> {
     const { pricing } = request;
     const today = await this.organizationReads.businessToday(input.now, tx);
     const repriced = await this.repricing.reprice(
       tx,
       this.groups.withoutPeople(request, input.dropped),
-      input.expectedSpendOn ?? (pricing.expectedSpendOn as string),
+      pricing.expectedSpendOn as string,
       { today, fiscalYearStartMonth: input.fiscalYearStartMonth },
     );
-    if (input.dropped.length === 0 && repriced.expectedSpendOn === pricing.expectedSpendOn) {
+    if (input.dropped.length === 0) {
       throw new SpendSupplementRefusedError('NO_CHANGE');
     }
     const change = supplementChangeOf(pricing, repriced);

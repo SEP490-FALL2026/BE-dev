@@ -97,7 +97,6 @@ export class SpendRoutingService {
           codes: codesOf(check).join(','),
           state,
           opened: moved?.opened ?? null,
-          offPlan: check.offPlan,
         },
       ),
     );

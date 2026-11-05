@@ -77,7 +77,7 @@ export class OffboardingAuditService {
         record.id,
         record.id,
         null,
-        { employeeId: record.employeeId, audience: 'SUPER_ADMIN', abrupt: record.abrupt },
+        { employeeId: record.employeeId, audience: 'SUPER_ADMIN', accessBlockMode: record.accessBlockMode },
       ),
     );
   }

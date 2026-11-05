@@ -19,6 +19,9 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
   - `inspectEmployeeAccount` — tài khoản của nhân viên: có không, dùng được không, vai trò gì (khóa `FOR SHARE`); thân hàm ở
     `accounts/account-record.service.ts`, facade và `employee-accounts.listener.ts` cùng gọi nó.
   - `markEmployeeLeft` — ghi ngày người rời đi lên tài khoản của họ.
+  - `setDepartureBlock`, `moveDepartureBlock`, `clearPendingDepartureBlock`, `findDepartureBlock(s)` — dòng chặn truy cập theo hồ sơ nghỉ việc
+    (`employee_access_blocks`, QĐ-100q): từ `blockedFrom` đăng nhập, refresh và guard từ chối (`accessAllowed` ở `accounts/account.policy.ts`),
+    bất kể trạng thái hồ sơ; chỉ dòng `DEPARTURE_LAST_DAY` dời theo ngày làm việc cuối; hủy sau khi hiệu lực giữ dòng, `releasable`.
   - `findUsableItAdminEmployeeIds`, `findUsableFinanceEmployeeId`, `countUsableItAdminsExcept`, `getSuperAdminHolder`,
     `listRoleHoldersAmong` — ai đang giữ vai trò nào.
   - `getSpendingApproverEmployeeId(tx?, { forShare? })` — ai giữ vai Người duyệt chi (grant còn hiệu lực); với `forShare` khóa
@@ -39,7 +42,7 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
 ## Bảng sở hữu
 
 - `app_users`, `password_credentials`, `role_grants`, `auth_sessions`, `refresh_tokens`, `login_throttles`,
-  `account_action_tokens`, `recovery_tickets`; bảng `approval_role_holders` đã gỡ (migration `…_identity_drop_approval_role_holders`,
+  `account_action_tokens`, `recovery_tickets`, `employee_access_blocks`; bảng `approval_role_holders` đã gỡ (migration `…_identity_drop_approval_role_holders`,
   QĐ-93c; chỉ `migration-preflight.repo.ts` còn đọc nó, khi có, cho DB cũ)
   ([prisma/models/identity-access.prisma](../../../prisma/models/identity-access.prisma)).
 

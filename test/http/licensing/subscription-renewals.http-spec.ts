@@ -6,7 +6,6 @@ import { RenewalOutcomeService } from '../../../src/modules/licensing/subscripti
 import { RenewalProposalService } from '../../../src/modules/licensing/subscription-renewal/proposal/renewal-proposal.service';
 import { RenewalError } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal.errors';
 import { RenewalViewService } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal-view.service';
-import { FinanceSetupIncompleteError } from '../../../src/modules/organization/public/organization.errors';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
@@ -38,7 +37,7 @@ const ROUTES: Array<[string, Call]> = [
   ],
   [
     'POST /subscription-renewals/{id}/decision',
-    (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/decision`).send({ choice: 'RENEW' }),
+    (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/decision`).send({ decision: 'CONFIRM' }),
   ],
   [
     'POST /subscription-renewals/{id}/outcome',
@@ -72,7 +71,7 @@ describe('subscription renewal routes (e2e, no database)', () => {
           },
         },
         { token: RenewalProposalService, useValue: { propose: throwing } },
-        { token: RenewalDecisionService, useValue: { decide: throwing } },
+        { token: RenewalDecisionService, useValue: { confirm: throwing } },
         { token: RenewalOutcomeService, useValue: { record: throwing } },
       ],
     });
@@ -126,19 +125,27 @@ describe('subscription renewal routes (e2e, no database)', () => {
   describe('the refusals of the services, as their codes (SoD-2, SoD-3, US-11-02 AC-2, AC-20, US-11-05 AC-9)', () => {
     it.each<[string, Error, number, string, Call, string[]]>([
       [
-        'a head reading the queue',
+        'an employee reading the queue',
         new RenewalError('READ_FORBIDDEN'),
         403,
         'SUBSCRIPTION_RENEWAL.READ_FORBIDDEN',
         (s) => request(s).get('/api/v1/subscription-renewals'),
+        ['EMPLOYEE'],
+      ],
+      [
+        'a head of another department reading a case',
+        new RenewalError('NOT_FOUND'),
+        404,
+        'SUBSCRIPTION_RENEWAL.NOT_FOUND',
+        (s) => request(s).get(`/api/v1/subscription-renewals/${ID}`),
         ['MANAGER'],
       ],
       [
-        'an IT Admin deciding',
+        'an IT Admin confirming',
         new RenewalError('NOT_DECIDER'),
         403,
         'SUBSCRIPTION_RENEWAL.NOT_DECIDER',
-        (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/decision`).send({ choice: 'RENEW' }),
+        (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/decision`).send({ decision: 'CONFIRM' }),
         ['IT_ADMIN'],
       ],
       [
@@ -146,31 +153,32 @@ describe('subscription renewal routes (e2e, no database)', () => {
         new RenewalError('ACTIVE_USERS_NOT_ACKNOWLEDGED', { seatsInUse: 5 }),
         409,
         'SUBSCRIPTION_RENEWAL.ACTIVE_USERS_NOT_ACKNOWLEDGED',
-        (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/decision`).send({ choice: 'CANCEL' }),
-        ['SPENDING_APPROVER'],
+        (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/decision`).send({ decision: 'CONFIRM' }),
+        ['MANAGER'],
       ],
       [
-        'a renewal of a department without a Cost Center',
-        new FinanceSetupIncompleteError('dep'),
+        'seats proposed that no longer match the excess',
+        new RenewalError('PROPOSAL_STALE', { required: 2, stillHeld: 1 }),
         409,
-        'FINANCE.SETUP_INCOMPLETE',
-        (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/decision`).send({ choice: 'RENEW' }),
-        ['SPENDING_APPROVER'],
+        'SUBSCRIPTION_RENEWAL.PROPOSAL_STALE',
+        (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/decision`).send({ decision: 'CONFIRM' }),
+        ['MANAGER'],
       ],
       [
-        'three seats chosen for four to go',
+        'three seats proposed for four to go',
         new RenewalError('EXCESS_SELECTION_INVALID', { required: 4, selected: 3 }),
         422,
         'SUBSCRIPTION_RENEWAL.EXCESS_SELECTION_INVALID',
         (s) =>
           request(s)
-            .post(`/api/v1/subscription-renewals/${ID}/decision`)
+            .post('/api/v1/subscription-renewals')
             .send({
+              subscriptionId: SUB,
               choice: 'REDUCE',
-              quantity: 88,
+              proposedQuantity: 88,
               releasedAssignmentIds: [SUB, ID, '11111111-1111-4111-8111-111111111111'],
             }),
-        ['SPENDING_APPROVER'],
+        ['IT_ADMIN'],
       ],
       [
         'an outcome with more seats in use than bought',
@@ -242,12 +250,75 @@ describe('subscription renewal routes (e2e, no database)', () => {
             .send({ subscriptionId: SUB, choice: 'RENEW', commitment: true }),
       ],
       [
-        'a decision with seats that are not ids',
-        ['SPENDING_APPROVER'],
+        'a proposal with seats that are not ids',
+        ['IT_ADMIN'],
+        (s) =>
+          request(s)
+            .post('/api/v1/subscription-renewals')
+            .send({ subscriptionId: SUB, choice: 'REDUCE', proposedQuantity: 8, releasedAssignmentIds: ['x'] }),
+      ],
+      [
+        'a proposal that sends the point of execution (worked out by the system)',
+        ['IT_ADMIN'],
+        (s) =>
+          request(s)
+            .post('/api/v1/subscription-renewals')
+            .send({ subscriptionId: SUB, choice: 'REDUCE', proposedQuantity: 8, withinCurrentTerm: true }),
+      ],
+      [
+        'a decision that is not a confirmation',
+        ['MANAGER'],
+        (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/decision`).send({ decision: 'REJECT' }),
+      ],
+      [
+        'a decision with no decision field',
+        ['MANAGER'],
+        (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/decision`).send({ reason: 'ok' }),
+      ],
+      [
+        'a decision that still names the choice',
+        ['MANAGER'],
         (s) =>
           request(s)
             .post(`/api/v1/subscription-renewals/${ID}/decision`)
-            .send({ choice: 'REDUCE', quantity: 8, releasedAssignmentIds: ['x'] }),
+            .send({ decision: 'CONFIRM', choice: 'RENEW' }),
+      ],
+      [
+        'a decision that still names the quantity',
+        ['MANAGER'],
+        (s) =>
+          request(s).post(`/api/v1/subscription-renewals/${ID}/decision`).send({ decision: 'CONFIRM', quantity: 8 }),
+      ],
+      [
+        'a decision that still carries withinCurrentTerm',
+        ['MANAGER'],
+        (s) =>
+          request(s)
+            .post(`/api/v1/subscription-renewals/${ID}/decision`)
+            .send({ decision: 'CONFIRM', withinCurrentTerm: true }),
+      ],
+      [
+        'a decision that still carries the seats to take back',
+        ['MANAGER'],
+        (s) =>
+          request(s)
+            .post(`/api/v1/subscription-renewals/${ID}/decision`)
+            .send({ decision: 'CONFIRM', releasedAssignmentIds: [SUB] }),
+      ],
+      [
+        'an outcome of a vendor that refused, with no note',
+        ['IT_ADMIN'],
+        (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/outcome`).send({ outcome: 'VENDOR_REFUSED' }),
+      ],
+      [
+        'an outcome that is different from the decision, with no note',
+        ['IT_ADMIN'],
+        (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/outcome`).send({ outcome: 'DIFFERENT' }),
+      ],
+      [
+        'a seat ranking asked proposedOnly with something that is not a flag',
+        ['IT_ADMIN'],
+        (s) => request(s).get(`/api/v1/subscription-renewals/${ID}/seat-ranking?proposedOnly=maybe`),
       ],
       [
         'an outcome that does not exist',

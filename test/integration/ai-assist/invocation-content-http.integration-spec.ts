@@ -72,7 +72,7 @@ describe('the content of a call of the AI over HTTP (integration, real PostgreSQ
     owner = await createActivatedAccount(ctx, seed, {
       code: 'E-OWNER',
       email: 'owner@acme.vn',
-      roles: ['IT_ADMIN'],
+      role: 'IT_ADMIN',
       admin,
     });
   }, 120000);

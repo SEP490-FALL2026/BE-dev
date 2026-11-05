@@ -6,7 +6,7 @@ import { employeeRef, page, pageQuery } from '../budget/budget.dto';
 export const createBudgetAttachmentBodySchema = z.strictObject({
   fileName: z.string().min(1).max(400),
   contentType: z.string().min(1).max(100),
-  sizeBytes: z.number().int().min(0).max(1_000_000_000),
+  sizeBytes: z.number().int().min(1).max(1_000_000_000),
 });
 
 export const uploadInstructionsSchema = z.strictObject({

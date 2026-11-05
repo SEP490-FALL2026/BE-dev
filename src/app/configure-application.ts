@@ -68,6 +68,15 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
     .setVersion('1.0')
     .setOpenAPIVersion('3.0.0')
     .addBearerAuth()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'opaque',
+        description: 'The credential a collector received when it enrolled.',
+      },
+      'deviceCredential',
+    )
     .build();
 
   return withRequestParserResponses(

@@ -178,6 +178,13 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
   });
 
   describe('the versions (INV-21)', () => {
+    it('keeps the reason of the reserve either absent or written and at most 1000 characters (B-L)', async () => {
+      expect((await version({ reserve_reason: 'Two vendors raise their price' })).state).toBeNull();
+      expect((await version({ reserve_reason: null, number: 2 })).state).toBeNull();
+      expect((await version({ reserve_reason: '   ' })).state).toBe(CHECK);
+      expect((await version({ reserve_reason: 'x'.repeat(1001) })).state).toBe(CHECK);
+    });
+
     it('takes a version, and one in progress for a Cost Center and a year at a time', async () => {
       const first = await version();
       expect(first.state).toBeNull();

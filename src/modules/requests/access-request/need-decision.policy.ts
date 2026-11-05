@@ -6,9 +6,6 @@ import type { AccessRequestBranchCode } from './access-request.policy';
  * and nobody decides a request they asked or are given (`SoD-4`).
  */
 
-/** A term longer than this needs the person who decides to confirm it in so many words (`BR-07.4`, `OI-07a`). */
-export const LONG_TERM_MONTHS = 12;
-
 export interface DecisionFacts {
   actorEmployeeId: string;
   requesterEmployeeId: string;
@@ -16,27 +13,17 @@ export interface DecisionFacts {
   /** Who holds the need step; null while it waits for somebody. */
   assigneeEmployeeId: string | null;
   stepState: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
-  termMonths: number;
-}
-
-/** What a head gives with the approval of a request that costs money (`US-05-04` AC-12, AC-16). */
-export interface SpendInput {
-  /** A line of the plan, or null when the request is outside it. */
-  planLine: { position: number; stillNeeded: boolean } | null;
-  expectedSpendOn?: string;
 }
 
 export interface DecisionInput {
   decision: 'APPROVE' | 'REJECT';
   reason?: string;
-  termConfirmationReason?: string;
-  spend?: SpendInput;
 }
 
-export type DecisionRefusal = 'OWN_REQUEST' | 'NOT_THE_ASSIGNEE' | 'STEP_NOT_PENDING' | 'TERM_CONFIRMATION_REQUIRED';
+export type DecisionRefusal = 'OWN_REQUEST' | 'NOT_THE_ASSIGNEE' | 'STEP_NOT_PENDING';
 
 /** The first reason the person may not decide the step, in the order a caller should learn it, or null when they may. */
-export function checkNeedDecision(facts: DecisionFacts, input: DecisionInput): DecisionRefusal | null {
+export function checkNeedDecision(facts: DecisionFacts): DecisionRefusal | null {
   if (
     facts.actorEmployeeId === facts.requesterEmployeeId ||
     facts.beneficiaryEmployeeIds.includes(facts.actorEmployeeId)
@@ -46,10 +33,6 @@ export function checkNeedDecision(facts: DecisionFacts, input: DecisionInput): D
   if (facts.assigneeEmployeeId === null || facts.actorEmployeeId !== facts.assigneeEmployeeId)
     return 'NOT_THE_ASSIGNEE';
   if (facts.stepState !== 'PENDING') return 'STEP_NOT_PENDING';
-  const confirmed = (input.termConfirmationReason ?? '').trim() !== '';
-  if (input.decision === 'APPROVE' && facts.termMonths > LONG_TERM_MONTHS && !confirmed) {
-    return 'TERM_CONFIRMATION_REQUIRED';
-  }
 
   return null;
 }
@@ -94,19 +77,15 @@ export interface NeedDecisionOutcome {
   /** Where the request goes: the next state of its branch for an approval, `REJECTED` for a refusal. */
   requestState: ApprovedRequestState | 'REJECTED';
   deciderRole: DeciderRole;
-  /** The reason a person gave for confirming a long term; only an approval carries it. */
-  termConfirmationReason: string | null;
-  /** The head approving a request that costs money chooses its line first; a refusal there undoes the whole decision. */
-  headChoosesLine: boolean;
 }
 
 /**
  * What a decision leads to, once it is allowed (`US-05-04` AC-12, AC-16): the state the request goes to, the role the person decided
- * in (the row of the routing table as it stood), and whether the head has the line of the plan to choose. Throws for a row that gives
+ * in (the row of the routing table as it stood). Throws for a row that gives
  * the step to nobody.
  */
 export function needDecisionOutcome(
-  asked: { branch: AccessRequestBranchCode; routingRow: number; hasSpendStep: boolean },
+  asked: { branch: AccessRequestBranchCode; routingRow: number },
   input: DecisionInput,
 ): NeedDecisionOutcome {
   const approved = input.decision === 'APPROVE';
@@ -121,7 +100,5 @@ export function needDecisionOutcome(
     approved,
     requestState: approved ? nextRequestState(asked.branch) : 'REJECTED',
     deciderRole,
-    termConfirmationReason: (approved ? input.termConfirmationReason?.trim() : null) || null,
-    headChoosesLine: approved && asked.hasSpendStep && deciderRole === 'MANAGER',
   };
 }

@@ -9,10 +9,10 @@ import type { HeadDecision, ReviewDecision, ReviewStatus, WaitingReason } from '
  */
 
 /** What the head may decide about a tool, in the order the wire lists them. */
-export const HEAD_DECISIONS: readonly HeadDecision[] = ['STILL_NEEDED', 'NOT_NEEDED', 'NEEDS_NEW_TOOL'];
+export const HEAD_DECISIONS: readonly HeadDecision[] = ['STILL_NEEDED', 'NOT_NEEDED'];
 
-/** The longest note about a new tool the head may leave (`US-03-07` AC-5). */
-export const NEW_TOOL_NOTE_MAX = 500;
+/** The longest reason the head may give for a decision (`US-03-07` AC-5, F17). */
+export const REASON_MAX = 500;
 
 /**
  * The last day to decide: the working days after the day the transfer took effect, which itself does not count (`OQ-A-17` (b)). A
@@ -49,13 +49,6 @@ export function mayDecide(headEmployeeId: string | null, callerEmployeeId: strin
 
 export function waitingReasonOf(status: ReviewStatus, headEmployeeId: string | null): WaitingReason | null {
   return status === 'OPEN' && headEmployeeId === null ? 'NO_HEAD' : null;
-}
-
-/** Whether the note that goes with a decision is allowed: only the need for a new tool carries one, never blank, within the limit. */
-export function isNoteAllowed(decision: HeadDecision, note: string | undefined): boolean {
-  if (note === undefined) return true;
-
-  return decision === 'NEEDS_NEW_TOOL' && note.trim().length > 0 && note.length <= NEW_TOOL_NOTE_MAX;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { isNoteAllowed, NEW_TOOL_NOTE_MAX } from './transfer-review.policy';
+import { REASON_MAX } from './transfer-review.policy';
 
 const idParamSchema = z.strictObject({ id: z.uuid() });
 
@@ -23,17 +23,12 @@ const itemsQuerySchema = z.strictObject({
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
 
-const decideBodySchema = z
-  .strictObject({
-    assignmentId: z.uuid(),
-    decision: z.enum(['STILL_NEEDED', 'NOT_NEEDED', 'NEEDS_NEW_TOOL']),
-    newToolNote: z.string().max(NEW_TOOL_NOTE_MAX).optional(),
-  })
-  .refine((body) => isNoteAllowed(body.decision, body.newToolNote), {
-    message: 'A note goes only with the need for a new tool, and is not blank.',
-    path: ['newToolNote'],
-  })
-  .meta({ description: 'A note (newToolNote) goes only with the decision NEEDS_NEW_TOOL, and it is not blank.' });
+/** The head decides still needed or no longer needed and always says why; the decision NEEDS_NEW_TOOL and its note are retired. */
+const decideBodySchema = z.strictObject({
+  assignmentId: z.uuid(),
+  decision: z.enum(['STILL_NEEDED', 'NOT_NEEDED']),
+  reason: z.string().trim().min(1).max(REASON_MAX),
+});
 
 const pagination = z.strictObject({
   page: z.number().int().positive(),
@@ -105,7 +100,10 @@ export const transferReviewItemSchema = z.strictObject({
   decision: z.enum(['PENDING', 'STILL_NEEDED', 'NOT_NEEDED', 'NEEDS_NEW_TOOL']),
   decidedBy: employeeBrief.nullable(),
   decidedAt: z.iso.datetime().nullable(),
+  /** Only on a line decided before the decision was retired. */
   newToolNote: z.string().nullable(),
+  /** Why the head decided as they did; null for a line decided before the reason was asked for, or still waiting. */
+  reason: z.string().nullable(),
   /** The revocation task a "no longer needed" decision opened. */
   revocationTaskId: z.uuid().nullable(),
   /**

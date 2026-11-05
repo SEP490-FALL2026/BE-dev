@@ -29,15 +29,8 @@ const NOT_FOUND = {
 const INVALID_DECISION = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
-    'The decision is invalid (VALIDATION_ERROR: a refusal without a reason, a signature, both a line and outside the plan) or a term over twelve months is approved without a confirmation (ACCESS_REQUEST.TERM_CONFIRMATION_REQUIRED). The head who approves a request that costs money gives a line of the plan of the budget or says it is outside the plan, else nothing is saved (ACCESS_REQUEST.PLAN_LINE_REQUIRED); a line that is not there (ACCESS_REQUEST.LINE_NOT_FOUND) or whose window has gone by and is not confirmed as still needed (ACCESS_REQUEST.STILL_NEEDED_REQUIRED) is refused, and a line or a day is not for anyone else or for a request that costs nothing (ACCESS_REQUEST.SPEND_NOT_APPLICABLE).',
-  examples: [
-    VALIDATION_EXAMPLE,
-    EXAMPLES.TERM_CONFIRMATION_REQUIRED,
-    EXAMPLES.PLAN_LINE_REQUIRED,
-    EXAMPLES.LINE_NOT_FOUND,
-    EXAMPLES.STILL_NEEDED_REQUIRED,
-    EXAMPLES.SPEND_NOT_APPLICABLE,
-  ],
+    'The decision is invalid (VALIDATION_ERROR: a refusal without a reason, or a field the decision does not take).',
+  examples: [VALIDATION_EXAMPLE],
 } as const;
 
 /**
@@ -86,17 +79,6 @@ export class NeedDecisionController {
       const record = await this.decisions.decide(actor, params.id, {
         decision: body.decision,
         reason: body.reason,
-        termConfirmationReason: body.termConfirmation?.reason,
-        ...(body.spend
-          ? {
-              spend: {
-                planLine: body.spend.planLine
-                  ? { position: body.spend.planLine.position, stillNeeded: body.spend.planLine.stillNeeded ?? false }
-                  : null,
-                expectedSpendOn: body.spend.expectedSpendOn,
-              },
-            }
-          : {}),
       });
 
       return { request: toWire(await this.queries.view(record)) };

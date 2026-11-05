@@ -2,11 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
-import {
-  AccessRequestGroupUsesLinesError,
-  AccessRequestNotFoundError,
-  AccessRequestPlanLineRefusedError,
-} from '../access-request/access-request.errors';
+import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 import type { BlockedReason } from './spend-decision.policy';
 import {
@@ -102,12 +98,9 @@ const example = (error: Error) => errorExampleOf(toSpendApiException(error));
 export const SPEND_ERROR_EXAMPLES = {
   REQUEST_NOT_FOUND: example(new AccessRequestNotFoundError()),
   GROUP_USES_LINES: example(new AccessRequestGroupUsesLinesError()),
-  PLAN_LINE_NOT_FOUND: example(new AccessRequestPlanLineRefusedError('LINE_NOT_FOUND')),
-  STILL_NEEDED_REQUIRED: example(new AccessRequestPlanLineRefusedError('STILL_NEEDED_REQUIRED')),
   REVIEW_NOT_FOUND: example(new SpendReviewNotFoundError()),
   NOT_FINANCE: example(new SpendNotFinanceError()),
   REVIEW_NOT_OPEN: example(new SpendReviewNotOpenError()),
-  PLAN_LINE_NOT_UPDATED: example(new SpendReviewRefusedError('PLAN_LINE_NOT_UPDATED')),
   NO_BUDGET_TO_MAKE: example(new SpendReviewRefusedError('NO_BUDGET_TO_MAKE')),
   NO_HEAD_TO_PROPOSE: example(new SpendReviewRefusedError('NO_HEAD_TO_PROPOSE')),
   ALREADY_AWAITING_BUDGET: example(new SpendReviewRefusedError('ALREADY_AWAITING_BUDGET')),

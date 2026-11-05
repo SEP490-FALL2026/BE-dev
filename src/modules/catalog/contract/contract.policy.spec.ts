@@ -7,6 +7,7 @@ import {
   DocumentPurposeNotAvailableError,
   DocumentTooLargeError,
   DocumentTypeNotAllowedError,
+  DocumentPurposeMismatchError,
   DocumentUploadMismatchError,
 } from './contract.errors';
 import {
@@ -14,6 +15,7 @@ import {
   assertAttachable,
   assertFileAllowed,
   assertMayChoosePurpose,
+  assertPurposeAttachesTo,
   assertPurposeAvailable,
   assertUploadMatches,
   cleanContractName,
@@ -62,14 +64,15 @@ describe('who chooses which purpose of a file (US-04-04 AC-6, AC-9)', () => {
 });
 
 describe('the purposes that have somewhere to be attached today', () => {
-  it('are the two that attach to a contract', () => {
+  it('are the two that attach to a contract and the signed record that attaches to its signer', () => {
     expect(() => {
       assertPurposeAvailable('CONTRACT_ATTACHMENT');
       assertPurposeAvailable('PURCHASE_DOCUMENT');
+      assertPurposeAvailable('SIGNATURE_RECORD');
     }).not.toThrow();
   });
 
-  it.each(['TAX_PAYMENT_PROOF', 'SIGNATURE_RECORD', 'IMPORT_SOURCE', 'COST_STATEMENT'] as const)(
+  it.each(['TAX_PAYMENT_PROOF', 'IMPORT_SOURCE', 'COST_STATEMENT'] as const)(
     'are not yet for %s: its target does not exist',
     (purpose) => {
       expect(() => {
@@ -77,6 +80,22 @@ describe('the purposes that have somewhere to be attached today', () => {
       }).toThrow(DocumentPurposeNotAvailableError);
     },
   );
+});
+
+describe('what a file is attached to', () => {
+  it('attaches a contract file to a contract and a signed record to its signer, and nothing else to either', () => {
+    expect(() => {
+      assertPurposeAttachesTo('CONTRACT_ATTACHMENT', 'CONTRACT');
+      assertPurposeAttachesTo('PURCHASE_DOCUMENT', 'CONTRACT');
+      assertPurposeAttachesTo('SIGNATURE_RECORD', 'SIGNER');
+    }).not.toThrow();
+    expect(() => {
+      assertPurposeAttachesTo('SIGNATURE_RECORD', 'CONTRACT');
+    }).toThrow(DocumentPurposeMismatchError);
+    expect(() => {
+      assertPurposeAttachesTo('CONTRACT_ATTACHMENT', 'SIGNER');
+    }).toThrow(DocumentPurposeMismatchError);
+  });
 });
 
 describe('the file that may be stored (US-04-04 AC-10)', () => {
@@ -145,7 +164,12 @@ describe('what was stored is what was declared (US-04-04 AC-10)', () => {
 });
 
 describe('who opens a file (US-04-04 AC-1, AC-3, AC-6)', () => {
-  const base = { uploaderAppUserId: 'u1', actorAppUserId: 'u1', roles: ['IT_ADMIN'] };
+  const base = {
+    purpose: 'CONTRACT_ATTACHMENT' as const,
+    uploaderAppUserId: 'u1',
+    actorAppUserId: 'u1',
+    roles: ['IT_ADMIN'],
+  };
 
   it('lets the one who uploaded a file that is not attached yet open it, and nobody else see it', () => {
     expect(mayOpen({ ...base, status: 'PENDING_ATTACH' })).toBe('OPEN');
@@ -232,5 +256,19 @@ describe('what the first bytes of a file must say (US-04-04 AC-10)', () => {
 
   it('refuses a prefix that stops inside the signature', () => {
     expect(contentMatchesType('application/pdf', ascii('%PD'))).toBe(false);
+  });
+});
+
+describe('who opens a signed record', () => {
+  const record = {
+    purpose: 'SIGNATURE_RECORD' as const,
+    status: 'READY' as const,
+    uploaderAppUserId: 'u1',
+    actorAppUserId: 'u2',
+  };
+
+  it('opens for the IT Admin and not for Finance', () => {
+    expect(mayOpen({ ...record, roles: ['IT_ADMIN'] })).toBe('OPEN');
+    expect(mayOpen({ ...record, roles: ['FINANCE'] })).toBe('FORBIDDEN');
   });
 });

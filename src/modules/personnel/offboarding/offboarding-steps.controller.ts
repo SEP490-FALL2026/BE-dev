@@ -74,8 +74,8 @@ export class OffboardingStepsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The person has not left yet (OFFBOARDING_CASE.CASE_NOT_LEFT) or the lock was recorded already (ALREADY_RECORDED).',
-      examples: [E.CASE_NOT_LEFT, E.ALREADY_RECORDED],
+        'The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED: the last working day has not passed and they have not left) or the lock was recorded already (ALREADY_RECORDED).',
+      examples: [E.CASE_NOT_BLOCKED, E.ALREADY_RECORDED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -101,21 +101,21 @@ export class OffboardingStepsController {
   @ApiSuccessResponse(OffboardingRevocationsOpenedResponseDto, {
     message: 'OFFBOARDING_CASE.REVOCATIONS_OPENED',
     description:
-      'A task of the queue was made for each right chosen (all that have none when none is named), after the lock of the company account is recorded or together with it, with one reason for all and the count the IT Admin typed. The seats stay whole until each task is done; nothing is transferred to anyone. A seat that has a task already gets the reason added.',
+      'A task of the queue was made for each right chosen (all that have none when none is named), after the lock of the company account is recorded or together with it, with the standard reason of a departure (and the note the IT Admin adds); the server counts the rights. The seats stay whole until each task is done; nothing is transferred to anyone. A seat that has a task already gets the reason added.',
   })
   @ApiErrorResponses(
     ...COMMON,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: `The person has not left yet (OFFBOARDING_CASE.CASE_NOT_LEFT) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED), or ${CONCURRENT}.`,
-      examples: [E.CASE_NOT_LEFT, E.CASE_CLOSED, ...LOCK_REFUSALS, E.REVOCATION_NOT_SUPPORTED],
+      description: `The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED), there is nothing left to take away (NOTHING_TO_REVOKE), or ${CONCURRENT}.`,
+      examples: [E.CASE_NOT_BLOCKED, E.CASE_CLOSED, ...LOCK_REFUSALS, E.REVOCATION_NOT_SUPPORTED, E.NOTHING_TO_REVOKE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), no reason is given (OFFBOARDING_CASE.REASON_REQUIRED), the number does not match the rights chosen, which the answer states (COUNT_MISMATCH), or a seat named is not held or has a task (ASSIGNMENT_NOT_AVAILABLE): nothing is made.',
-      examples: [VALIDATION_EXAMPLE, E.REASON_REQUIRED, E.COUNT_MISMATCH, E.ASSIGNMENT_NOT_AVAILABLE],
+        'The body is invalid, such as one that still sends a count or a reason (VALIDATION_ERROR), or a seat named is not held or has a task (ASSIGNMENT_NOT_AVAILABLE): nothing is made.',
+      examples: [VALIDATION_EXAMPLE, E.ASSIGNMENT_NOT_AVAILABLE],
     },
   )
   async openRevocations(
@@ -124,7 +124,7 @@ export class OffboardingStepsController {
     @Body() body: OpenRevocationsBodyDto,
   ) {
     try {
-      const opened = await this.revocations.openRevocations(actor, params.id, { ...body, reason: body.reason ?? '' });
+      const opened = await this.revocations.openRevocations(actor, params.id, body);
       const detail = await this.detail.detailOf(opened.record, 'MINIMAL');
 
       return { ...detail, revocations: { created: opened.created, reasonAdded: opened.reasonAdded } };

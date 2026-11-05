@@ -39,7 +39,9 @@ export interface VersionWire {
   base: { amount: string };
   reserve: { amount: string };
   total: { amount: string };
-  highValuePercent: number;
+  /** The default share of the base the reserve has, in whole percent, and why a reserve that is not that share is what it is. */
+  reservePercent: number;
+  reserveReason: string | null;
   quarters: Record<'q1' | 'q2' | 'q3' | 'q4', { amount: string }> | null;
   reason: string | null;
   previousTotal: { amount: string } | null;
@@ -58,11 +60,8 @@ export interface VersionLineWire {
   description: string;
   seats: number | null;
   amount: { amount: string };
-  windowFrom: string;
-  windowTo: string;
   financeComment: string | null;
   adjustmentReason: string | null;
-  overdue: boolean;
 }
 
 export interface HistoryEntryWire {
@@ -96,18 +95,13 @@ export class BudgetHarness extends RequestHarness {
     ).rows[0].reporting_currency;
   }
 
-  money = (amount: string | number) => ({ amount: String(amount), currency: this.reporting });
+  money = (amount: string | number) => ({ amount: String(amount) });
 
-  /** A line of a proposal as the head fills it; every line says all of what `QĐ-82d` asks unless `extra` takes it away. */
+  /** A line of a proposal as the head fills it; a line is a description, the seats, the amount of the year and a note (`QĐ-101n`). */
   line = (extra: Record<string, unknown> = {}) => ({
     description: 'Figma Organization 10 seats',
     seats: 10,
     amount: this.money(50_000_000),
-    windowFrom: `${this.next}-03-01`,
-    windowTo: `${this.next}-03-31`,
-    servicePeriodMonths: 12,
-    repeatCycle: 'ANNUAL',
-    quoteValidUntil: `${this.next}-01-31`,
     ...extra,
   });
 
@@ -118,15 +112,10 @@ export class BudgetHarness extends RequestHarness {
       description: 'Miro 5 seats',
       seats: 5,
       amount: this.money(20_000_000),
-      windowFrom: `${this.next}-04-01`,
-      windowTo: `${this.next}-06-30`,
-      servicePeriodMonths: 12,
-      quoteValidUntil: undefined,
     }),
   ];
 
-  proposalBody = (costCenterId: string, lines: object[] = this.twoLines(), year = this.next) => ({
-    costCenterId,
+  proposalBody = (_costCenterId: string, lines: object[] = this.twoLines(), year = this.next) => ({
     year,
     lines,
   });
@@ -156,8 +145,6 @@ export class BudgetHarness extends RequestHarness {
 
   createVersion = (body: object, account: ApiAccount = this.finance) =>
     request(this.server()).post('/api/v1/budget-versions').set(this.as(account)).send(body);
-  createRevision = (body: object, account: ApiAccount = this.finance) =>
-    request(this.server()).post('/api/v1/budget-versions/revisions').set(this.as(account)).send(body);
   versionOf = (id: string, account: ApiAccount = this.finance) =>
     request(this.server()).get(`/api/v1/budget-versions/${id}`).set(this.as(account));
   versionList = (account: ApiAccount = this.finance, query: Record<string, string | number> = {}) =>
@@ -170,13 +157,6 @@ export class BudgetHarness extends RequestHarness {
     request(this.server()).put(`/api/v1/budget-versions/${id}/lines/${position}`).set(this.as(account)).send(body);
   addLines = (id: string, lines: object[], account: ApiAccount = this.finance) =>
     request(this.server()).post(`/api/v1/budget-versions/${id}/lines`).set(this.as(account)).send({ lines });
-  moveWindow = (id: string, position: number, body: object, account: ApiAccount = this.finance) =>
-    request(this.server())
-      .put(`/api/v1/budget-versions/${id}/lines/${position}/window`)
-      .set(this.as(account))
-      .send(body);
-  lineChanges = (id: string, position: number, account: ApiAccount = this.finance) =>
-    request(this.server()).get(`/api/v1/budget-versions/${id}/lines/${position}/changes`).set(this.as(account));
   sendVersion = (id: string, account: ApiAccount = this.finance) =>
     request(this.server()).post(`/api/v1/budget-versions/${id}/submission`).set(this.as(account));
   versionHistory = (id: string, account: ApiAccount = this.finance, query: Record<string, string | number> = {}) =>
@@ -199,7 +179,7 @@ export class BudgetHarness extends RequestHarness {
       proposalId,
       base: this.money(60_000_000),
       reserve: this.money(20_000_000),
-      highValuePercent: 50,
+      reserveReason: 'The reserve of the test is not the default share',
       ...extra,
     });
     if (response.status !== 201) throw new Error(`version: ${response.status} ${JSON.stringify(response.body)}`);

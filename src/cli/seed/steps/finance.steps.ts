@@ -9,7 +9,7 @@ function personWith(ctx: DemoRunContext, role: 'FINANCE'): string {
   return ctx.fixture.people.find((person) => person.account === role)?.code ?? '';
 }
 
-const money = (ctx: DemoRunContext, amount: string) => ({ amount, currency: ctx.fixture.currency });
+const money = (amount: string) => ({ amount });
 
 interface CostCenterRow {
   id: string;
@@ -136,9 +136,8 @@ async function budgetTurn(ctx: DemoRunContext, plan: DemoBudget, year: number): 
   return act(ctx, 'Finance lập phiên bản', () =>
     ctx.api.call(finance, 'POST', '/budget-versions', {
       proposalId: proposal.id,
-      base: money(ctx, plan.base),
-      reserve: money(ctx, plan.reserve),
-      highValuePercent: plan.highValuePercent,
+      // The server sets the reserve to the default 10 % of the base; a different share would carry `reserveReason`.
+      base: money(plan.base),
     }),
   );
 }
@@ -168,21 +167,13 @@ function propose(
   plan: DemoBudget,
   to: { headEmail: string; costCenterId: string; year: number },
 ): Promise<unknown> {
-  const lastDay = `${to.year}-12-31`;
-  const firstDay = to.year === Number(ctx.today.slice(0, 4)) ? ctx.today : `${to.year}-01-01`;
-
   return ctx.api.call(to.headEmail, 'POST', '/budget-proposals', {
-    costCenterId: to.costCenterId,
     year: to.year,
     lines: plan.lines.map((line) => ({
       description: line.description,
       planId: ctx.ids.plans.get(line.plan),
       seats: line.seats,
-      amount: money(ctx, line.amount),
-      windowFrom: firstDay,
-      windowTo: lastDay,
-      servicePeriodMonths: 12,
-      repeatCycle: 'MONTHLY',
+      amount: money(line.amount),
     })),
   });
 }

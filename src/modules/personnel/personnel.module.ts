@@ -8,8 +8,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { RequestsModule } from '../requests/requests.module';
+import { DepartmentMemberController } from './department-member/department-member.controller';
+import { DepartmentMemberQueryService } from './department-member/department-member-query.service';
 import { DepartmentOpenWorkReader } from './event-notice/department-open-work.listener';
 import { DepartmentOpenWorkRepo } from './event-notice/department-open-work.repo';
+import { PersonnelGroundsDateService } from './personnel-grounds-date.service';
 import { PersonnelNotifier } from './event-notice/personnel-notifier.service';
 import { LeaveDepartureService } from './leave/leave-departure.service';
 import { LeaveOverdueService } from './leave/leave-overdue.service';
@@ -59,6 +62,8 @@ import { PersonnelFileHooks } from './event-notice/personnel-file-hooks.service'
 import { OffboardingSources } from './offboarding/offboarding-sources.service';
 import { MeDepartureNoticeController } from './role-duties/me-departure-notice.controller';
 import { RoleDutiesHook } from './role-duties/role-duties.listener';
+import { DeviceRegistrationHook } from './offboarding/device-registration.listener';
+import { DevicesModule } from '../devices/devices.module';
 import { RoleDutiesRepo } from './role-duties/role-duties.repo';
 import { RoleDutiesService } from './role-duties/role-duties.service';
 import { RoleDutiesViewService } from './role-duties/role-duties-view.service';
@@ -132,6 +137,7 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     OperatingParametersModule,
     RequestsModule,
     NotificationsModule,
+    DevicesModule,
   ],
   controllers: [
     TransfersController,
@@ -140,6 +146,7 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     OffboardingController,
     OffboardingStepsController,
     OpenRequestsController,
+    DepartmentMemberController,
     MeDepartureNoticeController,
     SuperAdminWatchController,
     NoticesController,
@@ -147,6 +154,7 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
   providers: [
     PersonnelFileHookContributions,
     PersonnelFileHooks,
+    PersonnelGroundsDateService,
     TransferRepo,
     DepartmentOpenWorkRepo,
     DepartmentOpenWorkReader,
@@ -201,6 +209,7 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     OffboardingViewService,
     OpenRequestsService,
     OpenRequestsSource,
+    DepartmentMemberQueryService,
     PersonnelFileDeadlinesRepo,
     PersonnelFileDeadlines,
     ServiceAccountDutyHook,
@@ -209,6 +218,7 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     RoleDutiesService,
     RoleDutiesViewService,
     RoleDutiesHook,
+    DeviceRegistrationHook,
     RoleWarningSource,
     WorkspaceBlockerSource,
     NoticeRepo,

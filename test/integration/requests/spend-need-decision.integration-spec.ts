@@ -1,3 +1,4 @@
+import request from 'supertest';
 import { SpendHarness, Unit } from '../../support/spend-harness';
 
 const h = new SpendHarness();
@@ -5,24 +6,13 @@ const M = 1_000_000;
 
 interface RequestSpendWire {
   state: string;
-  offPlan: boolean;
-  planLineAttached: boolean;
-  expectedSpendOn: string | null;
   budgetYear: number | null;
   pricing: { amount: { amount: string } | null };
   spend: { stage: string } | null;
 }
-interface SuggestionWire {
-  position: number;
-  description: string;
-  plan: { planId: string } | null;
-  overdue: boolean;
-  suggested: boolean;
-}
 
-describe('the need step of a request that costs money over PostgreSQL (US-05-04 AC-11 to AC-16, US-06-14 AC-8)', () => {
+describe('the need step of a request that costs money over PostgreSQL (US-05-04 AC-11, US-06-14 AC-8)', () => {
   let plan: string;
-  let otherPlan: string;
   let design: Unit;
   let counter = 0;
 
@@ -30,27 +20,8 @@ describe('the need step of a request that costs money over PostgreSQL (US-05-04 
     await h.start();
     await h.withApprover();
     plan = await h.planOf(await h.subscription(10));
-    otherPlan = await h.planOf(await h.subscription(10));
     design = await h.departmentWithHead('P-DES');
-    await h.budgetFor(design, {
-      total: 100 * M,
-      lines: [
-        h.line({
-          description: 'Figma Organization 10 seats',
-          planId: plan,
-          windowFrom: `${h.year}-12-01`,
-          windowTo: `${h.year}-12-31`,
-          quoteValidUntil: undefined,
-        }),
-        h.line({
-          description: 'Another tool',
-          planId: otherPlan,
-          windowFrom: `${h.year}-11-01`,
-          windowTo: `${h.year}-11-30`,
-          quoteValidUntil: undefined,
-        }),
-      ],
-    });
+    await h.budgetFor(design, { total: 100 * M });
   }, 240000);
 
   afterAll(async () => {
@@ -71,38 +42,16 @@ describe('the need step of a request that costs money over PostgreSQL (US-05-04 
         .rows[0].count,
     );
 
-  describe('what the head chooses when they approve (AC-12)', () => {
-    it('is told the lines of the plan, those for the plan asked for first marked, and sees no figure of the budget', async () => {
+  describe('what the head decides when they approve (AC-11, QĐ-101n)', () => {
+    it('keeps the decision alone, and the request goes to their queue to be sent on (AC-11)', async () => {
       const sent = await sentBy(design);
 
-      const response = await h.suggestions(sent.id, design.head.account).expect(200);
+      await h.decide(sent.id, { decision: 'APPROVE' }, design.head.account).expect(200);
 
-      const items = h.dataOf<{ items: SuggestionWire[] }>(response).items;
-      expect(items).toEqual([
-        expect.objectContaining({
-          position: 1,
-          description: 'Figma Organization 10 seats',
-          suggested: true,
-          overdue: false,
-        }),
-        expect.objectContaining({ position: 2, description: 'Another tool', suggested: false, overdue: false }),
-      ]);
-      expect(JSON.stringify(response.body)).not.toMatch(/remaining|committed|spent|held|INSUFFICIENT|HIGH_VALUE/);
-    });
-
-    it('keeps the line they chose, and the request goes to their queue (AC-11)', async () => {
-      const sent = await sentBy(design);
-
-      await h
-        .decide(sent.id, { decision: 'APPROVE', spend: { planLine: { position: 1 } } }, design.head.account)
-        .expect(200);
-
-      expect(await wire(sent.id)).toMatchObject({
-        state: 'AWAITING_SPEND_SUBMISSION',
-        planLineAttached: true,
-        offPlan: false,
-        spend: { stage: 'NOT_SUBMITTED' },
-      });
+      const read = await wire(sent.id);
+      expect(read).toMatchObject({ state: 'AWAITING_SPEND_SUBMISSION', spend: { stage: 'NOT_SUBMITTED' } });
+      // No line of the plan, no flag of "outside the plan" and no day of spending is kept on the request.
+      for (const key of ['planLineAttached', 'offPlan', 'expectedSpendOn']) expect(read).not.toHaveProperty(key);
       const queue = h.dataOf<{ items: Array<{ requestId: string; readyToSubmit: boolean }> }>(
         await h.spendQueue(design.head.account, { pageSize: 100 }).expect(200),
       );
@@ -112,195 +61,50 @@ describe('the need step of a request that costs money over PostgreSQL (US-05-04 
       expect(await h.steps(sent.id, 'SPEND_APPROVAL')).toEqual([]);
     });
 
-    it('keeps "outside the plan" as a flag, and not as an exception', async () => {
+    it('works the budget year out from today, since the head is not asked for a day of spending', async () => {
       const sent = await sentBy(design);
 
-      await h.decide(sent.id, { decision: 'APPROVE', spend: { offPlan: true } }, design.head.account).expect(200);
+      await h.decide(sent.id, { decision: 'APPROVE' }, design.head.account).expect(200);
 
-      expect(await wire(sent.id)).toMatchObject({
-        planLineAttached: false,
-        offPlan: true,
-        state: 'AWAITING_SPEND_SUBMISSION',
-      });
-    });
-
-    it('saves nothing when they choose neither', async () => {
-      const sent = await sentBy(design);
-
-      const response = await h
-        .decide(sent.id, { decision: 'APPROVE', spend: undefined }, design.head.account)
-        .expect(422);
-
-      expect(h.codeOf(response)).toBe('ACCESS_REQUEST.PLAN_LINE_REQUIRED');
-      expect(await wire(sent.id)).toMatchObject({ state: 'PENDING', planLineAttached: false, offPlan: false });
-      expect(await decisions(sent.id)).toBe(0);
+      expect((await wire(sent.id)).budgetYear).toBe(Number(h.today().slice(0, 4)));
     });
 
     it.each([
-      ['both a line and outside the plan', { planLine: { position: 1 }, offPlan: true }],
-      ['neither in the object', {}],
-      ['a line of nothing', { planLine: { position: 0 } }],
-      ['a day that is not a day', { offPlan: true, expectedSpendOn: '2026-13-40' }],
-    ])('does not take %s', async (_name, spend) => {
+      ['a line of the plan', { planLine: { position: 1 } }],
+      ['"outside the plan"', { offPlan: true }],
+      ['an empty object', {}],
+      ['a day of spending', { expectedSpendOn: '2026-12-01' }],
+    ])('does not take %s: the object of spending is gone', async (_name, spend) => {
       const sent = await sentBy(design);
 
       const response = await h.decide(sent.id, { decision: 'APPROVE', spend }, design.head.account).expect(422);
 
       expect(h.codeOf(response)).toBe('VALIDATION_ERROR');
+      expect(await wire(sent.id)).toMatchObject({ state: 'PENDING' });
       expect(await decisions(sent.id)).toBe(0);
     });
 
-    it('refuses a line the plan does not have, and undoes the whole decision', async () => {
-      const sent = await sentBy(design);
-
-      const response = await h
-        .decide(sent.id, { decision: 'APPROVE', spend: { planLine: { position: 9 } } }, design.head.account)
-        .expect(422);
-
-      expect(h.codeOf(response)).toBe('ACCESS_REQUEST.LINE_NOT_FOUND');
-      expect(await wire(sent.id)).toMatchObject({ state: 'PENDING', planLineAttached: false });
-      expect(await decisions(sent.id)).toBe(0);
-    });
-
-    it('is not for a refusal, for software that is free, or for a person who is not the head', async () => {
+    it('does not take it with a refusal, for free software or from the approver either', async () => {
       const refused = await sentBy(design);
       const free = await h.sent(await h.staff(design.department, 'P-DES-FREE'), await h.plan('K5'));
-      // The spending approver decides the need of a head who asks for themselves, and chooses no line of the plan.
       const headOwn = await h.sent(design.head, plan, { termMonths: 1 });
+      const spend = { offPlan: true };
 
       const refusal = await h
-        .decide(refused.id, { decision: 'REJECT', reason: 'No', spend: { offPlan: true } }, design.head.account)
+        .decide(refused.id, { decision: 'REJECT', reason: 'No', spend }, design.head.account)
         .expect(422);
-      const internal = await h
-        .decide(free.id, { decision: 'APPROVE', spend: { offPlan: true } }, design.head.account)
-        .expect(422);
-      const approverChoice = await h
-        .decide(headOwn.id, { decision: 'APPROVE', spend: { offPlan: true } }, h.boss.account)
-        .expect(422);
+      const internal = await h.decide(free.id, { decision: 'APPROVE', spend }, design.head.account).expect(422);
+      const byApprover = await h.decide(headOwn.id, { decision: 'APPROVE', spend }, h.boss.account).expect(422);
 
-      expect(h.codeOf(refusal)).toBe('VALIDATION_ERROR');
-      expect(h.codeOf(internal)).toBe('ACCESS_REQUEST.SPEND_NOT_APPLICABLE');
-      expect(h.codeOf(approverChoice)).toBe('ACCESS_REQUEST.SPEND_NOT_APPLICABLE');
-    });
-  });
-
-  describe('a line whose window has gone by (AC-13)', () => {
-    it('is kept only when the head says it is still needed, and the request is then checked as overdue', async () => {
-      const unit = await h.departmentWithHead('P-OD');
-      const version = await h.budgetFor(unit, {
-        total: 100 * M,
-        lines: [
-          h.line({
-            description: 'Miro 5 seats',
-            planId: plan,
-            windowFrom: `${h.year}-01-01`,
-            windowTo: `${h.year}-03-31`,
-            quoteValidUntil: undefined,
-          }),
-        ],
-      });
-      const sent = await sentBy(unit);
-
-      const refused = await h
-        .decide(sent.id, { decision: 'APPROVE', spend: { planLine: { position: 1 } } }, unit.head.account)
-        .expect(422);
-
-      expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.STILL_NEEDED_REQUIRED');
-      expect(await decisions(sent.id)).toBe(0);
-      const listed = h.dataOf<{ items: SuggestionWire[] }>(await h.suggestions(sent.id, unit.head.account).expect(200));
-      expect(listed.items[0]).toMatchObject({ overdue: true });
-
-      await h
-        .decide(
-          sent.id,
-          { decision: 'APPROVE', spend: { planLine: { position: 1, stillNeeded: true } } },
-          unit.head.account,
-        )
-        .expect(200);
-      const batch = h.dataOf<{ batch: { id: string } }>(await h.sendOn([sent.id], unit.head.account).expect(201)).batch;
-      const items = h.dataOf<{ items: Array<{ outcome: string }> }>(
-        await h.batchItems(batch.id, unit.head.account).expect(200),
-      ).items;
-
-      expect(items).toEqual([expect.objectContaining({ outcome: 'SENT_TO_FINANCE' })]);
-      expect(
-        h.dataOf<{ budgetCheck: { planLineOverdue: boolean } }>(await h.checkOf(sent.id).expect(200)).budgetCheck,
-      ).toMatchObject({
-        planLineOverdue: true,
-      });
-      expect(version.id).toBeDefined();
-    });
-  });
-
-  describe('the day the money goes out (AC-16)', () => {
-    it('is corrected by the head when they approve: the budget year and the price follow, and the change is kept', async () => {
-      const unit = await h.departmentWithHead('P-DT');
-      await h.budgetFor(unit, {
-        total: 100 * M,
-        year: h.next,
-        lines: [
-          h.line({
-            description: 'Figma next year',
-            planId: plan,
-            windowFrom: `${h.next}-02-01`,
-            windowTo: `${h.next}-02-28`,
-            quoteValidUntil: undefined,
-          }),
-        ],
-      });
-      const sent = await sentBy(unit, { expectedSpendOn: `${h.year}-12-01` });
-      expect(await wire(sent.id, unit.head.account)).toMatchObject({
-        expectedSpendOn: `${h.year}-12-01`,
-        budgetYear: h.year,
-      });
-
-      await h
-        .decide(
-          sent.id,
-          { decision: 'APPROVE', spend: { planLine: { position: 1 }, expectedSpendOn: `${h.next}-01-15` } },
-          unit.head.account,
-        )
-        .expect(200);
-
-      expect(await wire(sent.id, unit.head.account)).toMatchObject({
-        expectedSpendOn: `${h.next}-01-15`,
-        budgetYear: h.next,
-        planLineAttached: true,
-        state: 'AWAITING_SPEND_SUBMISSION',
-      });
-      const events = await h.ctx.sql.query<{
-        after: { before: string; after: string; beforeBudgetYear: number; afterBudgetYear: number };
-      }>(
-        `SELECT after FROM audit_events WHERE resource_id = $1 AND action = 'ACCESS_REQUEST.EXPECTED_SPEND_DATE_CHANGED'`,
-        [sent.id],
-      );
-      expect(events.rows).toHaveLength(1);
-      expect(events.rows[0].after).toMatchObject({
-        before: `${h.year}-12-01`,
-        after: `${h.next}-01-15`,
-        beforeBudgetYear: h.year,
-        afterBudgetYear: h.next,
-      });
+      for (const response of [refusal, internal, byApprover]) expect(h.codeOf(response)).toBe('VALIDATION_ERROR');
     });
 
-    it('is checked against the lines of the year it falls in, not the year it was given first', async () => {
-      const unit = await h.departmentWithHead('P-DY');
-      await h.budgetFor(unit, { total: 100 * M }); // the lines of this year only
-      const sent = await sentBy(unit, { expectedSpendOn: `${h.year}-12-01` });
+    it('has no route to choose a line of the plan or to list the lines of the plan', async () => {
+      const sent = await sentBy(design);
+      const as = h.as(design.head.account);
 
-      const refused = await h
-        .decide(
-          sent.id,
-          { decision: 'APPROVE', spend: { planLine: { position: 1 }, expectedSpendOn: `${h.next}-01-15` } },
-          unit.head.account,
-        )
-        .expect(422);
-
-      expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.LINE_NOT_FOUND');
-      expect(await wire(sent.id, unit.head.account)).toMatchObject({
-        state: 'PENDING',
-        expectedSpendOn: `${h.year}-12-01`,
-      });
+      await request(h.server()).put(`/api/v1/access-requests/${sent.id}/plan-line`).set(as).send({}).expect(404);
+      await request(h.server()).get(`/api/v1/access-requests/${sent.id}/plan-line-suggestions`).set(as).expect(404);
     });
   });
 
@@ -327,8 +131,8 @@ describe('the need step of a request that costs money over PostgreSQL (US-05-04 
       expect(await h.steps(sent.id, 'NEED')).toEqual([
         expect.objectContaining({ state: 'PENDING', assignee_employee_id: newHead.employeeId, waiting_reason: null }),
       ]);
-      // The head of a request that costs money chooses its line, or says it is outside the plan.
-      await h.decide(sent.id, { decision: 'APPROVE', spend: { offPlan: true } }, newHead.account).expect(200);
+      // The head of a request that costs money confirms the need alone: no line of the plan is chosen (QĐ-101n).
+      await h.decide(sent.id, { decision: 'APPROVE' }, newHead.account).expect(200);
       expect(await h.state(sent.id)).toBe('AWAITING_SPEND_SUBMISSION');
       expect(await h.steps(sent.id, 'FINANCE_REVIEW')).toEqual([]);
       expect(await h.steps(sent.id, 'SPEND_APPROVAL')).toEqual([]);
@@ -359,8 +163,7 @@ describe('the need step of a request that costs money over PostgreSQL (US-05-04 
       expect(await h.steps(proposed.id, 'IT_ASSESSMENT')).toEqual([]);
 
       await h.makeHead(headless, newHead);
-      // The proposal costs money: the head chooses its line, or says it is outside the plan.
-      await h.decide(proposed.id, { decision: 'APPROVE', spend: { offPlan: true } }, newHead.account).expect(200);
+      await h.decide(proposed.id, { decision: 'APPROVE' }, newHead.account).expect(200);
 
       expect(await h.state(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
     });

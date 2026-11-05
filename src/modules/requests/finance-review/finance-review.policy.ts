@@ -10,7 +10,7 @@ import type { ReviewRefusal } from '../spend/spend.errors';
 export type ReviewOutcomeKind = 'ASSESSED' | 'RETURN_TO_HEAD' | 'NEEDS_BUDGET';
 
 export interface ReviewFacts {
-  check: Pick<CheckResult, 'years' | 'planLineOverdue'>;
+  check: Pick<CheckResult, 'years'>;
   /** Somebody heads the department of the request today, and so could send a proposal for its Cost Center. */
   departmentHasHead: boolean;
 }
@@ -25,7 +25,7 @@ export const BUDGET_LACKING_CODES: ReadonlySet<string> = new Set(['NO_ACTIVE_BUD
  * only when somebody heads the department to propose it: with nobody, it is not chosen, even when a version is current.
  */
 export function checkReviewOutcome(outcome: ReviewOutcomeKind, facts: ReviewFacts): ReviewRefusal | null {
-  if (outcome === 'ASSESSED') return facts.check.planLineOverdue ? 'PLAN_LINE_NOT_UPDATED' : null;
+  if (outcome === 'ASSESSED') return null;
   if (outcome === 'RETURN_TO_HEAD') return null;
   if (!facts.check.years.some((year) => year.code !== null && BUDGET_LACKING_CODES.has(year.code))) {
     return 'NO_BUDGET_TO_MAKE';
@@ -38,12 +38,8 @@ export function checkReviewOutcome(outcome: ReviewOutcomeKind, facts: ReviewFact
  * What a Finance outcome does for a request that waits for a version of the budget and has no review open (J.3): it may be
  * given back to its head or assessed, never sent to wait again; an opinion is refused while the plan line is overdue, as on a review.
  */
-export function checkWaitingOutcome(
-  outcome: ReviewOutcomeKind,
-  facts: Pick<ReviewFacts['check'], 'planLineOverdue'>,
-): ReviewRefusal | null {
+export function checkWaitingOutcome(outcome: ReviewOutcomeKind): ReviewRefusal | null {
   if (outcome === 'NEEDS_BUDGET') return 'ALREADY_AWAITING_BUDGET';
-  if (outcome === 'ASSESSED' && facts.planLineOverdue) return 'PLAN_LINE_NOT_UPDATED';
 
   return null;
 }

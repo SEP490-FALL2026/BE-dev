@@ -42,6 +42,7 @@ export class OffboardingChangeJudge {
       placementFrom,
       newLastWorkingDay: input.lastWorkingDay,
       reason: input.reason,
+      grounds: input.grounds,
     });
     const early = changeLastDayRefusal({ ...facts, successor: null });
     if (early) throw new OffboardingRefusedError(early.code, early.details);
@@ -50,7 +51,12 @@ export class OffboardingChangeJudge {
       // The periods go back first so the new day is judged on the department as it was before the handover; a refusal rolls it all back.
       await this.periods.undo(tx, held);
     }
-    const endsOn = departureEffectiveOn({ lastWorkingDay: input.lastWorkingDay, abrupt: false, today, placementFrom });
+    const endsOn = departureEffectiveOn({
+      lastWorkingDay: input.lastWorkingDay,
+      blockNow: false,
+      today,
+      placementFrom,
+    });
     const { leavesAsHead, chosen } = await this.judgeHeadSuccessor(tx, held, endsOn, input.successor);
 
     return { endsOn, leavesAsHead, chosen };

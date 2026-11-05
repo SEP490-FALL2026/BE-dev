@@ -116,12 +116,11 @@ export class FinanceReviewsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request has no review open and does not wait for a version of the budget (SPEND.REVIEW_NOT_OPEN), it already waits for a budget (SPEND.ALREADY_AWAITING_BUDGET), the caller will decide its spend step (SPEND.REVIEWER_IS_APPROVER), the plan line is still overdue (SPEND.PLAN_LINE_NOT_UPDATED), no year has no budget or too little (SPEND.NO_BUDGET_TO_MAKE), or nobody heads the department to propose it, even when a version is current (SPEND.NO_HEAD_TO_PROPOSE).',
+        'The request has no review open and does not wait for a version of the budget (SPEND.REVIEW_NOT_OPEN), it already waits for a budget (SPEND.ALREADY_AWAITING_BUDGET), the caller will decide its spend step (SPEND.REVIEWER_IS_APPROVER), no year has no budget or too little (SPEND.NO_BUDGET_TO_MAKE), or nobody heads the department to propose it, even when a version is current (SPEND.NO_HEAD_TO_PROPOSE).',
       examples: [
         SPEND_ERROR_EXAMPLES.REVIEW_NOT_OPEN,
         SPEND_ERROR_EXAMPLES.ALREADY_AWAITING_BUDGET,
         SPEND_ERROR_EXAMPLES.REVIEW_REVIEWER_IS_APPROVER,
-        SPEND_ERROR_EXAMPLES.PLAN_LINE_NOT_UPDATED,
         SPEND_ERROR_EXAMPLES.NO_BUDGET_TO_MAKE,
         SPEND_ERROR_EXAMPLES.NO_HEAD_TO_PROPOSE,
       ],

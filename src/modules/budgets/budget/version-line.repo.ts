@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client';
-import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { RepeatCycle } from './budget.policy';
 
 export interface VersionLineRecord {
   position: number;
@@ -13,11 +11,6 @@ export interface VersionLineRecord {
   planId: string | null;
   seats: number | null;
   amountMinor: bigint;
-  windowFrom: BusinessDate;
-  windowTo: BusinessDate;
-  servicePeriodMonths: number;
-  repeatCycle: RepeatCycle;
-  quoteValidUntil: BusinessDate | null;
   financeComment: string | null;
   adjustmentReason: string | null;
 }
@@ -27,11 +20,6 @@ export interface LinePatch {
   planId?: string | null;
   seats?: number | null;
   amountMinor?: bigint;
-  windowFrom?: BusinessDate;
-  windowTo?: BusinessDate;
-  servicePeriodMonths?: number;
-  repeatCycle?: RepeatCycle;
-  quoteValidUntil?: BusinessDate | null;
   financeComment?: string | null;
   adjustmentReason?: string | null;
 }
@@ -46,11 +34,6 @@ const toLine = (row: LineRow): VersionLineRecord => ({
   planId: row.planId,
   seats: row.seats,
   amountMinor: row.amountMinor,
-  windowFrom: fromDateColumn(row.windowFrom),
-  windowTo: fromDateColumn(row.windowTo),
-  servicePeriodMonths: row.servicePeriodMonths,
-  repeatCycle: row.repeatCycle,
-  quoteValidUntil: row.quoteValidUntil ? fromDateColumn(row.quoteValidUntil) : null,
   financeComment: row.financeComment,
   adjustmentReason: row.adjustmentReason,
 });
@@ -62,22 +45,9 @@ export const lineData = (line: Omit<VersionLineRecord, 'position'>) => ({
   planId: line.planId,
   seats: line.seats,
   amountMinor: line.amountMinor,
-  windowFrom: toDateColumn(line.windowFrom),
-  windowTo: toDateColumn(line.windowTo),
-  servicePeriodMonths: line.servicePeriodMonths,
-  repeatCycle: line.repeatCycle,
-  quoteValidUntil: line.quoteValidUntil ? toDateColumn(line.quoteValidUntil) : null,
   financeComment: line.financeComment,
   adjustmentReason: line.adjustmentReason,
 });
-
-export interface LineChangeRecord {
-  before: { windowFrom: BusinessDate; windowTo: BusinessDate };
-  after: { windowFrom: BusinessDate; windowTo: BusinessDate };
-  reason: string;
-  changedByEmployeeId: string;
-  changedAt: Date;
-}
 
 /** The one writer of `budget_version_lines` and the history of their windows, and their reads. */
 @Injectable()
@@ -122,13 +92,6 @@ export class VersionLineRepo {
         ...(patch.planId !== undefined ? { planId: patch.planId } : {}),
         ...(patch.seats !== undefined ? { seats: patch.seats } : {}),
         ...(patch.amountMinor !== undefined ? { amountMinor: patch.amountMinor } : {}),
-        ...(patch.windowFrom !== undefined ? { windowFrom: toDateColumn(patch.windowFrom) } : {}),
-        ...(patch.windowTo !== undefined ? { windowTo: toDateColumn(patch.windowTo) } : {}),
-        ...(patch.servicePeriodMonths !== undefined ? { servicePeriodMonths: patch.servicePeriodMonths } : {}),
-        ...(patch.repeatCycle !== undefined ? { repeatCycle: patch.repeatCycle } : {}),
-        ...(patch.quoteValidUntil !== undefined
-          ? { quoteValidUntil: patch.quoteValidUntil ? toDateColumn(patch.quoteValidUntil) : null }
-          : {}),
         ...(patch.financeComment !== undefined ? { financeComment: patch.financeComment } : {}),
         ...(patch.adjustmentReason !== undefined ? { adjustmentReason: patch.adjustmentReason } : {}),
       },
@@ -144,61 +107,5 @@ export class VersionLineRepo {
     });
 
     return first;
-  }
-
-  async addLineChange(
-    tx: DbTx,
-    change: {
-      versionId: string;
-      position: number;
-      before: { windowFrom: BusinessDate; windowTo: BusinessDate };
-      after: { windowFrom: BusinessDate; windowTo: BusinessDate };
-      reason: string;
-      changedByEmployeeId: string;
-      now: Date;
-    },
-  ): Promise<void> {
-    await tx.budgetVersionLineChange.create({
-      data: {
-        versionId: change.versionId,
-        position: change.position,
-        windowFromBefore: toDateColumn(change.before.windowFrom),
-        windowToBefore: toDateColumn(change.before.windowTo),
-        windowFromAfter: toDateColumn(change.after.windowFrom),
-        windowToAfter: toDateColumn(change.after.windowTo),
-        reason: change.reason,
-        changedByEmployeeId: change.changedByEmployeeId,
-        changedAt: change.now,
-      },
-    });
-  }
-
-  async pageLineChanges(
-    versionId: string,
-    position: number,
-    skip: number,
-    take: number,
-  ): Promise<{ items: LineChangeRecord[]; total: number }> {
-    const where = { versionId, position };
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.budgetVersionLineChange.findMany({
-        where,
-        orderBy: [{ changedAt: 'desc' }, { id: 'asc' }],
-        skip,
-        take,
-      }),
-      this.prisma.budgetVersionLineChange.count({ where }),
-    ]);
-
-    return {
-      items: rows.map((row) => ({
-        before: { windowFrom: fromDateColumn(row.windowFromBefore), windowTo: fromDateColumn(row.windowToBefore) },
-        after: { windowFrom: fromDateColumn(row.windowFromAfter), windowTo: fromDateColumn(row.windowToAfter) },
-        reason: row.reason,
-        changedByEmployeeId: row.changedByEmployeeId,
-        changedAt: row.changedAt,
-      })),
-      total,
-    };
   }
 }

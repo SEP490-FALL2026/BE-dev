@@ -53,15 +53,12 @@ export class SupplementService {
       const refusal = checkSupplement({
         state: request.state,
         priced: pricing.status === 'PRICED' && pricing.amount !== null,
-        currentExpectedSpendOn: pricing.expectedSpendOn,
-        newExpectedSpendOn: body.expectedSpendOn,
         leavesPeopleOut: dropped.length > 0,
       });
       if (refusal) throw new SpendSupplementRefusedError(refusal);
 
       const now = new Date();
       const { repriced, change } = await this.pricing.repriceFor(tx, request, {
-        expectedSpendOn: body.expectedSpendOn,
         dropped,
         fiscalYearStartMonth,
         now,

@@ -53,14 +53,19 @@ describe('the return from a long leave (integration, real PostgreSQL)', () => {
       ]);
     });
 
-    it('ignores a basis given on the day, wrong or not', async () => {
+    it('ignores a basis given on the day, wrong or not, and refuses one that is malformed', async () => {
       const { leave } = await onLeave(h.day(-90), h.today());
 
-      const response = await h.confirmReturn(leave.id, {
+      const malformed = await h.confirmReturn(leave.id, {
         returnedOn: h.today(),
         grounds: { reference: 'BM09-2026-000001' },
       });
+      const response = await h.confirmReturn(leave.id, {
+        returnedOn: h.today(),
+        grounds: { ...h.extension, reference: 'BM09-2026-000001' },
+      });
 
+      expect([malformed.status, h.codeOf(malformed)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(response.status).toBe(200);
       expect(h.dataOf<LeaveWire>(response).status).toBe('ENDED');
     });
@@ -131,7 +136,7 @@ describe('the return from a long leave (integration, real PostgreSQL)', () => {
       const without = await h.changeReturnDate(leave.id, { newApprovedReturnOn: h.day(40) });
       const response = await h.changeReturnDate(leave.id, { newApprovedReturnOn: h.day(40), grounds: h.extension });
 
-      expect([without.status, h.codeOf(without)]).toEqual([422, 'LONG_LEAVE.GROUNDS_REQUIRED']);
+      expect([without.status, h.codeOf(without)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(response.status).toBe(200);
       expect(h.dataOf<LeaveWire>(response)).toMatchObject({
         status: 'ACTIVE',

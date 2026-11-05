@@ -9,7 +9,7 @@ const json = (status: number, body: unknown) =>
 
 const facts = {
   organizationId: 'org-1',
-  organizationName: 'SLM Demo',
+  organizationName: 'Công ty Cổ phần Công nghệ Sao Việt',
   reportingCurrency: 'VND',
   today: '2026-10-31',
   timeZone: 'Asia/Ho_Chi_Minh',
@@ -18,7 +18,7 @@ const facts = {
 
 const args = (mode: 'plan' | 'apply'): SeedCommandArguments => ({
   mode,
-  fixture: 'shared-demo-v2',
+  fixture: 'shared-demo-v3',
   apiUrl: 'http://slm-api:4000',
   operator: 'CHG-1',
   environment: 'SHARED',

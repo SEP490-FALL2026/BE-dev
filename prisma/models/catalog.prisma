@@ -328,7 +328,7 @@ model Subscription {
   ownerDepartment     Department                   @relation("SubscriptionOwnerDepartment", fields: [ownerDepartmentId], references: [id], onDelete: Restrict)
   renewedFrom         Subscription?                @relation("SubscriptionRenewalChain", fields: [renewedFromId], references: [id], onDelete: Restrict)
   renewedBy           Subscription?                @relation("SubscriptionRenewalChain")
-  renewalCase         SubscriptionRenewal?         @relation("RenewalOfPeriod")
+  renewalCases        SubscriptionRenewal[]        @relation("RenewalOfPeriod")
   renewalNextOf       SubscriptionRenewal?         @relation("RenewalNextPeriod")
   deadlineEvent       SubscriptionDeadlineEvent?
   ownerAssignment     SubscriptionOwnerAssignment?
@@ -488,6 +488,8 @@ model DocumentAttachment {
   finalObjectKey      String?         @unique @map("final_object_key")
   uploadedByAppUserId String          @map("uploaded_by_app_user_id") @db.Uuid
   contractId          String?         @map("contract_id") @db.Uuid
+  // A `SIGNATURE_RECORD` belongs to the person who signed it, not to a contract (BM-06).
+  signerEmployeeId    String?         @map("signer_employee_id") @db.Uuid
   attachedAt          DateTime?       @map("attached_at") @db.Timestamptz(3)
   createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
 

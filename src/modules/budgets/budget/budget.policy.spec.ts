@@ -1,6 +1,7 @@
 import type { BusinessDate } from '../../../core/business-date';
 import {
-  backwardLines,
+  defaultReserveOf,
+  reserveReasonMissing,
   checkVersionDecision,
   commitmentAttachedAfter,
   decisionOutcomeOf,
@@ -9,14 +10,11 @@ import {
   canWithdraw,
   closesAtYearEnd,
   deciderOf,
-  incompleteLines,
   isEditable,
   copiedLineOf,
-  isOverdue,
   quartersMismatchAfter,
   patchChangesLine,
   versionDecidedDetail,
-  kindOfChange,
   proposalIsSucceedable,
   quartersMatch,
   totalOf,
@@ -25,40 +23,11 @@ import {
   yearEndOfVersion,
   yearHasEnded,
   yearIsOpen,
-  type LineDraft,
   type ProposalState,
   type VersionStateName,
 } from './budget.policy';
 
 const day = (value: string): BusinessDate => value;
-const full: LineDraft = {
-  description: 'Figma Organization',
-  amountMinor: 50_000_000n,
-  windowFrom: day('2027-03-01'),
-  windowTo: day('2027-03-31'),
-  servicePeriodMonths: 12,
-  repeatCycle: 'ANNUAL',
-};
-
-describe('what a line of a proposal must say (US-06-10 AC-2, QĐ-82d)', () => {
-  it('has no line to name when every line is complete', () => {
-    expect(incompleteLines([full, full])).toEqual([]);
-  });
-
-  it('names the line and every field it lacks, all of them at once', () => {
-    const miro: LineDraft = { description: 'Miro', amountMinor: 20_000_000n };
-
-    expect(incompleteLines([full, miro, { ...full, repeatCycle: undefined }])).toEqual([
-      { line: 2, fields: ['windowFrom', 'windowTo', 'servicePeriodMonths', 'repeatCycle'] },
-      { line: 3, fields: ['repeatCycle'] },
-    ]);
-  });
-
-  it('finds the lines whose window runs backwards', () => {
-    expect(backwardLines([full, { ...full, windowFrom: day('2027-04-10'), windowTo: day('2027-04-01') }])).toEqual([2]);
-    expect(backwardLines([{ windowFrom: undefined, windowTo: undefined }])).toEqual([]);
-  });
-});
 
 describe('which fiscal years take a proposal (US-06-10 AC-9)', () => {
   it.each([
@@ -204,30 +173,6 @@ describe('a version made from a proposal that a refusal left reviewed, and a suc
   });
 });
 
-describe('a change to a line of the current budget (US-06-09 AC-17)', () => {
-  const line = { amountMinor: 20_000_000n, windowFrom: day('2026-04-01'), windowTo: day('2026-06-30') };
-
-  it.each([
-    ['moving the window', { windowFrom: day('2026-06-01'), windowTo: day('2026-08-31') }, 'WINDOW'],
-    ['moving only the end', { windowTo: day('2026-08-31') }, 'WINDOW'],
-    ['keeping everything', { amountMinor: 20_000_000n, windowFrom: day('2026-04-01') }, 'NONE'],
-    ['changing the amount', { amountMinor: 22_000_000n }, 'AMOUNT'],
-    [
-      'changing the amount and the window: the amount decides',
-      { amountMinor: 1n, windowTo: day('2026-08-31') },
-      'AMOUNT',
-    ],
-    ['giving nothing', {}, 'NONE'],
-  ] as const)('%s', (_name, change, kind) => {
-    expect(kindOfChange(line, change)).toBe(kind);
-  });
-
-  it('a line is overdue the day after its window ends', () => {
-    expect(isOverdue({ windowTo: day('2026-06-30') }, day('2026-06-30'))).toBe(false);
-    expect(isOverdue({ windowTo: day('2026-06-30') }, day('2026-07-01'))).toBe(true);
-  });
-});
-
 describe('who may decide a version, and when (US-06-11 AC-7, AC-8, SoD-8)', () => {
   const facts = {
     actorIsDecider: true,
@@ -314,17 +259,12 @@ describe('whether an adjustment changes what the line of the proposal said (US-0
     planId: 'plan-1' as string | null,
     seats: 10 as number | null,
     amountMinor: 1_000n,
-    windowFrom: '2027-01-01',
-    windowTo: '2027-03-31',
-    servicePeriodMonths: 12,
-    repeatCycle: 'ANNUAL' as const,
-    quoteValidUntil: '2026-12-31' as string | null,
   };
 
   it('changes nothing when the patch gives nothing, or gives what the line already says', () => {
     expect(patchChangesLine(line, {})).toBe(false);
     expect(patchChangesLine(line, { description: 'Giấy phép', seats: 10, amountMinor: 1_000n })).toBe(false);
-    expect(patchChangesLine(line, { planId: undefined, quoteValidUntil: undefined })).toBe(false);
+    expect(patchChangesLine(line, { planId: undefined })).toBe(false);
   });
 
   it.each([
@@ -333,11 +273,6 @@ describe('whether an adjustment changes what the line of the proposal said (US-0
     ['its plan, cleared', { planId: null }],
     ['its seats', { seats: 12 }],
     ['its money', { amountMinor: 1_100n }],
-    ['the start of its window', { windowFrom: '2027-02-01' }],
-    ['the end of its window', { windowTo: '2027-04-30' }],
-    ['its service', { servicePeriodMonths: 6 }],
-    ['its cycle', { repeatCycle: 'MONTHLY' as const }],
-    ['the day its quote is valid until', { quoteValidUntil: '2027-01-31' }],
   ])('changes the line when the patch changes %s', (_label, patch) => {
     expect(patchChangesLine(line, patch)).toBe(true);
   });
@@ -349,11 +284,6 @@ describe('what a version copies from the line before it, and whether an edit kee
     planId: 'plan-1',
     seats: 10,
     amountMinor: 1_000n,
-    windowFrom: '2027-01-01',
-    windowTo: '2027-03-31',
-    servicePeriodMonths: 12,
-    repeatCycle: 'ANNUAL' as const,
-    quoteValidUntil: '2026-12-31',
     financeComment: 'đã có',
     adjustmentReason: 'đổi giá',
   };
@@ -366,11 +296,6 @@ describe('what a version copies from the line before it, and whether an edit kee
       planId: 'plan-1',
       seats: 10,
       amountMinor: 1_000n,
-      windowFrom: '2027-01-01',
-      windowTo: '2027-03-31',
-      servicePeriodMonths: 12,
-      repeatCycle: 'ANNUAL',
-      quoteValidUntil: '2026-12-31',
       financeComment: null,
       adjustmentReason: null,
     });
@@ -395,5 +320,23 @@ describe('what a version copies from the line before it, and whether an edit kee
   it('has nothing to keep honest when there are no quarters, or when the edit takes them away', () => {
     expect(quartersMismatchAfter({ ...version, quarters: null }, { baseMinor: 5n })).toBe(false);
     expect(quartersMismatchAfter(version, { baseMinor: 5n, quarters: null })).toBe(false);
+  });
+});
+
+describe('the default reserve of a version (US-06-09 AC-30, QĐ-98)', () => {
+  it('is the share of the base rounded to the nearest minor unit', () => {
+    expect(defaultReserveOf(1_000_000n, 10)).toBe(100_000n);
+    expect(defaultReserveOf(105n, 10)).toBe(11n);
+    expect(defaultReserveOf(104n, 10)).toBe(10n);
+    expect(defaultReserveOf(500n, 0)).toBe(0n);
+  });
+
+  it('asks a reason only of a version that kept its share and differs from it', () => {
+    const version = { baseMinor: 1000n, reserveMinor: 100n, reservePercent: 10, reserveReason: null };
+
+    expect(reserveReasonMissing(version)).toBe(false);
+    expect(reserveReasonMissing({ ...version, reserveMinor: 150n })).toBe(true);
+    expect(reserveReasonMissing({ ...version, reserveMinor: 150n, reserveReason: 'Kế hoạch mua thêm' })).toBe(false);
+    expect(reserveReasonMissing({ ...version, reserveMinor: 150n, reservePercent: null })).toBe(false);
   });
 });

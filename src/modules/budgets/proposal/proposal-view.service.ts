@@ -140,10 +140,5 @@ const toLineWire = (
   planId: line.planId,
   seats: line.seats,
   amount: money(line.amountMinor),
-  windowFrom: line.windowFrom,
-  windowTo: line.windowTo,
-  servicePeriodMonths: line.servicePeriodMonths,
-  repeatCycle: line.repeatCycle,
-  quoteValidUntil: line.quoteValidUntil,
   note: line.note,
 });

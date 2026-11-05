@@ -24,6 +24,7 @@ import {
   SpendingApproverHeadsDepartmentError,
   SuperAdminHolderNotLockableError,
 } from './account.errors';
+import { AccessBlockNotReleasableError } from '../access-block/access-block.errors';
 
 // Shared by account administration (accounts/) and the invitation redeem route of the auth controller (auth/).
 
@@ -66,6 +67,9 @@ export function toAccountApiException(error: unknown): unknown {
     return refuse(HttpStatus.CONFLICT, 'APP_USER.ALREADY_ACTIVATED', error.message);
   }
   if (error instanceof AccountLockedError) return refuse(HttpStatus.CONFLICT, 'APP_USER.ACCOUNT_LOCKED', error.message);
+  if (error instanceof AccessBlockNotReleasableError) {
+    return refuse(HttpStatus.CONFLICT, 'APP_USER.ACCESS_BLOCK_NOT_RELEASABLE', error.message);
+  }
   if (error instanceof SuperAdminHolderNotLockableError) {
     return refuse(HttpStatus.CONFLICT, 'APP_USER.SUPER_ADMIN_HOLDER_NOT_LOCKABLE', error.message);
   }
@@ -119,6 +123,7 @@ export const ACCOUNT_ERROR_EXAMPLES = {
   ALREADY_ACTIVATED: example(new AccountAlreadyActivatedError()),
   ACCOUNT_LOCKED: example(new AccountLockedError()),
   SUPER_ADMIN_HOLDER_NOT_LOCKABLE: example(new SuperAdminHolderNotLockableError()),
+  ACCESS_BLOCK_NOT_RELEASABLE: example(new AccessBlockNotReleasableError()),
 
   MANAGER_STILL_HEADING: example(
     new ManagerStillHeadingError([

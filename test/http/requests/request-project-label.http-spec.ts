@@ -25,12 +25,6 @@ const cases: Array<[string, string, string, object]> = [
   ],
   ['draft', '/api/v1/access-requests/drafts', 'EMPLOYEE', { kind: 'INDIVIDUAL', ...base }],
   [
-    'delegated',
-    '/api/v1/delegated-requests',
-    'MANAGER',
-    { beneficiaryEmployeeIds: [ID], items: [{ planId: ID }], businessReason: 'Work', termMonths: 6 },
-  ],
-  [
     'service account',
     '/api/v1/access-requests/service-accounts',
     'EMPLOYEE',
@@ -40,7 +34,7 @@ const cases: Array<[string, string, string, object]> = [
     'renewal',
     '/api/v1/access-requests/renewals',
     'EMPLOYEE',
-    { assignmentId: ID, newExpectedEndDate: '2027-01-01', businessReason: 'Work' },
+    { assignmentId: ID, extensionMonths: 6, businessReason: 'Work' },
   ],
   ['group check', '/api/v1/group-requests/check', 'EMPLOYEE', group],
   ['group submit', '/api/v1/group-requests', 'EMPLOYEE', group],

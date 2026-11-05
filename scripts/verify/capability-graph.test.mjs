@@ -419,10 +419,10 @@ describe('the layers of requests, as the command prints them and as the module c
     return rows;
   };
 
-  test('prints one line with a layer for each of the 39 capabilities, every one in exactly one layer', () => {
+  test('prints one line with a layer for each of the 38 capabilities, every one in exactly one layer', () => {
     assert.equal(printed.status, 0);
-    assert.equal(lines.length, 39);
-    assert.equal(new Set(lines.map(([, , name]) => name)).size, 39);
+    assert.equal(lines.length, 38);
+    assert.equal(new Set(lines.map(([, , name]) => name)).size, 38);
   });
 
   test('marks as isolated, and only as such, the capability that imports nothing and that nothing imports', () => {

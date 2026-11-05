@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import { groupBodySchema } from '../group-request/group-request.dto';
 import { serviceAccountSubmitSchema } from '../service-account-request/service-account-request.dto';
-import { submitBodySchema } from '../access-request/access-request.dto';
+import { COMMITMENT_MONTHS_MAX, submitBodySchema, TERM_MONTHS_MAX } from '../access-request/access-request.dto';
 import type { DraftSaveBody } from './request-draft.dto';
 import { draftPolicyJson, RETIRED_DRAFT_BODY_KEYS, type DraftPolicy } from '../request-draft/request-draft-policy.json';
 import { beneficiaryCountOf } from '../request-draft/request-draft.policy';
@@ -27,6 +27,22 @@ export function toContentJson(body: DraftSaveBody): DraftPolicy['draft'] {
 export function contentOf(row: Pick<DraftRow, 'id' | 'policy'>): DraftContent {
   const { kind, ...body } = draftPolicyJson.decode(row.policy).draft;
   for (const key of RETIRED_DRAFT_BODY_KEYS) delete body[key];
+  // The day a person's access ends is worked out by the system now; an older draft of a group may still carry one per line.
+  if (Array.isArray(body.lines)) {
+    for (const line of body.lines as Record<string, unknown>[]) delete line.expectedEndDate;
+  }
+  // A draft saved when a term could be longer than a year is still read; sending it is refused by the limit (`QĐ-98`).
+  const oldTerm = typeof body.termMonths === 'number' ? body.termMonths : undefined;
+  const longTerm =
+    oldTerm !== undefined && oldTerm > TERM_MONTHS_MAX && oldTerm <= COMMITMENT_MONTHS_MAX ? oldTerm : undefined;
+  if (longTerm !== undefined) body.termMonths = TERM_MONTHS_MAX;
+  const content = parseContent(row.id, kind, body);
+  if (longTerm !== undefined) content.body.termMonths = longTerm;
+
+  return content;
+}
+
+function parseContent(id: string, kind: string, body: Record<string, unknown>): DraftContent {
   switch (kind) {
     case 'INDIVIDUAL':
       return { kind, body: submitBodySchema.parse(body) };
@@ -35,7 +51,7 @@ export function contentOf(row: Pick<DraftRow, 'id' | 'policy'>): DraftContent {
     case 'SERVICE_ACCOUNT':
       return { kind, body: serviceAccountSubmitSchema.parse(body) };
     default:
-      throw new Error(`The draft ${row.id} is of the unknown kind ${kind}.`);
+      throw new Error(`The draft ${id} is of the unknown kind ${kind}.`);
   }
 }
 

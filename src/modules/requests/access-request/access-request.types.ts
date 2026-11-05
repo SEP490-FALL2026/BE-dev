@@ -95,7 +95,6 @@ export interface NewAccessRequest {
   termMonths: number;
   pricing: PricingRecord;
   policy: RequestPolicy;
-  delegatedBatchId?: string | null;
   expectedEndDate?: BusinessDate | null;
   createdByAppUserId: string;
   now: Date;
@@ -141,7 +140,6 @@ export interface ApprovalRecordRecord {
   decidedByEmployeeId: string;
   deciderRole: DeciderRole;
   reason: string | null;
-  termConfirmationReason: string | null;
   decidedAt: Date;
 }
 
@@ -191,7 +189,6 @@ export interface AccessRequestRecord {
   planLine: { versionId: string; position: number; confirmed: boolean } | null;
   /** The head chose "outside the plan": a flag for Finance and the approver, never an exception. */
   offPlan: boolean;
-  delegatedBatchId: string | null;
   expectedEndDate: BusinessDate | null;
   policy: RequestPolicy;
   submittedAt: Date;
@@ -257,22 +254,6 @@ export const ENDED_STATES: readonly AccessRequestState[] = [
  * the task of a withdrawal (that has its own way).
  */
 export const NOT_OPEN_FOR_LEAVER: readonly AccessRequestState[] = [...ENDED_STATES, 'AWAITING_IT_CLOSE'];
-
-export type DelegationRefusal =
-  /** The caller does not head the department they belong to today (`AC-11`). */
-  | 'NOT_HEAD'
-  /** The person is not in the department of the head: the request is refused at once, with no request for them (`US-05-03` row 7, `AC-5`). */
-  | 'OUTSIDE_DEPARTMENT'
-  /** The person has no work email yet (`AC-3`). */
-  | 'EMAIL_REQUIRED'
-  /** The person has left the company. */
-  | 'BENEFICIARY_NOT_ACTIVE'
-  /** A contractor, freelancer or intern needs the day the access ends (`AC-10`). */
-  | 'END_DATE_REQUIRED'
-  /** The day the access ends is before the day it can begin. */
-  | 'END_DATE_TOO_EARLY'
-  /** A long term is confirmed in so many words by whoever confirms the need (`OI-07a`). */
-  | 'TERM_CONFIRMATION_REQUIRED';
 
 /**
  * Where a request that costs money stands on its way to the spending approver, as the people with a part in it read it

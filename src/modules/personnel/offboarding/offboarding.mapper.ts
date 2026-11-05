@@ -11,7 +11,14 @@ import type { ReadAccess } from '../personnel-self-action.policy';
 import { ROLE_FLAGS, type RoleFlagMap } from '../public/personnel.types';
 import type { Checklist } from './offboarding.policy';
 import type { OffboardingChangeRecord, OffboardingRecord, OffboardingSummaryRecord } from './offboarding.types';
-import { isPastLastDay, isRevocableType } from './offboarding.policy';
+import {
+  accessBlockedFrom,
+  isBlocked,
+  isPastLastDay,
+  isRevocableType,
+  ownBlock,
+  type DepartureBlock,
+} from './offboarding.policy';
 
 const UNKNOWN = '';
 
@@ -27,18 +34,31 @@ const brief = (employees: ReadonlyMap<string, EmployeeRecord>, id: string) => {
 export function toSummary(
   record: OffboardingSummaryRecord,
   employees: ReadonlyMap<string, EmployeeRecord>,
-  facts: { today: string; heldRights: number; roleFlags?: RoleFlagMap | undefined },
+  facts: {
+    today: string;
+    heldRights: number;
+    roleFlags?: RoleFlagMap | undefined;
+    /** The block the departure put on the access of the person, if any. */
+    block?: DepartureBlock | null | undefined;
+  },
 ): OffboardingSummaryWire {
+  const block = ownBlock(facts.block, record.id);
+  const accessBlocked = isBlocked(record, block, facts.today);
+
   return {
     id: record.id,
     employee: brief(employees, record.employeeId),
     state: record.state,
-    abrupt: record.abrupt,
+    accessBlockMode: record.accessBlockMode,
+    abrupt: record.accessBlockMode === 'BLOCK_NOW',
     lastWorkingDay: record.lastWorkingDay,
     handoverDueOn: record.handoverDueOn,
     pastLastDay: isPastLastDay(record.state, record.lastWorkingDay, facts.today),
+    accessBlocked,
+    accessBlockedFrom: accessBlockedFrom(record, block),
     heldRights: facts.heldRights,
-    accountLockMissing: record.state === 'LEFT' && !record.accountLocked && !record.closed,
+    // A handover that is already blocked is waiting for the IT Admin to lock the account like a departure that has happened (L3).
+    accountLockMissing: (record.state === 'LEFT' || accessBlocked) && !record.accountLocked && !record.closed,
     closed: record.closed,
     roleFlags: facts.roleFlags ?? NO_ROLES,
   };
@@ -48,6 +68,7 @@ export interface DetailFacts {
   today: string;
   heldRights: number;
   roleFlags?: RoleFlagMap | undefined;
+  block?: DepartureBlock | null | undefined;
   /** The workspaces of K2 plans the person owns or administers, by plan id with the names. */
   workspaces: Record<string, string>;
   checklist: Checklist | null;
@@ -56,13 +77,21 @@ export interface DetailFacts {
   registeredWarnings: Record<string, number>;
 }
 
+/** Both moments are taken inside one transaction when the person is left as the departure is recorded. */
+const SAME_TRANSACTION_MS = 10_000;
+
 /**
  * Who marked the person left. A sudden departure the controlled procedure recorded is `LEFT` at once, and the column that says who
  * marked it holds the stand-in account the database demands (see `TransferGuardService.standIn`): it is never shown, the answer
  * says it was the procedure.
  */
 function leftOf(leftOn: string, leftAt: Date, record: OffboardingRecord) {
-  const byProcedure = record.recordedByTicketId !== null && record.abrupt;
+  // The controlled procedure records a departure blocked now and, when its last working day is not ahead, leaves the person in the same
+  // transaction: the moment of leaving is then the moment of recording. A person the Super Admin marks left later is theirs.
+  const byProcedure =
+    record.recordedByTicketId !== null &&
+    record.accessBlockMode === 'BLOCK_NOW' &&
+    leftAt.getTime() - record.recordedAt.getTime() < SAME_TRANSACTION_MS;
 
   return {
     leftOn,
@@ -89,8 +118,9 @@ export function toDetail(
         id: record.id,
         employeeId: record.employeeId,
         state: record.state,
-        abrupt: record.abrupt,
+        accessBlockMode: record.accessBlockMode,
         lastWorkingDay: record.lastWorkingDay,
+        leftOn: record.leftOn,
         handoverDueOn: record.handoverDueOn,
         accountLocked: locked,
         closed: record.closedAt !== null,

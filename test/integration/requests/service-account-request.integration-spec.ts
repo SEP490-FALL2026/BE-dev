@@ -238,7 +238,7 @@ describe('a request for a service account after the installation over PostgreSQL
 
       for (const plan of [paidPlan, fullPlan]) {
         const sent = await h.sentService(u.member, plan);
-        await h.decide(sent.id, { decision: 'APPROVE', spend: { offPlan: true } }, u.head.account).expect(200);
+        await h.decide(sent.id, { decision: 'APPROVE' }, u.head.account).expect(200);
 
         expect(sent).toMatchObject({ branch: 'PAID_IN_CATALOG', policy: { hasSpendStep: true } });
         expect(await h.state(sent.id)).toBe('AWAITING_SPEND_SUBMISSION');
@@ -255,7 +255,7 @@ describe('a request for a service account after the installation over PostgreSQL
 
       const withBudget = await h.approvedService(funded, funded.member, paidPlan, 10 * M);
       const sent = await h.sentService(bare.member, paidPlan);
-      await h.decide(sent.id, { decision: 'APPROVE', spend: { offPlan: true } }, bare.head.account).expect(200);
+      await h.decide(sent.id, { decision: 'APPROVE' }, bare.head.account).expect(200);
       await h.setPayments(sent.id, { amount: 10 * M });
       await h.sendOn([sent.id], bare.head.account).expect(201);
 
@@ -333,6 +333,15 @@ describe('a request for a service account after the installation over PostgreSQL
         normalized_account_identifier: 'github-ci-bot',
       });
       expect(await commitmentOf(id)).toMatchObject({ state: 'HELD', released_minor: '0' });
+      // A service account has no end by term, whatever the term of the request (R-H1, `Q-03` a1).
+      expect(
+        (
+          await h.ctx.sql.query<{ expected_end_date: string | null }>(
+            `SELECT a.expected_end_date::text FROM license_assignments a JOIN provisioning_tasks t ON t.assignment_id = a.id WHERE t.request_id = $1`,
+            [id],
+          )
+        ).rows,
+      ).toEqual([{ expected_end_date: null }]);
       const created = await events('LICENSE_ASSIGNMENT.CREATED', id);
       expect(created).toMatchObject([
         { after: { kind: 'SERVICE', owningDepartmentId: u.department.id, requestId: id } },
@@ -352,7 +361,7 @@ describe('a request for a service account after the installation over PostgreSQL
     it('refuses the shared mailbox of three people: the request ends as refused, what was held goes back, nothing is granted (AC-3)', async () => {
       const u = await example();
       const sent = await h.sentService(u.member, paidPlan, { purpose: SHARED_MAILBOX });
-      await h.decide(sent.id, { decision: 'APPROVE', spend: { offPlan: true } }, u.head.account).expect(200);
+      await h.decide(sent.id, { decision: 'APPROVE' }, u.head.account).expect(200);
       await h.setPayments(sent.id, { amount: 15 * M });
       await h.sendOn([sent.id], u.head.account).expect(201);
       await h.decideSpend(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
@@ -525,7 +534,7 @@ describe('a request for a service account after the installation over PostgreSQL
       const requests: string[] = [];
       for (let index = 0; index < 2; index += 1) {
         const sent = await h.sentService(a1, paidPlan);
-        await h.decide(sent.id, { decision: 'APPROVE', spend: { offPlan: true } }, unit.head.account).expect(200);
+        await h.decide(sent.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
         await h.setPayments(sent.id, { amount: 5 * M });
         await h.sendOn([sent.id], unit.head.account).expect(201);
         await h.decideSpend(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
@@ -641,7 +650,7 @@ describe('a request for a service account after the installation over PostgreSQL
       const assignments = await h.count('license_assignments');
       const needing = await h.sentService(u.member, paidPlan);
       const spending = await h.sentService(u.member, paidPlan);
-      await h.decide(spending.id, { decision: 'APPROVE', spend: { offPlan: true } }, u.head.account).expect(200);
+      await h.decide(spending.id, { decision: 'APPROVE' }, u.head.account).expect(200);
       await h.setPayments(spending.id, { amount: 10 * M });
       await h.sendOn([spending.id], u.head.account).expect(201);
       const accepted = await h.approvedService(u, u.member, paidPlan, 15 * M);

@@ -175,7 +175,7 @@ describe('the notices of the department heads (integration, real PostgreSQL)', (
         h1.account,
       );
       const gone = await h.worker(des, code());
-      await h.recordedCase(gone, { abrupt: true, lastWorkingDay: h.today() });
+      await h.recordedCase(gone, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.today() });
 
       const left = await h.sendNotice(departure(gone), h1.account);
 

@@ -1,4 +1,4 @@
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v2/installation';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -6,7 +6,7 @@ import type { AddressInfo, Server } from 'node:net';
 import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
 import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
 import type { FetchLike } from '../../../src/cli/seed/demo-api-client';
-import { SHARED_DEMO_V2 } from '../../../src/cli/seed/fixture/shared-demo-v2';
+import { SHARED_DEMO_V3 } from '../../../src/cli/seed/fixture/shared-demo-v3';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
 import { PgRelay } from '../../support/pg-relay';
@@ -24,7 +24,7 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
   const ONE_WAY_DELAY_MS = 50;
   /** Generous: one demo account's transaction needs at most about 18; the old single transaction needed about 165. */
   const MAX_STATEMENTS_PER_TRANSACTION = 40;
-  const demoAccounts = SHARED_DEMO_V2.people.filter((person) => person.account !== null).length;
+  const demoAccounts = SHARED_DEMO_V3.people.filter((person) => person.account !== null).length;
   const secrets = { superAdminPassword: SEED_PASSWORD, demoAccountPassword: 'a demo password for the tests' };
 
   let ctx: HttpTestApp;
@@ -35,7 +35,7 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
 
   const args = (mode: 'plan' | 'apply'): SeedCommandArguments => ({
     mode,
-    fixture: 'shared-demo-v2',
+    fixture: 'shared-demo-v3',
     apiUrl: baseUrl,
     operator: 'TEST-A04',
     environment: 'LOCAL_TEST',
@@ -66,7 +66,7 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
 
   async function heldAdvisoryLocks(): Promise<number> {
     const { rows } = await ctx.sql.query<{ n: string }>(
-      `WITH k AS (SELECT hashtextextended('seed:shared-demo-v2:apply', 0) AS v)
+      `WITH k AS (SELECT hashtextextended('seed:shared-demo-v3:apply', 0) AS v)
        SELECT count(*) AS n FROM pg_locks, k
         WHERE locktype = 'advisory' AND granted AND objsubid = 1
           AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
@@ -77,11 +77,11 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
 
   async function demoAccountRows(): Promise<{ accounts: number; created: number }> {
     const accounts = await ctx.sql.query<{ n: string }>(
-      `SELECT count(*) AS n FROM app_users WHERE normalized_login_email LIKE '%@ds1.slm-demo.example'`,
+      `SELECT count(*) AS n FROM app_users WHERE normalized_login_email LIKE '%@saoviet.example' AND normalized_login_email <> 'system.admin@saoviet.example'`,
     );
     const created = await ctx.sql.query<{ n: string }>(
       `SELECT count(*) AS n FROM audit_events WHERE action = 'DEMO_DATASET.ACCOUNT_CREATED' AND operator_reference = $1`,
-      ['DEMO_DATASET:shared-demo-v2:TEST-A04'],
+      ['DEMO_DATASET:shared-demo-v3:TEST-A04'],
     );
     return { accounts: Number(accounts.rows[0].n), created: Number(created.rows[0].n) };
   }
