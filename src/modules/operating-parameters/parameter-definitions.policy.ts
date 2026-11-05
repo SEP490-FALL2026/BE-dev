@@ -132,6 +132,17 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'FR-5.7, OQ-09',
   },
   {
+    key: 'BUDGET_RESERVE_DEFAULT_PERCENT',
+    label: 'Tỷ lệ dự phòng mặc định của ngân sách năm',
+    group: 'BUDGET',
+    shape: { kind: 'int', min: 0, max: 100 },
+    default: 10,
+    unit: 'percent',
+    unitLabel: '%',
+    description: 'The share of the base budget a new version sets aside as its reserve when Finance gives none.',
+    source: 'QĐ-98, US-06-09 AC-30',
+  },
+  {
     key: 'TRANSFER_REVIEW_WORKING_DAYS',
     label: 'Hạn rà soát quyền sau điều chuyển',
     group: 'PERSONNEL',

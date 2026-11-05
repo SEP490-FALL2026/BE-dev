@@ -107,6 +107,30 @@ describe('Global rate limit (e2e)', () => {
       await exhaust('/api/v1/rate-probe/a', '198.51.100.2');
     });
 
+    it('G-H1: a forged device token, a new id each time, does not take a caller out of the limit of their address', async () => {
+      const forged = (index: number) =>
+        `Bearer sstd_3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c${String(index).padStart(4, '0')}_${'a'.repeat(43)}`;
+      for (let attempt = 0; attempt < LIMIT; attempt += 1) {
+        await get('/api/v1/rate-probe/a', '198.51.100.20').set('Authorization', forged(attempt)).expect(200);
+      }
+
+      await get('/api/v1/rate-probe/a', '198.51.100.20').set('Authorization', forged(99)).expect(429);
+      // The route that sends the reset mail is limited by address in the same way, a forged token or none.
+      const routeLimit = 10; // the @Throttle of the route; this app has no database, so the answers before the limit are not 202
+      const statuses: number[] = [];
+      for (let attempt = 0; attempt < routeLimit + 1; attempt += 1) {
+        const response = await request(app!.getHttpServer())
+          .post('/api/v1/auth/password-reset-requests')
+          .set('x-forwarded-for', '198.51.100.21')
+          .set('Authorization', forged(attempt))
+          .send({ email: 'nobody@acme.vn' });
+        statuses.push(response.status);
+      }
+
+      expect(statuses.slice(0, routeLimit)).not.toContain(429);
+      expect(statuses[routeLimit]).toBe(429);
+    });
+
     it('still limits public and authentication routes', async () => {
       for (const path of ['/api/v1/health/live']) {
         await exhaust(path, '198.51.100.3');

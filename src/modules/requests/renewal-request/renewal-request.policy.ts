@@ -28,25 +28,14 @@ export function monthsBetween(from: BusinessDate, to: BusinessDate): number {
 }
 
 export type RenewalSenderRefusal =
-  /** Neither the holder nor the head of the department of the holder. */
-  | 'NOT_HOLDER'
-  /** The head of another department. */
-  | 'OUTSIDE_DEPARTMENT';
+  /** Anybody but the holder of the right (a head included): only the person who holds it asks to keep it (`QĐ-100t`). */
+  'NOT_HOLDER';
 
-export type RenewalSenderVerdict = { ok: true; byHead: boolean } | { ok: false; refusal: RenewalSenderRefusal };
+export type RenewalSenderVerdict = { ok: true } | { ok: false; refusal: RenewalSenderRefusal };
 
-/** The holder asks to renew their own right; the head of their department asks for them (`US-05-14` AC-1). */
-export function checkRenewalSender(facts: {
-  actorEmployeeId: string;
-  holderEmployeeId: string;
-  holderDepartmentId: string | null;
-  actorHeadedDepartmentId: string | null;
-}): RenewalSenderVerdict {
-  if (facts.actorEmployeeId === facts.holderEmployeeId) return { ok: true, byHead: false };
-  if (facts.actorHeadedDepartmentId === null) return { ok: false, refusal: 'NOT_HOLDER' };
-  if (facts.actorHeadedDepartmentId === facts.holderDepartmentId) return { ok: true, byHead: true };
-
-  return { ok: false, refusal: 'OUTSIDE_DEPARTMENT' };
+/** Only the holder asks to renew their own right (`US-05-14` AC-1, `QĐ-100t`). */
+export function checkRenewalSender(facts: { actorEmployeeId: string; holderEmployeeId: string }): RenewalSenderVerdict {
+  return facts.actorEmployeeId === facts.holderEmployeeId ? { ok: true } : { ok: false, refusal: 'NOT_HOLDER' };
 }
 
 export type RenewableProblem =
@@ -80,28 +69,6 @@ export function checkRenewable(facts: {
   if (facts.revocationLive) return 'REVOCATION_PENDING';
 
   return null;
-}
-
-export type EndRefusal =
-  /** The new end is not after the end the right has, or, when the end has passed, not after today. */
-  | 'END_NOT_AFTER'
-  /** The term it asks for is longer than any request may ask for. */
-  | 'END_TOO_FAR';
-
-/**
- * Whether the end asked for is acceptable: after the end the right has and after today. `maxTermMonths` is the bound every request
- * keeps against a typo.
- */
-export function checkNewEnd(facts: {
-  today: BusinessDate;
-  previousEnd: BusinessDate;
-  newEnd: BusinessDate;
-  maxTermMonths: number;
-}): EndRefusal | null {
-  const floor = facts.previousEnd > facts.today ? facts.previousEnd : facts.today;
-  if (facts.newEnd <= floor) return 'END_NOT_AFTER';
-
-  return monthsBetween(floor, facts.newEnd) > facts.maxTermMonths ? 'END_TOO_FAR' : null;
 }
 
 /**

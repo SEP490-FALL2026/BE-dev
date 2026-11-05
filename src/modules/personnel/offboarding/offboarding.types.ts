@@ -2,6 +2,8 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { Grounds, GroundsInput } from '../personnel-grounds.policy';
 import type { RoleFlag } from '../public/personnel.types';
 
+/** How the access of the person is blocked: from the day after the last working day, or from the day the departure is recorded (QĐ-96c). */
+export type AccessBlockMode = 'WITH_LAST_DAY' | 'BLOCK_NOW';
 export type OffboardingState = 'HANDING_OVER' | 'LEFT' | 'CANCELLED';
 export type OffboardingChangeKind =
   | 'RECORDED'
@@ -33,7 +35,7 @@ export interface OffboardingRecord {
   employeeId: string;
   departmentId: string | null;
   state: OffboardingState;
-  abrupt: boolean;
+  accessBlockMode: AccessBlockMode;
   priorWorkState: PriorWorkState;
   lastWorkingDay: BusinessDate;
   departureEffectiveOn: BusinessDate;
@@ -67,8 +69,9 @@ export interface OffboardingSummaryRecord {
   id: string;
   employeeId: string;
   state: OffboardingState;
-  abrupt: boolean;
+  accessBlockMode: AccessBlockMode;
   lastWorkingDay: BusinessDate;
+  leftOn: BusinessDate | null;
   handoverDueOn: BusinessDate | null;
   accountLocked: boolean;
   closed: boolean;
@@ -110,10 +113,11 @@ export interface AccountLockInput {
 export interface RecordOffboardingInput {
   employeeId: string;
   lastWorkingDay?: BusinessDate | undefined;
-  abrupt: boolean;
+  accessBlockMode: AccessBlockMode;
   grounds?: GroundsInput | undefined;
   successor?: SuccessorChoice | undefined;
-  pendingTransferCancellation?: { reason: string } | undefined;
+  /** The Super Admin confirms that a transfer waiting to take effect after the last working day is cancelled with the departure. */
+  cancelPendingTransfer?: true | undefined;
   /** The notice of a head this case is recorded from (`US-03-11`); a case recorded straight from a document has none. */
   noticeId?: string | undefined;
 }
@@ -121,17 +125,13 @@ export interface RecordOffboardingInput {
 export interface ChangeLastDayInput {
   lastWorkingDay: BusinessDate;
   reason: string;
+  grounds?: GroundsInput | undefined;
   successor?: SuccessorChoice | undefined;
-}
-
-export interface MarkLeftInput {
-  departedOn?: BusinessDate | undefined;
-  accountLock?: AccountLockInput | undefined;
 }
 
 export interface OpenRevocationsInput {
   assignmentIds?: readonly string[] | undefined;
-  count: number;
-  reason: string;
+  /** The IT Admin's own words, added to the standard reason of a departure. */
+  note?: string | undefined;
   accountLock?: AccountLockInput | undefined;
 }

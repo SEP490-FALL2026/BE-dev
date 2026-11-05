@@ -1,4 +1,4 @@
-export type AuditActorKind = 'USER' | 'SYSTEM' | 'OPERATOR';
+export type AuditActorKind = 'USER' | 'SYSTEM' | 'OPERATOR' | 'DEVICE';
 
 /** Plain JSON-compatible value allowed in an audit snapshot. */
 export type AuditValue = string | number | boolean | null | AuditValue[] | { [key: string]: AuditValue };

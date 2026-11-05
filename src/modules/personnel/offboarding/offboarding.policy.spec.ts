@@ -1,5 +1,4 @@
 import {
-  accountLockRefusal,
   blockersOf,
   cancelRefusal,
   changeLastDayRefusal,
@@ -9,7 +8,6 @@ import {
   departureEffectiveOn,
   handoverDueOn,
   isPastLastDay,
-  markLeftRefusal,
   namedRightsRefusal,
   pendingTransferRefusal,
   recordRefusal,
@@ -20,18 +18,18 @@ import {
   type RightFacts,
 } from './offboarding.policy';
 
-const GROUNDS = { type: 'DECISION', reference: 'QD-1/2026', issuer: 'HR', issuedOn: '2026-10-01' };
+const GROUNDS = { type: 'HR_DECISION', reference: 'QD-1/2026', issuer: 'HR', issuedOn: '2026-10-01' };
 
 const record = (extra: Partial<RecordFacts> = {}): RecordFacts => ({
   today: '2026-10-24',
   hireDate: '2020-01-01',
   placementFrom: '2026-01-05',
   lastWorkingDay: '2026-11-03',
-  abrupt: false,
+  accessBlockMode: 'WITH_LAST_DAY',
   employee: { status: 'ACTIVE', workState: 'WORKING' },
   grounds: GROUNDS,
   pendingTransfer: null,
-  transferCancellationReason: undefined,
+  cancelPendingTransfer: false,
   namedAsSuccessor: false,
   successor: null,
   ...extra,
@@ -40,24 +38,24 @@ const record = (extra: Partial<RecordFacts> = {}): RecordFacts => ({
 const code = (refusal: { code: string } | null) => refusal?.code ?? null;
 
 describe('the days of a departure', () => {
-  it('ends the membership the day after the last working day, and never writes an abrupt departure into the past', () => {
+  it('ends the membership the day after the last working day, and never writes a departure blocked now into the past', () => {
     const base = { today: '2026-10-24', placementFrom: '2026-01-05' };
 
-    expect(departureEffectiveOn({ ...base, lastWorkingDay: '2026-11-03', abrupt: false })).toBe('2026-11-04');
-    expect(departureEffectiveOn({ ...base, lastWorkingDay: '2026-10-24', abrupt: true })).toBe('2026-10-25');
-    expect(departureEffectiveOn({ ...base, lastWorkingDay: '2026-10-20', abrupt: true })).toBe('2026-10-24');
+    expect(departureEffectiveOn({ ...base, lastWorkingDay: '2026-11-03', blockNow: false })).toBe('2026-11-04');
+    expect(departureEffectiveOn({ ...base, lastWorkingDay: '2026-10-24', blockNow: true })).toBe('2026-10-25');
+    expect(departureEffectiveOn({ ...base, lastWorkingDay: '2026-10-20', blockNow: true })).toBe('2026-10-24');
     expect(
-      departureEffectiveOn({ today: '2026-10-24', placementFrom: null, lastWorkingDay: '2026-11-03', abrupt: false }),
+      departureEffectiveOn({ today: '2026-10-24', placementFrom: null, lastWorkingDay: '2026-11-03', blockNow: false }),
     ).toBe('2026-11-04');
     expect(
-      departureEffectiveOn({ today: '2026-10-24', placementFrom: null, lastWorkingDay: '2026-10-20', abrupt: true }),
+      departureEffectiveOn({ today: '2026-10-24', placementFrom: null, lastWorkingDay: '2026-10-20', blockNow: true }),
     ).toBe('2026-10-24');
     expect(
       departureEffectiveOn({
         today: '2026-10-24',
         placementFrom: '2026-10-24',
         lastWorkingDay: '2026-10-20',
-        abrupt: true,
+        blockNow: true,
       }),
     ).toBe('2026-10-25');
   });
@@ -76,9 +74,9 @@ describe('the days of a departure', () => {
 });
 
 describe('whether a departure may be recorded', () => {
-  it('accepts a whole planned handover and an abrupt departure of today', () => {
+  it('accepts a whole planned handover and a departure blocked now with today as its last day', () => {
     expect(recordRefusal(record())).toBeNull();
-    expect(recordRefusal(record({ abrupt: true, lastWorkingDay: '2026-10-24' }))).toBeNull();
+    expect(recordRefusal(record({ accessBlockMode: 'BLOCK_NOW', lastWorkingDay: '2026-10-24' }))).toBeNull();
     expect(recordRefusal(record({ employee: { status: 'ACTIVE', workState: 'ON_LONG_LEAVE' } }))).toBeNull();
   });
 
@@ -90,9 +88,12 @@ describe('whether a departure may be recorded', () => {
       'ALREADY_HANDING_OVER',
     ],
     ['no last working day, planned', { lastWorkingDay: undefined }, 'LAST_WORKING_DAY_REQUIRED'],
-    ['no last working day, abrupt', { lastWorkingDay: undefined, abrupt: true }, 'LAST_WORKING_DAY_REQUIRED'],
+    [
+      'no last working day, blocked now',
+      { lastWorkingDay: undefined, accessBlockMode: 'BLOCK_NOW' },
+      'LAST_WORKING_DAY_REQUIRED',
+    ],
     ['a planned day in the past', { lastWorkingDay: '2026-10-23' }, 'LAST_WORKING_DAY_INVALID'],
-    ['an abrupt day ahead', { abrupt: true, lastWorkingDay: '2026-10-25' }, 'LAST_WORKING_DAY_INVALID'],
     ['a day before the person came', { hireDate: '2026-11-10' }, 'LAST_WORKING_DAY_INVALID'],
     ['a day before the placement began', { placementFrom: '2026-11-10' }, 'LAST_WORKING_DAY_INVALID'],
     ['no basis', { grounds: undefined }, 'GROUNDS_REQUIRED'],
@@ -103,13 +104,13 @@ describe('whether a departure may be recorded', () => {
     ],
     ['a basis lacking its issuer', { grounds: { ...GROUNDS, issuer: ' ' } }, 'GROUNDS_INCOMPLETE'],
     [
-      'a transfer that takes effect first, without a reason',
+      'a transfer that takes effect first, without the confirmation to cancel it',
       { pendingTransfer: { effectiveOn: '2026-12-01' } },
-      'TRANSFER_CANCELLATION_REASON_REQUIRED',
+      'TRANSFER_CANCELLATION_REQUIRED',
     ],
     [
       'a transfer that takes effect by the last day',
-      { pendingTransfer: { effectiveOn: '2026-11-03' }, transferCancellationReason: 'x' },
+      { pendingTransfer: { effectiveOn: '2026-11-03' }, cancelPendingTransfer: true },
       'PENDING_EVENT_EXISTS',
     ],
     ['a person named to follow a head', { namedAsSuccessor: true }, 'PENDING_EVENT_EXISTS'],
@@ -122,12 +123,11 @@ describe('whether a departure may be recorded', () => {
     expect(code(recordRefusal(record(facts)))).toBe(expected);
   });
 
-  it('cancels the transfer that waits only with a reason', () => {
-    expect(
-      recordRefusal(
-        record({ pendingTransfer: { effectiveOn: '2026-12-01' }, transferCancellationReason: 'Nghỉ việc' }),
-      ),
-    ).toBeNull();
+  it('cancels the transfer that waits only when the Super Admin confirms it', () => {
+    const waiting = { pendingTransfer: { effectiveOn: '2026-12-01' } };
+
+    expect(code(recordRefusal(record(waiting)))).toBe('TRANSFER_CANCELLATION_REQUIRED');
+    expect(recordRefusal(record({ ...waiting, cancelPendingTransfer: true }))).toBeNull();
   });
 });
 
@@ -140,6 +140,7 @@ describe('moving, cancelling and leaving', () => {
     currentLastWorkingDay: '2026-11-03',
     newLastWorkingDay: '2026-11-20',
     reason: 'Dời ngày',
+    grounds: GROUNDS,
     successor: null,
     ...extra,
   });
@@ -150,6 +151,12 @@ describe('moving, cancelling and leaving', () => {
     ['is not a cancelled case', { state: 'CANCELLED' }, 'NOT_HANDING_OVER'],
     ['is not allowed after the last day', { today: '2026-11-04' }, 'LAST_DAY_ALREADY_PASSED'],
     ['needs a reason', { reason: '  ' }, 'REASON_REQUIRED'],
+    ['needs a basis', { grounds: undefined }, 'GROUNDS_REQUIRED'],
+    [
+      'needs a basis that is not a notice',
+      { grounds: { ...GROUNDS, reference: 'BM09-2026-000123' } },
+      'GROUNDS_IS_NOTICE',
+    ],
     ['is not the same day', { newLastWorkingDay: '2026-11-03' }, 'NO_CHANGE'],
     ['is not in the past', { newLastWorkingDay: '2026-10-20' }, 'LAST_WORKING_DAY_INVALID'],
     [
@@ -161,26 +168,11 @@ describe('moving, cancelling and leaving', () => {
     expect(code(changeLastDayRefusal(change(extra)))).toBe(expected);
   });
 
-  it('cancels a handover under way with a reason, and only that', () => {
-    expect(cancelRefusal({ state: 'HANDING_OVER', reason: 'Rút' })).toBeNull();
-    expect(code(cancelRefusal({ state: 'HANDING_OVER', reason: '' }))).toBe('REASON_REQUIRED');
-    expect(code(cancelRefusal({ state: 'LEFT', reason: 'Rút' }))).toBe('CASE_LEFT');
-  });
-
-  it('lets the departure come on any day up to today, after the last working day too, and never ahead', () => {
-    const base = { state: 'HANDING_OVER' as const, today: '2026-11-10', recordedOn: '2026-10-24' };
-
-    expect(markLeftRefusal({ ...base, departedOn: undefined })).toBeNull();
-    expect(markLeftRefusal({ ...base, departedOn: '2026-11-04' })).toBeNull();
-    expect(code(markLeftRefusal({ ...base, departedOn: '2026-11-11' }))).toBe('DEPARTED_ON_INVALID');
-    expect(code(markLeftRefusal({ ...base, departedOn: '2026-10-23' }))).toBe('DEPARTED_ON_INVALID');
-    expect(code(markLeftRefusal({ ...base, state: 'LEFT', departedOn: undefined }))).toBe('CASE_LEFT');
-  });
-
-  it('writes the lock of the account once and only for a person who has left', () => {
-    expect(accountLockRefusal({ state: 'LEFT', locked: false })).toBeNull();
-    expect(code(accountLockRefusal({ state: 'LEFT', locked: true }))).toBe('ALREADY_RECORDED');
-    expect(code(accountLockRefusal({ state: 'HANDING_OVER', locked: false }))).toBe('CASE_NOT_LEFT');
+  it('cancels a handover under way with a reason and a basis, and only that', () => {
+    expect(cancelRefusal({ state: 'HANDING_OVER', reason: 'Rút', grounds: GROUNDS })).toBeNull();
+    expect(code(cancelRefusal({ state: 'HANDING_OVER', reason: '', grounds: GROUNDS }))).toBe('REASON_REQUIRED');
+    expect(code(cancelRefusal({ state: 'HANDING_OVER', reason: 'Rút' }))).toBe('GROUNDS_REQUIRED');
+    expect(code(cancelRefusal({ state: 'LEFT', reason: 'Rút', grounds: GROUNDS }))).toBe('CASE_LEFT');
   });
 });
 
@@ -195,10 +187,8 @@ describe('the revocations of the rights', () => {
   const rights = [right('a'), right('b'), right('c')];
   const revoke = (extra: Partial<RevocationFacts> = {}) =>
     revocationSelection({
-      state: 'LEFT',
+      blocked: true,
       closed: false,
-      reason: 'Đã nghỉ việc',
-      count: 3,
       named: undefined,
       rights,
       lockRecorded: false,
@@ -206,25 +196,29 @@ describe('the revocations of the rights', () => {
       ...extra,
     });
 
-  it('selects every right without a task when none is named, and needs the count to be exactly that many (AC-4)', () => {
+  it('selects every right without a task when none is named, and counts them itself (AC-4, L-412)', () => {
     expect(revoke()).toEqual({ refusal: null, selected: ['a', 'b', 'c'] });
-    expect(revoke({ count: 2 }).refusal).toEqual({ code: 'COUNT_MISMATCH', details: { expected: 3 } });
-    expect(revoke({ rights: [right('a', { hasTask: true }), right('b'), right('c')], count: 2 }).selected).toEqual([
-      'b',
-      'c',
-    ]);
+    expect(revoke({ rights: [right('a', { hasTask: true }), right('b'), right('c')] }).selected).toEqual(['b', 'c']);
+  });
+
+  it('refuses when there is nothing left to take away', () => {
+    expect(code(revoke({ rights: [] }).refusal)).toBe('NOTHING_TO_REVOKE');
+    expect(code(revoke({ rights: [right('a', { hasTask: true })] }).refusal)).toBe('NOTHING_TO_REVOKE');
+    expect(code(revoke({ rights: [right('k4', { revocable: false, provisioningType: 'K4' })] }).refusal)).toBe(
+      'NOTHING_TO_REVOKE',
+    );
   });
 
   it('skips a seat that has no revocation unless it is named, and then refuses the whole command', () => {
     const mixed = [right('a'), right('k4', { revocable: false, provisioningType: 'K4' })];
 
-    expect(revoke({ rights: mixed, count: 1 }).selected).toEqual(['a']);
-    expect(revoke({ rights: mixed, named: ['a', 'k4'], count: 2 }).refusal).toEqual({
+    expect(revoke({ rights: mixed }).selected).toEqual(['a']);
+    expect(revoke({ rights: mixed, named: ['a', 'k4'] }).refusal).toEqual({
       code: 'REVOCATION_NOT_SUPPORTED',
       details: { assignmentId: 'k4', provisioningType: 'K4' },
     });
-    expect(code(revoke({ named: ['zzz'], count: 1 }).refusal)).toBe('ASSIGNMENT_NOT_AVAILABLE');
-    expect(code(revoke({ named: ['a'], rights: [right('a', { hasTask: true })], count: 1 }).refusal)).toBe(
+    expect(code(revoke({ named: ['zzz'] }).refusal)).toBe('ASSIGNMENT_NOT_AVAILABLE');
+    expect(code(revoke({ named: ['a'], rights: [right('a', { hasTask: true })] }).refusal)).toBe(
       'ASSIGNMENT_NOT_AVAILABLE',
     );
   });
@@ -239,9 +233,8 @@ describe('the revocations of the rights', () => {
   });
 
   it.each([
-    ['not left', { state: 'HANDING_OVER' as const }, 'CASE_NOT_LEFT'],
+    ['not blocked', { blocked: false }, 'CASE_NOT_BLOCKED'],
     ['closed', { closed: true }, 'CASE_CLOSED'],
-    ['no reason', { reason: ' ' }, 'REASON_REQUIRED'],
     ['no lock recorded or given', { lockGiven: false }, 'ACCOUNT_LOCK_NOT_RECORDED'],
     ['the lock given when it was recorded', { lockRecorded: true }, 'ALREADY_RECORDED'],
   ])('refuses %s', (_name, extra, expected) => {
@@ -292,7 +285,7 @@ describe('what keeps a case open and the four steps', () => {
 
   it('puts the steps in the order they are done and marks the lock urgent only for a departure nobody planned', () => {
     const steps = checklistOf({
-      abrupt: true,
+      blockNow: true,
       lockRecorded: false,
       pendingDuties: 2,
       heldRights: 3,
@@ -310,7 +303,7 @@ describe('what keeps a case open and the four steps', () => {
     });
     expect(
       checklistOf({
-        abrupt: false,
+        blockNow: false,
         lockRecorded: true,
         pendingDuties: 0,
         heldRights: 1,
@@ -326,7 +319,7 @@ describe('what keeps a case open and the four steps', () => {
     });
     expect(
       checklistOf({
-        abrupt: false,
+        blockNow: false,
         lockRecorded: true,
         pendingDuties: 0,
         heldRights: 0,
@@ -361,20 +354,15 @@ describe('what a departure is recorded for, before and after the locks', () => {
     expect(departmentWithoutHeadFrom(null, '2026-11-04')).toBeNull();
   });
 
-  it('refuses a departure that comes after the transfer takes effect, or before it without a reason to cancel it', () => {
+  it('refuses a departure that comes after the transfer takes effect, or before it without the confirmation to cancel it', () => {
     const waiting = { effectiveOn: '2026-11-10' };
 
-    expect(pendingTransferRefusal(null, '2026-11-12', undefined)).toBeNull();
-    expect(pendingTransferRefusal(waiting, '2026-11-10', 'x')).toEqual({
+    expect(pendingTransferRefusal(null, '2026-11-12', false)).toBeNull();
+    expect(pendingTransferRefusal(waiting, '2026-11-10', true)).toEqual({
       code: 'PENDING_EVENT_EXISTS',
       details: { kind: 'TRANSFER', effectiveOn: '2026-11-10' },
     });
-    expect(pendingTransferRefusal(waiting, '2026-11-09', ' ')).toEqual({
-      code: 'TRANSFER_CANCELLATION_REASON_REQUIRED',
-    });
-    expect(pendingTransferRefusal(waiting, '2026-11-09', undefined)?.code).toBe(
-      'TRANSFER_CANCELLATION_REASON_REQUIRED',
-    );
-    expect(pendingTransferRefusal(waiting, '2026-11-09', 'Nghỉ việc')).toBeNull();
+    expect(pendingTransferRefusal(waiting, '2026-11-09', false)).toEqual({ code: 'TRANSFER_CANCELLATION_REQUIRED' });
+    expect(pendingTransferRefusal(waiting, '2026-11-09', true)).toBeNull();
   });
 });

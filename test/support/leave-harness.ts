@@ -39,13 +39,13 @@ export interface LeaveChangeWire {
 /** The people, the calls of the routes of the long leaves and what a leave leaves in the database. No assertion lives here. */
 export class LeaveHarness extends TransferHarness {
   readonly approval = {
-    type: 'LEAVE_APPROVAL',
+    type: 'APPROVED_APPLICATION',
     reference: 'DN-05/2026',
     issuer: 'HR Department',
     issuedOn: '2026-05-25',
   };
   readonly extension = {
-    type: 'LEAVE_EXTENSION',
+    type: 'APPROVED_APPLICATION',
     reference: 'GH-09/2026',
     issuer: 'HR Department',
     issuedOn: '2026-08-20',

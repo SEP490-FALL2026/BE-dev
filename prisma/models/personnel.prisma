@@ -146,6 +146,8 @@ model TransferReviewItem {
   decidedByEmployeeId String?                @map("decided_by_employee_id") @db.Uuid
   decidedAt           DateTime?              @map("decided_at") @db.Timestamptz(3)
   newToolNote         String?                @map("new_tool_note")
+  // Why the head said the tool is still needed or no longer needed (1..500); null for a line decided before it was asked for.
+  reason              String?
   revocationTaskId    String?                @map("revocation_task_id") @db.Uuid
 
   review         TransferReview    @relation(fields: [reviewId], references: [id], onDelete: Restrict)
@@ -241,6 +243,12 @@ model EmployeeLeaveChange {
   @@map("employee_leave_changes")
 }
 
+// How the access of the person is blocked (QĐ-96c): from the day after the last working day, or from the day the departure is recorded.
+enum OffboardingAccessBlockMode {
+  WITH_LAST_DAY
+  BLOCK_NOW
+}
+
 enum OffboardingState {
   HANDING_OVER
   LEFT
@@ -270,7 +278,7 @@ enum OffboardingChangeKind {
 }
 
 // The record of a person who leaves, from the day it is written until it is closed (g6-offboarding-record): a planned handover
-// with a last working day (HANDING_OVER) that ends as LEFT or CANCELLED, or an abrupt departure that is LEFT at once. At most one
+// with a last working day (HANDING_OVER) that ends as LEFT or CANCELLED; one blocked now with a last working day that is past is LEFT at once. At most one
 // live case (HANDING_OVER or LEFT) for each employee. The periods the case wrote (the placement, the head of the department) are
 // named here so a move or a cancellation puts them back exactly; the basis never changes after it is written.
 model OffboardingCase {
@@ -282,7 +290,7 @@ model OffboardingCase {
   cancelledPlacementDepartmentId String?       @map("cancelled_placement_department_id") @db.Uuid
   cancelledPlacementFrom DateTime?             @map("cancelled_placement_from") @db.Date
   state                  OffboardingState      @default(HANDING_OVER)
-  abrupt                 Boolean               @default(false)
+  accessBlockMode        OffboardingAccessBlockMode @map("access_block_mode")
   priorWorkState         EmployeeWorkState     @map("prior_work_state")
   lastWorkingDay         DateTime              @map("last_working_day") @db.Date
   departureEffectiveOn   DateTime              @map("departure_effective_on") @db.Date

@@ -113,3 +113,11 @@ export class DocumentAccessForbiddenError extends Error {
     this.name = 'DocumentAccessForbiddenError';
   }
 }
+
+/** The file is not of the kind the record takes: a signed record is not attached to a contract, nor a contract file to a signer. */
+export class DocumentPurposeMismatchError extends Error {
+  constructor() {
+    super('The purpose of this document does not fit what it is attached to.');
+    this.name = 'DocumentPurposeMismatchError';
+  }
+}

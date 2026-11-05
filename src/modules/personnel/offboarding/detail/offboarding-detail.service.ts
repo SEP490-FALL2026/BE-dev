@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
 import { LicensingApi } from '../../../licensing/public/licensing.api';
 import { LicensingHandoverApi } from '../../../licensing/public/licensing-handover.api';
+import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { EmployeeRecord } from '../../../organization/public/organization.types';
 import type { ReadAccess } from '../../personnel-self-action.policy';
@@ -30,6 +31,7 @@ export class OffboardingDetailService {
     private readonly catalog: CatalogApi,
     private readonly sources: OffboardingSources,
     private readonly roleDuties: RoleDutiesService,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** The case in full: for a case that is not cancelled, what the person still holds, the four steps and what keeps it open. */
@@ -56,6 +58,7 @@ export class OffboardingDetailService {
       department ?? undefined,
       {
         today,
+        block: await this.identity.findDepartureBlock(record.employeeId),
         heldRights: facts.heldRights,
         roleFlags: roles?.map,
         workspaces: Object.fromEntries(

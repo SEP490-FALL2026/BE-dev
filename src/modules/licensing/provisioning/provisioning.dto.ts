@@ -17,7 +17,6 @@ export const grantBodySchema = z.strictObject({
   requestId: z.uuid(),
   subscriptionId: z.uuid().optional(),
   accountIdentifier: z.string().max(254).optional(),
-  expectedEndDate: businessDate.optional(),
   /** Only for the request of a service account: the person of its department who answers for it, in the place of the one it names. */
   responsibleEmployeeId: z.uuid().optional(),
   /** Only for a request for a group, which is granted one person at a time: the person of the request this grant is for. */

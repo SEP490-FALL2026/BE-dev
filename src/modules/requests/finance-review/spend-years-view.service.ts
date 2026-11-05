@@ -6,7 +6,6 @@ import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { YearResult } from '../spend/budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord } from '../spend/budget-check.repo';
 import { BudgetCheckService } from '../spend/budget-check.service';
-import { SpendDecisionRepo } from '../spend/spend-decision.repo';
 import { SpendReviewNotFoundError } from '../spend/spend.errors';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 import type { YearWire } from './finance-review.dto';
@@ -23,7 +22,6 @@ export class SpendYearsViewService {
     private readonly requests: AccessRequestRepo,
     private readonly steps: SpendStepRepo,
     private readonly checks: BudgetCheckRepo,
-    private readonly decisions: SpendDecisionRepo,
     private readonly runner: TransactionRunner,
     private readonly compute: BudgetCheckService,
   ) {}
@@ -43,8 +41,6 @@ export class SpendYearsViewService {
       ? { items: live.years.slice(skip, skip + query.pageSize), total: live.years.length }
       : await this.checks.pageYears((check as CheckRecord).id, skip, query.pageSize);
     const money = await this.views.formatter(live ? live.currency : (check as CheckRecord).currency);
-    const decided = await this.decisions.latest(requestId);
-    const overridden = new Set(check && decided?.checkId === check.id ? decided.overrideYears : []);
     const nullable = (value: bigint | null): Money | null => (value === null ? null : money(value));
 
     return pageOf(
@@ -58,7 +54,6 @@ export class SpendYearsViewService {
         remaining: nullable(year.remainingMinor),
         shareBasisPoints: year.shareBasisPoints,
         pending: nullable(year.pendingMinor),
-        overridden: overridden.has(year.year),
       })),
       total,
       query.page,

@@ -13,18 +13,16 @@ import {
   AccessRequestNotDraftError,
   AccessRequestRoleRequiredError,
   AccessRequestSuperAdminCannotRequestError,
+  AccessRequestTermBeyondLimitError,
   AccessRequestGroupUsesLinesError,
-  DelegatedRequestRefusedError,
   AccessRequestApplicationRetiredError,
   AccessRequestDecisionRefusedError,
   AccessRequestNotAssigneeError,
-  AccessRequestSpendDateNotAllowedError,
   AccessRequestCancellationRefusedError,
   AccessRequestWithdrawalRefusedError,
   AccessRequestNoDepartmentError,
   AccessRequestNotFoundError,
   AccessRequestNotPriceableError,
-  AccessRequestPlanLineRefusedError,
   AccessRequestPlanNotFoundError,
 } from './access-request.errors';
 
@@ -74,18 +72,11 @@ export function toAccessRequestApiException(error: unknown): unknown {
     );
   }
 
-  if (error instanceof DelegatedRequestRefusedError) {
-    const status =
-      error.reason === 'NOT_HEAD'
-        ? HttpStatus.FORBIDDEN
-        : error.reason === 'BENEFICIARY_NOT_ACTIVE'
-          ? HttpStatus.CONFLICT
-          : HttpStatus.UNPROCESSABLE_ENTITY;
-
-    return new ApiException(status, {
-      code: `DELEGATED_REQUEST.${error.reason}`,
+  if (error instanceof AccessRequestTermBeyondLimitError) {
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+      code: 'ACCESS_REQUEST.TERM_BEYOND_LIMIT',
       message: error.message,
-      ...(error.employeeId === null ? {} : { details: { employeeId: error.employeeId } }),
+      details: { maxMonths: error.maxMonths, endsBy: error.endsBy },
     });
   }
   if (error instanceof AccessRequestAlreadyHoldsAccessError) {
@@ -94,9 +85,6 @@ export function toAccessRequestApiException(error: unknown): unknown {
       message: error.message,
       details: { assignment: error.held },
     });
-  }
-  if (error instanceof AccessRequestSpendDateNotAllowedError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE', error.message);
   }
   if (error instanceof AccessRequestNotAssigneeError) {
     return refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.NOT_THE_ASSIGNEE', error.message);
@@ -138,9 +126,6 @@ export function toAccessRequestApiException(error: unknown): unknown {
   if (error instanceof AccessRequestEmployeeRequiredError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCESS_REQUEST.EMPLOYEE_REQUIRED', error.message);
   }
-  if (error instanceof AccessRequestPlanLineRefusedError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `ACCESS_REQUEST.${error.reason}`, error.message);
-  }
   if (error instanceof AccessRequestNotPriceableError) {
     return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_PRICEABLE', error.message);
   }
@@ -155,14 +140,13 @@ const withdrawal = (reason: ConstructorParameters<typeof AccessRequestWithdrawal
   example(new AccessRequestWithdrawalRefusedError(reason));
 const cancellation = (reason: ConstructorParameters<typeof AccessRequestCancellationRefusedError>[0]) =>
   example(new AccessRequestCancellationRefusedError(reason));
-const delegation = (reason: ConstructorParameters<typeof DelegatedRequestRefusedError>[0]) =>
-  example(new DelegatedRequestRefusedError(reason, '<employee-id>'));
 
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
 export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
+  TERM_BEYOND_LIMIT: example(new AccessRequestTermBeyondLimitError(12, '2026-12-31')),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({
@@ -185,18 +169,12 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
       validUntil: null,
     }),
   ),
-  NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),
   NOT_ASSIGNEE: example(new AccessRequestNotAssigneeError()),
   EMPLOYEE_REQUIRED: example(new AccessRequestEmployeeRequiredError()),
   GROUP_USES_LINES: example(new AccessRequestGroupUsesLinesError()),
   DECISION_OWN_REQUEST: decision('OWN_REQUEST'),
   DECISION_NOT_THE_ASSIGNEE: decision('NOT_THE_ASSIGNEE'),
   STEP_NOT_PENDING: decision('STEP_NOT_PENDING'),
-  TERM_CONFIRMATION_REQUIRED: decision('TERM_CONFIRMATION_REQUIRED'),
-  PLAN_LINE_REQUIRED: decision('PLAN_LINE_REQUIRED'),
-  SPEND_NOT_APPLICABLE: decision('SPEND_NOT_APPLICABLE'),
-  LINE_NOT_FOUND: example(new AccessRequestPlanLineRefusedError('LINE_NOT_FOUND')),
-  STILL_NEEDED_REQUIRED: example(new AccessRequestPlanLineRefusedError('STILL_NEEDED_REQUIRED')),
   NOT_REQUESTER: withdrawal('NOT_REQUESTER'),
   WITHDRAWAL_REASON_REQUIRED: withdrawal('REASON_REQUIRED'),
   WITHDRAWAL_ALREADY_ENDED: withdrawal('ALREADY_ENDED'),
@@ -211,11 +189,4 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   BENEFICIARY_NOT_LEFT: cancellation('BENEFICIARY_NOT_LEFT'),
   BENEFICIARY_NOT_TRANSFERRED: cancellation('BENEFICIARY_NOT_TRANSFERRED'),
   EVIDENCE_REQUIRED: cancellation('EVIDENCE_REQUIRED'),
-  NOT_HEAD: delegation('NOT_HEAD'),
-  BENEFICIARY_NOT_ACTIVE: delegation('BENEFICIARY_NOT_ACTIVE'),
-  OUTSIDE_DEPARTMENT: delegation('OUTSIDE_DEPARTMENT'),
-  EMAIL_REQUIRED: delegation('EMAIL_REQUIRED'),
-  END_DATE_REQUIRED: delegation('END_DATE_REQUIRED'),
-  END_DATE_TOO_EARLY: delegation('END_DATE_TOO_EARLY'),
-  DELEGATED_TERM_CONFIRMATION_REQUIRED: delegation('TERM_CONFIRMATION_REQUIRED'),
 } as const;

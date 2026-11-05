@@ -5,7 +5,7 @@ import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
-const GROUNDS = { type: 'DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-10-01' };
+const GROUNDS = { type: 'HR_DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-10-01' };
 const VERIFICATION = { method: 'ATTACHED_DOCUMENT', reference: 'Resignation letter 31/10' };
 
 type Call = (server: App) => request.Test;
@@ -118,6 +118,29 @@ describe('personnel notice routes (e2e, no database)', () => {
         'a recording with a field the event does not have',
         '/recording',
         { verification: VERIFICATION, event: { reason: 'x' } },
+      ],
+      [
+        'a recording with no basis',
+        '/recording',
+        { verification: VERIFICATION, event: { lastWorkingDay: '2026-10-31' } },
+      ],
+      [
+        'a recording with a basis of a kind outside the list',
+        '/recording',
+        {
+          verification: VERIFICATION,
+          grounds: { ...GROUNDS, type: 'DECISION' },
+          event: { lastWorkingDay: '2026-10-31' },
+        },
+      ],
+      [
+        'a recording with the retired reason to cancel a transfer',
+        '/recording',
+        {
+          verification: VERIFICATION,
+          grounds: GROUNDS,
+          event: { lastWorkingDay: '2026-10-31', pendingTransferCancellation: { reason: 'x' } },
+        },
       ],
       ['a link with no event', '/linking', { verification: VERIFICATION }],
     ])('refuses %s with 422', async (_name, path, payload) => {

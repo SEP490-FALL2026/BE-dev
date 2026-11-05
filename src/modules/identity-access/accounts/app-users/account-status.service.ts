@@ -81,9 +81,12 @@ export class AccountStatusService {
     await this.runner.run(async (tx) => {
       const account = await this.accounts.lockAndReadAccount(tx, appUserId);
       if (!account) throw new AccountNotFoundError();
-      if (account.status === 'ACTIVE') return;
+      // The departure of the employee: a block it left in force after it was cancelled is lifted with the unlock and the reason
+      // (QĐ-100q, QĐ-81); one whose departure is still alive is not the Super Admin's to lift.
+      const released = await this.accounts.releaseDepartureBlockForUnlock(tx, account.employeeId);
+      if (account.status === 'ACTIVE' && !released) return;
 
-      await this.accounts.setStatus(tx, appUserId, 'ACTIVE');
+      if (account.status === 'LOCKED') await this.accounts.setStatus(tx, appUserId, 'ACTIVE');
       await this.audit.record(
         tx,
         accountAuditEvent(
@@ -91,8 +94,8 @@ export class AccountStatusService {
           account.organizationId,
           'APP_USER.UNLOCKED',
           appUserId,
-          { status: 'LOCKED' },
-          { status: 'ACTIVE', reason },
+          { status: account.status },
+          { status: 'ACTIVE', reason, ...(released ? { departureBlockReleased: true } : {}) },
         ),
       );
     });

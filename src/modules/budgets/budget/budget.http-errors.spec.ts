@@ -3,7 +3,6 @@ import { Prisma } from '../../../generated/prisma/client';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import {
-  BudgetDepartmentHasNoHeadError,
   BudgetNotAHistoryReaderError,
   BudgetNotFinanceError,
   BudgetPlanNotFoundError,
@@ -171,13 +170,6 @@ describe('toBudgetApiException: the answers of the budget lifecycle (F27, F37, F
     });
   });
 
-  it('a revision for a department nobody heads is the 409 BUDGET.DEPARTMENT_HAS_NO_HEAD', () => {
-    expect(answer(new BudgetDepartmentHasNoHeadError('d')).status).toBe(HttpStatus.CONFLICT);
-    expect((answer(new BudgetDepartmentHasNoHeadError('d')).body as { code: string }).code).toBe(
-      'BUDGET.DEPARTMENT_HAS_NO_HEAD',
-    );
-  });
-
   it('a line that names a plan the catalog does not have is the 422 BUDGET.PLAN_NOT_FOUND, naming the plans', () => {
     expect(answer(new BudgetPlanNotFoundError(['p1']))).toEqual({
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -189,10 +181,10 @@ describe('toBudgetApiException: the answers of the budget lifecycle (F27, F37, F
     });
   });
 
-  it('the reason of a revision that is taken away is the 422 BUDGET.REVISION_REASON_REQUIRED', () => {
-    expect(answer(new BudgetReasonRequiredError('REVISION')).status).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
-    expect((answer(new BudgetReasonRequiredError('REVISION')).body as { code: string }).code).toBe(
-      'BUDGET.REVISION_REASON_REQUIRED',
+  it('a reserve that is not the default share and has no reason is the 422 BUDGET.RESERVE_REASON_REQUIRED', () => {
+    expect(answer(new BudgetReasonRequiredError('RESERVE')).status).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+    expect((answer(new BudgetReasonRequiredError('RESERVE')).body as { code: string }).code).toBe(
+      'BUDGET.RESERVE_REASON_REQUIRED',
     );
   });
 

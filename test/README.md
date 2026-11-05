@@ -6,19 +6,24 @@ chế database dùng riêng: [test/support/README.md](support/README.md).
 
 ## Năm tầng, mỗi tầng một mục đích
 
-| Tầng          | Ở đâu                                             | Chứng minh                                                             | Không làm                             | Lệnh                    |
-| ------------- | ------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------- | ----------------------- |
-| Unit          | `src/**/*.spec.ts`                                | policy thuần, mapper, schema DTO, guard/pipe riêng lẻ                  | không Nest app, không DB              | `pnpm test`             |
-| Gate tĩnh     | `test/gates/*.gate-spec.ts`                       | kiến trúc, OpenAPI, lệnh vận hành, migration, compose                  | không chạy app                        | `pnpm test:gates`       |
-| HTTP contract | `test/http/<module>/*.http-spec.ts`               | guard, khai quyền, validate, mã lỗi, envelope, OpenAPI                 | không DB (repo/port giả khi cần)      | `pnpm test:http`        |
-| Integration   | `test/integration/<module>/*.integration-spec.ts` | ràng buộc DB, SQL của repo, transaction, khóa, đồng thời, role H7, CLI | không đi qua HTTP chỉ để dựng dữ liệu | `pnpm test:integration` |
-| E2E smoke     | `test/e2e/*.e2e-spec.ts`                          | vài hành trình nghiệp vụ qua HTTP + PostgreSQL thật                    | không kiểm từng nhánh lỗi             | `pnpm test:e2e`         |
+| Tầng          | Ở đâu                                             | Chứng minh                                                                               | Không làm                             | Lệnh                    |
+| ------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------- |
+| Unit          | `src/**/*.spec.ts`                                | policy thuần, mapper, schema DTO, guard/pipe riêng lẻ                                    | không Nest app, không DB              | `pnpm test`             |
+| Gate tĩnh     | `test/gates/*.gate-spec.ts`                       | kiến trúc, OpenAPI, lệnh vận hành, migration, compose                                    | không chạy app                        | `pnpm test:gates`       |
+| HTTP contract | `test/http/<module>/*.http-spec.ts`               | guard, khai quyền, validate, mã lỗi, envelope, OpenAPI                                   | không DB (repo/port giả khi cần)      | `pnpm test:http`        |
+| Integration   | `test/integration/<module>/*.integration-spec.ts` | ràng buộc DB, SQL của repo, transaction, khóa, đồng thời, role H7, CLI                   | không đi qua HTTP chỉ để dựng dữ liệu | `pnpm test:integration` |
+| E2E smoke     | `test/e2e/*.e2e-spec.ts`                          | vài hành trình nghiệp vụ qua HTTP + PostgreSQL thật                                      | không kiểm từng nhánh lỗi             | `pnpm test:e2e`         |
+| Main flows    | `test/flows/*.flow-spec.ts`                       | 5 main flow qua API thật, đăng nhập thật theo vai, dataset seed, đồng hồ điều khiển được | không mock bước nghiệp vụ, không CI   | `pnpm test:flows`       |
 
 Script trong `scripts/**/*.test.mjs` chạy bằng `pnpm rules:test` và `pnpm test:scripts`. Chưa có browser suite.
 
 **Chọn tầng:** quyết định thuần → unit. Ai được gọi route, input nào bị từ chối, lỗi map ra mã nào → HTTP contract. Điều
 chỉ PostgreSQL chứng minh được (ràng buộc, khóa, transaction hoàn tác, quyền role) → integration. Một luồng nghiệp vụ
 nối nhiều module chạy được từ đầu tới cuối → một bước trong E2E smoke, không thêm file mới cho mỗi nhánh.
+
+## Main flows (`pnpm test:flows`)
+
+Runner riêng cho suite E2E của 5 main flow ([spec](../docs/workspace/items/e2e-main-flows-suite/spec.md)): cần `TEST_DATABASE_ADMIN_URL` như integration; global setup migrate một mẫu, **seed đầy đủ bằng `runSeed` qua HTTP** thành mẫu thứ hai, mỗi file flow clone mẫu seed và dựng app với mọi `*Sweeper` tắt. Đăng nhập thật theo mã người trong dataset (`NV-DEV3`, `NV-ENGH`, `NV-CEO`…, `NV-SA`), `Date` giả riêng trong tiến trình (`FlowClock`, chỉ tiến), job chạy tay (`clock.sweep(tên)`). Thay thế duy nhất ngoài BE: `FakeObjectStorage` cho bytes tệp. Không thuộc `pnpm check` hay CI. Harness: [support/flows](support/flows).
 
 ## Chạy
 
@@ -33,6 +38,9 @@ pnpm test:integration -- test/integration/requests --maxWorkers=4
 pnpm test:integration:serial                 # test/integration/_serial: role cluster, chạy tuần tự
 pnpm test:integration:timing                 # *.timing-spec.ts: giới hạn thời gian thực, chạy tuần tự
 pnpm test:e2e                                # tuần tự
+pnpm test:flows                              # 5 main flow: dataset seed 1 lần/lượt, tuần tự
+pnpm test:flows -- -t "@D1"                  # chỉ kịch bản thuộc Đợt 1 (tag trong tên describe/it)
+pnpm test:flows -- test/flows/mf4-budget     # một flow
 pnpm test:discovery                          # mọi spec thuộc đúng một runner
 ```
 

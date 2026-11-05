@@ -1,4 +1,3 @@
-import type { BusinessDate } from '../../../core/business-date';
 import type { AuditValue } from '../../audit/public/audit.types';
 import type { SubmitBodyDto } from '../access-request/access-request.dto';
 import { hasSpendStep } from '../access-request/access-request.policy';
@@ -12,8 +11,6 @@ export interface SubmittedRequest {
   body: Pick<SubmitBodyDto, 'planId' | 'termMonths' | 'businessReason'>;
   assessed: Pick<Assessment, 'unit' | 'policy' | 'pricing' | 'routing'>;
   now: Date;
-  /** The day the access ends, when a renewal was sent after the end of the right. */
-  expectedEndDate?: BusinessDate;
   /** The draft the request is sent from: its row becomes the request. */
   draftId?: string;
 }
@@ -40,7 +37,7 @@ export function newRequestOf(facts: SubmittedRequest): NewAccessRequest {
     costCenterId: unit.costCenter?.id ?? null,
     businessReason: body.businessReason,
     termMonths: body.termMonths,
-    expectedEndDate: facts.expectedEndDate ?? null,
+    expectedEndDate: null,
     pricing,
     policy,
     createdByAppUserId: actor.appUserId,

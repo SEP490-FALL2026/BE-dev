@@ -59,8 +59,8 @@ describe('the AI summary of the queue of the spending approver (integration, rea
     const it = { employeeId: h.it1.employeeId, account: h.it1 };
     await h.setItAdminInCharge(design.department, it);
     // Whole percent of what is left above which a request is high value: 100, so no review of Finance stands in the way.
-    await h.budgetFor(design, { total: 100 * M, held: 20 * M, spent: 40 * M, percent: 100 });
-    await h.budgetFor(engineering, { total: 100 * M, percent: 100 });
+    await h.budgetFor(design, { total: 100 * M, held: 20 * M, spent: 40 * M });
+    await h.budgetFor(engineering, { total: 100 * M });
 
     r1 = await h.sent(design.member, internal, { businessReason: 'Nhân viên cần công cụ ghi chú' });
     r9 = await h.sent(design.head, plan, { businessReason: 'Trưởng phòng cần công cụ thiết kế' });
@@ -198,8 +198,15 @@ describe('the AI summary of the queue of the spending approver (integration, rea
     });
   });
 
-  it('AC-13: a renewal waiting for the decision of C1 stays out of the summary and in its own queue', async () => {
-    const queue = h.dataOf<{ items: Array<{ id: string }> }>(await h.renewalQueue(h.boss.account).expect(200)).items;
+  it('AC-13: a renewal waiting for its decision stays out of the summary of C1, who no longer reads renewals (QĐ-101, step 13)', async () => {
+    // The head of the owning department confirms a renewal now, not the spending approver: C1 is refused the renewal queue.
+    expect(h.codeOf(await h.renewalQueue(h.boss.account).expect(403))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
+    const waiting = (
+      await h.ctx.sql.query<{ id: string }>(
+        `SELECT id FROM subscription_renewals WHERE id = $1 AND state = 'PROPOSED'`,
+        [renewal.renewalId],
+      )
+    ).rows;
     const subscription = (
       await h.ctx.sql.query<{ name: string }>(
         `SELECT a.name FROM subscriptions s JOIN plans p ON p.id = s.plan_id JOIN applications a ON a.id = p.application_id
@@ -208,7 +215,7 @@ describe('the AI summary of the queue of the spending approver (integration, rea
       )
     ).rows[0];
 
-    expect(queue.map((item) => item.id)).toContain(renewal.renewalId);
+    expect(waiting).toHaveLength(1);
     // The three Access Request lines of AC-8 and nothing else, though the renewal waited for C1 when the summary was made.
     expect(view.lines.map((line) => line.requestId)).toEqual([r9.id, r10, r11]);
     expect(call.body.context.requests).toHaveLength(3);

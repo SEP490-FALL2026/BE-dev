@@ -55,6 +55,9 @@ export class RenewalHarness extends ExpiryHarness {
     request(this.server()).post('/api/v1/subscription-renewals').set(this.as(account)).send(body);
   decideRenewal = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/subscription-renewals/${id}/decision`).set(this.as(account)).send(body);
+  /** The head of the department that owns the subscription confirms the proposal as it is (`QĐ-94d`(2)). */
+  confirmRenewal = (id: string, account: ApiAccount, body: object = {}) =>
+    this.decideRenewal(id, { decision: 'CONFIRM', ...body }, account);
   outcome = (id: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/subscription-renewals/${id}/outcome`).set(this.as(account)).send(body);
   deadlineEvents = (query = '', account: ApiAccount = this.it1) =>

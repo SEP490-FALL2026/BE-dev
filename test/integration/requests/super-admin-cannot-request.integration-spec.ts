@@ -32,16 +32,6 @@ describe('the Super Admin sends no request (integration, real PostgreSQL)', () =
     ['accessRequestSubmit', () => post('/access-requests', h.form(plan))],
     ['accessRequestPropose', () => post('/access-requests/proposals', h.proposeBody())],
     [
-      'delegatedRequestSend',
-      () =>
-        post('/delegated-requests', {
-          beneficiaryEmployeeIds: [randomUUID()],
-          items: [{ planId: plan }],
-          businessReason: 'The new designer needs the tool',
-          termMonths: 1,
-        }),
-    ],
-    [
       'groupRequestSubmit',
       () =>
         post('/group-requests', {
@@ -67,7 +57,7 @@ describe('the Super Admin sends no request (integration, real PostgreSQL)', () =
       () =>
         post('/access-requests/renewals', {
           assignmentId: randomUUID(),
-          newExpectedEndDate: `${Number(h.today().slice(0, 4)) + 1}-01-31`,
+          extensionMonths: 3,
           businessReason: 'The work goes on',
         }),
     ],

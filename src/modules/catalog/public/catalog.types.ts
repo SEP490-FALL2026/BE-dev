@@ -36,6 +36,8 @@ export interface SeatTarget {
   purchasedQuantity: number | null;
   /** The department that owns the subscription (`QĐ-89a`); null only for a plan that has no subscription (an internal plan, K5). */
   ownerDepartmentId: string | null;
+  /** Whether the subscription can be cut mid-term (a flexible plan); false for a plan that has none (`QĐ-98`, R-15). */
+  allowsMidTermReduction: boolean;
 }
 
 /** How much of the catalog exists, for the onboarding checklist: judged from the data, not from how it was entered. */

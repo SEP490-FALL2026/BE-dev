@@ -166,35 +166,7 @@ describe('my requests: whose they are and what a row says (integration, real Pos
     });
   });
 
-  describe('sent on behalf, for a group, for a service account (creator is not beneficiary)', () => {
-    it('lists to the head the requests they sent for a colleague, naming the colleague, and to the colleague none of them', async () => {
-      const unit = await h.departmentWithHead('P-MR-D');
-      const colleague = await h.colleague(unit);
-      const sentFor = h.dataOf<{ batchId: string; requests: Array<{ id: string }> }>(
-        await h
-          .sendDelegated(
-            {
-              beneficiaryEmployeeIds: [colleague.employeeId],
-              items: [{ planId: internal }],
-              businessReason: 'The new designer needs the tool',
-              termMonths: 6,
-            },
-            unit.head.account,
-          )
-          .expect(201),
-      );
-      const [made] = sentFor.requests;
-
-      const headList = await page(unit.head.account);
-      const colleagueList = await page(colleague.account);
-
-      expect(headList.items.map((item) => item.id)).toEqual([made.id]);
-      expect(headList.items[0]).toMatchObject({ type: 'GRANT', lineCount: 1, beneficiary: ref(colleague) });
-      // The person it is for does not see it in the list (the owner has not decided otherwise), but reads it by its address.
-      expect(colleagueList.items).toEqual([]);
-      expect((await detail(made.id, colleague.account)).state).not.toBeUndefined();
-    });
-
+  describe('sent for a group, for a service account (creator is not beneficiary)', () => {
     it('lists a request for a group to the head who sent it, as one row with no person, and to the people of it none', async () => {
       const unit = await h.departmentWithHead('P-MR-G');
       await h.roomFor(unit);
@@ -210,7 +182,11 @@ describe('my requests: whose they are and what a row says (integration, real Pos
         outcome: null,
         spend: { stage: ANY_STRING },
       });
-      for (const person of people) expect(await idsOf(person.account)).toEqual([]);
+      // The people it is for do not see it in the list (the owner has not decided otherwise), but read it by its address.
+      for (const person of people) {
+        expect(await idsOf(person.account)).toEqual([]);
+        expect((await detail(id, person.account)).state).not.toBeUndefined();
+      }
     });
 
     it('lists the request for a service account to the one who sent it', async () => {

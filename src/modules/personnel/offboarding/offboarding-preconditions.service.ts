@@ -75,7 +75,7 @@ export class OffboardingPreconditions {
     if (before) {
       const endsOn = departureEffectiveOn({
         lastWorkingDay: input.lastWorkingDay as BusinessDate,
-        abrupt: input.abrupt,
+        blockNow: input.accessBlockMode === 'BLOCK_NOW',
         today,
         placementFrom: before.validFrom,
       });
@@ -89,7 +89,7 @@ export class OffboardingPreconditions {
     if (isUnplaced) {
       const endsOn = departureEffectiveOn({
         lastWorkingDay: input.lastWorkingDay as BusinessDate,
-        abrupt: input.abrupt,
+        blockNow: input.accessBlockMode === 'BLOCK_NOW',
         today,
         placementFrom: null,
       });
@@ -98,11 +98,11 @@ export class OffboardingPreconditions {
 
     const scheduled = await this.organizationReads.getScheduledFirstPlacement(input.employeeId, today, tx);
     if (scheduled) {
-      const effectiveLastDay = (input.abrupt ? today : input.lastWorkingDay) as BusinessDate;
+      const effectiveLastDay = input.lastWorkingDay as BusinessDate;
       if (effectiveLastDay < scheduled.validFrom) {
         const endsOn = departureEffectiveOn({
           lastWorkingDay: input.lastWorkingDay as BusinessDate,
-          abrupt: input.abrupt,
+          blockNow: input.accessBlockMode === 'BLOCK_NOW',
           today,
           placementFrom: null,
         });
@@ -209,11 +209,11 @@ export class OffboardingPreconditions {
       hireDate: held.employee.hireDate,
       placementFrom: held.current ? held.current.validFrom : null,
       lastWorkingDay: input.lastWorkingDay,
-      abrupt: input.abrupt,
+      accessBlockMode: input.accessBlockMode,
       employee: { status: held.employee.status, workState: held.employee.workState },
       grounds: input.grounds,
       pendingTransfer: held.pending && { effectiveOn: held.pending.effectiveOn },
-      transferCancellationReason: input.pendingTransferCancellation?.reason,
+      cancelPendingTransfer: input.cancelPendingTransfer === true,
       namedAsSuccessor: await this.repo.isNamedSuccessorOfPendingTransfer(tx, input.employeeId),
       // Only a person with a placement in force heads a department (an unplaced one never does), so there is a department to judge.
       successor:

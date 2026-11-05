@@ -41,7 +41,6 @@ export class ProposalService {
       const now = new Date();
       const assessed = await this.assessment.assessProposal(tx, {
         employeeId: actor.employeeId,
-        expectedSpendOn: body.expectedSpendOn,
         now,
         settings,
         lockDepartment: true,

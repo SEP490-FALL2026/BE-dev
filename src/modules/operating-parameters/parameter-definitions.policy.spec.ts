@@ -115,6 +115,7 @@ const EXPECTED_KEYS = [
   'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
   'FISCAL_YEAR_START_MONTH',
   'FORECAST_ERROR_THRESHOLD_PERCENT',
+  'BUDGET_RESERVE_DEFAULT_PERCENT',
   'TRANSFER_REVIEW_WORKING_DAYS',
   'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
   'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
@@ -135,7 +136,7 @@ const EXPECTED_KEYS = [
 ];
 
 describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
-  it('pins the twenty-two keys, ordered by group and, inside a group, as the spec table lists them', () => {
+  it('pins the twenty-three keys, ordered by group and, inside a group, as the spec table lists them', () => {
     expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
   });
 
@@ -197,6 +198,7 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['SPEND_SUBMISSION_WAIT_WORKING_DAYS', 'Hạn chờ trình duyệt chi', 'WORKFLOW', 'working days', 'ngày làm việc'],
       ['FISCAL_YEAR_START_MONTH', 'Tháng bắt đầu năm tài chính', 'BUDGET', 'month of the year', 'tháng trong năm'],
       ['FORECAST_ERROR_THRESHOLD_PERCENT', 'Ngưỡng sai số dự báo chi phí', 'BUDGET', 'percent', '%'],
+      ['BUDGET_RESERVE_DEFAULT_PERCENT', 'Tỷ lệ dự phòng mặc định của ngân sách năm', 'BUDGET', 'percent', '%'],
       [
         'TRANSFER_REVIEW_WORKING_DAYS',
         'Hạn rà soát quyền sau điều chuyển',

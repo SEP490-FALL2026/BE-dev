@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { LicensingApi } from '../../../src/modules/licensing/public/licensing.api';
 import { LicensingRenewalApi } from '../../../src/modules/licensing/public/licensing-renewal.api';
+import { renewalEndOf } from '../../../src/core/term-limit';
+import { monthsBetween } from '../../../src/modules/requests/renewal-request/renewal-request.policy';
 import { ReturnHarness, type RenewalWire } from '../../support/return-harness';
 import type { Unit } from '../../support/spend-harness';
 
@@ -45,16 +47,20 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
 
     return { unit, assignmentId, end };
   };
-  const body = (assignmentId: string, newExpectedEndDate: string, extra: object = {}) => ({
+  /** What the holder sends: how many months more. The server works the new end out from the day the right ends (`QĐ-98`). */
+  const body = (assignmentId: string, extensionMonths: number, extra: object = {}) => ({
     assignmentId,
-    newExpectedEndDate,
+    extensionMonths,
     businessReason: REASON,
     ...extra,
   });
+  /** The last day of a renewal of `months` months of a right that ends on `previousEnd`, as the server works it out. */
+  const endAfter = (previousEnd: string | undefined, months: number, flexible = false) =>
+    renewalEndOf({ previousEnd: previousEnd ?? '', today: h.today(), months, flexible, fiscalYearStartMonth: 1 });
   const approve = (id: string, unit: Unit) => h.decide(id, { decision: 'APPROVE' }, unit.head.account);
-  /** The head chooses to take a paid renewal outside the plan, and the approver decides it. */
+  /** The head confirms the need of a paid renewal, sends it on, and the approver decides it. */
   const approvePaid = async (id: string, unit: Unit, amount = 5 * M) => {
-    await h.decide(id, { decision: 'APPROVE', spend: { offPlan: true } }, unit.head.account).expect(200);
+    await h.decide(id, { decision: 'APPROVE' }, unit.head.account).expect(200);
     await h.setPayments(id, { amount });
     await h.sendOn([id], unit.head.account).expect(201);
     await h.decideSpend(id, { decision: 'APPROVE' }, h.boss.account).expect(200);
@@ -79,10 +85,10 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
   describe('a request of its own, which approval turns into the record that follows (AC-1)', () => {
     it('renews a right of internal software: the old record keeps its end, a new one begins there and nobody is waited for', async () => {
       const { unit, assignmentId, end } = await holder({ planId: internalPlan }, 5);
-      const newEnd = h.inDays(95);
+      const newEnd = endAfter(end, 3);
       const tasksBefore = await h.count('provisioning_tasks');
 
-      const { outcome, request } = await h.renewed(unit.member.account, body(assignmentId, newEnd));
+      const { outcome, request } = await h.renewed(unit.member.account, body(assignmentId, 3));
 
       expect(outcome).toBe('RENEWAL_REQUESTED');
       expect(request).toMatchObject({
@@ -130,9 +136,9 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
 
     it('renews a paid right through the spend step, holds the cost for the new term and keeps the seats of every day', async () => {
       const { unit, assignmentId, end } = await holder(paid, 5);
-      const newEnd = h.inDays(95);
+      const newEnd = endAfter(end, 3);
       const freeBefore = await h.freeSeats(paid.subscriptionId);
-      const { request } = await h.renewed(unit.member.account, body(assignmentId, newEnd));
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
       expect(request).toMatchObject({ branch: 'PAID_IN_CATALOG', termMonths: 3 });
 
       await approvePaid(request.id, unit);
@@ -158,6 +164,16 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
           (event) => event.action === 'LICENSE_ASSIGNMENT.CREATED',
         )?.after,
       ).toMatchObject({ predecessorId: assignmentId, requestId: request.id });
+    });
+
+    it('prices and charges a renewal that begins in the next fiscal year to that year, from the day it begins, not from today (R-M3)', async () => {
+      const year = Number(h.today().slice(0, 4));
+      const days = Math.round((Date.UTC(year, 11, 31) - Date.parse(`${h.today()}T00:00:00Z`)) / 86_400_000);
+      const { unit, assignmentId } = await holder(paid, days);
+
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
+
+      expect(request).toMatchObject({ budgetYear: year + 1, pricing: { firstDueOn: `${year + 1}-01-01` } });
     });
 
     it('ends the old record today when the decision comes after the day the right was to end, and never leaves a period empty', async () => {
@@ -192,41 +208,36 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
   });
 
   describe('a stay over twelve months in all (AC-3)', () => {
-    it('asks for the confirmation by the months the records run on without a break, not by the term of the renewal', async () => {
-      const { unit, assignmentId } = await holder({ planId: internalPlan }, 5, '2026-10-05');
-      const first = await h.renewed(unit.member.account, body(assignmentId, '2027-04-30'));
+    it('asks for no confirmation however many months the records run on without a break: the stay is counted and shown, never confirmed in words (QĐ-98)', async () => {
+      const since = '2026-10-05';
+      const { unit, assignmentId, end } = await holder({ planId: internalPlan }, 5, since);
+      const firstEnd = endAfter(end, 6);
+      const first = await h.renewed(unit.member.account, body(assignmentId, 6));
       await approve(first.request.id, unit).expect(200);
       const [current] = await h.successorsOf(assignmentId);
-      expect(first.request.renewal?.consecutiveMonths).toBe(7);
+      expect(first.request.renewal?.consecutiveMonths).toBe(monthsBetween(since, firstEnd));
 
-      // 2027-04-30 to 2027-12-31 is eight months, but the right would have run fifteen without a break.
-      const second = await h.renewed(unit.member.account, body(current.id, '2027-12-31'));
-      expect(second.request).toMatchObject({ termMonths: 8, renewal: { consecutiveMonths: 15 } });
-
-      const refused = await approve(second.request.id, unit).expect(422);
-      expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.TERM_CONFIRMATION_REQUIRED');
-      expect(await h.state(second.request.id)).toBe('PENDING');
-
-      await h
-        .decide(
-          second.request.id,
-          { decision: 'APPROVE', termConfirmation: { reason: 'The project runs a long cycle' } },
-          unit.head.account,
-        )
-        .expect(200);
-      expect(await h.state(second.request.id)).toBe('COMPLETED');
-      expect((await h.successorsOf(current.id))[0]).toMatchObject({
-        valid_from: '2027-04-30',
-        expected_end_date: '2027-12-31',
+      // Six months more is a term of six, but the right would have run more than a year without a break.
+      const secondEnd = endAfter(firstEnd, 6);
+      const second = await h.renewed(unit.member.account, body(current.id, 6));
+      expect(second.request).toMatchObject({
+        termMonths: 6,
+        renewal: { consecutiveMonths: monthsBetween(since, secondEnd) },
       });
+      expect(second.request.renewal?.consecutiveMonths).toBeGreaterThan(12);
+
+      await approve(second.request.id, unit).expect(200);
+      expect(await h.state(second.request.id)).toBe('COMPLETED');
+      expect((await h.successorsOf(current.id))[0]).toMatchObject({ expected_end_date: secondEnd });
     });
 
-    it('asks for nothing when the right would run eleven months in all, and adds no step', async () => {
-      const { unit, assignmentId } = await holder({ planId: internalPlan }, 5, '2026-10-05');
+    it('asks for nothing for a short stay, and adds no step', async () => {
+      const since = '2026-10-05';
+      const { unit, assignmentId, end } = await holder({ planId: internalPlan }, 5, since);
 
-      const { request } = await h.renewed(unit.member.account, body(assignmentId, '2027-08-31'));
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
 
-      expect(request.renewal?.consecutiveMonths).toBe(11);
+      expect(request.renewal?.consecutiveMonths).toBe(monthsBetween(since, endAfter(end, 3)));
       await approve(request.id, unit).expect(200);
       expect(await h.state(request.id)).toBe('COMPLETED');
       expect((await h.steps(request.id, 'NEED')).length).toBe(1);
@@ -236,7 +247,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
   describe('a request sent before the end that is not decided leaves the right as it is (AC-4)', () => {
     it('holds the right while the request waits, and lets it go when the request is refused', async () => {
       const { unit, assignmentId, end } = await holder({ planId: internalPlan }, 0);
-      const { request } = await h.renewed(unit.member.account, body(assignmentId, h.inDays(60)));
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 2));
 
       expect(await holds(assignmentId)).toBe(true);
       expect(await h.seatRow(assignmentId)).toMatchObject({ valid_until: null, expected_end_date: end });
@@ -250,13 +261,13 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
 
     it('lets the right go when the request is withdrawn, and a new request may follow', async () => {
       const { unit, assignmentId } = await holder({ planId: internalPlan }, 3);
-      const { request } = await h.renewed(unit.member.account, body(assignmentId, h.inDays(60)));
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 2));
       expect(await holds(assignmentId)).toBe(true);
 
       await h.withdrawRequest(request.id, {}, unit.member.account).expect(200);
 
       expect(await holds(assignmentId)).toBe(false);
-      await h.renewed(unit.member.account, body(assignmentId, h.inDays(70)));
+      await h.renewed(unit.member.account, body(assignmentId, 3));
       expect(await holds(assignmentId)).toBe(true);
     });
   });
@@ -264,19 +275,19 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
   describe('a request sent after the end is a new request (AC-5)', () => {
     it('makes a request for the tool like any other, which the seat the person still holds does not stop', async () => {
       const { unit, assignmentId, end } = await holder({ planId: internalPlan }, -2);
-      const newEnd = h.inDays(60);
+      // The right has ended: the new request is a request like any other, and its end is worked out when it is granted (R-M4).
       // Without the tolerance the seat the person still holds would refuse any request for the tool.
       const plain = await h.submit(h.form(internalPlan, { termMonths: 2 }), unit.member.account);
       expect(h.codeOf(plain)).toBe('ACCESS_REQUEST.ALREADY_HOLDS_ACCESS');
 
-      const { outcome, request } = await h.renewed(unit.member.account, body(assignmentId, newEnd));
+      const { outcome, request } = await h.renewed(unit.member.account, body(assignmentId, 2));
 
       expect(outcome).toBe('NEW_REQUEST');
       expect(request).toMatchObject({
         type: 'GRANT',
         state: 'PENDING',
         termMonths: 2,
-        expectedEndDate: newEnd,
+        expectedEndDate: null,
         renewal: null,
         plan: { planId: internalPlan },
       });
@@ -288,64 +299,50 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       expect((await h.eventsOf('ACCESS_REQUEST.RENEWAL_REDIRECTED', request.id))[0].after).toMatchObject({
         assignmentId,
         previousExpectedEndDate: end,
-        newExpectedEndDate: newEnd,
+        termMonths: 2,
       });
       expect(await holds(assignmentId)).toBe(false);
     });
 
-    it('leaves the request for a person whose right ended to that person: the head does not send it through this route', async () => {
+    it('leaves the request for a person whose right ended to that person: the head is refused as a non-holder, whatever the day (QĐ-100t)', async () => {
       const { unit, assignmentId } = await holder({ planId: internalPlan }, -2);
       const before = await h.requestRows();
 
-      const refused = await h.renew(body(assignmentId, h.inDays(60)), unit.head.account).expect(409);
+      const refused = await h.renew(body(assignmentId, 2), unit.head.account).expect(403);
 
-      expect(h.codeOf(refused)).toBe('RENEWAL_REQUEST.END_PASSED');
+      expect(h.codeOf(refused)).toBe('RENEWAL_REQUEST.NOT_HOLDER');
       expect(await h.requestRows()).toBe(before);
     });
   });
 
   describe('who may ask, and for which right (US-05-14 AC-1)', () => {
-    it('lets the head of the department ask for the person: the need step is confirmed by sending', async () => {
-      const { unit, assignmentId, end } = await holder({ planId: internalPlan }, 5);
+    it('refuses the head of the department for a free right and for a paid one: only the person who holds the right asks to keep it (QĐ-100t)', async () => {
+      const free = await holder({ planId: internalPlan }, 5);
+      const costly = await holder(paid, 5);
+      const before = [await h.requestRows(), await h.count('access_request_renewals')];
 
-      const { request } = await h.renewed(unit.head.account, body(assignmentId, h.inDays(95)));
+      const freeRefused = await h.renew(body(free.assignmentId, 3), free.unit.head.account).expect(403);
+      const costlyRefused = await h.renew(body(costly.assignmentId, 3), costly.unit.head.account).expect(403);
 
-      // Nobody is left to decide a right that costs nothing: it was confirmed by the head and applied at once.
-      expect(request).toMatchObject({
-        type: 'RENEWAL',
-        state: 'COMPLETED',
-        requester: { employeeId: unit.head.employeeId },
-        beneficiary: { employeeId: unit.member.employeeId },
-        needDecision: { decision: 'APPROVED', deciderRole: 'MANAGER', decidedBy: { employeeId: unit.head.employeeId } },
-        needStep: { routingRow: 5, state: 'APPROVED' },
-      });
-      expect(await h.seatRow(assignmentId)).toMatchObject({ valid_until: end, expected_end_date: end });
-      expect(await h.successorsOf(assignmentId)).toHaveLength(1);
+      expect(h.codeOf(freeRefused)).toBe('RENEWAL_REQUEST.NOT_HOLDER');
+      expect(h.codeOf(costlyRefused)).toBe('RENEWAL_REQUEST.NOT_HOLDER');
+      expect([await h.requestRows(), await h.count('access_request_renewals')]).toEqual(before);
+      expect(await h.seatRow(costly.assignmentId)).toMatchObject({ valid_until: null });
+      expect(await holds(free.assignmentId)).toBe(false);
     });
 
-    it('lets the head ask for a paid right, which then waits for the head to send it on', async () => {
-      const { unit, assignmentId } = await holder(paid, 5);
-
-      const { request } = await h.renewed(unit.head.account, body(assignmentId, h.inDays(95)));
-
-      expect(request).toMatchObject({ state: 'AWAITING_SPEND_SUBMISSION', needStep: { state: 'APPROVED' } });
-      expect(await h.seatRow(assignmentId)).toMatchObject({ valid_until: null });
-      // The need was confirmed by sending: the head who sent it does not decide it again, whatever they hold.
-      await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(403);
-    });
-
-    it('refuses a person who is not the holder and the head of another department, and writes nothing', async () => {
+    it('refuses a person who is not the holder, the head of another department included, and writes nothing', async () => {
       const { unit, assignmentId } = await holder({ planId: internalPlan }, 5);
       const other = await h.departmentWithHead(`P-RN-X${(counter += 1)}`);
       const colleague = await h.staff(unit.department, `RN-C${counter}`);
       const before = [await h.requestRows(), await h.count('access_request_renewals')];
 
-      const stranger = await h.renew(body(assignmentId, h.inDays(95)), colleague.account).expect(403);
-      const foreignHead = await h.renew(body(assignmentId, h.inDays(95)), other.head.account).expect(403);
-      const missing = await h.renew(body(randomUUID(), h.inDays(95)), unit.member.account).expect(404);
+      const stranger = await h.renew(body(assignmentId, 3), colleague.account).expect(403);
+      const foreignHead = await h.renew(body(assignmentId, 3), other.head.account).expect(403);
+      const missing = await h.renew(body(randomUUID(), 3), unit.member.account).expect(404);
 
       expect(h.codeOf(stranger)).toBe('RENEWAL_REQUEST.NOT_HOLDER');
-      expect(h.codeOf(foreignHead)).toBe('RENEWAL_REQUEST.OUTSIDE_DEPARTMENT');
+      expect(h.codeOf(foreignHead)).toBe('RENEWAL_REQUEST.NOT_HOLDER');
       expect(h.codeOf(missing)).toBe('RENEWAL_REQUEST.ASSIGNMENT_NOT_FOUND');
       expect([await h.requestRows(), await h.count('access_request_renewals')]).toEqual(before);
     });
@@ -353,7 +350,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
     it('refuses a right with no end date, one that another record follows, and a service account', async () => {
       const open = await holder({ planId: internalPlan }, null);
       const chained = await holder({ planId: internalPlan }, 5);
-      const first = await h.renewed(chained.unit.member.account, body(chained.assignmentId, h.inDays(95)));
+      const first = await h.renewed(chained.unit.member.account, body(chained.assignmentId, 3));
       await approve(first.request.id, chained.unit).expect(200);
       counter += 1;
       const service = await h.departmentWithHead(`P-RN${counter}`);
@@ -384,7 +381,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
         { assignmentId: serviceSeat, account: service.member.account, problem: 'SERVICE_ACCOUNT' },
       ];
       for (const { assignmentId, account, problem } of cases) {
-        const response = await h.renew(body(assignmentId, h.inDays(200)), account).expect(409);
+        const response = await h.renew(body(assignmentId, 6), account).expect(409);
         expect(h.codeOf(response)).toBe('RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE');
         expect(h.detailsOf(response)).toEqual({ reason: problem });
       }
@@ -396,8 +393,8 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       const { unit, assignmentId } = await holder({ planId: internalPlan }, 5);
 
       const [byHolder, again] = await Promise.all([
-        h.renew(body(assignmentId, h.inDays(95)), unit.member.account),
-        h.renew(body(assignmentId, h.inDays(96)), unit.member.account),
+        h.renew(body(assignmentId, 3), unit.member.account),
+        h.renew(body(assignmentId, 4), unit.member.account),
       ]);
 
       expect([byHolder.status, again.status].sort()).toEqual([201, 409]);
@@ -408,45 +405,40 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       ).toBe(1);
     });
 
-    it('refuses an end that is not later, a term that is too long and a form that is not valid', async () => {
-      const { unit, assignmentId, end } = await holder({ planId: internalPlan }, 5);
+    it('refuses a form that is not valid: months outside 1..12, a day in place of months, a missing field, a blank reason, an extra key', async () => {
+      const { unit, assignmentId } = await holder({ planId: internalPlan }, 5);
       const before = await h.requestRows();
 
-      expect(h.codeOf(await h.renew(body(assignmentId, end ?? ''), unit.member.account).expect(422))).toBe(
-        'RENEWAL_REQUEST.END_NOT_AFTER',
-      );
-      expect(h.codeOf(await h.renew(body(assignmentId, h.inDays(1)), unit.member.account).expect(422))).toBe(
-        'RENEWAL_REQUEST.END_NOT_AFTER',
-      );
-      expect(h.codeOf(await h.renew(body(assignmentId, '2040-01-01'), unit.member.account).expect(422))).toBe(
-        'RENEWAL_REQUEST.END_TOO_FAR',
-      );
       for (const invalid of [
-        { assignmentId, newExpectedEndDate: 'tomorrow', businessReason: REASON },
+        { assignmentId, extensionMonths: 0, businessReason: REASON },
+        { assignmentId, extensionMonths: 13, businessReason: REASON },
+        { assignmentId, extensionMonths: 1.5, businessReason: REASON },
+        { assignmentId, extensionMonths: '3', businessReason: REASON },
         { assignmentId, businessReason: REASON },
-        { newExpectedEndDate: h.inDays(95), businessReason: REASON },
-        { assignmentId, newExpectedEndDate: h.inDays(95), businessReason: '  ' },
-        { assignmentId, newExpectedEndDate: h.inDays(95), businessReason: REASON, extra: 1 },
+        { extensionMonths: 3, businessReason: REASON },
+        { assignmentId, extensionMonths: 3, businessReason: '  ' },
+        { assignmentId, extensionMonths: 3, businessReason: REASON, extra: 1 },
+        // The fields of the old form are gone: the end is worked out by the server, and nothing in words lifts the limit.
+        { assignmentId, newExpectedEndDate: h.inDays(95), businessReason: REASON },
+        { assignmentId, extensionMonths: 3, businessReason: REASON, expectedSpendOn: h.inDays(10) },
+        {
+          assignmentId,
+          extensionMonths: 3,
+          businessReason: REASON,
+          termConfirmation: { reason: 'The project runs on' },
+        },
       ]) {
         expect(h.codeOf(await h.renew(invalid, unit.member.account).expect(422))).toBe('VALIDATION_ERROR');
       }
       expect(await h.requestRows()).toBe(before);
     });
 
-    it('asks a head who sends for more than twelve months in all for the confirmation, as the one who decides would', async () => {
-      const { unit, assignmentId } = await holder({ planId: internalPlan }, 5, '2026-10-05');
+    it('accepts a year, the most one request asks for, and works the end out from the day the right ends (QĐ-98)', async () => {
+      const { unit, assignmentId, end } = await holder({ planId: internalPlan }, 5);
 
-      const refused = await h.renew(body(assignmentId, '2027-12-31'), unit.head.account).expect(422);
-      expect(h.codeOf(refused)).toBe('RENEWAL_REQUEST.TERM_CONFIRMATION_REQUIRED');
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 12));
 
-      const { request } = await h.renewed(
-        unit.head.account,
-        body(assignmentId, '2027-12-31', { termConfirmation: { reason: 'The project runs a long cycle' } }),
-      );
-      expect(request).toMatchObject({
-        state: 'COMPLETED',
-        needDecision: { termConfirmationReason: 'The project runs a long cycle' },
-      });
+      expect(request).toMatchObject({ termMonths: 12, expectedEndDate: endAfter(end, 12) });
     });
   });
 
@@ -458,11 +450,9 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
         reason: 'Done',
       });
       const waiting = await holder({ planId: internalPlan }, 5);
-      await h.renewed(waiting.unit.member.account, body(waiting.assignmentId, h.inDays(95)));
+      await h.renewed(waiting.unit.member.account, body(waiting.assignmentId, 3));
 
-      const renewal = await h
-        .renew(body(returning.assignmentId, h.inDays(95)), returning.unit.member.account)
-        .expect(409);
+      const renewal = await h.renew(body(returning.assignmentId, 3), returning.unit.member.account).expect(409);
       const returned = await h
         .returnSeat({ assignmentId: waiting.assignmentId, reason: 'Done' }, waiting.unit.member.account)
         .expect(409);
@@ -481,8 +471,8 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
     /** A renewal of a seat of the subscription, sent, and the seat then taken away by a revocation of another source. */
     const revokedMeanwhile = async (complete: boolean) => {
       const { unit, assignmentId } = await holder(paid, 5);
-      const { request } = await h.renewed(unit.member.account, body(assignmentId, h.inDays(95)));
-      await h.decide(request.id, { decision: 'APPROVE', spend: { offPlan: true } }, unit.head.account).expect(200);
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
+      await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
       await h.setPayments(request.id, { amount: 5 * M });
       await h.sendOn([request.id], unit.head.account).expect(201);
       const { TransactionRunner } = await import('../../../src/infrastructure/database/transaction-runner');

@@ -1,3 +1,4 @@
+import { checkTerm, termLimitOf, type TermLimit } from '../../../core/term-limit';
 import type { HeldAccess } from './access-request.types';
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
@@ -11,7 +12,6 @@ import {
   AccessRequestApplicationRetiredError,
   AccessRequestNoDepartmentError,
   AccessRequestPlanNotFoundError,
-  AccessRequestSpendDateNotAllowedError,
 } from './access-request.errors';
 import { hasSpendStep, policyFor, proposalPolicy, type RequestPolicy } from './access-request.policy';
 import type { PricingRecord } from './access-request.types';
@@ -50,6 +50,9 @@ export interface Assessment {
   pricing: PricingRecord;
   routing: GatheredRouting & { decision: RoutingDecision };
   heldAccess: HeldAccess | null;
+  /** What term the plan takes on the day (`US-05-01` AC-4) and whether the term asked for breaks it. */
+  termLimit: TermLimit;
+  termBeyondLimit: boolean;
 }
 
 /** What a proposal of software that is not in the catalog is judged by: there is no plan, so no price or seat. */
@@ -70,7 +73,7 @@ export interface AssessmentInput {
   requesterEmployeeId?: string;
   planId: string;
   termMonths: number;
-  expectedSpendOn: BusinessDate | undefined;
+  expectedSpendOn?: BusinessDate;
   now: Date;
   settings: RequestSettings;
   /** Sending locks the department of the sender against change until commit; showing a preview locks nothing. */
@@ -109,8 +112,7 @@ export class RequestFactsService {
   /**
    * Throws AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError,
    * FinanceSetupIncompleteError (a request that costs money, or ends in a service seat, and the department has no Cost Center yet:
-   * the gate runs before the budget check, `QĐ-87g(3)`; a free internal request is not stopped by it, `QĐ-87g(2)`) and
-   * AccessRequestSpendDateNotAllowedError.
+   * the gate runs before the budget check, `QĐ-87g(3)`; a free internal request is not stopped by it, `QĐ-87g(2)`).
    */
   async assess(tx: DbTx, input: AssessmentInput): Promise<Assessment> {
     const today = await this.organizationReads.businessToday(input.now, tx);
@@ -154,6 +156,14 @@ export class RequestFactsService {
       pricing,
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
       heldAccess: await this.heldAccess(input.employeeId, input.planId),
+      ...(await this.termCheck(tx, {
+        planId: input.planId,
+        departmentId: unit.departmentId,
+        free: policy.branch === 'INTERNAL_FREE',
+        termMonths: input.termMonths,
+        today,
+        fiscalYearStartMonth: input.settings.fiscalYearStartMonth,
+      })),
     };
   }
 
@@ -199,6 +209,31 @@ export class RequestFactsService {
     };
   }
 
+  /** The term limit of the plan from today, and whether the term asked for breaks it; a flexible plan is the one the department can cut mid-term. */
+  async termCheck(
+    tx: DbTx,
+    input: {
+      planId: string;
+      departmentId: string;
+      free: boolean;
+      termMonths: number;
+      today: BusinessDate;
+      fiscalYearStartMonth: number;
+    },
+  ): Promise<{ termLimit: TermLimit; termBeyondLimit: boolean }> {
+    const flexible = input.free
+      ? false
+      : ((await this.catalog.getPlanPrice(input.planId, input.departmentId, tx))?.allowsMidTermReduction ?? false);
+    const facts = {
+      start: input.today,
+      months: input.termMonths,
+      flexible,
+      fiscalYearStartMonth: input.fiscalYearStartMonth,
+    };
+
+    return { termLimit: termLimitOf(facts), termBeyondLimit: checkTerm(facts) !== null };
+  }
+
   /**
    * The seat the person holds of the plan today, if any. It is read outside the transaction: it is a courtesy that spares
    * a pointless request, and the grant itself still refuses an overlapping seat (`LICENSE_ASSIGNMENT.OVERLAP`).
@@ -230,8 +265,6 @@ export class RequestFactsService {
     },
   ): Promise<PricingRecord> {
     if (input.free) {
-      if (input.expectedSpendOn !== undefined) throw new AccessRequestSpendDateNotAllowedError();
-
       return {
         status: 'NOT_APPLICABLE',
         missingReason: null,

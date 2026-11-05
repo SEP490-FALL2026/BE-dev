@@ -133,6 +133,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
         'FISCAL_YEAR_START_MONTH',
         'FORECAST_ERROR_THRESHOLD_PERCENT',
+        'BUDGET_RESERVE_DEFAULT_PERCENT',
         'TRANSFER_REVIEW_WORKING_DAYS',
         'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
         'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
@@ -380,7 +381,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       const parameters = await list();
 
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
-      expect(parameters.size).toBe(22);
+      expect(parameters.size).toBe(23);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {

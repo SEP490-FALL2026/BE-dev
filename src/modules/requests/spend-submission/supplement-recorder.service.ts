@@ -6,11 +6,7 @@ import { accessRequestAuditEvent } from '../access-request/access-request-audit-
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
 import { GroupSupplementService } from '../group-request/group-supplement.service';
-import {
-  supplementAuditDetail,
-  supplementDropsPlanLine,
-  type supplementChangeOf,
-} from '../spend/spend-submission.policy';
+import { supplementAuditDetail, type supplementChangeOf } from '../spend/spend-submission.policy';
 import { SupplementRepo, type SupplementRecord } from './supplement.repo';
 
 /**
@@ -41,10 +37,6 @@ export class SupplementRecorder {
   ): Promise<SupplementRecord> {
     const { repriced, change, dropped, now } = written;
     await this.requests.setPricing(tx, request.id, repriced);
-    // The line was a line of the plan of another year's budget when the year changed: it is attached again.
-    if (supplementDropsPlanLine(change.afterBudgetYear, change.beforeBudgetYear, request)) {
-      await this.requests.setSpendPlan(tx, request.id, { line: null, offPlan: false });
-    }
     const saved = await this.supplements.insert(tx, {
       organizationId: request.organizationId,
       requestId: request.id,

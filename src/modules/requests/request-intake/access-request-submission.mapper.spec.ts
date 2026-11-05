@@ -59,13 +59,13 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
     });
   });
 
-  it('leaves the need step waiting under control when nobody valid exists, and keeps the draft and the end asked for', () => {
-    const row = newRequestOf(base(waiting, { draftId: 'draft-1', expectedEndDate: '2027-04-30' }));
+  it('leaves the need step waiting under control when nobody valid exists, and keeps the draft; the end is worked out when the request is granted (R-M4)', () => {
+    const row = newRequestOf(base(waiting, { draftId: 'draft-1' }));
 
     expect(row).toMatchObject({
       state: 'WAITING_CONTROLLED',
       draftId: 'draft-1',
-      expectedEndDate: '2027-04-30',
+      expectedEndDate: null,
       needStep: { state: 'WAITING', assigneeEmployeeId: null, routingRow: 8, waitingReason: 'NO_VALID_APPROVER' },
     });
   });

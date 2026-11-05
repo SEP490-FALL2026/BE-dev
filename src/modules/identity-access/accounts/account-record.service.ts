@@ -15,6 +15,7 @@ import {
   EmployeeAccountInspection,
   SuperAdminHolder,
 } from '../public/identity-access.types';
+import { AccessBlockService } from '../access-block/access-block.service';
 import { AppUserRepo } from './app-user.repo';
 import { RoleGrantService } from './role-grant.service';
 import { SuperAdminHolderRepo } from './super-admin-holder.repo';
@@ -31,7 +32,13 @@ export class AccountRecordService {
     private readonly accounts: AppUserRepo,
     private readonly superAdmin: SuperAdminHolderRepo,
     private readonly grants: RoleGrantService,
+    private readonly accessBlocks: AccessBlockService,
   ) {}
+
+  /** See {@link AccessBlockService.releaseForUnlock}. */
+  releaseDepartureBlockForUnlock(tx: DbTx, employeeId: string): Promise<boolean> {
+    return this.accessBlocks.releaseForUnlock(tx, employeeId);
+  }
 
   /** Unlocked lookup used before the transaction to decide what to verify. */
   findAccountByLoginEmail(organizationId: string, normalizedLoginEmail: string): Promise<AccountSnapshot | null> {

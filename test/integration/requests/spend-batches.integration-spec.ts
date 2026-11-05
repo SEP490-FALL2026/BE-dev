@@ -41,13 +41,6 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
   });
 
   const waiting = (amount = 10 * M, unit: Unit = design) => h.paidRequest(unit, plan, { amount });
-  /** A request nobody has attached to anything: the head has still to choose. */
-  const unattached = async () => {
-    const id = await waiting();
-    await h.ctx.sql.query(`UPDATE access_requests SET off_plan = false WHERE id = $1`, [id]);
-
-    return id;
-  };
   const send = async (ids: string[], account = design.head.account) =>
     h.dataOf<{ batch: { id: string; itemCount: number; submittedBy: { employeeId: string } } }>(
       await h.sendOn(ids, account).expect(201),
@@ -163,85 +156,29 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
     });
   });
 
-  describe('the line of the plan (AC-5)', () => {
-    it('keeps a request that has no line and is not outside the plan in the queue, with the reason, and sends the others', async () => {
+  describe('no line of the plan any more (AC-5, QĐ-101n)', () => {
+    it('sends a request that waits in the queue as it is: the head has no line to attach, and none is kept', async () => {
       const ready = await waiting();
-      const bare = await unattached();
 
-      const batch = await send([ready, bare]);
+      const batch = await send([ready]);
 
       expect((await items(batch.id)).map((item) => [item.outcome, item.stopReason])).toEqual([
         ['SENT_TO_APPROVER', null],
-        ['STOPPED', 'PLAN_LINE_REQUIRED'],
       ]);
-      expect(await h.state(bare)).toBe('AWAITING_SPEND_SUBMISSION');
-      expect(await h.steps(bare, 'SPEND_APPROVAL')).toEqual([]);
-      const checks = await h.ctx.sql.query(`SELECT 1 FROM request_budget_checks WHERE request_id = $1`, [bare]);
-      expect(checks.rowCount).toBe(0);
-      expect((await queue()).find((item) => item.requestId === bare)).toMatchObject({ readyToSubmit: false });
-    });
-
-    it('is sent once the head attaches a line, or says it is outside the plan', async () => {
-      const [first, second] = [await unattached(), await unattached()];
-
-      const attached = await h.setPlanLine(first, { planLine: { position: 1 } }, design.head.account).expect(200);
-      const outside = await h.setPlanLine(second, { offPlan: true }, design.head.account).expect(200);
-      const batch = await send([first, second]);
-
-      expect(h.dataOf<{ planLine: object }>(attached).planLine).toMatchObject({
-        planLineAttached: true,
-        offPlan: false,
-      });
-      expect(h.dataOf<{ planLine: object }>(outside).planLine).toMatchObject({
-        planLineAttached: false,
-        offPlan: true,
-      });
-      expect((await items(batch.id)).map((item) => item.outcome)).toEqual(['SENT_TO_APPROVER', 'SENT_TO_APPROVER']);
-    });
-
-    it('is changed from a line to outside the plan and back, and the choice is kept in the Audit Trail', async () => {
-      const id = await unattached();
-      await h.setPlanLine(id, { planLine: { position: 1 } }, design.head.account).expect(200);
-
-      await h.setPlanLine(id, { offPlan: true }, design.head.account).expect(200);
-
-      const events = await h.ctx.sql.query<{ after: { choice: string; previousPosition: number | null } }>(
-        `SELECT after FROM audit_events WHERE resource_id = $1 AND action = 'ACCESS_REQUEST.PLAN_LINE_CHOSEN' ORDER BY occurred_at`,
-        [id],
+      const chosen = await h.ctx.sql.query(
+        `SELECT 1 FROM audit_events WHERE resource_id = $1 AND action = 'ACCESS_REQUEST.PLAN_LINE_CHOSEN'`,
+        [ready],
       );
-      expect(events.rows.map((event) => [event.after.choice, event.after.previousPosition])).toEqual([
-        ['OFF_PLAN', null], // the approval of the need, as the harness gives it
-        ['LINE', null],
-        ['OFF_PLAN', 1],
-      ]);
+      expect(chosen.rowCount).toBe(0);
     });
 
-    it.each([
-      ['a line that is not there', { planLine: { position: 9 } }, 422, 'ACCESS_REQUEST.LINE_NOT_FOUND'],
-      ['both a line and outside the plan', { planLine: { position: 1 }, offPlan: true }, 422, 'VALIDATION_ERROR'],
-      ['neither', {}, 422, 'VALIDATION_ERROR'],
-    ])('does not take %s', async (_name, body, status, code) => {
-      const id = await unattached();
+    it('has no route to choose a line or to list the lines of the plan', async () => {
+      const id = await waiting();
+      const as = h.as(design.head.account);
+      const base = `/api/v1/access-requests/${id}`;
 
-      const response = await h.setPlanLine(id, body, design.head.account);
-
-      expect([response.status, h.codeOf(response)]).toEqual([status, code]);
-    });
-
-    it('is only for the head of the department, on a request that waits in their queue', async () => {
-      const id = await unattached();
-      const other = await h.departmentWithHead('P-OT2');
-      const sent = await waiting();
-      await send([sent]);
-
-      await h.setPlanLine(id, { offPlan: true }, other.head.account).expect(404);
-      await h.setPlanLine(id, { offPlan: true }, design.member.account).expect(403);
-      await h.setPlanLine(id, { offPlan: true }, h.finance).expect(403);
-      expect(h.codeOf(await h.setPlanLine(sent, { offPlan: true }, design.head.account).expect(409))).toBe(
-        'SPEND.NOT_IN_QUEUE',
-      );
-      await h.suggestions(id, other.head.account).expect(404);
-      await h.suggestions(id, design.member.account).expect(403);
+      await request(h.server()).put(`${base}/plan-line`).set(as).send({ offPlan: true }).expect(404);
+      await request(h.server()).get(`${base}/plan-line-suggestions`).set(as).expect(404);
     });
   });
 
@@ -266,7 +203,7 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
 
     it('goes to Finance first when it needs a review, while the others go to the approver, and stays in its batch (AC-12)', async () => {
       const ok = await waiting();
-      const big = await waiting(900 * M);
+      const big = await waiting(1500 * M);
       const batch = await send([ok, big]);
 
       expect((await items(batch.id)).map((item) => item.outcome)).toEqual(['SENT_TO_APPROVER', 'SENT_TO_FINANCE']);
@@ -287,7 +224,7 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
     });
 
     it('leaves the batch when Finance gives it back, and is in the queue with the reason and no figure (AC-13)', async () => {
-      const id = await waiting(900 * M);
+      const id = await waiting(1500 * M);
       const batch = await send([id]);
 
       await h.completeReview(id, { outcome: 'RETURN_TO_HEAD', reason: 'Too much: reduce the scope' }).expect(200);

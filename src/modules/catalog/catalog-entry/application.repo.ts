@@ -322,4 +322,18 @@ export class ApplicationRepo {
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
   }
+
+  /** The applications with these ids, for a decision on what a collector may report; those that do not exist are absent. */
+  async collectorApplications(
+    ids: readonly string[],
+    tx?: DbTx,
+  ): Promise<
+    { id: string; name: string; kind: ApplicationKind; isCommunicationService: boolean; retiredAt: Date | null }[]
+  > {
+    return (tx ?? this.prisma).application.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, name: true, kind: true, isCommunicationService: true, retiredAt: true },
+      orderBy: { id: 'asc' },
+    });
+  }
 }

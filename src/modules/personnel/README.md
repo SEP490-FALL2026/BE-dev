@@ -30,6 +30,10 @@ và lệnh `src/cli/record-super-admin-event/`.
   `employee_leaves`, `employee_leave_changes`, `offboarding_cases`, `offboarding_case_changes`, `personnel_notices`,
   `personnel_notice_verifications`, `personnel_notice_counters`, `super_admin_event_tickets`
   (`prisma/models/personnel.prisma`).
+- Hồ sơ nghỉ việc ghi/dời/hủy dòng chặn truy cập `employee_access_blocks` (bảng của `identity-access`, qua `IdentityAccessApi`) trong
+  transaction của hồ sơ: `WITH_LAST_DAY` chặn từ ngày sau ngày làm việc cuối, `BLOCK_NOW` (`offboarding_cases.access_block_mode`) chặn từ ngày
+  ghi; IT Admin ghi khóa tài khoản và mở thu hồi khi `accessBlocked` (không chờ `LEFT`); `đã nghỉ việc` chỉ từ ngày làm việc cuối và
+  `left_on` = ngày làm việc cuối. Mọi thao tác ghi sự kiện nhận căn cứ có kiểu (`personnel-grounds.dto.ts`: `HR_DECISION|APPROVED_APPLICATION|WRITTEN_DIRECTIVE`).
 
 ## Extension point
 
@@ -53,7 +57,8 @@ Bốn point mở, cả bốn đều do listener trong chính module đăng ký:
 ## Hướng phụ thuộc giữa capability (R6)
 
 Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-graph`). Từ thấp lên cao: `event-notice`,
-`service-account` → `role-duties`, `transfer`, `transfer-review` → `notice` → `leave` → `offboarding` →
+`service-account`, `department-member` (chỉ gọi facade của `organization`, `licensing`, `requests`; không import capability
+anh em) → `role-duties`, `transfer`, `transfer-review` → `notice` → `leave` → `offboarding` →
 `super-admin-event`. Recorder điều chuyển nằm ở `notice/` (đứng trên `transfer/`); recorder nghỉ dài hạn và thôi việc nằm ở
 `leave/`, `offboarding/` (đứng trên `notice/`).
 
@@ -81,6 +86,12 @@ Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-grap
   controller và `OffboardingViewService`; `offboarding-detail.policy.ts`), `change/` (đổi ngày làm cuối, hủy:
   `OffboardingChangeService` điều phối `OffboardingChangeJudge` (xét) và `OffboardingChangeWriter` (ghi);
   `offboarding-change.policy.ts`).
+- `department-member/` — trưởng phòng đọc một người đang ở phòng mình hôm nay (`QĐ-41c`(2)); `department-member.controller.ts`
+  (`GET /departments/{id}/employees/{employeeId}` + `…/software-rights` + `…/open-requests`, `@RequireRoles('MANAGER')`),
+  `DepartmentMemberQueryService` (hồ sơ không email/hợp đồng + hai số đếm; hai danh sách phân trang ≤ 100),
+  `department-member.policy.ts` (`memberReadVerdict`: 403 `OUT_OF_SCOPE`, 404 `NOT_FOUND` không phân biệt _đã chuyển đi_ với
+  _không tồn tại_). Không repo: đọc qua `OrganizationReadApi`/`OrganizationHistoryApi`, `LicensingApi.pageHeldSoftwareOf`,
+  `RequestsApi.listOpenOfBeneficiary(…, { departmentId })`.
 - `notice/` — thông báo của trưởng phòng; Super Admin từ chối, ghi nhận hoặc nối vào sự kiện (US-03-10, US-03-11);
   `notice.controller.ts`; `NoticeService`, `NoticeHandlingService`; `notice-overdue.job.ts`; `transfer-notice.listener.ts`
   (`TransferNoticeRecorder`: ghi điều chuyển mà thông báo nêu, nên `notice/` đứng trên `transfer/`; recorder của nghỉ dài hạn và

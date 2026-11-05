@@ -92,6 +92,15 @@ khi chưa có run của revision đang review.
 Nếu process bị kill trước cleanup, DB tạm (kể cả database mẫu của lượt) có thể còn lại. Kiểm tra tên, marker và
 connection trước khi dọn thủ công; không xóa theo wildcard.
 
+## Harness của runner `flows` (`support/flows/`)
+
+Không assertion, không hook. `flow-template.ts`: mẫu đã seed của lượt (`prepareSeededTemplate` ở global setup, `cloneSeededTemplate` cho từng file),
+mật khẩu dataset và danh sách `SWEEPER_OVERRIDES`. `flow-world.ts`: `FlowWorld.open()` clone mẫu, bật đồng hồ, dựng app, đăng ký các
+pass (`projection`, `sla`, `expiry`, `renewal`, `transferReview`) vào `FlowClock`. `flow-actors.ts`: đăng nhập thật theo mã
+(`signIn`, `ensure`, `as`, `refresh`/`keep`). `flow-clock.ts`: `Date` giả (D0 = ngày thật, 12:00 giờ tổ chức), `jumpTo`/`jumpDays`/
+`jumpWorkingDays` chỉ tiến, luật CR-1 về đồng hồ PostgreSQL. `flow-facts.ts`: chỉ `SELECT` (đếm bảng, một dòng, thông báo, Audit).
+`flow-calls.ts`: gọi API theo vai (`get`/`post`/`put`) và các bước lặp lại của luồng Request.
+
 ## Ứng dụng trên PostgreSQL thật
 
 `support/http-test-app.ts` dựng **toàn bộ** ứng dụng Nest (pipe, guard, filter) trên một

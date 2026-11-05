@@ -72,6 +72,8 @@ export class FakeGrantGate implements GrantRequestGate {
       planId,
       departmentId,
       expectedEndDate: null,
+      termMonths: 6,
+      termBound: true,
     });
   }
 

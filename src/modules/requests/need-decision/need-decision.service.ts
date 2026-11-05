@@ -8,7 +8,7 @@ import {
   AccessRequestGroupUsesLinesError,
   AccessRequestNotFoundError,
 } from '../access-request/access-request.errors';
-import { canViewRequest, viewFactsOf, hasSpendStep } from '../access-request/access-request.policy';
+import { canViewRequest, viewFactsOf } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import {
@@ -18,7 +18,6 @@ import {
   type NeedDecisionOutcome,
 } from '../access-request/need-decision.policy';
 import { RequestFactsService } from '../access-request/request-facts.service';
-import { NeedSpendService } from '../assessment/need-spend.service';
 import { NeedDecisionEffects } from './need-decision-effects.service';
 
 /**
@@ -39,27 +38,14 @@ export class NeedDecisionService {
     private readonly repo: AccessRequestRepo,
     private readonly audit: AuditApi,
     private readonly settings: RequestFactsService,
-    private readonly spendChoice: NeedSpendService,
     private readonly effects: NeedDecisionEffects,
   ) {}
 
   async decide(actor: AuthenticatedPrincipal, requestId: string, input: DecisionInput): Promise<AccessRequestRecord> {
-    const { fiscalYearStartMonth } = await this.settings.settings();
-
     return this.runner.run(async (tx) => {
-      const request = await this.lockDecidable(tx, actor, requestId, input);
-      const outcome = needDecisionOutcome(
-        { branch: request.branch, routingRow: request.needStep.routingRow, hasSpendStep: hasSpendStep(request.policy) },
-        input,
-      );
-      // The head approving a request that costs money chooses its line first; a refusal here undoes the whole decision.
-      if (input.spend !== undefined && !outcome.headChoosesLine) {
-        throw new AccessRequestDecisionRefusedError('SPEND_NOT_APPLICABLE');
-      }
+      const request = await this.lockDecidable(tx, actor, requestId);
+      const outcome = needDecisionOutcome({ branch: request.branch, routingRow: request.needStep.routingRow }, input);
       const decidedAt = new Date();
-      if (outcome.headChoosesLine) {
-        await this.spendChoice.apply(tx, actor, request, input.spend, { decidedAt, fiscalYearStartMonth });
-      }
       await this.writeDecision(tx, actor, request, { input, outcome, decidedAt });
 
       return this.effects.follow(tx, actor, request, outcome, decidedAt);
@@ -71,25 +57,19 @@ export class NeedDecisionService {
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     requestId: string,
-    input: DecisionInput,
   ): Promise<AccessRequestRecord> {
     const request = await this.repo.lockById(tx, requestId);
     if (!request || !canViewRequest(actor, viewFactsOf(request))) throw new AccessRequestNotFoundError();
     // The people of a request for a group are decided one by one, in the routes of its lines (`US-05-17`).
     if (request.type === 'GROUP_GRANT') throw new AccessRequestGroupUsesLinesError();
     const { needStep } = request;
-    const refusal = checkNeedDecision(
-      {
-        actorEmployeeId: actor.employeeId,
-        requesterEmployeeId: request.requesterEmployeeId,
-        beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
-        assigneeEmployeeId: needStep.assigneeEmployeeId,
-        stepState: needStep.state,
-        // A renewal is long when the right would run on over twelve months in all, not when its own term is.
-        termMonths: request.renewal?.consecutiveMonths ?? request.termMonths,
-      },
-      input,
-    );
+    const refusal = checkNeedDecision({
+      actorEmployeeId: actor.employeeId,
+      requesterEmployeeId: request.requesterEmployeeId,
+      beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
+      assigneeEmployeeId: needStep.assigneeEmployeeId,
+      stepState: needStep.state,
+    });
     if (refusal) throw new AccessRequestDecisionRefusedError(refusal);
 
     return request;
@@ -117,7 +97,6 @@ export class NeedDecisionService {
         decidedByEmployeeId: actor.employeeId,
         deciderRole: outcome.deciderRole,
         reason: input.reason?.trim() || null,
-        termConfirmationReason: outcome.termConfirmationReason,
         decidedAt,
       },
     });
@@ -137,7 +116,6 @@ export class NeedDecisionService {
           deciderRole: outcome.deciderRole,
           departmentId: request.departmentId,
           requestState: outcome.requestState,
-          termConfirmed: Boolean(outcome.termConfirmationReason),
         },
       ),
     );

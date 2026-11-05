@@ -1,4 +1,3 @@
-import { LONG_TERM_MONTHS } from '../access-request/need-decision.policy';
 import type { LineState } from '../access-request/group-request.types';
 
 /**
@@ -9,7 +8,7 @@ import type { LineState } from '../access-request/group-request.types';
 
 export type LineDecisionRefusal =
   /** The one who decides is not the one who asked or a person of the lines of this step, whatever role they hold (`SoD-4`). */
-  'OWN_REQUEST' | 'NOT_THE_ASSIGNEE' | 'STEP_NOT_PENDING' | 'TERM_CONFIRMATION_REQUIRED';
+  'OWN_REQUEST' | 'NOT_THE_ASSIGNEE' | 'STEP_NOT_PENDING';
 
 export interface LineDeciderFacts {
   actorEmployeeId: string;
@@ -19,10 +18,8 @@ export interface LineDeciderFacts {
   /** Who holds the step; null while it waits for somebody. */
   assigneeEmployeeId: string | null;
   stepState: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
-  termMonths: number;
   /** Whether the decision approves at least one line. */
   approves: boolean;
-  confirmed: boolean;
 }
 
 /** The first reason the person may not decide the lines of the step, in the order a caller should learn it, or null. */
@@ -34,7 +31,6 @@ export function checkLineNeedDecider(facts: LineDeciderFacts): LineDecisionRefus
     return 'NOT_THE_ASSIGNEE';
   }
   if (facts.stepState !== 'PENDING') return 'STEP_NOT_PENDING';
-  if (facts.approves && facts.termMonths > LONG_TERM_MONTHS && !facts.confirmed) return 'TERM_CONFIRMATION_REQUIRED';
 
   return null;
 }
@@ -121,19 +117,14 @@ export function needStepOf<S extends { id: string; assigneeEmployeeId: string | 
 export const verdictsOf = (open: readonly { employeeId: string }[], given: readonly LineVerdict[]): LineVerdict[] =>
   open.map((line) => given.find((verdict) => verdict.employeeId === line.employeeId) as LineVerdict);
 
-/** What the record of approval of the step keeps: what was decided, the reason when it is a refusal, the confirmation of a long term when approved. */
-export function needRecordOf(
-  verdicts: readonly LineVerdict[],
-  termConfirmationReason: string | undefined,
-): { decision: 'APPROVED' | 'REJECTED'; reason: string | null; termConfirmationReason: string | null } {
+/** What the record of approval of the step keeps: what was decided and the reason when it is a refusal. */
+export function needRecordOf(verdicts: readonly LineVerdict[]): {
+  decision: 'APPROVED' | 'REJECTED';
+  reason: string | null;
+} {
   const decision = stepOutcomeOf(verdicts);
-  const confirmation = (termConfirmationReason ?? '').trim();
 
-  return {
-    decision,
-    reason: decision === 'REJECTED' ? stepRefusalReason(verdicts) : null,
-    termConfirmationReason: decision === 'APPROVED' && confirmation !== '' ? confirmation : null,
-  };
+  return { decision, reason: decision === 'REJECTED' ? stepRefusalReason(verdicts) : null };
 }
 
 /** What the audit entry `ACCESS_REQUEST.LINE_SPEND_DECIDED` says of one person: approved or refused, the reason trimmed, and by whom. */

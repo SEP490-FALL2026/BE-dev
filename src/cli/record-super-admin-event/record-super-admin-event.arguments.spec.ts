@@ -16,7 +16,7 @@ const COMMON = [
   '--subject-code',
   'E-SA',
   '--basis-type',
-  'DECISION',
+  'HR_DECISION',
   '--basis-reference',
   'QD-31/2026',
   '--basis-issuer',
@@ -49,6 +49,14 @@ const parse = (mode: string, ...rest: string[]) => parseSuperAdminEventArguments
 const refused = (args: readonly string[]) => () => parseSuperAdminEventArguments(args);
 
 describe('the arguments of ops:record-super-admin-event', () => {
+  it('refuses a kind of basis outside the list every personnel operation takes (L6)', () => {
+    const args = ['transfer-cancel', ...COMMON, ...MODE_ARGUMENTS['transfer-cancel']];
+    const at = args.indexOf('--basis-type') + 1;
+
+    expect(refused(args.map((arg, index) => (index === at ? 'DECISION' : arg)))).toThrow(/--basis-type must be one of/);
+    expect(refused(args.map((arg, index) => (index === at ? 'WRITTEN_DIRECTIVE' : arg)))).not.toThrow();
+  });
+
   it.each(SUPER_ADMIN_EVENT_MODES)('parses %s with the common parameters and its own', (mode) => {
     const parsed = parse(mode, ...MODE_ARGUMENTS[mode]);
 
@@ -61,7 +69,7 @@ describe('the arguments of ops:record-super-admin-event', () => {
           operator: 'ops-2',
           environment: 'SHARED',
           subjectCode: 'E-SA',
-          basis: { type: 'DECISION', reference: 'QD-31/2026', issuer: 'Board of Directors', issuedOn: '2026-10-20' },
+          basis: { type: 'HR_DECISION', reference: 'QD-31/2026', issuer: 'Board of Directors', issuedOn: '2026-10-20' },
         },
         parameters: { mode },
       },

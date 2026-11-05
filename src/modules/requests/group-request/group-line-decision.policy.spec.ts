@@ -20,9 +20,7 @@ const facts: LineDeciderFacts = {
   stepEmployeeIds: ['e1', 'e2', 'e3'],
   assigneeEmployeeId: 'h1',
   stepState: 'PENDING',
-  termMonths: 6,
   approves: true,
-  confirmed: false,
 };
 
 describe('who decides the lines of a step (US-05-17 AC-3, AC-16, US-05-04 AC-14)', () => {
@@ -40,14 +38,8 @@ describe('who decides the lines of a step (US-05-17 AC-3, AC-16, US-05-04 AC-14)
     ['somebody the step is not given to', { actorEmployeeId: 'x1' }, 'NOT_THE_ASSIGNEE'],
     ['anybody while the step waits for a holder', { assigneeEmployeeId: null }, 'NOT_THE_ASSIGNEE'],
     ['a step that was decided', { stepState: 'APPROVED' as const }, 'STEP_NOT_PENDING'],
-    ['a long term nobody confirmed', { termMonths: 13 }, 'TERM_CONFIRMATION_REQUIRED'],
   ])('refuses %s', (_name, change, refusal) => {
     expect(checkLineNeedDecider({ ...facts, ...change })).toBe(refusal);
-  });
-
-  it('asks the confirmation of a long term only of a decision that approves somebody', () => {
-    expect(checkLineNeedDecider({ ...facts, termMonths: 13, approves: false })).toBeNull();
-    expect(checkLineNeedDecider({ ...facts, termMonths: 13, confirmed: true })).toBeNull();
   });
 });
 
@@ -129,32 +121,22 @@ describe('the step a person decides, and what they decided, in a request for a g
     expect(verdictsOf([{ employeeId: 'p1' }, { employeeId: 'p2' }], given)).toEqual([given[1], given[0]]);
   });
 
-  it('records an approval with the confirmation of a long term, trimmed, and no reason (needRecordOf)', () => {
+  it('records an approval, and no reason (needRecordOf)', () => {
     const verdicts = [
       { employeeId: 'p1', decision: 'APPROVE' as const },
       { employeeId: 'p2', decision: 'REJECT' as const, reason: ' Không cần ' },
     ];
 
-    expect(needRecordOf(verdicts, ' Cần 18 tháng ')).toEqual({
-      decision: 'APPROVED',
-      reason: null,
-      termConfirmationReason: 'Cần 18 tháng',
-    });
-    expect(needRecordOf(verdicts, '  ').termConfirmationReason).toBeNull();
-    expect(needRecordOf(verdicts, undefined).termConfirmationReason).toBeNull();
+    expect(needRecordOf(verdicts)).toEqual({ decision: 'APPROVED', reason: null });
   });
 
-  it('records a refusal of everybody with what was said of each, and no confirmation (needRecordOf)', () => {
+  it('records a refusal of everybody with what was said of each (needRecordOf)', () => {
     const verdicts = [
       { employeeId: 'p1', decision: 'REJECT' as const, reason: 'A' },
       { employeeId: 'p2', decision: 'REJECT' as const, reason: 'B' },
     ];
 
-    expect(needRecordOf(verdicts, 'Cần 18 tháng')).toEqual({
-      decision: 'REJECTED',
-      reason: 'A; B',
-      termConfirmationReason: null,
-    });
+    expect(needRecordOf(verdicts)).toEqual({ decision: 'REJECTED', reason: 'A; B' });
   });
 });
 

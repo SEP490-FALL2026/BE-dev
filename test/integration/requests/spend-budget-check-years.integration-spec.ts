@@ -143,25 +143,6 @@ describe('the check of the budget by year over PostgreSQL (US-06-12 AC-11 to AC-
       expect(await checkWire(id)).toMatchObject({ bindingTotal: { amount: '4800000' }, yearCount: 2 });
     });
 
-    it('applies the threshold of each year to the slice of that year (AC-16)', async () => {
-      const u = await unit();
-      await h.budgetFor(u, { total: 4_000_000, percent: 50 });
-      await h.budgetFor(u, { total: 30_000_000, percent: 50, year: h.next });
-      const id = await h.paidRequest(u, plan, {
-        schedule: [
-          { dueOn: `${h.year}-11-01`, amount: 2_400_000, year: h.year },
-          { dueOn: `${h.next}-11-01`, amount: 2_400_000, year: h.next },
-        ],
-      });
-
-      await checked(id, u);
-
-      expect(await years(id)).toEqual([
-        expect.objectContaining({ year: h.year, code: 'HIGH_VALUE', shareBasisPoints: 6000 }),
-        expect.objectContaining({ year: h.next, code: 'BUDGET_OK', shareBasisPoints: 800 }),
-      ]);
-    });
-
     it('does not check a period that is only a forecast, and does not add it to what binds (AC-18)', async () => {
       const u = await unit();
       await h.budgetFor(u, { total: 100 * M });

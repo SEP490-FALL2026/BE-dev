@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addWorkingDays } from '../../../core/working-days';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import type { PendingBlockOutcome } from '../../identity-access/public/identity-access.types';
 import { LicensingHandoverApi } from '../../licensing/public/licensing-handover.api';
 import type { OperatorAuditActor } from '../../licensing/public/licensing-handover.types';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
@@ -27,7 +29,38 @@ export class OffboardingHandoverService {
     private readonly licensingHandovers: LicensingHandoverApi,
     private readonly parameters: OperatingParametersApi,
     private readonly guard: TransferGuardService,
+    private readonly identity: IdentityAccessApi,
   ) {}
+
+  /** From the day after the last working day the person is refused, whatever the state of the case (QĐ-100q). */
+  blockAccessAfterLastDay(tx: DbTx, record: OffboardingRecord): Promise<void> {
+    return this.identity.setDepartureBlock(tx, {
+      employeeId: record.employeeId,
+      cause: 'DEPARTURE_LAST_DAY',
+      blockedFrom: addDays(record.lastWorkingDay, 1),
+      caseId: record.id,
+    });
+  }
+
+  /** A departure blocked now: refused from the day it is recorded, however far the last working day is. */
+  blockAccessNow(tx: DbTx, record: OffboardingRecord, today: BusinessDate): Promise<void> {
+    return this.identity.setDepartureBlock(tx, {
+      employeeId: record.employeeId,
+      cause: 'DEPARTURE_BLOCK_NOW',
+      blockedFrom: today,
+      caseId: record.id,
+    });
+  }
+
+  /** The last working day moved: the block that follows it moves with it. */
+  moveAccessBlock(tx: DbTx, employeeId: string, lastWorkingDay: BusinessDate): Promise<void> {
+    return this.identity.moveDepartureBlock(tx, employeeId, addDays(lastWorkingDay, 1));
+  }
+
+  /** The handover is cancelled: a block not in force is dropped; one in force stays for the Super Admin to lift. */
+  releaseAccessBlock(tx: DbTx, employeeId: string, today: BusinessDate): Promise<PendingBlockOutcome> {
+    return this.identity.clearPendingDepartureBlock(tx, employeeId, today);
+  }
 
   /** The day a planned handover must be confirmed by: the last working day less one working day. */
   async plannedDueOn(lastWorkingDay: BusinessDate): Promise<BusinessDate> {
@@ -56,7 +89,7 @@ export class OffboardingHandoverService {
     if (record.departmentId === null) return;
     await this.licensingHandovers.openHandoverDuties(tx, await this.guard.standIn(tx, actor), {
       leaverEmployeeId: record.employeeId,
-      source: record.abrupt ? 'ABRUPT_DEPARTURE' : 'DEPARTURE',
+      source: record.accessBlockMode === 'BLOCK_NOW' ? 'ABRUPT_DEPARTURE' : 'DEPARTURE',
       caseRefId: record.id,
       // The day after it is the day a successor to a head who leaves is looked up for: the day the membership ends.
       lastWorkingDay: addDays(record.departureEffectiveOn, -1),

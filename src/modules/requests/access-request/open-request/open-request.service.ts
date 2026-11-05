@@ -21,8 +21,9 @@ export class OpenRequestService {
     employeeId: string,
     page: { skip: number; take: number },
     tx?: DbTx,
+    filter: { departmentId?: string } = {},
   ): Promise<{ items: OpenRequestOfBeneficiary[]; total: number }> {
-    const { items, total } = await this.repo.pageOf(employeeId, page, tx);
+    const { items, total } = await this.repo.pageOf(employeeId, page, tx, filter);
     const planIds = [...new Set(items.flatMap((item) => (item.planId === null ? [] : [item.planId])))];
     const people = await this.organizationReads.getEmployees(
       [...new Set(items.map((item) => item.requesterEmployeeId))],

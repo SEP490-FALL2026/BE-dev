@@ -66,7 +66,7 @@ describe('the outcome of a renewal and the chain of periods (integration, real P
       choice: body.choice,
       ...(body.quantity !== undefined ? { proposedQuantity: body.quantity } : {}),
     });
-    await h.decideRenewal(id, body, h.boss.account).expect(200);
+    await h.confirmRenewal(id, unit.head.account, { acknowledgeActiveUsers: body.acknowledgeActiveUsers }).expect(200);
 
     return { subscriptionId, seats, id };
   };
@@ -130,7 +130,7 @@ describe('the outcome of a renewal and the chain of periods (integration, real P
     const seatsOfB = (await seatsOf([b])).map((row) => row.id);
 
     const secondCase = await h.proposedRenewal({ subscriptionId: b, choice: 'RENEW' });
-    await h.decideRenewal(secondCase, { choice: 'RENEW' }, h.boss.account).expect(200);
+    await h.confirmRenewal(secondCase, unit.head.account).expect(200);
     const c = (
       await recorded(secondCase, {
         outcome: 'AS_DECIDED',
@@ -175,15 +175,15 @@ describe('the outcome of a renewal and the chain of periods (integration, real P
   });
 
   it('refuses the new period while the excess is still held, then records it with the savings it shows (US-11-03 AC-3, AC-5, AC-12, US-11-05 AC-9)', async () => {
-    const term = await h.termWithSeats(await h.unit(3), 20, { quantity: 10, ...year() });
+    const unit = await h.unit(3);
+    const term = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
     const caseId = await h.proposedRenewal({
       subscriptionId: term.subscriptionId,
       choice: 'REDUCE',
       proposedQuantity: 2,
+      releasedAssignmentIds: [term.seats[0]],
     });
-    await h
-      .decideRenewal(caseId, { choice: 'REDUCE', quantity: 2, releasedAssignmentIds: [term.seats[0]] }, h.boss.account)
-      .expect(200);
+    await h.confirmRenewal(caseId, unit.head.account).expect(200);
 
     expect(h.codeOf(await h.outcome(caseId, { outcome: 'AS_DECIDED', nextPeriod: nextYear(5) }).expect(422))).toBe(
       'SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH',
@@ -270,7 +270,7 @@ describe('the outcome of a renewal and the chain of periods (integration, real P
     const unit = await h.unit(0);
     const { id } = await decided(unit, { choice: 'RENEW' });
 
-    expect((await h.outcome(id, { outcome: 'UNCONFIRMED' }, h.boss.account)).status).toBe(403);
+    expect((await h.outcome(id, { outcome: 'UNCONFIRMED' }, unit.head.account)).status).toBe(403);
     expect((await h.outcome(id, { outcome: 'UNCONFIRMED' }, h.finance)).status).toBe(403);
     await h.outcome(id, { outcome: 'UNCONFIRMED' }).expect(200);
   });

@@ -2,13 +2,23 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { BudgetDecisionRefusedError, BudgetVersionNotFoundError, BudgetYearEndedError } from '../budget/budget.errors';
+import {
+  BudgetDecisionRefusedError,
+  BudgetVersionNotEditableError,
+  BudgetVersionNotFoundError,
+  BudgetYearEndedError,
+} from '../budget/budget.errors';
 import { checkVersionDecision, deciderOf, yearHasEnded } from '../budget/budget.policy';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
 import { BudgetChangeListeners } from '../public/budgets.extension-points';
+
+/** A revision of the budget of a year is gone (`QĐ-97b`): one that an older release left is not decided. */
+function refuseRevision(version: VersionRecord): void {
+  if (version.kind === 'REVISION') throw new BudgetVersionNotEditableError(version.state);
+}
 
 /** What a decision on a version is written from: the version, the versions of its year, who decides it and the day. */
 export interface JudgedDecision {
@@ -56,6 +66,7 @@ export class VersionDecisionJudge {
     const today = await this.facts.today(new Date(), tx);
     if (yearHasEnded(version.year, today, fiscalStart)) throw new BudgetYearEndedError(version.year);
     if (refusal) throw new BudgetDecisionRefusedError(refusal);
+    refuseRevision(version);
     // The requests that wait on this budget are locked before the year, as every writer of the system does.
     await this.listeners.emit(tx, {
       kind: 'LOCK_WAITING',

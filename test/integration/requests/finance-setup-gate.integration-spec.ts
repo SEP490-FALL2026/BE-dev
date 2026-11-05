@@ -121,31 +121,19 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
     h.dataOf<{ draft: DraftWire }>(await save(body, account).expect(201)).draft;
 
   describe('every operation that charges a cost to the department (F27)', () => {
-    it('refuses a request, a proposal, a delegated request, a request for a group and one for a service account with 409 FINANCE.SETUP_INCOMPLETE, and writes nothing', async () => {
+    it('refuses a request, a proposal, a request for a group and one for a service account with 409 FINANCE.SETUP_INCOMPLETE, and writes nothing', async () => {
       const u = await bare();
-      const colleague = await h.colleague(u);
       const [e1, e2] = await h.colleagues(u, 2);
       const before = await footprint();
 
       const individual = await h.submit(h.form(plan), u.member.account);
       const proposal = await h.propose(h.proposeBody(), u.member.account);
-      const delegated = await h.sendDelegated(
-        {
-          beneficiaryEmployeeIds: [colleague.employeeId],
-          items: [{ planId: plan }],
-          businessReason: 'The new designer needs the tool',
-          termMonths: 1,
-        },
-        u.head.account,
-      );
       const group = await h.submitGroup(h.groupBody(plan, [e1, e2]), u.head.account);
       const service = await submitService(serviceBody(), u.member.account);
 
-      expect([individual, proposal, delegated, group, service].map((response) => response.status)).toEqual([
-        409, 409, 409, 409, 409,
-      ]);
-      expect([individual, proposal, delegated, group, service].map((response) => h.codeOf(response))).toEqual(
-        Array(5).fill('FINANCE.SETUP_INCOMPLETE'),
+      expect([individual, proposal, group, service].map((response) => response.status)).toEqual([409, 409, 409, 409]);
+      expect([individual, proposal, group, service].map((response) => h.codeOf(response))).toEqual(
+        Array(4).fill('FINANCE.SETUP_INCOMPLETE'),
       );
       expect(await footprint()).toEqual(before);
     });

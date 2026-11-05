@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { toTransientError } from '../../../infrastructure/database/transaction-runner';
 import {
   AccessTokenVerifierPort,
@@ -11,7 +12,7 @@ import { EmployeeRecord } from '../../organization/public/organization.types';
 import { SessionRecordService } from '../auth/session-record.service';
 import { TokenService } from '../auth/token.service';
 import { PrincipalContext } from '../public/identity-access.types';
-import { employeeHasNotLeft } from '../accounts/account.policy';
+import { accessAllowed } from '../accounts/account.policy';
 import { authorizingRoles } from './effective-roles.policy';
 
 /**
@@ -42,6 +43,18 @@ export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
       throw error;
     }
 
+    // A block puts the person out from its first day, whatever the state of the departure (QĐ-100q); the day is read with the
+    // session, and the organization's today is asked only when there is a block to compare it with.
+    let today: BusinessDate = '0000-00-00';
+    if (context?.accessBlockedFrom) {
+      try {
+        today = await this.organizationReads.businessToday();
+      } catch (error) {
+        if (toTransientError(error)) throw new TokenVerificationUnavailableError(error);
+        throw error;
+      }
+    }
+
     const now = new Date();
     if (
       !context ||
@@ -51,7 +64,7 @@ export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
       context.absoluteExpiresAt <= now ||
       context.status !== 'ACTIVE' ||
       context.activationState !== 'ACTIVATED' ||
-      !employeeHasNotLeft(employee)
+      !accessAllowed(employee, context.accessBlockedFrom ? { blockedFrom: context.accessBlockedFrom } : null, today)
     ) {
       throw new InvalidAccessTokenError();
     }

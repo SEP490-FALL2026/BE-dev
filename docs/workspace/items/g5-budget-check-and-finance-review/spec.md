@@ -24,11 +24,11 @@ Khi một Request có chi phí được trình, hệ thống kiểm ngân sách 
 
 ## Primary Story/AC
 
-| Story    | AC         | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                        |
-| -------- | ---------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-06-12 | AC-1→AC-19 | full     | —                                                                                                                                                                                                                                         |
-| US-06-13 | AC-1→AC-13 | full     | —                                                                                                                                                                                                                                         |
-| US-06-09 | AC-17      | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-16, AC-18→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-10, AC-21: `g5-budget-version-decision`; AC-12: `g3-downstream-finance-integration` |
+| Story    | AC         | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                                                                     |
+| -------- | ---------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-12 | AC-1→AC-19 | partial  | AC-1, AC-4, AC-5, AC-8→AC-10, AC-14, AC-15, AC-19 vế QĐ-96→QĐ-100 và AC-20, AC-23, AC-24: `qd96-100-budget-check-three-outcomes`; AC-11 vế năm: `qd96-100-request-year-without-spend-date`; AC-18 vế thời hạn: `qd96-100-request-term-limit`; AC-25: `qd96-100-remove-finance-review-path`; AC-26: `qd96-100-budget-visibility-qd100p` |
+| US-06-13 | AC-1→AC-13 | full     | —                                                                                                                                                                                                                                                                                                                                      |
+| US-06-09 | AC-17      | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-16, AC-18→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-10, AC-21: `g5-budget-version-decision`; AC-12: `g3-downstream-finance-integration`                                                                                              |
 
 ## Supporting references
 
@@ -117,6 +117,10 @@ Khi một Request có chi phí được trình, hệ thống kiểm ngân sách 
 23/10/2026: lập khung theo scope map G5 của [roadmap](../../../roadmap.md). Chưa thiết kế chi tiết, chưa code, chưa review, chưa nghiệm thu.
 
 23/10/2026: implement và `verified` local (người phụ trách: AI theo giao việc của người dùng). Phép kiểm chạy trong transaction của người gọi vì chưa có route trình (`g5-spend-submission-batches`); test gọi nó như việc trình sẽ gọi và đặt dòng kế hoạch, cờ _ngoài kế hoạch_ bằng SQL. Rà soát bị rút (`US-06-13` AC-7) kiểm bằng trạng thái bước _đã đóng_, việc đóng khi rút thuộc `g5-request-withdrawal`. Chưa commit, chưa peer review, chưa Owner review, chưa nghiệm thu.
+
+05/11/2026 (điều phối viên bó `qd96-100-alignment`, gỡ lỗi `rules:check`): dòng `US-06-12` `full` → `partial` — map G5 chia AC-1, AC-4, AC-5,
+AC-8→AC-10, AC-11, AC-14, AC-15, AC-18, AC-19 với hạng mục `qd96-100-*` (chủ phần còn lại chính: `qd96-100-budget-check-three-outcomes`)
+và thêm AC-20→AC-26 cho hạng mục mới. Hạng mục này giữ `Owner` các AC cũ; không đổi thiết kế, trạng thái triển khai giữ nguyên.
 
 ## Mở lại theo baseline `769bb64` (Prompt 03, 26/10/2026)
 

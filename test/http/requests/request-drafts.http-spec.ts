@@ -141,16 +141,6 @@ describe('the drafts of a request, and the Super Admin (e2e, no database)', () =
           termMonths: 6,
         }),
     ],
-    [
-      'delegatedRequestSend',
-      (agent) =>
-        agent.post('/api/v1/delegated-requests').send({
-          beneficiaryEmployeeIds: [EMPLOYEE],
-          items: [{ planId: PLAN }],
-          businessReason: 'The new designer needs the tool',
-          termMonths: 1,
-        }),
-    ],
     ['groupRequestSubmit', (agent) => agent.post('/api/v1/group-requests').send({ ...GROUP, kind: undefined })],
     [
       'accessRequestServiceAccountSubmit',
@@ -161,7 +151,7 @@ describe('the drafts of a request, and the Super Admin (e2e, no database)', () =
       (agent) =>
         agent
           .post('/api/v1/access-requests/renewals')
-          .send({ assignmentId: ID, newExpectedEndDate: '2027-01-31', businessReason: 'The work goes on' }),
+          .send({ assignmentId: ID, extensionMonths: 6, businessReason: 'The work goes on' }),
     ],
   ];
 

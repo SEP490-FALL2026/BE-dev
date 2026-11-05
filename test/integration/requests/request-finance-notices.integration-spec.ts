@@ -36,7 +36,7 @@ describe('the notices of the loop between Finance and the head (integration, rea
   };
   /** A request of 45 million of a budget with 40 left: the check sends it to Finance. Whoever made the check is not told of it. */
   const inReview = async (u: Unit, by: ApiAccount = u.head.account) => {
-    await h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M, percent: 95 });
+    await h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M });
     const id = await h.paidRequest(u, plan, { amount: 45 * M });
     await h.route(id, by);
 
@@ -53,7 +53,7 @@ describe('the notices of the loop between Finance and the head (integration, rea
     // The check is made by the requester's side, not by the head: the head is told of what somebody else did (an actor is never told of their own act).
     const id = await inReview(u, u.member.account);
     const calm = await unit();
-    await h.budgetFor(calm, { total: 100 * M, percent: 95 });
+    await h.budgetFor(calm, { total: 100 * M });
     const ordinary = await h.paidRequest(calm, plan, { amount: 5 * M });
     await h.route(ordinary, calm.head.account);
 
@@ -89,12 +89,7 @@ describe('the notices of the loop between Finance and the head (integration, rea
     const id = await h.paidRequest(u, plan, { amount: 30 * M });
     await h.route(id, u.head.account);
     await h.completeReview(id, { outcome: 'NEEDS_BUDGET', reason: 'Make the budget of the year' }).expect(200);
-    const proposal = await h.budgetProposed(
-      u.head,
-      u.department.unitId,
-      [h.line({ windowFrom: `${h.year}-12-01`, windowTo: `${h.year}-12-31`, quoteValidUntil: undefined })],
-      h.year,
-    );
+    const proposal = await h.budgetProposed(u.head, u.department.unitId, [h.line()], h.year);
     const version = await h.built(proposal.id, { base: h.money(100 * M), reserve: h.money(0) });
     await h.sendVersion(version.id).expect(200);
     await h

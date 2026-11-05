@@ -18,13 +18,19 @@ export class SubscriptionFactsService {
     planId: string,
     ownerDepartmentId: string,
     tx?: DbTx,
-  ): Promise<{ unitPrice: Money; billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' } | null> {
+  ): Promise<{
+    unitPrice: Money;
+    billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+    /** The subscription may be cut before its term ends (`QĐ-96f`): a request on it runs to the end of the fiscal year at most. */
+    allowsMidTermReduction: boolean;
+  } | null> {
     const priced = await this.subscriptions.findPricedOfPlan(planId, ownerDepartmentId, tx);
 
     return (
       priced && {
         unitPrice: { amountMinor: priced.unitPriceMinor, currency: priced.currency },
         billingCycle: priced.billingCycle,
+        allowsMidTermReduction: priced.allowsMidTermReduction,
       }
     );
   }

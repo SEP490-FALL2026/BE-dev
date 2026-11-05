@@ -65,9 +65,7 @@ describe('the reviewer of Finance does not decide what they reviewed or sent (in
         expect.objectContaining({ state: 'PENDING', assignee_employee_id: finance.employeeId }),
       ]);
 
-      const refused = await h
-        .decideSpend(id, { decision: 'APPROVE', override: { reason: 'Mended next month', years: [h.year] } }, finance)
-        .expect(409);
+      const refused = await h.decideSpend(id, { decision: 'APPROVE' }, finance).expect(409);
 
       expect(h.codeOf(refused)).toBe('SPEND.REVIEWER_IS_APPROVER');
       expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');

@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client';
-import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { ProposalState, RepeatCycle } from './budget.policy';
+import type { ProposalState } from './budget.policy';
 
 export interface ProposalLineRecord {
   position: number;
@@ -11,11 +10,6 @@ export interface ProposalLineRecord {
   planId: string | null;
   seats: number | null;
   amountMinor: bigint;
-  windowFrom: BusinessDate;
-  windowTo: BusinessDate;
-  servicePeriodMonths: number;
-  repeatCycle: RepeatCycle;
-  quoteValidUntil: BusinessDate | null;
   note: string | null;
 }
 
@@ -66,11 +60,6 @@ const toLine = (row: LineRow): ProposalLineRecord => ({
   planId: row.planId,
   seats: row.seats,
   amountMinor: row.amountMinor,
-  windowFrom: fromDateColumn(row.windowFrom),
-  windowTo: fromDateColumn(row.windowTo),
-  servicePeriodMonths: row.servicePeriodMonths,
-  repeatCycle: row.repeatCycle,
-  quoteValidUntil: row.quoteValidUntil ? fromDateColumn(row.quoteValidUntil) : null,
   note: row.note,
 });
 
@@ -131,11 +120,6 @@ export class ProposalRepo {
             planId: line.planId,
             seats: line.seats,
             amountMinor: line.amountMinor,
-            windowFrom: toDateColumn(line.windowFrom),
-            windowTo: toDateColumn(line.windowTo),
-            servicePeriodMonths: line.servicePeriodMonths,
-            repeatCycle: line.repeatCycle,
-            quoteValidUntil: line.quoteValidUntil ? toDateColumn(line.quoteValidUntil) : null,
             note: line.note,
           })),
         },

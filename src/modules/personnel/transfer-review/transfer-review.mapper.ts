@@ -70,8 +70,11 @@ export function toItem(item: ReviewItemRecord, names: ReviewNames): TransferRevi
     decidedBy: decidedBy ? employeeBriefOf(decidedBy) : null,
     decidedAt: item.decidedAt ? item.decidedAt.toISOString() : null,
     newToolNote: item.newToolNote,
+    reason: item.reason,
     revocationTaskId: item.revocationTaskId,
     // A new Request is still asked for only while the old seat stays: once its revocation is under way (the Request ended) it is not.
-    needsNewRequest: item.decision === 'STILL_NEEDED' && !names.revoking.has(item.assignmentId),
+    // An internal tool (K5) has no Request to ask for: the head keeping it asks nothing more of anybody.
+    needsNewRequest:
+      item.decision === 'STILL_NEEDED' && plan.provisioningType !== 'K5' && !names.revoking.has(item.assignmentId),
   };
 }

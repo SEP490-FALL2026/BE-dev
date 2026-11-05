@@ -61,7 +61,7 @@ export class ServiceAccountHarness extends SpendHarness {
    */
   async approvedService(unit: Unit, person: Person, planId: string, amount: number): Promise<string> {
     const sent = await this.sentService(person, planId);
-    await this.decide(sent.id, { decision: 'APPROVE', spend: { offPlan: true } }, unit.head.account).expect(200);
+    await this.decide(sent.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
     await this.setPayments(sent.id, { amount });
     await this.sendOn([sent.id], unit.head.account).expect(201);
     await this.decideSpend(sent.id, { decision: 'APPROVE' }, this.boss.account).expect(200);

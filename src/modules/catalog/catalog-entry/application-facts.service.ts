@@ -50,4 +50,9 @@ export class ApplicationFactsService {
 
     return owner && owner.status === 'ACTIVE' ? owner.id : null;
   }
+
+  /** The kind, whether it is a communication service and whether it is retired, of these applications (those that exist). */
+  collectorApplications(ids: readonly string[], tx?: DbTx) {
+    return this.applications.collectorApplications(ids, tx);
+  }
 }

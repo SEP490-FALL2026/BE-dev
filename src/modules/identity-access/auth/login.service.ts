@@ -5,7 +5,8 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { AccountRecordService } from '../accounts/account-record.service';
 import { CredentialService } from '../credentials/credential.service';
 import { AccountSnapshot, IssuedSession } from '../public/identity-access.types';
-import { employeeHasNotLeft } from '../accounts/account.policy';
+import { AccessBlockService } from '../access-block/access-block.service';
+import { accessAllowed } from '../accounts/account.policy';
 import { InvalidCredentialsError } from './auth.errors';
 import { LoginThrottle } from './login-throttle.service';
 import { SessionTokenService } from './session-token.service';
@@ -14,6 +15,7 @@ import { SessionTokenService } from './session-token.service';
 export class LoginService {
   constructor(
     private readonly accounts: AccountRecordService,
+    private readonly accessBlocks: AccessBlockService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly credentials: CredentialService,
     private readonly throttle: LoginThrottle,
@@ -49,12 +51,14 @@ export class LoginService {
     const account = await this.accounts.findAccountByLoginEmail(organization.id, normalized);
     const verifiedHash = await this.verifyPassword(account, password);
     const employee = account ? await this.organizationReads.getEmployee(account.employeeId) : null;
+    const today = await this.organizationReads.businessToday();
+    const block = account ? await this.accessBlocks.find(account.employeeId) : null;
     const usable =
       verifiedHash !== null &&
       account !== null &&
       account.status === 'ACTIVE' &&
       account.activationState === 'ACTIVATED' &&
-      employeeHasNotLeft(employee);
+      accessAllowed(employee, block, today);
 
     if (!usable) {
       // Only a wrong attempt is a failure. An attempt still being checked, or one that succeeds, is
@@ -70,12 +74,14 @@ export class LoginService {
 
       const current = await this.accounts.readAccount(tx, account.id);
       const employeeNow = await this.organizationReads.getEmployee(account.employeeId, tx);
+      const blockNow = await this.accessBlocks.find(account.employeeId, tx);
+      const todayNow = await this.organizationReads.businessToday(new Date(), tx);
       const unchanged =
         current !== null &&
         current.status === 'ACTIVE' &&
         current.activationState === 'ACTIVATED' &&
         current.credentialHash === verifiedHash &&
-        employeeHasNotLeft(employeeNow);
+        accessAllowed(employeeNow, blockNow, todayNow);
       if (!unchanged) return null;
 
       const session = await this.sessionTokens.open(tx, account.id);

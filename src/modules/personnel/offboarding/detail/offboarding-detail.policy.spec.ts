@@ -3,7 +3,7 @@ import { departureDetailFacts } from './offboarding-detail.policy';
 
 const seat = (assignmentId: string, revocation: unknown = null) => ({ assignmentId, revocation });
 const record = (extra: { state?: OffboardingState; closedAt?: Date | null } = {}) => ({
-  abrupt: false,
+  accessBlockMode: 'WITH_LAST_DAY' as const,
   state: 'HANDING_OVER' as OffboardingState,
   accountLockAt: null as Date | null,
   closedAt: null as Date | null,

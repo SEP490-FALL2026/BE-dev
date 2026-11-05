@@ -74,9 +74,7 @@ describe('a row of the queue of the need steps', () => {
       department: { id: 'dep-1', code: 'P-DES', name: 'Design' },
       businessReasonExcerpt: 'The project needs a wiki',
       termMonths: 6,
-      termConfirmationRequired: false,
       pricing: { status: 'PRICED', amount: { amount: '123456', currency: 'VND' } },
-      planLineRequired: true,
       samePersonAsSpend: false,
     });
     expect(JSON.stringify(item)).not.toMatch(/remaining|committed|spent|held|primaryCode|toolset|standard/i);
@@ -97,12 +95,6 @@ describe('a row of the queue of the need steps', () => {
         `The routing row ${routingRow} gives the step to nobody`,
       );
     }
-  });
-
-  it('asks the spending approver for no line of the plan, and the head of free software neither', () => {
-    expect(needQueueItemOf(row({ routingRow: 2 }), lookups()).planLineRequired).toBe(false);
-    const free = { policy: { ...PAID, chain: ['NEED', 'IT_EXECUTION'] }, amountMinor: null, amountCurrency: null };
-    expect(needQueueItemOf(row({ request: free }), lookups()).planLineRequired).toBe(false);
   });
 
   it('has no one person it is for when it is a group, and counts the people still waiting on this step', () => {
@@ -132,13 +124,11 @@ describe('a row of the queue of the need steps', () => {
     expect(item).toMatchObject({ pricing: { status: 'MISSING', amount: null }, plan: null, softwareName: 'Lạ' });
   });
 
-  it('asks the confirmation of a term over twelve months, and reads a renewal by the months the right runs on in all', () => {
-    expect(needQueueItemOf(row({ request: { termMonths: 18 } }), lookups()).termConfirmationRequired).toBe(true);
+  it('reads a renewal by the months the right runs on in all', () => {
     const renewal = { type: 'RENEWAL', termMonths: 3, renewal: { consecutiveMonths: 24 } };
 
     expect(needQueueItemOf(row({ request: renewal }), lookups())).toMatchObject({
       termMonths: 3,
-      termConfirmationRequired: true,
     });
   });
 

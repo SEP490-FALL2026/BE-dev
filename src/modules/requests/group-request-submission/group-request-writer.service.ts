@@ -20,7 +20,6 @@ export interface GroupWritten {
     planId: string;
     businessReason: string;
     termMonths: number;
-    termConfirmation?: { reason: string };
   };
   draftId: string | null;
 }
@@ -129,7 +128,6 @@ export class GroupRequestWriter {
         decidedByEmployeeId: actor.employeeId,
         deciderRole: 'MANAGER',
         reason: null,
-        termConfirmationReason: input.body.termConfirmation?.reason.trim() ?? null,
         decidedAt: input.now,
       },
     });
@@ -179,7 +177,6 @@ export class GroupRequestWriter {
           deciderRole: 'MANAGER',
           departmentId: input.judged.assessed.unit.departmentId,
           requestState: input.state,
-          termConfirmed: input.body.termConfirmation !== undefined,
           delegated: true,
           lineCount: input.lines.length,
         },

@@ -1,5 +1,5 @@
 import type { WithdrawalRefusal } from './withdrawal.policy';
-import type { CancellationRefusal, DelegationRefusal, HeldAccess } from './access-request.types';
+import type { CancellationRefusal, HeldAccess } from './access-request.types';
 
 /** The request does not exist, or the caller has no part in it: the two answer alike so a request cannot be probed. */
 export class AccessRequestNotFoundError extends Error {
@@ -33,14 +33,6 @@ export class AccessRequestNoDepartmentError extends Error {
   }
 }
 
-/** Internal software with no fee has no money to spend, so it has no day the money is expected to go out (`US-05-02` AC-11). */
-export class AccessRequestSpendDateNotAllowedError extends Error {
-  constructor() {
-    super('A request for internal software has no expected spend date: nothing is paid.');
-    this.name = 'AccessRequestSpendDateNotAllowedError';
-  }
-}
-
 /** The caller has a part in the request but is not the person who holds its need step (`US-05-04` AC-3, AC-4). */
 export class AccessRequestNotAssigneeError extends Error {
   constructor() {
@@ -51,17 +43,7 @@ export class AccessRequestNotAssigneeError extends Error {
 
 /** The person may not decide the need step now: the reason says why (`US-05-04`). */
 export class AccessRequestDecisionRefusedError extends Error {
-  constructor(
-    readonly reason:
-      | 'OWN_REQUEST'
-      | 'NOT_THE_ASSIGNEE'
-      | 'STEP_NOT_PENDING'
-      | 'TERM_CONFIRMATION_REQUIRED'
-      /** A head approving a request that costs money chooses a line of the plan or "outside the plan" (`US-05-04` AC-12). */
-      | 'PLAN_LINE_REQUIRED'
-      /** The line, the flag or the day is only for the head who approves a request that costs money. */
-      | 'SPEND_NOT_APPLICABLE',
-  ) {
+  constructor(readonly reason: 'OWN_REQUEST' | 'NOT_THE_ASSIGNEE' | 'STEP_NOT_PENDING') {
     super(`The need step cannot be decided: ${reason}.`);
     this.name = 'AccessRequestDecisionRefusedError';
   }
@@ -75,21 +57,6 @@ export class AccessRequestAlreadyHoldsAccessError extends Error {
   }
 }
 
-/** The line a request is attached to cannot be kept (`US-05-04` AC-12, AC-13, `US-06-14` AC-5). */
-export class AccessRequestPlanLineRefusedError extends Error {
-  constructor(
-    readonly reason:
-      /** The request costs nothing, so it has no line of a plan to be attached to. */
-      | 'NO_SPEND'
-      | 'LINE_NOT_FOUND'
-      /** The window of the line has gone by and the head did not say it is still needed. */
-      | 'STILL_NEEDED_REQUIRED',
-  ) {
-    super(`The line cannot be attached: ${reason}.`);
-    this.name = 'AccessRequestPlanLineRefusedError';
-  }
-}
-
 /** The request cannot be priced for another day: its quote is not in force then, or does not say how it is paid. */
 export class AccessRequestNotPriceableError extends Error {
   constructor() {
@@ -98,14 +65,16 @@ export class AccessRequestNotPriceableError extends Error {
   }
 }
 
-/** A head cannot send requests for the person as asked (`US-03-02`, `US-05-03` rows 5 to 7); `employeeId` is the person it is about. */
-export class DelegatedRequestRefusedError extends Error {
+/** The term asked for is longer than a request may ask for, or a flexible plan would run past the end of the fiscal year (`US-05-01` AC-4, `QĐ-98`). */
+export class AccessRequestTermBeyondLimitError extends Error {
   constructor(
-    readonly reason: DelegationRefusal,
-    readonly employeeId: string | null,
+    readonly maxMonths: number,
+    readonly endsBy: string | null,
   ) {
-    super(`The requests cannot be sent for the person: ${reason}.`);
-    this.name = 'DelegatedRequestRefusedError';
+    super(
+      'The term is longer than a request may ask for: at most 12 months. A draft saved with a longer term must be saved again with a shorter one.',
+    );
+    this.name = 'AccessRequestTermBeyondLimitError';
   }
 }
 

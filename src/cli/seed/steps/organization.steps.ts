@@ -225,7 +225,7 @@ async function approvalRoles(ctx: DemoRunContext): Promise<StepOutcome> {
 export const ORGANIZATION_STEPS: readonly DemoStep[] = [
   { key: 'org.departments', title: 'Phòng ban (Super Admin)', needs: [], run: departments },
   { key: 'org.employees', title: 'Nhân viên (Super Admin)', needs: ['org.departments'], run: employees },
-  { key: 'org.accounts', title: 'Tài khoản demo (lệnh vận hành)', needs: ['org.employees'], run: accounts },
+  { key: 'org.accounts', title: 'Tài khoản đăng nhập (lệnh vận hành)', needs: ['org.employees'], run: accounts },
   { key: 'org.it-admins', title: 'IT Admin phụ trách phòng (Super Admin)', needs: ['org.accounts'], run: itAdmins },
   { key: 'org.heads', title: 'Trưởng phòng (Super Admin)', needs: ['org.accounts'], run: heads },
   { key: 'org.approval-roles', title: 'Người duyệt chi (Super Admin)', needs: ['org.accounts'], run: approvalRoles },

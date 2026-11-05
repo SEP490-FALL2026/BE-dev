@@ -1,3 +1,5 @@
+import type { BusinessDate } from '../../../core/business-date';
+
 export type AppRole = 'SUPER_ADMIN' | 'IT_ADMIN' | 'FINANCE' | 'EMPLOYEE' | 'MANAGER' | 'SPENDING_APPROVER';
 export type AppUserStatus = 'ACTIVE' | 'LOCKED';
 export type ActivationState = 'INVITED' | 'ACTIVATED';
@@ -46,6 +48,8 @@ export interface PrincipalContext {
   status: AppUserStatus;
   activationState: ActivationState;
   directRoles: AppRole[];
+  /** First day a departure block refuses the employee, or null when there is none; the guard compares it with today. */
+  accessBlockedFrom: BusinessDate | null;
 }
 
 export interface CreateAppUserInput {
@@ -196,3 +200,16 @@ export interface CreateDemoAccountInput {
   passwordHash: string;
   hashPolicyVersion: number;
 }
+
+export type AccessBlockCause = 'DEPARTURE_LAST_DAY' | 'DEPARTURE_BLOCK_NOW';
+
+export interface AccessBlockRecord {
+  blockedFrom: BusinessDate;
+  cause: AccessBlockCause;
+  /** Set when the departure was cancelled after the block took effect: only an unlock with a reason removes it. */
+  releasable: boolean;
+  sourceCaseId: string | null;
+}
+
+/** What cancelling a departure did to the block: dropped, kept because it already took effect, or there was none. */
+export type PendingBlockOutcome = 'CLEARED' | 'IN_FORCE' | 'NONE';

@@ -48,7 +48,12 @@ export interface NoticeRow {
  */
 export class NoticeHarness extends OffboardingHarness {
   readonly verification = { method: 'ATTACHED_DOCUMENT', reference: 'Resignation letter DN-31/2026' };
-  readonly resignation = { type: 'RESIGNATION_LETTER', reference: 'DN-31/2026', issuer: 'E1', issuedOn: '2026-10-20' };
+  readonly resignation = {
+    type: 'APPROVED_APPLICATION',
+    reference: 'DN-31/2026',
+    issuer: 'E1',
+    issuedOn: '2026-10-20',
+  };
 
   sendNotice = (body: object, account: ApiAccount) =>
     request(this.server()).post('/api/v1/personnel-notices').set(this.as(account)).send(body);

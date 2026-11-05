@@ -9,6 +9,8 @@ import { checkBeneficiary, type BeneficiaryRefusal } from './beneficiary-eligibi
 
 /** The most people an Employee names in one request (`QĐ-82h`). */
 export const GROUP_EMPLOYEE_MAX = 10;
+/** The fewest different people a request for a group names, whoever sends it (`QĐ-100aa`, `S-01`). */
+export const GROUP_LINES_MIN = 2;
 /** The most people a head names: a technical bound against a typing slip, since the Story leaves it to the design (`AC-13`). */
 export const GROUP_HEAD_MAX = 100;
 
@@ -43,6 +45,8 @@ export interface LineCountFacts {
 export interface LineCountRefusals {
   /** The maximum when more were named than the sender may name. */
   tooMany: { max: number } | null;
+  /** The minimum when fewer than that many different people were named. */
+  tooFew: { min: number } | null;
   /** The people named more than once, each once. */
   duplicates: string[];
 }
@@ -56,7 +60,9 @@ export function checkLineCount(facts: LineCountFacts): LineCountRefusals {
   }
   const max = maxLines(facts.senderIsHead);
 
-  return { tooMany: facts.requested.length > max ? { max } : null, duplicates: [...duplicates] };
+  const tooFew = seen.size < GROUP_LINES_MIN ? { min: GROUP_LINES_MIN } : null;
+
+  return { tooMany: facts.requested.length > max ? { max } : null, tooFew, duplicates: [...duplicates] };
 }
 
 /** The first reason a person cannot be a line, in the order a caller should learn it; the spending approver is never a party of a Request, so they come first (`D-S21`). */
@@ -72,8 +78,6 @@ export interface LineFacts {
   workEmail: string | null;
   employmentType: string;
   hireDate: BusinessDate;
-  /** The day the access of this person ends, when the sender gave one. */
-  expectedEndDate: BusinessDate | undefined;
   /** The person holds a seat of the plan today. */
   holdsAccess: boolean;
   /** A request for the plan is open for the person: another of their own, or a line of another group. */
@@ -93,17 +97,17 @@ export interface RefusedLine {
  * The first reason each person cannot be in the request, in the order a caller should learn it; a person with none is not listed.
  * `departmentId` is the department of the sender: only its people can be named (`AC-2`).
  */
-export function checkLines(departmentId: string, people: readonly LineFacts[], today: BusinessDate): RefusedLine[] {
+export function checkLines(departmentId: string, people: readonly LineFacts[]): RefusedLine[] {
   const refused: RefusedLine[] = [];
   for (const person of people) {
-    const reason = reasonFor(departmentId, person, today);
+    const reason = reasonFor(departmentId, person);
     if (reason !== null) refused.push({ employeeId: person.employeeId, reason });
   }
 
   return refused;
 }
 
-function reasonFor(departmentId: string, person: LineFacts, today: BusinessDate): LineReason | null {
+function reasonFor(departmentId: string, person: LineFacts): LineReason | null {
   if (person.spendingApprover) return 'SPENDING_APPROVER';
   if (person.departmentId !== departmentId) return 'OUTSIDE_DEPARTMENT';
   const refusal = checkBeneficiary(
@@ -111,9 +115,6 @@ function reasonFor(departmentId: string, person: LineFacts, today: BusinessDate)
       active: person.active,
       workEmail: person.workEmail,
       employmentType: person.employmentType,
-      hireDate: person.hireDate,
-      today,
-      expectedEndDate: person.expectedEndDate,
     },
     { skipContact: person.isHeadOwnLine },
   );
@@ -122,11 +123,3 @@ function reasonFor(departmentId: string, person: LineFacts, today: BusinessDate)
 
   return person.hasOpenRequest ? 'HAS_OPEN_REQUEST' : null;
 }
-
-/** A long term is confirmed in so many words by the head who sends it, or by the head who decides it when an Employee sent it. */
-export const needsTermConfirmation = (input: {
-  senderIsHead: boolean;
-  termMonths: number;
-  confirmed: boolean;
-  longTermMonths: number;
-}): boolean => input.senderIsHead && input.termMonths > input.longTermMonths && !input.confirmed;

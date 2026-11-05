@@ -54,9 +54,9 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
     it('writes one Audit Trail record with the real values before and after, and one entry of the history, for each edit', async () => {
       const s = await sentBack();
       const csv = [
-        'cost_center_code,description,amount,window_from,window_to,service_period_months,repeat_cycle',
-        `${s.version.costCenter.code},Imported one,1000,${h.next}-05-01,${h.next}-05-31,12,ANNUAL`,
-        `${s.version.costCenter.code},Imported two,2000,${h.next}-06-01,${h.next}-06-30,12,ANNUAL`,
+        'cost_center_code,description,amount',
+        `${s.version.costCenter.code},Imported one,1000`,
+        `${s.version.costCenter.code},Imported two,2000`,
       ].join('\n');
 
       await h.updateVersion(s.version.id, { reserve: h.money(10_000_000) }).expect(200);
@@ -123,40 +123,10 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
       expect(lines.map((line) => line.position)).toEqual([1, 2, 3, 4, 5]);
     });
 
-    it('keeps the record of the move of a window, and adds an entry for it', async () => {
-      const w = await waiting();
-      const current = await h.current(w.proposal.id);
-
-      await h
-        .moveWindow(current.id, 2, {
-          windowFrom: `${h.next}-06-01`,
-          windowTo: `${h.next}-08-31`,
-          reason: 'The purchase slipped',
-        })
-        .expect(200);
-
-      expect(await h.budgetRows(`budget_version_line_changes WHERE version_id = '${current.id}'`)).toBe(1);
-      const [entry] = (await history(current.id)).items;
-      expect(entry).toMatchObject({
-        kind: 'WINDOW_MOVED',
-        versionState: 'APPROVED',
-        position: 2,
-        changes: [
-          { field: 'windowFrom', before: `${h.next}-04-01`, after: `${h.next}-06-01` },
-          { field: 'windowTo', before: `${h.next}-06-30`, after: `${h.next}-08-31` },
-        ],
-      });
-      const [moved] = await auditOf(current.id, 'BUDGET_VERSION.WINDOW_MOVED');
-      expect(moved).toMatchObject({
-        before: { windowFrom: `${h.next}-04-01`, windowTo: `${h.next}-06-30` },
-        after: { position: 2, windowTo: `${h.next}-08-31`, reason: 'The purchase slipped' },
-      });
-    });
-
     it('writes neither an entry nor a number when the edit gave the values the version already had', async () => {
       const s = await sentBack();
 
-      await h.updateVersion(s.version.id, { highValuePercent: s.version.highValuePercent }).expect(200);
+      await h.updateVersion(s.version.id, { base: { amount: String(Number(s.version.base.amount)) } }).expect(200);
 
       expect((await history(s.version.id)).items).toEqual([]);
     });
@@ -211,9 +181,9 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
    * bytes, so the entries are cut by bytes as well as by count; a legal import is kept whole in the history, never a 500.
    */
   describe('the size of an entry (R4 D-6)', () => {
-    const HEADER = 'cost_center_code,description,amount,window_from,window_to,service_period_months,repeat_cycle,note';
+    const HEADER = 'cost_center_code,description,amount,seats,note';
     const row = (code: string, index: number, description: string, note: string) =>
-      `${code},${description},${1000 + index},${h.next}-05-01,${h.next}-05-31,12,ANNUAL,${note}`;
+      `${code},${description},${1000 + index},,${note}`;
 
     it('keeps 200 imported lines with the longest description and note as several entries that follow one another, and answers 201', async () => {
       const s = await sentBack();
@@ -323,7 +293,7 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
     it('is newest first, in pages of at most a hundred, with the total; a page past the end is empty', async () => {
       const s = await sentBack();
       for (let percent = 1; percent <= 25; percent += 1) {
-        await h.updateVersion(s.version.id, { highValuePercent: percent }).expect(200);
+        await h.updateVersion(s.version.id, { base: h.money(1_000_000 + percent) }).expect(200);
       }
 
       const first = await history(s.version.id, h.finance, { pageSize: 10 });

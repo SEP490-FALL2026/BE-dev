@@ -44,11 +44,9 @@ import { VersionDecisionWriter } from './version/version-decision-writer.service
 import { VersionDecisionService } from './version/version-decision.service';
 import { VersionLineMovedNotifier } from './version/version-line-moved.service';
 import { VersionLineService } from './version/version-line.service';
-import { VersionWindowService } from './version/version-window.service';
 import { VersionRepo } from './budget/version.repo';
 import { VersionCreationService } from './version/version-creation.service';
 import { VersionFigures } from './version/version-figures.service';
-import { VersionRevisionService } from './version/version-revision.service';
 import { VersionTrail } from './version/version-trail.service';
 import { VersionService } from './version/version.service';
 import { VersionViewService } from './budget/version-view.service';
@@ -117,11 +115,9 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     VersionFigures,
     VersionTrail,
     VersionCreationService,
-    VersionRevisionService,
     VersionService,
     VersionLineMovedNotifier,
     VersionLineService,
-    VersionWindowService,
     VersionDecisionJudge,
     VersionDecisionWriter,
     VersionDecisionService,

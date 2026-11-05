@@ -55,7 +55,6 @@ export class SpendDecisionRepo {
         deciderRole: input.deciderRole,
         departmentId: input.departmentId,
         reason: input.reason,
-        termConfirmationReason: null,
         decidedAt: input.decidedAt,
       },
     });

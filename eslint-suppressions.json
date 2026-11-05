@@ -4,11 +4,6 @@
       "count": 1
     }
   },
-  "src/modules/budgets/budget/version-line.repo.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/budgets/budget/version-view.service.ts": {
     "complexity": {
       "count": 1
@@ -326,11 +321,6 @@
     "complexity": {
       "count": 1
     },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "src/modules/requests/group-line-decisions/group-lines.controller.ts": {
     "max-lines-per-function": {
       "count": 1
     }

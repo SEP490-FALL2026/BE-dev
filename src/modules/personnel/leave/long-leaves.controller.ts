@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { PersonnelGroundsDateService } from '../personnel-grounds-date.service';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -50,12 +51,17 @@ const NOT_FOUND = {
 } as const;
 
 /** The refusals of the basis of a day, the same on every write that needs one. */
-const GROUNDS_EXAMPLES = [EXAMPLES.GROUNDS_REQUIRED, EXAMPLES.GROUNDS_INCOMPLETE, EXAMPLES.GROUNDS_IS_NOTICE] as const;
+const GROUNDS_EXAMPLES = [
+  EXAMPLES.GROUNDS_REQUIRED,
+  EXAMPLES.GROUNDS_INCOMPLETE,
+  EXAMPLES.GROUNDS_IS_NOTICE,
+  PERSONNEL_ACCESS_ERROR_EXAMPLES.GROUNDS_ISSUED_ON_FUTURE,
+] as const;
 /** The refusal of a write on a leave that has ended. */
 const ENDED_EXAMPLES = [EXAMPLES.NOT_ACTIVE] as const;
 
 const GROUNDS_REFUSALS =
-  'the basis is empty or lacks a part (LONG_LEAVE.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE)';
+  'the basis is empty or lacks a part (LONG_LEAVE.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE), or is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE)';
 
 /**
  * Long leaves of employees with the day they are due back and the basis of that day. The Super Admin records them (`QĐ-87a`); the
@@ -69,6 +75,7 @@ export class LongLeavesController {
   constructor(
     private readonly leaves: LeaveService,
     private readonly query: LeaveQueryService,
+    private readonly groundsDate: PersonnelGroundsDateService,
   ) {}
 
   @Post()
@@ -105,6 +112,7 @@ export class LongLeavesController {
     },
   )
   async start(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: StartLeaveBodyDto) {
+    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       return await this.query.detailOf(await this.leaves.start(userActor(actor), body));
     } catch (error) {
@@ -211,6 +219,7 @@ export class LongLeavesController {
     @Param() params: LeaveIdParamDto,
     @Body() body: ChangeReturnDateBodyDto,
   ) {
+    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       return await this.query.detailOf(await this.leaves.changeReturnDate(userActor(actor), params.id, body));
     } catch (error) {
@@ -245,6 +254,7 @@ export class LongLeavesController {
     @Param() params: LeaveIdParamDto,
     @Body() body: ConfirmReturnBodyDto,
   ) {
+    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       return await this.query.detailOf(await this.leaves.confirmReturn(userActor(actor), params.id, body));
     } catch (error) {

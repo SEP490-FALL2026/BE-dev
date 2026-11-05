@@ -4,19 +4,9 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
 import { REVOCATION_SOURCES } from '../../licensing/public/licensing.types';
 import { ROLE_FLAGS } from '../public/personnel.types';
 import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
+import { groundsBodySchema } from '../personnel-grounds.dto';
 
 const flag = z.enum(['true', 'false']).transform((value) => value === 'true');
-
-/**
- * The basis a departure rests on. Every part is optional here and judged after: a basis that is empty or lacks a part has its own
- * answer, and so has a reference that is the code of a notice (`BM-09`), which is not the document that ends the process.
- */
-const groundsBodySchema = z.strictObject({
-  type: z.string().max(100).nullish(),
-  reference: z.string().max(200).nullish(),
-  issuer: z.string().max(200).nullish(),
-  issuedOn: z.string().max(10).nullish(),
-});
 
 const successorBodySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('EMPLOYEE'), employeeId: z.uuid() }),
@@ -27,31 +17,34 @@ const accountLockBodySchema = z.strictObject({ note: z.string().trim().min(1).ma
 
 const recordBodySchema = z.strictObject({
   employeeId: z.uuid(),
-  // Judged by the policy, so a day that is missing has its own answer (`LAST_WORKING_DAY_REQUIRED`) in both modes.
-  lastWorkingDay: businessDay.optional(),
-  abrupt: z.boolean().default(false),
-  grounds: groundsBodySchema.optional(),
+  // The last working day and the mode are always given: the Super Admin chooses both on purpose, there is no default (`QĐ-96c`).
+  lastWorkingDay: businessDay,
+  accessBlockMode: z.enum(['WITH_LAST_DAY', 'BLOCK_NOW']),
+  grounds: groundsBodySchema,
   successor: successorBodySchema.optional(),
-  pendingTransferCancellation: z.strictObject({ reason: z.string().max(1000) }).optional(),
+  // A transfer that waits and would take effect after the last working day is cancelled with the departure: the Super Admin confirms it,
+  // the reason is the standard one and the basis is the one of the departure.
+  cancelPendingTransfer: z.literal(true).optional(),
 });
+
+const reasonSchema = z.string().trim().min(1).max(1000);
 
 const changeLastDayBodySchema = z.strictObject({
   lastWorkingDay: businessDay,
-  reason: z.string().max(1000).optional(),
+  reason: reasonSchema,
+  grounds: groundsBodySchema,
   successor: successorBodySchema.optional(),
 });
 
-const cancelBodySchema = z.strictObject({ reason: z.string().max(1000).optional() });
+const cancelBodySchema = z.strictObject({ reason: reasonSchema, grounds: groundsBodySchema });
 
-const markLeftBodySchema = z.strictObject({
-  departedOn: businessDay.optional(),
-  accountLock: accountLockBodySchema.optional(),
-});
+/** The person left on their last working day: nothing is typed, and the lock of the company account is the IT Admin's step. */
+const markLeftBodySchema = z.strictObject({});
 
+/** The rights are the server's to count, and the reason is the standard one of a departure: the IT Admin may add a note. */
 const revocationsBodySchema = z.strictObject({
   assignmentIds: z.array(z.uuid()).min(1).max(200).optional(),
-  count: z.number().int().min(0).max(1000),
-  reason: z.string().max(1000).optional(),
+  note: z.string().trim().min(1).max(1000).optional(),
   accountLock: accountLockBodySchema.optional(),
 });
 
@@ -94,10 +87,16 @@ export const offboardingSummarySchema = z.strictObject({
   id: z.uuid(),
   employee: employeeBrief,
   state: stateSchema,
+  accessBlockMode: z.enum(['WITH_LAST_DAY', 'BLOCK_NOW']),
+  /** Deprecated: `accessBlockMode === 'BLOCK_NOW'`. */
   abrupt: z.boolean(),
   lastWorkingDay: z.string(),
   handoverDueOn: z.string().nullable(),
   pastLastDay: z.boolean(),
+  /** The departure refuses the person today (the last working day has passed, or they have left): the IT Admin may lock the account and open the revocations. */
+  accessBlocked: z.boolean(),
+  /** The first day the departure refuses the person; null for a cancelled case. */
+  accessBlockedFrom: z.string().nullable(),
   heldRights: z.number().int().nonnegative(),
   accountLockMissing: z.boolean(),
   closed: z.boolean(),

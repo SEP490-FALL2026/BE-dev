@@ -43,19 +43,12 @@ describe('the calendar of the demo dataset', () => {
 
 describe('shared paid-request budget calendar', () => {
   it.each([
-    ['2026-01-01', '2026-01-08', [2026]],
-    ['2026-06-15', '2026-06-22', [2026]],
-    ['2026-11-24', '2026-12-01', [2026]],
-    ['2026-11-25', '2027-01-01', [2026, 2027]],
-    ['2026-11-30', '2027-01-01', [2026, 2027]],
-    ['2026-12-01', '2027-01-01', [2026, 2027]],
-    ['2026-12-25', '2027-01-01', [2026, 2027]],
-    ['2026-12-31', '2027-01-01', [2026, 2027]],
-    ['2027-12-10', '2028-01-03', [2027, 2028]],
-  ] as const)('dates %s with a one-month in-plan term', (today, spendDay, years) => {
-    expect(seedCalendar(today, 1)).toEqual({ spendDay, years });
-  });
-  it('can force the next-year branch for a test on any day', () => {
-    expect(seedCalendar('2026-01-01', 1, true)).toEqual({ spendDay: '2027-01-01', years: [2026, 2027] });
+    ['2026-01-01', [2026, 2027]],
+    ['2026-06-15', [2026, 2027]],
+    ['2026-11-05', [2026, 2027]],
+    ['2026-12-31', [2026, 2027]],
+    ['2027-12-10', [2027, 2028]],
+  ] as const)('writes the budgets of the year and of the next one on %s', (today, years) => {
+    expect(seedCalendar(today).years).toEqual(years);
   });
 });

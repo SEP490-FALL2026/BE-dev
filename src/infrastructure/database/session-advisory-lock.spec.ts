@@ -31,7 +31,7 @@ function fakeClient(options: { locked: boolean; unlock?: () => Promise<unknown> 
   return client;
 }
 
-const take = () => trySessionAdvisoryLock('postgresql://slm@localhost/db', 'demo-dataset:shared-demo-v2');
+const take = () => trySessionAdvisoryLock('postgresql://slm@localhost/db', 'demo-dataset:shared-demo-v3');
 
 describe('trySessionAdvisoryLock', () => {
   afterEach(() => jest.clearAllMocks());

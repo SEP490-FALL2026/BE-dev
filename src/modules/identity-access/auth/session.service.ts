@@ -4,7 +4,8 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccountRecordService } from '../accounts/account-record.service';
 import { IssuedSession } from '../public/identity-access.types';
-import { employeeHasNotLeft } from '../accounts/account.policy';
+import { AccessBlockService } from '../access-block/access-block.service';
+import { accessAllowed } from '../accounts/account.policy';
 import { SessionInvalidError } from './auth.errors';
 import { SessionTokenService } from './session-token.service';
 import { SessionRepo } from './session.repo';
@@ -19,6 +20,7 @@ export class SessionService {
 
   constructor(
     private readonly accounts: AccountRecordService,
+    private readonly accessBlocks: AccessBlockService,
     private readonly sessions: SessionRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
@@ -60,8 +62,10 @@ export class SessionService {
 
       const now = new Date();
       const employee = await this.organizationReads.getEmployee(account.employeeId, tx);
+      const block = await this.accessBlocks.find(account.employeeId, tx);
+      const today = await this.organizationReads.businessToday(now, tx);
       const accountUsable =
-        account.status === 'ACTIVE' && account.activationState === 'ACTIVATED' && employeeHasNotLeft(employee);
+        account.status === 'ACTIVE' && account.activationState === 'ACTIVATED' && accessAllowed(employee, block, today);
       const sessionOpen = session.revokedAt === null && session.idleExpiresAt > now && session.absoluteExpiresAt > now;
       if (!accountUsable || !sessionOpen || token.expiresAt <= now) return { kind: 'invalid' };
 

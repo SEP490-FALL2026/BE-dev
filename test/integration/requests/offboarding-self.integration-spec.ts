@@ -45,7 +45,7 @@ describe('who writes the departure of a person, and the one about an IT Admin (i
       await h.recordCase(h.body(a1), h.it1),
       await h.changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: 'Dời' }, h.it1),
       await h.cancelCase(wire.id, { reason: 'Ở lại' }, h.it1),
-      await h.markLeft(wire.id, {}, h.it1),
+      await h.leaveOnLastDay(wire.id, {}, h.it1),
     ];
     const aboutSelf = await h.recordCase({ ...h.body(a1), employeeId: h.sa.employeeId });
 
@@ -60,13 +60,9 @@ describe('who writes the departure of a person, and the one about an IT Admin (i
 
   it('leaves the technical steps to the IT Admin: the lock of the account and the revocations go through after the Super Admin marks the person left', async () => {
     const wire = await h.recordedCase(a1);
-    await h.markLeft(wire.id).expect(200);
+    await h.leaveOnLastDay(wire.id).expect(200);
 
-    const bySuperAdmin = await h.revokeRights(
-      wire.id,
-      { count: 1, reason: 'Thu hồi', accountLock: { note: 'khóa' } },
-      h.sa,
-    );
+    const bySuperAdmin = await h.revokeRights(wire.id, { accountLock: { note: 'khóa' } }, h.sa);
     expect([bySuperAdmin.status, h.codeOf(bySuperAdmin)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
     expect(
       await h
@@ -74,9 +70,7 @@ describe('who writes the departure of a person, and the one about an IT Admin (i
         .expect(200)
         .then((response) => h.dataOf<{ items: unknown[] }>(response).items),
     ).toHaveLength(1);
-    const byItAdmin = h.dataOf<CaseWire>(
-      await h.revokeRights(wire.id, { count: 1, reason: 'Thu hồi', accountLock: { note: 'khóa' } }).expect(200),
-    );
+    const byItAdmin = h.dataOf<CaseWire>(await h.revokeRights(wire.id, { accountLock: { note: 'khóa' } }).expect(200));
 
     expect(byItAdmin.revocations?.created).toBe(1);
     // One duty for each departure recorded on the seat in this suite: the two cancelled by the tests above, and the one of this case.

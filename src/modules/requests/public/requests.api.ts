@@ -15,13 +15,16 @@ export class RequestsApi {
   /**
    * The requests the person is the beneficiary of that are not over (a request of their own that has not ended, or the person's share of
    * a request for a group that has not ended), oldest first, with how many there are in all. The requests that wait for the IT Admin to
-   * close the task of a withdrawal are not among them. The cost of a page is the same whatever its size.
+   * close the task of a withdrawal are not among them. The cost of a page is the same whatever its size. `filter.departmentId` keeps
+   * only the requests that were sent from that department: a person who changed department keeps the open requests of the old one
+   * out of the answer of the new head.
    */
   listOpenOfBeneficiary(
     employeeId: string,
     page: { skip: number; take: number },
     tx?: DbTx,
+    filter: { departmentId?: string } = {},
   ): Promise<{ items: OpenRequestOfBeneficiary[]; total: number }> {
-    return this.open.pageOf(employeeId, page, tx);
+    return this.open.pageOf(employeeId, page, tx, filter);
   }
 }

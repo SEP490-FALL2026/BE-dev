@@ -90,17 +90,17 @@ model BudgetProposal {
 }
 
 model BudgetProposalLine {
-  proposalId          String            @map("proposal_id") @db.Uuid
+  proposalId          String             @map("proposal_id") @db.Uuid
   position            Int
   description         String
-  planId              String?           @map("plan_id") @db.Uuid
+  planId              String?            @map("plan_id") @db.Uuid
   seats               Int?
-  amountMinor         BigInt            @map("amount_minor")
-  windowFrom          DateTime          @map("window_from") @db.Date
-  windowTo            DateTime          @map("window_to") @db.Date
-  servicePeriodMonths Int               @map("service_period_months")
-  repeatCycle         BudgetRepeatCycle @map("repeat_cycle")
-  quoteValidUntil     DateTime?         @map("quote_valid_until") @db.Date
+  amountMinor         BigInt             @map("amount_minor")
+  windowFrom          DateTime?          @map("window_from") @db.Date
+  windowTo            DateTime?          @map("window_to") @db.Date
+  servicePeriodMonths Int?               @map("service_period_months")
+  repeatCycle         BudgetRepeatCycle? @map("repeat_cycle")
+  quoteValidUntil     DateTime?          @map("quote_valid_until") @db.Date
   note                String?
 
   proposal     BudgetProposal      @relation(fields: [proposalId], references: [id], onDelete: Restrict)
@@ -126,10 +126,14 @@ model BudgetVersion {
   basedOnVersionId      String?            @map("based_on_version_id") @db.Uuid
   baseMinor             BigInt             @map("base_minor")
   reserveMinor          BigInt             @map("reserve_minor")
+  // The share of the base the reserve defaults to, as it stood when the version was made; null before QĐ-98 (no reason is asked then).
+  reservePercent        Int?               @map("reserve_percent") @db.SmallInt
+  // Why the reserve is not that share of the base; asked when the version is sent.
+  reserveReason         String?            @map("reserve_reason")
   totalMinor            BigInt             @map("total_minor")
   currency              String             @db.Char(3)
   // A line is "high value" when it is over this share of what is left of the year (US-06-12).
-  highValuePercent      Int                @map("high_value_percent")
+  highValuePercent      Int?               @map("high_value_percent")
   // The other way a line is high value: over this amount, whatever is left (QĐ-82c). Null when the version sets none.
   highValueAmountMinor  BigInt?            @map("high_value_amount_minor")
   // Forecast by quarter only: it never limits a payment (QĐ-82e). All four or none, adding up to the total.
@@ -176,23 +180,23 @@ model BudgetVersion {
 // A line of a version: what is planned to be bought and when. It is a plan, not a quota (QĐ-57c): a request is not stopped
 // by a line that is used up. The line of the proposal it comes from stays as it was (US-06-09 AC-14).
 model BudgetVersionLine {
-  versionId           String            @map("version_id") @db.Uuid
+  versionId           String             @map("version_id") @db.Uuid
   position            Int
   // The line of the proposal this adjusts; null for a line Finance added.
-  proposalId          String?           @map("proposal_id") @db.Uuid
-  proposalPosition    Int?              @map("proposal_position")
+  proposalId          String?            @map("proposal_id") @db.Uuid
+  proposalPosition    Int?               @map("proposal_position")
   description         String
-  planId              String?           @map("plan_id") @db.Uuid
+  planId              String?            @map("plan_id") @db.Uuid
   seats               Int?
-  amountMinor         BigInt            @map("amount_minor")
-  windowFrom          DateTime          @map("window_from") @db.Date
-  windowTo            DateTime          @map("window_to") @db.Date
-  servicePeriodMonths Int               @map("service_period_months")
-  repeatCycle         BudgetRepeatCycle @map("repeat_cycle")
-  quoteValidUntil     DateTime?         @map("quote_valid_until") @db.Date
-  financeComment      String?           @map("finance_comment")
+  amountMinor         BigInt             @map("amount_minor")
+  windowFrom          DateTime?          @map("window_from") @db.Date
+  windowTo            DateTime?          @map("window_to") @db.Date
+  servicePeriodMonths Int?               @map("service_period_months")
+  repeatCycle         BudgetRepeatCycle? @map("repeat_cycle")
+  quoteValidUntil     DateTime?          @map("quote_valid_until") @db.Date
+  financeComment      String?            @map("finance_comment")
   // Why Finance changed what the proposal said; required when it differs from the line it adjusts.
-  adjustmentReason    String?           @map("adjustment_reason")
+  adjustmentReason    String?            @map("adjustment_reason")
 
   version      BudgetVersion             @relation(fields: [versionId], references: [id], onDelete: Restrict)
   proposalLine BudgetProposalLine?       @relation(fields: [proposalId, proposalPosition], references: [proposalId, position], onDelete: Restrict)

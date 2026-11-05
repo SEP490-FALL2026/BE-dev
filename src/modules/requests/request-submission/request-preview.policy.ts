@@ -1,5 +1,4 @@
 import { hasSpendStep, type RequestPolicy } from '../access-request/access-request.policy';
-import { LONG_TERM_MONTHS } from '../access-request/need-decision.policy';
 import type { RoutedRole, RoutingDecision, RoutingFacts, WaitingReason } from '../access-request/routing.policy';
 
 /**
@@ -103,6 +102,3 @@ export function spendSubmissionOf(
 
   return pricingStatus === 'PRICED' ? 'ALLOWED' : 'BLOCKED_UNTIL_PRICED';
 }
-
-/** A term over twelve months needs the head to confirm it in so many words; the chain gains no step (`US-05-01` AC-4, OI-07a). */
-export const termNeedsConfirmation = (termMonths: number): boolean => termMonths > LONG_TERM_MONTHS;

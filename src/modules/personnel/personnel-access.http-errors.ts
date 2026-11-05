@@ -22,9 +22,19 @@ export function toPersonnelAccessApiException(error: unknown): ApiException | nu
   });
 }
 
+/** A basis cannot be issued after today (the day of the organization): the Owner's rule for every operation that takes one. */
+export function groundsIssuedOnFutureException(today: string): ApiException {
+  return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+    code: 'PERSONNEL.GROUNDS_ISSUED_ON_FUTURE',
+    message: 'The basis cannot be issued after today.',
+    details: { today },
+  });
+}
+
 /** The answer above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const PERSONNEL_ACCESS_ERROR_EXAMPLES = {
   SELF_CHANGE_FORBIDDEN: errorExampleOf(
     toPersonnelAccessApiException(new PersonnelAccessRefusedError('SELF_CHANGE_FORBIDDEN')),
   ),
+  GROUNDS_ISSUED_ON_FUTURE: errorExampleOf(groundsIssuedOnFutureException('2026-01-01')),
 } as const;

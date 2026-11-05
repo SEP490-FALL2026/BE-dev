@@ -10,15 +10,13 @@ import {
   AccessRequestNoDepartmentError,
   AccessRequestNotFoundError,
   AccessRequestNotPriceableError,
-  AccessRequestPlanLineRefusedError,
   AccessRequestPlanNotFoundError,
-  AccessRequestSpendDateNotAllowedError,
   AccessRequestSuperAdminCannotRequestError,
   AccessRequestWithdrawalRefusedError,
 } from '../access-request/access-request.errors';
 import { SpendDecisionRefusedError, SpendSupplementRefusedError } from '../spend/spend.errors';
 import { toRecheckedApiException, toSpendApiException } from '../spend/spend.http-errors';
-import { GROUP_EMPLOYEE_MAX } from './group-request.policy';
+import { GROUP_EMPLOYEE_MAX, GROUP_LINES_MIN } from './group-request.policy';
 import {
   GroupRequestDuplicateLineError,
   GroupRequestLineHoldsAccessError,
@@ -26,7 +24,8 @@ import {
   GroupRequestLinesMismatchError,
   GroupRequestLinesRefusedError,
   GroupRequestPlanNotEligibleError,
-  GroupRequestTermConfirmationRequiredError,
+  GroupRequestTermBeyondLimitError,
+  GroupRequestTooFewLinesError,
   GroupRequestTooManyLinesError,
   GroupSupplementDropRefusedError,
 } from './group-request.errors';
@@ -52,6 +51,20 @@ export function toGroupRequestApiException(error: unknown): unknown {
       details: { max: error.max },
     });
   }
+  if (error instanceof GroupRequestTermBeyondLimitError) {
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+      code: 'GROUP_REQUEST.TERM_BEYOND_LIMIT',
+      message: error.message,
+      details: { maxMonths: error.maxMonths, endsBy: error.endsBy },
+    });
+  }
+  if (error instanceof GroupRequestTooFewLinesError) {
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+      code: 'GROUP_REQUEST.TOO_FEW_LINES',
+      message: error.message,
+      details: { min: error.min },
+    });
+  }
   if (error instanceof GroupRequestDuplicateLineError) {
     return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
       code: 'GROUP_REQUEST.DUPLICATE_LINE',
@@ -64,12 +77,6 @@ export function toGroupRequestApiException(error: unknown): unknown {
       code: 'GROUP_REQUEST.LINES_REFUSED',
       message: error.message,
       details: { lines: error.lines.map((line) => ({ employeeId: line.employeeId, reason: line.reason })) },
-    });
-  }
-  if (error instanceof GroupRequestTermConfirmationRequiredError) {
-    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
-      code: 'GROUP_REQUEST.TERM_CONFIRMATION_REQUIRED',
-      message: error.message,
     });
   }
   if (error instanceof GroupRequestLinesMismatchError) {
@@ -115,12 +122,12 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
     new RequestPartyIneligibleError({ reason: 'SPENDING_APPROVER', party: 'REQUESTER', employeeIds: [PERSON] }),
   ),
   SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
-  NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),
   PLAN_NOT_ELIGIBLE: example(new GroupRequestPlanNotEligibleError('KIND_NOT_MULTI_SEAT')),
   TOO_MANY_LINES: example(new GroupRequestTooManyLinesError(GROUP_EMPLOYEE_MAX)),
+  TOO_FEW_LINES: example(new GroupRequestTooFewLinesError(GROUP_LINES_MIN)),
+  TERM_BEYOND_LIMIT: example(new GroupRequestTermBeyondLimitError(12, '2026-12-31')),
   DUPLICATE_LINE: example(new GroupRequestDuplicateLineError([PERSON])),
   LINES_REFUSED: example(new GroupRequestLinesRefusedError([{ employeeId: PERSON, reason: 'OUTSIDE_DEPARTMENT' }])),
-  TERM_CONFIRMATION_REQUIRED: example(new GroupRequestTermConfirmationRequiredError()),
   REQUEST_NOT_FOUND: example(new AccessRequestNotFoundError()),
   CLOSURE_ALREADY_ENDED: example(new AccessRequestCancellationRefusedError('ALREADY_ENDED')),
   CLOSURE_WITHDRAWAL_PENDING: example(new AccessRequestCancellationRefusedError('WITHDRAWAL_PENDING')),
@@ -130,11 +137,6 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   NEED_OWN_REQUEST: example(new AccessRequestDecisionRefusedError('OWN_REQUEST')),
   NEED_NOT_THE_ASSIGNEE: example(new AccessRequestDecisionRefusedError('NOT_THE_ASSIGNEE')),
   NEED_STEP_NOT_PENDING: example(new AccessRequestDecisionRefusedError('STEP_NOT_PENDING')),
-  NEED_TERM_CONFIRMATION_REQUIRED: example(new AccessRequestDecisionRefusedError('TERM_CONFIRMATION_REQUIRED')),
-  PLAN_LINE_REQUIRED: example(new AccessRequestDecisionRefusedError('PLAN_LINE_REQUIRED')),
-  SPEND_NOT_APPLICABLE: example(new AccessRequestDecisionRefusedError('SPEND_NOT_APPLICABLE')),
-  PLAN_LINE_NOT_FOUND: example(new AccessRequestPlanLineRefusedError('LINE_NOT_FOUND')),
-  STILL_NEEDED_REQUIRED: example(new AccessRequestPlanLineRefusedError('STILL_NEEDED_REQUIRED')),
   LINE_HOLDS_ACCESS: example(new GroupRequestLineHoldsAccessError([PERSON])),
   LINES_MISMATCH: example(new GroupRequestLinesMismatchError({ missing: [PERSON], extra: [] })),
   SPEND_NOT_THE_ASSIGNEE: example(new SpendDecisionRefusedError('NOT_THE_ASSIGNEE')),

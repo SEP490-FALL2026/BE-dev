@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
@@ -17,13 +18,15 @@ export interface RenewalPeople {
   superAdmin: string | null;
 }
 
-/** The roles that read the cases of renewal: the IT Admin who proposes and carries them out, Finance and the decider. */
-const READER_ROLES = ['IT_ADMIN', 'FINANCE', 'SPENDING_APPROVER'];
+/** What a reader of the renewals sees: every case (the IT Admin, Finance), or those of the department that owns the subscription. */
+export type RenewalReadScope = { kind: 'ALL'; itAdmin: boolean } | { kind: 'DEPARTMENT'; departmentId: string };
 
 /**
- * Who a renewal concerns (`US-11-01`, `US-11-02`, `US-11-05`): the IT Admin in charge of the department that owns the subscription
- * (any usable IT Admin while that department names none), Finance, the Business Owner, the person who decides spending — and nobody
- * in their place (`QĐ-93d`(1)) — and the Super Admin. A head of department and an employee are never among them.
+ * Who a renewal concerns (`US-11-01`, `US-11-05`, `QĐ-94d`(2)): the IT Admin in charge of the department that owns the subscription
+ * (any usable IT Admin while that department names none), Finance, the Business Owner, the head of the owner department — who
+ * confirms the proposal on the day of the decision, whatever role their account holds, and nobody in their place — and the Super
+ * Admin. The person who decides spending is no longer among those who decide a renewal, but still hears of an incident
+ * (`QĐ-98f`).
  */
 @Injectable()
 export class RenewalPartiesService {
@@ -41,50 +44,54 @@ export class RenewalPartiesService {
     );
   }
 
-  /**
-   * The spending approver, when they still work: who decides the cases now, and nobody else does (`QĐ-93d`(1)). Null when nobody holds
-   * the role or the holder has left, which is what a case that waits for its decision waits for. With `forShare`, in the transaction
-   * `tx`, the row of the grant is locked until it ends, so a case that starts to wait and a revocation take turns (`M6`).
-   */
-  async usableApproverOf(tx?: DbTx, options?: { forShare?: boolean }): Promise<string | null> {
-    const holder = await this.identity.getSpendingApproverEmployeeId(tx, options);
-    if (holder === null) return null;
-    const [found] = await this.organizationReads.getEmployees([holder], tx);
-
-    return found?.status === 'ACTIVE' ? holder : null;
+  /** The person assigned head of the department on `today`, or null: the department names none, or its head period has not begun. */
+  async ownerHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
+    return (
+      (await this.organizationReads.getDepartmentHeads([departmentId], today, tx)).get(departmentId)?.employeeId ?? null
+    );
   }
 
-  /** The Super Admin of today, whatever the state of their account, or null: who is told that a case waits for an approver (`D-S16`). */
+  /** The heads of these departments on `today`, by department id (a department with none is absent): one read for a page. */
+  async ownerHeadsOf(departmentIds: readonly string[], today: BusinessDate, tx?: DbTx): Promise<Map<string, string>> {
+    const heads = await this.organizationReads.getDepartmentHeads([...new Set(departmentIds)], today, tx);
+
+    return new Map([...heads].map(([departmentId, head]) => [departmentId, head.employeeId]));
+  }
+
+  /** The Super Admin of today, whatever the state of their account, or null: who is told that a case waits for a head. */
   async superAdminOf(tx?: DbTx): Promise<string | null> {
     return (await this.identity.getSuperAdminHolder(tx))?.employeeId ?? null;
   }
 
-  /** Whether the employee still works for the company. */
-  async employeeWorks(employeeId: string, tx?: DbTx): Promise<boolean> {
-    const [found] = await this.organizationReads.getEmployees([employeeId], tx);
-
-    return found?.status === 'ACTIVE';
+  /** Finance, when they still work: who is told the result of a decision (`QĐ-94d`(2)). */
+  financeOf(tx?: DbTx): Promise<string | null> {
+    return this.identity.findUsableFinanceEmployeeId(tx);
   }
 
-  /** Whether the employee holds the role of the spending approver now (an unlocked read). */
-  async holdsApproverRole(employeeId: string, tx?: DbTx): Promise<boolean> {
-    return (await this.identity.getSpendingApproverEmployeeId(tx)) === employeeId;
-  }
-
-  /** Who decides a case proposed by this person now: the spending approver, and nobody in their place. */
+  /** Who confirms a case proposed by this person now: the head of the owner department, and nobody in their place. */
   async deciderOf(
+    ownerDepartmentId: string,
     proposerEmployeeId: string,
+    today: BusinessDate,
     tx?: DbTx,
-  ): Promise<{ employeeId: string | null; role: Extract<DeciderRole, 'SPENDING_APPROVER'> }> {
-    return renewalDeciderOf(await this.usableApproverOf(tx), proposerEmployeeId);
+  ): Promise<{ employeeId: string | null; role: Extract<DeciderRole, 'OWNER_DEPARTMENT_HEAD'> }> {
+    return renewalDeciderOf(await this.ownerHeadOf(ownerDepartmentId, today, tx), proposerEmployeeId);
   }
 
-  /** Whether the caller reads the cases: one of the roles that work them; the substitute for a conflict has no part in them any more. */
-  canRead(actor: AuthenticatedPrincipal): boolean {
-    return actor.roles.some((role) => READER_ROLES.includes(role));
+  /**
+   * What the caller reads of the cases: every case for the IT Admin and Finance (Finance only reads), those of the department the
+   * caller heads today for a head (whatever role their account holds), and nothing for anyone else (`SoD-2`): null.
+   */
+  async readScopeOf(actor: AuthenticatedPrincipal, today: BusinessDate): Promise<RenewalReadScope | null> {
+    if (actor.roles.includes('IT_ADMIN')) return { kind: 'ALL', itAdmin: true };
+    if (actor.roles.includes('FINANCE')) return { kind: 'ALL', itAdmin: false };
+    // The head of today reads the cases of their department whatever role their account holds: the one who confirms must be able to read.
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, today);
+
+    return headed ? { kind: 'DEPARTMENT', departmentId: headed.departmentId } : null;
   }
 
-  /** The people every period shares (Finance, the decider, the Super Admin), read once for a pass. */
+  /** The people every period shares (Finance, the spending approver, the Super Admin), read once for a pass. */
   async sharedPeople(): Promise<Pick<RenewalPeople, 'finance' | 'approver' | 'superAdmin'>> {
     return {
       finance: await this.identity.findUsableFinanceEmployeeId(),

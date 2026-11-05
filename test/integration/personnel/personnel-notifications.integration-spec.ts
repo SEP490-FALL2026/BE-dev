@@ -97,7 +97,12 @@ describe('the notices of the personnel context (integration, real PostgreSQL)', 
         employeeId: who.employeeId,
         startedOn: h.day(-1),
         approvedReturnOn: h.day(40),
-        grounds: { type: 'LEAVE_APPROVAL', reference: 'DN-05/2026', issuer: 'HR Department', issuedOn: '2026-05-25' },
+        grounds: {
+          type: 'APPROVED_APPLICATION',
+          reference: 'DN-05/2026',
+          issuer: 'HR Department',
+          issuedOn: '2026-05-25',
+        },
       });
 
       expect(leave.status).toBe(201);
@@ -111,7 +116,7 @@ describe('the notices of the personnel context (integration, real PostgreSQL)', 
       const who = await worker();
 
       const wire = h.dataOf<CaseWire>(
-        await h.recordCase(h.body(who, { abrupt: true, lastWorkingDay: h.day(-1) })).expect(201),
+        await h.recordCase(h.body(who, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.day(-1) })).expect(201),
       );
 
       const rows = await noticesOf('ABRUPT_DEPARTURE_RECORDED', wire.id);

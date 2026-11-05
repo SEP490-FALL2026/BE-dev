@@ -29,12 +29,15 @@ interface Refusal {
 describe('the grant of SPENDING_APPROVER and the work that is still open (integration, real PostgreSQL)', () => {
   let internalA: string;
   let internalB: string;
+  let paidPlan: string;
   let counter = 0;
 
   beforeAll(async () => {
     await h.start();
     internalA = await h.plan('K5');
     internalB = await h.plan('K5');
+    // A request for a group is only for paid software (`GROUP_REQUEST.PLAN_NOT_ELIGIBLE`), so it is on a plan that is paid.
+    paidPlan = await h.planOf(await h.subscription(10));
   }, 240000);
 
   afterEach(async () => {
@@ -118,24 +121,13 @@ describe('the grant of SPENDING_APPROVER and the work that is still open (integr
   };
 
   describe('Requests (US-01-03 AC-12)', () => {
-    it('refuses a holder with open requests and lists them: the one they sent and the one sent for them, nothing is redetermined', async () => {
+    it('refuses a holder with open requests and lists them: the one they sent and the one sent for them and a colleague, nothing is redetermined', async () => {
       const u = await unit();
       const person = await h.staff(u.department, `E7-${counter}`);
+      const colleague = await h.staff(u.department, `E7C-${counter}`);
       await hired(person);
       const sentByThem = await h.sent(person, internalA);
-      const delegated = h.dataOf<{ requests: { id: string }[] }>(
-        await h
-          .sendDelegated(
-            {
-              beneficiaryEmployeeIds: [person.employeeId],
-              items: [{ planId: internalB }],
-              businessReason: 'The new designer needs the tool',
-              termMonths: 1,
-            },
-            u.head.account,
-          )
-          .expect(201),
-      ).requests[0].id;
+      const forGroup = await h.sentForPeople(paidPlan, [person, colleague], u.head.account);
       const audit = await redeterminations();
 
       const refusal = await refused(person);
@@ -144,7 +136,7 @@ describe('the grant of SPENDING_APPROVER and the work that is still open (integr
       expect(refusal.blockers).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ kind: 'REQUEST', id: sentByThem.id, partyRole: 'REQUESTER' }),
-          expect.objectContaining({ kind: 'REQUEST', id: delegated, partyRole: 'BENEFICIARY' }),
+          expect.objectContaining({ kind: 'REQUEST', id: forGroup, partyRole: 'BENEFICIARY' }),
         ]),
       );
       expect(refusal.blockers).toHaveLength(2);
@@ -152,9 +144,9 @@ describe('the grant of SPENDING_APPROVER and the work that is still open (integr
       expect(await holders()).toBe(0);
       expect(await redeterminations()).toBe(audit);
 
-      // The work ends (the requester withdraws, the head withdraws what was sent for the person): the grant goes through.
+      // The work ends (the requester withdraws, the head withdraws what was sent for the person and a colleague): the grant goes through.
       await h.withdrawRequest(sentByThem.id, {}, person.account).expect(200);
-      await h.withdrawRequest(delegated, {}, u.head.account).expect(200);
+      await h.withdrawRequest(forGroup, {}, u.head.account).expect(200);
       await grant(person).expect(200);
       expect(await holders()).toBe(1);
     });

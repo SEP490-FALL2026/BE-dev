@@ -281,7 +281,8 @@ export class AppUsersController {
   @ApiOperation({ operationId: 'appUserUnlock', summary: 'Unlock an account' })
   @ApiSuccessResponse(AccountDetailResponseDto, {
     message: 'APP_USER.UNLOCKED',
-    description: 'The account is active again.',
+    description:
+      'The account is active again. When the departure of its employee was cancelled after the block took effect, the block is lifted in the same act (departureBlockReleased in the Audit Trail).',
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
@@ -292,8 +293,9 @@ export class AppUsersController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description: 'The caller cannot change their own account.',
-      examples: [ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN],
+      description:
+        'The caller cannot change their own account, or the departure of its employee is still under way and keeps the access blocked (APP_USER.ACCESS_BLOCK_NOT_RELEASABLE).',
+      examples: [ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN, ACCOUNT_ERROR_EXAMPLES.ACCESS_BLOCK_NOT_RELEASABLE],
     },
     STATUS_CHANGE_VALIDATION_ERROR,
   )

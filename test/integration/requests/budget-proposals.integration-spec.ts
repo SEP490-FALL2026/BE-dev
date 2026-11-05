@@ -54,23 +54,18 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
       expect(events.map((event) => event.action)).toEqual(['BUDGET_PROPOSAL.SUBMITTED']);
     });
 
-    it('names the line and every field it lacks, and writes nothing (AC-2)', async () => {
+    it('wants a plan or a description of every line, and writes nothing (AC-2, QĐ-101n)', async () => {
       const { head, department } = await fresh('P-A2');
       const before = await h.budgetRows('budget_proposals');
-      const miro = h.line({
-        description: 'Miro',
-        windowFrom: undefined,
-        windowTo: undefined,
-        servicePeriodMonths: undefined,
-        repeatCycle: undefined,
-      });
+      const bare = { amount: h.money(1_000_000) };
 
-      const response = await propose(head, department.unitId, { lines: [h.line(), miro] }).expect(422);
+      const response = await h.submitProposal(
+        { ...h.proposalBody(department.unitId), lines: [h.line(), bare] },
+        head.account,
+      );
 
-      expect(h.codeOf(response)).toBe('BUDGET.PROPOSAL_INCOMPLETE');
-      expect(h.detailsOf(response)).toEqual({
-        lines: [{ line: 2, fields: ['windowFrom', 'windowTo', 'servicePeriodMonths', 'repeatCycle'] }],
-      });
+      expect(response.status).toBe(422);
+      expect(h.codeOf(response)).toBe('VALIDATION_ERROR');
       expect(await h.budgetRows('budget_proposals')).toBe(before);
     });
 
@@ -78,7 +73,7 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
       ['no lines', { lines: [] }],
       ['a line with no description', { lines: [h.line({ description: undefined })] }],
       ['a line with no amount', { lines: [h.line({ amount: undefined })] }],
-      ['a window that runs backwards', { lines: [h.line({ windowFrom: '2027-05-01', windowTo: '2027-04-01' })] }],
+      ['a window, which a line no longer has', { lines: [h.line({ windowFrom: '2027-05-01' })] }],
       ['an amount in another currency', { lines: [h.line({ amount: { amount: '5', currency: 'USD' } })] }],
       ['a negative amount', { lines: [h.line({ amount: h.money(-5) })] }],
     ])('refuses %s', async (_name, over) => {
@@ -89,26 +84,18 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
       expect(response.status).toBe(422);
     });
 
-    it("is only for the Cost Center of the head's own department, and only by a head (AC-3)", async () => {
-      const { head, department } = await fresh('P-A3');
+    it('is only for the Cost Center of the head of the department, and only by a head (AC-3)', async () => {
+      const { department } = await fresh('P-A3');
       const before = await h.budgetRows('budget_proposals');
 
-      const other = await propose(head, eng.department.unitId).expect(403);
       const employee = await propose(des.member, des.department.unitId).expect(403);
       const unheaded = await propose(headless, des.department.unitId).expect(403);
       const finance = await h.submitProposal(h.proposalBody(department.unitId), h.finance).expect(403);
       const it = await h.submitProposal(h.proposalBody(department.unitId), h.it1).expect(403);
 
-      expect(h.codeOf(other)).toBe('BUDGET.NOT_YOUR_COST_CENTER');
       for (const refused of [employee, unheaded, finance, it])
         expect(h.codeOf(refused)).toBe('AUTHORIZATION.FORBIDDEN');
       expect(await h.budgetRows('budget_proposals')).toBe(before);
-    });
-
-    it('is not for a Cost Center that does not exist, nor for the company', async () => {
-      const response = await propose(des.head, '00000000-0000-4000-8000-000000000000').expect(404);
-
-      expect(h.codeOf(response)).toBe('BUDGET.COST_CENTER_NOT_FOUND');
     });
 
     it('is the only one that waits for a Cost Center and a year', async () => {
@@ -280,9 +267,9 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
         'version',
         'year',
       ]);
-      expect(lines.items.map((line) => [line.description, line.amount.amount, line.overdue])).toEqual([
-        ['Figma Organization 10 seats', '50000000', false],
-        ['Miro 5 seats', '20000000', false],
+      expect(lines.items.map((line) => [line.description, line.amount.amount])).toEqual([
+        ['Figma Organization 10 seats', '50000000'],
+        ['Miro 5 seats', '20000000'],
       ]);
       expect(lines.items.every((line) => line.financeComment === null && line.adjustmentReason === null)).toBe(true);
       expect(JSON.stringify(lines)).not.toMatch(/remaining|left|check/i);
@@ -295,24 +282,9 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
 
       const next = h.dataOf<{ budget: Record<string, unknown> }>(await h.mine(head.account, h.next).expect(200)).budget;
       const lines = h.dataOf<Pageable<VersionLineWire>>(await h.mineLines(head.account, h.next).expect(200));
-      const revision = await h.createRevision({ costCenterId: department.unitId, year: h.next }).expect(409);
 
       expect(next).toMatchObject({ status: 'NO_ACTIVE_BUDGET', total: null, version: null });
       expect(lines.items).toEqual([]);
-      expect(h.codeOf(revision)).toBe('BUDGET.NO_CURRENT_BUDGET');
-    });
-
-    it('flags a line whose purchase window has gone by', async () => {
-      const { head, department } = await fresh('P-V3');
-      const past = h.line({ windowFrom: `${h.year}-01-01`, windowTo: `${h.year}-01-02`, description: 'Already due' });
-      const proposal = await h.budgetProposed(head, department.unitId, [past], h.year);
-      await h.current(proposal.id);
-
-      const lines = h.dataOf<Pageable<VersionLineWire>>(await h.mineLines(head.account, h.year).expect(200));
-
-      expect(lines.items.map((line) => line.overdue)).toEqual([
-        Number(h.today().slice(5, 7)) > 1 || Number(h.today().slice(8)) > 2,
-      ]);
     });
 
     it('is the department of the head only: another head, a member and a person with no department read nothing of it', async () => {

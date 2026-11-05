@@ -42,6 +42,7 @@ export class VersionCreationService {
    */
   async createFromProposal(actor: AuthenticatedPrincipal, body: VersionBodyDto): Promise<VersionWire> {
     this.facts.requireFinance(actor);
+    const defaultPercent = await this.facts.reserveDefaultPercent();
 
     return this.runner.run(async (tx) => {
       // The month is read here and held until the commit: a change of it waits for this version, and finds it (`US-01-04` AC-8).
@@ -60,7 +61,7 @@ export class VersionCreationService {
       if (await this.versions.inFlight(proposal.costCenterId, proposal.year, tx))
         throw new BudgetVersionInFlightError();
 
-      const figures = await this.figures.figures(tx, proposal.currency, body);
+      const figures = await this.figures.figures(tx, proposal.currency, { ...body, defaultPercent });
       const lines = (await this.proposals.allLines(proposal.id, tx)).map((line) =>
         copiedLineOf(line, { proposalId: proposal.id, proposalPosition: line.position }),
       );

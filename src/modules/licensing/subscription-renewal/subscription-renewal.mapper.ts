@@ -33,6 +33,28 @@ export function toRenewalSummary(
   };
 }
 
+/** The decision as its page shows it; the IT Admin does not read the money the head saw (`L-617`). */
+function decisionWire(
+  decision: NonNullable<RenewalRecord['decision']>,
+  releasedSeatCount: number,
+  showSnapshot: boolean,
+): NonNullable<RenewalDetailWire['decision']> {
+  return {
+    choice: decision.choice,
+    quantity: decision.quantity,
+    reason: decision.reason,
+    decidedByEmployeeId: decision.decidedByEmployeeId,
+    deciderRole: decision.deciderRole,
+    decidedAt: decision.decidedAt.toISOString(),
+    decidedOn: decision.decidedOn,
+    decidedAfterDeadline: decision.decidedAfterDeadline,
+    executionPoint: decision.executionPoint,
+    seatsInUseAtDecision: decision.activeSeatsAtDecision,
+    releasedSeatCount,
+    snapshot: showSnapshot ? decision.snapshot : null,
+  };
+}
+
 /** A case as its page shows it, with the period, the seats in use, the decision and its snapshot, and the outcome. */
 export function toRenewalDetail(
   record: RenewalRecord,
@@ -43,6 +65,8 @@ export function toRenewalDetail(
     released: readonly ReleasedSeat[];
     savings: { amount: string; currency: string } | null;
     waitingReason: RenewalSummaryWire['waitingReason'];
+    /** False for the IT Admin: the money the head saw is not theirs to read (`L-617`). */
+    showSnapshot: boolean;
   },
 ): RenewalDetailWire {
   const { period, released } = context;
@@ -68,21 +92,9 @@ export function toRenewalDetail(
       businessOwnerOpinion: record.businessOwnerOpinion,
       proposedByEmployeeId: record.proposedByEmployeeId,
       proposedAt: record.proposedAt.toISOString(),
-    },
-    decision: decision && {
-      choice: decision.choice,
-      quantity: decision.quantity,
-      reason: decision.reason,
-      decidedByEmployeeId: decision.decidedByEmployeeId,
-      deciderRole: decision.deciderRole,
-      decidedAt: decision.decidedAt.toISOString(),
-      decidedOn: decision.decidedOn,
-      decidedAfterDeadline: decision.decidedAfterDeadline,
-      executionPoint: decision.executionPoint,
-      seatsInUseAtDecision: decision.activeSeatsAtDecision,
       releasedSeatCount: released.length,
-      snapshot: decision.snapshot,
     },
+    decision: decision && decisionWire(decision, released.length, context.showSnapshot),
     lateFlaggedAt: record.lateFlaggedAt?.toISOString() ?? null,
     outcomeDetail: outcome && {
       kind: outcome.kind,

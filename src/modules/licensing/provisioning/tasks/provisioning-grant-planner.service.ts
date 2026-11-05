@@ -3,7 +3,6 @@ import { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../../catalog/public/catalog.types';
 import { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
-import type { BusinessDate } from '../../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
   GrantRequestRefusedError,
@@ -24,7 +23,6 @@ export interface GrantInput {
   requestId: string;
   subscriptionId?: string;
   accountIdentifier?: string;
-  expectedEndDate?: BusinessDate;
   responsibleEmployeeId?: string;
   /** The person of a request for a group this grant is for; a request for one person has none to name. */
   beneficiaryEmployeeId?: string;
@@ -69,6 +67,8 @@ export class ProvisioningGrantPlanner {
     // The most tries are fixed here: a parameter changed later reaches only the tasks made after it (US-01-04 AC-13).
     const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT')));
 
-    return { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts };
+    const fiscalYearStartMonth = Number(await this.parameters.getValue('FISCAL_YEAR_START_MONTH'));
+
+    return { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts, fiscalYearStartMonth };
   }
 }

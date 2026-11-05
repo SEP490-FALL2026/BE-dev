@@ -296,12 +296,14 @@ describe('closing a request because its person was transferred (integration, rea
     });
 
     it('closes a request whose last live line is the transferred person’s: the line goes and the request ends with it', async () => {
-      const { people, id, target } = await group(1);
+      // A group names two people at least, so the other one is taken out first and the last live line is the transferred person's.
+      const { u, people, id, target } = await group(2);
+      await h.withdrawLine(id, people[1].employeeId, {}, u.head.account).expect(200);
       await h.moveTo(people[0].employeeId, target.department.id);
 
       await h.closeForDeparture(id, reason, h.it1).expect(200);
 
-      expect(await h.lineStates(id)).toEqual(['CANCELLED']);
+      expect((await h.lineStates(id))[0]).toBe('CANCELLED');
       expect(await h.state(id)).toBe('CANCELLED');
     });
   });

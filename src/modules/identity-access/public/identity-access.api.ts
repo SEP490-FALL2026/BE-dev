@@ -3,14 +3,18 @@ import type { BusinessDate } from '../../../core/business-date';
 import { normalizeEmail } from '../../../core/email';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccessBlockService } from '../access-block/access-block.service';
 import { AccountRecordService } from '../accounts/account-record.service';
 import { ActionLinkService } from '../accounts/action-link.service';
 import { CredentialService } from '../credentials/credential.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
 import {
+  AccessBlockCause,
+  AccessBlockRecord,
   BootstrapSuperAdminInput,
   EmployeeAccountInspection,
   LeaverGrantRole,
+  PendingBlockOutcome,
   SuperAdminHolder,
 } from './identity-access.types';
 import { employeeHasNotLeft, isActionLinkRedeemable } from '../accounts/account.policy';
@@ -20,6 +24,7 @@ import { employeeHasNotLeft, isActionLinkRedeemable } from '../accounts/account.
 export class IdentityAccessApi {
   constructor(
     private readonly accounts: AccountRecordService,
+    private readonly accessBlocks: AccessBlockService,
     private readonly grants: RoleGrantService,
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
@@ -89,6 +94,45 @@ export class IdentityAccessApi {
    */
   markEmployeeLeft(tx: DbTx, employeeId: string, leftOn: BusinessDate): Promise<void> {
     return this.accounts.markEmployeeLeft(tx, employeeId, leftOn);
+  }
+
+  /**
+   * The departure of this employee puts a block on their access from `blockedFrom` (QĐ-100q), in the transaction of the case:
+   * from that day the sign-in, the refresh and the guard refuse the account whatever the state of the case. One block for each employee.
+   */
+  setDepartureBlock(
+    tx: DbTx,
+    input: { employeeId: string; cause: AccessBlockCause; blockedFrom: BusinessDate; caseId: string },
+  ): Promise<void> {
+    return this.accessBlocks.set(tx, input);
+  }
+
+  /** The last working day moved: the block that follows it moves too; a block set to act now keeps its day (R-11). */
+  moveDepartureBlock(tx: DbTx, employeeId: string, blockedFrom: BusinessDate): Promise<void> {
+    return this.accessBlocks.move(tx, employeeId, blockedFrom);
+  }
+
+  /** The departure was cancelled: a block not yet in force is removed; one in force stays and can be lifted only by an unlock with a reason. */
+  clearPendingDepartureBlock(tx: DbTx, employeeId: string, today: BusinessDate): Promise<PendingBlockOutcome> {
+    return this.accessBlocks.clearPending(tx, employeeId, today);
+  }
+
+  /**
+   * Whether a block on the access of this employee is in force today (`blocked_from <= business today`, QĐ-100q): the device credential of a
+   * person who is blocked is refused from that day, as the sign-in is.
+   */
+  isAccessBlocked(employeeId: string, tx?: DbTx): Promise<boolean> {
+    return this.accessBlocks.isBlockedNow(employeeId, tx);
+  }
+
+  /** The block on the access of this employee, or null (an unlocked read; with `tx`, in the transaction of the act). */
+  findDepartureBlock(employeeId: string, tx?: DbTx): Promise<AccessBlockRecord | null> {
+    return this.accessBlocks.find(employeeId, tx);
+  }
+
+  /** The blocks on the access of these employees by employee id, one statement (an unlocked read, for lists). */
+  findDepartureBlocks(employeeIds: readonly string[]): Promise<Map<string, AccessBlockRecord>> {
+    return this.accessBlocks.findMany(employeeIds);
   }
 
   /** Among these employees, those who hold the IT Admin role on a usable account (an unlocked read, for lists). */

@@ -1,4 +1,4 @@
-import { INSTALLATION } from './fixture/shared-demo-v2/installation';
+import { INSTALLATION } from './fixture/shared-demo-v3/installation';
 import { seedSecretsProblem } from './seed-secrets';
 import type { DemoAccountsApi } from '../../modules/installation/public/demo-accounts.api';
 import type { SeedCommandArguments } from './seed.arguments';
@@ -26,7 +26,6 @@ export interface DemoRunInput {
   /** Told each phase as the run enters it, so a failure line can place it (demo-failure.ts). */
   clock?: Pick<DemoRunClock, 'enter'>;
   bootstrap?: () => Promise<void>;
-  forceNextFiscalYear?: boolean;
 }
 
 const API_PREFIX = '/api/v1';
@@ -237,7 +236,7 @@ function context(
   fixture: DemoFixture,
   api: DemoApiClient,
   facts: { organizationId: string; today: string; superAdmin: { loginEmail: string } | null },
-): DemoRunContext & { forceNextFiscalYear: boolean } {
+): DemoRunContext {
   const attribution = {
     operatorReference: `DEMO_DATASET:${fixture.id}:${input.args.operator}`,
     environment: input.args.environment,
@@ -248,7 +247,6 @@ function context(
     fixture,
     api,
     today: facts.today,
-    forceNextFiscalYear: process.env.NODE_ENV === 'test' && input.forceNextFiscalYear === true,
     superAdminEmail: facts.superAdmin?.loginEmail ?? '',
     demoPassword: input.secrets.demoAccountPassword,
     ids: emptyIds(),

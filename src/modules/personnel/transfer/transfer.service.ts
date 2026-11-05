@@ -38,7 +38,7 @@ export class TransferService {
     const owned = await this.catalog.getApplicationsOwnedBy(input.employeeId, WARNING_APPLICATION_LIMIT);
     const warnings: TransferWarning[] =
       owned.total > 0
-        ? [{ code: 'BUSINESS_OWNER_REPLACEMENT_NEEDED', applications: owned.items, totalApplications: owned.total }]
+        ? [{ code: 'BUSINESS_OWNER_KEEP_OR_CHANGE', applications: owned.items, totalApplications: owned.total }]
         : [];
 
     return { transfer, warnings };

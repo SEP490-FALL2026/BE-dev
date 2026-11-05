@@ -7,7 +7,7 @@ import { RequestPartyEligibilityApi } from '../../identity-access/public/request
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNoDepartmentError } from '../access-request/access-request.errors';
 import type { PreviewBodyDto, PreviewWire } from './request-preview.dto';
-import { buildChain, spendSubmissionOf, termNeedsConfirmation } from './request-preview.policy';
+import { buildChain, spendSubmissionOf } from './request-preview.policy';
 import { PricingViewService } from '../request-view/pricing-view.service';
 import { RequestFactsService } from '../access-request/request-facts.service';
 
@@ -63,13 +63,10 @@ export class RequestPreviewService {
       termMonths: body.termMonths,
       department: { id: department.id, code: department.code, name: department.name },
       costCenter: costCenter && { id: costCenter.id, code: costCenter.code, name: costCenter.name },
-      requirements: {
-        termConfirmationByHead: termNeedsConfirmation(body.termMonths),
-      },
+      termLimit: assessed.termLimit,
       existingAccess: assessed.heldAccess,
       blockedBy,
-      canSubmit: assessed.heldAccess === null && blockedBy === null,
-      expectedSpendOn: pricing.expectedSpendOn,
+      canSubmit: assessed.heldAccess === null && blockedBy === null && !assessed.termBeyondLimit,
       budgetYear: pricing.budgetYear,
       pricing: priceView,
       costEstimate,
@@ -94,7 +91,6 @@ export class RequestPreviewService {
         employeeId: actor.employeeId,
         planId: body.planId,
         termMonths: body.termMonths,
-        expectedSpendOn: body.expectedSpendOn,
         now: new Date(),
         settings,
         lockDepartment: false,

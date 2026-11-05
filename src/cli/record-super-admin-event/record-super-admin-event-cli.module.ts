@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigurationModule } from '../../infrastructure/config/configuration.module';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { UsageModule } from '../../modules/usage/usage.module';
 import { SuperAdminEventCliModule } from '../../modules/personnel/super-admin-event/super-admin-event-cli.module';
 
 /**
@@ -9,5 +10,5 @@ import { SuperAdminEventCliModule } from '../../modules/personnel/super-admin-ev
  * the notices of the event) are the ones of the application. Nothing of the API is served: no route, no guard, no sweep that runs soon
  * enough to matter in a process that ends with the command.
  */
-@Module({ imports: [ConfigurationModule, DatabaseModule, SuperAdminEventCliModule] })
+@Module({ imports: [ConfigurationModule, DatabaseModule, SuperAdminEventCliModule, UsageModule] })
 export class RecordSuperAdminEventCliModule {}

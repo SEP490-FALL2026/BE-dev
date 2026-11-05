@@ -53,10 +53,10 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
     return h.departmentWithHead(`P-C${counter}`);
   };
   /** 100 million, 20 held, 40 spent: 40 left. */
-  const example = async (percent = 100) => {
+  const example = async () => {
     const u = await unit();
 
-    return { u, version: await h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M, percent }) };
+    return { u, version: await h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M }) };
   };
   const approve = (id: string, over: object = {}) =>
     h.decideSpend(id, { decision: 'APPROVE', ...over }, h.boss.account);
@@ -207,9 +207,10 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
       expect(await row(u, h.next)).toMatchObject({ remaining: { amount: String(90 * M) } });
     });
 
-    it('is one for each year the binding payments fall in, and the year with no budget waits for one (AC-11, US-06-07 AC-7)', async () => {
+    it('is one for each year the binding payments fall in, each attached to the budget of its own year (AC-11, US-06-07 AC-7)', async () => {
       const u = await unit();
       await h.budgetFor(u, { total: 5_000_000 });
+      await h.budgetFor(u, { total: 32 * M, year: h.next });
       const id = await h.paidRequest(u, plan, {
         schedule: [
           { dueOn: `${h.year}-11-01`, amount: 2_400_000, year: h.year },
@@ -217,52 +218,26 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
         ],
       });
       await h.sendOn([id], u.head.account).expect(201);
-      await h
-        .completeReview(id, {
-          outcome: 'ASSESSED',
-          opinion: 'No budget next year: accepted',
-          direction: 'RECOMMEND_OVERRIDE',
-        })
-        .expect(200);
 
-      await approve(id, { override: { reason: 'The budget of next year is being made', years: [h.next] } }).expect(200);
+      await approve(id).expect(200);
 
-      const commitments = await held(id);
-      expect(commitments).toEqual([
+      expect(await held(id)).toEqual([
         expect.objectContaining({
           year: h.year,
           amount_minor: '2400000',
           attached_version_id: expect.any(String) as string,
+          unattached_reason: null,
         }),
         expect.objectContaining({
           year: h.next,
           amount_minor: '2400000',
-          attached_version_id: null,
-          unattached_reason: 'NO_BUDGET',
+          attached_version_id: expect.any(String) as string,
+          unattached_reason: null,
         }),
       ]);
-      // This year loses its own payment only, and the one of next year waits in the list of Finance for the budget of next year.
+      // Each year loses its own payment only.
       expect(await row(u)).toMatchObject({ remaining: { amount: '2600000' } });
-      const waiting = h.dataOf<{
-        items: Array<{ requestId: string; year: number; attached: boolean; unattachedReason: string }>;
-      }>(await h.commitmentList(h.finance, { attached: 'false', year: h.next, pageSize: 100 }).expect(200));
-      expect(waiting.items).toContainEqual(
-        expect.objectContaining({ requestId: id, year: h.next, attached: false, unattachedReason: 'NO_BUDGET' }),
-      );
-
-      await h.budgetFor(u, { total: 32 * M, year: h.next });
-
-      expect((await held(id))[1]).toMatchObject({
-        unattached_reason: null,
-        attached_version_id: expect.any(String) as string,
-      });
       expect(await row(u, h.next)).toMatchObject({ remaining: { amount: String(32 * M - 2_400_000) } });
-      expect((await held(id))[0].year).toBe(h.year);
-      const events = await h.ctx.sql.query(
-        `SELECT 1 FROM audit_events WHERE action = 'BUDGET_COMMITMENT.ATTACHED' AND after->>'requestId' = $1`,
-        [id],
-      );
-      expect(events.rowCount).toBe(1);
     });
 
     it('is none for a period that is only a forecast (AC-12)', async () => {
@@ -288,36 +263,6 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
     });
   });
 
-  describe('no budget yet (AC-7, US-06-07 AC-1, AC-2, AC-5)', () => {
-    it('is held and waits with the reason, is in the list of Finance, blocks nothing and makes no budget of nothing', async () => {
-      const u = await unit();
-      const id = await h.paidRequest(u, plan, { amount: 30 * M });
-      await h.sendOn([id], u.head.account).expect(201);
-      await h
-        .completeReview(id, { outcome: 'ASSESSED', opinion: 'No budget: accepted', direction: 'RECOMMEND_OVERRIDE' })
-        .expect(200);
-      const versions = await h.budgetRows('budget_versions');
-
-      await approve(id, { override: { reason: 'The budget comes in March', years: [h.year] } }).expect(200);
-
-      expect(await held(id)).toEqual([
-        expect.objectContaining({
-          amount_minor: String(30 * M),
-          state: 'HELD',
-          attached_version_id: null,
-          unattached_reason: 'NO_BUDGET',
-        }),
-      ]);
-      const list = h.dataOf<{ items: Array<{ requestId: string }> }>(
-        await h.commitmentList(h.finance, { attached: 'false', pageSize: 100 }).expect(200),
-      );
-      expect(list.items.map((item) => item.requestId)).toContain(id);
-      expect(await h.steps(id, 'FINANCE_REVIEW')).toEqual([expect.objectContaining({ state: 'COMPLETED' })]);
-      await h.grant({ requestId: id, subscriptionId }).expect(201);
-      expect(await h.budgetRows('budget_versions')).toBe(versions);
-    });
-  });
-
   describe('what Finance and the snapshot show (US-06-09 AC-2, AC-4, AC-9)', () => {
     it('lets Finance open the request a commitment was held for, and no other (AC-2)', async () => {
       const { u } = await example();
@@ -340,31 +285,6 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
       expect(orphans.rowCount).toBe(0);
       await h.commitmentList(h.boss.account).expect(403);
       await h.commitmentList(h.it1).expect(403);
-    });
-
-    it('keeps the snapshot of the decision as it was when the budget is revised afterwards (AC-9)', async () => {
-      const { u } = await example(50);
-      const id = await approved(u, 15 * M);
-      const revision = h.dataOf<{ version: { id: string } }>(
-        await h
-          .createRevision({
-            costCenterId: u.department.unitId,
-            year: h.year,
-            base: h.money(60 * M),
-            reserve: h.money(20 * M),
-            reason: 'Cut to the plan',
-          })
-          .expect(201),
-      ).version;
-      await h.sendVersion(revision.id).expect(200);
-      await h.decideVersion(revision.id, { decision: 'APPROVE' }, h.deciderOf()).expect(200);
-
-      const years = h.dataOf<{ items: Array<{ budget: { amount: string } }> }>(
-        await h.checkYears(id, h.finance).expect(200),
-      ).items;
-
-      expect(years[0].budget.amount).toBe(String(100 * M));
-      expect(await row(u)).toMatchObject({ total: { amount: String(80 * M) } });
     });
   });
 });

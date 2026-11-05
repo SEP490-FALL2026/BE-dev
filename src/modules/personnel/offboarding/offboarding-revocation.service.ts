@@ -9,7 +9,15 @@ import { OffboardingSources } from './offboarding-sources.service';
 import { OffboardingFrame } from './offboarding-frame.service';
 import { OffboardingLeftService } from './offboarding-left.service';
 import { OffboardingRefusedError } from './offboarding.errors';
-import { closeRefusal, isRevocableType, revocationSelection, type RightFacts } from './offboarding.policy';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import {
+  closeRefusal,
+  isBlocked,
+  isRevocableType,
+  ownBlock,
+  revocationSelection,
+  type RightFacts,
+} from './offboarding.policy';
 import { OffboardingRepo } from './offboarding.repo';
 import type { OffboardingRecord, OpenRevocationsInput } from './offboarding.types';
 
@@ -20,10 +28,13 @@ export interface RevocationsOpened {
   reasonAdded: number;
 }
 
+/** The standard reason of the revocations a departure opens (`QĐ-77j`): the IT Admin may add a note, never a count. */
+export const DEPARTURE_REVOCATION = 'DEPARTURE_REVOCATION';
+
 /**
  * The IT Admin takes the rights of a person who has left away, all at once from the list of the rights the case keeps, and closes the
  * case (`US-03-04` AC-4, AC-5, AC-16, AC-20, `QĐ-62i`, `QĐ-77i`). Nothing is taken away by itself: a task is made for a seat only when
- * the IT Admin asks for it, with how many they mean (so a count that does not match the list is refused), one reason for all, and
+ * the IT Admin asks for it, with the standard reason of a departure and the note they add (the server counts the rights), and
  * after the lock of the company account is written or together with it. Every task goes through the one gate of `licensing`, in one
  * transaction with the case. The case closes only when no personal right is left, the account is locked, and what the flows that come
  * after register is empty.
@@ -37,12 +48,18 @@ export class OffboardingRevocationService {
     private readonly left: OffboardingLeftService,
     private readonly sources: OffboardingSources,
     private readonly audit: OffboardingAuditService,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** Opens the revocations the IT Admin chose. Throws OffboardingRefusedError. */
   openRevocations(actor: AuthenticatedPrincipal, id: string, input: OpenRevocationsInput): Promise<RevocationsOpened> {
     return this.frame.runTechnical(actor, id, {}, async (tx, { held, today }) => {
-      const seats = held.state === 'LEFT' ? await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx) : [];
+      const blocked = isBlocked(
+        held,
+        ownBlock(await this.identity.findDepartureBlock(held.employeeId, tx), held.id),
+        today,
+      );
+      const seats = blocked ? await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx) : [];
       const rights: RightFacts[] = seats.map((seat) => ({
         assignmentId: seat.assignmentId,
         hasTask: seat.revocation !== null,
@@ -50,10 +67,8 @@ export class OffboardingRevocationService {
         provisioningType: seat.provisioningType,
       }));
       const { refusal, selected } = revocationSelection({
-        state: held.state,
+        blocked,
         closed: held.closedAt !== null,
-        reason: input.reason,
-        count: input.count,
         named: input.assignmentIds,
         rights,
         lockRecorded: held.accountLockAt !== null,
@@ -63,7 +78,8 @@ export class OffboardingRevocationService {
 
       // The lock of the company account goes first, or with the revocations, in the same transaction (`QĐ-77i`).
       if (input.accountLock) await this.left.writeAccountLock(tx, actor, held, input.accountLock);
-      const reason = input.reason.trim();
+      const note = input.note?.trim();
+      const reason = note ? `${DEPARTURE_REVOCATION}: ${note}` : DEPARTURE_REVOCATION;
       let created = 0;
       let reasonAdded = 0;
       for (const assignmentId of selected) {
@@ -126,7 +142,7 @@ export class OffboardingRevocationService {
   }
 
   private sourceOf(held: OffboardingRecord): 'DEPARTURE' | 'ABRUPT_DEPARTURE' {
-    return held.abrupt ? 'ABRUPT_DEPARTURE' : 'DEPARTURE';
+    return held.accessBlockMode === 'BLOCK_NOW' ? 'ABRUPT_DEPARTURE' : 'DEPARTURE';
   }
 
   private async openOne(

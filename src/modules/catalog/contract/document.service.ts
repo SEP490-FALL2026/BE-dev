@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { ObjectKeyFactory } from '../../../infrastructure/object-storage/object-key.factory';
 import { ObjectStorageUnavailableError } from '../../../infrastructure/object-storage/object-storage.errors';
 import { OBJECT_STORAGE, type ObjectStoragePort } from '../../../infrastructure/object-storage/object-storage.port';
@@ -22,6 +22,7 @@ import {
   assertAttachable,
   assertFileAllowed,
   assertMayChoosePurpose,
+  assertPurposeAttachesTo,
   assertPurposeAvailable,
   assertUploadMatches,
   contentMatchesType,
@@ -260,12 +261,13 @@ export class DocumentService {
   /**
    * Attaches the file to a contract: only by the person who uploaded it, who still holds a role that chooses its purpose,
    * and only once. Throws DocumentNotFoundError, DocumentPurposeForbiddenError, ContractNotFoundError,
-   * DocumentAlreadyAttachedError and DocumentNotReadyToAttachError.
+   * DocumentAlreadyAttachedError, DocumentNotReadyToAttachError and DocumentPurposeMismatchError.
    */
   async attach(actor: AuthenticatedPrincipal, id: string, input: { contractId: string }): Promise<DocumentRecord> {
     const organization = await this.requireOrganization();
     const current = await this.ownedBy(actor, id);
     assertMayChoosePurpose(current.purpose, actor.roles);
+    assertPurposeAttachesTo(current.purpose, 'CONTRACT');
     if (!(await this.contracts.find(input.contractId))) throw new ContractNotFoundError();
     const now = new Date();
 
@@ -289,6 +291,36 @@ export class DocumentService {
 
       return (await this.documents.find(id, tx)) ?? locked;
     });
+  }
+
+  /**
+   * Attaches a signed record (`BM-06`) to the person who signed it, in the transaction of the caller (the register of devices):
+   * only by the IT Admin who uploaded it, and only once. Throws DocumentNotFoundError, DocumentPurposeMismatchError,
+   * DocumentAlreadyAttachedError and DocumentNotReadyToAttachError.
+   */
+  async attachSignatureRecord(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { documentId: string; signerEmployeeId: string },
+  ): Promise<void> {
+    const organization = await this.requireOrganization();
+    const locked = await this.documents.lock(tx, input.documentId);
+    if (!locked || locked.uploadedByAppUserId !== actor.appUserId) throw new DocumentNotFoundError();
+    assertPurposeAttachesTo(locked.purpose, 'SIGNER');
+    assertAttachable(locked.status);
+    await this.documents.markAttachedToSigner(tx, locked.id, input.signerEmployeeId, new Date());
+    await this.audit.record(
+      tx,
+      catalogAuditEvent(
+        actor,
+        organization.id,
+        'DOCUMENT.ATTACHED',
+        'DocumentAttachment',
+        locked.id,
+        { status: locked.status },
+        { status: 'READY', signerEmployeeId: input.signerEmployeeId },
+      ),
+    );
   }
 
   /** A file as the person may see it; one they may not see is as if it did not exist. Throws DocumentNotFoundError. */
@@ -335,6 +367,7 @@ export class DocumentService {
     const document = await this.documents.find(id);
     if (!document) throw new DocumentNotFoundError();
     const decision = mayOpen({
+      purpose: document.purpose,
       status: document.status,
       uploaderAppUserId: document.uploadedByAppUserId,
       actorAppUserId: actor.appUserId,

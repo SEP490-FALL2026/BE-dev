@@ -29,14 +29,12 @@ import {
   AddLinesBodyDto,
   IdParamDto,
   BudgetLineImportResponseDto,
-  LineChangePageResponseDto,
   LineParamDto,
   LinePatchDto,
   LineResponseDto,
   PageQueryDto,
   VersionLinePageResponseDto,
   VersionResponseDto,
-  WindowBodyDto,
 } from '../budget/budget.dto';
 import { BudgetImportFileInvalidError } from '../budget/budget.errors';
 import {
@@ -46,7 +44,6 @@ import {
 } from '../budget/budget.http-errors';
 import { LineImportService } from './line-import.service';
 import { VersionLineService } from './version-line.service';
-import { VersionWindowService } from './version-window.service';
 import { VersionViewService } from '../budget/version-view.service';
 
 /** The largest file the route reads: a file of 1 000 lines is far smaller. */
@@ -120,9 +117,9 @@ const MONEY_EXAMPLES = [
 ] as const;
 
 /**
- * The versions of a budget as Finance builds them (`US-06-09`): a first version from the proposal that waits, a revision of
- * the current budget, lines adjusted with a comment and a reason, a forecast by quarter that never limits a payment, a file
- * of lines, and the sending to the spending approver. Only Finance does this: the head, the IT Admin, the Super Admin and
+ * The versions of a budget as Finance builds them (`US-06-09`): a first version from the proposal that waits, lines adjusted
+ * with a comment and a reason, a forecast by quarter that never limits a payment, a file of lines, and the sending to the
+ * spending approver. Only Finance does this: the head, the IT Admin, the Super Admin and
  * the spending approver cannot, and nobody here makes a version current.
  */
 @ApiTags('budget-versions')
@@ -130,7 +127,6 @@ const MONEY_EXAMPLES = [
 export class BudgetVersionLinesController {
   constructor(
     private readonly lineOps: VersionLineService,
-    private readonly windows: VersionWindowService,
     private readonly views: VersionViewService,
     private readonly imports: LineImportService,
   ) {}
@@ -165,10 +161,9 @@ export class BudgetVersionLinesController {
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The body is invalid (VALIDATION_ERROR), the window runs backwards (BUDGET.WINDOW_BACKWARDS), the reason of the adjustment is missing (BUDGET.ADJUSTMENT_REASON_REQUIRED), the line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND) or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
+      'The body is invalid (VALIDATION_ERROR), the reason of the adjustment is missing (BUDGET.ADJUSTMENT_REASON_REQUIRED), the line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND) or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
     examples: [
       VALIDATION_EXAMPLE,
-      EXAMPLES.WINDOW_BACKWARDS,
       EXAMPLES.ADJUSTMENT_REASON_REQUIRED,
       EXAMPLES.PLAN_NOT_FOUND,
       EXAMPLES.YEAR_ENDED,
@@ -198,15 +193,8 @@ export class BudgetVersionLinesController {
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, VERSION_NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The body is invalid (VALIDATION_ERROR), a line is incomplete (BUDGET.PROPOSAL_INCOMPLETE), a window runs backwards (BUDGET.WINDOW_BACKWARDS), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND) or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
-    examples: [
-      VALIDATION_EXAMPLE,
-      EXAMPLES.PROPOSAL_INCOMPLETE,
-      EXAMPLES.WINDOW_BACKWARDS,
-      EXAMPLES.PLAN_NOT_FOUND,
-      EXAMPLES.YEAR_ENDED,
-      ...MONEY_EXAMPLES,
-    ],
+      'The body is invalid (VALIDATION_ERROR), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND) or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
+    examples: [VALIDATION_EXAMPLE, EXAMPLES.PLAN_NOT_FOUND, EXAMPLES.YEAR_ENDED, ...MONEY_EXAMPLES],
   })
   async addLines(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -215,71 +203,6 @@ export class BudgetVersionLinesController {
   ) {
     try {
       return { version: await this.lineOps.addLines(actor, params.id, body) };
-    } catch (error) {
-      throw toBudgetApiException(error);
-    }
-  }
-
-  @Put(':id/lines/:position/window')
-  @RequireRoles('FINANCE')
-  @ApiOperation({
-    operationId: 'budgetVersionLineWindow',
-    summary: 'Move the purchase window of a line of the current budget',
-  })
-  @ApiSuccessResponse(LineResponseDto, {
-    message: 'BUDGET_VERSION.WINDOW_MOVED',
-    description: 'The move is kept with what the window was and the reason. An amount is never changed here.',
-  })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    FINANCE_ONLY,
-    NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The version is not the current budget (BUDGET.VERSION_NOT_CURRENT), or an amount is given: that is a revision (BUDGET.REVISION_REQUIRED).',
-      examples: [EXAMPLES.VERSION_NOT_CURRENT, EXAMPLES.REVISION_REQUIRED],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The body is invalid (VALIDATION_ERROR), the reason is missing (BUDGET.WINDOW_REASON_REQUIRED), the window runs backwards (BUDGET.WINDOW_BACKWARDS) or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
-      examples: [
-        VALIDATION_EXAMPLE,
-        EXAMPLES.WINDOW_REASON_REQUIRED,
-        EXAMPLES.WINDOW_BACKWARDS,
-        EXAMPLES.YEAR_ENDED,
-        ...MONEY_EXAMPLES,
-      ],
-    },
-  )
-  async changeWindow(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: LineParamDto,
-    @Body() body: WindowBodyDto,
-  ) {
-    try {
-      return { line: await this.windows.changeWindow(actor, params.id, params.position, body) };
-    } catch (error) {
-      throw toBudgetApiException(error);
-    }
-  }
-
-  @Get(':id/lines/:position/changes')
-  @AuthenticatedOnly()
-  @ApiOperation({ operationId: 'budgetVersionLineChangeList', summary: 'List the moves of the window of a line' })
-  @ApiSuccessResponse(LineChangePageResponseDto, {
-    message: 'BUDGET_VERSION.CHANGES_LISTED',
-    description: 'Newest first: the window before and after, the reason, who and when.',
-  })
-  @ApiErrorResponses(...AUTH_ERRORS, READERS_ONLY, NOT_FOUND, INVALID)
-  async changes(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: LineParamDto,
-    @Query() query: PageQueryDto,
-  ) {
-    try {
-      return await this.views.changes(actor, params.id, params.position, query);
     } catch (error) {
       throw toBudgetApiException(error);
     }

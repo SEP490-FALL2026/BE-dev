@@ -8,7 +8,6 @@ import {
   AccessRequestNoDepartmentError,
   AccessRequestNotFoundError,
   AccessRequestPlanNotFoundError,
-  AccessRequestSpendDateNotAllowedError,
   AccessRequestSuperAdminCannotRequestError,
 } from '../access-request/access-request.errors';
 import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
@@ -63,5 +62,4 @@ export const SERVICE_ACCOUNT_ERROR_EXAMPLES = {
   ),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
-  NO_SPEND_FOR_FREE_SOFTWARE: example(new AccessRequestSpendDateNotAllowedError()),
 } as const;

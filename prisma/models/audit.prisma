@@ -2,6 +2,7 @@ enum AuditActorKind {
   USER
   SYSTEM
   OPERATOR
+  DEVICE
 }
 
 // Append-only. organization_id and actor_app_user_id are plain values, deliberately without

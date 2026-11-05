@@ -35,7 +35,7 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
     h.dataOf<Pageable<VersionLineWire>>(await h.versionLines(versionId).expect(200)).items;
 
   describe('the first version of a Cost Center and a year (US-06-09 AC-1, AC-14)', () => {
-    it('is built from the proposal that waits, with the base, the reserve and the threshold, and its lines copied', async () => {
+    it('is built from the proposal that waits, with the base, the reserve with its reason, and its lines copied', async () => {
       const { proposal, department } = await waiting();
 
       const response = await h
@@ -43,7 +43,7 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
           proposalId: proposal.id,
           base: h.money(60_000_000),
           reserve: h.money(20_000_000),
-          highValuePercent: 50,
+          reserveReason: 'The plan buys more in the autumn',
         })
         .expect(201);
 
@@ -56,7 +56,9 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
         base: { amount: '60000000' },
         reserve: { amount: '20000000' },
         total: { amount: '80000000' },
-        highValuePercent: 50,
+        reservePercent: 10,
+        defaultReserve: { amount: '6000000' },
+        reserveReason: 'The plan buys more in the autumn',
         quarters: null,
         costCenter: { id: department.unitId },
       });
@@ -88,7 +90,7 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
       await h.sendVersion(version.id).expect(200);
 
       expect(h.codeOf(await h.sendVersion(version.id).expect(409))).toBe('BUDGET.VERSION_NOT_EDITABLE');
-      expect(h.codeOf(await h.updateVersion(version.id, { highValuePercent: 10 }).expect(409))).toBe(
+      expect(h.codeOf(await h.updateVersion(version.id, { base: h.money(1) }).expect(409))).toBe(
         'BUDGET.VERSION_NOT_EDITABLE',
       );
       expect(h.codeOf(await h.updateLine(version.id, 1, { financeComment: 'late' }).expect(409))).toBe(
@@ -102,7 +104,7 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
       const nextYear = await h.budgetProposed(head, department.unitId, undefined, h.next + 1);
 
       const sameYear = await h
-        .createVersion({ proposalId: proposal.id, base: h.money(1), reserve: h.money(0), highValuePercent: 10 })
+        .createVersion({ proposalId: proposal.id, base: h.money(1), reserve: h.money(0) })
         .expect(409);
       const otherYear = await h.built(nextYear.id);
 
@@ -113,7 +115,7 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
     it('is not built from a proposal that was withdrawn, given back or does not exist (AC-18)', async () => {
       const { proposal, head } = await waiting();
       await h.withdraw(proposal.id, head.account).expect(200);
-      const body = { base: h.money(1), reserve: h.money(0), highValuePercent: 10 };
+      const body = { base: h.money(1), reserve: h.money(0) };
 
       const withdrawn = await h.createVersion({ proposalId: proposal.id, ...body }).expect(409);
       const missing = await h
@@ -168,33 +170,23 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
       expect(h.dataOf<{ line: VersionLineWire }>(reasoned).line.amount.amount).toBe('18000000');
     });
 
-    it('refuses a window that runs backwards and a line that does not exist', async () => {
+    it('refuses a line that does not exist', async () => {
       const { proposal } = await waiting();
       const version = await h.built(proposal.id);
 
-      const backwards = await h
-        .updateLine(version.id, 1, {
-          windowFrom: `${h.next}-05-01`,
-          windowTo: `${h.next}-04-01`,
-          adjustmentReason: 'x',
-        })
-        .expect(422);
       const missing = await h.updateLine(version.id, 9, { financeComment: 'x' }).expect(404);
 
-      expect(h.codeOf(backwards)).toBe('BUDGET.WINDOW_BACKWARDS');
       expect(h.codeOf(missing)).toBe('BUDGET.LINE_NOT_FOUND');
     });
 
-    it('takes lines of Finance own, saying what every line says', async () => {
+    it('takes lines of Finance own: a plan or a description, and the plan names the line (QĐ-101n)', async () => {
       const { proposal } = await waiting();
       const version = await h.built(proposal.id);
-      const incomplete = await h
-        .addLines(version.id, [h.line({ description: 'Notion', repeatCycle: undefined })])
-        .expect(422);
+      const bare = await h.addLines(version.id, [{ amount: h.money(1_000_000) }]).expect(422);
 
       await h.addLines(version.id, [h.line({ description: 'Notion', amount: h.money(9_000_000) })]).expect(201);
 
-      expect(h.codeOf(incomplete)).toBe('BUDGET.PROPOSAL_INCOMPLETE');
+      expect(h.codeOf(bare)).toBe('VALIDATION_ERROR');
       const lines = await linesOf(version.id);
       expect(lines).toHaveLength(3);
       expect(lines[2]).toMatchObject({ description: 'Notion', proposalPosition: null });
@@ -227,7 +219,7 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
           proposalId: proposal.id,
           base: h.money(60_000_000),
           reserve: h.money(20_000_000),
-          highValuePercent: 50,
+          reserveReason: 'The plan buys more in the autumn',
           quarters: quarters(20_000_000, 20_000_000, 20_000_000, 15_000_000),
         })
         .expect(422);
@@ -241,176 +233,75 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
 
     it('is the only phasing there is: a limit for a quarter or a month has no field to be given in', async () => {
       const { proposal } = await waiting();
-      const base = { proposalId: proposal.id, base: h.money(1), reserve: h.money(0), highValuePercent: 10 };
+      const base = { proposalId: proposal.id, base: h.money(1), reserve: h.money(0) };
 
       for (const extra of [{ controlBudgetQ4: h.money(5) }, { monthlyLimit: { month: 10, amount: h.money(5) } }]) {
         expect(h.codeOf(await h.createVersion({ ...base, ...extra }).expect(422))).toBe('VALIDATION_ERROR');
       }
     });
 
-    it('does not take a year that has ended', async () => {
-      const response = await h
-        .createRevision({ costCenterId: (await waiting()).department.unitId, year: h.year - 1 })
-        .expect(422);
-
-      expect(h.codeOf(response)).toBe('BUDGET.YEAR_ENDED');
-    });
-
     it('changes the base and the reserve of a version being built, and the total follows', async () => {
       const { proposal } = await waiting();
       const version = await h.built(proposal.id);
 
-      const response = await h
-        .updateVersion(version.id, { base: h.money(50_000_000), highValuePercent: 40 })
-        .expect(200);
+      const response = await h.updateVersion(version.id, { base: h.money(50_000_000) }).expect(200);
 
       expect(h.dataOf<{ version: VersionWire }>(response).version).toMatchObject({
         base: { amount: '50000000' },
         reserve: { amount: '20000000' },
         total: { amount: '70000000' },
-        highValuePercent: 40,
       });
       expect(h.codeOf(await h.updateVersion(version.id, {}).expect(422))).toBe('VALIDATION_ERROR');
     });
   });
 
-  describe('a revision changes the current budget only once it is approved (AC-7, AC-8; US-06-11)', () => {
-    it('is built and sent with its reason while the current budget stays what it is', async () => {
-      const { proposal, department } = await waiting();
-      const current = await h.current(proposal.id, { base: h.money(80_000_000), reserve: h.money(20_000_000) });
+  describe('the reserve that is the default share of the base (B-M3)', () => {
+    it('follows the base when only the base is changed, so it stays the default and asks for no reason', async () => {
+      const { proposal } = await waiting();
+      const made = await h.createVersion({ proposalId: proposal.id, base: h.money(60_000_000) }).expect(201);
+      const version = h.dataOf<{ version: VersionWire }>(made).version;
+      const before = BigInt(version.reserve.amount);
+      expect(before).toBe((BigInt(version.base.amount) * BigInt(version.reservePercent)) / 100n);
 
-      const draft = h.dataOf<{ version: VersionWire }>(
-        await h
-          .createRevision({
-            costCenterId: department.unitId,
-            year: h.next,
-            base: h.money(60_000_000),
-            reserve: h.money(20_000_000),
-            reason: 'Cut to the plan',
-          })
-          .expect(201),
-      ).version;
-      await h.sendVersion(draft.id).expect(200);
+      const response = await h.updateVersion(version.id, { base: h.money(50_000_000) }).expect(200);
 
-      expect(draft).toMatchObject({
-        kind: 'REVISION',
-        number: 2,
-        basedOnVersionId: current.id,
-        total: { amount: '80000000' },
-      });
-      expect(await stateOf(current.id)).toBe('APPROVED');
-      expect(await stateOf(draft.id)).toBe('SENT');
-      const table = h.dataOf<Pageable<{ costCenter: { id: string }; total: { amount: string } }>>(
-        await h.table(h.finance, { year: h.next }).expect(200),
-      );
-      expect(table.items.find((row) => row.costCenter.id === department.unitId)?.total.amount).toBe('100000000');
+      const after = h.dataOf<{ version: VersionWire }>(response).version;
+      expect(BigInt(after.reserve.amount)).toBe((50_000_000n * BigInt(after.reservePercent)) / 100n);
+      expect(after.reserveReason).toBeNull();
+      await h.sendVersion(version.id).expect(200);
     });
 
-    it('is not sent without its reason, and the current budget is untouched', async () => {
-      const { proposal, department } = await waiting();
-      const current = await h.current(proposal.id);
-      const revision = h.dataOf<{ version: VersionWire }>(
-        await h.createRevision({ costCenterId: department.unitId, year: h.next }).expect(201),
-      ).version;
+    it('stays as it was when it is not the default, and when the reserve is given together with the base', async () => {
+      const { proposal } = await waiting();
+      const version = await h.built(proposal.id);
 
-      const refused = await h.sendVersion(revision.id).expect(422);
-      await h.updateVersion(revision.id, { reason: 'Cut to the plan' }).expect(200);
-      await h.sendVersion(revision.id).expect(200);
+      const kept = await h.updateVersion(version.id, { base: h.money(50_000_000) }).expect(200);
+      const given = await h
+        .updateVersion(version.id, { base: h.money(40_000_000), reserve: h.money(1_000_000) })
+        .expect(200);
 
-      expect(h.codeOf(refused)).toBe('BUDGET.REVISION_REASON_REQUIRED');
-      expect(await stateOf(current.id)).toBe('APPROVED');
-    });
-
-    it('is the only version in progress, and the lines of the current budget are its starting point', async () => {
-      const { proposal, department } = await waiting();
-      await h.current(proposal.id);
-      const first = h.dataOf<{ version: VersionWire }>(
-        await h.createRevision({ costCenterId: department.unitId, year: h.next }).expect(201),
-      ).version;
-
-      const second = await h.createRevision({ costCenterId: department.unitId, year: h.next }).expect(409);
-
-      expect(h.codeOf(second)).toBe('BUDGET.VERSION_IN_FLIGHT');
-      expect(await linesOf(first.id)).toHaveLength(2);
-    });
-
-    it('is not built for a Cost Center that has no current budget', async () => {
-      const { department } = await waiting();
-
-      const response = await h.createRevision({ costCenterId: department.unitId, year: h.next }).expect(409);
-
-      expect(h.codeOf(response)).toBe('BUDGET.NO_CURRENT_BUDGET');
+      expect(h.dataOf<{ version: VersionWire }>(kept).version.reserve.amount).toBe('20000000');
+      expect(h.dataOf<{ version: VersionWire }>(given).version.reserve.amount).toBe('1000000');
     });
   });
 
   describe('the lines of the current budget (US-06-09 AC-17)', () => {
-    it('has its purchase window moved with a reason, and the move is kept with what it was', async () => {
-      const { proposal } = await waiting();
-      const current = await h.current(proposal.id);
-
-      const moved = await h
-        .moveWindow(current.id, 2, {
-          windowFrom: `${h.next}-06-01`,
-          windowTo: `${h.next}-08-31`,
-          reason: 'The purchase slipped',
-        })
-        .expect(200);
-
-      expect(h.dataOf<{ line: VersionLineWire }>(moved).line).toMatchObject({
-        windowFrom: `${h.next}-06-01`,
-        windowTo: `${h.next}-08-31`,
-        amount: { amount: '20000000' },
-      });
-      const changes = h.dataOf<
-        Pageable<{ before: { windowFrom: string }; after: { windowTo: string }; reason: string }>
-      >(await h.lineChanges(current.id, 2).expect(200));
-      expect(changes.items).toMatchObject([
-        {
-          before: { windowFrom: `${h.next}-04-01` },
-          after: { windowTo: `${h.next}-08-31` },
-          reason: 'The purchase slipped',
-        },
-      ]);
-    });
-
-    it('needs the reason of the move, and a window that runs forwards', async () => {
-      const { proposal } = await waiting();
-      const current = await h.current(proposal.id);
-
-      const noReason = await h.moveWindow(current.id, 2, { windowTo: `${h.next}-09-30` }).expect(422);
-      const backwards = await h
-        .moveWindow(current.id, 2, { windowFrom: `${h.next}-09-01`, windowTo: `${h.next}-08-01`, reason: 'x' })
-        .expect(422);
-
-      expect(h.codeOf(noReason)).toBe('BUDGET.WINDOW_REASON_REQUIRED');
-      expect(h.codeOf(backwards)).toBe('BUDGET.WINDOW_BACKWARDS');
-    });
-
-    it('never has an amount changed in place, even only to update a price: that is a revision', async () => {
+    it('never has an amount changed in place, even only to update a price: the budget of a year is not revised (QĐ-97b)', async () => {
       const { proposal } = await waiting();
       const current = await h.current(proposal.id);
 
       const response = await h
-        .moveWindow(current.id, 2, { amount: h.money(22_000_000), reason: 'The price went up' })
+        .updateLine(current.id, 2, { amount: h.money(22_000_000), adjustmentReason: 'The price went up' })
         .expect(409);
 
-      expect(h.codeOf(response)).toBe('BUDGET.REVISION_REQUIRED');
+      expect(h.codeOf(response)).toBe('BUDGET.VERSION_NOT_EDITABLE');
       expect((await linesOf(current.id))[1].amount.amount).toBe('20000000');
-      expect(h.dataOf<Pageable<unknown>>(await h.lineChanges(current.id, 2).expect(200)).items).toEqual([]);
-    });
-
-    it('is only for the current budget', async () => {
-      const { proposal } = await waiting();
-      const draft = await h.built(proposal.id);
-
-      const response = await h.moveWindow(draft.id, 1, { windowTo: `${h.next}-09-30`, reason: 'x' }).expect(409);
-
-      expect(h.codeOf(response)).toBe('BUDGET.VERSION_NOT_CURRENT');
     });
   });
 
   describe('lines loaded from a file (AC-3)', () => {
-    const header =
+    const header = 'cost_center_code,description,amount,seats,note';
+    const retiredHeader =
       'cost_center_code,description,amount,window_from,window_to,service_period_months,repeat_cycle,seats,note';
 
     it('adds the right rows to the draft, reports the others by row and reason, and budgets nothing', async () => {
@@ -421,24 +312,20 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
       ).rows[0].code;
       const csv = [
         header,
-        `${code},Zoom,12000000,${h.next}-02-01,${h.next}-02-28,12,ANNUAL,20,`,
-        `CC-Z,Slack,5000000,${h.next}-02-01,${h.next}-02-28,12,ANNUAL,,`,
-        `${code},Linear,not-a-number,${h.next}-02-01,${h.next}-02-28,12,ANNUAL,,`,
-        `${code},Loom,3000000,${h.next}-03-01,${h.next}-02-01,12,ANNUAL,,`,
-        `${code},Airtable,2000000,${h.next}-03-01,${h.next}-03-31,12,SOMETIMES,,`,
-        `${code},Notion,9000000,${h.next}-05-01,${h.next}-05-31,12,ANNUAL,,Team plan`,
+        `${code},Zoom,12000000,20,`,
+        `CC-Z,Slack,5000000,,`,
+        `${code},Linear,not-a-number,,`,
+        `${code},Notion,9000000,,Team plan`,
       ].join('\n');
 
       const response = await h.importLines(version.id, csv).expect(201);
 
       expect(h.dataOf<{ result: unknown }>(response).result).toEqual({
         added: 2,
-        rejected: 4,
+        rejected: 2,
         errors: [
           { row: 3, code: 'COST_CENTER_NOT_FOUND' },
           { row: 4, code: 'AMOUNT_INVALID' },
-          { row: 5, code: 'WINDOW_BACKWARDS' },
-          { row: 6, code: 'REPEAT_CYCLE_INVALID' },
         ],
       });
       expect((await linesOf(version.id)).map((line) => line.description)).toEqual([
@@ -470,6 +357,7 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
 
     it.each([
       ['a header without the columns', 'cost_center_code,description\nA,B', 'MISSING_COLUMNS'],
+      ['a header with a column the file no longer has (QĐ-101n)', retiredHeader, 'RETIRED_COLUMNS'],
       ['a header and no rows', header, 'EMPTY'],
       ['a file that is not a table', 'a,"b', 'NOT_CSV'],
     ])('refuses the whole file with %s', async (_name, csv, reason) => {
@@ -500,11 +388,10 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
       const { proposal, head } = await waiting();
       const version = await h.built(proposal.id);
       const account = who(head);
-      const body = { proposalId: proposal.id, base: h.money(1), reserve: h.money(0), highValuePercent: 10 };
+      const body = { proposalId: proposal.id, base: h.money(1), reserve: h.money(0) };
 
       await h.createVersion(body, account).expect(403);
-      await h.createRevision({ costCenterId: version.costCenter.id, year: h.next }, account).expect(403);
-      await h.updateVersion(version.id, { highValuePercent: 1 }, account).expect(403);
+      await h.updateVersion(version.id, { base: h.money(1) }, account).expect(403);
       await h.updateLine(version.id, 1, { financeComment: 'x' }, account).expect(403);
       await h.sendVersion(version.id, account).expect(403);
       // The spending approver reads the versions to decide them, but changes none; the others read none.
@@ -522,7 +409,7 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
       const response = await request(h.server())
         .post('/api/v1/budget-versions')
         .set(admin)
-        .send({ proposalId: proposal.id, base: h.money(1), reserve: h.money(0), highValuePercent: 10 });
+        .send({ proposalId: proposal.id, base: h.money(1), reserve: h.money(0) });
 
       expect(response.status).toBe(403);
     });

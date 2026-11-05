@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
-import { fromDateColumn } from '../../../core/business-date';
 import { formatAmount as formatMinor } from '../../../core/money/money';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
@@ -72,14 +71,11 @@ export class SpendQueueService {
           row.amountMinor !== null && row.amountCurrency !== null
             ? { amount: formatMinor(row.amountMinor, units.get(row.amountCurrency) ?? 2), currency: row.amountCurrency }
             : null,
-        expectedSpendOn: row.expectedSpendOn ? fromDateColumn(row.expectedSpendOn) : null,
         budgetYear: row.budgetYear,
         stage: status.stage as QueueItemWire['stage'],
         blockedReason: status.blockedReason,
         financeReturnReason: status.financeReturnReason,
-        offPlan: row.offPlan,
-        planLineAttached: row.planLineVersionId !== null,
-        readyToSubmit: priced && (row.planLineVersionId !== null || row.offPlan),
+        readyToSubmit: priced,
         updatedAt: row.updatedAt.toISOString(),
         queuedAt: row.spendQueuedAt?.toISOString() ?? null,
         waitedWorkingDays: ages.get(row.id)?.waitedWorkingDays ?? 0,

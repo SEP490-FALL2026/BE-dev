@@ -30,6 +30,7 @@ describe('offboarding data and reads (integration, real PostgreSQL)', () => {
       employee_id: employeeId,
       department_id: des.id,
       state: 'HANDING_OVER',
+      access_block_mode: 'WITH_LAST_DAY',
       prior_work_state: 'WORKING',
       last_working_day: '2026-12-01',
       departure_effective_on: '2026-12-02',
@@ -45,7 +46,7 @@ describe('offboarding data and reads (integration, real PostgreSQL)', () => {
 
     return sqlState(
       `INSERT INTO offboarding_cases (${columns.join(', ')})
-       VALUES (${columns.map((column, index) => (column === 'state' ? `$${index + 1}::"OffboardingState"` : column === 'prior_work_state' ? `$${index + 1}::"EmployeeWorkState"` : `$${index + 1}`)).join(', ')})`,
+       VALUES (${columns.map((column, index) => (column === 'state' ? `$${index + 1}::"OffboardingState"` : column === 'access_block_mode' ? `$${index + 1}::"OffboardingAccessBlockMode"` : column === 'prior_work_state' ? `$${index + 1}::"EmployeeWorkState"` : `$${index + 1}`)).join(', ')})`,
       columns.map((column) => row[column]),
     );
   };
@@ -105,7 +106,9 @@ describe('offboarding data and reads (integration, real PostgreSQL)', () => {
       expect(await sqlState(`UPDATE offboarding_cases SET grounds_reference = 'QD-2' WHERE id = $1`, [open.id])).toBe(
         '55000',
       );
-      expect(await sqlState(`UPDATE offboarding_cases SET abrupt = true WHERE id = $1`, [open.id])).toBe('55000');
+      expect(
+        await sqlState(`UPDATE offboarding_cases SET access_block_mode = 'BLOCK_NOW' WHERE id = $1`, [open.id]),
+      ).toBe('55000');
       expect(await sqlState(`UPDATE offboarding_cases SET state = 'HANDING_OVER' WHERE id = $1`, [wire.id])).toBe(
         '55000',
       );
@@ -120,7 +123,7 @@ describe('offboarding data and reads (integration, real PostgreSQL)', () => {
     it('lets the person who left keep only the lock of the account and the closing, each written once, and the day once', async () => {
       const person = await h.worker(des, code());
       const wire = await h.recordedCase(person);
-      await h.markLeft(wire.id).expect(200);
+      await h.leaveOnLastDay(wire.id).expect(200);
 
       expect(
         await sqlState(
@@ -186,7 +189,7 @@ describe('offboarding data and reads (integration, real PostgreSQL)', () => {
     it('filters by state, person and what still needs a person, and pages', async () => {
       const person = await h.worker(des, code());
       const wire = await h.recordedCase(person);
-      await h.markLeft(wire.id).expect(200);
+      await h.leaveOnLastDay(wire.id).expect(200);
 
       const missing = h.dataOf<{ items: CaseWire[] }>(
         await h.listCases('?accountLockMissing=true&pageSize=100').expect(200),

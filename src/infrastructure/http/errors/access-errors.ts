@@ -24,3 +24,27 @@ export const FORBIDDEN_ERROR: Readonly<ApiErrorBody> = Object.freeze({
   code: 'AUTHORIZATION.FORBIDDEN',
   message: 'You do not have permission to perform this action.',
 });
+
+/**
+ * The answers of the device guard. A device that is told `REVOKED` or `EXPIRED` deletes its credential and asks for a new code; one told
+ * `INVALID` keeps what it has and reports to the IT Admin, so the three are never mixed.
+ */
+export const DEVICE_CREDENTIAL_INVALID_ERROR: Readonly<ApiErrorBody> = Object.freeze({
+  code: 'DEVICE.CREDENTIAL_INVALID',
+  message: 'A valid device credential is required.',
+});
+
+export const DEVICE_CREDENTIAL_REVOKED_ERROR: Readonly<ApiErrorBody> = Object.freeze({
+  code: 'DEVICE.CREDENTIAL_REVOKED',
+  message: 'The device credential was revoked.',
+});
+
+export const DEVICE_CREDENTIAL_EXPIRED_ERROR: Readonly<ApiErrorBody> = Object.freeze({
+  code: 'DEVICE.CREDENTIAL_EXPIRED',
+  message: 'The device credential has expired.',
+});
+
+export const DEVICE_WRONG_COLLECTOR_KIND_ERROR: Readonly<ApiErrorBody> = Object.freeze({
+  code: 'DEVICE.WRONG_COLLECTOR_KIND',
+  message: 'This credential was issued to another kind of collector.',
+});

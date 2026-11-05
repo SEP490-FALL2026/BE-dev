@@ -10,6 +10,14 @@ import type {
   SeatTargetRef,
 } from './catalog.types';
 import { OnboardingFactsService } from '../subscription/onboarding-facts.service';
+import { DocumentService } from '../contract/document.service';
+import {
+  DocumentAlreadyAttachedError,
+  DocumentNotFoundError,
+  DocumentNotReadyToAttachError,
+  DocumentPurposeMismatchError,
+} from '../contract/contract.errors';
+import { DocumentAttachRefusedError } from './catalog.errors';
 import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { SubscriptionFactsService } from '../subscription/subscription-facts.service';
@@ -34,7 +42,29 @@ export class CatalogApi {
     private readonly vendors: VendorFactsService,
     private readonly internalRegistration: InternalSoftwareRegistrationService,
     private readonly applicationLookup: ApplicationFactsService,
+    private readonly documents: DocumentService,
   ) {}
+
+  /**
+   * Attaches an uploaded signed record (`BM-06`) to the person who signed it, in the transaction of the caller: only the IT Admin
+   * who uploaded it, only once. Throws DocumentAttachRefusedError for a file that is not the uploader's, of another kind, not
+   * uploaded or already attached.
+   */
+  async attachSignatureRecord(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { documentId: string; signerEmployeeId: string },
+  ): Promise<void> {
+    try {
+      await this.documents.attachSignatureRecord(tx, actor, input);
+    } catch (error) {
+      if (error instanceof DocumentNotFoundError) throw new DocumentAttachRefusedError('NOT_FOUND');
+      if (error instanceof DocumentAlreadyAttachedError) throw new DocumentAttachRefusedError('ALREADY_ATTACHED');
+      if (error instanceof DocumentNotReadyToAttachError) throw new DocumentAttachRefusedError('NOT_READY_TO_ATTACH');
+      if (error instanceof DocumentPurposeMismatchError) throw new DocumentAttachRefusedError('PURPOSE_MISMATCH');
+      throw error;
+    }
+  }
 
   /**
    * The first `limit` applications in use whose Business Owner is this employee, and how many there are (a read, `US-03-01`
@@ -42,6 +72,14 @@ export class CatalogApi {
    */
   getApplicationsOwnedBy(employeeId: string, limit: number, tx?: DbTx) {
     return this.applicationLookup.ownedBy(employeeId, limit, tx);
+  }
+
+  /**
+   * The applications with these ids as a collector's allowlist needs to judge them: name, kind, whether the application is a
+   * communication service (never reported, `QĐ-62o`) and whether it is retired. An id that does not exist is absent.
+   */
+  getCollectorApplications(ids: readonly string[], tx?: DbTx) {
+    return this.applicationLookup.collectorApplications(ids, tx);
   }
 
   /**

@@ -73,11 +73,10 @@ export class ServiceAccountRequestsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is incomplete or invalid (VALIDATION_ERROR): the purpose, the identifier, the reason and the term are required. The plan is granted by a key tied to a device or cannot be granted yet (SERVICE_ACCOUNT_REQUEST.PLAN_NOT_SUPPORTED), or an expected spend date is given for internal software (ACCESS_REQUEST.NO_SPEND_FOR_FREE_SOFTWARE), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.',
+        'The form is incomplete or invalid (VALIDATION_ERROR): the purpose, the identifier, the reason and the term are required. The plan is granted by a key tied to a device or cannot be granted yet (SERVICE_ACCOUNT_REQUEST.PLAN_NOT_SUPPORTED), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.',
       examples: [
         VALIDATION_EXAMPLE,
         SERVICE_ACCOUNT_ERROR_EXAMPLES.PLAN_NOT_SUPPORTED,
-        SERVICE_ACCOUNT_ERROR_EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE,
         SERVICE_ACCOUNT_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE,
       ],
     },

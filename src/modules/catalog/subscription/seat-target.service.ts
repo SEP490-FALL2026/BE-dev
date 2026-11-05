@@ -21,6 +21,7 @@ const ofPlan = (plan: PlanLookup): SeatTarget => ({
   missing: [],
   purchasedQuantity: null,
   ownerDepartmentId: null,
+  allowsMidTermReduction: false,
 });
 
 const ofSubscription = (subscription: SubscriptionRecord, plan: PlanLookup): SeatTarget => ({
@@ -39,6 +40,7 @@ const ofSubscription = (subscription: SubscriptionRecord, plan: PlanLookup): Sea
   }),
   purchasedQuantity: subscription.purchasedQuantity,
   ownerDepartmentId: subscription.ownerDepartmentId,
+  allowsMidTermReduction: subscription.allowsMidTermReduction,
 });
 
 /**

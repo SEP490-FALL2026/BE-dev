@@ -70,11 +70,7 @@ export class GroupRequestsController {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE).',
-      examples: [
-        VALIDATION_EXAMPLE,
-        GROUP_REQUEST_ERROR_EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE,
-        GROUP_REQUEST_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE,
-      ],
+      examples: [VALIDATION_EXAMPLE, GROUP_REQUEST_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE],
     },
   )
   async check(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: GroupBodyDto) {
@@ -90,10 +86,7 @@ export class GroupRequestsController {
           : null;
 
       return {
-        plan: checked.plan,
-        tooManyLines: checked.tooManyLines,
-        lines: checked.lines,
-        lineCount: checked.lineCount,
+        ...checked,
         hasSpendStep: true,
         pricing: await this.money.view(pricing),
         amountPerPerson: perPerson,
@@ -137,15 +130,15 @@ export class GroupRequestsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE); too many people are named (GROUP_REQUEST.TOO_MANY_LINES) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); a head sends a term over twelve months without confirming it (GROUP_REQUEST.TERM_CONFIRMATION_REQUIRED); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER. Nothing is written.',
+        'The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE); too many people are named (GROUP_REQUEST.TOO_MANY_LINES), fewer than two different people (GROUP_REQUEST.TOO_FEW_LINES, with min), a term beyond the plan (GROUP_REQUEST.TERM_BEYOND_LIMIT) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER. Nothing is written.',
       examples: [
         VALIDATION_EXAMPLE,
         GROUP_REQUEST_ERROR_EXAMPLES.PLAN_NOT_ELIGIBLE,
         GROUP_REQUEST_ERROR_EXAMPLES.TOO_MANY_LINES,
+        GROUP_REQUEST_ERROR_EXAMPLES.TOO_FEW_LINES,
+        GROUP_REQUEST_ERROR_EXAMPLES.TERM_BEYOND_LIMIT,
         GROUP_REQUEST_ERROR_EXAMPLES.DUPLICATE_LINE,
         GROUP_REQUEST_ERROR_EXAMPLES.LINES_REFUSED,
-        GROUP_REQUEST_ERROR_EXAMPLES.TERM_CONFIRMATION_REQUIRED,
-        GROUP_REQUEST_ERROR_EXAMPLES.NO_SPEND_FOR_FREE_SOFTWARE,
         GROUP_REQUEST_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE,
       ],
     },
