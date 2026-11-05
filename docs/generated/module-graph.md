@@ -30,10 +30,15 @@ flowchart BT
     personnel["personnel"]
     onboarding["onboarding"]
     installation["installation"]
+    ai_assist["ai-assist"]
   end
   subgraph T7["T7"]
     dashboards["dashboards"]
   end
+  ai_assist -->|8| audit
+  ai_assist -->|2| operating_parameters
+  ai_assist -->|4| organization
+  ai_assist -->|4| requests
   budgets -->|18| audit
   budgets -->|2| catalog
   budgets -->|3| finance
@@ -92,7 +97,7 @@ flowchart BT
   personnel -->|5| requests
   requests -->|60| audit
   requests -->|16| budgets
-  requests -->|24| catalog
+  requests -->|25| catalog
   requests -->|7| finance
   requests -->|30| identity_access
   requests -->|40| licensing
@@ -101,4 +106,4 @@ flowchart BT
   requests -->|78| organization
 ```
 
-65 module edges.
+69 module edges.

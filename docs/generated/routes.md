@@ -295,6 +295,10 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/notifications/unread-count` | [notifications/inbox/inbox.controller.ts](../../src/modules/notifications/inbox/inbox.controller.ts) → `unreadCount` | [InboxService](../../src/modules/notifications/inbox/inbox.service.ts) |
 | POST | `/notifications/read-all` | [notifications/inbox/inbox.controller.ts](../../src/modules/notifications/inbox/inbox.controller.ts) → `markAllRead` | [InboxService](../../src/modules/notifications/inbox/inbox.service.ts) |
 | POST | `/notifications/{id}/read` | [notifications/inbox/inbox.controller.ts](../../src/modules/notifications/inbox/inbox.controller.ts) → `markRead` | [InboxService](../../src/modules/notifications/inbox/inbox.service.ts) |
+| GET | `/ai/access-request-summaries/source` | [ai-assist/queue-summary/queue-summary.controller.ts](../../src/modules/ai-assist/queue-summary/queue-summary.controller.ts) → `source` | [QueueSummaryService](../../src/modules/ai-assist/queue-summary/queue-summary.service.ts) |
+| POST | `/ai/access-request-summaries` | [ai-assist/queue-summary/queue-summary.controller.ts](../../src/modules/ai-assist/queue-summary/queue-summary.controller.ts) → `create` | [QueueSummaryService](../../src/modules/ai-assist/queue-summary/queue-summary.service.ts) |
+| GET | `/ai/access-request-summaries/{invocationId}` | [ai-assist/queue-summary/queue-summary.controller.ts](../../src/modules/ai-assist/queue-summary/queue-summary.controller.ts) → `get` | [QueueSummaryService](../../src/modules/ai-assist/queue-summary/queue-summary.service.ts) |
+| GET | `/ai/invocations/{invocationId}/content` | [ai-assist/invocation-content/invocation-content.controller.ts](../../src/modules/ai-assist/invocation-content/invocation-content.controller.ts) → `read` | [InvocationContentQueryService](../../src/modules/ai-assist/invocation-content/invocation-content-query.service.ts) |
 | GET | `/onboarding-checklist` | [onboarding/onboarding.controller.ts](../../src/modules/onboarding/onboarding.controller.ts) → `get` | [OnboardingService](../../src/modules/onboarding/onboarding.service.ts) |
 | POST | `/auth/login` | [identity-access/auth/auth.controller.ts](../../src/modules/identity-access/auth/auth.controller.ts) → `login` | [LoginService](../../src/modules/identity-access/auth/login.service.ts) |
 | POST | `/auth/refresh` | [identity-access/auth/auth.controller.ts](../../src/modules/identity-access/auth/auth.controller.ts) → `refresh` | [SessionService](../../src/modules/identity-access/auth/session.service.ts) |
@@ -317,4 +321,4 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/dashboards/it-admin` | [dashboards/it-admin/it-admin-dashboard.controller.ts](../../src/modules/dashboards/it-admin/it-admin-dashboard.controller.ts) → `get` | [ItAdminDashboardService](../../src/modules/dashboards/it-admin/it-admin-dashboard.service.ts) |
 | GET | `/dashboards/super-admin` | [dashboards/super-admin/super-admin-dashboard.controller.ts](../../src/modules/dashboards/super-admin/super-admin-dashboard.controller.ts) → `get` | [SuperAdminDashboardService](../../src/modules/dashboards/super-admin/super-admin-dashboard.service.ts) |
 
-311 operations.
+316 operations.

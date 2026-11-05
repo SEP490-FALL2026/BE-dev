@@ -375,4 +375,13 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     'added',
     '2026-11-03',
   ),
+  boundedNested(
+    'aiAccessRequestSummaryGet#lines',
+    'QUEUE_MAX_REQUESTS',
+    'LD-14',
+    'ai-assist-queue-summary-be',
+    'The AI summary of the approval queue of a person lists the checked lines of one summary, at most QUEUE_MAX_REQUESTS (20); added without an Owner decision, it needs the agreement of the Owner.',
+    'added',
+    '2026-11-04',
+  ),
 ];

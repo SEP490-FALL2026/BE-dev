@@ -65,6 +65,7 @@ import { DepartmentOpenRequestsReader } from './access-request/open-request/depa
 import { RequestUseRepo } from './access-request/open-request/request-use.repo';
 import { RequestEndService } from './request-end/request-end.service';
 import { RequestsApi } from './public/requests.api';
+import { RequestsAiSourceApi } from './public/requests-ai-source.api';
 import { PricingViewService } from './request-view/pricing-view.service';
 import { RequestFactsService } from './access-request/request-facts.service';
 import { RequestPreviewService } from './request-submission/request-preview.service';
@@ -178,7 +179,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
  * yet; the part the worker runs (the reassignment of steps when the organization or a role changes) is
  * `RequestsWorkFacadeModule`, which this module imports for who a step is given to and the queue of the steps that wait.
  * It exports its facade `RequestsApi`, which gives the personnel context the requests of a person who leaves that are still open,
- * and the extension point `RequestOutcomeListeners` the personnel context listens to.
+ * and the extension point `RequestOutcomeListeners` the personnel context listens to. `RequestsAiSourceApi` gives the summary of the
+ * queue of a person the steps that wait for them (`US-15-05`).
  */
 @Module({
   imports: [
@@ -360,7 +362,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     MyRequestsFactsRepo,
     MyRequestsService,
     RequestsDashboardApi,
+    RequestsAiSourceApi,
   ],
-  exports: [RequestsApi, RequestOutcomeListeners, RequestsDashboardApi],
+  exports: [RequestsApi, RequestOutcomeListeners, RequestsDashboardApi, RequestsAiSourceApi],
 })
 export class RequestsModule {}

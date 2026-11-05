@@ -51,7 +51,9 @@ const NO_HTTP_GRAPHS = [
   'RecoveryCliModule',
   'InspectionCliModule',
   'AssignSubscriptionOwnerCliModule',
-  'SeedCliModule',
+  'AiPurgeCliModule',
+  'DevSeedCliModule',
+  'DemoDatasetCliModule',
 ] as const;
 
 const DEACTIVATION_ONLY =
@@ -106,7 +108,9 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'RecoveryCliModule',
       'InspectionCliModule',
       'AssignSubscriptionOwnerCliModule',
-      'SeedCliModule',
+      'AiPurgeCliModule',
+      'DevSeedCliModule',
+      'DemoDatasetCliModule',
     ],
     point: 'OrganizationChangeListeners',
     binders: [

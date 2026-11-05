@@ -29,6 +29,8 @@ import { SeedCliModule } from '../../src/modules/installation/seed/seed-cli.modu
 import { MigrationPreflightCliModule } from '../../src/modules/installation/migration-preflight/migration-preflight-cli.module';
 import { SubscriptionOwnerAssignmentCliModule } from '../../src/modules/catalog/subscription-owner-assignment/subscription-owner-assignment-cli.module';
 import { AssignSubscriptionOwnerCliModule } from '../../src/cli/assign-subscription-owner/assign-subscription-owner-cli.module';
+import { AiPurgeCliModule } from '../../src/cli/ai-purge/ai-purge-cli.module';
+import { AiAssistPurgeCliModule } from '../../src/modules/ai-assist/purge/ai-assist-purge-cli.module';
 import { CostCenterDirectionRootCliModule } from '../../src/cli/cost-center-direction/cost-center-direction-cli.module';
 import { SuperAdminEventCliModule } from '../../src/modules/personnel/super-admin-event/super-admin-event-cli.module';
 import { RecordSuperAdminEventCliModule } from '../../src/cli/record-super-admin-event/record-super-admin-event-cli.module';
@@ -120,6 +122,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'MigrationPreflightCliModule: MigrationPreflightApi',
   // F02: the entry service of `pnpm ops:assign-subscription-owner`.
   'SubscriptionOwnerAssignmentCliModule: SubscriptionOwnerAssignmentApi',
+  // US-15-05: the entry service of `pnpm ops:ai-purge`.
+  'AiAssistPurgeCliModule: AiPurgeApi',
   // F01: the service `pnpm ops:cost-center-direction` runs and the organization facade asks (whether the link is activated).
   'CostCenterDirectionCliModule: CostCenterDirectionApi',
   // F19 (Task 5.5): the controlled procedure for an event about the Super Admin, and the writes of the events it runs with an operator
@@ -175,6 +179,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'RequestsModule: RequestsApi',
   // G8 (US-12-15): the counts of requests the role overviews read.
   'RequestsModule: RequestsDashboardApi',
+  // US-15-05: the steps that wait for a person, which the summary of their queue reads and checks again.
+  'RequestsModule: RequestsAiSourceApi',
   // F43: the extension point the personnel context adds its listener of the outcome of a request to (public/requests.extension-points.ts).
   'RequestsModule: RequestOutcomeListeners',
   // The two entry services of `pnpm ops:recover` (Q6; E7): the holder's own account, and the role transfer.
@@ -553,6 +559,8 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
           MigrationPreflightCliModule,
           SubscriptionOwnerAssignmentCliModule,
           AssignSubscriptionOwnerCliModule,
+          AiAssistPurgeCliModule,
+          AiPurgeCliModule,
           CostCenterDirectionRootCliModule,
           SuperAdminEventCliModule,
           RecordSuperAdminEventCliModule,
@@ -574,6 +582,7 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
       ['SeedCliModule', SeedCliModule, 0],
       ['MigrationPreflightCliModule', MigrationPreflightCliModule, 1],
       ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule, 0],
+      ['AiPurgeCliModule', AiPurgeCliModule, 0],
       ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule, 0],
       ['RecordSuperAdminEventCliModule', RecordSuperAdminEventCliModule, 0],
     ];
@@ -651,6 +660,29 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
     expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
   });
 
+  // rule 1, US-15-05
+  it('the AI purge graph loads the database settings, the organization and the audit facades only: no AI service, no requests, no controller', () => {
+    const graph = collectGraph(AiPurgeCliModule);
+
+    expect(controllersOf(graph)).toEqual([]);
+    for (const forbidden of [
+      NotificationsModule,
+      IdentityAccessModule,
+      IdentityAccessRecoveryCliModule,
+      QueueInfrastructureModule,
+    ]) {
+      expect({ forbidden: forbidden.name, mounted: graph.map((node) => node.module).includes(forbidden) }).toEqual({
+        forbidden: forbidden.name,
+        mounted: false,
+      });
+    }
+    expect(moduleNames(graph)).toContain('InstallationConfigurationModule');
+    for (const forbidden of ['ConfigurationModule', 'AiAssistModule', 'RequestsModule', 'OperatingParametersModule']) {
+      expect({ forbidden, mounted: moduleNames(graph).includes(forbidden) }).toEqual({ forbidden, mounted: false });
+    }
+    expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
+  });
+
   // rule 1, P28-01
   it('the preflight graph loads the database settings and the database only: no business module', () => {
     const graph = collectGraph(MigrationPreflightCliModule);
@@ -687,6 +719,7 @@ describe('the local seed graph', () => {
       ['SeedCliModule', SeedCliModule, 1],
       ['MigrationPreflightCliModule', MigrationPreflightCliModule, 0],
       ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule, 0],
+      ['AiPurgeCliModule', AiPurgeCliModule, 0],
       ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule, 0],
       ['RecordSuperAdminEventCliModule', RecordSuperAdminEventCliModule, 0],
     ];

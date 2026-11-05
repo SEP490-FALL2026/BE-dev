@@ -148,6 +148,8 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'DETECTION_THRESHOLD_DAYS',
         'RULE_SCHEDULE_G1_G2',
         'RULE_SCHEDULE_G3_G4',
+        'AI_ENABLED',
+        'AI_ACCESS_REQUEST_SUMMARY_ENABLED',
       ]);
       expect([...new Set(items.map((item) => item.group))]).toEqual([
         'WORKFLOW',
@@ -158,6 +160,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'DOCUMENT',
         'SUBSCRIPTION',
         'USAGE',
+        'AI',
       ]);
       const byKey = new Map(items.map((item) => [item.key, item]));
       expect(byKey.get('APPROVAL_SLA_WORKING_DAYS')).toMatchObject({
@@ -352,6 +355,21 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect([...found]).toEqual([first]);
     });
 
+    it('starts both AI switches off, turns one on and off by its key with an audit, and takes nothing but ON or OFF', async () => {
+      const key = 'AI_ACCESS_REQUEST_SUMMARY_ENABLED';
+      const before = await list();
+
+      expect(before.get('AI_ENABLED')).toMatchObject({ value: 'OFF', default: 'OFF', group: 'AI', isDefault: true });
+      expect(before.get(key)).toMatchObject({ value: 'OFF', default: 'OFF', group: 'AI', isDefault: true });
+
+      await setParameter(key, 'ON').expect(200);
+      expect((await list()).get(key)).toMatchObject({ value: 'ON', isDefault: false });
+      expect((await auditFor(key))[0]).toMatchObject({ before: { value: 'OFF' }, after: { value: 'ON' } });
+      expect(errorOf(await setParameter(key, 'MAYBE').expect(422)).details).toMatchObject({ problem: 'OUT_OF_RANGE' });
+      await setParameter(key, 'OFF').expect(200);
+      expect((await list()).get(key)).toMatchObject({ value: 'OFF' });
+    });
+
     it('does not return, and does not fail on, a budget period kind stored before it was removed (AC-8)', async () => {
       await ctx.sql.query(
         `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
@@ -362,7 +380,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       const parameters = await list();
 
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
-      expect(parameters.size).toBe(20);
+      expect(parameters.size).toBe(22);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {

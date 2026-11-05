@@ -14,11 +14,14 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 - `RequestsDashboardApi` ([public/requests-dashboard.api.ts](public/requests-dashboard.api.ts)) — `openRequestsSentBy` (số Request đang mở người đó đã gửi, mọi vai; Super Admin thường 0), `needDecisionsHeldBy` (số bước nhu cầu đang chờ mình quyết); dashboards gọi (US-12-15 AC-2, AC-3).
 - `RequestsApi` ([public/requests.api.ts](public/requests.api.ts)) — `listOpenOfBeneficiary`: request còn mở của một
   người, hiện cạnh hồ sơ nghỉ việc (US-03-04 AC-24); personnel gọi.
+- `RequestsAiSourceApi` ([public/requests-ai-source.api.ts](public/requests-ai-source.api.ts)) — `openStepsHeldBy`: bước nhu
+  cầu và bước duyệt chi đang chờ một người (cùng bộ lọc với hai hàng đợi `need-decision-queue` và hàng đợi của người duyệt chi),
+  sớm giao trước, lý do đầy đủ cắt 1000 ký tự; `stillHeldBy`: bước nào còn mở và còn giao người đó. Nguồn của tóm tắt AI (US-15-05).
 - Worker gọi (`src/worker/request-work.job.ts`): `StepRedeterminationSweepApi.sweep` — lưới an toàn chuyển bước
   (US-05-11, US-05-12); `StepSlaSweepApi.sweep` — nhắc bước trễ, báo tồn đọng (US-05-09, US-05-10);
   `RequestStatusProjectorApi.project` — chiếu audit event của request thành thông báo inbox (US-05-15). File:
   `public/step-redetermination-sweep.api.ts`, `public/step-sla-sweep.api.ts`, `public/request-status-projector.api.ts`.
-- `public/requests.types.ts` — `OpenRequestOfBeneficiary`; `public/requests.extension-points.ts` —
+- `public/requests.types.ts` — `OpenRequestOfBeneficiary`, `AiSourceStep`; `public/requests.extension-points.ts` —
   `RequestOutcomeListeners`, `RequestOutcomeEvent`.
 
 ## Bảng sở hữu

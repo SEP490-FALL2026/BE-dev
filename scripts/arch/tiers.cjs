@@ -6,7 +6,7 @@ const TIERS = [
   ['finance', 'operating-parameters'],
   ['catalog', 'licensing'],
   ['budgets', 'requests', 'data-import'],
-  ['personnel', 'onboarding', 'installation'],
+  ['personnel', 'onboarding', 'installation', 'ai-assist'],
   // The role overviews read through the facades of the modules below, personnel among them.
   ['dashboards'],
 ];

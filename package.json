@@ -24,6 +24,7 @@
     "ops:record-super-admin-event": "node dist/cli record-super-admin-event",
     "ops:inspect": "node dist/cli inspect",
     "ops:preflight": "node dist/cli preflight",
+    "ops:ai-purge": "node dist/cli ai-purge",
     "ops:assign-subscription-owner": "node dist/cli assign-subscription-owner",
     "ops:cost-center-direction": "node dist/cli cost-center-direction",
     "ops:db-roles": "node dist/cli db-roles",

@@ -30,6 +30,8 @@ function listTypeScriptFiles(directory: string): string[] {
  * delegates; it reads another module's data through that module's public contract.
  */
 const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
+  AiInvocation: 'ai-assist',
+  AiInvocationContent: 'ai-assist',
   AuditEvent: 'audit',
   Application: 'catalog',
   ApplicationBusinessOwner: 'catalog',
