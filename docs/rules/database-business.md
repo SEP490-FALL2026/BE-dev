@@ -8,8 +8,9 @@
   không truy cập bảng/repository của nhau.
 - Add schema only for the User Story being implemented. Do not scaffold unused models.
 - Migration đã apply không viết lại. Review SQL, backfill, constraint và khả năng
-  tương thích trước khi chạy trên database riêng. Không reset shared DB hoặc dùng
-  production `db push` thay migration.
+  tương thích trước khi chạy trên database riêng. Reset DB demo dùng chung chỉ qua Owner-run `seed.sh`, có
+  `SEED_ALLOW_RESET=true`, xác nhận đúng tên DB và dump đã kiểm trước khi xóa; xem [seed](../guides/seed.md).
+  Không dùng production `db push` thay migration. Reset local chỉ qua wrapper có chốt development/loopback và xác nhận.
 - Constraint Prisma không biểu diễn được viết SQL rõ ràng theo
   [ADR-0005](../decisions/0005-database-constraints-outside-prisma.md).
 - **Tên migration (`DB-15`):** `YYYYMMDDHHMMSS_<snake_case>` với thời điểm hợp lệ (giờ `00`–`23`, phút/giây `00`–`59`) và

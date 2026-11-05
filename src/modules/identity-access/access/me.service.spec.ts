@@ -80,11 +80,13 @@ describe('MeService (GET /api/v1/me — D-S19)', () => {
     expect(headed).not.toHaveBeenCalled();
   });
 
-  it('is selfServiceOnly only without any role, MANAGER without a department included as a role', async () => {
-    const { subject } = service();
-
-    expect((await subject.get(principal([], []))).selfServiceOnly).toBe(true);
-    expect((await subject.get(principal(['MANAGER'], []))).selfServiceOnly).toBe(false);
-    expect((await subject.get(principal(['EMPLOYEE'], ['EMPLOYEE']))).selfServiceOnly).toBe(false);
-  });
+  it.each(['SUPER_ADMIN', 'IT_ADMIN', 'FINANCE', 'MANAGER', 'EMPLOYEE', 'SPENDING_APPROVER'])(
+    'returns the single role %s without selfServiceOnly',
+    async (role) => {
+      const { subject } = service();
+      const me = await subject.get(principal([role], [role]));
+      expect(me.roles).toEqual([role]);
+      expect(me).not.toHaveProperty('selfServiceOnly');
+    },
+  );
 });

@@ -47,9 +47,12 @@ describe('MANAGER and SPENDING_APPROVER when two writers meet (integration, real
       ])
     ).rows[0].d;
   const grant = (appUserId: string, role: string) =>
-    h.admin.post(`/api/v1/app-users/${appUserId}/role-grants`, { role }).then((response) => response);
+    h.admin.put(`/api/v1/app-users/${appUserId}/role`, { role }).then((response) => response);
   const revoke = (appUserId: string, role: string) =>
-    h.admin.delete(`/api/v1/app-users/${appUserId}/role-grants/${role}`).then((response) => response);
+    h.admin
+      .put(`/api/v1/app-users/${appUserId}/role`)
+      .send({ role: role === 'SUPER_ADMIN' ? role : 'EMPLOYEE' })
+      .then((response) => response);
   const assignHead = async (employeeId: string) =>
     h.admin
       .post(`/api/v1/departments/${h.seed.departmentId}/head-assignments`, { employeeId, effectiveFrom: await day(0) })
@@ -104,7 +107,7 @@ describe('MANAGER and SPENDING_APPROVER when two writers meet (integration, real
       await holder.query('SELECT pg_advisory_unlock($1)', [APPROVAL_ROLES_LOCK_KEY]);
       const answers = await Promise.all([one, two]);
 
-      expect(answers.map((answer) => answer.status).sort()).toEqual([201, 409]);
+      expect(answers.map((answer) => answer.status).sort()).toEqual([200, 409]);
       const refused = answers.find((answer) => answer.status === 409);
       expect(errorCode(refused as request.Response)).toBe('APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED');
       const holders = await h.ctx.sql.query(
@@ -129,7 +132,7 @@ describe('MANAGER and SPENDING_APPROVER when two writers meet (integration, real
       expect(revokeAnswer.status).toBe(200);
       expect([assignAnswer.status, errorCode(assignAnswer)]).toEqual([422, 'DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED']);
       expect(await periodsOf(person.employeeId)).toBe(0);
-      expect(await rolesOf(person.appUserId)).toEqual([]);
+      expect(await rolesOf(person.appUserId)).toEqual(['EMPLOYEE']);
       expect(await headsWithoutManager()).toBe(0);
     });
 
@@ -224,7 +227,7 @@ describe('MANAGER and SPENDING_APPROVER when two writers meet (integration, real
       const [firstAnswer, secondAnswer] = await Promise.all([first, second]);
 
       // The one served first holds the role; the other is refused with the code of the single holder, and nothing of it is written.
-      expect([firstAnswer.status, secondAnswer.status]).toEqual([201, 409]);
+      expect([firstAnswer.status, secondAnswer.status]).toEqual([200, 409]);
       expect(errorCode(secondAnswer)).toBe('APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED');
       const held = await h.ctx.sql.query(
         `SELECT u.employee_id FROM role_grants g JOIN app_users u ON u.id = g.app_user_id

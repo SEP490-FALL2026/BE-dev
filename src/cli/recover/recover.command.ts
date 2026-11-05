@@ -15,7 +15,7 @@ const NEXT_STEP: Record<RecoveryResult['outcome'], string> = {
   UNLOCKED: 'The account is open again. No role changed.',
   NOTHING_TO_UNLOCK: 'The account was not locked. Nothing was changed.',
   ACCOUNT_CREATED:
-    'The successor has an account with no role and an invitation. When they have activated it, run this ticket again.',
+    'The successor has an account with EMPLOYEE and an invitation. When they have activated it, run this ticket again.',
   INVITATION_REISSUED:
     'The earlier invitation no longer worked; a new one was queued. Run this ticket again after they activate.',
   INVITATION_ALREADY_SENT:

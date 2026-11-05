@@ -2,7 +2,6 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RequestsDashboardApi } from '../../requests/public/requests-dashboard.api';
-import { DashboardRefusedError } from '../section/dashboard-section.errors';
 import { EmployeeDashboardService } from './employee-dashboard.service';
 
 const actor = (roles: readonly string[]): AuthenticatedPrincipal => ({
@@ -14,7 +13,7 @@ const actor = (roles: readonly string[]): AuthenticatedPrincipal => ({
   roles,
 });
 
-function serviceWith(openRequests: number | null = 2) {
+function serviceWith(openRequests: number = 2) {
   const employeeFacts = jest.fn().mockResolvedValue({ currentRights: 4, expiringRights: 1, openSaasIssues: 0 });
   const openRequestsSentBy = jest.fn().mockResolvedValue(openRequests);
   const service = new EmployeeDashboardService(
@@ -45,25 +44,22 @@ describe('EmployeeDashboardService', () => {
       },
     });
     expect(employeeFacts).toHaveBeenCalledWith('e-1', '2026-10-23');
-    expect(openRequestsSentBy).toHaveBeenCalledWith(actor(['EMPLOYEE']));
+    expect(openRequestsSentBy).toHaveBeenCalledWith('e-1');
   });
 
-  it('answers NO_DATA_SOURCE when caller cannot send requests (Super Admin)', async () => {
-    const { service } = serviceWith(null);
-
-    const overview = await service.overview(actor(['SUPER_ADMIN', 'EMPLOYEE']));
-    expect(overview.sections.requests).toEqual({
-      state: 'NOT_AVAILABLE',
-      count: null,
-      sourceOperationId: null,
-      reason: 'NO_DATA_SOURCE',
-    });
-  });
-
-  it('refuses a caller without the Employee role before reading anything', async () => {
-    const { service, employeeFacts } = serviceWith();
-
-    await expect(service.overview(actor(['IT_ADMIN', 'MANAGER']))).rejects.toBeInstanceOf(DashboardRefusedError);
-    expect(employeeFacts).not.toHaveBeenCalled();
-  });
+  it.each(['SUPER_ADMIN', 'SPENDING_APPROVER', 'IT_ADMIN', 'FINANCE', 'MANAGER', 'EMPLOYEE'])(
+    "counts the caller's own data for the single role %s",
+    async (role) => {
+      const { service, employeeFacts, openRequestsSentBy } = serviceWith(0);
+      const overview = await service.overview(actor([role]));
+      expect(overview.sections.requests).toEqual({
+        state: 'COUNTED',
+        count: 0,
+        sourceOperationId: 'meAccessRequestList',
+        reason: null,
+      });
+      expect(employeeFacts).toHaveBeenCalledWith('e-1', '2026-10-23');
+      expect(openRequestsSentBy).toHaveBeenCalledWith('e-1');
+    },
+  );
 });

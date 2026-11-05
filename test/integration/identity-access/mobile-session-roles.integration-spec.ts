@@ -27,7 +27,7 @@ const adminPost = (path: string, body?: object) =>
 
 interface MeData {
   appUserId: string;
-  selfServiceOnly: boolean;
+
   roles: string[];
   managerScope: { departmentId: string; departmentCode: string; departmentName: string } | null;
 }
@@ -49,7 +49,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
   const person = (roles: string[] = []) => {
     counter += 1;
 
-    return h.staff(department, `MOB-${counter}`, roles);
+    return h.staff(department, `MOB-${counter}`, roles[0] ?? 'EMPLOYEE');
   };
   const passwordOf = () => ACCOUNT_PASSWORD;
 
@@ -183,7 +183,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
         const departed = await person(['EMPLOYEE']);
         const active = await person(['EMPLOYEE']);
         const invited = await h.member(department.code, `MOB-INV-${label['X-Client']}`, await h.title());
-        await adminPost('/api/v1/app-users', { employeeId: invited, roles: ['EMPLOYEE'] }).expect(201);
+        await adminPost('/api/v1/app-users', { employeeId: invited }).expect(201);
 
         await adminPost(`/api/v1/app-users/${locked.account.appUserId}/lock`, {
           reason: 'Mobile uniform answer test',
@@ -301,7 +301,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       await h.vacateHead(department.id).expect(200);
 
       // The grant stays and the scope goes: MANAGER without a department authorizes nothing as a MANAGER (US-01-02 AC-3).
-      expect(await meOf(token)).toMatchObject({ roles: ['MANAGER'], managerScope: null, selfServiceOnly: false });
+      expect(await meOf(token)).toMatchObject({ roles: ['MANAGER'], managerScope: null });
       await get('/api/v1/spend-queue', token).expect(403);
       // The step is no longer the ex-head's: the request is answered as one the caller has no part in, and nothing moved.
       const decided = await h.decide(sent.id, { decision: 'APPROVE' }, head.account).expect(404);
@@ -311,45 +311,38 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       expect(['PENDING', 'WAITING_CONTROLLED']).toContain(state);
     });
 
-    it('applies a grant and a revocation of a direct role to the next call, and keeps EMPLOYEE only for who holds it', async () => {
+    it('changes the web role and applies it to the next mobile call without changing the session', async () => {
       const it2 = await person(['IT_ADMIN']);
       const token = it2.account.accessToken;
       await get('/api/v1/provisioning-tasks', token).expect(200);
-      expect((await meOf(token)).roles).toEqual(['IT_ADMIN']);
-
-      await h.grantRoleTo(it2.account.appUserId, 'EMPLOYEE').expect(201);
-      expect((await meOf(token)).roles).toEqual(['EMPLOYEE', 'IT_ADMIN']);
-
-      await h.revokeRoleFrom(it2.account.appUserId, 'IT_ADMIN').expect(200);
+      await h.changeRoleOf(it2.account.appUserId, 'EMPLOYEE').expect(200);
       await get('/api/v1/provisioning-tasks', token).expect(403);
-      const afterwards = await meOf(token);
-      expect(afterwards.roles).toEqual(['EMPLOYEE']);
-      expect(afterwards.selfServiceOnly).toBe(false);
-
-      await h.revokeRoleFrom(it2.account.appUserId, 'EMPLOYEE').expect(200);
-      expect((await meOf(token)).selfServiceOnly).toBe(true);
-      // Revoking the last role leaves the account signed in: the inbox and /me are self-service, open to every account.
-      await get('/api/v1/notifications', token).expect(200);
+      expect((await meOf(token)).roles).toEqual(['EMPLOYEE']);
+      for (const path of [
+        '/api/v1/notifications',
+        '/api/v1/me/software-rights',
+        '/api/v1/me/access-requests',
+        '/api/v1/dashboards/employee',
+      ]) {
+        await get(path, token).expect(200);
+      }
     });
   });
 
   describe('who gets the Employee tasks (US-16-04 AC-5, AC-6; US-01-01 AC-16, AC-17)', () => {
-    it('gives IT Admin, Finance and Super Admin no EMPLOYEE role by default, and an account made with no role none at all', async () => {
+    it('gives every account exactly the one role it was created with, EMPLOYEE when none is chosen (QĐ-95a, b)', async () => {
       const superAdmin = h.dataOf<{ accessToken: string }>(
         await login(h.seed.superAdmin.email, h.seed.superAdmin.password).expect(200),
       );
-      const itOnly = await accountMadeThroughTheApi(['IT_ADMIN']);
-      const itWithEmployee = await accountMadeThroughTheApi(['IT_ADMIN', 'EMPLOYEE']);
-      const noRole = await accountMadeThroughTheApi([]);
+      const itOnly = await accountMadeThroughTheApi('IT_ADMIN');
+      const noRole = await accountMadeThroughTheApi();
 
       expect((await meOf(superAdmin.accessToken)).roles).toEqual(['SUPER_ADMIN']);
       expect((await meOf(h.finance.accessToken)).roles).toEqual(['FINANCE']);
       expect((await meOf(itOnly.accessToken)).roles).toEqual(['IT_ADMIN']);
-      // Roles add up and are not inherited: the IT Admin who also holds EMPLOYEE has exactly those two.
-      expect((await meOf(itWithEmployee.accessToken)).roles).toEqual(['EMPLOYEE', 'IT_ADMIN']);
       const none = await meOf(noRole.accessToken);
-      expect(none.roles).toEqual([]);
-      expect(none.selfServiceOnly).toBe(true);
+      expect(none.roles).toEqual(['EMPLOYEE']);
+      expect(none).not.toHaveProperty('selfServiceOnly');
     });
 
     it('refuses the Super Admin a request of their own with its own code, whichever client asks', async () => {
@@ -377,7 +370,14 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       ['MANAGER', 'GET', '/api/v1/spend-queue'],
       ['SUPER_ADMIN', 'GET', '/api/v1/app-users'],
     ];
-    const SELF_SERVICE = ['/api/v1/me', '/api/v1/notifications', '/api/v1/notifications/unread-count'];
+    const SELF_SERVICE = [
+      '/api/v1/me',
+      '/api/v1/notifications',
+      '/api/v1/notifications/unread-count',
+      '/api/v1/me/software-rights',
+      '/api/v1/me/access-requests',
+      '/api/v1/dashboards/employee',
+    ];
 
     it.each([
       ['an account with no role', async () => (await person()).account.accessToken, []],
@@ -418,6 +418,47 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
     );
   });
 
+  it('lets IT Admin and Finance send and withdraw through mobile labels', async () => {
+    const planId = await h.plan('K5');
+    for (const account of [(await person(['IT_ADMIN'])).account, h.finance]) {
+      const sent = await request(h.server())
+        .post('/api/v1/access-requests')
+        .set(bearer(account.accessToken))
+        .send(h.form(planId))
+        .expect(201);
+      const id = h.dataOf<{ request: { id: string } }>(sent).request.id;
+      await request(h.server())
+        .post(`/api/v1/access-requests/${id}/withdraw`)
+        .set(bearer(account.accessToken))
+        .send({ reason: 'Mobile request cancelled' })
+        .expect(200);
+    }
+  });
+
+  it('gives a mobile MANAGER the need queue and own self-service without EMPLOYEE, and routes their request away', async () => {
+    const own = await h.departmentWithUnit(`P-MSELF${++counter}`);
+    const head = await h.staff(own, `MOB-SELF${counter}`, 'MANAGER');
+    await h.makeHead(own, head);
+    const token = head.account.accessToken;
+    expect((await meOf(token)).roles).toEqual(['MANAGER']);
+    for (const path of [
+      '/api/v1/need-decisions',
+      '/api/v1/me/software-rights',
+      '/api/v1/me/access-requests',
+      '/api/v1/dashboards/employee',
+    ]) {
+      await get(path, token).expect(200);
+    }
+    const sent = await request(h.server())
+      .post('/api/v1/access-requests')
+      .set(bearer(token))
+      .send(h.form(await h.plan('K5')))
+      .expect(201);
+    const wire = h.dataOf<{ request: { needStep: { assignee: { employeeId: string } | null } } }>(sent).request;
+    expect(wire.needStep.assignee?.employeeId).toBe(h.boss.employeeId);
+    expect(wire.needStep.assignee?.employeeId).not.toBe(head.employeeId);
+  });
+
   describe('the roles that unlock the approver tasks follow the data as well (US-16-04 AC-6; US-01-03 AC-2)', () => {
     it('shows the spending approver the granted role while they hold it and drops it at the next call when the grant ends', async () => {
       const token = h.boss.account.accessToken;
@@ -426,16 +467,16 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
 
       await h.clearRole('SPENDING_APPROVER');
 
-      expect((await meOf(token)).roles).toEqual([]);
+      expect((await meOf(token)).roles).toEqual(['EMPLOYEE']);
     });
   });
 
-  /** Creates an account through `POST /app-users` with exactly `roles`, activates it through its invitation and signs it in. */
-  async function accountMadeThroughTheApi(roles: string[]): Promise<ApiAccount> {
+  /** Creates an account through `POST /app-users` with `role` (EMPLOYEE when left out), activates it through its invitation and signs it in. */
+  async function accountMadeThroughTheApi(role?: string): Promise<ApiAccount> {
     counter += 1;
     const code = `MOB-API-${counter}`;
     const employeeId = await h.member(department.code, code, await h.title());
-    const created = await adminPost('/api/v1/app-users', { employeeId, roles }).expect(201);
+    const created = await adminPost('/api/v1/app-users', role ? { employeeId, role } : { employeeId }).expect(201);
     const appUserId = h.dataOf<{ id: string }>(created).id;
     await activateInvitedAccount(h.ctx, appUserId);
     const email = `${code.toLowerCase()}@acme.vn`;

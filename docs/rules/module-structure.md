@@ -169,13 +169,13 @@ tên `<lệnh>-cli.module.ts`.
 
 - Phần `<x>` của `-facade` bỏ trống thì đó là phần mọi graph cần của module: `identity-access-facade.module.ts`; có `<x>` thì là tập con
   cho một nơi dùng: `requests-work-facade.module.ts` (worker), `identity-access-inspection-facade.module.ts` (`ops:inspect`),
-  `identity-access-local-seed-facade.module.ts` (`dev:seed`, `ops:demo-dataset`).
+  `identity-access-local-seed-facade.module.ts` (`ops:seed`).
 - `<cap>-cli.module.ts` chỉ cần kết thúc bằng `-cli`, không buộc trùng tên thư mục (`installation/inspect/inspection-cli.module.ts`).
-- `installation/installation.module.ts` giữ tên: nó là **module** `installation` (tầng T6), không phải phần của một lệnh; bootstrap là
-  lệnh duy nhất dùng nó.
+- `installation/installation.module.ts` giữ tên: nó là **module** `installation` (tầng T6), không phải phần của một lệnh; bootstrap và pha bootstrap của seed
+  dùng cùng graph này, không thêm graph mới.
 - Lớp theo tên file (`inspection-cli.module.ts` → `InspectionCliModule`). Lớp gốc của lệnh (`src/cli/<lệnh>/`) đặt tên theo lệnh; riêng
   `cost-center-direction` có cùng tên cho phần và gốc nên gốc là `CostCenterDirectionRootCliModule`.
-- Gốc graph của một lệnh thường là `src/cli/<lệnh>/<lệnh>-cli.module.ts`, nhưng `ops:inspect`, `ops:preflight`, `dev:seed` và `ops:demo-dataset`
+- Gốc graph của một lệnh thường là `src/cli/<lệnh>/<lệnh>-cli.module.ts`, nhưng `ops:inspect`, `ops:preflight` và `ops:seed`
   dùng chính `<cap>-cli.module.ts` của module làm gốc (lệnh không ghép thêm gì), và `PROCESS_GRAPHS` ghi các lớp đó làm graph.
 - Lệnh mới có Nest graph: thêm vào `PROCESS_GRAPHS` ([process-graphs](../../test/support/process-graphs.ts)); đổi tên graph thì đổi cả
   `GRAPH_WIRING_EXCEPTIONS` của gate `extension-wiring`.

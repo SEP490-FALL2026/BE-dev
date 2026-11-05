@@ -1,3 +1,4 @@
+import { Prisma } from '../../../generated/prisma/client';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessInspectionApi } from '../../identity-access/public/identity-access-inspection.api';
@@ -62,6 +63,7 @@ describe('InstallationInspectionApi', () => {
       }),
     };
     const audit = {
+      firstAfterField: jest.fn(() => Promise.resolve('SHARED')),
       countByAction: jest.fn((client: DbTx) => {
         record('countByAction', client);
         return Promise.resolve(new Map(Object.entries(CURRENT_INSTALLATION_RECORDS)));
@@ -147,5 +149,28 @@ describe('InstallationInspectionApi', () => {
       },
     });
     expect(organization.countUnmarkedChangesAsOf).toHaveBeenCalledWith(TX, new Date('2026-10-24T15:00:00Z'));
+  });
+  it('seedCheck reads one snapshot without any migration metadata', async () => {
+    const { service } = build();
+    expect(await service.seedCheck()).toEqual({
+      state: 'INSTALLED',
+      organization: 'x',
+      environment: 'SHARED',
+      departments: 2,
+      accounts: 1,
+    });
+    expect(reads.some((read) => /migration|seededAt/i.test(read.read))).toBe(false);
+    expect(reads.every((read) => read.client === TX && read.inside)).toBe(true);
+  });
+  it('seedCheck distinguishes unmigrated tables from other database failures', async () => {
+    const h = build();
+    jest
+      .spyOn(h.organization, 'getOrganization')
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('missing table', { code: 'P2021', clientVersion: 'test' }),
+      );
+    expect((await h.service.seedCheck()).state).toBe('NOT_MIGRATED');
+    jest.spyOn(h.organization, 'getOrganization').mockRejectedValueOnce(new Error('connection lost'));
+    await expect(h.service.seedCheck()).rejects.toThrow('connection lost');
   });
 });

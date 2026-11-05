@@ -80,17 +80,17 @@ export class SeatHarness {
     this.it1 = await buildActivatedAccount(this.ctx, this.seed, {
       code: 'E-IT1',
       email: 'it1@acme.vn',
-      roles: ['IT_ADMIN'],
+      role: 'IT_ADMIN',
     });
     this.finance = await buildActivatedAccount(this.ctx, this.seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
     });
     this.employee = await buildActivatedAccount(this.ctx, this.seed, {
       code: 'E-EMP',
       email: 'emp@acme.vn',
-      roles: [],
+      role: 'EMPLOYEE',
     });
     this.businessOwner = (
       await insertEmployeeFixture(this.ctx.app, this.seed, { code: 'E-OWN', email: 'owner@acme.vn' })

@@ -480,7 +480,7 @@ describe('a request for a service account after the installation over PostgreSQL
 
   describe('one identifier on one subscription (AC-5)', () => {
     it('lets two IT Admins grant the same identifier at once to one request only, whatever its case and spaces', async () => {
-      const second = await h.staff(await h.departmentWithUnit('P-S-IT2'), 'SA-IT2', ['IT_ADMIN']);
+      const second = await h.staff(await h.departmentWithUnit('P-S-IT2'), 'SA-IT2', 'IT_ADMIN');
       otherItAdmins.push(second.account);
       // An identifier is one under one subscription, and a request is granted on the subscription of its own department (F20): the
       // two requests are of one department, so that they meet on one subscription.
@@ -520,7 +520,7 @@ describe('a request for a service account after the installation over PostgreSQL
   describe('an IT Admin who answers for the account (AC-6)', () => {
     it('leaves both the verdict and the grant to another IT Admin while one can act, then does them alone and says so', async () => {
       const unit = await example();
-      const a1 = await h.staff(unit.department, 'SA-A1', ['IT_ADMIN']);
+      const a1 = await h.staff(unit.department, 'SA-A1', 'IT_ADMIN');
       const itAdmins = [h.it1, ...otherItAdmins];
       const requests: string[] = [];
       for (let index = 0; index < 2; index += 1) {

@@ -11,7 +11,7 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 
 ## Public API (`public/`)
 
-- `RequestsDashboardApi` ([public/requests-dashboard.api.ts](public/requests-dashboard.api.ts)) — `openRequestsSentBy` (số yêu cầu đang chờ mình gửi, null cho Super Admin), `needDecisionsHeldBy` (số bước nhu cầu đang chờ mình quyết); dashboards gọi (US-12-15 AC-2, AC-3).
+- `RequestsDashboardApi` ([public/requests-dashboard.api.ts](public/requests-dashboard.api.ts)) — `openRequestsSentBy` (số Request đang mở người đó đã gửi, mọi vai; Super Admin thường 0), `needDecisionsHeldBy` (số bước nhu cầu đang chờ mình quyết); dashboards gọi (US-12-15 AC-2, AC-3).
 - `RequestsApi` ([public/requests.api.ts](public/requests.api.ts)) — `listOpenOfBeneficiary`: request còn mở của một
   người, hiện cạnh hồ sơ nghỉ việc (US-03-04 AC-24); personnel gọi.
 - `RequestsAiSourceApi` ([public/requests-ai-source.api.ts](public/requests-ai-source.api.ts)) — `openStepsHeldBy`: bước nhu
@@ -137,7 +137,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     `need-spend.service.ts`, `internal-registration.service.ts` (đăng ký nội bộ; `internalRegistrationBasis`, `registeredShapeOf`,
     `actsForAssignee` ở `assessment.policy.ts`); `proposal-review/` — `proposals.controller.ts`.
   - `delegated-request/` — gửi thay, hàng đợi grant (US-03-02; `delegated-request-submission.mapper.ts` dựng dòng và audit); `cancellation/` — IT Admin đóng request của người đã nghỉ (US-03-04).
-  - Ba danh sách đọc theo vai, chỉ đọc, không khóa, không ghi (L3): `my-requests/` — `GET /me/access-requests`, Request tôi đã gửi (`my-requests.service.ts`,
+  - Ba danh sách đọc theo vai, chỉ đọc, không khóa, không ghi (L3): `my-requests/` — `GET /me/access-requests`, Request tôi đã gửi, mọi tài khoản (`QĐ-95d`; `my-requests.service.ts`,
     `my-requests.repo.ts`, `my-requests-facts.repo.ts`); `need-decision-queue/` — `GET /need-decisions`, bước chờ quyết nhu cầu của người đang được giao
     (`need-decision-queue.service.ts`, `.repo.ts`, `.mapper.ts`); `assessment-queue/` — `GET /assessment-queue`, việc thẩm định của IT Admin trong phạm vi phụ trách
     (`assessment-queue.service.ts`, `.repo.ts`, `.mapper.ts`). `my-requests` và `need-decision-queue` đọc cột `policy` qua `requestPolicyJson` (không ép kiểu).
@@ -151,7 +151,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   - `group-request-submission/` — kiểm tra, gửi, ứng viên; `group-requests.controller.ts`; `GroupRequestWriter` ghi request và dòng,
     `group-need-routing.policy.ts` chọn người xét nhu cầu; `line-closure/` — đóng dòng của người đã nghỉ (`GroupLineCloser`).
 - **Trả ghế, gia hạn, service account**
-  - `return-request/` (US-05-13; `ReturnSeatGate` xét ghế trả, `ReturnHandoverService` mở bàn giao; `return-request.policy.ts`),
+  - `return-request/` (US-05-13; mọi vai trừ Super Admin, `ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST`; `ReturnSeatGate` xét ghế trả, `ReturnHandoverService` mở bàn giao; `return-request.policy.ts`),
     `renewal-request/` (US-05-14; `renewal-requests.controller.ts`; `RenewalRequestWriter` ghi, `renewal-request-submission.mapper.ts`
     dựng dòng và audit) với `renewal-apply/`
     (`renewal-apply.service.ts`, `renewal-request.repo.ts`: áp gia hạn khi được duyệt), `service-account-request/` (US-05-21).

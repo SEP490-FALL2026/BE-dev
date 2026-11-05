@@ -2,7 +2,7 @@ import type { INestApplicationContext, LoggerService, Type } from '@nestjs/commo
 import { EnvironmentValidationError } from '../infrastructure/config/env-schema';
 
 /**
- * What every out-of-HTTP command (`node dist/cli.js <command>`, `pnpm ops:*`, `pnpm dev:seed`) shares: `--help`, an
+ * What every out-of-HTTP command (`node dist/cli.js <command>`, `pnpm ops:*`, `pnpm ops:seed`) shares: `--help`, an
  * argument error printed with the usage, the Nest graph loaded only when the command runs (so `--help` and argument errors
  * need no database settings), a quiet logger, an environment that does not validate reported by its message, any other
  * failure reported by the command (by error name: no URL, no stack), `app.close()`. Each command keeps its own exit

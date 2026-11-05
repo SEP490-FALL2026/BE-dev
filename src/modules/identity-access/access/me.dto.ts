@@ -23,8 +23,6 @@ export const meSchema = z.strictObject({
   managerScope: z
     .strictObject({ departmentId: z.uuid(), departmentCode: z.string(), departmentName: z.string() })
     .nullable(),
-  /** True when `roles` is empty: the account can only use self-service routes. */
-  selfServiceOnly: z.boolean(),
 });
 
 export class MeResponseDto extends createZodDto(successEnvelopeSchema(meSchema)) {}

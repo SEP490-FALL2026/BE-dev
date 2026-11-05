@@ -24,7 +24,7 @@ describe('handling a report of an error in a SaaS right (integration, real Postg
     figma = { subscriptionId: await h.subscription(80, 'K2') };
     it1 = { employeeId: h.it1.employeeId, account: h.it1 };
     // The second IT Admin works in another department: they are not the one in charge of the people below.
-    it2 = await h.staff(await h.departmentWithUnit('P-IT2'), 'E-IT2', ['IT_ADMIN']);
+    it2 = await h.staff(await h.departmentWithUnit('P-IT2'), 'E-IT2', 'IT_ADMIN');
   }, 300000);
 
   afterEach(() => {

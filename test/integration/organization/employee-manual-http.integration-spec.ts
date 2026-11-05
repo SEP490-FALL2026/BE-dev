@@ -61,11 +61,11 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
     admin = await adminToken(ctx, seed);
-    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
+    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
     finance = await createActivatedAccount(ctx, seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin,
     });
     adminAccount = (
@@ -595,7 +595,8 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
     it('is entered by hand by the Super Admin, given an account and the FINANCE role by them, and signs in', async () => {
       // An installation holds one Finance officer (QĐ-52d). The one this suite made to prove a refusal steps down.
       await request(server())
-        .delete(`/api/v1/app-users/${finance.appUserId}/role-grants/FINANCE`)
+        .put(`/api/v1/app-users/${finance.appUserId}/role`)
+        .send({ role: 'EMPLOYEE' })
         .set({ Authorization: `Bearer ${admin}` })
         .expect(200);
       const entered = await enter(
@@ -606,7 +607,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       const account = await request(server())
         .post('/api/v1/app-users')
         .set({ Authorization: `Bearer ${admin}` })
-        .send({ employeeId, roles: ['FINANCE'] })
+        .send({ employeeId, role: 'FINANCE' })
         .expect(201);
       const appUserId = (account.body as { data: { id: string } }).data.id;
       await activateInvitedAccount(ctx, appUserId);
@@ -623,7 +624,6 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
         },
         roles: ['FINANCE'],
         managerScope: null,
-        selfServiceOnly: false,
       });
     });
   });

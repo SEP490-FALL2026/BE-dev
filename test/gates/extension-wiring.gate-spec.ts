@@ -134,7 +134,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
     users: ['RoleGrantService'],
     reason:
       'The point is emitted by RoleGrantService.grantRole / revokeRole and ApprovalRoleService.set, reached in all of src only from controllers ' +
-      'of the API and the commands bootstrap, dev-seed, demo-dataset and recover; `ops:inspect` reads and never changes a role.',
+      'of the API and the commands bootstrap, seed and recover; `ops:inspect` reads and never changes a role.',
   },
   {
     graphs: ['InstallationModule', 'RecoveryCliModule'],
@@ -159,7 +159,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'starts here and HEAD_PERIOD_START is not emitted: there is no held notice to hand over.',
   },
   {
-    graphs: ['DevSeedCliModule', 'DemoDatasetCliModule'],
+    graphs: ['SeedCliModule'],
     point: 'ApprovalRoleChangeListeners',
     binders: ['RequestsApprovalRoleListener', 'SpendingApproverWaitListener', 'RenewalSpendingApproverWaitListener'],
     users: ['RoleGrantService'],
@@ -167,7 +167,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'Owner 30/10/2026. These commands only create demo accounts, and granting FINANCE (RoleGrantService.grantRole via ' +
       'LocalDemoAccountApi.createDemoAccount) emits the approval-role change that this listener answers by re-trying the steps that wait for Finance. ' +
       'On the databases they target no request step waits for Finance, and a step that is already waiting is NOT re-tried by these commands (the ' +
-      'API path would re-try it). The limitation is documented in docs/guides/demo-dataset.md and docs/rules/operational-commands.md. ' +
+      'API path would re-try it). The limitation is documented in docs/guides/seed.md and docs/rules/operational-commands.md. ' +
       'The two listeners of qd93-remove-fallback-substitute-approvers (SpendingApproverWaitListener, RenewalSpendingApproverWaitListener) answer ' +
       'only the role SPENDING_APPROVER taken back with nobody after it, and tell the Super Admin of a budget version or a renewal that waits; ' +
       'these commands create accounts and never take that role back, and no version or renewal waits on the databases they target.',
@@ -179,7 +179,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
     users: ['RoleGrantService'],
     reason:
       'The point is emitted by RoleGrantService.grantRole / revokeRole, reached in all of src only from controllers of the API and the commands ' +
-      'bootstrap, dev-seed, demo-dataset and recover; the worker declares none of them and its loops grant and revoke no role. The listeners ' +
+      'bootstrap, seed and recover; the worker declares none of them and its loops grant and revoke no role. The listeners ' +
       '(qd93-remove-fallback-substitute-approvers) only tell the Super Admin that a budget version or a renewal waits for a spending approver ' +
       'when the role is taken back; the sending of the version and the proposal of the renewal tell it themselves in the API.',
   },

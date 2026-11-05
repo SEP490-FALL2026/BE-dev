@@ -30,8 +30,8 @@ dùng bởi: không module nào; chỉ `app/app.module.ts` mount `DashboardsModu
 - `section/` — một mục của trang: `dashboard-section.policy.ts` (`counted`, `atSource`, `notAvailable`, `assertHoldsRole`; ba
   trạng thái `COUNTED`/`AT_SOURCE`/`NOT_AVAILABLE` và lý do thiếu nguồn), `dashboard-section.dto.ts` (schema chung bốn trường),
   `dashboard-section.errors.ts` (`DashboardRefusedError`), `dashboard-section.http-errors.ts` (403 như guard, 503).
-- `employee/` — `GET /dashboards/employee` (`EMPLOYEE`): quyền đang giữ, quyền sắp hết, báo lỗi SaaS của mình; Request của tôi
-  `COUNTED` (hoặc `NOT_AVAILABLE` `NO_DATA_SOURCE` cho Super Admin).
+- `employee/` — `GET /dashboards/employee` (mọi tài khoản đã đăng nhập, `QĐ-95d`): quyền đang giữ, quyền sắp hết, báo lỗi SaaS mình
+  đã gửi (`saasIssueList` `scope=mine`); Request của tôi luôn `COUNTED` (0 khi không có, kể cả Super Admin).
 - `manager/` — `GET /dashboards/manager` (`MANAGER`, phòng đang làm trưởng): ghế phòng, review sau điều chuyển; hàng đợi trình
   chi, đề xuất ngân sách, dòng phiên bản đã duyệt `AT_SOURCE`; chờ quyết nhu cầu `COUNTED`; ghost seat, thực chi + cam kết `NOT_AVAILABLE`.
 - `it-admin/` — `GET /dashboards/it-admin` (`IT_ADMIN`, phạm vi phụ trách): task cấp/thu hồi, báo lỗi SaaS, ca nghỉ việc đang bàn

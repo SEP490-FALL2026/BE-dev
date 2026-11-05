@@ -150,19 +150,19 @@ export class RequestHarness extends ProvisioningHarness {
   }
 
   /** A person of the department with an activated account holding `roles`; a head or an approver is made one by the calls below. */
-  async staff(department: Department, code: string, roles: string[] = []): Promise<Person> {
+  async staff(department: Department, code: string, role = 'EMPLOYEE'): Promise<Person> {
     const employeeId = await this.member(department.code, code, await this.title());
 
-    return { employeeId, account: await this.account(code, employeeId, roles) };
+    return { employeeId, account: await this.account(code, employeeId, role) };
   }
 
-  async unplacedStaff(code: string, roles: string[] = []): Promise<Person> {
+  async unplacedStaff(code: string, role = 'EMPLOYEE'): Promise<Person> {
     const employeeId = await insertEmployeeWithoutPlacement(this.ctx, this.seed, {
       code,
       email: `${code.toLowerCase()}@acme.vn`,
     });
 
-    return { employeeId, account: await this.account(code, employeeId, roles) };
+    return { employeeId, account: await this.account(code, employeeId, role) };
   }
 
   /**

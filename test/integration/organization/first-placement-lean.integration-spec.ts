@@ -31,7 +31,7 @@ describe('first placement (integration)', () => {
       employeeId: person.id,
       code: 'NV-LEAN',
       email: 'lean@acme.vn',
-      roles: ['EMPLOYEE'],
+      role: 'EMPLOYEE',
       admin: h.admin,
     });
     const me = await h.api().get('/api/v1/me').set(h.as(account)).expect(200);

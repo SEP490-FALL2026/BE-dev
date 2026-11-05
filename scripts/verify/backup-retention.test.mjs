@@ -202,3 +202,18 @@ describe('postgres-backup-retention.sh', () => {
     assert.ok(existsSync(directory));
   });
 });
+
+it('retains ten newest per backup kind and all young reseed dumps', () => {
+  const oldMigrate = Array.from({ length: 11 }, (_, i) => backupName(50 + i));
+  const oldReseed = Array.from({ length: 11 }, (_, i) => `slm-pre-reseed-${stamp(50 + i)}.dump`);
+  const directory = backupDirectory([...oldMigrate, ...oldReseed]);
+  const result = retention(directory, '--apply');
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readdirSync(directory).filter((name) => name.startsWith('slm-pre-migrate-')).length, 10);
+  assert.equal(readdirSync(directory).filter((name) => name.startsWith('slm-pre-reseed-')).length, 10);
+  writeFileSync(join(directory, `slm-pre-reseed-${stamp(1)}.dump`), 'young');
+  writeFileSync(join(directory, 'slm-pre-reseed-invalid.dump'), 'untouched');
+  assert.equal(retention(directory, '--apply').status, 0);
+  assert(readdirSync(directory).includes(`slm-pre-reseed-${stamp(1)}.dump`));
+  assert(readdirSync(directory).includes('slm-pre-reseed-invalid.dump'));
+});

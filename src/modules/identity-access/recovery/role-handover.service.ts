@@ -32,6 +32,7 @@ export class RoleHandover {
   ): Promise<RecoveryResult> {
     const { context, organizationId, ticket, holderId, successorAccountId, now } = input;
     const holderRoles = holderId ? await this.grants.effectiveRoles(holderId, tx) : [];
+    const successorRoles = await this.grants.effectiveRoles(successorAccountId, tx);
     if (holderId) {
       await this.grants.revokeRole(tx, {
         appUserId: holderId,
@@ -40,19 +41,28 @@ export class RoleHandover {
         now,
       });
     }
+    for (const role of successorRoles) {
+      await this.grants.revokeRole(tx, {
+        appUserId: successorAccountId,
+        role,
+        revokedBy: holderId ?? successorAccountId,
+        now,
+      });
+    }
     try {
       await this.grants.grantRole(tx, {
         organizationId,
         appUserId: successorAccountId,
         role: 'SUPER_ADMIN',
+        grantedAt: now,
       });
     } catch (error) {
-      if (readSqlState(error) === '23514') throw new RecoveryRefusedError('WORK_ROLE_HELD');
+      if (readSqlState(error) === '23514') throw new RecoveryRefusedError('HEADS_DEPARTMENT');
       throw error;
     }
     await this.tickets.setStatus(tx, ticket.id, 'COMPLETED', now);
-    const successorRoles = await this.grants.effectiveRoles(successorAccountId, tx);
     if (holderId) {
+      await this.grants.grantRole(tx, { organizationId, appUserId: holderId, role: 'EMPLOYEE', grantedAt: now });
       await this.audit.record(
         tx,
         operatorEvent(
@@ -62,7 +72,7 @@ export class RoleHandover {
           'SUPER_ADMIN.TRANSFERRED_OUT',
           holderId,
           { roles: holderRoles },
-          { roles: holderRoles.filter((role) => role !== 'SUPER_ADMIN') },
+          { roles: ['EMPLOYEE'] },
         ),
       );
     }
@@ -74,8 +84,8 @@ export class RoleHandover {
         ticket,
         'SUPER_ADMIN.TRANSFERRED_IN',
         successorAccountId,
-        { roles: successorRoles.filter((role) => role !== 'SUPER_ADMIN') },
         { roles: successorRoles },
+        { roles: ['SUPER_ADMIN'] },
       ),
     );
 

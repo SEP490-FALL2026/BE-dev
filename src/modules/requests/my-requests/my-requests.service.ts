@@ -3,8 +3,6 @@ import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { AccessRequestSuperAdminCannotRequestError } from '../access-request/access-request.errors';
-import { mayRequest } from '../access-request/access-request.policy';
 import type { MyRequestSummaryWire } from './my-requests.dto';
 import { MyRequestsFactsRepo } from './my-requests-facts.repo';
 import { toSummary, type MyRequestLookups } from './my-requests.mapper';
@@ -30,8 +28,7 @@ const idsOf = <T>(rows: readonly MyRequestRow[], pick: (row: MyRequestRow) => T 
  * "My requests" (`US-16-01` AC-2): the requests the caller sent, never a draft and never one that somebody else sent, for the web and
  * the phone alike. Whose they are is one condition, the person who sent them; there is no way to name another person, and the person it
  * is for, the person who holds a step and the IT Admin read a request by its detail, not here. Everything about the page is read in a
- * number of statements that does not grow with the rows. The caller is judged as the drafts are: the Super Admin sends no request, so
- * has none to list.
+ * number of statements that does not grow with the rows. Every signed-in account reads its own historical requests, regardless of its current role.
  */
 @Injectable()
 export class MyRequestsService {
@@ -42,9 +39,7 @@ export class MyRequestsService {
     private readonly catalog: CatalogApi,
   ) {}
 
-  /** Throws AccessRequestSuperAdminCannotRequestError. */
   async list(actor: AuthenticatedPrincipal, query: MyRequestsQuery): Promise<Page<MyRequestSummaryWire>> {
-    if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const { rows, total } = await this.requests.pageOf({
       requesterEmployeeId: actor.employeeId,
       states: statesOf(query.view, query.state === undefined ? undefined : (parseStateList(query.state) ?? [])),

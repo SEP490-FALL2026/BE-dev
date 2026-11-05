@@ -5,6 +5,7 @@ import { EmployeeRecord } from '../../organization/public/organization.types';
 import { AccountRecordService } from '../accounts/account-record.service';
 import { ActionLinkRevocation } from '../accounts/action-link-revocation.service';
 import { SuccessorEligibility } from '../accounts/successor-eligibility.service';
+import { RoleGrantService } from '../accounts/role-grant.service';
 import { RecoveryLinks } from './recovery-links.service';
 import { operatorEvent, tryNormalize } from './recovery-procedure.policy';
 import { RecoveryRefusedError } from '../public/recovery.errors';
@@ -12,7 +13,7 @@ import { RecoveryRepo, TicketRecord } from './recovery.repo';
 import { RecoveryContext, RecoveryResult } from '../public/recovery.types';
 
 /**
- * The successor's side of a role transfer (AC-12): first an account with no role and an invitation, then the wait until
+ * The successor's side of a role transfer (AC-12): first an account with EMPLOYEE and an invitation, then the wait until
  * they have activated it. Activating never grants the role; only the next run of the same ticket moves it. Every invitation goes to
  * the login email of the successor's account, never to the work email on the record as it is now: the work email
  * can change while an invitation is on its way, the account's login email does not, so a link is never sent to an address the
@@ -27,9 +28,10 @@ export class SuccessorEnrolment {
     private readonly revocation: ActionLinkRevocation,
     private readonly tickets: RecoveryRepo,
     private readonly audit: AuditApi,
+    private readonly grants: RoleGrantService,
   ) {}
 
-  /** Stage 1: the successor has no account yet. It is created with no role, and invited. */
+  /** Stage 1: the successor has no account yet. It is created with EMPLOYEE, and invited. */
   async createAccount(
     tx: DbTx,
     input: {
@@ -59,6 +61,7 @@ export class SuccessorEnrolment {
       emailVerificationSource: null,
       emailVerifiedAt: null,
     });
+    await this.grants.grantRole(tx, { organizationId, appUserId: created.id, role: 'EMPLOYEE' });
     await this.links.sendInvitation(
       tx,
       {
@@ -74,7 +77,7 @@ export class SuccessorEnrolment {
     await this.audit.record(
       tx,
       operatorEvent(context, organizationId, ticket, 'SUPER_ADMIN.RECOVERY_ACCOUNT_CREATED', created.id, null, {
-        roles: [],
+        roles: ['EMPLOYEE'],
         activationState: 'INVITED',
       }),
     );

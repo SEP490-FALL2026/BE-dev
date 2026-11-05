@@ -185,6 +185,8 @@ Planned khác passed. Bằng chứng ghi lệnh, revision và môi trường, kh
 
 ## Changes and acceptance
 
+- 04/11/2026: superseded in part by [qd95-one-role-per-account](../qd95-one-role-per-account/spec.md). Accounts now have one effective role; PUT /app-users/{id}/role replaces additive grant/revoke routes; recovery prepares EMPLOYEE and replaces both holders' roles. Demo uses shared-demo-v2 with initialRole/finalRole and MANAGER-only heads. Earlier design below remains historical.
+
 30/10/2026: lập và hiện thực theo yêu cầu Owner (đầu việc B). Chưa commit, chưa chạy trên VPS, chưa Owner review, chưa
 nghiệm thu: không có gì là `accepted`.
 

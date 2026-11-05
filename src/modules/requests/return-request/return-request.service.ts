@@ -9,6 +9,8 @@ import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.t
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
+import { AccessRequestSuperAdminCannotRequestError } from '../access-request/access-request.errors';
+import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { handoverFor } from './handover.policy';
 import type { ReturnBodyDto } from './return-request.dto';
@@ -44,6 +46,7 @@ export class ReturnRequestService {
    * Throws ReturnRequestRefusedError, plus what the gate throws that is not a refusal of the seat (the database not answering).
    */
   async submit(actor: AuthenticatedPrincipal, body: ReturnBodyDto): Promise<ReturnRequestRecord> {
+    if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const shortDeadlineWorkingDays = Number(await this.parameters.getValue(SHORT_DEADLINE_PARAMETER));
     const reason = body.reason.trim();
 

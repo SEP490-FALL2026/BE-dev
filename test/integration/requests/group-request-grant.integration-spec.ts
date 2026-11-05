@@ -29,7 +29,7 @@ describe('the grant of the people of a request for a group, one person at a time
     second = await createActivatedAccount(h.ctx, h.seed, {
       code: 'E-IT2',
       email: 'it2@acme.vn',
-      roles: ['IT_ADMIN'],
+      role: 'IT_ADMIN',
       admin: h.admin,
     });
   }, 240000);

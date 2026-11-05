@@ -66,3 +66,31 @@
 - [ ] AC trong scope có bằng chứng (run id).
 - [ ] Spec/plan phản ánh đúng YAML cuối; lựa chọn Owner ghi ở spec.
 - [ ] Giao Owner review; cập nhật roadmap.
+
+### Bằng chứng triển khai local — Task 1 (04/11/2026)
+
+- Test cấu trúc `node --test scripts/verify/check-script-order.test.mjs`: 4 pass, 0 fail.
+- Đột biến thủ công matrix `[1, 2]`: exit 1, expected `[1, 2, 3]`; đã hoàn lại bytes gốc.
+- `pnpm rules:format`: pass. `pnpm exec prettier --check .github/workflows/*.yml`: pass.
+- Không chạy Actions, integration, timing, serial hay e2e theo phạm vi giao việc.
+
+### Bằng chứng triển khai local — Task 2 (04/11/2026)
+
+- Đã triển khai OD-CI2/3/4/5. Test cấu trúc cập nhật điều kiện `run` cùng thay đổi YAML (bổ sung vào Files của task để không giữ assertion cũ).
+- `pnpm rules:check`: 419 files, 3434 links, 0 errors. `pnpm rules:format` và Prettier mọi workflow: pass.
+- Test cấu trúc: 4 pass. `pnpm test:scripts` trong sandbox: 275 tests, 211 pass, 62 fail, 2 skip; lỗi quyền tạo thư mục tạm Git Bash (`mkdir /c/Users/Asus: Permission denied`). Đang chạy lại ngoài sandbox.
+- Task 3 chỉ chuẩn bị nhánh thử cục bộ, không push; run đỏ/xanh chờ phiên review/Owner.
+- Task 4: **chờ số đo** ít nhất hai run `main`; chưa đổi timeout theo ước lượng.
+
+### Kết quả script cuối
+
+- `pnpm test:scripts` ngoài sandbox: 275 tests, 273 pass, 2 skip, 0 fail, exit 0 (`ci-scripts-final.log`). Chỉ mock Docker/SSH và thư mục tạm; không kết nối VPS/database thật.
+- Task 3 có commit `f7156cc` trên `ci-trial/deploy-gate`, chưa push/chạy. Dùng `workflow_dispatch` để chạy đủ e2e và ALL trước khi xét probe đỏ/xanh. Nhánh triển khai không chứa test đỏ/probe.
+
+### Review audit 04/11/2026 (nhánh `fix/qd95-seed-audit`, commit local)
+
+- `concurrency`: chỉ run PR thay nhau; mỗi run push/dispatch có group riêng (không bỏ run push đang chờ).
+- `select`: base không có trong clone thì chạy hết; output `timing` mới, job in-band chỉ chạy khi có `*.timing-spec.ts` được chọn hoặc
+  `SERIAL`; bỏ `fetch-depth: 0` ở shard/in-band; `SKIP_DEPLOY_DEV` chỉ áp cho push.
+- `check-script-order.test.mjs` kiểm `needs: select`, cổng `run`, concurrency, bộ lọc PR `dev`, biểu thức base, cổng timing.
+- Run đỏ/xanh trên GitHub và số đo hai run `main` vẫn chờ Owner (không push).

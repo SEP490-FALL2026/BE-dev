@@ -93,7 +93,6 @@ describe('authentication over HTTP (integration, real PostgreSQL)', () => {
           },
           roles: ['SUPER_ADMIN'],
           managerScope: null,
-          selfServiceOnly: false,
         },
       });
     });

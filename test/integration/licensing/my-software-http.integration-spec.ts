@@ -109,9 +109,9 @@ describe('my software rights (integration, real PostgreSQL)', () => {
       },
     });
     counter = QueryCounter.on(relay);
-    e1 = await h.account('MS-E1', await h.person('MS-E1'), ['EMPLOYEE']);
-    e2 = await h.account('MS-E2', await h.person('MS-E2'), ['EMPLOYEE']);
-    e3 = await h.account('MS-E3', await h.person('MS-E3'), ['IT_ADMIN', 'EMPLOYEE']);
+    e1 = await h.account('MS-E1', await h.person('MS-E1'), 'EMPLOYEE');
+    e2 = await h.account('MS-E2', await h.person('MS-E2'), 'EMPLOYEE');
+    e3 = await h.account('MS-E3', await h.person('MS-E3'), 'IT_ADMIN');
 
     const figma = await h.subscription(10, 'K2');
     const office = await h.subscription(10, 'K4');
@@ -312,10 +312,10 @@ describe('my software rights (integration, real PostgreSQL)', () => {
     expect((await pageOf(e3)).items.map((item) => item.assignmentId)).toEqual([seats.e3Portal]);
   });
 
-  it('refuses every account without the Employee role, and an anonymous call', async () => {
+  it('reads the own list for every role and refuses an anonymous call', async () => {
     for (const headers of [h.as(h.it1), h.as(h.finance), h.as(h.employee), { Authorization: `Bearer ${h.admin}` }]) {
-      const response = await request(h.server()).get('/api/v1/me/software-rights').set(headers).expect(403);
-      expect(h.codeOf(response)).toBe('AUTHORIZATION.FORBIDDEN');
+      const response = await request(h.server()).get('/api/v1/me/software-rights').set(headers).expect(200);
+      expect(h.dataOf<{ items: unknown[] }>(response).items).toEqual([]);
     }
     expect(h.codeOf(await read(null).expect(401))).toBe('AUTHENTICATION_REQUIRED');
   });

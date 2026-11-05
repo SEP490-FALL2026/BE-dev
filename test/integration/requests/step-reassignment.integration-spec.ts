@@ -7,7 +7,7 @@ import { TransactionRunner } from '../../../src/infrastructure/database/transact
 import { ReassignmentHarness } from '../../support/reassignment-harness';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
-import { ensureManagerGrant } from '../../support/builders/account.builder';
+import { changeRoleTo } from '../../support/builders/account.builder';
 
 const h = new ReassignmentHarness();
 const M = 1_000_000;
@@ -291,12 +291,12 @@ describe('who holds a step when the organization or a role changes, over Postgre
       const nominee = await h.staff(headless, `FD-H${counter}`);
       // A member who holds MANAGER and heads nothing is not a head: the step does not go to them (US-01-02 AC-10).
       const manager = await h.staff(headless, `FD-M${counter}`);
-      await ensureManagerGrant(h.ctx, h.admin, manager.employeeId);
+      await changeRoleTo(h.ctx, h.admin, manager.employeeId, 'MANAGER');
       const sent = await h.sent(requester, internal);
       expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD' });
 
       // The head is named from tomorrow: nothing changes today, not for the one who holds MANAGER either.
-      await ensureManagerGrant(h.ctx, h.admin, nominee.employeeId);
+      await changeRoleTo(h.ctx, h.admin, nominee.employeeId, 'MANAGER');
       await request(h.server())
         .post(`/api/v1/departments/${headless.id}/head-assignments`)
         .set({ Authorization: `Bearer ${h.admin}` })
@@ -430,14 +430,14 @@ describe('who holds a step when the organization or a role changes, over Postgre
       counter += 1;
       const departed = await h.staff(await h.departmentWithUnit(`P-FIN${counter}`), `FIN-D${counter}`);
       const next = await h.staff(await h.departmentWithUnit(`P-FIN${counter + 100}`), `FIN-N${counter}`);
-      await h.revokeRoleFrom(h.finance.appUserId, 'FINANCE').expect(200);
-      await h.grantRoleTo(departed.account.appUserId, 'FINANCE').expect(201);
+      await h.changeRoleOf(h.finance.appUserId, 'EMPLOYEE').expect(200);
+      await h.changeRoleOf(departed.account.appUserId, 'FINANCE').expect(200);
       const id = await h.paidRequest(unit, paid, { amount: 45 * M });
       await h.route(id, unit.head.account);
       expect(await h.stepOf(id, 'FINANCE_REVIEW')).toMatchObject({ assignee_employee_id: departed.employeeId });
 
       try {
-        await h.revokeRoleFrom(departed.account.appUserId, 'FINANCE').expect(200);
+        await h.changeRoleOf(departed.account.appUserId, 'EMPLOYEE').expect(200);
         await h.leave(departed.employeeId);
         expect(await h.stepOf(id, 'FINANCE_REVIEW')).toMatchObject({
           state: 'WAITING',
@@ -446,7 +446,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
         });
         expect(await h.state(id)).toBe('WAITING_CONTROLLED');
 
-        await h.grantRoleTo(next.account.appUserId, 'FINANCE').expect(201);
+        await h.changeRoleOf(next.account.appUserId, 'FINANCE').expect(200);
         expect(await h.stepOf(id, 'FINANCE_REVIEW')).toMatchObject({
           state: 'PENDING',
           assignee_employee_id: next.employeeId,
@@ -455,15 +455,15 @@ describe('who holds a step when the organization or a role changes, over Postgre
         });
         expect(await h.state(id)).toBe('AWAITING_FINANCE_REVIEW');
       } finally {
-        await h.revokeRoleFrom(next.account.appUserId, 'FINANCE');
-        await h.grantRoleTo(h.finance.appUserId, 'FINANCE');
+        await h.changeRoleOf(next.account.appUserId, 'EMPLOYEE');
+        await h.changeRoleOf(h.finance.appUserId, 'FINANCE');
       }
     });
 
     it('makes the assessment of the IT Admin wait when the IT Admin in charge leaves, and gives it to the one named after', async () => {
       const unit = await scene();
-      const inCharge = await h.staff(unit.department, `IT-A${(counter += 1)}`, ['IT_ADMIN']);
-      const successor = await h.staff(unit.department, `IT-B${counter}`, ['IT_ADMIN']);
+      const inCharge = await h.staff(unit.department, `IT-A${(counter += 1)}`, 'IT_ADMIN');
+      const successor = await h.staff(unit.department, `IT-B${counter}`, 'IT_ADMIN');
       await h.setItAdminInCharge(unit.department, inCharge);
       const proposed = await h.proposed(unit.member);
       await h.decide(proposed.id, APPROVE, unit.head.account).expect(200);
@@ -613,7 +613,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
 
       failOrganizationListener = true;
       try {
-        await ensureManagerGrant(h.ctx, h.admin, successor.employeeId);
+        await changeRoleTo(h.ctx, h.admin, successor.employeeId, 'MANAGER');
         await request(h.server())
           .post(`/api/v1/departments/${unit.department.id}/head-assignments`)
           .set({ Authorization: `Bearer ${h.admin}` })
@@ -638,7 +638,8 @@ describe('who holds a step when the organization or a role changes, over Postgre
       try {
         // Taking the role from the approver is the change; the listener that refuses it takes the revoke back with it.
         await request(h.server())
-          .delete(`/api/v1/app-users/${h.boss.account.appUserId}/role-grants/SPENDING_APPROVER`)
+          .put(`/api/v1/app-users/${h.boss.account.appUserId}/role`)
+          .send({ role: 'EMPLOYEE' })
           .set({ Authorization: `Bearer ${h.admin}` })
           .expect(500);
       } finally {

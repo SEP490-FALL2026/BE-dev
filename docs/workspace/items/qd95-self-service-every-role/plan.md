@@ -66,5 +66,42 @@ Quick set + `pnpm test:http` + integration các file đổi xanh; tự review di
 | `pnpm openapi:export`       | —                     | chưa chạy         | —                       |
 | Integration theo file đổi   | —                     | chưa chạy         | —                       |
 
+### Bằng chứng Task 1 — 04/11/2026
+
+- `pnpm typecheck`: pass (exit 0, gọi qua `pnpm.cmd` trên Windows).
+- `pnpm arch:check`: 1643 modules, 8410 dependencies, không vi phạm; `pnpm rules:check`: 419 files, 3434 links, 0 errors.
+- `pnpm test:gates`: 16 suites, 327 tests pass.
+- Unit hai service đã đổi: 2 suites, 8 tests pass. HTTP software: 16 tests pass; HTTP dashboards/my-requests sau sửa mock: 2 suites, 67 tests pass.
+- `pnpm openapi:export`: đã sinh; so JSON với HEAD: đúng bốn operation `meSoftwareRightList`, `employeeDashboardGet`, `meAccessRequestList`, `returnRequestSubmit`; schemas không đổi.
+- Lint đã gọi, đang chờ tiến trình kết thúc. Integration chỉ viết, chưa chạy theo chỉ dẫn giao việc.
+- Bổ sung Files: `dashboard-section.policy.spec.ts` phải đổi vai được kiểm từ `EMPLOYEE` sang `IT_ADMIN` vì kiểu `DashboardRole` bỏ `EMPLOYEE`; giữ cả ca cho phép/từ chối.
+
+| Test cũ                                                | Test mới                                                                    |
+| ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| My software từ chối các vai khác `EMPLOYEE`            | Mỗi vai riêng đọc được và service nhận đúng employeeId; không token vẫn 401 |
+| Employee dashboard từ chối vai khác                    | Các vai đọc overview cá nhân; ma trận các dashboard theo vai còn nguyên     |
+| Super Admin my-requests 403 / dashboard NO_DATA_SOURCE | Trang riêng rỗng 200 / COUNTED 0, không thêm grant EMPLOYEE                 |
+| Super Admin không gửi Request, chưa xét hoàn trả       | Thêm hoàn trả seat đang giữ: 403 và không thêm return/task/audit            |
+
+### Bằng chứng Task 2 — 04/11/2026
+
+- Viết `self-service-every-role.integration-spec.ts`: tám tài khoản đọc dữ liệu riêng; các vai được gửi/rút/hoàn trả/báo lỗi; giới hạn gửi và phân biệt báo lỗi đã gửi với báo lỗi được giao.
+- Mobile: thêm ba route vào ma trận self-service; thêm IT/Finance gửi-rút và MANAGER chỉ một vai gửi cho mình, bước nhu cầu giao Người duyệt chi.
+- `pnpm typecheck`: pass sau sửa lời gọi harness. `pnpm arch:check` và `pnpm rules:check`: pass.
+- `pnpm test:gates`: 16 suites / 327 tests pass. Unit policy section: 7 tests pass.
+- `pnpm lint`: hai lỗi format trong file mới; đã format và gọi lại, chờ kết quả cuối.
+- Integration chỉ viết, chưa chạy. Dùng `DashboardHarness` (kế thừa `RequestHarness`) để tái sử dụng import quyền, báo lỗi và đọc overview, không thêm harness.
+
+- Lint cuối Task 2: pass, exit 0 (`ss-task2-lint-final.log`).
+
 - [ ] AC trong scope có bằng chứng; báo FE/mobile.
 - [ ] Giao Owner review; cập nhật roadmap.
+
+### Review audit 04/11/2026 (nhánh `fix/qd95-seed-audit`, commit local)
+
+- `requests-dashboard-facts`: Super Admin đếm `0` (không còn `null`). Mô tả section `requests` không còn hứa `NO_DATA_SOURCE` cho
+  Super Admin; `saasIssues` nêu `saasIssueList` `scope=mine`; `openapi.json` sinh lại (không mã nội bộ trong mô tả).
+- `RequestsDashboardApi.openRequestsSentBy(employeeId)` bỏ tham số vai không dùng.
+- Test ma trận: danh sách phần mềm chỉ của người gọi; IT Admin thấy `requests` 1 và `softwareRights` ≥ 1 (US-12-15 AC-27).
+- README `dashboards`, `licensing`, `requests` cập nhật theo `QĐ-95d`.
+- Bằng chứng: run `w2` (`self-service-every-role`, `requests-dashboard-facts`, `dashboards-http`, http dashboards/my-software/my-requests).

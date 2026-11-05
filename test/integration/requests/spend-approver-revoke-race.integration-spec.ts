@@ -52,7 +52,8 @@ describe('the revocation of the spending approver and the opening of a spend ste
   const opens = (id: string) => h.sendOn([id], unit.head.account).then((response) => response);
   const revokes = () =>
     request(h.server())
-      .delete(`/api/v1/app-users/${h.boss.account.appUserId}/role-grants/SPENDING_APPROVER`)
+      .put(`/api/v1/app-users/${h.boss.account.appUserId}/role`)
+      .send({ role: 'EMPLOYEE' })
       .set({ Authorization: `Bearer ${h.admin}` })
       .then((response) => response);
   const spendSteps = (id: string) => h.steps(id, 'SPEND_APPROVAL');

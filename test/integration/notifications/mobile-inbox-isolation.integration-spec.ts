@@ -64,8 +64,8 @@ describe('the inbox the mobile app reads is the inbox of its own caller and of n
     const department = await h.departmentWithUnit('P-INB');
     head = await h.staff(department, 'INB-H1');
     await h.makeHead(department, head);
-    alice = await h.staff(department, 'INB-A1', ['EMPLOYEE']);
-    bob = await h.staff(department, 'INB-B1', ['EMPLOYEE']);
+    alice = await h.staff(department, 'INB-A1', 'EMPLOYEE');
+    bob = await h.staff(department, 'INB-B1', 'EMPLOYEE');
     noRole = await h.staff(department, 'INB-N1');
     // The notices of the real flow: alice sends a request, the projection tells her and her head.
     aliceRequest = (await h.sent(alice, await h.plan('K5'))).id;
@@ -164,12 +164,12 @@ describe('the inbox the mobile app reads is the inbox of its own caller and of n
   });
 
   it('keeps the inbox with the person, not with their roles: it opens with no role at all, and the notice survives the loss of every role', async () => {
-    const holder = await h.staff(await h.departmentWithUnit('P-INB2'), 'INB-X1', ['IT_ADMIN']);
+    const holder = await h.staff(await h.departmentWithUnit('P-INB2'), 'INB-X1', 'IT_ADMIN');
     const subject = randomUUID();
     await tell(holder.employeeId, subject);
     expect(await unread(holder.account)).toBe(1);
 
-    await h.revokeRoleFrom(holder.account.appUserId, 'IT_ADMIN').expect(200);
+    await h.changeRoleOf(holder.account.appUserId, 'EMPLOYEE').expect(200);
 
     const afterwards = await inbox(holder.account);
     expect(afterwards.items.map((item) => item.subject?.id)).toEqual([subject]);
@@ -177,7 +177,7 @@ describe('the inbox the mobile app reads is the inbox of its own caller and of n
   });
 
   it('shuts the inbox of a locked account at once, and gives it back unchanged after the unlock and a new sign-in', async () => {
-    const holder = await h.staff(await h.departmentWithUnit('P-INB3'), 'INB-L1', ['EMPLOYEE']);
+    const holder = await h.staff(await h.departmentWithUnit('P-INB3'), 'INB-L1', 'EMPLOYEE');
     const subject = randomUUID();
     await tell(holder.employeeId, subject);
     await inbox(holder.account);

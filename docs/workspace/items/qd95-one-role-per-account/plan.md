@@ -160,9 +160,94 @@ Quick set + `pnpm test:http` + `pnpm test:e2e` + integration các file đổi xa
 
 Bảng test cũ → mới (điền khi implement):
 
-| Test cũ | Hành vi | Thay bằng / lý do |
-| ------- | ------- | ----------------- |
+| Test cũ                                           | Hành vi                       | Thay bằng / lý do                                                                                  |
+| ------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------- |
+| `validateRoleSet`, `forbiddenPairInSet` unit      | Tạo tài khoản với tập vai     | DTO chỉ nhận `role`, mặc định EMPLOYEE; test từ chối mọi `roles` array; policy từng vai giữ nguyên |
+| `/me.selfServiceOnly` unit và assertions HTTP/e2e | Phân biệt tài khoản không vai | Không có thuộc tính trong response; giữ `roles`, `managerScope` và kiểm quyền                      |
+| Fixture My software IT_ADMIN + EMPLOYEE           | Tự phục vụ khi có vai thứ hai | Chỉ IT_ADMIN đọc dữ liệu cá nhân theo hạng mục self-service                                        |
+| Fixture Manager + IT Admin                        | Hợp quyền của hai vai         | IT Admin riêng và Manager riêng, giữ kiểm có/không phạm vi trưởng phòng                            |
+
+### Bằng chứng Task 1 — 04/11/2026
+
+- Đổi tạo tài khoản sang `role?`, mặc định `EMPLOYEE`, một grant và audit tương ứng; bỏ `/me.selfServiceOnly`.
+- Chuyển các lời gọi tạo tài khoản trong fixture sang body mới, giữ response/principal `roles` là mảng.
+- `pnpm typecheck`: pass; unit các file đổi: 3 suites / 70 tests pass; `pnpm test:gates`: 16 suites / 327 tests pass; HTTP identity-access: 2 suites / 14 tests pass.
+- `pnpm arch:check`, `pnpm rules:check`, `pnpm openapi:export` đã gọi; lint đang chờ kết quả cuối.
+- Integration/e2e chỉ sửa, không chạy. Các test gán/thu hồi và helper đổi vai vẫn chuyển tiếp ở Task 2–4 theo plan; chưa xác nhận checkpoint integration.
+
+### Bằng chứng Task 2 — 04/11/2026
+
+- Thêm `PUT /app-users/{id}/role`, message `ROLE.CHANGED`, khóa mọi thay đổi theo approval-role → employee → account, kiểm vai rời/nhận trước ghi, thu hồi trước cấp, một audit before/after. Hai route cũ còn tới Task 4.
+- Chuyển seam Manager/Người duyệt chi sang thay vai; Finance reviewer chuyển vai qua seam đó.
+- Unit service/controller: 2 suites, 59 tests pass. HTTP route mới + API inventory: 2 suites, 20 tests pass.
+- Gates sau giảm trần nợ lint: 16 suites, 327 tests pass. Typecheck pass; route generator ghi 313 operations.
+- Integration mới có thay vai, idempotent, hiệu lực request kế tiếp, từ chối, Manager hiện tại/tương lai/kế nhiệm và đua Finance/Người duyệt chi; chỉ viết, chưa chạy.
+- Lint Task 1 phát hiện suppression của hàm tạo tài khoản đã thừa sau khi bỏ vòng lặp: gỡ đúng một suppression và giảm trần `max-lines-per-function` 51 → 50, tổng 107 → 106 trong gate (bổ sung Files bắt buộc để giữ gate chặt hơn).
+- Lint Task 2 lần đầu có lỗi format và `expect.any(String)` cần kiểu string; đã sửa, đang chạy lại. Không chạy integration/e2e.
+
+### Scope resolution
+
+- Task 2 final lint passed. Owner approved adding both dev-seed-report consumers to Task 3; Tasks 3-6 subsequently implemented. No active blocker remains from that clarification.
+
+### Bảng thay test trước Task 4
+
+| Test cũ                                                   | Test thay thế                                                                            |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Policy/lỗi tổ hợp, vai đã có/vai chưa có                  | Bỏ cùng tính năng thêm/bớt vai; DTO một vai, PUT no-op, lịch sử thay vai và route cũ 404 |
+| Gán/thu hồi MANAGER và đua grant                          | PUT rời/nhận MANAGER, giữ từ chối trưởng phòng hiện tại/tương lai/kế nhiệm và đồng thời  |
+| Gán Người duyệt chi, blocker bên Request, đua Request–vai | PUT thay vai; giữ singleton, tài khoản/nhân viên dùng được, open-work và tính nguyên tử  |
+| Thu hồi vai cuối để roles rỗng                            | PUT về EMPLOYEE, vẫn đăng nhập/tự phục vụ; không còn đường để tài khoản không vai        |
+
+### Task 3 — tiếp tục theo xác nhận Owner
+
+- Owner xác nhận trong chat 04/11/2026: bổ sung `src/cli/dev-seed/dev-seed-report.ts` và `dev-seed-report.spec.ts` vào Files; điểm dừng ở trên đã được gỡ.
+- Đã đổi hợp đồng demo sang `initialRole`/`finalRole`, giữ một vai ở cả trước/sau bước đổi Người duyệt chi, dùng PUT; fixture v2 có DS1-ITOH và trưởng phòng chỉ MANAGER; đã xóa hai file fixture v1 khỏi source.
+- Unit các file đổi lần đầu: 14 suites / 113 tests pass; thêm unit fixture riêng kiểm số người/tài khoản và mọi trưởng phòng.
+- Integration demo đã viết ca dừng ở PATCH phòng ngay sau org.accounts, CEO còn EMPLOYEE, chạy tiếp rồi chạy lần ba; thêm kiểm mọi tài khoản demo có đúng một grant. Chưa chạy integration.
+- Đã gọi typecheck/lint/arch/rules/gates và script tests; đang thu kết quả cuối, không chạy database thật.
 
 - [ ] AC trong scope có bằng chứng; thay đổi hợp đồng đã báo FE/mobile.
 - [ ] Spec/plan phản ánh implementation cuối.
 - [ ] Giao Owner review; cập nhật roadmap.
+
+### Task 4 evidence
+
+- Removed POST/DELETE role-grants; PUT is the only account role mutation route. Updated callers, SQL fixtures and the collection registry (maxItems remains 6).
+- typecheck, lint, arch:check, rules:check passed. Gates: 16 suites / 327 tests; changed unit: 4 suites / 62 tests; HTTP: 2 suites / 23 tests passed. openapi:export and arch:routes completed (311 operations).
+- Integration/e2e fixtures updated, not executed. Generic account fixtures now receive EMPLOYEE; deliberate constraint setup opts out with role:null.
+- Task 3 final script run exposed LF-only template expectations; corrected both env templates and reran the two affected tests (2 passed). Full script rerun remains for unified-seed task.
+
+### Task 5 evidence
+
+- Successor enrolment grants EMPLOYEE and records it. Role handover revokes old SUPER_ADMIN, revokes all successor grants, grants successor SUPER_ADMIN, then grants old holder EMPLOYEE in one transaction; OUT/IN audit uses captured previous roles. Unnamed 23514 maps to HEADS_DEPARTMENT.
+- typecheck, lint (final exit 0), arch:check, rules:check passed. Unit: 2 suites / 26 tests; gates: 16 suites / 327 tests passed.
+- Integration tests added for EMPLOYEE enrolment, exact effective grants/audits, future head and Finance refusal, reset-email redemption retaining SUPER_ADMIN; CLI help asserts EMPLOYEE wording. Not executed.
+- Old no-role preparation assertion replaced by exactly EMPLOYEE; empty transfer audit on rollback retained.
+
+### Task 6 evidence
+
+- Added 20261104120000_identity_one_role_per_account after the current last migration. Guard lists every NO_ROLE / MULTIPLE_ROLES account and raises P0001 without repair. Adds partial unique account index and removes only the superseded per-role index and combination trigger/function.
+- prisma:validate, typecheck, arch:check, rules:check and gates passed (16 suites / 327 tests). Full lint passed (exit 0); focused lint for the new migration test also passed. No unit file changed.
+- New one-role-per-account-migration.integration-spec.ts covers guard/deploy refusal, unchanged rows, empty deployment, retained singleton/head objects and direct unique violation with history replacement. Written only, not run.
+- README records failed Prisma row recovery via Owner migrate resolve --rolled-back after correction/rebuild. No database command executed.
+
+### Task 7 evidence and client handoff
+
+- Updated module invariants, operational rule 6, superseded notes in historical specs (Changes and acceptance only), and roadmap.
+- FE/mobile: create body role? defaults EMPLOYEE; PUT /app-users/{id}/role returns ROLE.CHANGED; old grant/revoke routes 404; removed /me.selfServiceOnly; roles stays an array. No client implementation in scope.
+- Test replacement ledger: old no-role recovery preparation becomes EMPLOYEE; transfer OUT/IN checks exact previous/new roles; SQL allowed-combination cases become unique-account violations; retained singleton, head, request-party, concurrency and rollback tests use atomic replacement.
+- Integration/e2e checkpoints are pending review; never marked green from unit or HTTP evidence.
+
+- Task 7 arch:docs:check and rules:check passed. First rules:format found formatting in the three added superseded notes; formatted those notes and reran. No changes outside Changes and acceptance in historical specs.
+
+### Review audit 04/11/2026 (nhánh `fix/qd95-seed-audit`, commit local)
+
+- Test: 28 kỳ vọng cấp phát `201` bị đổi thành `200` đã trả lại `201`; body `roles[]` → `role`; test trigger tổ hợp vai đổi sang vi phạm
+  `role_grants_one_role_per_account` (23505); usage `recover unlock` không còn chữ "no role".
+- Code: đổi vai và chuyển Super Admin ghi `revoked_at` của vai cũ và `granted_at` của vai mới cùng một thời điểm (lịch sử không chồng,
+  không hở).
+- Bổ sung test AC-23: `IT_ADMIN`/`FINANCE` bị từ chối làm trưởng phòng và người kế nhiệm (`MANAGER_ROLE_REQUIRED`); tạo `MANAGER` không
+  sinh kỳ trưởng phòng; `FINANCE` thứ hai 409; body `roles` 422.
+- Giữ `SpendingApproverHeadsDepartmentError` làm mapping của trigger `role_grants_spending_approver_not_head` (lưới an toàn).
+- Bằng chứng: run `w2` 40 suite integration xanh (gồm `account-role-change`, `account-creation-http`, `department-head-http`,
+  `super-admin-recovery-role`).

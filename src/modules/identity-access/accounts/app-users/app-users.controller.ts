@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -21,9 +21,8 @@ import {
   AccountDetailResponseDto,
   AccountPageResponseDto,
   AppUserIdParamDto,
-  AppUserRoleParamDto,
   CreateAppUserBodyDto,
-  GrantRoleBodyDto,
+  ChangeRoleBodyDto,
   ListAppUsersQueryDto,
 } from '../account-management.dto';
 import { ACCOUNT_ERROR_EXAMPLES, toAccountApiException } from '../account.http-errors';
@@ -113,7 +112,7 @@ export class AppUsersController {
   @ApiSuccessResponse(AccountDetailResponseDto, {
     status: HttpStatus.CREATED,
     message: 'APP_USER.CREATED',
-    description: 'The account was created (invited) and its invitation queued.',
+    description: 'The account was created with one role (EMPLOYEE by default), invited and its invitation queued.',
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
@@ -130,7 +129,6 @@ export class AppUsersController {
         ACCOUNT_ERROR_EXAMPLES.ALREADY_EXISTS_FOR_EMPLOYEE,
         ACCOUNT_ERROR_EXAMPLES.LOGIN_EMAIL_TAKEN,
         ACCOUNT_ERROR_EXAMPLES.FINANCE_ALREADY_ASSIGNED,
-        ACCOUNT_ERROR_EXAMPLES.ROLE_COMBINATION_FORBIDDEN,
       ],
     },
     {
@@ -313,12 +311,12 @@ export class AppUsersController {
     }
   }
 
-  @Post('app-users/:id/role-grants')
-  @ApiOperation({ operationId: 'appUserGrantRole', summary: 'Grant a role to an account' })
+  @Put('app-users/:id/role')
+  @ApiOperation({ operationId: 'appUserChangeRole', summary: 'Change the role of an account' })
   @ApiSuccessResponse(AccountDetailResponseDto, {
-    status: HttpStatus.CREATED,
-    message: 'ROLE.GRANTED',
-    description: 'The role is granted and takes effect at the account next request.',
+    message: 'ROLE.CHANGED',
+    description:
+      'Replaces the current role atomically. The same role is a no-op; changes take effect on the next request.',
   })
   @ApiErrorResponses(
     ...COMMON_ERRORS,
@@ -330,21 +328,19 @@ export class AppUsersController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'Already granted, forbidden combination, Finance seat taken, a second spending approver, a head asked to be the spending approver, a person with open work asked to be the spending approver, or the caller.',
+        'Self change, a Manager still heading a department, an occupied Finance or spending approver role, or open work blocking the spending approver.',
       examples: [
         ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN,
-        ACCOUNT_ERROR_EXAMPLES.ROLE_ALREADY_GRANTED,
-        ACCOUNT_ERROR_EXAMPLES.ROLE_COMBINATION_FORBIDDEN,
+        ACCOUNT_ERROR_EXAMPLES.MANAGER_STILL_HEADING,
         ACCOUNT_ERROR_EXAMPLES.FINANCE_ALREADY_ASSIGNED,
         ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_ALREADY_ASSIGNED,
-        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_HEADS_DEPARTMENT,
         ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_HAS_OPEN_WORK,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The role is the Super Admin role, which changes only by the operations command outside the application, or the person cannot be the spending approver (employee not working, account not usable).',
+        'Invalid input, the Super Admin role changes only outside the application, or the spending approver account or employee is not usable.',
       examples: [
         VALIDATION_EXAMPLE,
         ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_TRANSFER_ONLY,
@@ -353,50 +349,13 @@ export class AppUsersController {
       ],
     },
   )
-  async grantRole(
+  async changeRole(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: AppUserIdParamDto,
-    @Body() body: GrantRoleBodyDto,
+    @Body() body: ChangeRoleBodyDto,
   ) {
     try {
-      await this.status.grantRole(actor, params.id, body.role);
-
-      return toDetailWire(await this.queries.getAccount(params.id));
-    } catch (error) {
-      throw toAccountApiException(error);
-    }
-  }
-
-  @Delete('app-users/:id/role-grants/:role')
-  @ApiOperation({ operationId: 'appUserRevokeRole', summary: 'Revoke a role from an account' })
-  @ApiSuccessResponse(AccountDetailResponseDto, {
-    message: 'ROLE.REVOKED',
-    description: 'The role is revoked (the last role may be revoked); it stops at the next request.',
-  })
-  @ApiErrorResponses(
-    ...COMMON_ERRORS,
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'No such account, or it does not hold this role.',
-      examples: [ACCOUNT_ERROR_EXAMPLES.NOT_FOUND, ACCOUNT_ERROR_EXAMPLES.ROLE_NOT_GRANTED],
-    },
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The caller cannot change their own account, or the account still heads a department, will head one, or is named as a successor (MANAGER).',
-      examples: [ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN, ACCOUNT_ERROR_EXAMPLES.MANAGER_STILL_HEADING],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The role is the Super Admin role, which changes only by the operations command outside the application, or the person cannot be the spending approver (employee not working, account not usable).',
-      examples: [VALIDATION_EXAMPLE, ACCOUNT_ERROR_EXAMPLES.SUPER_ADMIN_TRANSFER_ONLY],
-    },
-  )
-  async revokeRole(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: AppUserRoleParamDto) {
-    try {
-      await this.status.revokeRole(actor, params.id, params.role);
-
+      await this.status.changeRole(actor, params.id, body.role);
       return toDetailWire(await this.queries.getAccount(params.id));
     } catch (error) {
       throw toAccountApiException(error);

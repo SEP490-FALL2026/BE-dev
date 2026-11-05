@@ -105,7 +105,7 @@ describe('the reminder to Finance of a question that is still open (US-06-02 AC-
 
   it('skips Finance when nobody can act for it, and does not fail', async () => {
     const { stepId } = await lateWithQuestion();
-    expect((await h.revokeRoleFrom(h.finance.appUserId, 'FINANCE')).status).toBeLessThan(300);
+    expect((await h.changeRoleOf(h.finance.appUserId, 'EMPLOYEE')).status).toBeLessThan(300);
     try {
       const result = await h.sweepAt(at(5, '10:00'));
 
@@ -114,7 +114,7 @@ describe('the reminder to Finance of a question that is still open (US-06-02 AC-
       expect(reminder.recipients.map((row) => row.role)).not.toContain('FINANCE_QUESTION');
       expect(reminder.recipients.map((row) => row.role)).toContain('HOLDER');
     } finally {
-      expect((await h.grantRoleTo(h.finance.appUserId, 'FINANCE')).status).toBeLessThan(300);
+      expect((await h.changeRoleOf(h.finance.appUserId, 'FINANCE')).status).toBeLessThan(300);
     }
   });
 

@@ -1,5 +1,6 @@
 import {
   BOOTSTRAP_ACTIONS,
+  seedStateOf,
   CURRENT_INSTALLATION_RECORDS,
   EARLIER_INSTALLATION_RECORDS,
   NO_ANNOUNCEMENT_GAPS,
@@ -191,5 +192,23 @@ describe('problemsOf', () => {
     expect(problemsOf({ migrations, bootstrapMismatches: [], changeAnnouncements: gaps, superAdmin })).toEqual([
       'CHANGE_ANNOUNCEMENTS_MISSING',
     ]);
+  });
+});
+
+describe('seedStateOf without migration metadata', () => {
+  const holder = { holders: 1, status: 'ACTIVE', activationState: 'ACTIVATED' };
+  it('distinguishes empty, complete, missing audit, missing holder and unusable holder', () => {
+    expect(seedStateOf({ organization: false, bootstrapMismatches: [], superAdmin: null })).toBe('EMPTY');
+    expect(seedStateOf({ organization: true, bootstrapMismatches: [], superAdmin: holder })).toBe('INSTALLED');
+    expect(seedStateOf({ organization: true, bootstrapMismatches: ['missing'], superAdmin: holder })).toBe(
+      'INCOMPLETE',
+    );
+    expect(seedStateOf({ organization: true, bootstrapMismatches: [], superAdmin: null })).toBe('INCOMPLETE');
+    expect(
+      seedStateOf({ organization: true, bootstrapMismatches: [], superAdmin: { ...holder, status: 'LOCKED' } }),
+    ).toBe('INCOMPLETE');
+    expect(seedStateOf({ organization: true, bootstrapMismatches: [], superAdmin: { ...holder, holders: 2 } })).toBe(
+      'INCOMPLETE',
+    );
   });
 });

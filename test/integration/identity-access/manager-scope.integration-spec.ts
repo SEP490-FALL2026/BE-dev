@@ -15,7 +15,7 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
   let unit: Unit;
   /** Holds MANAGER and heads nothing: the person this file is about. */
   let holder: Person;
-  /** Holds MANAGER, IT_ADMIN and heads nothing. */
+  /** Holds IT_ADMIN and heads nothing. */
   let holderWhoIsItAdmin: Person;
   let counter = 0;
 
@@ -23,8 +23,8 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
     await h.start();
     await h.withApprover();
     unit = await h.departmentWithHead('P-MS1');
-    holder = await h.staff(unit.department, 'MS-HOLD', ['MANAGER']);
-    holderWhoIsItAdmin = await h.staff(unit.department, 'MS-HOLD-IT', ['MANAGER', 'IT_ADMIN']);
+    holder = await h.staff(unit.department, 'MS-HOLD', 'MANAGER');
+    holderWhoIsItAdmin = await h.staff(unit.department, 'MS-HOLD-IT', 'IT_ADMIN');
   }, 240000);
 
   afterAll(async () => {
@@ -81,7 +81,7 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
       expect(asItAdmin.status).toBe(200);
     });
 
-    it('opens the tools of a department to the IT Admin who also holds MANAGER, and to no MANAGER who heads nothing', async () => {
+    it('opens the tools of a department to the IT Admin with only IT_ADMIN, and to no MANAGER who heads nothing', async () => {
       const refused = await call('get', `/api/v1/departments/${departmentId()}/tools-in-use`, holder.account);
       expect([refused.status, h.codeOf(refused)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
 
@@ -93,7 +93,7 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
       expect(asItAdmin.status).toBe(200);
     });
 
-    it('opens the notices of the heads to the IT Admin who also holds MANAGER, and to no MANAGER who heads nothing', async () => {
+    it('opens the notices of the heads to the IT Admin with only IT_ADMIN, and to no MANAGER who heads nothing', async () => {
       const refused = await call('get', '/api/v1/personnel-notices', holder.account);
       expect([refused.status, h.codeOf(refused)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
 
@@ -114,17 +114,17 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
       expect(h.dataOf<{ items: unknown[] }>(response).items).toEqual([]);
     });
 
-    it('refuses the route that is the Employee’s alone to a person who holds only MANAGER, head or not (US-01-01 AC-17)', async () => {
+    it('opens the route that is the Employee’s alone to a person who holds only MANAGER, head or not (US-01-01 AC-17)', async () => {
       const second = await h.departmentWithUnit(`P-MS${(counter += 1)}`);
       // Holds MANAGER only and heads the department from today.
-      const only = await h.staff(second, `MS-ONLY-${counter}`, ['MANAGER']);
+      const only = await h.staff(second, `MS-ONLY-${counter}`, 'MANAGER');
       await h.makeHead(second, only);
 
       const notHeading = await call('get', '/api/v1/me/software-rights', holder.account);
       const headingOnly = await call('get', '/api/v1/me/software-rights', only.account);
 
-      expect([notHeading.status, h.codeOf(notHeading)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
-      expect([headingOnly.status, h.codeOf(headingOnly)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
+      expect(notHeading.status).toBe(200);
+      expect(headingOnly.status).toBe(200);
       // The same person does use the routes of the Manager once they head the department.
       expect((await call('get', '/api/v1/dashboards/manager', only.account)).status).toBe(200);
     });

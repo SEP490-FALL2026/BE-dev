@@ -100,7 +100,7 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 - `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts`.
 - `license-key/` — kho key của mua đứt K4 (US-04-12); `license-keys.controller.ts`; `LicenseKeyService`.
 - `my-software/` — "Phần mềm của tôi" (US-12-15 AC-2, US-16-01 AC-1): `my-software.controller.ts`
-  (`GET /me/software-rights`, chỉ vai `EMPLOYEE`, chỉ quyền cá nhân của chính người gọi), `MySoftwareService`, `MySoftwareRepo`;
+  (`GET /me/software-rights`, mọi tài khoản đã đăng nhập (`QĐ-95d`), chỉ quyền cá nhân của chính người gọi), `MySoftwareService`, `MySoftwareRepo`;
   trạng thái theo ngày nghiệp vụ ở `my-software.policy.ts`. Không đọc khóa K4, giá, Cost Center hay định danh tài khoản.
 - `device-binding/` — contract sổ thiết bị G7 cho K4 (`DeviceRegistryPort`) và luật thuần gán/gỡ/giới hạn khóa theo thiết
   bị; **chưa dùng ở đâu, chưa bind**: sổ thiết bị của Owner chưa có, chỉ có contract test với mock

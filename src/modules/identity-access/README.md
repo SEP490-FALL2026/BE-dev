@@ -33,8 +33,7 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
 - `HolderRecoveryApi`, `RoleTransferRecoveryApi` (`public/holder-recovery.api.ts`, `role-transfer-recovery.api.ts`) —
   khôi phục và đổi người giữ vai Super Admin (ca có kế hoạch lẫn khẩn cấp), chỉ lệnh `pnpm ops:recover` (qua
   `identity-access-recovery-cli.module.ts`).
-- `IdentityAccessInspectionApi` — chỉ `pnpm ops:inspect`; `LocalDemoAccountApi` — chỉ `pnpm dev:seed` và
-  `pnpm ops:demo-dataset` (qua `DemoAccountsApi` của installation).
+- `IdentityAccessInspectionApi` — chỉ `pnpm ops:inspect`; `LocalDemoAccountApi` — chỉ `pnpm ops:seed` (qua `DemoAccountsApi` của installation).
 - Type/lỗi: `identity-access.types.ts`, `identity-access.errors.ts`, `recovery.types.ts`, `recovery.errors.ts`.
 
 ## Bảng sở hữu
@@ -84,9 +83,13 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
 
 ## Bất biến quan trọng
 
-- Tối đa một grant `SUPER_ADMIN` còn hiệu lực (index `role_grants_one_super_admin`); `SUPER_ADMIN` không đi cùng
-  IT_ADMIN hay FINANCE trên một tài khoản, không trao cho trưởng phòng hay người giữ vai trò phê duyệt (trigger).
-- `SUPER_ADMIN` chỉ đổi chủ bằng `pnpm ops:recover transfer-role`; route grant/revoke từ chối nó. Tài khoản gắn đúng một
+- Mỗi tài khoản có đúng một grant hiệu lực; index `role_grants_one_role_per_account` chặn grant thứ hai. Lịch sử thu hồi được giữ.
+  Tối đa một người giữ mỗi vai `SUPER_ADMIN`, `FINANCE`, `SPENDING_APPROVER` trong tổ chức; các guard trưởng phòng giữ nguyên.
+- Tạo tài khoản nhận `role?` (mặc định `EMPLOYEE`), từ chối trường `roles`. Đổi vai bằng `PUT /app-users/{id}/role`, trả `ROLE.CHANGED`;
+  đổi cùng vai là no-op. Hai route POST/DELETE `role-grants` đã bỏ (404), các mã lỗi tổ hợp vai/đã cấp/chưa cấp đã bỏ.
+- `/me.roles` vẫn là mảng, hiện có một phần tử; `/me.selfServiceOnly` đã bỏ. `MANAGER` chỉ có phạm vi ở phòng đang đứng đầu.
+- `SUPER_ADMIN` chỉ đổi chủ bằng `pnpm ops:recover transfer-role`; route đổi vai từ chối nó. Recovery chuẩn bị người nhận với
+  `EMPLOYEE`; hoàn tất thay người nhận thành `SUPER_ADMIN` và người cũ thành `EMPLOYEE`, audit before/after đúng vai. Tài khoản gắn đúng một
   người: trigger `app_users_employee_immutable` từ chối đổi `employee_id`.
 - Thứ tự khóa: nhân viên → tài khoản (`FOR SHARE`) → ticket khôi phục; băm mật khẩu trước khi mở transaction.
 - Chỉ lưu SHA-256 của refresh token và của token trong link; JWT chỉ nhận HS256 (`algorithms` ghim khi verify).
@@ -98,3 +101,11 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
   `test/integration/identity-access/`.
 
 `MANAGER` and `SPENDING_APPROVER` are direct grants; the latter is unique and cannot be a department head. Account listing can filter department membership on a date.
+
+## Migration QD-95
+
+`20261104120000_identity_one_role_per_account` refuses accounts with `MULTIPLE_ROLES` or `NO_ROLE`, listing employee codes before any schema change. It does not backfill or repair data. Rebuild the database and seed again as instructed by the Owner. A failed `migrate deploy` leaves a failed Prisma history row: after correcting/rebuilding data, the Owner runs `prisma migrate resolve --rolled-back 20261104120000_identity_one_role_per_account` before retrying deployment.
+
+The partial unique index limits effective grants to one per account; all application creation and replacement paths supply that role. Historical revoked grants remain.
+
+Demo accounts are created only by ops:seed through LocalDemoAccountApi; installation creates the separate SUPER_ADMIN. Password preflight uses public/password.policy.ts, a pure wrapper around the same credential policy (Owner-approved alternative to a forbidden re-export). See [seed operations](../../../docs/guides/seed.md).

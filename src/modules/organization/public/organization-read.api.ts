@@ -6,7 +6,7 @@ import { DepartmentRecordService } from '../department/department-record.service
 import { OrganizationChangeService } from '../change-announcement/organization-change.service';
 import { DepartmentHeadRecord } from '../department/department.types';
 import { EmployeeRecordService } from '../employee/employee-record.service';
-import { toBrief, toLocalSeedFixtureFacts } from '../organization-local-seed-fixture.mapper';
+import { toBrief } from '../organization-brief.mapper';
 import { OrganizationContextService } from '../organization-context.service';
 import { OrganizationRepo } from '../organization.repo';
 import {
@@ -21,7 +21,6 @@ import {
   EmployeeImportLookupData,
   EmployeeProfile,
   EmployeeRecord,
-  LocalSeedFixtureFacts,
   ItAdminInCharge,
   OnboardingFacts,
   OwningUnit,
@@ -255,18 +254,6 @@ export class OrganizationReadApi {
   /** Among these active departments, those nobody heads today: what the people import reports at its end (AC-1). */
   async departmentsWithoutHead(ids: string[]) {
     return (await this.departments.activeWithoutHead(await this.businessToday())).filter((d) => ids.includes(d.id));
-  }
-
-  /** The two local seed fixture items by their stable keys, in the caller's transaction (`pnpm dev:seed`); null when absent. */
-  async readLocalSeedFixture(
-    tx: DbTx,
-    keys: { organizationId: string; costCenterCode: string; departmentCode: string },
-  ): Promise<LocalSeedFixtureFacts> {
-    const costCenter = await this.costCenters.findByCode(tx, keys.organizationId, keys.costCenterCode);
-    const department = await this.departments.findByCode(tx, keys.organizationId, keys.departmentCode);
-    const activated = await this.costCenters.isDirectionActivated(tx);
-
-    return toLocalSeedFixtureFacts(costCenter, department, activated);
   }
 
   /** For each employee, the department they were in on `onDate` and its Unit: where a service account they answer for is owned and charged (`QĐ-86c`). */

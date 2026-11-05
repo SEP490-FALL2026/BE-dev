@@ -2,17 +2,19 @@
 # DB-05 (delivery-gate-hardening): bounded retention for the pre-migration dumps written by the deploy workflow
 # (.github/workflows/deploy.yml, step 3.5). Runbook: docs/guides/containers.md#backup-before-production-migrations.
 #
-# Keeps the 10 newest backups AND every backup younger than 30 days; only older backups beyond those 10 are deleted.
-# Dry run unless --apply. Touches only regular files named slm-pre-migrate-<UTC yyyyMMddTHHmmssZ>-<sha>.dump directly in
-# the given directory, which must be an absolute path ending in /backups/postgres. Age comes from the UTC stamp in the
-# file name, not the file time. RETENTION_NOW=<yyyyMMddTHHmmssZ> fixes "now" (tests only).
+# Keeps the 10 newest backups OF EACH KIND and every backup younger than 30 days.
+# Dry run unless --apply. Touches only regular files directly in the given directory named
+# slm-pre-migrate-<UTC yyyyMMddTHHmmssZ>-<sha>.dump (deploy workflow) or slm-pre-reseed-<UTC yyyyMMddTHHmmssZ>.dump
+# (scripts/ops/seed.sh), each its own kind. The directory must be an absolute path ending in /backups/postgres. Age comes
+# from the UTC stamp in the file name, not the file time. RETENTION_NOW=<yyyyMMddTHHmmssZ> fixes "now" (tests only).
 #
 # Exit: 0 done (or dry run), 1 a deletion failed, 2 usage error or refused target (nothing deleted).
 set -euo pipefail
 
 KEEP_NEWEST=10
 KEEP_DAYS=30
-NAME_PATTERN='^slm-pre-migrate-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7,40}\.dump$'
+NAME_PATTERN='^slm-pre-(migrate-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7,40}|reseed-[0-9]{8}T[0-9]{6}Z)\.dump$'
+stamp_of() { case "$1" in slm-pre-reseed-*) printf '%s' "${1:15:16}" ;; *) printf '%s' "${1:16:16}" ;; esac; }
 
 usage() {
   echo 'usage: postgres-backup-retention.sh --dir <APP_DIR>/backups/postgres [--apply]' >&2
@@ -81,7 +83,7 @@ while IFS= read -r name; do
     echo "ignored $name"
     continue
   fi
-  if ! stamp_epoch "${name:16:16}" >/dev/null; then
+  if ! stamp_epoch "$(stamp_of "$name")" >/dev/null; then
     echo "ignored $name (invalid time stamp)"
     continue
   fi
@@ -95,9 +97,12 @@ if [ "${#backups[@]}" -gt 0 ]; then
 fi
 
 expired=()
-index=0
+declare -A indexes=([migrate]=0 [reseed]=0)
 for name in "${sorted[@]+"${sorted[@]}"}"; do
-  epoch="$(stamp_epoch "${name:16:16}")"
+  kind=migrate
+  [[ "$name" != slm-pre-reseed-* ]] || kind=reseed
+  index="${indexes[$kind]}"
+  epoch="$(stamp_epoch "$(stamp_of "$name")")"
   if [ "$index" -lt "$KEEP_NEWEST" ]; then
     echo "keep $name (one of the $KEEP_NEWEST newest)"
   elif [ "$epoch" -gt "$CUTOFF" ]; then
@@ -105,7 +110,7 @@ for name in "${sorted[@]+"${sorted[@]}"}"; do
   else
     expired+=("$name")
   fi
-  index=$((index + 1))
+  indexes[$kind]=$((index + 1))
 done
 
 total="${#sorted[@]}"

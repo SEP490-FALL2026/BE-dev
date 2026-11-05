@@ -141,16 +141,21 @@ describe('role overview routes (e2e, no database)', () => {
 
     // The role matrix: each overview belongs to one role; Finance and the spending approver have their own overview elsewhere.
     it.each([...ALL_ROLES.filter((role) => role !== route.role), 'none'])(
-      'refuses the role %s with 403',
+      'applies the overview access rule to role %s',
       async (role) => {
         const caller = role === 'none' ? principal([]) : holder(role);
         const response = await request(app.getHttpServer())
           .get(route.path)
           .set('Authorization', bearer(caller))
-          .expect(403);
+          .expect(route.name === 'employee' ? 200 : 403);
 
-        expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
-        expect(called()).not.toHaveBeenCalled();
+        if (route.name === 'employee') {
+          expect(bodyOf(response).data).toEqual(route.answer);
+          expect(called()).toHaveBeenCalledWith(caller);
+        } else {
+          expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+          expect(called()).not.toHaveBeenCalled();
+        }
       },
     );
 

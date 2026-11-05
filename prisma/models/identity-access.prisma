@@ -72,6 +72,7 @@ model PasswordCredential {
 
 // Direct role grants with history, all six roles (QĐ-93a). MANAGER only counts while the holder heads a department today;
 // SPENDING_APPROVER is held by at most one person (role_grants_one_spending_approver).
+// SQL-only partial unique index role_grants_one_role_per_account: one effective grant per app_user_id (QĐ-95).
 model RoleGrant {
   id             String    @id @default(uuid()) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid

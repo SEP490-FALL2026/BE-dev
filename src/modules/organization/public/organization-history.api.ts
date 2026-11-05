@@ -5,7 +5,7 @@ import { AnnounceDueResult, OrganizationChangeService } from '../change-announce
 import { DepartmentRecordService } from '../department/department-record.service';
 import { HeadAssignmentError } from '../department/department.errors';
 import { EmployeeRecordService } from '../employee/employee-record.service';
-import { toBrief } from '../organization-local-seed-fixture.mapper';
+import { toBrief } from '../organization-brief.mapper';
 import { HeadHandoverRefusedError } from './organization.errors';
 import { OrganizationReadApi } from './organization-read.api';
 import type {

@@ -6,10 +6,12 @@ trúc, import, chuỗi bị cấm), [module-graph.spec.ts](../../test/gates/modu
 lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu và transaction theo
 [database rules](database-business.md).
 
-**Một điểm vào, alias giữ vĩnh viễn (`OD-A7`):** mọi lệnh chạy bằng `node dist/cli.js <lệnh>` (`pnpm ops:<lệnh>`,
-`pnpm dev:seed`); bảng lệnh duy nhất là [`src/cli/commands.ts`](../../src/cli/commands.ts), mã của lệnh nằm ở `src/cli/<lệnh>/`.
+**Một điểm vào, alias giữ vĩnh viễn (`OD-A7`):** mọi lệnh chạy bằng `node dist/cli.js <lệnh>` (`pnpm ops:<lệnh>`); bảng lệnh duy nhất là [`src/cli/commands.ts`](../../src/cli/commands.ts), mã của lệnh nằm ở `src/cli/<lệnh>/`.
 `pnpm build` sinh từ bảng đó `dist/<tên cũ>-cli.js` một dòng cho mỗi lệnh (`scripts/build/emit-cli-aliases.mjs`); image,
 `scripts/ops/*.sh` và runbook gọi các đường này nên không bỏ hay đổi tên alias. Lệnh mới = một dòng bảng + một thư mục.
+
+**Ngoại lệ của `OD-A7` (Owner 04/11/2026, `OD-S3`):** lệnh `demo-dataset`, `dev-seed` và alias của chúng đã bỏ vì VPS demo được
+dựng lại và `scripts/ops/seed.sh` thay mọi nơi gọi chúng. Alias của các lệnh khác vẫn giữ nguyên.
 
 ## Tám quy tắc
 
@@ -17,9 +19,11 @@ lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu
    hay callback bị sửa nhầm: phiên PostgreSQL của nó mở với `default_transaction_read_only=on`
    (`ReadOnlyDatabaseSessionModule`), nên server từ chối mọi lệnh ghi (SQLSTATE `25006`). Kiểm "chỉ đọc" bằng bằng
    chứng ở database, không chỉ bằng mock.
-2. **Lệnh ghi local** cần đủ **ba** chốt độc lập, kiểm trước khi mở transaction ghi: `NODE_ENV` được phép (`development`
-   hoặc `test`), host của `DATABASE_URL` hiệu lực **parse** ra là loopback (`localhost`, `127.0.0.0/8`, `::1`), và cờ xác
-   nhận tường minh (`--confirm-local`). Không có `--force` hay cờ chung nào bỏ qua một chốt.
+2. **Reset local chỉ nằm trong wrapper Node** ([`seed-local.mjs`](../../scripts/dev/seed-local.mjs)): `NODE_ENV=development` và
+   host của `DATABASE_URL` **parse** ra loopback được kiểm trước mọi tiến trình con; xóa cần gõ đúng tên database; database đã cài
+   chỉ được xóa hay chạy tiếp khi bootstrap ghi `LOCAL_TEST` (URL loopback vẫn có thể là tunnel tới server dùng chung). Mã Nest
+   (CLI, `installation`) không có lệnh xóa database. Wrapper không đặt và không chuyển tiếp biến consent của Prisma; lượt reset thật
+   do Owner chạy. Xem [seed](../guides/seed.md).
 3. **Entry CLI và module lệnh không tới được từ `AppModule` và `WorkerModule`** (cả import TypeScript lẫn đồ thị Nest).
 4. **Phân vai:** entry (`src/cli/<lệnh>/<lệnh>.command.ts`) parse tham số, in kết quả, chọn mã thoát; repository query; service
    application/domain thực thi workflow và ghi Audit Trail. Không Prisma trực tiếp hay raw SQL trong entry hoặc service
@@ -27,7 +31,7 @@ lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu
 5. **Không commit mật khẩu, token, hash hay private key mặc định.** Credential sinh ra (CSPRNG) chỉ được in **một lần**
    ra terminal gọi lệnh; không log, không audit, không trả lại ở lần chạy lặp.
 6. **Vai demo theo đúng ownership:** `SUPER_ADMIN`, `IT_ADMIN`, `FINANCE`, `EMPLOYEE`, `MANAGER` và
-   `SPENDING_APPROVER` là vai trực tiếp; cấp và thu hồi qua capability sở hữu cùng các luật nghiệp vụ.
+   `SPENDING_APPROVER` là vai trực tiếp; mỗi tài khoản đúng một vai, đổi vai qua capability sở hữu cùng các luật nghiệp vụ.
 7. **Lệnh, fixture và test chia theo capability/use case** dưới cùng ngưỡng kích thước và quy tắc phụ thuộc của
    [module structure](module-structure.md).
 8. **Dọn tài nguyên:** mọi bước kiểm tra tạo container, image, database tạm, tiến trình hay file phải **đăng ký cleanup
@@ -40,7 +44,8 @@ lệnh. Vị trí file theo [module structure](module-structure.md); dữ liệu
 
 **Đúng:**
 
-- `NODE_ENV=development`, `DATABASE_URL` có host parse ra `127.0.0.1`/`localhost`/`::1`, cờ `--confirm-local`.
+- `pnpm seed:local`: `NODE_ENV=development`, `DATABASE_URL` có host parse ra `127.0.0.1`/`localhost`/`::1`, xóa chỉ khi gõ đúng
+  tên database (`--confirm-reset <tên database>`).
 - Mật khẩu tài khoản mới sinh bằng `randomBytes`, in một lần; test tiêm generator cố định.
 - Ghi qua service của module sở hữu (`OrganizationService`, facade của `identity-access`) và `AuditService`.
 
@@ -111,11 +116,12 @@ biến thể literal vẫn bị từ chối theo tên. Hiện thực (`src/cli/b
 `bootstrap.command.ts` chỉ nối. Người dùng cờ này là [bootstrap wrapper](../../scripts/ops/bootstrap-installation.sh) trên VPS
 (`.env.bootstrap` riêng, owner-only, parse như dữ liệu): [containers](../guides/containers.md#bootstrap-wrapper-prompt-06).
 
-**Giới hạn của tài khoản demo `FINANCE` (`dev:seed`, Owner 30/10/2026):** cấp vai `FINANCE` phát thay đổi vai trò phê duyệt mà graph của
-lệnh không có listener của `requests` trả lời, nên một step đang chờ Finance không được thử lại (đường API thì thử lại); trên database
-local mà lệnh nhắm tới chưa có step nào chờ Finance (`ops:demo-dataset` có cùng giới hạn, xem [demo-dataset](../guides/demo-dataset.md)).
+**Giới hạn của tài khoản demo `FINANCE` (Owner 30/10/2026):** tạo tài khoản demo vai `FINANCE` trong tiến trình (`DemoAccountsApi`)
+phát thay đổi vai trò phê duyệt mà graph của lệnh không có listener của `requests` trả lời, nên một step đang chờ Finance không được
+thử lại (đường API thì thử lại); fixture tạo tài khoản trước mọi Request nên chưa có step nào chờ Finance. Xem
+[seed](../guides/seed.md).
 
-**`ops:demo-dataset` (dataset demo của VPS dùng chung):** không phải lệnh ghi local và không nới chốt nào của `dev:seed`.
+**`ops:seed` (dataset demo của VPS dùng chung):** không phải lệnh ghi local và không thực hiện reset trong Nest.
 Nó ghi qua **HTTP API đang chạy** bằng đúng vai của từng bước (Super Admin, Finance, IT Admin, trưởng phòng, Người duyệt chi,
 nhân viên), nên validation, chuyển trạng thái và Audit Trail là của ứng dụng; không SQL nghiệp vụ, không endpoint seed. Phần duy
 nhất ghi trong tiến trình là tài khoản đăng nhập của người demo (`DemoAccountsApi` của `installation`, dùng lại hợp đồng
@@ -123,17 +129,21 @@ nhất ghi trong tiến trình là tài khoản đăng nhập của người dem
 `DEMO_DATASET.ACCOUNT_CREATED` với `actorKind OPERATOR`). Trước mọi ghi, lệnh chứng minh đích: tên tổ chức, tiền tệ báo cáo của
 fixture, Super Admin đăng nhập qua API là người giữ vai trong database. Hai mật khẩu chỉ đọc từ stdin (`--secrets-stdin`, hai dòng
 `SUPER_ADMIN_PASSWORD=`/`DEMO_ACCOUNT_PASSWORD=`, tối đa 2048 byte, 10 giây). Fixture có phiên bản ở
-`src/cli/demo-dataset/fixture/`; xung đột với dữ liệu ngoài dataset, hay bản ghi của dataset đã bị sửa khác fixture, được báo,
+`src/cli/seed/fixture/`; xung đột với dữ liệu ngoài dataset, hay bản ghi của dataset đã bị sửa khác fixture, được báo,
 không ghi đè; danh sách dài quá giới hạn đọc cũng là xung đột, không bao giờ coi là "chưa có". `apply` giữ một khóa advisory
 **phiên** (`trySessionAdvisoryLock`, kết nối riêng — không giữ transaction mở trong lúc gọi HTTP) cho fixture trên database:
-lượt thứ hai bị từ chối, khóa nhả khi xong/lỗi và khi tiến trình chết. Lịch: `apply` chỉ ghi 01/01–30/11 của năm nạp lần đầu,
+lượt thứ hai bị từ chối, khóa nhả khi xong/lỗi và khi tiến trình chết. Lịch: `apply` ghi mọi ngày; khi cần thì lập thêm ngân sách năm sau,
 năm tài chính phải bắt đầu tháng 1; sang năm khác thì từ chối. Với `NODE_ENV=production` đồ thị lệnh nạp
 `RuntimeDatabaseRoleModule` như API: vai PostgreSQL không phải runtime role thì dừng trước mọi việc. Hai đường vận hành:
-wrapper [`demo-dataset.sh`](../../scripts/ops/demo-dataset.sh) trên VPS (image mới) và
-[`demo-dataset-local.mjs`](../../scripts/ops/demo-dataset-local.mjs) từ máy local (bản build local, API HTTPS, SSH tunnel tới
-PostgreSQL chỉ mở ở `127.0.0.1`, chỉ chạy khi `prisma/` và `openapi.json` giống hệt commit đang deploy). Vận hành:
-[demo-dataset](../guides/demo-dataset.md).
+[seed](../guides/seed.md): wrapper local [`seed-local.mjs`](../../scripts/dev/seed-local.mjs) và wrapper VPS
+[`seed.sh`](../../scripts/ops/seed.sh).
 
 **Preflight chỉ kiểm, không sửa:** CSDL bị chặn (exit 2) giữ nguyên, deploy dừng trước migration; xem lịch sử được hỗ trợ và
 cách xử lý CSDL bị chặn ở [containers](../guides/containers.md#preflight-before-migrate-deploy-p28-01). Thiết kế:
 [g0-g4-checkpoint-fix-forward](../workspace/items/g0-g4-checkpoint-fix-forward/spec.md).
+
+## Confirmed demo reset
+
+`pnpm seed:local` reads .env.seed.local, checks development/loopback, refuses an answering API port, builds if needed, checks passwords/state, and asks reset/continue/exit. It always deploys migrations before apply, owns its API/worker children and cleans them up. A check error permits reset only; continuation requires a complete fixture organization.
+
+`scripts/ops/seed.sh` is Owner-run on the demo VPS, never by CD. Reset requires SEED_ALLOW_RESET=true and exact POSTGRES_DB confirmation. It holds the deploy lock; verifies a custom dump before stop/drop; provisions, migrates, reconciles, starts and waits for ready before apply. Failure after recreation stops services and prints recovery commands. Reports are owner-only. Retention keeps ten newest per kind and all under thirty days. The seed guide has the one-time QD-95 rebuild runbook.

@@ -853,3 +853,9 @@ Chưa xác minh: remote CI, chạy trên môi trường dùng chung, `pnpm ops:r
 Người phụ trách cập nhật khi thiết kế ready, bắt đầu code, kiểm chứng, tích hợp `dev` và giao Owner review. Ghi `merged-dev`, `accepted` và `released` chỉ sau đúng sự kiện tương ứng. Trạng thái yêu cầu BRD/US ghi ở spec, không trộn vào tiến độ này.
 
 Nếu sau này dùng GitHub Projects quản lý tiến độ, chuyển trạng thái/assignee sang đó, đặt link ở đây và chỉ giữ milestone/phụ thuộc trong roadmap. Tránh hai bảng tiến độ song song.
+
+## Implementation handoff 04/11/2026: QD-95 one role
+
+Local stacked branch `feat/qd95-one-role-per-account`: Tasks 1-6 committed; Task 7 documents the HTTP changes and superseded designs. [Plan and evidence](workspace/items/qd95-one-role-per-account/plan.md) records quick checks and test replacements. Integration/e2e are written but deliberately not run in this implementation session; review and acceptance remain pending. No push, merge or deployment.
+
+FE/mobile contract: create accepts `role?` (EMPLOYEE default), PUT `/app-users/{id}/role` replaces both additive endpoints (404), `/me.selfServiceOnly` removed; `roles` remains an array with one role.

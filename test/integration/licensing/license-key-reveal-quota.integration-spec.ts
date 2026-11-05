@@ -12,7 +12,7 @@ describe('how many license keys an account may open (integration, real PostgreSQ
 
   beforeAll(async () => {
     await h.start();
-    it2 = await h.account('E-IT2', await h.person('E-IT2'), ['IT_ADMIN']);
+    it2 = await h.account('E-IT2', await h.person('E-IT2'), 'IT_ADMIN');
     const subscriptionId = await h.subscription(60, 'K4');
     const keys = Array.from(
       { length: 40 },

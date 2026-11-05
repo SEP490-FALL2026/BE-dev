@@ -21,8 +21,18 @@ describe('role grant constraints (integration, real PostgreSQL)', () => {
   beforeAll(async () => {
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
-    second = await insertAccountFixture(ctx.app, seed, { code: 'E-2', email: 'two@acme.vn', activated: true });
-    third = await insertAccountFixture(ctx.app, seed, { code: 'E-3', email: 'three@acme.vn', activated: true });
+    second = await insertAccountFixture(ctx.app, seed, {
+      code: 'E-2',
+      email: 'two@acme.vn',
+      activated: true,
+      role: null,
+    });
+    third = await insertAccountFixture(ctx.app, seed, {
+      code: 'E-3',
+      email: 'three@acme.vn',
+      activated: true,
+      role: null,
+    });
   }, 90000);
 
   afterAll(async () => {
@@ -78,6 +88,9 @@ describe('role grant constraints (integration, real PostgreSQL)', () => {
   });
 
   it('rejects a duplicate effective (account, role) grant but keeps history of revoked ones', async () => {
+    await ctx.sql.query('UPDATE role_grants SET revoked_at = now() WHERE app_user_id = $1 AND revoked_at IS NULL', [
+      third.appUserId,
+    ]);
     await grant(ctx.sql, third.appUserId, 'EMPLOYEE');
     await expect(grant(ctx.sql, third.appUserId, 'EMPLOYEE')).rejects.toMatchObject({ code: UNIQUE_VIOLATION });
 
@@ -94,7 +107,12 @@ describe('role grant constraints (integration, real PostgreSQL)', () => {
   });
 
   it('rejects the Super Admin role for a department head, whoever writes the row (the database is the last guard of a role transfer)', async () => {
-    const head = await insertAccountFixture(ctx.app, seed, { code: 'E-5', email: 'five@acme.vn', activated: true });
+    const head = await insertAccountFixture(ctx.app, seed, {
+      code: 'E-5',
+      email: 'five@acme.vn',
+      activated: true,
+      role: null,
+    });
     await ctx.sql.query(
       `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
        VALUES (gen_random_uuid(), $1, $2, $3, now()::date)`,
@@ -142,7 +160,7 @@ describe('role grant constraints (integration, real PostgreSQL)', () => {
       counter += 1;
       const code = `E-Q${counter}`;
 
-      return insertAccountFixture(ctx.app, seed, { code, email: `q${counter}@acme.vn`, activated: true });
+      return insertAccountFixture(ctx.app, seed, { code, email: `q${counter}@acme.vn`, activated: true, role: null });
     };
     const rejected = (promise: Promise<unknown>) => expect(promise).rejects.toMatchObject({ code: CHECK_VIOLATION });
     /** The SQLSTATE and the message of a statement the database refused (the message names the rule that refused it). */
@@ -204,20 +222,25 @@ describe('role grant constraints (integration, real PostgreSQL)', () => {
         const account = await fresh();
         await withoutSuperAdmin(async () => {
           await grant(ctx.sql, account.appUserId, first);
-          await rejected(grant(ctx.sql, account.appUserId, second));
+          await expect(grant(ctx.sql, account.appUserId, second)).rejects.toMatchObject({
+            code: UNIQUE_VIOLATION,
+            constraint: 'role_grants_one_role_per_account',
+          });
           await revokeAll(account.appUserId);
         });
       }
     });
 
-    it('allows the pairs the spec allows: MANAGER with IT_ADMIN or FINANCE, and EMPLOYEE with each role', async () => {
-      const account = await fresh();
-      for (const role of ['MANAGER', 'IT_ADMIN', 'FINANCE', 'EMPLOYEE']) await grant(ctx.sql, account.appUserId, role);
-      await revokeAll(account.appUserId);
-      const approver = await fresh();
-      await grant(ctx.sql, approver.appUserId, 'SPENDING_APPROVER');
-      await grant(ctx.sql, approver.appUserId, 'EMPLOYEE');
-      await revokeAll(approver.appUserId);
+    it('also rejects the previously allowed pairs, including EMPLOYEE with every other role', async () => {
+      for (const role of ['MANAGER', 'IT_ADMIN', 'FINANCE', 'SPENDING_APPROVER']) {
+        const account = await fresh();
+        await grant(ctx.sql, account.appUserId, role);
+        await expect(grant(ctx.sql, account.appUserId, 'EMPLOYEE')).rejects.toMatchObject({
+          code: UNIQUE_VIOLATION,
+          constraint: 'role_grants_one_role_per_account',
+        });
+        await revokeAll(account.appUserId);
+      }
     });
 
     it('allows one effective SPENDING_APPROVER, whatever the state of the holder (a locked account keeps it), and not a second (US-01-03 AC-10)', async () => {
@@ -291,8 +314,8 @@ describe('role grant constraints (integration, real PostgreSQL)', () => {
     it('gives the holder of the Super Admin role neither MANAGER nor SPENDING_APPROVER (US-01-03 AC-2)', async () => {
       const holder = await superAdminHolder();
 
-      await rejected(grant(ctx.sql, holder, 'MANAGER'));
-      await rejected(grant(ctx.sql, holder, 'SPENDING_APPROVER'));
+      await expect(grant(ctx.sql, holder, 'MANAGER')).rejects.toMatchObject({ code: UNIQUE_VIOLATION });
+      await expect(grant(ctx.sql, holder, 'SPENDING_APPROVER')).rejects.toMatchObject({ code: UNIQUE_VIOLATION });
     });
   });
 });

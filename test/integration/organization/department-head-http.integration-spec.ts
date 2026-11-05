@@ -1,4 +1,4 @@
-import { clearSpendingApprover, setSpendingApprover } from '../../support/builders/account.builder';
+import { changeRoleTo, clearSpendingApprover, setSpendingApprover } from '../../support/builders/account.builder';
 import { insertEmployeeFixture } from '../../support/http-test-app';
 import { OrganizationHistoryApi } from '../../../src/modules/organization/public/organization-history.api';
 import { HR_BASIS } from '../../support/hr-basis';
@@ -494,6 +494,45 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       expect((await getDepartment(department.id)).successor).toBeNull();
       await clearSpendingApprover(h.ctx, h.admin);
     });
+
+    it.each(['IT_ADMIN', 'FINANCE'] as const)(
+      'refuses a member holding %s as head or successor: only MANAGER heads (QĐ-95, US-03-06 AC-23)',
+      async (role) => {
+        const department = await newDepartment();
+        const head = await accountIn(department.code);
+        const person = await accountIn(department.code);
+        // One Finance per organization: the seed holder steps down to EMPLOYEE for the test and takes the role back after.
+        const { rows } = await h.ctx.sql.query<{ employee_id: string }>(
+          `SELECT u.employee_id FROM role_grants g JOIN app_users u ON u.id = g.app_user_id
+            WHERE g.role = 'FINANCE' AND g.revoked_at IS NULL`,
+        );
+        const financeHolder = role === 'FINANCE' ? (rows[0]?.employee_id ?? null) : null;
+        if (financeHolder) await changeRoleTo(h.ctx, h.admin, financeHolder, 'EMPLOYEE');
+        try {
+          await changeRoleTo(h.ctx, h.admin, person.employeeId, role);
+
+          const asHead = await assignHeadRaw(department.id, person.employeeId).expect(422);
+          expect(errorOf(asHead).code).toBe('DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED');
+          await assignHead(department.id, head.employeeId).expect(200);
+          const asSuccessor = await designate(department.id, person.employeeId, addDays(today(), 10)).expect(422);
+          expect(errorOf(asSuccessor).code).toBe('DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED');
+
+          expect(await getDepartment(department.id)).toMatchObject({
+            head: { employeeId: head.employeeId },
+            successor: null,
+          });
+          expect(
+            (await h.ctx.sql.query('SELECT 1 FROM department_head_periods WHERE employee_id = $1', [person.employeeId]))
+              .rows,
+          ).toEqual([]);
+        } finally {
+          if (financeHolder) {
+            await changeRoleTo(h.ctx, h.admin, person.employeeId, 'EMPLOYEE');
+            await changeRoleTo(h.ctx, h.admin, financeHolder, 'FINANCE');
+          }
+        }
+      },
+    );
 
     it('is the Super Admin’s alone, takes no HR basis (QĐ-93f), and is 404 for a department that does not exist (F10, F13)', async () => {
       const department = await newDepartment();

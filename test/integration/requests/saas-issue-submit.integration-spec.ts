@@ -205,7 +205,7 @@ describe('reporting an error in a SaaS right (integration, real PostgreSQL)', ()
       ).rows[0].id;
 
     it('gives it to the first IT Admin who can act when the department has none in charge', async () => {
-      await h.staff(await h.departmentWithUnit('P-SIX'), 'E-AAA-IT', ['IT_ADMIN']);
+      await h.staff(await h.departmentWithUnit('P-SIX'), 'E-AAA-IT', 'IT_ADMIN');
       const { member, assignmentId } = await reporter(null);
 
       const issue = await h.reported(member.account, assignmentId);

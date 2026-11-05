@@ -77,7 +77,7 @@ describe('lock protocol: account administration races (integration, real Postgre
     const response = await request(server())
       .post('/api/v1/app-users')
       .set(asAdmin())
-      .send({ employeeId, roles: ['IT_ADMIN'] })
+      .send({ employeeId, role: 'IT_ADMIN' })
       .expect(201);
     return { id: (response.body as { data: { id: string } }).data.id, email };
   };

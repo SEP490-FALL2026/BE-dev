@@ -82,8 +82,8 @@ describe('the proposals waiting for IT assessment (integration, real PostgreSQL)
     noItHead = await h.staff(noItInCharge, 'QH-H1');
     noItStaff = await h.staff(noItInCharge, 'QH-E1');
     itDesign = { employeeId: h.it1.employeeId, account: h.it1 };
-    itOps = await h.staff(ops, 'QO-IT1', ['IT_ADMIN']);
-    itOps2 = await h.staff(ops, 'QO-IT2', ['IT_ADMIN']);
+    itOps = await h.staff(ops, 'QO-IT1', 'IT_ADMIN');
+    itOps2 = await h.staff(ops, 'QO-IT2', 'IT_ADMIN');
     await h.makeHead(design, head);
     await h.makeHead(ops, opsHead);
     await h.makeHead(executive, await h.staff(executive, 'EXE-H1')); // the Spending Approver does not head a department (QĐ-93b)

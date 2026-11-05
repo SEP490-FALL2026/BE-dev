@@ -54,7 +54,7 @@ describe('the grant of SPENDING_APPROVER and the work that is still open (integr
   };
   const grant = (person: Person) =>
     request(h.server())
-      .post(`/api/v1/app-users/${person.account.appUserId}/role-grants`)
+      .put(`/api/v1/app-users/${person.account.appUserId}/role`)
       .set('Authorization', `Bearer ${h.admin}`)
       .send({ role: 'SPENDING_APPROVER' });
   const holders = async (): Promise<number> =>
@@ -155,7 +155,7 @@ describe('the grant of SPENDING_APPROVER and the work that is still open (integr
       // The work ends (the requester withdraws, the head withdraws what was sent for the person): the grant goes through.
       await h.withdrawRequest(sentByThem.id, {}, person.account).expect(200);
       await h.withdrawRequest(delegated, {}, u.head.account).expect(200);
-      await grant(person).expect(201);
+      await grant(person).expect(200);
       expect(await holders()).toBe(1);
     });
 
@@ -170,7 +170,7 @@ describe('the grant of SPENDING_APPROVER and the work that is still open (integr
         draft.id,
       ]);
 
-      await grant(person).expect(201);
+      await grant(person).expect(200);
 
       expect(await holders()).toBe(1);
     });
@@ -212,7 +212,7 @@ describe('the grant of SPENDING_APPROVER and the work that is still open (integr
       const decided = await proposalOf(person, 'REVIEWED', 2036);
       await versionOf(decided, person, 'REJECTED', 1);
 
-      await grant(person).expect(201);
+      await grant(person).expect(200);
 
       expect(await holders()).toBe(1);
     });
@@ -242,7 +242,7 @@ describe('the grant of SPENDING_APPROVER and the work that is still open (integr
       ]);
 
       await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = current_date WHERE id = $1`, [bot.id]);
-      await grant(person).expect(201);
+      await grant(person).expect(200);
     });
   });
 
@@ -280,7 +280,7 @@ describe('the grant of SPENDING_APPROVER and the work that is still open (integr
       const none = await runner.run((tx) => api.lockSpendingApproverAmong(tx, between));
       expect(none).toBeNull();
 
-      await grant(other).expect(201);
+      await grant(other).expect(200);
       const held = await runner.run(async (tx) => {
         const holder = await api.lockSpendingApproverAmong(tx, between);
         // The lock is held to the end of the transaction: an update of the account of either person has to wait, a share does not.

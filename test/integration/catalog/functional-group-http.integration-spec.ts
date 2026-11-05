@@ -22,14 +22,19 @@ describe('functional groups over HTTP (integration, real PostgreSQL)', () => {
     ctx = await createHttpTestApp();
     seed = await seedInstallation(ctx.app);
     const admin = await adminToken(ctx, seed);
-    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', roles: ['IT_ADMIN'], admin });
+    it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
     finance = await createActivatedAccount(ctx, seed, {
       code: 'E-FIN',
       email: 'fin@acme.vn',
-      roles: ['FINANCE'],
+      role: 'FINANCE',
       admin,
     });
-    employee = await createActivatedAccount(ctx, seed, { code: 'E-EMP', email: 'emp@acme.vn', roles: [], admin });
+    employee = await createActivatedAccount(ctx, seed, {
+      code: 'E-EMP',
+      email: 'emp@acme.vn',
+      role: 'EMPLOYEE',
+      admin,
+    });
   }, 120000);
 
   afterAll(async () => {

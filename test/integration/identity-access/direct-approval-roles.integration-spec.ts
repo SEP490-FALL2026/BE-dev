@@ -5,11 +5,8 @@ import { bodyOf } from '../../support/api-body';
 import { AccountManagementHttpHarness, dataOf, errorCode } from '../../support/account-management-http-harness';
 
 /**
- * `qd93-direct-manager-spending-approver-roles`, Tasks 5, 6a, 6b: MANAGER and SPENDING_APPROVER are granted and revoked by the Super
- * Admin through the routes of IT_ADMIN and FINANCE (`POST /app-users`, `POST /app-users/{id}/role-grants`,
- * `DELETE /app-users/{id}/role-grants/{role}`), with the rules of the spec in the order it lists them, in one transaction with the
- * Audit Trail. This file proves the grant and the revoke on the database (rows, audit, the details of the refusal); who may call a
- * route as a MANAGER is `manager-scope`.
+ * MANAGER and SPENDING_APPROVER are selected through PUT /app-users/{id}/role.
+ * The retained eligibility, singleton, head-period and audit rules apply to every atomic replacement.
  */
 describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real PostgreSQL)', () => {
   const h = new AccountManagementHttpHarness();
@@ -36,10 +33,9 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
         offset,
       ])
     ).rows[0].d;
-  const grant = (appUserId: string, role: string) =>
-    h.admin.post(`/api/v1/app-users/${appUserId}/role-grants`, { role });
+  const grant = (appUserId: string, role: string) => h.admin.put(`/api/v1/app-users/${appUserId}/role`, { role });
   const revoke = (appUserId: string, role: string) =>
-    h.admin.delete(`/api/v1/app-users/${appUserId}/role-grants/${role}`);
+    h.admin.put(`/api/v1/app-users/${appUserId}/role`).send({ role: role === 'SUPER_ADMIN' ? role : 'EMPLOYEE' });
   const rolesOf = async (appUserId: string): Promise<string[]> =>
     dataOf(await h.admin.get(`/api/v1/app-users/${appUserId}`).expect(200))
       .roles.slice()
@@ -66,17 +62,17 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
     it('grants MANAGER without making a head, and says so in the Audit Trail (AC-4)', async () => {
       const user = await h.activatedAccount([]);
 
-      const response = await grant(user.appUserId, 'MANAGER').expect(201);
+      const response = await grant(user.appUserId, 'MANAGER').expect(200);
 
-      expect(bodyOf(response).message).toBe('ROLE.GRANTED');
+      expect(bodyOf(response).message).toBe('ROLE.CHANGED');
       expect(await rolesOf(user.appUserId)).toEqual(['MANAGER']);
       // Granting the role names no department and writes no period: the head is named by the department screen.
       expect(await periodsOf(user.employeeId)).toBe(0);
-      expect(await auditOf('ROLE.GRANTED', user.appUserId)).toEqual([
+      expect(await auditOf('ROLE.CHANGED', user.appUserId)).toEqual([
         expect.objectContaining({
           actor_kind: 'USER',
-          before: { roles: [] },
-          after: { roles: ['MANAGER'], role: 'MANAGER' },
+          before: { role: 'EMPLOYEE' },
+          after: { role: 'MANAGER' },
         }),
       ]);
     });
@@ -85,7 +81,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
       const employee = await h.newEmployee();
 
       const created = await h.admin
-        .post('/api/v1/app-users', { employeeId: employee.employeeId, roles: ['MANAGER'] })
+        .post('/api/v1/app-users', { employeeId: employee.employeeId, role: 'MANAGER' })
         .expect(201);
 
       expect(dataOf(created).roles).toEqual(['MANAGER']);
@@ -96,17 +92,17 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
 
       const response = await revoke(user.appUserId, 'MANAGER').expect(200);
 
-      expect(bodyOf(response).message).toBe('ROLE.REVOKED');
-      expect(await rolesOf(user.appUserId)).toEqual([]);
-      expect(await auditOf('ROLE.REVOKED', user.appUserId)).toHaveLength(1);
+      expect(bodyOf(response).message).toBe('ROLE.CHANGED');
+      expect(await rolesOf(user.appUserId)).toEqual(['EMPLOYEE']);
+      expect(await auditOf('ROLE.CHANGED', user.appUserId)).toHaveLength(1);
     });
 
     it('allows MANAGER beside IT_ADMIN and FINANCE', async () => {
       const user = await h.activatedAccount(['IT_ADMIN']);
 
-      await grant(user.appUserId, 'MANAGER').expect(201);
+      await grant(user.appUserId, 'MANAGER').expect(200);
 
-      expect(await rolesOf(user.appUserId)).toEqual(['IT_ADMIN', 'MANAGER']);
+      expect(await rolesOf(user.appUserId)).toEqual(['MANAGER']);
     });
 
     it('refuses revoking MANAGER of a current head, a future head and a named successor, and changes nothing (AC-21)', async () => {
@@ -114,7 +110,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
       const future = await h.activatedAccount(['MANAGER']);
       const unchanged = async (appUserId: string) => {
         expect(await rolesOf(appUserId)).toEqual(['MANAGER']);
-        expect(await auditOf('ROLE.REVOKED', appUserId)).toEqual([]);
+        expect(await auditOf('ROLE.CHANGED', appUserId)).toEqual([]);
       };
       const refusal = async (appUserId: string) => {
         const response = await revoke(appUserId, 'MANAGER').expect(409);
@@ -166,7 +162,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
 
       await h.admin.post(`/api/v1/departments/${h.seed.departmentId}/successor-clearances`).expect(200);
       await revoke(heir.appUserId, 'MANAGER').expect(200);
-      expect(await rolesOf(heir.appUserId)).toEqual([]);
+      expect(await rolesOf(heir.appUserId)).toEqual(['EMPLOYEE']);
       await clearHeads();
     });
 
@@ -176,7 +172,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
 
       await revoke(user.appUserId, 'MANAGER').expect(200);
 
-      expect(await rolesOf(user.appUserId)).toEqual([]);
+      expect(await rolesOf(user.appUserId)).toEqual(['EMPLOYEE']);
       await clearHeads();
     });
 
@@ -203,10 +199,12 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
     const approvalRoleTable = async () =>
       (await h.ctx.sql.query<{ tbl: string | null }>(`SELECT to_regclass('public.approval_role_holders') AS tbl`))
         .rows[0].tbl;
-    const clearApprover = () =>
-      h.ctx.sql.query(
-        "UPDATE role_grants SET revoked_at = now() WHERE role = 'SPENDING_APPROVER' AND revoked_at IS NULL",
+    const clearApprover = async () => {
+      const { rows } = await h.ctx.sql.query<{ app_user_id: string }>(
+        "SELECT app_user_id FROM role_grants WHERE role = 'SPENDING_APPROVER' AND revoked_at IS NULL",
       );
+      for (const row of rows) await revoke(row.app_user_id, 'SPENDING_APPROVER').expect(200);
+    };
 
     afterEach(async () => {
       await clearApprover();
@@ -216,54 +214,47 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
     it('grants SPENDING_APPROVER and reads the holder from the role grant: the approval-role table is gone', async () => {
       const user = await h.activatedAccount([]);
 
-      const response = await grant(user.appUserId, 'SPENDING_APPROVER').expect(201);
+      const response = await grant(user.appUserId, 'SPENDING_APPROVER').expect(200);
 
-      expect(bodyOf(response).message).toBe('ROLE.GRANTED');
+      expect(bodyOf(response).message).toBe('ROLE.CHANGED');
       expect(await rolesOf(user.appUserId)).toEqual(['SPENDING_APPROVER']);
       expect(await holder()).toBe(user.employeeId);
       expect(await approvalRoleTable()).toBeNull();
-      expect(await auditOf('ROLE.GRANTED', user.appUserId)).toHaveLength(1);
+      expect(await auditOf('ROLE.CHANGED', user.appUserId)).toHaveLength(1);
     });
 
     it('refuses a second spending approver, whatever the state of the first holder account, and allows one after a revoke (AC-10)', async () => {
       const first = await h.activatedAccount([]);
       const second = await h.activatedAccount([]);
-      await grant(first.appUserId, 'SPENDING_APPROVER').expect(201);
+      await grant(first.appUserId, 'SPENDING_APPROVER').expect(200);
       await h.ctx.sql.query("UPDATE app_users SET status = 'LOCKED' WHERE id = $1", [first.appUserId]);
 
       const refused = await grant(second.appUserId, 'SPENDING_APPROVER').expect(409);
 
       expect(errorCode(refused)).toBe('APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED');
-      expect(await rolesOf(second.appUserId)).toEqual([]);
+      expect(await rolesOf(second.appUserId)).toEqual(['EMPLOYEE']);
       await h.ctx.sql.query("UPDATE app_users SET status = 'ACTIVE' WHERE id = $1", [first.appUserId]);
       await revoke(first.appUserId, 'SPENDING_APPROVER').expect(200);
-      await grant(second.appUserId, 'SPENDING_APPROVER').expect(201);
+      await grant(second.appUserId, 'SPENDING_APPROVER').expect(200);
       expect(await holder()).toBe(second.employeeId);
     });
 
-    it('names the roles in the way when SPENDING_APPROVER meets another role (AC-11)', async () => {
-      const itAdmin = await h.activatedAccount(['IT_ADMIN']);
-      const manager = await h.activatedAccount(['MANAGER']);
-
-      const withIt = await grant(itAdmin.appUserId, 'SPENDING_APPROVER').expect(409);
-      const withManager = await grant(manager.appUserId, 'SPENDING_APPROVER').expect(409);
-
-      const finance = await h.activatedAccount(['FINANCE']);
-      const withFinance = await grant(finance.appUserId, 'SPENDING_APPROVER').expect(409);
-      // SoD-7, SoD-8 (US-01-05 AC-7, AC-8): Finance never holds the role that decides what Finance reviews.
-      expect(detailsOf<{ conflictingRoles: string[] }>(withFinance).conflictingRoles).toEqual(['FINANCE']);
-      await revoke(finance.appUserId, 'FINANCE').expect(200);
-      expect(errorCode(withIt)).toBe('APP_USER.ROLE_COMBINATION_FORBIDDEN');
-      expect(detailsOf<{ conflictingRoles: string[] }>(withIt).conflictingRoles).toEqual(['IT_ADMIN']);
-      expect(detailsOf<{ conflictingRoles: string[] }>(withManager).conflictingRoles).toEqual(['MANAGER']);
-      expect(await rolesOf(manager.appUserId)).toEqual(['MANAGER']);
+    it('replaces each work role with SPENDING_APPROVER and can change directly back', async () => {
+      for (const role of ['IT_ADMIN', 'FINANCE', 'MANAGER']) {
+        const person = await h.activatedAccount([role]);
+        await grant(person.appUserId, 'SPENDING_APPROVER').expect(200);
+        expect(await rolesOf(person.appUserId)).toEqual(['SPENDING_APPROVER']);
+        await grant(person.appUserId, role).expect(200);
+        expect(await rolesOf(person.appUserId)).toEqual([role]);
+        await revoke(person.appUserId, role).expect(200);
+      }
     });
 
     it('refuses a head today or from a later day with the periods (AC-11)', async () => {
-      const head = await h.activatedAccount([]);
+      const head = await h.activatedAccount(['MANAGER']);
       const periodsOfRefusal = async () => {
         const refused = await grant(head.appUserId, 'SPENDING_APPROVER').expect(409);
-        expect(errorCode(refused)).toBe('APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT');
+        expect(errorCode(refused)).toBe('APP_USER.MANAGER_STILL_HEADING');
 
         return detailsOf<{ headPeriods: Array<{ timing: string }> }>(refused).headPeriods;
       };
@@ -273,7 +264,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
       await clearHeads();
       await headPeriod(head.employeeId, await day(7));
       expect(await periodsOfRefusal()).toMatchObject([{ timing: 'UPCOMING' }]);
-      expect(await rolesOf(head.appUserId)).toEqual([]);
+      expect(await rolesOf(head.appUserId)).toEqual(['MANAGER']);
     });
 
     it('refuses a person who left, is on long leave or is handing over (AC-6, OD-3)', async () => {
@@ -284,7 +275,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
         const refused = await grant(person.appUserId, 'SPENDING_APPROVER').expect(422);
 
         expect(errorCode(refused)).toBe('APP_USER.SPENDING_APPROVER_EMPLOYEE_NOT_ACTIVE');
-        expect(await rolesOf(person.appUserId)).toEqual([]);
+        expect(await rolesOf(person.appUserId)).toEqual(['EMPLOYEE']);
       }
     });
 
@@ -293,7 +284,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
       await h.ctx.sql.query("UPDATE app_users SET status = 'LOCKED' WHERE id = $1", [locked.appUserId]);
       const invited = await h.newEmployee();
       const created = await h.admin
-        .post('/api/v1/app-users', { employeeId: invited.employeeId, roles: [] })
+        .post('/api/v1/app-users', { employeeId: invited.employeeId, role: 'EMPLOYEE' })
         .expect(201);
       const before = await h.ctx.sql.query('SELECT count(*)::int AS n FROM app_users');
       const fresh = await h.newEmployee();
@@ -302,7 +293,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
       const lockedRefusal = await grant(locked.appUserId, 'SPENDING_APPROVER').expect(422);
       const invitedRefusal = await grant(dataOf(created).id, 'SPENDING_APPROVER').expect(422);
       const creation = await h.admin
-        .post('/api/v1/app-users', { employeeId: fresh.employeeId, roles: ['SPENDING_APPROVER'] })
+        .post('/api/v1/app-users', { employeeId: fresh.employeeId, role: 'SPENDING_APPROVER' })
         .expect(422);
 
       for (const response of [lockedRefusal, invitedRefusal, creation]) {
@@ -315,7 +306,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
     it('has no substitute to keep apart from it: whoever the old table names is granted like anyone else, and the routes of the old configuration are gone (QĐ-93c)', async () => {
       const person = await h.activatedAccount([]);
 
-      await grant(person.appUserId, 'SPENDING_APPROVER').expect(201);
+      await grant(person.appUserId, 'SPENDING_APPROVER').expect(200);
 
       expect(await holder()).toBe(person.employeeId);
       await request(h.server())
@@ -342,11 +333,12 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
         const caller = await h.activatedAccount([role]);
         const { token } = await h.signIn(caller.email, caller.password);
         const grantCall = request(h.server())
-          .post(`/api/v1/app-users/${target.appUserId}/role-grants`)
+          .put(`/api/v1/app-users/${target.appUserId}/role`)
           .set(h.as(token))
           .send({ role: 'SPENDING_APPROVER' });
         const revokeCall = request(h.server())
-          .delete(`/api/v1/app-users/${target.appUserId}/role-grants/SPENDING_APPROVER`)
+          .put(`/api/v1/app-users/${target.appUserId}/role`)
+          .send({ role: role === 'SUPER_ADMIN' ? role : 'EMPLOYEE' })
           .set(h.as(token));
         for (const call of [grantCall, revokeCall])
           expect(errorCode(await call.expect(403))).toBe('AUTHORIZATION.FORBIDDEN');
@@ -355,7 +347,7 @@ describe('MANAGER and SPENDING_APPROVER as granted roles (integration, real Post
           [caller.appUserId],
         );
       }
-      expect(await rolesOf(target.appUserId)).toEqual([]);
+      expect(await rolesOf(target.appUserId)).toEqual(['EMPLOYEE']);
     });
   });
 });

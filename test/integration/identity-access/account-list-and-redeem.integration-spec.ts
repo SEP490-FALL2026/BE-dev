@@ -84,6 +84,9 @@ describe('account list snapshot and redeem cost (integration, real PostgreSQL)',
       )
     ).rows;
     for (const row of rows.slice(0, 2)) {
+      await ctx.sql.query('UPDATE role_grants SET revoked_at = now() WHERE app_user_id = $1 AND revoked_at IS NULL', [
+        row.account,
+      ]);
       await ctx.sql.query(
         `INSERT INTO role_grants (id, organization_id, app_user_id, role)
         VALUES (gen_random_uuid(), $1, $2, 'MANAGER')`,
@@ -121,6 +124,9 @@ describe('account list snapshot and redeem cost (integration, real PostgreSQL)',
         .sort(),
     );
     expect(dataStatements(second.statements).length).toBe(dataStatements(first.statements).length);
+    await ctx.sql.query('UPDATE role_grants SET revoked_at = now() WHERE app_user_id = $1 AND revoked_at IS NULL', [
+      rows[2].account,
+    ]);
     await ctx.sql.query(
       `INSERT INTO role_grants (id, organization_id, app_user_id, role)
       VALUES (gen_random_uuid(), $1, $2, 'SPENDING_APPROVER')`,

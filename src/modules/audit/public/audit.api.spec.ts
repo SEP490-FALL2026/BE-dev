@@ -7,7 +7,8 @@ describe('AuditApi', () => {
   const insert = jest.fn().mockResolvedValue(undefined);
   const countByAction = jest.fn().mockResolvedValue(new Map([['INSTALLATION.EMPLOYEE_CREATED', 2]]));
   const readSince = jest.fn().mockResolvedValue([]);
-  const service = new AuditApi({ insert, countByAction, readSince });
+  const firstAfterField = jest.fn().mockResolvedValue('SHARED');
+  const service = new AuditApi({ insert, countByAction, readSince, firstAfterField });
   const tx = {} as DbTx;
   const base: AuditEventInput = {
     organizationId: '11111111-1111-4111-8111-111111111111',
@@ -19,6 +20,11 @@ describe('AuditApi', () => {
   };
 
   beforeEach(() => insert.mockClear());
+
+  it('passes the requested field and transaction through without reading other audit payloads', async () => {
+    expect(await service.firstAfterField(tx, 'INSTALLATION.ORGANIZATION_CREATED', 'environment')).toBe('SHARED');
+    expect(firstAfterField).toHaveBeenCalledWith(tx, 'INSTALLATION.ORGANIZATION_CREATED', 'environment');
+  });
 
   it('passes the caller transaction through to the repository', async () => {
     await service.record(tx, { ...base, after: { status: 'REVOKED' } });
