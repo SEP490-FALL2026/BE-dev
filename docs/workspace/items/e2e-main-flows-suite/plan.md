@@ -113,13 +113,13 @@ nới kỳ vọng.
 Lệnh từ gốc BE, DB theo `test/README.md` (`TEST_DATABASE_ADMIN_URL` trỏ `slm-test-db`): `pnpm test:flows` (theo batch),
 `pnpm test:discovery`, `pnpm test:gates`, `pnpm lint`, `pnpm typecheck`; tài liệu: `pnpm rules:check`, `pnpm rules:format`.
 
-| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại |
-| ------------------ | --------------------- | ----------------- | ----------------------- |
-| `pnpm test:flows -- -t "@D1"` | cây làm việc chưa commit, `feat/qd96-100-alignment`, PostgreSQL 17 `slm-test-db` | 5 file, 34 test xanh, ~60 s (seed ~30 s) | kịch bản còn lại chờ B1/B2/B3, chat bước 2→5, chat G7 |
-| `pnpm test:flows` không có `TEST_DATABASE_ADMIN_URL` | như trên | dừng ở global setup, thông báo rõ, không tạo database | — |
-| `pnpm test:discovery` | như trên | `flows 5 spec file(s)`, mọi spec thuộc đúng một runner | — |
-| `pnpm test:gates` | như trên | 329/330; đỏ 1 ca `module-layout` do `offboarding.policy.spec.ts` 416 dòng (chat bước 2→5), không thuộc suite | — |
-| `eslint`, `prettier --check` trên `test/flows`, `test/support/flows`, `test/config/flows-*` | như trên | sạch | — |
+| Lệnh / kiểm tra AC                                                                          | Revision / môi trường                                                            | Kết quả thực chạy                                                                                            | Giới hạn / việc còn lại                               |
+| ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| `pnpm test:flows -- -t "@D1"`                                                               | cây làm việc chưa commit, `feat/qd96-100-alignment`, PostgreSQL 17 `slm-test-db` | 5 file, 34 test xanh, ~60 s (seed ~30 s)                                                                     | kịch bản còn lại chờ B1/B2/B3, chat bước 2→5, chat G7 |
+| `pnpm test:flows` không có `TEST_DATABASE_ADMIN_URL`                                        | như trên                                                                         | dừng ở global setup, thông báo rõ, không tạo database                                                        | —                                                     |
+| `pnpm test:discovery`                                                                       | như trên                                                                         | `flows 5 spec file(s)`, mọi spec thuộc đúng một runner                                                       | —                                                     |
+| `pnpm test:gates`                                                                           | như trên                                                                         | 329/330; đỏ 1 ca `module-layout` do `offboarding.policy.spec.ts` 416 dòng (chat bước 2→5), không thuộc suite | —                                                     |
+| `eslint`, `prettier --check` trên `test/flows`, `test/support/flows`, `test/config/flows-*` | như trên                                                                         | sạch                                                                                                         | —                                                     |
 
 - [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
 - [ ] Spec/plan/test design phản ánh đúng implementation cuối; peer review nếu có đã xử lý hoặc ghi disposition.

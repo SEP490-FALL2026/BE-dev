@@ -105,8 +105,8 @@ vào nhật ký vận hành của `docs/guides/seed.md`.
 
 ## Verification and handoff
 
-| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại                |
-| ------------------ | --------------------- | ----------------- | -------------------------------------- |
+| Lệnh / kiểm tra AC                                                                                     | Revision / môi trường                                                | Kết quả thực chạy                     | Giới hạn / việc còn lại                          |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------ |
 | unit `src/cli/seed`; integration `test/integration/installation/seed*`; `pnpm seed:local` vào DB trống | cây chưa commit, `feat/qd96-100-alignment`, PostgreSQL `slm-test-db` | 98/98; 17/17; thoát 0, 24 bước ĐÃ GHI | full suite + reset VPS do Owner (CP-4); A1 Đợt 3 |
 
 - [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.

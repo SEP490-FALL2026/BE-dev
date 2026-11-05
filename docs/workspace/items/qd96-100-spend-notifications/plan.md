@@ -45,9 +45,9 @@ Quick gates (`typecheck`, `lint`, `arch:check`, `rules:check`, `test:gates`); in
 
 ## Verification and handoff
 
-| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại |
-| --- | --- | --- | --- |
-| planned | — | — | full suite do Owner ở audit |
+| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại     |
+| ------------------ | --------------------- | ----------------- | --------------------------- |
+| planned            | —                     | —                 | full suite do Owner ở audit |
 
 - [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
 - [ ] Spec/plan phản ánh implementation cuối; FE được báo mã mới.

@@ -26,7 +26,7 @@ FE-tonight (chỉnh 05/11 theo review main flow): toàn bộ là **phần B** �
 ### Task 2: gỡ đường ghi và đọc của Finance trong code
 
 - Files: xóa `requests/finance-review/**`, `requests/budget-information/**`, `requests/budget-questions/**`,
-  `spend/finance-review.repo.ts`; sửa danh sách ở spec mục *Ownership*; xóa test `spend-finance-review`, `spend-finance-information`,
+  `spend/finance-review.repo.ts`; sửa danh sách ở spec mục _Ownership_; xóa test `spend-finance-review`, `spend-finance-information`,
   `spend-awaiting-budget`, `spend-review-flows`, `spend-reviewer-separation`, `finance-reviews.http-spec` (thay bằng test 404);
   seed tối thiểu `src/cli/seed/steps/scenario-path.ts`, `fixture/demo-fixture.types.ts` (fixture đã đổi tên v3 và R9 mới ở `qd96-100-seed-demo-v3` phần A — không sửa v2).
 - Depends on: Task 1.
@@ -61,9 +61,9 @@ Quick gates đủ bộ. **CP-2** (cùng #12, #13, #16): báo FE sinh lại clien
 
 ## Verification and handoff
 
-| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại |
-| --- | --- | --- | --- |
-| planned | — | — | full suite do Owner ở audit; reset VPS bằng `shared-demo-v3` (#28) |
+| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại                                            |
+| ------------------ | --------------------- | ----------------- | ------------------------------------------------------------------ |
+| planned            | —                     | —                 | full suite do Owner ở audit; reset VPS bằng `shared-demo-v3` (#28) |
 
 - [ ] AC trong scope có bằng chứng; lỗi đã xử lý hoặc ghi blocker.
 - [ ] Spec/plan phản ánh implementation cuối; FE được báo route gỡ.

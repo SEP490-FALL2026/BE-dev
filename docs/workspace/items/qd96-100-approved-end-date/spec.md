@@ -12,7 +12,7 @@
 ## Business outcome
 
 Quyền trả phí cấp qua Request có ngày kết thúc = ngày duyệt chi + `termMonths` − 1 ngày (thuê bao linh hoạt cắt cuối năm);
-nhà thầu, freelancer, thực tập sinh lấy ngày sớm hơn giữa ngày đó và *ngày kết thúc hợp đồng* do Super Admin ghi trên hồ sơ
+nhà thầu, freelancer, thực tập sinh lấy ngày sớm hơn giữa ngày đó và _ngày kết thúc hợp đồng_ do Super Admin ghi trên hồ sơ
 (nhập tay hoặc import); người gửi Request nhóm không còn nhập ngày, không còn thấy chi phí/lý do của đồng nghiệp. Kiểm bằng
 integration duyệt chi → cấp → Assignment có ngày.
 
@@ -32,9 +32,9 @@ integration duyệt chi → cấp → Assignment có ngày.
 
 ## Primary Story/AC
 
-| Story      | AC    | Coverage  | Phần còn lại thuộc                                                                        |
-| ---------- | ----- | --------- | ----------------------------------------------------------------------------------------- |
-| US-05-02 | AC-11 | partial | vế năm tạm tính/tính lại và lịch trả từ ngày duyệt chi: `qd96-100-request-year-without-spend-date` |
+| Story    | AC    | Coverage | Phần còn lại thuộc                                                                                 |
+| -------- | ----- | -------- | -------------------------------------------------------------------------------------------------- |
+| US-05-02 | AC-11 | partial  | vế năm tạm tính/tính lại và lịch trả từ ngày duyệt chi: `qd96-100-request-year-without-spend-date` |
 
 ## Supporting references
 
@@ -46,7 +46,7 @@ sinh) bị `Q-03` b1 thay — báo Docs sửa; `BM-01`/QT phần nhóm cùng ý.
 
 - Ngày hợp đồng đổi **sau** khi đã cấp không tự rút ngắn Assignment đang có (nghỉ sớm đi MF-2; rút ngắn đi hoàn trả).
 - Request đã duyệt nhưng chưa cấp trước khi bản này chạy: không backfill (demo reset bằng `qd96-100-seed-demo-v3`).
-- Nhắc *cửa sổ tiếp tục mở* và job hết hạn của `licensing/expiry` (đã có): không đổi, nhưng từ đây áp cho cả nhân viên chính thức.
+- Nhắc _cửa sổ tiếp tục mở_ và job hết hạn của `licensing/expiry` (đã có): không đổi, nhưng từ đây áp cho cả nhân viên chính thức.
 - Hiện `contractEndDate` cho trưởng phòng/người gửi nhóm: không (dữ liệu nhân sự của Super Admin).
 
 ## Dependencies and blockers
@@ -59,12 +59,12 @@ recorder duyệt chi: hạng mục merge sau rebase, giữ một lời gọi `ap
 ## Ownership: module, data, API
 
 - `organization/employee/{employee.dto.ts, employee-manual.service.ts, employee-maintenance.service.ts, employee-correction.policy.ts,
-  employee.repo.ts}`, `organization/employee-directory/*` (detail), `organization/public/{organization.types.ts, organization-read.api.ts}`.
+employee.repo.ts}`, `organization/employee-directory/*` (detail), `organization/public/{organization.types.ts, organization-read.api.ts}`.
 - `data-import/employee-import/{row-validation/*, preview/*, confirmation/*, employee-import-cells.json.ts, employee-import-differences.json.ts}`.
 - `requests/access-request/term-limit.policy.ts` (dùng), mới `requests/grant/approved-end.policy.ts` (`approvedEndOf`, `grantEndOf`).
 - `requests/spend-approval/spend-decision-recorder.service.ts`, `requests/group-line-decisions/group-spend-record.service.ts`,
   `requests/grant/{grant.policy.ts, access-request-grant.listener.ts}`, `requests/group-request/{group-request.dto.ts,
-  group-request.policy.ts, beneficiary-eligibility.policy.ts}`, `group-request-submission/*`, `group-line-decisions/group-line-query.service.ts`,
+group-request.policy.ts, beneficiary-eligibility.policy.ts}`, `group-request-submission/*`, `group-line-decisions/group-line-query.service.ts`,
   `draft/request-draft-content.mapper.ts`; `licensing/public/licensing.types.ts` + nơi map trạng thái grant answer.
 - Bảng: `employees.contract_end_date` (mới); ghi `access_requests.expected_end_date`, `access_request_lines.expected_end_date`
   (nghĩa mới: ngày do server tính lúc duyệt chi).
@@ -86,7 +86,7 @@ recorder duyệt chi: hạng mục merge sau rebase, giữ một lời gọi `ap
    cùng transaction. `flexible` đọc như `qd96-100-request-term-limit` (thuê bao có giá của phòng hoặc báo giá).
 3. **Không có ngày theo thời hạn:** nội bộ không phí, tài khoản dịch vụ, quyền từ khởi tạo (`Q-03` a1) ⟹ `expected_end_date` trống.
 4. **Lúc IT nhận cấp** (`claimForGrant`/`check`): `grantEndOf = earliest(ngày đã lưu, contractEndDate của người thụ hưởng
-   nếu không phải STAFF)`; tài khoản dịch vụ bỏ qua hợp đồng. Kết quả `< hôm nay` ⟹ answer `ACCESS_END_PASSED`, licensing trả
+nếu không phải STAFF)`; tài khoản dịch vụ bỏ qua hợp đồng. Kết quả `< hôm nay` ⟹ answer `ACCESS_END_PASSED`, licensing trả
    `409 PROVISIONING_TASK.ACCESS_END_PASSED`, không tạo Assignment. IT không sửa ngày (`Q-03` c1, đã gỡ input ở #4).
 5. **Request nhóm:** bỏ `lines[].expectedEndDate` (strict ⟹ 422 nếu gửi); `checkBeneficiary` bỏ luật ngày kết thúc;
    `groupRequestCheck` không còn lý do lộ loại hợp đồng (đóng L-220 vế 1). Bản nháp cũ: codec xóa `expectedEndDate` của từng dòng.
@@ -94,7 +94,7 @@ recorder duyệt chi: hạng mục merge sau rebase, giữ một lời gọi `ap
    không IT Admin ⟹ dòng của người khác chỉ có `employee`, `position`, `state`, `needStep.state`; `cost`, `share`,
    `needDecision`, `spendDecision`, `endReason`, `expectedEndDate` = `null`. Dòng của chính mình đầy đủ.
 7. Migration: `ALTER TABLE employees ADD COLUMN contract_end_date date NULL` + `CHECK (employment_type <> 'STAFF' OR
-   contract_end_date IS NULL)`. Không đổi cột của `access_requests`/`access_request_lines`.
+contract_end_date IS NULL)`. Không đổi cột của `access_requests`/`access_request_lines`.
 
 ### Phần A — FE nối tối nay (chỉnh 05/11 theo review main flow F03)
 
@@ -104,30 +104,30 @@ migration. **B:** mục 1, 4, 6, 7 (cột `contractEndDate` trên hồ sơ + imp
 thầu/thực tập sinh kết thúc theo thời hạn đã duyệt (chưa cắt theo hợp đồng); quyền **nội bộ không phí** của họ chưa có ngày
 kết thúc — nợ `FR-2.8` tới phần B.
 
-| Operation (vai) | Hiện tại | Sau sửa — người dùng nhập | BE tự tính / output |
-| --- | --- | --- | --- |
-| `groupRequestSubmit`, `groupRequestCheck`, `accessRequestDraftSave` (nhánh GROUP) | `lines[] {employeeId, expectedEndDate?}`; lý do dòng `END_DATE_REQUIRED`, `END_DATE_TOO_EARLY` | `lines[] {employeeId}`; gửi `expectedEndDate` ⟹ 422 `VALIDATION_ERROR` | check bỏ hai lý do dòng đó (không lộ loại hợp đồng — L-220 vế 1); bản nháp cũ: codec bỏ ngày từng dòng |
-| `provisioningTaskGrant` (IT Admin) | `expectedEndDate?` | bỏ (`qd96-100-request-sender-rules` phần A) | Assignment lấy ngày của Request/dòng |
-| `accessRequestGet` (`request.expectedEndDate`), `accessRequestLineList` (`lines[].expectedEndDate`), `licenseAssignmentList`, `me/software-rights` | ngày do người gửi nhóm/IT nhập, chỉ nhà thầu | — | `expectedEndDate` = `null` trước khi duyệt chi; sau duyệt chi = ngày bắt đầu (ngày duyệt) + `termMonths` − 1 ngày, gói linh hoạt cắt ở cuối năm tài chính; `null` với nội bộ không phí, tài khoản dịch vụ, quyền khởi tạo. Tên field giữ nguyên |
+| Operation (vai)                                                                                                                                    | Hiện tại                                                                                       | Sau sửa — người dùng nhập                                              | BE tự tính / output                                                                                                                                                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `groupRequestSubmit`, `groupRequestCheck`, `accessRequestDraftSave` (nhánh GROUP)                                                                  | `lines[] {employeeId, expectedEndDate?}`; lý do dòng `END_DATE_REQUIRED`, `END_DATE_TOO_EARLY` | `lines[] {employeeId}`; gửi `expectedEndDate` ⟹ 422 `VALIDATION_ERROR` | check bỏ hai lý do dòng đó (không lộ loại hợp đồng — L-220 vế 1); bản nháp cũ: codec bỏ ngày từng dòng                                                                                                                                          |
+| `provisioningTaskGrant` (IT Admin)                                                                                                                 | `expectedEndDate?`                                                                             | bỏ (`qd96-100-request-sender-rules` phần A)                            | Assignment lấy ngày của Request/dòng                                                                                                                                                                                                            |
+| `accessRequestGet` (`request.expectedEndDate`), `accessRequestLineList` (`lines[].expectedEndDate`), `licenseAssignmentList`, `me/software-rights` | ngày do người gửi nhóm/IT nhập, chỉ nhà thầu                                                   | —                                                                      | `expectedEndDate` = `null` trước khi duyệt chi; sau duyệt chi = ngày bắt đầu (ngày duyệt) + `termMonths` − 1 ngày, gói linh hoạt cắt ở cuối năm tài chính; `null` với nội bộ không phí, tài khoản dịch vụ, quyền khởi tạo. Tên field giữ nguyên |
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống (gồm từ chối, edge case) | Cấp test | Kết quả mong đợi | Bằng chứng sau implement |
-| --- | --- | --- | --- | --- |
-| AC-11 | `E1` STAFF Figma cam kết kỳ 6 tháng, duyệt chi 15/06 → cấp | integration | Assignment kết thúc 14/12 | planned |
-| AC-11 | Linh hoạt 6 tháng, duyệt chi 15/10 | unit `approvedEndOf` + integration | kết thúc 31/12 | planned |
-| R-15 | Linh hoạt 2 tháng, trình 15/10, duyệt 20/12 | integration | quyền tới 31/12; cam kết chỉ phần tới 31/12 (khớp #16) | planned |
-| Q-03 b1 | `E3` thực tập sinh hợp đồng tới 31/08, Request 12 tháng duyệt 15/06 | integration | Assignment kết thúc 31/08 | planned |
-| Q-03 b1 | Nội bộ không phí cho nhà thầu hợp đồng tới 30/09 | integration | kết thúc 30/09 (`FR-2.8`) | planned |
-| Q-03 a1 | Nội bộ không phí STAFF; tài khoản dịch vụ | integration | không có ngày kết thúc | planned |
-| Nhóm | Dòng `E1` STAFF + dòng `E3` thực tập sinh được duyệt | integration | mỗi dòng ngày riêng | planned |
-| Biên | Hợp đồng đã hết trước lúc cấp | integration | 409 `ACCESS_END_PASSED`, không Assignment | planned |
-| Hồ sơ | Tạo INTERN thiếu ngày; STAFF có ngày; ngày trước ngày vào | http | 422 các mã tương ứng | planned |
-| Import | Dòng CONTRACTOR thiếu `contract_end_date`; import lại đổi ngày | integration import | lỗi dòng; khác biệt hiện cột | planned |
-| L-220 | `groupRequestSubmit` có `lines[].expectedEndDate`; check có thực tập sinh | http | 422 `VALIDATION_ERROR`; không lý do ngày | planned |
-| L-220 | Nhân viên gửi nhóm đọc `accessRequestLineList` | http | dòng người khác không có chi phí/lý do | planned |
-| Hồi quy | Trưởng phòng, người giữ bước, IT Admin đọc `accessRequestLineList` | http | đầy đủ như cũ | planned |
-| Nháp | Bản nháp nhóm cũ có ngày từng dòng | unit codec | đọc được, ngày bị bỏ | planned |
+| AC / rủi ro | Tình huống (gồm từ chối, edge case)                                       | Cấp test                           | Kết quả mong đợi                                       | Bằng chứng sau implement |
+| ----------- | ------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------ | ------------------------ |
+| AC-11       | `E1` STAFF Figma cam kết kỳ 6 tháng, duyệt chi 15/06 → cấp                | integration                        | Assignment kết thúc 14/12                              | planned                  |
+| AC-11       | Linh hoạt 6 tháng, duyệt chi 15/10                                        | unit `approvedEndOf` + integration | kết thúc 31/12                                         | planned                  |
+| R-15        | Linh hoạt 2 tháng, trình 15/10, duyệt 20/12                               | integration                        | quyền tới 31/12; cam kết chỉ phần tới 31/12 (khớp #16) | planned                  |
+| Q-03 b1     | `E3` thực tập sinh hợp đồng tới 31/08, Request 12 tháng duyệt 15/06       | integration                        | Assignment kết thúc 31/08                              | planned                  |
+| Q-03 b1     | Nội bộ không phí cho nhà thầu hợp đồng tới 30/09                          | integration                        | kết thúc 30/09 (`FR-2.8`)                              | planned                  |
+| Q-03 a1     | Nội bộ không phí STAFF; tài khoản dịch vụ                                 | integration                        | không có ngày kết thúc                                 | planned                  |
+| Nhóm        | Dòng `E1` STAFF + dòng `E3` thực tập sinh được duyệt                      | integration                        | mỗi dòng ngày riêng                                    | planned                  |
+| Biên        | Hợp đồng đã hết trước lúc cấp                                             | integration                        | 409 `ACCESS_END_PASSED`, không Assignment              | planned                  |
+| Hồ sơ       | Tạo INTERN thiếu ngày; STAFF có ngày; ngày trước ngày vào                 | http                               | 422 các mã tương ứng                                   | planned                  |
+| Import      | Dòng CONTRACTOR thiếu `contract_end_date`; import lại đổi ngày            | integration import                 | lỗi dòng; khác biệt hiện cột                           | planned                  |
+| L-220       | `groupRequestSubmit` có `lines[].expectedEndDate`; check có thực tập sinh | http                               | 422 `VALIDATION_ERROR`; không lý do ngày               | planned                  |
+| L-220       | Nhân viên gửi nhóm đọc `accessRequestLineList`                            | http                               | dòng người khác không có chi phí/lý do                 | planned                  |
+| Hồi quy     | Trưởng phòng, người giữ bước, IT Admin đọc `accessRequestLineList`        | http                               | đầy đủ như cũ                                          | planned                  |
+| Nháp        | Bản nháp nhóm cũ có ngày từng dòng                                        | unit codec                         | đọc được, ngày bị bỏ                                   | planned                  |
 
 ## Definition of Done
 

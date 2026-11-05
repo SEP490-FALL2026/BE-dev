@@ -84,7 +84,7 @@ Mỗi nơi gọi `RevocationService.open` truyền được **hạn** và **mố
   nhưng quyền đã thu hồi không tự trả lại (không khôi phục quyền đã thu hồi — spec `departure-day-access-block` mục 3).
 - Giảm thiểu tạm: trước khi hủy hồ sơ đã bị chặn, Super Admin kiểm danh sách tác vụ thu hồi của người đó (`offboardingCaseRightList`).
 - Cách đóng: Phần B của hạng mục này — `withdrawRevocationReason(tx, actor, { sources: ['DEPARTURE','ABRUPT_DEPARTURE'], referenceId: caseId,
-  cause: 'NO_LONGER_APPLIES' })` trong cùng transaction hủy (spec `qd96-100-departure-day-access-block` Phần B mục 2).
+cause: 'NO_LONGER_APPLIES' })` trong cùng transaction hủy (spec `qd96-100-departure-day-access-block` Phần B mục 2).
 
 ## Test matrix
 
