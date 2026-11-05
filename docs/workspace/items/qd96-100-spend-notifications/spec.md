@@ -11,9 +11,9 @@
 
 ## Business outcome
 
-Người duyệt chi nhận **một** thông báo khi trưởng phòng trình lô có mục tới bước của họ; trưởng phòng nhận thông báo *cần xác
-nhận dùng dự phòng* (kèm phần vượt số cơ sở); người yêu cầu và trưởng phòng nhận thông báo *bị chặn* (kèm lý do và phần vượt) và
-*bị trả về lúc duyệt*; IT Admin phụ trách nhận thêm ca *bằng chứng giá hết hạn*; trưởng phòng nhận thông báo cấp phát xong hoặc
+Người duyệt chi nhận **một** thông báo khi trưởng phòng trình lô có mục tới bước của họ; trưởng phòng nhận thông báo _cần xác
+nhận dùng dự phòng_ (kèm phần vượt số cơ sở); người yêu cầu và trưởng phòng nhận thông báo _bị chặn_ (kèm lý do và phần vượt) và
+_bị trả về lúc duyệt_; IT Admin phụ trách nhận thêm ca _bằng chứng giá hết hạn_; trưởng phòng nhận thông báo cấp phát xong hoặc
 thất bại. Finance không nhận gì về Request. Kiểm được bằng unit status rules + integration hộp thông báo.
 
 ## Sizing decision
@@ -31,11 +31,11 @@ thất bại. Finance không nhận gì về Request. Kiểm được bằng uni
 
 ## Primary Story/AC
 
-| Story    | AC | Coverage | Phần còn lại thuộc |
-| -------- | -- | -------- | ------------------ |
-| US-12-15 | AC-30 | partial | AC-28: `qd96-100-role-dashboards-and-summary` (hoãn H5); còn lại: chủ hiện có ở scope map G8 |
+| Story    | AC    | Coverage | Phần còn lại thuộc                                                                           |
+| -------- | ----- | -------- | -------------------------------------------------------------------------------------------- |
+| US-12-15 | AC-30 | partial  | AC-28: `qd96-100-role-dashboards-and-summary` (hoãn H5); còn lại: chủ hiện có ở scope map G8 |
 
-Vế *được báo* của `US-06-12` AC-4, AC-5, AC-8, AC-23 và `US-06-01` AC-18 hiện thực ở đây (các AC đó có chủ là
+Vế _được báo_ của `US-06-12` AC-4, AC-5, AC-8, AC-23 và `US-06-01` AC-18 hiện thực ở đây (các AC đó có chủ là
 `qd96-100-budget-check-three-outcomes`); test của vế này nằm trong hạng mục này.
 
 ## Supporting references
@@ -44,7 +44,7 @@ Vế *được báo* của `US-06-12` AC-4, AC-5, AC-8, AC-23 và `US-06-01` AC-
   trách), 72 (dùng dự phòng → trưởng phòng, kèm phần vượt số cơ sở), 73 (bị chặn → người yêu cầu, trưởng phòng, kèm lý do và phần
   vượt; không Finance). AC-1/AC-11: mỗi thông báo khớp đúng một dòng, đúng người nhận.
 - `US-06-12` AC-23: bị trả về lúc duyệt ⟹ **người yêu cầu và trưởng phòng** được báo — cụ thể hơn dòng 72 (chỉ trưởng phòng); hạng
-  mục này theo AC-23 cho ca *lúc duyệt*, theo dòng 72 cho ca *lúc trình*.
+  mục này theo AC-23 cho ca _lúc duyệt_, theo dòng 72 cho ca _lúc trình_.
 - `QĐ-99h`: Người duyệt chi chỉ nhận thông báo ngay khi cần quyết (lô duyệt chi). QT 1.11: trưởng phòng được báo cấp phát xong.
 - `QĐ-100p` thay `INF-06` ⟹ được phép đưa **phần vượt của chính Request** vào thông báo (không số ngân sách phòng).
 
@@ -83,7 +83,7 @@ Vế *được báo* của `US-06-12` AC-4, AC-5, AC-8, AC-23 và `US-06-01` AC-
    vẫn bị từ chối. IT Admin không bao giờ nhận khóa số tiền (rule không đặt cho người nhận đó — tách intent).
 4. **Không báo Finance:** test quét mọi intent của các mã trên không có người nhận vai Finance (trừ khi người đó là bên của Request).
 5. Không áp dụng: migration, API, job (rule chạy trong pipeline thông báo hiện có).
-6. Dữ liệu rule đọc: Audit `ACCESS_REQUEST.BUDGET_CHECKED`, `ACCESS_REQUEST.SPEND_STEP_CLOSED` đúng bảng *Hợp đồng Audit* của
+6. Dữ liệu rule đọc: Audit `ACCESS_REQUEST.BUDGET_CHECKED`, `ACCESS_REQUEST.SPEND_STEP_CLOSED` đúng bảng _Hợp đồng Audit_ của
    `qd96-100-budget-check-three-outcomes` mục 11 (chủ hợp đồng; C-REVIEW R-13) — hạng mục này không định nghĩa lại.
 
 ### Mức FE-tonight (chỉnh 05/11 theo review main flow)
@@ -94,17 +94,17 @@ phần A) thay vì thông báo đẩy.
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống | Cấp test | Kết quả mong đợi | Bằng chứng sau implement |
-| --- | --- | --- | --- | --- |
-| Dòng 43 | lô có 2 mục tới bước chi, 1 mục dừng | unit + integration | 1 `SPEND_BATCH_SUBMITTED` cho Người duyệt chi, `sentCount=2` | planned |
-| Dòng 43 | lô chỉ có mục dừng | unit | không gửi | planned |
-| `US-12-15` AC-30, dòng 72 | R dùng dự phòng lúc trình | unit + integration | trưởng phòng nhận, `overBaseAmount`; Finance không | planned |
-| AC-30, dòng 73 | R vượt dự phòng | integration | người yêu cầu + trưởng phòng nhận, `overageAmount`; Finance không | planned |
-| Dòng 49 | báo giá hết hạn | unit | thêm IT Admin phụ trách, không khóa số tiền | planned |
-| `US-06-12` AC-23 | kiểm lại lúc duyệt thành dùng dự phòng | integration | người yêu cầu + trưởng phòng nhận `REQUEST_RETURNED_AT_DECISION` | planned |
-| L-811 | cấp phát xong / thất bại | unit | trưởng phòng nhận thêm | planned |
-| Chính sách | mã khác mang `overageAmount` | unit | bị từ chối | planned |
-| `US-12-15` AC-1 | quét danh mục | unit | mỗi mã khớp một dòng | planned |
+| AC / rủi ro               | Tình huống                             | Cấp test           | Kết quả mong đợi                                                  | Bằng chứng sau implement |
+| ------------------------- | -------------------------------------- | ------------------ | ----------------------------------------------------------------- | ------------------------ |
+| Dòng 43                   | lô có 2 mục tới bước chi, 1 mục dừng   | unit + integration | 1 `SPEND_BATCH_SUBMITTED` cho Người duyệt chi, `sentCount=2`      | planned                  |
+| Dòng 43                   | lô chỉ có mục dừng                     | unit               | không gửi                                                         | planned                  |
+| `US-12-15` AC-30, dòng 72 | R dùng dự phòng lúc trình              | unit + integration | trưởng phòng nhận, `overBaseAmount`; Finance không                | planned                  |
+| AC-30, dòng 73            | R vượt dự phòng                        | integration        | người yêu cầu + trưởng phòng nhận, `overageAmount`; Finance không | planned                  |
+| Dòng 49                   | báo giá hết hạn                        | unit               | thêm IT Admin phụ trách, không khóa số tiền                       | planned                  |
+| `US-06-12` AC-23          | kiểm lại lúc duyệt thành dùng dự phòng | integration        | người yêu cầu + trưởng phòng nhận `REQUEST_RETURNED_AT_DECISION`  | planned                  |
+| L-811                     | cấp phát xong / thất bại               | unit               | trưởng phòng nhận thêm                                            | planned                  |
+| Chính sách                | mã khác mang `overageAmount`           | unit               | bị từ chối                                                        | planned                  |
+| `US-12-15` AC-1           | quét danh mục                          | unit               | mỗi mã khớp một dòng                                              | planned                  |
 
 ## Definition of Done
 

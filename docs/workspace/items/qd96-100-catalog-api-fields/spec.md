@@ -82,7 +82,7 @@ Owner, loại thuế là mã đóng, và cờ _cho giảm giữa kỳ_ của thu
      2 mục đích, thuê bao chỉ nhận `PURCHASE_DOCUMENT` (lớp DB đỡ `DOCUMENT.ATTACH_TARGET_INVALID`).
    - `<ts+1>_finance_vendor_tax_code` (C-REVIEW R-07 — trigger `vendor_tax_profile_lines_immutable` cấm UPDATE, nên **không
      backfill**): thêm `tax_code TEXT NULL` + `CHECK (tax_code IS NOT NULL AND tax_code IN ('VAT','FCT','CIT_WITHHOLDING','OTHER'))
-     NOT VALID` (chỉ áp dòng mới); unique một phần `(version_id, tax_code) WHERE tax_code IS NOT NULL AND tax_code <> 'OTHER'`.
+NOT VALID` (chỉ áp dòng mới); unique một phần `(version_id, tax_code) WHERE tax_code IS NOT NULL AND tax_code <> 'OTHER'`.
      Dòng cũ là lịch sử bất biến: khi đọc, một hàm thuần suy mã từ `normalized_tax_type` (`gtgt`, `vat`, `thue gtgt`… ⟹ `VAT`; chứa
      `tndn` ⟹ `CIT_WITHHOLDING`; `thue nha thau`, `fct` ⟹ `FCT`; còn lại `OTHER`). Owner muốn có cột trên dữ liệu cũ thì dùng
      `DISABLE/ENABLE TRIGGER` trong migration (tiền lệ `20261022120000_cost_centers_unit_only`) kèm Audit `SYSTEM` — không mặc định.
@@ -90,19 +90,19 @@ Owner, loại thuế là mã đóng, và cờ _cho giảm giữa kỳ_ của thu
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống                                                                | Cấp test                | Kết quả mong đợi                                          | Bằng chứng sau implement |
-| ----------- | ------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------- | ------------------------ |
-| S-22        | `contractCreate` không `name` / chỉ khoảng trắng                          | HTTP                    | 422 `VALIDATION_ERROR`                                    | planned                  |
-| `QĐ-66h`    | `documentCreate` `TAX_PAYMENT_PROOF`                                      | HTTP                    | 422 `VALIDATION_ERROR`; OpenAPI chỉ 2 giá trị             | planned                  |
-| `QĐ-96d`    | đính biên lai `PURCHASE_DOCUMENT` vào thuê bao                            | integration + HTTP      | đính được; `subscriptionGet.documents` có tệp             | planned                  |
-| đích        | gửi cả hai đích / `CONTRACT_ATTACHMENT` vào thuê bao                      | HTTP                    | 422 `VALIDATION_ERROR` / `DOCUMENT.ATTACH_TARGET_INVALID` | planned                  |
-| `FR-1.10`   | `planTermsSet.sharingPolicy`                                              | integration             | lưu và đọc lại ở gói; `planUpdate.sharingPolicy` ⟹ 422    | planned                  |
-| `QĐ-62n`    | xác nhận ngừng không gửi BO                                               | integration             | dùng BO hiện tại; BO đã nghỉ ⟹ mã từ chối cũ              | planned                  |
-| Q-10(3)     | `taxType: "GTGT"`                                                         | HTTP                    | 422; `VAT` + label ⟹ 200                                  | planned                  |
-| Q-10(3)     | hai dòng `VAT` / `OTHER` thiếu label                                      | unit policy             | từ chối `TAX_PROFILE.*`                                   | planned                  |
-| migration   | dữ liệu `GTGT`, `TNDN nhà thầu`, chữ lạ (dòng cũ, không backfill)         | unit (hàm suy mã) + integration | đọc ra `VAT`, `CIT_WITHHOLDING`, `OTHER`; migration không UPDATE | planned |
-| R-06 (DB)   | đính `PURCHASE_DOCUMENT` vào thuê bao (`READY`, `contract_id` NULL); `CONTRACT_ATTACHMENT` vào thuê bao | integration | CHECK nhận; CHECK từ chối | planned |
-| L-715       | đổi `allowsMidTermReduction` thuê bao ACTIVE không/kèm `basis.correction` | HTTP                    | 422 / 200 + Audit                                         | planned                  |
+| AC / rủi ro | Tình huống                                                                                              | Cấp test                        | Kết quả mong đợi                                                 | Bằng chứng sau implement |
+| ----------- | ------------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------- | ------------------------ |
+| S-22        | `contractCreate` không `name` / chỉ khoảng trắng                                                        | HTTP                            | 422 `VALIDATION_ERROR`                                           | planned                  |
+| `QĐ-66h`    | `documentCreate` `TAX_PAYMENT_PROOF`                                                                    | HTTP                            | 422 `VALIDATION_ERROR`; OpenAPI chỉ 2 giá trị                    | planned                  |
+| `QĐ-96d`    | đính biên lai `PURCHASE_DOCUMENT` vào thuê bao                                                          | integration + HTTP              | đính được; `subscriptionGet.documents` có tệp                    | planned                  |
+| đích        | gửi cả hai đích / `CONTRACT_ATTACHMENT` vào thuê bao                                                    | HTTP                            | 422 `VALIDATION_ERROR` / `DOCUMENT.ATTACH_TARGET_INVALID`        | planned                  |
+| `FR-1.10`   | `planTermsSet.sharingPolicy`                                                                            | integration                     | lưu và đọc lại ở gói; `planUpdate.sharingPolicy` ⟹ 422           | planned                  |
+| `QĐ-62n`    | xác nhận ngừng không gửi BO                                                                             | integration                     | dùng BO hiện tại; BO đã nghỉ ⟹ mã từ chối cũ                     | planned                  |
+| Q-10(3)     | `taxType: "GTGT"`                                                                                       | HTTP                            | 422; `VAT` + label ⟹ 200                                         | planned                  |
+| Q-10(3)     | hai dòng `VAT` / `OTHER` thiếu label                                                                    | unit policy                     | từ chối `TAX_PROFILE.*`                                          | planned                  |
+| migration   | dữ liệu `GTGT`, `TNDN nhà thầu`, chữ lạ (dòng cũ, không backfill)                                       | unit (hàm suy mã) + integration | đọc ra `VAT`, `CIT_WITHHOLDING`, `OTHER`; migration không UPDATE | planned                  |
+| R-06 (DB)   | đính `PURCHASE_DOCUMENT` vào thuê bao (`READY`, `contract_id` NULL); `CONTRACT_ATTACHMENT` vào thuê bao | integration                     | CHECK nhận; CHECK từ chối                                        | planned                  |
+| L-715       | đổi `allowsMidTermReduction` thuê bao ACTIVE không/kèm `basis.correction`                               | HTTP                            | 422 / 200 + Audit                                                | planned                  |
 
 ## Definition of Done
 

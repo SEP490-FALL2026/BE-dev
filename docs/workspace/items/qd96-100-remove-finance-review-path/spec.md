@@ -11,8 +11,8 @@
 
 ## Business outcome
 
-Không còn thao tác, trạng thái, bước, SLA, thông báo hay bảng nào của *Finance rà soát*, *hỏi Finance* và *chờ ngân sách*:
-7 endpoint bị gỡ, Request đang treo được một migration tiến đưa về hàng đợi trình với stage *cần kiểm lại*, bước Finance đang
+Không còn thao tác, trạng thái, bước, SLA, thông báo hay bảng nào của _Finance rà soát_, _hỏi Finance_ và _chờ ngân sách_:
+7 endpoint bị gỡ, Request đang treo được một migration tiến đưa về hàng đợi trình với stage _cần kiểm lại_, bước Finance đang
 mở được đóng và ghi Audit. Kiểm được bằng grep sạch, gate OpenAPI, integration migration và HTTP 404 cho route cũ.
 
 ## Sizing decision
@@ -30,9 +30,9 @@ mở được đóng và ghi Audit. Kiểm được bằng grep sạch, gate Ope
 
 ## Primary Story/AC
 
-| Story    | AC | Coverage | Phần còn lại thuộc |
-| -------- | -- | -------- | ------------------ |
-| US-06-12 | AC-25 | partial | xem bảng của `qd96-100-budget-check-three-outcomes`; vế override: `qd96-100-remove-spend-override`; vế ngưỡng giá trị cao: `qd96-100-remove-budget-revision-and-high-value` |
+| Story    | AC    | Coverage | Phần còn lại thuộc                                                                                                                                                          |
+| -------- | ----- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-12 | AC-25 | partial  | xem bảng của `qd96-100-budget-check-three-outcomes`; vế override: `qd96-100-remove-spend-override`; vế ngưỡng giá trị cao: `qd96-100-remove-budget-revision-and-high-value` |
 
 AC-25 nói ba khái niệm; hạng mục này là **chủ** AC và chạy kiểm tra cuối (không còn operation nào của ba khái niệm) sau khi hai
 hạng mục gỡ kia merge — test AC-25 đặt ở hạng mục này, mở rộng lúc #12, #13 xong.
@@ -50,7 +50,7 @@ hạng mục gỡ kia merge — test AC-25 đặt ở hạng mục này, mở r�
 - Sự kiện `PLAN_LINE_MOVED` (dời khoảng mua) → `qd96-100-remove-budget-revision-and-high-value`.
 - Vai SLA `SUPERIOR`, `REQUESTER` → `qd96-100-sla-reminder-recipients` (Track R).
 - Dữ liệu demo → `qd96-100-seed-demo-v3`. Theo Q-R1 (QUESTIONS mục D) fixture được **đổi tên v2 → v3**; vì hạng mục này nay là
-  phần B, việc đổi tên dời lên `qd96-100-seed-demo-v3` phần A (Task 0) và R9 mới (*bị chặn*) đã có ở đó. Ở đây chỉ còn kiểm seed
+  phần B, việc đổi tên dời lên `qd96-100-seed-demo-v3` phần A (Task 0) và R9 mới (_bị chặn_) đã có ở đó. Ở đây chỉ còn kiểm seed
   không còn đích `AWAITING_FINANCE_REVIEW` (`src/cli/seed/steps/scenario-path.ts:10,16`, `fixture/demo-fixture.types.ts:87`).
 - FE xóa màn hình Finance rà soát (L-981, ngoài BE).
 
@@ -92,11 +92,11 @@ hạng mục gỡ kia merge — test AC-25 đặt ở hạng mục này, mở r�
    Giá trị `AWAITING_FINANCE_REVIEW`, `AWAITING_BUDGET`, `FINANCE_REVIEW` (step kind, route), `FINANCE_QUESTION`,
    `RETURNED_BY_FINANCE`, `SENT_TO_FINANCE`, trigger `BUDGET_VERSION_APPROVED`/`FINANCE_OUTCOME_WHILE_WAITING` **để lại**,
    test chặn ghi mới. **DB-05:** drop bảng có dữ liệu là không hoàn tác — ngoại lệ theo Q-02 B; khôi phục bằng backup trước deploy.
-2. **Stage *cần kiểm lại*:** Request ở hàng đợi có check mới nhất route cũ `FINANCE_REVIEW` ⟹ stage `RECHECK_REQUIRED`
+2. **Stage _cần kiểm lại_:** Request ở hàng đợi có check mới nhất route cũ `FINANCE_REVIEW` ⟹ stage `RECHECK_REQUIRED`
    (wire mới), `readyToSubmit` theo luật hiện có; trưởng phòng trình lại thì #6 kiểm lại toàn bộ. Rút được ở stage này.
 3. **Thông báo:** gỡ phát `REQUEST_FINANCE_REVIEW_OPENED`, `REQUEST_RETURNED_BY_FINANCE`, `REQUEST_AWAITING_BUDGET`,
    `REQUEST_BUDGET_VERSION_ENDED`, `FINANCE_QUESTION_REMINDER`, `COMMITMENT_RELEASED_BY_WITHDRAWAL` (L-127, ngoài danh mục). Mã
-   chuyển vào danh sách *chỉ đọc* để thông báo cũ trong hộp vẫn hiển thị; test chặn phát mới.
+   chuyển vào danh sách _chỉ đọc_ để thông báo cũ trong hộp vẫn hiển thị; test chặn phát mới.
 4. **SLA:** bỏ `FINANCE_REVIEW` khỏi `SLA_STEP_KINDS` và `congestion.dto`; bỏ nhánh vai `FINANCE_QUESTION`.
 5. **SoD-8 người rà soát:** gỡ `refuseReviewer` (không còn người rà soát); `SoD-8` cho phiên bản ngân sách giữ nguyên.
 6. Route cũ trả 404 chuẩn của Nest (không giữ stub). Không áp dụng: job mới, khóa mới.
@@ -110,16 +110,16 @@ nên không có Request treo; `RECHECK_REQUIRED` chỉ để migration dữ li�
 
 ## Test matrix
 
-| AC / rủi ro | Tình huống | Cấp test | Kết quả mong đợi | Bằng chứng sau implement |
-| --- | --- | --- | --- | --- |
-| `US-06-12` AC-25 | Finance/Người duyệt chi gọi 7 route cũ | http | 404; OpenAPI không còn `operationId` | planned |
-| AC-25 | quét OpenAPI sau #12, #13 | gates | không `override`, `highValue*`, `revision`, `finance-review`, `budget-information` | planned |
-| Q-02 B | DB có R ở `AWAITING_FINANCE_REVIEW` + bước mở, R' ở `AWAITING_BUDGET` | integration (migration) | cả hai `AWAITING_SPEND_SUBMISSION`, bước `CLOSED`, 2 Audit, bảng drop | planned |
-| Stage | R sau migration | http | `stage = RECHECK_REQUIRED`; trình lại ⟹ check mới | planned |
-| Ghi mới | mọi đường ghi state/route/kind | integration | không ghi giá trị cũ | planned |
-| L-127 | rút Request có cam kết | integration | không thông báo Finance/IT | planned |
-| SLA | quét SLA | unit | không có kind `FINANCE_REVIEW`, vai `FINANCE_QUESTION` | planned |
-| Hộp thư | thông báo cũ mã đã gỡ | http | vẫn đọc được | planned |
+| AC / rủi ro      | Tình huống                                                            | Cấp test                | Kết quả mong đợi                                                                   | Bằng chứng sau implement |
+| ---------------- | --------------------------------------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------- | ------------------------ |
+| `US-06-12` AC-25 | Finance/Người duyệt chi gọi 7 route cũ                                | http                    | 404; OpenAPI không còn `operationId`                                               | planned                  |
+| AC-25            | quét OpenAPI sau #12, #13                                             | gates                   | không `override`, `highValue*`, `revision`, `finance-review`, `budget-information` | planned                  |
+| Q-02 B           | DB có R ở `AWAITING_FINANCE_REVIEW` + bước mở, R' ở `AWAITING_BUDGET` | integration (migration) | cả hai `AWAITING_SPEND_SUBMISSION`, bước `CLOSED`, 2 Audit, bảng drop              | planned                  |
+| Stage            | R sau migration                                                       | http                    | `stage = RECHECK_REQUIRED`; trình lại ⟹ check mới                                  | planned                  |
+| Ghi mới          | mọi đường ghi state/route/kind                                        | integration             | không ghi giá trị cũ                                                               | planned                  |
+| L-127            | rút Request có cam kết                                                | integration             | không thông báo Finance/IT                                                         | planned                  |
+| SLA              | quét SLA                                                              | unit                    | không có kind `FINANCE_REVIEW`, vai `FINANCE_QUESTION`                             | planned                  |
+| Hộp thư          | thông báo cũ mã đã gỡ                                                 | http                    | vẫn đọc được                                                                       | planned                  |
 
 ## Definition of Done
 

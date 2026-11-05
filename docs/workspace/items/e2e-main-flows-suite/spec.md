@@ -182,13 +182,13 @@ Migration, route, khóa/transaction mới: không áp dụng (suite chỉ gọi 
 
 ## Test matrix
 
-| AC / rủi ro       | Tình huống                                           | Cấp test | Kết quả mong đợi                                                    | Bằng chứng sau implement |
-| ----------------- | ---------------------------------------------------- | -------- | ------------------------------------------------------------------- | ------------------------ |
-| E2E-FLOWS-01 lệnh | `pnpm test:flows` không có `TEST_DATABASE_ADMIN_URL` | flows    | dừng ở global setup, thông báo rõ, không DB nào bị tạo              | verified-local: dừng với thông báo, không tạo database |
-| seed              | global setup                                         | flows    | mẫu seeded tồn tại, report seed không `conflict`; teardown xóa sạch | verified-local: 24 bước `done`, exit 0; teardown xóa mẫu |
-| đồng hồ           | `jumpTo` lùi ngày                                    | flows    | harness ném lỗi trước khi gọi API                                   | verified-local: `f0-auth-roles` (FlowClockError, ngày không đổi) |
-| timer tắt         | file chạy > 5 phút                                   | flows    | không sweep nào tự chạy (Audit `SYSTEM` chỉ xuất hiện sau `sweep`)  | verified-local: `f0-auth-roles` đo 300 ms thật không tăng Audit `SYSTEM`; chưa đo 5 phút |
-| discovery         | `pnpm test:discovery`                                | gate     | runner `flows` liệt kê đúng `test/flows/*.flow-spec.ts`             | verified-local: `flows 5 spec file(s)` |
+| AC / rủi ro       | Tình huống                                           | Cấp test | Kết quả mong đợi                                                    | Bằng chứng sau implement                                                                   |
+| ----------------- | ---------------------------------------------------- | -------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| E2E-FLOWS-01 lệnh | `pnpm test:flows` không có `TEST_DATABASE_ADMIN_URL` | flows    | dừng ở global setup, thông báo rõ, không DB nào bị tạo              | verified-local: dừng với thông báo, không tạo database                                     |
+| seed              | global setup                                         | flows    | mẫu seeded tồn tại, report seed không `conflict`; teardown xóa sạch | verified-local: 24 bước `done`, exit 0; teardown xóa mẫu                                   |
+| đồng hồ           | `jumpTo` lùi ngày                                    | flows    | harness ném lỗi trước khi gọi API                                   | verified-local: `f0-auth-roles` (FlowClockError, ngày không đổi)                           |
+| timer tắt         | file chạy > 5 phút                                   | flows    | không sweep nào tự chạy (Audit `SYSTEM` chỉ xuất hiện sau `sweep`)  | verified-local: `f0-auth-roles` đo 300 ms thật không tăng Audit `SYSTEM`; chưa đo 5 phút   |
+| discovery         | `pnpm test:discovery`                                | gate     | runner `flows` liệt kê đúng `test/flows/*.flow-spec.ts`             | verified-local: `flows 5 spec file(s)`                                                     |
 | kịch bản          | 31 kịch bản ở [test-plan](test-plan.md)              | flows    | xanh theo batch đã implement; BLOCKER ghi riêng                     | verified-local Đợt 1: 9 kịch bản, 34 test xanh (xem _Changes and acceptance_); còn lại chờ |
 
 ## Definition of Done
