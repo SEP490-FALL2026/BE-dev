@@ -69000,6 +69000,727 @@
         "tags": ["notifications"]
       }
     },
+    "/api/v1/ai/access-request-summaries/source": {
+      "get": {
+        "operationId": "aiAccessRequestSummarySource",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The revision of the queue of approval steps given to the caller now, how many steps a summary would cover (at most 20) and how many it would leave out. Send the revision when asking for a summary. The AI service is not called and nothing is written. With no step waiting the answer is still 200, with stepCount 0.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/QueueSummarySourceResponseDto" },
+                    { "properties": { "message": { "example": "AI.SUMMARY_SOURCE_READ" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The AI summary of the queue is switched off (AI.DISABLED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AI.DISABLED": {
+                    "summary": "The AI summary of the queue is switched off.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AI.DISABLED",
+                        "message": "The AI summary of the queue is switched off.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read the queue a summary would cover",
+        "tags": ["ai-assist"]
+      }
+    },
+    "/api/v1/ai/access-request-summaries": {
+      "post": {
+        "operationId": "aiAccessRequestSummaryCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateQueueSummaryBodyDto" } } }
+        },
+        "responses": {
+          "202": {
+            "description": "The call is recorded and runs in the background; read it with GET until it is no longer PENDING or RUNNING. Asking again for the same revision gives the call already kept for it. When the steps of the caller cannot be read the answer is still 202, with status FAILED: nothing was sent to the model and the queue read by hand is unchanged. The model is never called when no step waits for the caller. With no AI service configured the answer is 503 AI.PROVIDER_UNAVAILABLE and nothing is written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/QueueSummaryAcceptedResponseDto" },
+                    { "properties": { "message": { "example": "AI.SUMMARY_ACCEPTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The AI summary of the queue is switched off (AI.DISABLED), or no approval step waits for the caller (AI.NO_ASSIGNED_STEPS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AI.DISABLED": {
+                    "summary": "The AI summary of the queue is switched off.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AI.DISABLED",
+                        "message": "The AI summary of the queue is switched off.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "AI.NO_ASSIGNED_STEPS": {
+                    "summary": "No approval step waits for this person.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AI.NO_ASSIGNED_STEPS",
+                        "message": "No approval step waits for this person.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The queue changed since the revision was read (AI.SOURCE_STALE): read it again and ask again.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AI.SOURCE_STALE": {
+                    "summary": "The queue changed since it was read. Read it again.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AI.SOURCE_STALE",
+                        "message": "The queue changed since it was read. Read it again.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "AI.PROVIDER_UNAVAILABLE": {
+                    "summary": "No AI service is available.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AI.PROVIDER_UNAVAILABLE",
+                        "message": "No AI service is available.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Ask for a summary of my approval queue",
+        "tags": ["ai-assist"]
+      }
+    },
+    "/api/v1/ai/access-request-summaries/{invocationId}": {
+      "get": {
+        "operationId": "aiAccessRequestSummaryGet",
+        "parameters": [
+          { "name": "invocationId", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The summary of the caller read against the queue now: a line shows only while its step still waits for the caller, omittedCount counts the steps still theirs that it leaves out, and sourceStale says the queue changed since it was composed. A call that shows nothing carries its state in status and errorCode (AI.PROVIDER_UNAVAILABLE, AI.PROVIDER_TIMEOUT, AI.OUTPUT_INVALID, AI.NO_VALID_OUTPUT, AI.SOURCE_UNREADABLE, AI.INTERNAL_ERROR) with 200, never as an HTTP error; the queue read by hand is unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/QueueSummaryResponseDto" },
+                    { "properties": { "message": { "example": "AI.SUMMARY_READ" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such summary, or it is somebody else's (AI.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AI.NOT_FOUND": {
+                    "summary": "There is no such summary.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AI.NOT_FOUND",
+                        "message": "There is no such summary.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read a summary of my approval queue",
+        "tags": ["ai-assist"]
+      }
+    },
+    "/api/v1/ai/invocations/{invocationId}/content": {
+      "get": {
+        "operationId": "aiInvocationContentGet",
+        "parameters": [
+          { "name": "invocationId", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The context sent to the AI service, the prompt, the raw answer, the parsed output and the result of the checks of the backend, as stored. The fields a call never got (it failed before the model answered) are null. Every read writes the event AI_INVOCATION.CONTENT_READ with the id of the call, in the same transaction.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/InvocationContentResponseDto" },
+                    { "properties": { "message": { "example": "AI.CONTENT_READ" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin reads the content of a call of the AI, whoever made the call.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no content for the id: the call was never made, or its content was purged (AI.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AI.NOT_FOUND": {
+                    "summary": "There is no such content.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AI.NOT_FOUND",
+                        "message": "There is no such content.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id is not a UUID (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read the content of a call of the AI",
+        "tags": ["ai-assist"]
+      }
+    },
     "/api/v1/onboarding-checklist": {
       "get": {
         "operationId": "onboardingChecklistGet",
@@ -93706,7 +94427,8 @@
                         "ACCOUNT",
                         "DOCUMENT",
                         "SUBSCRIPTION",
-                        "USAGE"
+                        "USAGE",
+                        "AI"
                       ]
                     },
                     "groupLabel": { "type": "string", "description": "The name of the group, in Vietnamese." },
@@ -93835,7 +94557,8 @@
                   "ACCOUNT",
                   "DOCUMENT",
                   "SUBSCRIPTION",
-                  "USAGE"
+                  "USAGE",
+                  "AI"
                 ]
               },
               "groupLabel": { "type": "string", "description": "The name of the group, in Vietnamese." },
@@ -95065,6 +95788,178 @@
               }
             },
             "required": ["notification"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "QueueSummarySourceResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "queueRevision": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "stepCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 20,
+                "description": "How many steps a summary would cover: at most 20; 0 when no step waits for the person."
+              },
+              "omittedCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "How many steps still given to the person a summary would leave out (past the first 20)."
+              }
+            },
+            "required": ["queueRevision", "stepCount", "omittedCount"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "CreateQueueSummaryBodyDto": {
+        "type": "object",
+        "properties": {
+          "queueRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The revision of the queue the person sees, as `GET /ai/access-request-summaries/source` gave it. A queue that changed since is refused (AI.SOURCE_STALE)."
+          }
+        },
+        "required": ["queueRevision"],
+        "additionalProperties": false
+      },
+      "QueueSummaryAcceptedResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "invocationId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The call to read with `GET /ai/access-request-summaries/{invocationId}`."
+              },
+              "status": {
+                "type": "string",
+                "enum": ["PENDING", "RUNNING", "COMPLETED", "NO_VALID_OUTPUT", "STALE", "FAILED"],
+                "description": "PENDING for a call just started. The same revision asked again gives the call already kept for it, in the state it is in. FAILED when the steps of the person could not be read: the call is recorded as failed (errorCode AI.SOURCE_UNREADABLE when read) and nothing was sent to the model."
+              }
+            },
+            "required": ["invocationId", "status"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "QueueSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "invocationId": { "type": "string", "format": "uuid" },
+              "status": {
+                "type": "string",
+                "enum": ["PENDING", "RUNNING", "COMPLETED", "NO_VALID_OUTPUT", "STALE", "FAILED"]
+              },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "sourceStale": {
+                "type": "boolean",
+                "description": "True when the queue of the person changed since the summary was composed."
+              },
+              "omittedCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "How many steps still given to the person the summary leaves out: past the first 20, or whose line did not pass the checks."
+              },
+              "lines": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": { "type": "string", "format": "uuid" },
+                    "stepId": { "type": "string", "format": "uuid" },
+                    "stepKind": { "type": "string", "enum": ["NEED_APPROVAL", "SPEND_APPROVAL"] },
+                    "summary": {
+                      "type": "string",
+                      "description": "One checked line about the step, in Vietnamese. Any amount in it was written from the request, not by the model."
+                    }
+                  },
+                  "required": ["requestId", "stepId", "stepKind", "summary"],
+                  "additionalProperties": false
+                },
+                "description": "The checked lines whose step still waits for the person, in the order of the queue; at most 20."
+              },
+              "errorCode": {
+                "description": "Why a call shows nothing, when it does not: AI.PROVIDER_UNAVAILABLE, AI.PROVIDER_TIMEOUT, AI.OUTPUT_INVALID, AI.NO_VALID_OUTPUT, AI.SOURCE_UNREADABLE or AI.INTERNAL_ERROR. A state of the call read here, never an HTTP error.",
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": ["invocationId", "status", "createdAt", "sourceStale", "omittedCount", "lines", "errorCode"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "InvocationContentResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "invocationId": { "type": "string", "format": "uuid" },
+              "context": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "The allow-listed context sent to the AI service, with opaque references (R001, C001) in place of ids. A JSON object."
+              },
+              "promptText": {
+                "description": "The prompt that was sent to the model; null while the call has not been answered.",
+                "type": "string",
+                "nullable": true
+              },
+              "rawResponse": {
+                "description": "What the model answered, as it came; null while the call has not been answered.",
+                "type": "string",
+                "nullable": true
+              },
+              "parsed": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "The output of the AI service as it parsed it, a JSON object; null when it did not answer or could not parse it.",
+                "nullable": true
+              },
+              "result": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "What the checks of the backend kept: the steps behind each reference, the lines that passed and why each other line was rejected, a JSON object; null until the checks have run.",
+                "nullable": true
+              }
+            },
+            "required": ["invocationId", "context", "promptText", "rawResponse", "parsed", "result"],
             "additionalProperties": false,
             "nullable": true
           }

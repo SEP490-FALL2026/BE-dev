@@ -1,5 +1,6 @@
 import type { Type } from '@nestjs/common';
 import { AppModule } from '../../src/app/app.module';
+import { AiPurgeCliModule } from '../../src/cli/ai-purge/ai-purge-cli.module';
 import { CostCenterDirectionRootCliModule } from '../../src/cli/cost-center-direction/cost-center-direction-cli.module';
 import { AssignSubscriptionOwnerCliModule } from '../../src/cli/assign-subscription-owner/assign-subscription-owner-cli.module';
 import { RecoveryCliModule } from '../../src/cli/recover/recover-cli.module';
@@ -25,6 +26,7 @@ export const PROCESS_GRAPHS: readonly (readonly [string, Type<unknown>])[] = [
   ['InspectionCliModule', InspectionCliModule],
   ['MigrationPreflightCliModule', MigrationPreflightCliModule],
   ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule],
+  ['AiPurgeCliModule', AiPurgeCliModule],
   ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule],
   ['DevSeedCliModule', DevSeedCliModule],
   ['DemoDatasetCliModule', DemoDatasetCliModule],

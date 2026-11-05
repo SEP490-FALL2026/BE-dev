@@ -11,6 +11,7 @@ export const PARAMETER_GROUPS = [
   'DOCUMENT',
   'SUBSCRIPTION',
   'USAGE',
+  'AI',
 ] as const;
 export type ParameterGroup = (typeof PARAMETER_GROUPS)[number];
 
@@ -24,6 +25,7 @@ export const GROUP_LABELS: Record<ParameterGroup, string> = {
   DOCUMENT: 'Tài liệu',
   SUBSCRIPTION: 'Thuê bao và gia hạn',
   USAGE: 'Sử dụng và lãng phí',
+  AI: 'Trợ lý AI',
 };
 
 /** Most choices an enum parameter offers; the registry of nested arrays records the same bound. */
@@ -306,6 +308,30 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     unitLabel: 'lịch',
     description: 'How often the waste rules that use usage data run.',
     source: 'FR-4.12b',
+  },
+  {
+    key: 'AI_ENABLED',
+    label: 'Công tắc tổng của các tính năng AI',
+    group: 'AI',
+    shape: { kind: 'enum', options: ['ON', 'OFF'], optionLabels: { ON: 'Bật', OFF: 'Tắt' } },
+    default: 'OFF',
+    unit: 'switch',
+    unitLabel: 'công tắc',
+    description:
+      'Công tắc tổng: khi tắt, hệ thống không gọi dịch vụ AI cho bất kỳ tính năng nào và mọi luồng làm việc chạy thủ công như cũ.',
+    source: 'OQ-G-08, US-15-05',
+  },
+  {
+    key: 'AI_ACCESS_REQUEST_SUMMARY_ENABLED',
+    label: 'Tóm tắt hàng chờ duyệt bằng AI',
+    group: 'AI',
+    shape: { kind: 'enum', options: ['ON', 'OFF'], optionLabels: { ON: 'Bật', OFF: 'Tắt' } },
+    default: 'OFF',
+    unit: 'switch',
+    unitLabel: 'công tắc',
+    description:
+      'Cho phép người được giao bước duyệt bấm "Tóm tắt bằng AI" trên hàng chờ của mình; chỉ có hiệu lực khi công tắc tổng của AI đang bật.',
+    source: 'OQ-G-08, US-15-05',
   },
 ];
 

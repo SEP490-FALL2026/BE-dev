@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { HELD_ROUTING_ROWS } from './need-decision-queue.policy';
 
 export type NeedQueueType = 'GRANT' | 'SERVICE_ACCOUNT' | 'RENEWAL' | 'GROUP_GRANT';
 
 /** The need steps that wait for one person, in the order the queue is read. */
 const OPEN_ORDER: Prisma.AccessRequestStepOrderByWithRelationInput[] = [{ createdAt: 'asc' }, { id: 'asc' }];
+
+/** The same steps in the order they were given to the person, as the summary of the queue reads them. */
+const GIVEN_ORDER: Prisma.AccessRequestStepOrderByWithRelationInput[] = [{ assignedAt: 'asc' }, { id: 'asc' }];
 
 const ROW_SELECT = {
   id: true,
@@ -89,6 +93,35 @@ export class NeedDecisionQueueRepo {
   /** How many need steps wait for the person now: the total of `pageOpenOf` for the same filter, without reading the rows. */
   async countOpenOf(employeeId: string, type?: NeedQueueType): Promise<number> {
     return this.prisma.accessRequestStep.count({ where: openWhere(employeeId, type) });
+  }
+
+  /**
+   * The first `take` need steps that wait for the person now (the filter of the queue), the earliest given first (`id` breaks ties),
+   * and how many wait in all. Reads only; takes no row lock.
+   */
+  async firstGivenOpenOf(
+    employeeId: string,
+    take: number,
+    tx?: DbTx,
+  ): Promise<{ rows: NeedQueueRow[]; total: number }> {
+    const client = tx ?? this.prisma;
+    const where = openWhere(employeeId);
+
+    return {
+      rows: await client.accessRequestStep.findMany({ where, orderBy: GIVEN_ORDER, take, select: ROW_SELECT }),
+      total: await client.accessRequestStep.count({ where }),
+    };
+  }
+
+  /** Which of the steps are need steps that wait for the person now, by the filter of the queue. */
+  async openAmong(employeeId: string, stepIds: readonly string[], tx?: DbTx): Promise<string[]> {
+    if (stepIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).accessRequestStep.findMany({
+      where: { ...openWhere(employeeId), id: { in: [...stepIds] } },
+      select: { id: true },
+    });
+
+    return rows.map((row) => row.id);
   }
 }
 

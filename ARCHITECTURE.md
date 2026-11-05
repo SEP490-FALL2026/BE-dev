@@ -40,15 +40,15 @@ src/app, worker, cli  ghép tiến trình; chỉ chạm module qua public/ và *
 process nào mount `QueueInfrastructureModule`, nên API, worker và lệnh không cần Redis và không kiểm cấu hình Redis; module nào
 mount nó sau này mới có validation chặt (`REDIS_HOST`, `REDIS_PASSWORD` ở production).
 
-| Tầng | Module                                    | Ý nghĩa                                                  |
-| ---- | ----------------------------------------- | -------------------------------------------------------- |
-| T1   | `audit`, `notifications`                  | Dịch vụ lõi: Audit Trail, email                          |
-| T2   | `organization`, `identity-access`         | Tổ chức, phòng ban, Cost Center, nhân sự; tài khoản, vai |
-| T3   | `finance`, `operating-parameters`         | Tiền, tỷ giá, thuế; tham số vận hành                     |
-| T4   | `catalog`, `licensing`                    | Ứng dụng, gói, thuê bao; seat, cấp/thu hồi quyền         |
-| T5   | `budgets`, `requests`, `data-import`      | Ngân sách; Request và chi; import                        |
-| T6   | `personnel`, `onboarding`, `installation` | Vòng đời nhân sự; onboarding; cài đặt, vận hành          |
-| T7   | `dashboards`                              | Trang tổng quan theo vai (chỉ đọc qua facade)            |
+| Tầng | Module                                                 | Ý nghĩa                                                                    |
+| ---- | ------------------------------------------------------ | -------------------------------------------------------------------------- |
+| T1   | `audit`, `notifications`                               | Dịch vụ lõi: Audit Trail, email                                            |
+| T2   | `organization`, `identity-access`                      | Tổ chức, phòng ban, Cost Center, nhân sự; tài khoản, vai                   |
+| T3   | `finance`, `operating-parameters`                      | Tiền, tỷ giá, thuế; tham số vận hành                                       |
+| T4   | `catalog`, `licensing`                                 | Ứng dụng, gói, thuê bao; seat, cấp/thu hồi quyền                           |
+| T5   | `budgets`, `requests`, `data-import`                   | Ngân sách; Request và chi; import                                          |
+| T6   | `personnel`, `onboarding`, `installation`, `ai-assist` | Vòng đời nhân sự; onboarding; cài đặt, vận hành; tóm tắt AI hàng đợi duyệt |
+| T7   | `dashboards`                                           | Trang tổng quan theo vai (chỉ đọc qua facade)                              |
 
 Module chỉ import tầng thấp hơn (cạnh cùng tầng được phép: `identity-access → organization`,
 `operating-parameters → finance`, `licensing → catalog`, `requests → budgets`). Khi module dưới cần phản ứng của module

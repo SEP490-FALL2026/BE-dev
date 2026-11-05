@@ -204,7 +204,7 @@ export class SpendStepRepo {
 
   /** The spend steps given to a person that are open (`PENDING`), oldest first, with what the queue of the approver shows. */
   async pageOpenSpendOf(employeeId: string, skip: number, take: number) {
-    const where = { kind: 'SPEND_APPROVAL' as const, assigneeEmployeeId: employeeId, state: 'PENDING' as const };
+    const where = openSpendWhere(employeeId);
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.accessRequestStep.findMany({
         where,
@@ -239,4 +239,56 @@ export class SpendStepRepo {
 
     return { rows, total };
   }
+
+  /**
+   * The first `take` spend steps the queue of the approver holds for the person, the earliest given first (`id` breaks ties), with
+   * the whole reason of each request, and how many there are in all. Reads only; takes no row lock.
+   */
+  async firstGivenOpenSpendOf(employeeId: string, take: number, tx?: DbTx) {
+    const client = tx ?? this.prisma;
+    const where = openSpendWhere(employeeId);
+
+    return {
+      rows: await client.accessRequestStep.findMany({
+        where,
+        orderBy: [{ assignedAt: 'asc' }, { id: 'asc' }],
+        take,
+        select: {
+          id: true,
+          requestId: true,
+          assignedAt: true,
+          request: {
+            select: {
+              type: true,
+              planId: true,
+              businessReason: true,
+              termMonths: true,
+              amountMinor: true,
+              amountCurrency: true,
+              proposal: { select: { softwareName: true } },
+              beneficiaries: { select: { employeeId: true }, orderBy: { position: 'asc' }, take: 1 },
+              _count: { select: { beneficiaries: true } },
+            },
+          },
+        },
+      }),
+      total: await client.accessRequestStep.count({ where }),
+    };
+  }
+
+  /** Which of the steps are spend steps the queue of the approver holds for the person now. */
+  async openSpendAmong(employeeId: string, stepIds: readonly string[], tx?: DbTx): Promise<string[]> {
+    if (stepIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).accessRequestStep.findMany({
+      where: { ...openSpendWhere(employeeId), id: { in: [...stepIds] } },
+      select: { id: true },
+    });
+
+    return rows.map((row) => row.id);
+  }
+}
+
+/** The spend steps that wait for a person: given to them and pending. One filter for the queue, its summary and its check. */
+function openSpendWhere(employeeId: string) {
+  return { kind: 'SPEND_APPROVAL' as const, assigneeEmployeeId: employeeId, state: 'PENDING' as const };
 }

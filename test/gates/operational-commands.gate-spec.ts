@@ -26,6 +26,7 @@ const COMMAND_FOLDERS = [
   'modules/installation/demo-dataset',
   'modules/installation/migration-preflight',
   'modules/catalog/subscription-owner-assignment',
+  'modules/ai-assist/purge',
   'modules/organization/cost-center-direction',
   'modules/personnel/super-admin-event',
   // H7: `pnpm ops:db-roles` administers PostgreSQL roles; the API and the worker share only the pure judgement beside
@@ -43,6 +44,8 @@ const COMMAND_ONLY_FILES = [
   'modules/installation/migration-preflight/migration-preflight-cli.module.ts',
   'cli/assign-subscription-owner/assign-subscription-owner-cli.module.ts',
   'modules/catalog/subscription-owner-assignment/subscription-owner-assignment-cli.module.ts',
+  'cli/ai-purge/ai-purge-cli.module.ts',
+  'modules/ai-assist/purge/ai-assist-purge-cli.module.ts',
   'cli/cost-center-direction/cost-center-direction-cli.module.ts',
   'modules/organization/cost-center-direction/cost-center-direction-cli.module.ts',
   'cli/record-super-admin-event/record-super-admin-event-cli.module.ts',

@@ -16,6 +16,7 @@
  *   its examples and removes the entry.
  */
 
+import { ROUTE_ERROR_CODES_AI_ASSIST } from './openapi-example-route-codes-ai-assist';
 import { ROUTE_ERROR_CODES_BUDGETS } from './openapi-example-route-codes-budgets';
 import { ROUTE_ERROR_CODES_CATALOG } from './openapi-example-route-codes-catalog';
 import { ROUTE_ERROR_CODES_DATA_IMPORT } from './openapi-example-route-codes-data-import';
@@ -63,6 +64,10 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   accessRequestTimingsGet: 'ACCESS_REQUEST.TIMINGS_FETCHED',
   accessRequestWithdraw: 'ACCESS_REQUEST.WITHDRAWN',
   accountCandidatesList: 'APP_USER.CANDIDATES_LISTED',
+  aiAccessRequestSummaryCreate: 'AI.SUMMARY_ACCEPTED',
+  aiAccessRequestSummaryGet: 'AI.SUMMARY_READ',
+  aiAccessRequestSummarySource: 'AI.SUMMARY_SOURCE_READ',
+  aiInvocationContentGet: 'AI.CONTENT_READ',
   appUserCreate: 'APP_USER.CREATED',
   appUserGet: 'APP_USER.RETRIEVED',
   appUserGrantRole: 'ROLE.GRANTED',
@@ -356,6 +361,7 @@ export const NO_EXAMPLE_RESPONSES: Readonly<Record<string, string>> = {};
  * routes do not fit one file has a second named by its area. An operationId listed twice is a mistake the inventory test reports.
  */
 const PARTS = [
+  ROUTE_ERROR_CODES_AI_ASSIST,
   ROUTE_ERROR_CODES_BUDGETS,
   ROUTE_ERROR_CODES_CATALOG,
   ROUTE_ERROR_CODES_DATA_IMPORT,

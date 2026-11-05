@@ -51,6 +51,7 @@ const NO_HTTP_GRAPHS = [
   'RecoveryCliModule',
   'InspectionCliModule',
   'AssignSubscriptionOwnerCliModule',
+  'AiPurgeCliModule',
   'DevSeedCliModule',
   'DemoDatasetCliModule',
 ] as const;
@@ -107,6 +108,7 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'RecoveryCliModule',
       'InspectionCliModule',
       'AssignSubscriptionOwnerCliModule',
+      'AiPurgeCliModule',
       'DevSeedCliModule',
       'DemoDatasetCliModule',
     ],

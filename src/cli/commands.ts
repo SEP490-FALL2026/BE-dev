@@ -67,6 +67,12 @@ export const COMMANDS: readonly CommandEntry[] = [
       import('./cost-center-direction/cost-center-direction.command').then((m) => m.costCenterDirectionCommand),
   },
   {
+    name: 'ai-purge',
+    description: 'Delete the content of the AI calls up to a day, keeping the calls (dry run unless --apply).',
+    alias: 'ai-purge-cli',
+    load: () => import('./ai-purge/ai-purge.command').then((m) => m.aiPurgeCommand),
+  },
+  {
     name: 'db-roles',
     description: 'Provision, reconcile or verify the PostgreSQL roles (H7).',
     alias: 'database-roles-cli',

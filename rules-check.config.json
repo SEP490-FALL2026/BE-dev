@@ -27,6 +27,7 @@
       "src/README.md",
       "test/support/README.md",
       "docs/guides/runtime-details.md",
+      "src/modules/ai-assist/README.md",
       "src/modules/audit/README.md",
       "src/modules/budgets/README.md",
       "src/modules/catalog/README.md",

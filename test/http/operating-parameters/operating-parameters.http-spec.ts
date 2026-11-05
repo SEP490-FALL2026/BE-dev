@@ -187,6 +187,7 @@ describe('the document says what an operating parameter is (QĐ93-PARAM-LABEL)',
         'DOCUMENT',
         'SUBSCRIPTION',
         'USAGE',
+        'AI',
       ]);
     },
   );

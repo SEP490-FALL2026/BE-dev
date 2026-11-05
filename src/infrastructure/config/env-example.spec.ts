@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  AI_SERVICE_ENVIRONMENT_KEYS,
+  aiServiceSettingsOf,
+} from '../../modules/ai-assist/ai-service/ai-service-environment.policy';
+import {
   OBJECT_STORAGE_ENVIRONMENT_KEYS,
   validateObjectStorageEnvironment,
 } from '../object-storage/object-storage.config';
@@ -33,10 +37,16 @@ const COMPOSE_ONLY = new Set([
 /** Owned by modules the API and the worker do not mount today (the Owner keeps them on standby); validated when a later slice mounts them. */
 const NOT_MOUNTED: ReadonlySet<string> = new Set([...OBJECT_STORAGE_ENVIRONMENT_KEYS, ...QUEUE_ENVIRONMENT_KEYS]);
 
+/**
+ * Owned and checked by one module when it is mounted, and read by nothing else: the AI service of `ai-assist`.
+ * None is required: without an address the feature says the AI service is unavailable.
+ */
+const MODULE_CHECKED: ReadonlySet<string> = new Set(AI_SERVICE_ENVIRONMENT_KEYS);
+
 /** Names that must never reappear: removed from the schema, a value would be silently ignored. */
 const REMOVED = ['AUTH_COOKIE_SECURE'];
 
-const SECRET_LIKE = /SECRET|PASSWORD|PEPPER|_KEY(_ID)?$|_KEYS$|ACCESS_KEY/;
+const SECRET_LIKE = /SECRET|PASSWORD|PEPPER|_TOKEN$|_KEY(_ID)?$|_KEYS$|ACCESS_KEY/;
 
 interface TemplateEntry {
   name: string;
@@ -96,16 +106,25 @@ describe('.env.example', () => {
   const entries = readTemplate();
   const names = entries.map((entry) => entry.name);
 
-  it('lists every schema variable exactly once, plus the not-mounted and Compose-only ones and nothing else', () => {
+  it('lists every schema variable exactly once, plus the not-mounted, module-checked and Compose-only ones and nothing else', () => {
     const schema = schemaNames();
+    const apart = (name: string) => COMPOSE_ONLY.has(name) || NOT_MOUNTED.has(name) || MODULE_CHECKED.has(name);
 
     expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
     expect(schema.filter((name) => !names.includes(name)).sort()).toEqual([]);
+    expect(names.filter((name) => !schema.includes(name) && !apart(name)).sort()).toEqual([]);
+    expect([...COMPOSE_ONLY, ...NOT_MOUNTED, ...MODULE_CHECKED].filter((name) => !names.includes(name))).toEqual([]);
+    expect(schema.filter((name) => NOT_MOUNTED.has(name) || MODULE_CHECKED.has(name))).toEqual([]);
+  });
+
+  it('requires no variable of the AI service, in production either: without an address the feature is unavailable', () => {
+    expect(aiServiceSettingsOf({ NODE_ENV: 'production' })).toBeNull();
     expect(
-      names.filter((name) => !schema.includes(name) && !COMPOSE_ONLY.has(name) && !NOT_MOUNTED.has(name)).sort(),
+      entries
+        .filter((entry) => MODULE_CHECKED.has(entry.name))
+        .filter((entry) => entry.productionRequired || entry.requiredOutsideTest || entry.productionRequiredWhenMounted)
+        .map((entry) => entry.name),
     ).toEqual([]);
-    expect([...COMPOSE_ONLY, ...NOT_MOUNTED].filter((name) => !names.includes(name))).toEqual([]);
-    expect(schema.filter((name) => NOT_MOUNTED.has(name))).toEqual([]);
   });
 
   it('marks exactly what object storage and the queue require in production once their module is mounted (ADR-0014, E2 = A)', () => {

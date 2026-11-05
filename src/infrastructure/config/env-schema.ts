@@ -14,7 +14,8 @@ import { SecretEnvironmentVariables, assertSecrets, secretKeys } from './secret-
  * The one public contract of the environment configuration: the settings type and the validators. The parts live
  * beside it by responsibility — database (also the installation command) and secrets (a development run has no fallback for them) — and are composed here.
  * The queue and object storage validate their own keys when their module is mounted; the API, the worker and the
- * recovery command mount neither (they stay on standby), so their keys are not part of this contract.
+ * recovery command mount neither (they stay on standby), so their keys are not part of this contract. The AI service
+ * (`AI_SERVICE_*`) is checked by the module of the AI summary when it is mounted, and read by nothing else.
  */
 export { EnvironmentValidationError } from './environment-validation';
 export { resolveDatabaseUrl } from './database-url';
