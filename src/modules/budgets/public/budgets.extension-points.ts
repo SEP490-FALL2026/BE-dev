@@ -95,6 +95,24 @@ export function budgetChangeHandler(listener: BudgetChangeListener): (tx: DbTx, 
   };
 }
 
+/** What a commitment shows of the request it is held for, as the context that keeps requests tells it. */
+export interface CommitmentRequestView {
+  id: string;
+  software: { name: string };
+  plan: { name: string } | null;
+  requester: { employeeCode: string; fullName: string };
+  beneficiaryCount: number;
+  spendApprovedAt: Date | null;
+  /** Whose software it is: the vendor an invoice for the commitment is from; null for internal software. */
+  vendorId: string | null;
+}
+
+/** A context that knows the requests commitments are held for, so that Finance reads a commitment with its request. */
+export interface CommitmentRequestFacts {
+  /** The requests with these ids, in one read; a request that cannot be read is not in the map. */
+  factsOf(requestIds: readonly string[]): Promise<Map<string, CommitmentRequestView>>;
+}
+
 /** A context that knows whether the request a commitment is held for has ended, so that Finance may let the remainder go. */
 export interface CommitmentReleaseGuard {
   canReleaseRemainder(requestId: string): Promise<boolean>;
@@ -109,5 +127,17 @@ export interface CommitmentReleaseGuard {
 export class CommitmentReleaseGuardHook extends Hook<CommitmentReleaseGuard> {
   constructor() {
     super('budgets.commitment-release-guard');
+  }
+}
+
+/**
+ * The requests behind a page of commitments and the vendor an invoice is from, bound by the requests context, which keeps the
+ * requests. Every graph that loads the budgets loads the requests and binds it; unbound, reading the commitments fails instead
+ * of showing commitments with no request.
+ */
+@Injectable()
+export class CommitmentRequestFactsHook extends Hook<CommitmentRequestFacts> {
+  constructor() {
+    super('budgets.commitment-request-facts');
   }
 }

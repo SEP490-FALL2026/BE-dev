@@ -1,7 +1,8 @@
 /**
  * The rules of the money that goes back to the budget from a commitment (`US-06-06`), as pure decisions: how much goes back
  * and from which commitment, and what refuses it. A commitment that became an expense or was released does not go back to
- * being held (`AC-4`), and what became an expense stays when the rest is released.
+ * being held (`AC-4`), and what became an expense stays when the rest is released: a share named for a commitment that is an
+ * expense gives back nothing, and a share larger than what is still held gives back what is held.
  */
 
 export interface CommitmentRow {
@@ -9,6 +10,8 @@ export interface CommitmentRow {
   year: number;
   amountMinor: bigint;
   releasedMinor: bigint;
+  /** What became an expense through invoices: it does not go back to the budget. */
+  appliedMinor: bigint;
   state: 'HELD' | 'RELEASED' | 'EXPENSED';
 }
 
@@ -34,7 +37,8 @@ export interface PlannedRelease {
 
 export type ReleasePlan = { ok: true; items: PlannedRelease[] } | { ok: false; refusal: ReleaseRefusal; year?: number };
 
-export const heldOf = (row: CommitmentRow): bigint => row.amountMinor - row.releasedMinor;
+/** What a commitment still holds: its amount less what went back to the budget and less what became an expense (`US-06-06` AC-4, AC-9). */
+export const heldOf = (row: CommitmentRow): bigint => row.amountMinor - row.releasedMinor - row.appliedMinor;
 
 /** Everything still held, or the amounts named; the commitments that are not held are left as they are when nothing is named. */
 export function planRelease(
@@ -51,21 +55,23 @@ export function planRelease(
   }
 
   const items: PlannedRelease[] = [];
+  const years = new Set<number>();
   for (const named of amounts) {
-    if (items.some((item) => item.year === named.year)) {
-      return { ok: false, refusal: 'YEAR_REPEATED', year: named.year };
-    }
+    if (years.has(named.year)) return { ok: false, refusal: 'YEAR_REPEATED', year: named.year };
+    years.add(named.year);
     const row = rows.find((candidate) => candidate.year === named.year);
     if (!row) return { ok: false, refusal: 'NO_COMMITMENT', year: named.year };
-    if (row.state !== 'HELD') return { ok: false, refusal: 'NOT_HELD', year: named.year };
+    if (row.state === 'RELEASED') return { ok: false, refusal: 'NOT_HELD', year: named.year };
     if (named.amountMinor <= 0n) return { ok: false, refusal: 'AMOUNT_NOT_POSITIVE', year: named.year };
-    if (named.amountMinor > heldOf(row)) return { ok: false, refusal: 'EXCEEDS_HELD', year: named.year };
-    items.push({
-      id: row.id,
-      year: row.year,
-      takeMinor: named.amountMinor,
-      leftMinor: heldOf(row) - named.amountMinor,
-    });
+    // A share is a share of what the commitment was made for less what already went back. What the invoices took of it is an
+    // expense and does not go back, so a share that reaches into it gives back only what is still held (`US-06-06` AC-9).
+    if (named.amountMinor > row.amountMinor - row.releasedMinor) {
+      return { ok: false, refusal: 'EXCEEDS_HELD', year: named.year };
+    }
+    const heldMinor = row.state === 'HELD' ? heldOf(row) : 0n;
+    if (heldMinor === 0n) continue;
+    const takeMinor = named.amountMinor < heldMinor ? named.amountMinor : heldMinor;
+    items.push({ id: row.id, year: row.year, takeMinor, leftMinor: heldMinor - takeMinor });
   }
 
   return { ok: true, items };

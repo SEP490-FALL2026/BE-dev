@@ -26,6 +26,14 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetAttachmentLink: {
       '404': ['BUDGET_ATTACHMENT.NOT_FOUND'],
     },
+    budgetCommitmentInvoiceList: {
+      '404': ['BUDGET.COMMITMENT_NOT_FOUND'],
+    },
+    budgetCommitmentInvoiceRecord: {
+      '404': ['BUDGET.COMMITMENT_NOT_FOUND'],
+      '409': ['INVOICE.COMMITMENT_RELEASED', 'INVOICE.DUPLICATE', 'INVOICE.VENDOR_UNKNOWN'],
+      '422': ['MONEY_OUT_OF_RANGE', 'MONEY_SCALE_EXCEEDED'],
+    },
     budgetCommitmentRelease: {
       '404': ['BUDGET.COMMITMENT_NOT_FOUND'],
       '409': ['BUDGET.COMMITMENT_NOT_HELD', 'BUDGET.COMMITMENT_REQUEST_OPEN'],

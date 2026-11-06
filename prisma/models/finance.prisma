@@ -18,6 +18,7 @@ model Currency {
   budgetProposals      BudgetProposal[]          @relation("BudgetProposalCurrency")
   budgetVersions       BudgetVersion[]           @relation("BudgetVersionCurrency")
   budgetCommitments    BudgetCommitment[]        @relation("BudgetCommitmentCurrency")
+  invoices             Invoice[]                 @relation("InvoiceCurrency")
   organizations        Organization[]            @relation("OrganizationReportingCurrency")
 
   @@map("currencies")

@@ -132,6 +132,8 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
       R7: 'AWAITING_SPEND_SUBMISSION',
       R8: 'AWAITING_IT_ASSESSMENT',
       R9: 'AWAITING_FINANCE_REVIEW',
+      R10: 'COMPLETED',
+      R11: 'COMPLETED',
     });
   }, 600000);
 

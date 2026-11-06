@@ -16,6 +16,9 @@ import {
   BudgetCommitmentNotFoundError,
   BudgetCommitmentRefusedError,
   BudgetCostCenterNotFoundError,
+  InvoiceCommitmentReleasedError,
+  InvoiceDuplicateError,
+  InvoiceVendorUnknownError,
   BudgetCurrencyError,
   BudgetDecisionRefusedError,
   BudgetNotAHistoryReaderError,
@@ -69,6 +72,15 @@ export function toBudgetApiException(error: unknown): unknown {
   }
   if (error instanceof BudgetCommitmentNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'BUDGET.COMMITMENT_NOT_FOUND', error.message);
+  }
+  if (error instanceof InvoiceDuplicateError) {
+    return refuse(HttpStatus.CONFLICT, 'INVOICE.DUPLICATE', error.message);
+  }
+  if (error instanceof InvoiceVendorUnknownError) {
+    return refuse(HttpStatus.CONFLICT, 'INVOICE.VENDOR_UNKNOWN', error.message);
+  }
+  if (error instanceof InvoiceCommitmentReleasedError) {
+    return refuse(HttpStatus.CONFLICT, 'INVOICE.COMMITMENT_RELEASED', error.message);
   }
   if (error instanceof BudgetCommitmentRefusedError) {
     const invalid = error.reason === 'REASON_REQUIRED' || error.reason === 'AMOUNT_NOT_POSITIVE';
@@ -216,6 +228,9 @@ export const BUDGET_ERROR_EXAMPLES = {
   COMMITMENT_NOT_FOUND: example(new BudgetCommitmentNotFoundError()),
   COMMITMENT_NOT_HELD: example(new BudgetCommitmentRefusedError('NOT_HELD', 2026)),
   COMMITMENT_REQUEST_OPEN: example(new BudgetCommitmentRefusedError('REQUEST_OPEN')),
+  INVOICE_DUPLICATE: example(new InvoiceDuplicateError()),
+  INVOICE_VENDOR_UNKNOWN: example(new InvoiceVendorUnknownError()),
+  INVOICE_COMMITMENT_RELEASED: example(new InvoiceCommitmentReleasedError()),
   NOT_SPENDING_APPROVER: example(new BudgetDecisionRefusedError('NOT_SPENDING_APPROVER')),
   CONFLICT_OF_INTEREST: example(new BudgetDecisionRefusedError('CONFLICT_OF_INTEREST')),
   OWN_VERSION: example(new BudgetDecisionRefusedError('OWN_VERSION')),

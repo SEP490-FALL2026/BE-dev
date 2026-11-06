@@ -144,6 +144,7 @@ export const budgetsQuerySchema = z.strictObject({
   year: z.coerce.number().int().min(2000).max(2200).optional(),
   ...pageQuery,
 });
+export const budgetSummaryQuerySchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2200) });
 export const idParamSchema = z.strictObject({ id: z.uuid() });
 export const lineParamSchema = z.strictObject({ id: z.uuid(), position: z.coerce.number().int().positive() });
 
@@ -275,6 +276,10 @@ const tableRowSchema = z.strictObject({
   year: z.number().int(),
   versionId: z.uuid(),
   number: z.number().int().positive(),
+  /** The base of the current version, before the reserve. */
+  base: moneyView,
+  /** The reserve of the current version, kept apart from the base. */
+  reserve: moneyView,
   total: moneyView,
   /** What is held against the budget by the commitments attached to it. */
   committed: moneyView,
@@ -283,6 +288,26 @@ const tableRowSchema = z.strictObject({
   /** The budget less what is held and what is spent; negative when more was committed than the budget allows (`US-06-07` AC-3). */
   remaining: moneyView,
   overCommitted: z.boolean(),
+});
+const summaryTotalSchema = z.strictObject({
+  currency: z.string(),
+  base: moneyView,
+  reserve: moneyView,
+  total: moneyView,
+  committed: moneyView,
+  spent: moneyView,
+  remaining: moneyView,
+  costCenterCount: z.number().int().nonnegative(),
+  /** The Cost Centers whose budget is less than what is held and spent against it. */
+  overBudgetCount: z.number().int().nonnegative(),
+});
+/** The company-wide figures of a year, added up for each currency: Cost Centers of two currencies are never added together. */
+const budgetSummarySchema = z.strictObject({
+  year: z.number().int(),
+  /** Keyed by currency code, empty when no Cost Center has a current budget for the year. */
+  totals: z.record(z.string(), summaryTotalSchema),
+  /** When the last invoice was recorded, which is when the spent figure was last brought up to date; null when none was. */
+  lastInvoiceRecordedAt: z.iso.datetime().nullable(),
 });
 export const mineVersionSummarySchema = z.strictObject({
   id: z.uuid(),
@@ -312,6 +337,7 @@ export class MineQueryDto extends createZodDto(mineQuerySchema) {}
 export class MineLinesQueryDto extends createZodDto(mineLinesQuerySchema) {}
 export class MineVersionsQueryDto extends createZodDto(mineVersionsQuerySchema) {}
 export class BudgetsQueryDto extends createZodDto(budgetsQuerySchema) {}
+export class BudgetSummaryQueryDto extends createZodDto(budgetSummaryQuerySchema) {}
 export class IdParamDto extends createZodDto(idParamSchema) {}
 export class LineParamDto extends createZodDto(lineParamSchema) {}
 
@@ -330,6 +356,7 @@ export class MineResponseDto extends createZodDto(successEnvelopeSchema(z.strict
 export class MineLinePageResponseDto extends createZodDto(page(versionLineSchema)) {}
 export class MineVersionPageResponseDto extends createZodDto(page(mineVersionSummarySchema)) {}
 export class BudgetTablePageResponseDto extends createZodDto(page(tableRowSchema)) {}
+export class BudgetSummaryResponseDto extends createZodDto(successEnvelopeSchema(budgetSummarySchema)) {}
 export class BudgetLineImportResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ result: importSchema })),
 ) {}
@@ -343,4 +370,5 @@ export type VersionLineWire = z.infer<typeof versionLineSchema>;
 export type MineWire = z.infer<typeof mineSchema>;
 export type MineVersionSummaryWire = z.infer<typeof mineVersionSummarySchema>;
 export type TableRowWire = z.infer<typeof tableRowSchema>;
+export type BudgetSummaryWire = z.infer<typeof budgetSummarySchema>;
 export type ImportWire = z.infer<typeof importSchema>;

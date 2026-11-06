@@ -23,6 +23,8 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   // added to and never changed or deleted (their triggers refuse it first).
   super_admin_event_tickets: ['INSERT', 'SELECT'],
   budget_version_history: ['INSERT', 'SELECT'],
+  // An invoice Finance recorded is evidence of what was spent: added to and never changed or deleted.
+  invoices: ['INSERT', 'SELECT'],
   // The notice, the signed record and the acknowledgement of a machine are evidence: added to and never changed.
   monitoring_notice_versions: ['INSERT', 'SELECT'],
   device_acknowledgements: ['INSERT', 'SELECT'],

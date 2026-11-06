@@ -105,6 +105,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   BudgetVersionDecision: 'budgets',
   BudgetCommitment: 'budgets',
   BudgetCommitmentRelease: 'budgets',
+  Invoice: 'budgets',
   BudgetAttachment: 'budgets',
   RequestBudgetCheck: 'requests',
   RequestBudgetCheckYear: 'requests',

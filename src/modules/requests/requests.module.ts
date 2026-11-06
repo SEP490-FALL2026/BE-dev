@@ -17,6 +17,7 @@ import { AssessmentQueueController } from './assessment-queue/assessment-queue.c
 import { AssessmentQueueRepo } from './assessment-queue/assessment-queue.repo';
 import { AssessmentQueueService } from './assessment-queue/assessment-queue.service';
 import { RequestCommitmentReleaseGuard } from './spend/commitment-release.listener';
+import { RequestCommitmentFacts } from './spend/commitment-request-facts.listener';
 import { RequestDraftService } from './draft/request-draft.service';
 import { RequestDraftSubmitService } from './draft/request-draft-submit.service';
 import { RequestDraftsController } from './draft/request-drafts.controller';
@@ -121,6 +122,7 @@ import { SpendDecisionRepo } from './spend/spend-decision.repo';
 import { SpendDecisionRecorder } from './spend-approval/spend-decision-recorder.service';
 import { SpendDecisionService } from './spend-approval/spend-decision.service';
 import { SpendBatchService } from './spend-submission/spend-batch.service';
+import { SpendBatchListService } from './spend-submission/spend-batch-list.service';
 import { SpendBatchViewService } from './spend-submission/spend-batch-view.service';
 import { SpendEffectsService } from './budget-information/spend-effects.service';
 import { SpendEntryService } from './spend/spend-entry.service';
@@ -263,6 +265,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     SimilarSeatsService,
     AccessRequestGrantGate,
     RequestCommitmentReleaseGuard,
+    RequestCommitmentFacts,
     SpendStepRepo,
     BudgetCheckRepo,
     FinanceReviewRepo,
@@ -282,6 +285,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     SpendBatchRepo,
     SpendBatchService,
     SpendBatchViewService,
+    SpendBatchListService,
     SpendQueueService,
     SupplementRepo,
     SupplementPricing,

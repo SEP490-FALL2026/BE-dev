@@ -298,15 +298,16 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
       await h.sendOn([id], design.member.account).expect(403);
     });
 
-    it('is read by the head who sent it and by the approver who holds a step of it, and by nobody else', async () => {
+    it('is read by the head who sent it, by the approver who holds a step of it and by Finance, and by nobody else', async () => {
       const id = await waiting();
       const batch = await send([id]);
       const stranger = await h.departmentWithHead('P-STR');
 
       await h.batchOf(batch.id, design.head.account).expect(200);
       await h.batchOf(batch.id, h.boss.account).expect(200);
+      await h.batchOf(batch.id, h.finance).expect(200);
       await h.batchOf(batch.id, stranger.head.account).expect(404);
-      await h.batchOf(batch.id, h.finance).expect(404);
+      await h.batchItems(batch.id, stranger.head.account).expect(404);
       await h.batchItems(batch.id, design.member.account).expect(404);
     });
 

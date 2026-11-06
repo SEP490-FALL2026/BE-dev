@@ -80,5 +80,23 @@ export const REQUESTS: Pick<DemoFixture, 'requests'> = {
       target: 'AWAITING_FINANCE_REVIEW',
       summary: 'Phòng Thiết kế chưa có ngân sách năm: kiểm tra NO_ACTIVE_BUDGET, chờ Finance rà soát.',
     },
+    {
+      key: 'R10',
+      requester: 'NV-MKT1',
+      plan: 'figma-professional',
+      termMonths: 1,
+      target: 'COMPLETED',
+      grantFrom: 'figma-mkt',
+      summary: 'Marketing: duyệt chi xong, cam kết có thuế GTGT được khấu trừ, đã nhận hóa đơn.',
+    },
+    {
+      key: 'R11',
+      requester: 'NV-SAL1',
+      plan: 'jira-standard',
+      termMonths: 1,
+      target: 'COMPLETED',
+      grantFrom: 'jira-sal',
+      summary: 'Kinh doanh: duyệt chi xong, hóa đơn về cao hơn cam kết.',
+    },
   ],
 };

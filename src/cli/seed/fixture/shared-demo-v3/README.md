@@ -80,6 +80,17 @@ The single versioned dataset for seed. All identities are fictional. Passwords c
 | MKT budget        | 1: ChatGPT Plus cho nhóm nội dung; 2: Figma Professional cho nhóm quảng cáo; same ordered lines in both fiscal years when required                    |
 | SAL budget        | 1: Jira Standard cho nhóm bán hàng; 2: ChatGPT Plus cho nhóm chăm sóc khách hàng; same ordered lines in both fiscal years when required               |
 
+### Finance screens: next-year proposal and invoices
+
+| Record                 | Request | Purpose                                                                                                                                                           |
+| ---------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Next-year proposal ITO | -       | NV-ITOH proposes next year's software budget for Information Technology, which has none: it waits for Finance (budget proposals screen). Step `budget.next-year`. |
+| Invoice HD1            | R1      | Finance records 50% of the commitment before tax: the invoice matches (MATCHED) and the rest stays held. Step `finance.invoices`.                                 |
+| Invoice HD2            | R10     | Finance records 40% before tax with 10% deductible tax and 5% non-deductible tax: only the tax differs (TAX_ONLY); the deductible tax is not an expense.          |
+| Invoice HD3            | R11     | Finance records 110% of the commitment: more than it allowed (PRICE_QUANTITY_EXCEPTION), flagged; the commitment becomes an expense.                              |
+
+The invoices are numbered with the tag of the dataset and their key (`SV-HD1`), so a rerun finds them and records none twice; the same number refused by the API as a duplicate also counts as present. Each is recorded by the Finance account through `POST /budget-commitments/{id}/invoices`.
+
 ## Requests and extras
 
 | Record | Requester | Target                    | Demo purpose                                                                          |
@@ -93,6 +104,8 @@ The single versioned dataset for seed. All identities are fictional. Passwords c
 | R7     | NV-DEV2   | AWAITING_SPEND_SUBMISSION | Đã duyệt nhu cầu, nằm trong hàng trình lô của trưởng phòng.                           |
 | R8     | NV-DEV1   | AWAITING_IT_ASSESSMENT    | Đề xuất phần mềm ngoài danh mục: đã duyệt nhu cầu, chờ IT Admin thẩm định.            |
 | R9     | NV-DES2   | AWAITING_FINANCE_REVIEW   | Phòng Thiết kế chưa có ngân sách năm: kiểm tra NO_ACTIVE_BUDGET, chờ Finance rà soát. |
+| R10    | NV-MKT1   | COMPLETED                 | Marketing: duyệt chi xong, cam kết có thuế GTGT được khấu trừ, đã nhận hóa đơn.       |
+| R11    | NV-SAL1   | COMPLETED                 | Kinh doanh: duyệt chi xong, hóa đơn về cao hơn cam kết.                               |
 
 | Record           | Purpose                                                    |
 | ---------------- | ---------------------------------------------------------- |
@@ -102,7 +115,7 @@ The single versioned dataset for seed. All identities are fictional. Passwords c
 
 ## Current decisions and limits
 
-QD-95: heads hold only MANAGER; IT Admin, Finance, spending approver and Super Admin are separate. QD-93: no fallback/substitute approvers or Project entities; every code matches the current uppercase/hyphen format. QD-94 implemented API: each subscription belongs to one department; requests use the requester department and current batch/review routes. R1/R2 use budget lines 1/2; R7 stays off-plan; R9 deliberately has no department budget.
+QD-95: heads hold only MANAGER; IT Admin, Finance, spending approver and Super Admin are separate. QD-93: no fallback/substitute approvers or Project entities; every code matches the current uppercase/hyphen format. QD-94 implemented API: each subscription belongs to one department; requests use the requester department and current batch/review routes. R1/R2 use budget lines 1/2; R7 stays off-plan; R9 deliberately has no department budget. R10 and R11 are granted from figma-mkt and jira-sal and exist to give the invoices a commitment in Marketing and Sales; ITO has no budget of its own, only the proposal for next year.
 
 Next-year branch: paid requests share the first working day of next year and ENG/MKT/SAL get both budget years. R1 is still granted from the current-year jira-eng subscription, ending December 31. Late-November/December seeding can produce renewal events whose notice milestones already passed; that is current sweep behavior. Calendar-year mismatch requires the wrapper reset path.
 

@@ -119,6 +119,16 @@ export const REFERENCE_VERSION: Prisma.BudgetVersionWhereInput = {
   OR: [{ state: 'APPROVED' }, { state: 'EXPIRED', neverCurrent: false }],
 };
 
+/** What the company-wide totals of a year need of a version that is the budget of its year. */
+export interface ReferenceFigures {
+  costCenterId: string;
+  year: number;
+  currency: string;
+  baseMinor: bigint;
+  reserveMinor: bigint;
+  totalMinor: bigint;
+}
+
 export interface VersionFilter {
   costCenterIds?: readonly string[];
   state?: VersionState;
@@ -284,6 +294,18 @@ export class VersionRepo {
     ]);
 
     return { items: rows.map(toRecord), total };
+  }
+
+  /**
+   * The figures of every version that is the budget of its year, for the company-wide totals: the columns the totals add up and
+   * nothing else, in the order of the Cost Centers.
+   */
+  async referenceFiguresOfYear(year: number): Promise<ReferenceFigures[]> {
+    return this.prisma.budgetVersion.findMany({
+      where: { year, ...REFERENCE_VERSION },
+      select: { costCenterId: true, year: true, currency: true, baseMinor: true, reserveMinor: true, totalMinor: true },
+      orderBy: [{ costCenterId: 'asc' }, { id: 'asc' }],
+    });
   }
 
   async pageSentOf(

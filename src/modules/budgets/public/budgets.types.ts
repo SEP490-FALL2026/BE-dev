@@ -54,3 +54,10 @@ export interface ReleasedCommitment {
   heldMinor: bigint;
   released: boolean;
 }
+
+/** What one commitment was made for, as another context counts it. */
+export interface CommittedAmount {
+  requestId: string;
+  amountMinor: bigint;
+  currency: string;
+}

@@ -86,6 +86,7 @@ model Organization {
   budgetProposals                    BudgetProposal[]
   budgetVersions                     BudgetVersion[]
   budgetCommitments                  BudgetCommitment[]
+  invoices                           Invoice[]
   applicationRetirementConfirmations ApplicationRetirementConfirmation[]
   contracts                          Contract[]
   documentAttachments                DocumentAttachment[]
@@ -289,6 +290,7 @@ model Employee {
   spendDecisionsGiven             SpendDecision[]                     @relation("SpendDecisionDecider")
   budgetQuestionsAsked            BudgetInformationRequest[]          @relation("BudgetInformationAsker")
   commitmentReleases              BudgetCommitmentRelease[]           @relation("CommitmentReleaser")
+  invoicesRecorded                Invoice[]                           @relation("InvoiceRecorder")
   budgetQuestionsAnswered         BudgetInformationRequest[]          @relation("BudgetInformationAnswerer")
   stepSlaRemindersHeld            StepSlaReminder[]                   @relation("StepSlaReminderHolder")
   stepSlaRemindersReceived        StepSlaReminderRecipient[]          @relation("StepSlaReminderRecipient")

@@ -113,6 +113,11 @@ export class CatalogApi {
     return this.plans.vendorIdOf(planId, tx);
   }
 
+  /** The vendor of the application of each of the plans, in one read; internal software has none and a plan that does not exist is not in the map. */
+  getPlanVendorIds(planIds: readonly string[]): Promise<Map<string, string | null>> {
+    return this.plans.vendorIdsOf(planIds);
+  }
+
   /** The Business Owner of the application of the plan now, or null when the plan does not exist. */
   getPlanBusinessOwnerId(planId: string, tx?: DbTx): Promise<string | null> {
     return this.plans.businessOwnerIdOf(planId, tx);

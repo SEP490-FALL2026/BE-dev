@@ -3,6 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import { CommitmentService } from '../commitment/commitment.service';
 import type {
+  CommittedAmount,
   CommitmentHoldInput,
   CommitmentReleaseInput,
   HeldCommitment,
@@ -43,6 +44,11 @@ export class BudgetsApi {
    */
   releaseForRequest(tx: DbTx, input: CommitmentReleaseInput): Promise<ReleasedCommitment[]> {
     return this.commitments.release(tx, input);
+  }
+
+  /** What each of the requests was committed for, one entry for each commitment, in one read: for a list that counts and adds them. */
+  committedByRequests(requestIds: readonly string[]): Promise<CommittedAmount[]> {
+    return this.commitments.committedBy(requestIds);
   }
 
   /** Whether the request holds a commitment, which is what lets Finance read it (`US-06-09` AC-2). */

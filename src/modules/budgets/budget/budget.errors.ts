@@ -204,3 +204,27 @@ export class BudgetImportFileInvalidError extends Error {
     this.name = 'BudgetImportFileInvalidError';
   }
 }
+
+/** The invoice of this vendor with this number was already recorded (`US-12-02` AC-11). */
+export class InvoiceDuplicateError extends Error {
+  constructor() {
+    super('An invoice with this number from this vendor was already recorded.');
+    this.name = 'InvoiceDuplicateError';
+  }
+}
+
+/** The vendor of the commitment cannot be told from its request, and an invoice is not recorded without one. */
+export class InvoiceVendorUnknownError extends Error {
+  constructor() {
+    super('The vendor of the software behind the commitment cannot be told, so an invoice cannot be recorded for it.');
+    this.name = 'InvoiceVendorUnknownError';
+  }
+}
+
+/** The commitment was released: no spend that was approved is left to be invoiced against it. */
+export class InvoiceCommitmentReleasedError extends Error {
+  constructor() {
+    super('The commitment was released, so no invoice is recorded against it.');
+    this.name = 'InvoiceCommitmentReleasedError';
+  }
+}

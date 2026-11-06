@@ -77,6 +77,43 @@ export class SpendRequestRepo {
     return { rows, total };
   }
 
+  /**
+   * What a commitment shows of each of its requests, in one read: who sent it, which plan, how many people it is for and when the
+   * spend was approved. A request that does not exist is not among the rows.
+   */
+  async commitmentFactsOf(requestIds: readonly string[]): Promise<CommitmentRequestRow[]> {
+    if (requestIds.length === 0) return [];
+    const rows = await this.prisma.accessRequest.findMany({
+      where: { id: { in: [...requestIds] } },
+      select: {
+        id: true,
+        planId: true,
+        requesterEmployeeId: true,
+        // A proposal of software that is not in the catalog has no plan until the IT Admin links one, which comes after the spend
+        // decision: until then the software is the one proposed and the vendor the one the assessment names.
+        proposal: { select: { softwareName: true } },
+        assessment: { select: { vendorId: true } },
+        _count: { select: { beneficiaries: true } },
+        spendDecisions: {
+          where: { decision: 'APPROVED' },
+          select: { decidedAt: true },
+          orderBy: { decidedAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      planId: row.planId,
+      proposedSoftwareName: row.proposal?.softwareName ?? null,
+      assessedVendorId: row.assessment?.vendorId ?? null,
+      requesterEmployeeId: row.requesterEmployeeId,
+      beneficiaryCount: row._count.beneficiaries,
+      spendApprovedAt: row.spendDecisions[0]?.decidedAt ?? null,
+    }));
+  }
+
   /** The state of each of the requests, in one read. */
   async statesOf(requestIds: readonly string[]): Promise<Map<string, AccessRequestState>> {
     if (requestIds.length === 0) return new Map();
@@ -87,4 +124,17 @@ export class SpendRequestRepo {
 
     return new Map(rows.map((row) => [row.id, row.state]));
   }
+}
+
+/** One request as a commitment shows it. */
+export interface CommitmentRequestRow {
+  id: string;
+  planId: string | null;
+  /** The software a proposal names, for a request that has no plan yet. */
+  proposedSoftwareName: string | null;
+  /** The vendor the assessment of a proposal names, for a request that has no plan yet. */
+  assessedVendorId: string | null;
+  requesterEmployeeId: string;
+  beneficiaryCount: number;
+  spendApprovedAt: Date | null;
 }

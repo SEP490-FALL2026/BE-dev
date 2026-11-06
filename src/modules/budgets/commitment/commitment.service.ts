@@ -3,7 +3,11 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { CommitmentReleaseGuardHook } from '../public/budgets.extension-points';
+import {
+  CommitmentReleaseGuardHook,
+  CommitmentRequestFactsHook,
+  type CommitmentRequestView,
+} from '../public/budgets.extension-points';
 import type {
   CommitmentHoldInput,
   CommitmentReleaseInput,
@@ -16,9 +20,17 @@ import {
   BudgetCommitmentNotFoundError,
   BudgetCommitmentRefusedError,
 } from '../budget/budget.errors';
-import { planRelease, planRemainder, type PlannedRelease, type ReleasePlan } from '../budget/commitment-release.policy';
+import {
+  heldOf,
+  planRelease,
+  planRemainder,
+  type PlannedRelease,
+  type ReleasePlan,
+} from '../budget/commitment-release.policy';
 import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo } from '../budget/commitment.repo';
+import { InvoiceRepo } from '../budget/invoice.repo';
+import type { CommittedAmount } from '../public/budgets.types';
 import type { CommitmentWire, ReleaseWire } from './commitment.dto';
 
 /**
@@ -35,6 +47,8 @@ export class CommitmentService {
     private readonly facts: BudgetFactsService,
     private readonly audit: AuditApi,
     private readonly releaseGuard: CommitmentReleaseGuardHook,
+    private readonly requestFacts: CommitmentRequestFactsHook,
+    private readonly invoices: InvoiceRepo,
   ) {}
 
   /**
@@ -43,7 +57,7 @@ export class CommitmentService {
    * stays one, and a request that holds nothing releases nothing. Throws BudgetCommitmentRefusedError.
    */
   async release(tx: DbTx, input: CommitmentReleaseInput): Promise<ReleasedCommitment[]> {
-    const rows = await this.commitments.ofRequest(tx, input.requestId);
+    const rows = await this.commitments.lockOfRequest(tx, input.requestId);
     const plan = planRelease(rows, input.amounts);
     if (!plan.ok) throw new BudgetCommitmentRefusedError(plan.refusal, plan.year ?? null);
 
@@ -116,6 +130,7 @@ export class CommitmentService {
       year: number;
       amountMinor: bigint;
       releasedMinor: bigint;
+      appliedMinor: bigint;
       state: 'HELD' | 'RELEASED' | 'EXPENSED';
       organizationId: string;
     },
@@ -189,6 +204,11 @@ export class CommitmentService {
     return held;
   }
 
+  /** What each of the requests was committed for (one entry for each commitment), in one read. */
+  committedBy(requestIds: readonly string[]): Promise<CommittedAmount[]> {
+    return this.commitments.amountsOfRequests(requestIds);
+  }
+
   async heldFor(requestId: string): Promise<boolean> {
     return this.commitments.existsFor(requestId);
   }
@@ -200,6 +220,7 @@ export class CommitmentService {
     year?: number;
     costCenterId?: string;
     requestId?: string;
+    state?: 'HELD' | 'RELEASED' | 'EXPENSED';
     page: number;
     pageSize: number;
   }): Promise<Page<CommitmentWire>> {
@@ -209,6 +230,13 @@ export class CommitmentService {
       take: query.pageSize,
     });
     const centers = await this.facts.costCenters(rows.map((row) => row.costCenterId));
+    // What the invoices of the whole page cost and whether one is flagged, in one read.
+    const invoiced = await this.invoices.figuresOf(rows.map((row) => row.id));
+    // The requests of the whole page in one read, never one for each commitment.
+    const requests =
+      rows.length === 0
+        ? new Map<string, CommitmentRequestView>()
+        : await this.requestFacts.get().factsOf([...new Set(rows.map((row) => row.requestId))]);
     const money = new Map<string, (minor: bigint) => { amount: string; currency: string }>();
     for (const code of new Set(rows.map((row) => row.currency))) money.set(code, await this.facts.formatter(code));
 
@@ -226,9 +254,15 @@ export class CommitmentService {
           row.releasedMinor,
         ),
         held: (money.get(row.currency) as (minor: bigint) => { amount: string; currency: string })(
-          row.state === 'RELEASED' ? 0n : row.amountMinor - row.releasedMinor,
+          row.state === 'HELD' ? heldOf(row) : 0n,
         ),
         state: row.state,
+        request: requestWire(requests.get(row.requestId)),
+        invoiced: (money.get(row.currency) as (minor: bigint) => { amount: string; currency: string })(
+          invoiced.get(row.id)?.costMinor ?? 0n,
+        ),
+        invoiceCount: invoiced.get(row.id)?.count ?? 0,
+        hasDiscrepancy: invoiced.get(row.id)?.flagged ?? false,
         attached: row.attachedVersionId !== null,
         attachedAt: row.attachedAt?.toISOString() ?? null,
         unattachedReason: row.unattachedReason === 'NO_BUDGET' ? 'NO_BUDGET' : null,
@@ -238,4 +272,18 @@ export class CommitmentService {
 
     return pageOf(items, total, query.page, query.pageSize);
   }
+}
+
+/** What a commitment shows of its request, or nothing when the request cannot be read. */
+function requestWire(view: CommitmentRequestView | undefined): CommitmentWire['request'] {
+  if (!view) return null;
+
+  return {
+    id: view.id,
+    software: view.software,
+    plan: view.plan,
+    requester: view.requester,
+    beneficiaryCount: view.beneficiaryCount,
+    spendApprovedAt: view.spendApprovedAt?.toISOString() ?? null,
+  };
 }

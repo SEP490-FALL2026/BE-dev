@@ -177,7 +177,39 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
       R7: 'AWAITING_SPEND_SUBMISSION',
       R8: 'AWAITING_IT_ASSESSMENT',
       R9: 'AWAITING_FINANCE_REVIEW',
+      R10: 'COMPLETED',
+      R11: 'COMPLETED',
     });
+    // Finance recorded one invoice on each of three commitments, each in another match (HD1 part of the price, HD2 with tax, HD3 over).
+    const recorded = await ctx.sql.query<{
+      number: string;
+      match: string;
+      state: string;
+      deductible: string;
+      nonDeductible: string;
+      cost: string;
+      net: string;
+    }>(
+      `SELECT i.number, i.match_result::text AS match, c.state::text AS state, i.deductible_tax_minor::text AS deductible,
+              i.non_deductible_tax_minor::text AS "nonDeductible", i.actual_cost_minor::text AS cost, i.net_minor::text AS net
+         FROM invoices i JOIN budget_commitments c ON c.id = i.commitment_id ORDER BY i.number`,
+    );
+    expect(recorded.rows.map((row) => [row.number, row.match, row.state])).toEqual([
+      ['SV-HD1', 'MATCHED', 'HELD'],
+      ['SV-HD2', 'TAX_ONLY', 'HELD'],
+      ['SV-HD3', 'PRICE_QUANTITY_EXCEPTION', 'EXPENSED'],
+    ]);
+    const taxed = recorded.rows[1];
+    expect(Number(taxed.deductible)).toBeGreaterThan(0);
+    expect(Number(taxed.nonDeductible)).toBeGreaterThan(0);
+    // The cost is the price and the tax that cannot be deducted; the deductible tax is not part of it.
+    expect(Number(taxed.cost)).toBe(Number(taxed.net) + Number(taxed.nonDeductible));
+    // The proposal of Information Technology for next year waits for Finance, with no version made from it.
+    const proposals = await ctx.sql.query<{ code: string; state: string; year: number }>(
+      `SELECT c.code, p.state::text AS state, p.year FROM budget_proposals p JOIN cost_centers c ON c.id = p.cost_center_id
+        WHERE c.code = 'CC-ITO'`,
+    );
+    expect(proposals.rows).toEqual([{ code: 'CC-ITO', state: 'SUBMITTED', year: new Date().getFullYear() + 1 }]);
     // Three departments hold an approved budget of this year and of the next one (ENG, MKT, SAL); Design has none, for R9.
     const approved = await ctx.sql.query<{ code: string }>(
       `SELECT c.code FROM budget_versions v JOIN cost_centers c ON c.id = v.cost_center_id

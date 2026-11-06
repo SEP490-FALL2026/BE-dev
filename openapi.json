@@ -45113,6 +45113,194 @@
         "security": [{ "bearer": [] }],
         "summary": "Send requests on to be decided as spend",
         "tags": ["spend-submission"]
+      },
+      "get": {
+        "operationId": "spendBatchList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          },
+          {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "submittedFrom",
+            "required": false,
+            "in": "query",
+            "description": "Must be earlier than submittedTo when both are given: the window includes submittedFrom and excludes submittedTo.",
+            "schema": { "format": "date-time", "type": "string" }
+          },
+          {
+            "name": "submittedTo",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "date-time", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every batch, the newest first, each with its department, who sent it and when, how many requests it holds, how many of them were approved for spend and what those were committed for (by currency), and how many still wait for a decision. Narrowed by department and by the time the batch was sent. Only Finance reads the list, and only reads it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SpendBatchListResponseDto" },
+                    { "properties": { "message": { "example": "SPEND_BATCH.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance reads the batches of all the departments.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the batches the heads sent on as spend",
+        "tags": ["spend-submission"]
       }
     },
     "/api/v1/spend-batches/{id}": {
@@ -45123,7 +45311,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Who sent the batch, when, and how many requests it holds. It has no decision and no commitment: each request keeps its own steps, state and reason. Read by the head who sent it and by a person who holds the spend step of a request in it.",
+            "description": "Who sent the batch, when, and how many requests it holds. It has no decision and no commitment: each request keeps its own steps, state and reason. Read by the head who sent it, by Finance (every batch) and by a person who holds the spend step of a request in it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -45295,7 +45483,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The requests of the batch in the order they were sent, each with how it fared (sent to the approver, sent to Finance, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head sees all of them; the person who holds a spend step sees the requests they hold.",
+            "description": "The requests of the batch in the order they were sent, each with how it fared (sent to the approver, sent to Finance, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head who sent the batch and Finance see all of them; the person who holds a spend step sees the requests they hold.",
             "content": {
               "application/json": {
                 "schema": {
@@ -58798,6 +58986,165 @@
         "tags": ["budgets"]
       }
     },
+    "/api/v1/budgets/summary": {
+      "get": {
+        "operationId": "budgetSummary",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 2000, "maximum": 2200, "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The base, reserve, total, held, spent and remaining of all the current budgets of the year, added up for each currency (keyed by currency code), with the number of Cost Centers and how many are over budget, and when the last invoice was recorded. Only Finance reads it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/BudgetSummaryResponseDto" },
+                    { "properties": { "message": { "example": "BUDGET.SUMMARY_FETCHED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance reads the budgets of the company.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Get the company-wide budget figures of a year",
+        "tags": ["budgets"]
+      }
+    },
     "/api/v1/budgets": {
       "get": {
         "operationId": "budgetTable",
@@ -58999,6 +59346,12 @@
           },
           { "name": "requestId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
           {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["HELD", "RELEASED", "EXPENSED"] }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -59019,7 +59372,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The commitments, the newest first, each with its request, Cost Center, year and amount, and whether it is attached to the budget of its year or waits for one (no budget yet). Narrowed by `attached`, the year, the Cost Center or the request.",
+            "description": "The commitments, the newest first, each with its request (the software and plan, who sent it, how many people it is for, when the spend was approved), Cost Center, year and amount, what is still held, what invoices have turned into an expense, and whether it is attached to the budget of its year or waits for one (no budget yet). Narrowed by `state`, `attached`, the year, the Cost Center or the request.",
             "content": {
               "application/json": {
                 "schema": {
@@ -59630,6 +59983,505 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Release what is left of a commitment",
+        "tags": ["budget-commitments"]
+      }
+    },
+    "/api/v1/budget-commitments/{id}/invoices": {
+      "post": {
+        "operationId": "budgetCommitmentInvoiceRecord",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InvoiceBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Finance records an invoice for a commitment: the price before tax, the tax that can be deducted (shown apart, not an expense) and the tax that cannot (an expense). The commitment goes down by the price, as far as it still holds anything, and becomes an expense when nothing is left; the spend of the Cost Center and year rises by what the invoice cost. The currency is the commitment's and the vendor is the one of its request. An invoice is never refused for being over the budget; one for more than the commitment allowed is flagged. The answer gives the invoice and the commitment as it stands now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/InvoiceRecordedResponseDto" },
+                    { "properties": { "message": { "example": "BUDGET_COMMITMENT.INVOICE_RECORDED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance records an invoice.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The commitment does not exist (BUDGET.COMMITMENT_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "BUDGET.COMMITMENT_NOT_FOUND": {
+                    "summary": "The commitment does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.COMMITMENT_NOT_FOUND",
+                        "message": "The commitment does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The vendor already has an invoice with this number (INVOICE.DUPLICATE), the vendor of the commitment cannot be told (INVOICE.VENDOR_UNKNOWN), or the commitment was released (INVOICE.COMMITMENT_RELEASED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "INVOICE.DUPLICATE": {
+                    "summary": "An invoice with this number from this vendor was already recorded.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVOICE.DUPLICATE",
+                        "message": "An invoice with this number from this vendor was already recorded.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVOICE.VENDOR_UNKNOWN": {
+                    "summary": "The vendor of the software behind the commitment cannot be told, so an invoice cannot be recorded for it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVOICE.VENDOR_UNKNOWN",
+                        "message": "The vendor of the software behind the commitment cannot be told, so an invoice cannot be recorded for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVOICE.COMMITMENT_RELEASED": {
+                    "summary": "The commitment was released, so no invoice is recorded against it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVOICE.COMMITMENT_RELEASED",
+                        "message": "The commitment was released, so no invoice is recorded against it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is invalid (VALIDATION_ERROR): a missing number or date, an amount that is not a number, or a currency named by the client; or an amount the currency cannot hold (MONEY_SCALE_EXCEEDED: more decimals than the currency has; MONEY_OUT_OF_RANGE: a price that is not more than nothing, a tax below nothing, or an amount that is too large).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_SCALE_EXCEEDED": {
+                    "summary": "This currency allows at most 2 decimal digit(s).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_SCALE_EXCEEDED",
+                        "message": "This currency allows at most 2 decimal digit(s).",
+                        "details": { "allowedDecimals": 2 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_OUT_OF_RANGE": {
+                    "summary": "The amount is outside the range a money value may hold.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_OUT_OF_RANGE",
+                        "message": "The amount is outside the range a money value may hold.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Record an invoice against a commitment",
+        "tags": ["budget-commitments"]
+      },
+      "get": {
+        "operationId": "budgetCommitmentInvoiceList",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invoices recorded against the commitment, the newest first: the number and date, the price before tax, both kinds of tax, what the invoice cost, how it stands against what the commitment allowed, who recorded it and when.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/InvoiceListResponseDto" },
+                    { "properties": { "message": { "example": "BUDGET_COMMITMENT.INVOICES_LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance reads the invoices.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The commitment does not exist (BUDGET.COMMITMENT_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "BUDGET.COMMITMENT_NOT_FOUND": {
+                    "summary": "The commitment does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.COMMITMENT_NOT_FOUND",
+                        "message": "The commitment does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the invoices of a commitment",
         "tags": ["budget-commitments"]
       }
     },
@@ -91108,6 +91960,85 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "SpendBatchListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "department": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "submittedBy": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false
+                    },
+                    "submittedAt": { "type": "string", "format": "date-time" },
+                    "itemCount": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0
+                    },
+                    "approvedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "pendingCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "approvedAmounts": { "type": "object", "additionalProperties": { "type": "string" } }
+                  },
+                  "required": [
+                    "id",
+                    "department",
+                    "submittedBy",
+                    "submittedAt",
+                    "itemCount",
+                    "approvedCount",
+                    "pendingCount",
+                    "approvedAmounts"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "BatchItemListResponseDto": {
         "type": "object",
         "properties": {
@@ -96077,6 +97008,84 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "BudgetSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              "totals": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "currency": { "type": "string" },
+                    "base": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "reserve": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "total": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "committed": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "spent": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "remaining": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "costCenterCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "overBudgetCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                  },
+                  "required": [
+                    "currency",
+                    "base",
+                    "reserve",
+                    "total",
+                    "committed",
+                    "spent",
+                    "remaining",
+                    "costCenterCount",
+                    "overBudgetCount"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "lastInvoiceRecordedAt": { "type": "string", "format": "date-time", "nullable": true }
+            },
+            "required": ["year", "totals", "lastInvoiceRecordedAt"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "BudgetTablePageResponseDto": {
         "type": "object",
         "properties": {
@@ -96107,6 +97116,18 @@
                       "exclusiveMinimum": true,
                       "maximum": 9007199254740991,
                       "minimum": 0
+                    },
+                    "base": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "reserve": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
                     },
                     "total": {
                       "type": "object",
@@ -96139,6 +97160,8 @@
                     "year",
                     "versionId",
                     "number",
+                    "base",
+                    "reserve",
                     "total",
                     "committed",
                     "spent",
@@ -96218,6 +97241,44 @@
                       "additionalProperties": false
                     },
                     "state": { "type": "string", "enum": ["HELD", "RELEASED", "EXPENSED"] },
+                    "request": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "software": {
+                          "type": "object",
+                          "properties": { "name": { "type": "string" } },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        },
+                        "plan": {
+                          "type": "object",
+                          "properties": { "name": { "type": "string" } },
+                          "required": ["name"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "requester": {
+                          "type": "object",
+                          "properties": { "employeeCode": { "type": "string" }, "fullName": { "type": "string" } },
+                          "required": ["employeeCode", "fullName"],
+                          "additionalProperties": false
+                        },
+                        "beneficiaryCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "spendApprovedAt": { "type": "string", "format": "date-time", "nullable": true }
+                      },
+                      "required": ["id", "software", "plan", "requester", "beneficiaryCount", "spendApprovedAt"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "invoiced": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "invoiceCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "hasDiscrepancy": { "type": "boolean" },
                     "attached": { "type": "boolean" },
                     "attachedAt": { "type": "string", "format": "date-time", "nullable": true },
                     "unattachedReason": { "type": "string", "enum": ["NO_BUDGET", null], "nullable": true },
@@ -96232,6 +97293,10 @@
                     "released",
                     "held",
                     "state",
+                    "request",
+                    "invoiced",
+                    "invoiceCount",
+                    "hasDiscrepancy",
                     "attached",
                     "attachedAt",
                     "unattachedReason",
@@ -96387,6 +97452,44 @@
                     "additionalProperties": false
                   },
                   "state": { "type": "string", "enum": ["HELD", "RELEASED", "EXPENSED"] },
+                  "request": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "software": {
+                        "type": "object",
+                        "properties": { "name": { "type": "string" } },
+                        "required": ["name"],
+                        "additionalProperties": false
+                      },
+                      "plan": {
+                        "type": "object",
+                        "properties": { "name": { "type": "string" } },
+                        "required": ["name"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "requester": {
+                        "type": "object",
+                        "properties": { "employeeCode": { "type": "string" }, "fullName": { "type": "string" } },
+                        "required": ["employeeCode", "fullName"],
+                        "additionalProperties": false
+                      },
+                      "beneficiaryCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "spendApprovedAt": { "type": "string", "format": "date-time", "nullable": true }
+                    },
+                    "required": ["id", "software", "plan", "requester", "beneficiaryCount", "spendApprovedAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "invoiced": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "invoiceCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "hasDiscrepancy": { "type": "boolean" },
                   "attached": { "type": "boolean" },
                   "attachedAt": { "type": "string", "format": "date-time", "nullable": true },
                   "unattachedReason": { "type": "string", "enum": ["NO_BUDGET", null], "nullable": true },
@@ -96401,6 +97504,10 @@
                   "released",
                   "held",
                   "state",
+                  "request",
+                  "invoiced",
+                  "invoiceCount",
+                  "hasDiscrepancy",
                   "attached",
                   "attachedAt",
                   "unattachedReason",
@@ -96410,6 +97517,317 @@
               }
             },
             "required": ["commitment"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "InvoiceBodyDto": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The number on the invoice; recorded once for the vendor."
+          },
+          "issuedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "netAmount": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "The price on the invoice before tax, more than nothing."
+          },
+          "deductibleTax": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "Tax that can be deducted: shown apart and not an expense. Nothing when left out."
+          },
+          "nonDeductibleTax": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "Tax that cannot be deducted: an expense. Nothing when left out."
+          },
+          "note": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        },
+        "required": ["number", "issuedOn", "netAmount"],
+        "additionalProperties": false
+      },
+      "InvoiceRecordedResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "invoice": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "number": { "type": "string" },
+                  "issuedOn": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                  "netAmount": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "deductibleTax": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "nonDeductibleTax": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "actualCost": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "matchResult": { "type": "string", "enum": ["MATCHED", "TAX_ONLY", "PRICE_QUANTITY_EXCEPTION"] },
+                  "note": { "type": "string", "nullable": true },
+                  "recordedBy": {
+                    "type": "object",
+                    "properties": {
+                      "employeeId": { "type": "string", "format": "uuid" },
+                      "employeeCode": { "type": "string" },
+                      "fullName": { "type": "string" }
+                    },
+                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "recordedAt": { "type": "string", "format": "date-time" }
+                },
+                "required": [
+                  "id",
+                  "number",
+                  "issuedOn",
+                  "netAmount",
+                  "deductibleTax",
+                  "nonDeductibleTax",
+                  "actualCost",
+                  "matchResult",
+                  "note",
+                  "recordedBy",
+                  "recordedAt"
+                ],
+                "additionalProperties": false
+              },
+              "commitment": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "requestId": { "type": "string", "format": "uuid" },
+                  "costCenter": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "code": { "type": "string" },
+                      "name": { "type": "string" }
+                    },
+                    "required": ["id", "code", "name"],
+                    "additionalProperties": false
+                  },
+                  "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                  "amount": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "released": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "held": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "state": { "type": "string", "enum": ["HELD", "RELEASED", "EXPENSED"] },
+                  "request": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "software": {
+                        "type": "object",
+                        "properties": { "name": { "type": "string" } },
+                        "required": ["name"],
+                        "additionalProperties": false
+                      },
+                      "plan": {
+                        "type": "object",
+                        "properties": { "name": { "type": "string" } },
+                        "required": ["name"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "requester": {
+                        "type": "object",
+                        "properties": { "employeeCode": { "type": "string" }, "fullName": { "type": "string" } },
+                        "required": ["employeeCode", "fullName"],
+                        "additionalProperties": false
+                      },
+                      "beneficiaryCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "spendApprovedAt": { "type": "string", "format": "date-time", "nullable": true }
+                    },
+                    "required": ["id", "software", "plan", "requester", "beneficiaryCount", "spendApprovedAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "invoiced": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "invoiceCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "hasDiscrepancy": { "type": "boolean" },
+                  "attached": { "type": "boolean" },
+                  "attachedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "unattachedReason": { "type": "string", "enum": ["NO_BUDGET", null], "nullable": true },
+                  "createdAt": { "type": "string", "format": "date-time" }
+                },
+                "required": [
+                  "id",
+                  "requestId",
+                  "costCenter",
+                  "year",
+                  "amount",
+                  "released",
+                  "held",
+                  "state",
+                  "request",
+                  "invoiced",
+                  "invoiceCount",
+                  "hasDiscrepancy",
+                  "attached",
+                  "attachedAt",
+                  "unattachedReason",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": ["invoice", "commitment"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "InvoiceListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "number": { "type": "string" },
+                    "issuedOn": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                    "netAmount": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "deductibleTax": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "nonDeductibleTax": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "actualCost": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "matchResult": { "type": "string", "enum": ["MATCHED", "TAX_ONLY", "PRICE_QUANTITY_EXCEPTION"] },
+                    "note": { "type": "string", "nullable": true },
+                    "recordedBy": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "recordedAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": [
+                    "id",
+                    "number",
+                    "issuedOn",
+                    "netAmount",
+                    "deductibleTax",
+                    "nonDeductibleTax",
+                    "actualCost",
+                    "matchResult",
+                    "note",
+                    "recordedBy",
+                    "recordedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
             "additionalProperties": false,
             "nullable": true
           }

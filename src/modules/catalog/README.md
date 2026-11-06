@@ -10,7 +10,7 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
 
 - `CatalogApi` ([public/catalog.api.ts](public/catalog.api.ts)) — facade cho module khác:
   - `findSeatTarget`, `findPlanSeatTargets`, `lockSeatTarget` — đích ghế (một subscription hoặc một plan nội bộ).
-  - `getPlanSummaries`, `getPlanRevocationInfo`, `getSimilarPlanIds`, `getPlanVendorId`, `getPlanBusinessOwnerId` — đọc
+  - `getPlanSummaries`, `getPlanRevocationInfo`, `getSimilarPlanIds`, `getPlanVendorId`, `getPlanVendorIds` (nhiều plan trong một lần đọc), `getPlanBusinessOwnerId` — đọc
     plan.
   - `getPlanPrice` — đơn giá plan cho một phòng ban, chỉ từ subscription phòng ban đó sở hữu.
   - `getSubscriptionIdsOwnedBy`, `getApplicationsOwnedBy`, `getWorkspaceDutiesOf` — thứ một phòng ban/người đang giữ.
