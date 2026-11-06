@@ -63,6 +63,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // The extension points the requests context binds (public/budgets.extension-points.ts): the change listeners and the release guard.
   'BudgetsModule: BudgetChangeListeners',
   'BudgetsModule: CommitmentReleaseGuardHook',
+  'BudgetsModule: CommitmentRequestFactsHook',
   // G4 (ADR-0013): the catalog facade licensing reads the seat targets (subscription or internal plan) through.
   'CatalogModule: CatalogApi',
   // The extension point licensing binds its reader of occupied seats to (public/catalog.extension-points.ts).

@@ -172,6 +172,8 @@ export class BudgetHarness extends RequestHarness {
     request(this.server()).get('/api/v1/budgets/mine/lines').query({ year }).set(this.as(account));
   table = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/budgets').query(query).set(this.as(account));
+  summary = (account: ApiAccount, query: Record<string, string | number> = {}) =>
+    request(this.server()).get('/api/v1/budgets/summary').query(query).set(this.as(account));
 
   /** A first version made from the proposal, failing on anything but 201. */
   async built(proposalId: string, extra: Record<string, unknown> = {}): Promise<VersionWire> {

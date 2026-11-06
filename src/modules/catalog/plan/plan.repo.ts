@@ -256,6 +256,17 @@ export class PlanRepo {
     return row?.application.vendorId ?? null;
   }
 
+  /** The vendor of the application of each plan, in one read; internal software has none, and a plan that does not exist is not in the map. */
+  async findVendorIds(planIds: readonly string[]): Promise<Map<string, string | null>> {
+    if (planIds.length === 0) return new Map();
+    const rows = await this.prisma.plan.findMany({
+      where: { id: { in: [...planIds] } },
+      select: { id: true, application: { select: { vendorId: true } } },
+    });
+
+    return new Map(rows.map((row) => [row.id, row.application.vendorId]));
+  }
+
   /** The Business Owner the application of the plan has now; null when the plan does not exist. */
   async findBusinessOwnerId(planId: string, tx?: DbTx): Promise<string | null> {
     const row = await (tx ?? this.prisma).plan.findUnique({

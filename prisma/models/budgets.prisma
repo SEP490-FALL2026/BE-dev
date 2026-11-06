@@ -290,9 +290,12 @@ model BudgetCommitment {
   unattachedReason  String?         @map("unattached_reason")
   attachedVersionId String?         @map("attached_version_id") @db.Uuid
   attachedAt        DateTime?       @map("attached_at") @db.Timestamptz(3)
-  // What went back to the budget so far; the commitment holds the amount less this, and it is released when none is left.
+  // What went back to the budget so far; the commitment holds the amount less this and less what became an expense, and it is
+  // released (nothing became an expense) or expensed (something did) when none is left.
   releasedMinor     BigInt          @default(0) @map("released_minor")
   releasedAt        DateTime?       @map("released_at") @db.Timestamptz(3)
+  // What became an expense through the invoices recorded against it, at the price on the invoice before tax (US-06-06 AC-1, AC-5).
+  appliedMinor      BigInt          @default(0) @map("applied_minor")
   // The check the decision of the spending approver kept, which is the snapshot this commitment was made on (US-06-04 AC-1).
   snapshotCheckId   String?         @map("snapshot_check_id") @db.Uuid
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -305,6 +308,7 @@ model BudgetCommitment {
   request         AccessRequest             @relation(fields: [requestId], references: [id], onDelete: Restrict)
   snapshotCheck   RequestBudgetCheck?       @relation(fields: [snapshotCheckId], references: [id], onDelete: Restrict)
   releases        BudgetCommitmentRelease[]
+  invoices        Invoice[]
 
   @@unique([requestId, year])
   @@index([costCenterId, year, state])
@@ -328,6 +332,48 @@ model BudgetCommitmentRelease {
 
   @@index([commitmentId, releasedAt])
   @@map("budget_commitment_releases")
+}
+
+/// How an invoice stands against what the commitment allowed (US-12-02 AC-5, AC-6): it fits, it differs only in tax, or it is for
+/// more than the commitment allowed, which raises the flag of the commitment.
+enum InvoiceMatchResult {
+  MATCHED
+  TAX_ONLY
+  PRICE_QUANTITY_EXCEPTION
+}
+
+/// An invoice Finance recorded against a commitment (US-12-02): the price before tax, the tax that can be deducted (shown apart, not
+/// an expense) and the tax that cannot (an expense), and what of the price took the commitment down. It is never changed or deleted
+/// (INV-05). The vendor is the one of the request behind the commitment; a vendor's number is recorded once.
+model Invoice {
+  id                    String             @id @default(uuid(7)) @db.Uuid
+  organizationId        String             @map("organization_id") @db.Uuid
+  commitmentId          String             @map("commitment_id") @db.Uuid
+  vendorId              String             @map("vendor_id") @db.Uuid
+  number                String
+  issuedOn              DateTime           @map("issued_on") @db.Date
+  currency              String             @db.Char(3)
+  netMinor              BigInt             @map("net_minor")
+  deductibleTaxMinor    BigInt             @default(0) @map("deductible_tax_minor")
+  nonDeductibleTaxMinor BigInt             @default(0) @map("non_deductible_tax_minor")
+  // What the invoice cost the company: the price before tax plus the tax that cannot be deducted (QĐ-97d).
+  actualCostMinor       BigInt             @map("actual_cost_minor")
+  // The part of the price that took the commitment down; the rest of the price is still an expense (QĐ-34b).
+  appliedMinor          BigInt             @map("applied_minor")
+  matchResult           InvoiceMatchResult @map("match_result")
+  note                  String?
+  recordedByEmployeeId  String             @map("recorded_by_employee_id") @db.Uuid
+  recordedAt            DateTime           @map("recorded_at") @db.Timestamptz(3)
+
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  commitment     BudgetCommitment @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+  vendor         Vendor           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  currencyRecord Currency         @relation("InvoiceCurrency", fields: [currency], references: [code], onDelete: Restrict)
+  recordedBy     Employee         @relation("InvoiceRecorder", fields: [recordedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, vendorId, number])
+  @@index([commitmentId, recordedAt])
+  @@map("invoices")
 }
 
 enum BudgetVersionHistoryKind {

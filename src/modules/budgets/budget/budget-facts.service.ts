@@ -295,6 +295,11 @@ export class BudgetFactsService {
     return parsed.amountMinor;
   }
 
+  /** Reads an amount in the minor units of a given currency, as an invoice states it in the currency of its commitment. Throws the money errors. */
+  async moneyIn(input: { amount: string }, currency: string, tx?: DbTx): Promise<bigint> {
+    return (await this.finance.parseMoney({ amount: input.amount, currency }, tx)).amountMinor;
+  }
+
   /** `money` for a threshold: it must be more than nothing, since a threshold of nothing would flag every line. */
   async positiveMoney(input: { amount: string; currency?: string }, reporting: string, tx?: DbTx): Promise<bigint> {
     const minor = await this.money(input, reporting, tx);

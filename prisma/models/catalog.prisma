@@ -99,6 +99,7 @@ model Vendor {
   applications    Application[]
   taxProfile      VendorTaxProfile?
   assessments     AccessRequestAssessment[]
+  invoices        Invoice[]
 
   @@unique([organizationId, normalizedName])
   @@unique([organizationId, dictionaryGroupId])

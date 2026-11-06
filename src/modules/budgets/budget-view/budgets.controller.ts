@@ -12,6 +12,8 @@ import { RequireRoles } from '../../../infrastructure/security/decorators/access
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
+  BudgetSummaryQueryDto,
+  BudgetSummaryResponseDto,
   BudgetTablePageResponseDto,
   BudgetsQueryDto,
   MineLinePageResponseDto,
@@ -91,6 +93,31 @@ export class BudgetsController {
   async mineVersions(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineVersionsQueryDto) {
     try {
       return await this.budgets.mineVersions(actor, query);
+    } catch (error) {
+      throw toBudgetApiException(error);
+    }
+  }
+
+  @Get('summary')
+  @RequireRoles('FINANCE')
+  @ApiOperation({ operationId: 'budgetSummary', summary: 'Get the company-wide budget figures of a year' })
+  @ApiSuccessResponse(BudgetSummaryResponseDto, {
+    message: 'BUDGET.SUMMARY_FETCHED',
+    description:
+      'The base, reserve, total, held, spent and remaining of all the current budgets of the year, added up for each currency (keyed by currency code), with the number of Cost Centers and how many are over budget, and when the last invoice was recorded. Only Finance reads it.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only Finance reads the budgets of the company.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    INVALID,
+  )
+  async summary(@Query() query: BudgetSummaryQueryDto) {
+    try {
+      return await this.budgets.summary(query.year);
     } catch (error) {
       throw toBudgetApiException(error);
     }

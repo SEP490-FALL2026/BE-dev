@@ -94,8 +94,8 @@ describe('judgeSeparation', () => {
         subject: 'audit_events: expected INSERT, SELECT, has DELETE, INSERT, SELECT, UPDATE',
       },
     ]);
-    // The records added to and never changed: a ticket of the Super Admin procedure and the history of a budget version (F66, L.2).
-    for (const name of ['super_admin_event_tickets', 'budget_version_history']) {
+    // The records added to and never changed: a ticket of the Super Admin procedure, the history of a budget version (F66, L.2) and an invoice.
+    for (const name of ['super_admin_event_tickets', 'budget_version_history', 'invoices']) {
       const withTable = (privileges: string[]): SeparationFacts => ({
         ...healthy(),
         tables: [...healthy().tables, { name, privileges }],

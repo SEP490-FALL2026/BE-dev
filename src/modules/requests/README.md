@@ -50,7 +50,8 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
   ← `reassignment/approval-role.listener.ts` (hai listener chuyển bước nằm trong `RequestsWorkFacadeModule`). Chỉ còn
   một vai phê duyệt, `SPENDING_APPROVER` (grant): không approver dự phòng, không người thay thế (QĐ-93c).
 - Đăng ký vào budgets: `budgets.change-listeners` ← `finance-review/spend-budget.listener.ts`;
-  `budgets.commitment-release-guard` ← `spend/commitment-release.listener.ts`.
+  `budgets.commitment-release-guard` ← `spend/commitment-release.listener.ts`; `budgets.commitment-request-facts` ←
+  `spend/commitment-request-facts.listener.ts` (request, plan, người gửi, nhà cung cấp của một trang commitment, đọc theo lô).
 
 ## Tầng trong module
 
@@ -120,7 +121,9 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     `budget-questions/` — `budget-information.controller.ts`.
   - `finance-review/` (US-06-13; `finance-reviews.controller.ts`; ghi ở `finance-review-writer.service.ts`, nhiều năm ở
     `spend-years-view.service.ts`), `spend-submission/` (hàng đợi chi, batch, bổ sung; US-06-12, US-06-14; bổ sung chia ba:
-    `supplement-pricing`, `supplement-recorder`, `supplement-query`), `spend-approval/` (spending approver quyết định; US-06-01;
+    `supplement-pricing`, `supplement-recorder`, `supplement-query`; **Finance chỉ đọc**: `GET /spend-batches` do `spend-batch-list.service.ts` — mỗi lô kèm
+    `approvedCount`, `pendingCount`, `approvedAmounts` theo đồng tiền, tiền lấy từ `BudgetsApi.committedByRequests` một lần cho cả trang —
+    và Finance đọc chi tiết/items mọi lô ở `spend-batch-view.service.ts`), `spend-approval/` (spending approver quyết định; US-06-01;
     `spend-approvals.controller.ts`, `spend-decision.service.ts` điều phối `spend-decision-recorder.service.ts`),
     `spend-approval-view/` (thẻ của approver: `spend-approval-queue.service.ts` hàng đợi, `spend-approval-view.service.ts` chi tiết,
     `spend-approval.mapper.ts` dựng wire, `spend-approval.dto.ts`, dùng cả cho request nhóm).

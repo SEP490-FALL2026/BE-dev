@@ -223,9 +223,8 @@ describe('the money held for a request goes back to the budget over PostgreSQL (
       await h.ctx.sql.query(`UPDATE budget_commitments SET state = 'EXPENSED' WHERE id = $1`, [commitment.id]);
 
       expect(await release(id)).toEqual([]);
-      await expect(release(id, { amounts: [{ year: h.year, amountMinor: 1n }] })).rejects.toMatchObject({
-        reason: 'NOT_HELD',
-      });
+      // A share named for an expense gives back nothing and does not fail the event that named it (a person of a group leaves).
+      expect(await release(id, { amounts: [{ year: h.year, amountMinor: 1n }] })).toEqual([]);
       expect(await ledger(commitment.id)).toEqual([]);
       expect(await sqlState(`UPDATE budget_commitments SET state = 'HELD' WHERE id = $1`, [commitment.id])).toBe(
         RESTRICT,

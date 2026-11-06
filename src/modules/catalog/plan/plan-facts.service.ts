@@ -42,6 +42,11 @@ export class PlanFactsService implements ApplicationPlans {
     return this.plans.findVendorId(planId, tx);
   }
 
+  /** The vendor of the application of each of the plans, in one read: for a page of rows that each show whose software it is. */
+  vendorIdsOf(planIds: readonly string[]): Promise<Map<string, string | null>> {
+    return this.plans.findVendorIds(planIds);
+  }
+
   /** Who owns the application of the plan now: a person the organization may since have lost (`INV-06`). */
   businessOwnerIdOf(planId: string, tx?: DbTx): Promise<string | null> {
     return this.plans.findBusinessOwnerId(planId, tx);

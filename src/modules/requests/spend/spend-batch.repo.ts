@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { StopReason } from './spend-submission.policy';
@@ -131,6 +132,55 @@ export class SpendBatchRepo {
     return { items: rows.map(toItem), total };
   }
 
+  /**
+   * One page of every batch, the newest first, with each batch's items and which of their requests already have a spend decision.
+   * The batches, the count, the items and the decisions are read in one snapshot, so the page and the total agree.
+   */
+  async pageForFinance(filter: BatchListFilter): Promise<BatchListPage> {
+    const where: Prisma.SpendBatchWhereInput = {
+      ...(filter.departmentId ? { departmentId: filter.departmentId } : {}),
+      ...(filter.submittedFrom || filter.submittedTo
+        ? {
+            submittedAt: {
+              ...(filter.submittedFrom ? { gte: filter.submittedFrom } : {}),
+              ...(filter.submittedTo ? { lt: filter.submittedTo } : {}),
+            },
+          }
+        : {}),
+    };
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.spendBatch.findMany({
+          where,
+          select: {
+            id: true,
+            departmentId: true,
+            submittedByEmployeeId: true,
+            submittedAt: true,
+            items: { select: { requestId: true, outcome: true, leftAt: true }, orderBy: { position: 'asc' } },
+          },
+          orderBy: [{ submittedAt: 'desc' }, { id: 'asc' }],
+          skip: filter.skip,
+          take: filter.take,
+        });
+        const total = await tx.spendBatch.count({ where });
+        const requestIds = [...new Set(rows.flatMap((row) => row.items.map((item) => item.requestId)))];
+        const decisions =
+          requestIds.length === 0
+            ? []
+            : await tx.spendDecision.findMany({
+                where: { requestId: { in: requestIds } },
+                select: { requestId: true },
+                distinct: ['requestId'],
+              });
+
+        return { rows, decided: new Set(decisions.map((decision) => decision.requestId)), total };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+
   /** The requests of a batch the person holds the spend step of now. */
   async heldBy(batchId: string, employeeId: string): Promise<string[]> {
     const rows = await this.prisma.spendBatchItem.findMany({
@@ -163,4 +213,30 @@ export class SpendBatchRepo {
 
     return new Map(rows.map((row) => [row.requestId, row.batchId]));
   }
+}
+
+export interface BatchListFilter {
+  departmentId?: string;
+  /** The batches sent at or after this instant. */
+  submittedFrom?: Date;
+  /** The batches sent before this instant. */
+  submittedTo?: Date;
+  skip: number;
+  take: number;
+}
+
+/** A batch as the list of Finance counts it: who sent it, when, and what became of each request. */
+export interface BatchListRow {
+  id: string;
+  departmentId: string;
+  submittedByEmployeeId: string;
+  submittedAt: Date;
+  items: { requestId: string; outcome: BatchItemOutcome; leftAt: Date | null }[];
+}
+
+export interface BatchListPage {
+  rows: BatchListRow[];
+  /** The requests of the page that already have a spend decision, approved or refused. */
+  decided: ReadonlySet<string>;
+  total: number;
 }

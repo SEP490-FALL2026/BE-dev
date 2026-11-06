@@ -12,7 +12,9 @@ import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/securit
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { SpendBatchService } from './spend-batch.service';
+import { SpendBatchListService } from './spend-batch-list.service';
 import { SpendBatchViewService } from './spend-batch-view.service';
+import { SpendBatchListQueryDto, SpendBatchListResponseDto } from './spend-batch-list.dto';
 import { SpendQueueService } from './spend-queue.service';
 import {
   BatchItemListResponseDto,
@@ -65,6 +67,7 @@ export class SpendSubmissionController {
     private readonly queue: SpendQueueService,
     private readonly batches: SpendBatchService,
     private readonly batchViews: SpendBatchViewService,
+    private readonly batchList: SpendBatchListService,
     private readonly supplements: SupplementService,
     private readonly supplementQueries: SupplementQueryService,
   ) {}
@@ -117,13 +120,34 @@ export class SpendSubmissionController {
     }
   }
 
+  @Get('spend-batches')
+  @RequireRoles('FINANCE')
+  @ApiOperation({ operationId: 'spendBatchList', summary: 'List the batches the heads sent on as spend' })
+  @ApiSuccessResponse(SpendBatchListResponseDto, {
+    message: 'SPEND_BATCH.LISTED',
+    description:
+      'Every batch, the newest first, each with its department, who sent it and when, how many requests it holds, how many of them were approved for spend and what those were committed for (by currency), and how many still wait for a decision. Narrowed by department and by the time the batch was sent. Only Finance reads the list, and only reads it.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only Finance reads the batches of all the departments.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    INVALID,
+  )
+  async listBatches(@Query() query: SpendBatchListQueryDto) {
+    return this.batchList.page(query);
+  }
+
   @Get('spend-batches/:id')
   @AuthenticatedOnly()
   @ApiOperation({ operationId: 'spendBatchGet', summary: 'Get a batch of requests sent on as spend' })
   @ApiSuccessResponse(BatchResponseDto, {
     message: 'SPEND_BATCH.FETCHED',
     description:
-      'Who sent the batch, when, and how many requests it holds. It has no decision and no commitment: each request keeps its own steps, state and reason. Read by the head who sent it and by a person who holds the spend step of a request in it.',
+      'Who sent the batch, when, and how many requests it holds. It has no decision and no commitment: each request keeps its own steps, state and reason. Read by the head who sent it, by Finance (every batch) and by a person who holds the spend step of a request in it.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, BATCH_NOT_FOUND, INVALID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {
@@ -140,7 +164,7 @@ export class SpendSubmissionController {
   @ApiSuccessResponse(BatchItemListResponseDto, {
     message: 'SPEND_BATCH.ITEMS_LISTED',
     description:
-      'The requests of the batch in the order they were sent, each with how it fared (sent to the approver, sent to Finance, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head sees all of them; the person who holds a spend step sees the requests they hold.',
+      'The requests of the batch in the order they were sent, each with how it fared (sent to the approver, sent to Finance, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head who sent the batch and Finance see all of them; the person who holds a spend step sees the requests they hold.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, BATCH_NOT_FOUND, INVALID)
   async items(
