@@ -32,43 +32,27 @@ OpenAPI 337 → 341 operation.
 
 ## Test đã chạy (máy local, sau FIX-2 + T7)
 
-| Bước CI                                              | Kết quả                                                                                                                                                                                                                                                                                                                      |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm check`                                         | xanh trừ 1 test `scripts/verify/bootstrap-installation.test.mjs` đỏ **do môi trường của tôi** (đặt `TEST_DATABASE_BOOTSTRAP_URL` trong shell; test cấm mọi biến `BOOTSTRAP_`). Chạy riêng không có biến ⟹ pass; chạy lại toàn bộ `test:scripts` không có biến — xem `## Bổ sung`. `test:discovery`, `build` chạy riêng: xanh |
-| OpenAPI export                                       | không drift                                                                                                                                                                                                                                                                                                                  |
-| `prisma migrate diff` trên DB mới migrate            | No difference                                                                                                                                                                                                                                                                                                                |
-| `test:http`                                          | xanh                                                                                                                                                                                                                                                                                                                         |
-| `test:integration`                                   | 348/349 suite (1 skip), 4132 test pass (4 skip)                                                                                                                                                                                                                                                                              |
-| `test:integration:timing`                            | 7/7, 28 test                                                                                                                                                                                                                                                                                                                 |
-| `test:integration:serial`                            | 13/13, 96 test                                                                                                                                                                                                                                                                                                               |
-| `test:e2e`                                           | 11/11, 50 test                                                                                                                                                                                                                                                                                                               |
-| `test:flows`                                         | 9/9, 64 test                                                                                                                                                                                                                                                                                                                 |
-| `pnpm build`, `pnpm audit --prod --audit-level high` | xanh                                                                                                                                                                                                                                                                                                                         |
-| Smoke API thật trên seed                             | xanh — [SMOKE.md](SMOKE.md)                                                                                                                                                                                                                                                                                                  |
+| Bước CI      | Kết quả                                                                                                                                                                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm check` | xanh trừ 1 test `scripts/verify/bootstrap-installation.test.mjs` đỏ **do môi trường của tôi** (đặt `TEST_DATABASE_BOOTSTRAP_URL` trong shell; test cấm mọi biến `BOOTSTRAP_`). Chạy riêng không có biến ⟹ pass; chạy lại toàn bộ `test:scripts` không có biến — xem `## Bổ sung |
 
-Lần chạy đầu có các bước integration/timing/serial/e2e/flows đỏ vì script của tôi thiếu `TEST_DATABASE_ADMIN_URL`; đã chạy lại
-tuần tự với biến đúng như CI và xanh như bảng trên.
+### Commit, PR
 
-## Logic cũ còn lại (không sửa — Owner sửa sau demo)
+- SEP: `491a0d6e` (API) + `03382f92` (seed) + merge `origin/dev` `01757398`, push `feat/qd96-100-alignment`,
+  [PR #34 → `dev`](https://github.com/SEP490-FALL2026/BE-dev/pull/34) — **chưa merge**.
+- Docs: `340051a` (chỉ `Figma UI-UX/API-Integration/`), push `main`. Lần push này kéo theo 2 commit local có sẵn của chat khác
+  (`60ec6c8 update docs`, `d725a43 API docs … Đợt 1`).
+- WDP (`D:\FPT\WDP\BE`, `dev`): 39 file chép dở của chat sửa CI được cất vào stash `stale finance-screens copy (before port
+07/11)` (không xóa); `git am` 2 commit + `918b31a` sinh lại Prisma client (WDP commit `src/generated`); push `dev`;
+  CI chạy tay (`workflow_dispatch`, quét ALL, không deploy) [run 42135280662](https://github.com/WDP301-FA26-GR8/BE/actions/runs/42135280662)
+  xanh mọi job; [PR #46 `dev` → `main`](https://github.com/WDP301-FA26-GR8/BE/pull/46) — **chưa merge** (merge = deploy VPS).
 
-- `GET /budgets` `remaining` chưa trừ Request đang chờ duyệt chi (`C-09`).
-- `GET /budgets/mine` không trả số còn lại (`QĐ-100p`).
-- Enum `SENT_TO_FINANCE`, `RETURNED_BY_FINANCE` của lô; luồng Finance rà soát (`financeReview*`) vẫn chạy.
+### CI GitHub của SEP PR #34
 
-## Chưa làm / gap so với US
-
-- `US-12-02`: số seat trên hóa đơn, dòng không ghép được, đóng hồ sơ sai lệch (chỉ có cờ), IT đính biên lai, import CSV, sao kê.
-- `US-12-01`: Người duyệt chi chưa đọc được `GET /budgets` / `summary` (chỉ FINANCE).
-- Docs tự mâu thuẫn: `US-12-02` AC-8 (giảm theo chi phí thực chịu) vs `US-06-06` AC-1/AC-5 + `QĐ-97d` (giảm theo giá gốc) — code theo
-  giá gốc; Owner sửa câu chữ `US-12-02` AC-8.
-
-## Việc của Owner
-
-1. Merge PR vào `dev` (CI phải xanh) rồi deploy; chạy migration trên VPS (chỉ thêm).
-2. Seed lại VPS nếu muốn có dữ liệu hóa đơn demo (seed idempotent, chỉ thêm R10/R11/đề xuất ITO/hóa đơn).
-3. Docs: thêm QĐ cho D1 (mở lại hóa đơn tối giản, Finance ghi trên khoản cam kết) và D2 (Finance đọc lô trình duyệt chi, chỉ đọc).
-4. Repo WDP: xem `## Repo WDP`.
-
-## Bổ sung
-
-(điều phối ghi khi xong commit/push, FE docs, WDP)
+select, http-contract, integration ×3, integration-inband: **xanh**. `quality`: unit 377 suite / 4905 test **pass**, rồi Jest in
+"Jest did not exit one second after the test run has completed" và treo tới giới hạn 20 phút ⟹ **cancelled** (2 lần, kể cả rerun).
+**Có từ trước hạng mục này:** run của `3cdbf622` (chỉ format docs Đợt 1) cũng bị hủy đúng như vậy; cùng code trên WDP thì job
+`quality` thoát bình thường (unit wall 30 s). Ở máy local `pnpm test` thoát bình thường. Chưa tìm được handle còn mở
+(`--detectOpenHandles` chạy tuần tự > 10 phút). Hướng sửa cho chat CI: chạy `pnpm test --detectOpenHandles` trên runner Linux để
+tìm suite giữ handle; hoặc tạm thêm `--forceExit` cho bước unit trong CI (che lỗi rò, Owner quyết). Vì `quality` bị hủy nên
+`e2e-smoke` bị skip trên CI — e2e đã chạy local xanh (11/11).
