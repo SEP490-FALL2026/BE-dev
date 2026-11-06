@@ -230,7 +230,7 @@ Kiểm ready và dữ liệu phục hồi trước khi nhả khóa. Không gọi
 
 Seed được mọi ngày, nhưng năm tài chính phải bắt đầu tháng 1. ENG/MKT/SAL luôn có ngân sách đã duyệt của năm hiện tại và năm sau (qua luồng đề xuất → phiên bản → Người duyệt chi), nên Request 1–12 tháng bắt đầu hôm nay đi thẳng tới duyệt chi; Thiết kế không có ngân sách nào, để R9 chờ Finance rà soát. Dataset đã được nạp ở năm khác bị từ chối; dùng wrapper và chọn reset.
 
-R1 cấp từ thuê bao năm hiện tại. Seed cuối tháng 11/tháng 12 có thể tạo sự kiện gia hạn cho mốc đã qua. Không cam kết luôn có thuê bao trong cửa sổ cảnh báo 15/7 ngày (OD-S6). Mục đích từng bản ghi, bảng tài khoản, ứng viên dữ liệu tương lai và cách mở rộng nằm trong README fixture.
+Phòng Công nghệ thông tin không có ngân sách nào cho năm sau mà chỉ có **đề xuất ngân sách năm sau đang chờ Finance** (bước `budget.next-year`, màn đề xuất của Finance). Ba hóa đơn do Finance ghi qua `POST /budget-commitments/{id}/invoices` (bước `finance.invoices`) trên cam kết của R1, R10 (Marketing) và R11 (Kinh doanh): một khớp (`MATCHED`), một chỉ lệch thuế (`TAX_ONLY`), một cao hơn cam kết (`PRICE_QUANTITY_EXCEPTION`); số hóa đơn là `SV-HD1`..`SV-HD3` nên chạy lại không ghi thêm. R1 cấp từ thuê bao năm hiện tại. Seed cuối tháng 11/tháng 12 có thể tạo sự kiện gia hạn cho mốc đã qua. Không cam kết luôn có thuê bao trong cửa sổ cảnh báo 15/7 ngày (OD-S6). Mục đích từng bản ghi, bảng tài khoản, ứng viên dữ liệu tương lai và cách mở rộng nằm trong README fixture.
 
 ## Bằng chứng và việc Owner còn phải chạy
 

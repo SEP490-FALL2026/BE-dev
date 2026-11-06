@@ -3,7 +3,7 @@ import type { DemoFixture } from './fixture/demo-fixture.types';
 import { SHARED_DEMO_V3 } from './fixture/shared-demo-v3';
 import { CATALOG_STEPS } from './steps/catalog.steps';
 import { extraSteps } from './steps/extras.steps';
-import { FINANCE_STEPS } from './steps/finance.steps';
+import { FINANCE_STEPS, invoiceSteps } from './steps/finance.steps';
 import { ORGANIZATION_STEPS } from './steps/organization.steps';
 import { requestSteps } from './steps/request.steps';
 
@@ -25,7 +25,9 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     ...CATALOG_STEPS,
     step(FINANCE_STEPS, 'finance.tax-profile'),
     step(FINANCE_STEPS, 'budget.year'),
+    step(FINANCE_STEPS, 'budget.next-year'),
     ...requestSteps(fixture.requests),
+    ...invoiceSteps(fixture),
     ...extraSteps(fixture.saasIssue.request),
   ];
 }
