@@ -42,7 +42,7 @@ OpenAPI 337 → 341 operation.
   [PR #34 → `dev`](https://github.com/SEP490-FALL2026/BE-dev/pull/34) — **chưa merge**.
 - Docs: `340051a` (chỉ `Figma UI-UX/API-Integration/`), push `main`. Lần push này kéo theo 2 commit local có sẵn của chat khác
   (`60ec6c8 update docs`, `d725a43 API docs … Đợt 1`).
-- WDP (`D:\FPT\WDP\BE`, `dev`): 39 file chép dở của chat sửa CI được cất vào stash `stale finance-screens copy (before port
+- WDP (`D:/FPT/WDP/2/BE`, `dev`): 39 file chép dở của chat sửa CI được cất vào stash `stale finance-screens copy (before port
 07/11)` (không xóa); `git am` 2 commit + `918b31a` sinh lại Prisma client (WDP commit `src/generated`); push `dev`;
   CI chạy tay (`workflow_dispatch`, quét ALL, không deploy) [run 42135280662](https://github.com/WDP301-FA26-GR8/BE/actions/runs/42135280662)
   xanh mọi job; [PR #46 `dev` → `main`](https://github.com/WDP301-FA26-GR8/BE/pull/46) — **chưa merge** (merge = deploy VPS).
