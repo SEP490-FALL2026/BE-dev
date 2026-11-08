@@ -175,7 +175,7 @@ export class BudgetCyclesController {
   @ApiSuccessResponse(CycleResponseDto, {
     message: 'BUDGET_CYCLE.CEILINGS_SET',
     description:
-      'Replaces the ceilings of the departments (three parts each) and the shared-pool reserve. The cycle is unpublished and must be published again; the figures before and after are recorded in the Audit Trail.',
+      'Replaces the ceilings of the departments (three parts each) and the shared-pool reserve. A change of a number (a part of a ceiling, the reserve, a department added or left out) or a ceiling with no explanation unpublishes the cycle, which must be published again; a change of an explanation alone does not. The figures before and after are recorded in the Audit Trail.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -208,7 +208,7 @@ export class BudgetCyclesController {
     status: HttpStatus.CREATED,
     message: 'BUDGET_CYCLE.PUBLISHED',
     description:
-      'The division is published when every department of the year has a ceiling, the shared-pool reserve is entered and the ceilings with the reserve are within the annual ceiling. The heads whose ceiling changed hear it. A refused publication is recorded in the Audit Trail.',
+      'The division is published when every department of the year has a ceiling with its explanation, the shared-pool reserve is entered and the ceilings with the reserve are within the annual ceiling. The heads whose ceiling changed hear it. A refused publication is recorded in the Audit Trail.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -223,7 +223,7 @@ export class BudgetCyclesController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The year is not a year (VALIDATION_ERROR), it has passed (BUDGET.CYCLE_YEAR_PAST), or the division is not complete (BUDGET.CEILINGS_INCOMPLETE, details.missingDepartmentIds, details.staleDepartmentIds, details.reserveMissing).',
+        'The year is not a year (VALIDATION_ERROR), it has passed (BUDGET.CYCLE_YEAR_PAST), or the division is not complete (BUDGET.CEILINGS_INCOMPLETE, details.missingDepartmentIds, details.staleDepartmentIds, details.explanationMissingDepartmentIds, details.reserveMissing).',
       examples: [VALIDATION_EXAMPLE, EXAMPLES.CYCLE_YEAR_PAST, EXAMPLES.CEILINGS_INCOMPLETE],
     },
   )

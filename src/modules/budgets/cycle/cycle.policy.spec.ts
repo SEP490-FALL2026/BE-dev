@@ -6,6 +6,7 @@ import {
   departmentsToTell,
   isPastYear,
   judgePublish,
+  leavesUnexplained,
   windowOf,
 } from './cycle.policy';
 
@@ -81,6 +82,13 @@ describe('the budget cycle policy (QĐ-103i)', () => {
         missingDepartmentIds: [],
       });
     });
+  });
+
+  it('says a division leaves a ceiling unexplained when one has no explanation or a blank one', () => {
+    expect(leavesUnexplained([{ explanation: 'a' }, { explanation: 'b' }])).toBe(false);
+    expect(leavesUnexplained([{ explanation: 'a' }, { explanation: null }])).toBe(true);
+    expect(leavesUnexplained([{ explanation: '  ' }])).toBe(true);
+    expect(leavesUnexplained([])).toBe(false);
   });
 
   describe('whether a change of the division changes a number (R-I04)', () => {

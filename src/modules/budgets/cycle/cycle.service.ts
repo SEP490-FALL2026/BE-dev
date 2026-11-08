@@ -34,6 +34,7 @@ import {
   departmentsToTell,
   isPastYear,
   judgePublish,
+  leavesUnexplained,
   type PublishVerdict,
 } from './cycle.policy';
 import { CycleRepo, figuresOf, type CycleFigures, type CycleRecord } from './cycle.repo';
@@ -271,8 +272,10 @@ export class CycleService {
       // The same division again changes nothing: the cycle stays published and nothing is recorded.
       if (changes.length === 0 && !reserveChanged) return cycle;
 
-      // A change of the explanation alone keeps the cycle published; a change of a number takes it back (R-I04).
-      await this.cycles.replaceCeilings(tx, cycle, reserve, rows, changesNumbers(changes, reserveChanged));
+      // A change of the explanation alone keeps the cycle published; a change of a number takes it back (R-I04), and so does a
+      // division with a ceiling that has no explanation, which could not be published (W2-N4).
+      const unpublish = changesNumbers(changes, reserveChanged) || leavesUnexplained(rows);
+      await this.cycles.replaceCeilings(tx, cycle, reserve, rows, unpublish);
       await this.audit.record(
         tx,
         budgetAuditEvent(

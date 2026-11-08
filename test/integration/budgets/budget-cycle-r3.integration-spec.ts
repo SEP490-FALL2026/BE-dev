@@ -76,7 +76,8 @@ describe('the budget cycle: what the review of R3 asked for (integration, real P
 
   it('answers a page of the list in the same number of statements however many cycles there are (F-017)', async () => {
     for (let i = 0; i < 3; i += 1) await open(year(), 100).expect(201);
-    const page = () => request(h.server()).get('/api/v1/budget-cycles?page=1&pageSize=2').set(h.as(h.finance));
+    // The page holds every cycle of the test: a statement per row would show as more statements when there are more rows.
+    const page = () => request(h.server()).get('/api/v1/budget-cycles?page=1&pageSize=100').set(h.as(h.finance));
     const few = await counter.run(() => page().expect(200));
     for (let i = 0; i < 6; i += 1) await open(year(), 100).expect(201);
     const many = await counter.run(() => page().expect(200));
@@ -92,21 +93,27 @@ describe('the budget cycle: what the review of R3 asked for (integration, real P
     const observer = new Client({ connectionString: h.ctx.database.url });
     await holder.connect();
     await observer.connect();
-    await holder.query('BEGIN');
-    await holder.query(`SELECT id FROM budget_cycles WHERE year = $1 FOR UPDATE`, [h.next]);
+    try {
+      await holder.query('BEGIN');
+      await holder.query(`SELECT id FROM budget_cycles WHERE year = $1 FOR UPDATE`, [h.next]);
 
-    const resent = h.resubmit(proposal.id, { lines: h.twoLines() }, u.head.account).then((response) => response);
-    await waitForLockWaiters(observer, 1);
-    // The resubmission waits for the cycle: it holds nothing of the proposal yet, so the proposal can be locked by anybody else.
-    await observer.query('BEGIN');
-    const free = await observer.query(`SELECT id FROM budget_proposals WHERE id = $1 FOR UPDATE NOWAIT`, [proposal.id]);
-    await observer.query('ROLLBACK');
-    await holder.query('COMMIT');
-    await holder.end();
+      const resent = h.resubmit(proposal.id, { lines: h.twoLines() }, u.head.account).then((response) => response);
+      await waitForLockWaiters(observer, 1);
+      // The resubmission waits for the cycle: it holds nothing of the proposal yet, so anybody else can lock the proposal.
+      await observer.query('BEGIN');
+      const free = await observer.query(`SELECT id FROM budget_proposals WHERE id = $1 FOR UPDATE NOWAIT`, [
+        proposal.id,
+      ]);
+      await observer.query('ROLLBACK');
+      await holder.query('COMMIT');
 
-    expect(free.rows).toHaveLength(1);
-    expect((await resent).status).toBe(201);
-    await observer.end();
+      expect(free.rows).toHaveLength(1);
+      expect((await resent).status).toBe(201);
+    } finally {
+      await holder.query('ROLLBACK').catch(() => undefined);
+      await holder.end();
+      await observer.end();
+    }
   });
 
   it('tells a head of another department that the proposal does not exist, whatever the state of the cycle (F-030)', async () => {
@@ -181,5 +188,18 @@ describe('the budget cycle: what the review of R3 asked for (integration, real P
     };
     expect(details.explanationMissingDepartmentIds).toEqual(await activeDepartments());
     expect(details.missingDepartmentIds).toEqual([]);
+  });
+
+  it('takes the publication back when a division comes again without the explanation of a ceiling (F-046, W2-N4)', async () => {
+    const y = year();
+    await open(y).expect(201);
+    await put(y, await division(1)).expect(200);
+    await publish(y).expect(201);
+
+    await put(y, await division(1, null)).expect(200);
+
+    expect(h.dataOf<CycleWire>(await get(y).expect(200)).status).toBe('CHANGED_AFTER_PUBLISH');
+    const refused = await publish(y).expect(422);
+    expect(h.codeOf(refused)).toBe('BUDGET.CEILINGS_INCOMPLETE');
   });
 });

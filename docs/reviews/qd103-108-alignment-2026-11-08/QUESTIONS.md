@@ -650,3 +650,55 @@ Năm câu dưới cần Owner vì quyết định thứ Owner **thấy** khi dem
 | Q-110 | Giữ: tách 3 hạng mục, tuần tự (cùng sửa `seed-steps.ts`, README).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 - **Q-19 (ghi thêm, F-043):** năm Y+1 luôn gồm đơn vị hôm nay của người đó; họ còn nộp được `BM-10` Y+1 cho phòng cũ dù nhiệm kỳ kết thúc 31/12 (hành vi cũ, giữ).
+
+## Câu khi thiết kế W8 (Q-120 → Q-160)
+
+Phát sinh khi rà API còn thiếu và thiết kế W8, 09/11/2026; bản cuối sau audit (23 finding, 4 Cao — DA8-01 phạm vi phình 9 hạng mục ~430 file). Chat review TẠM CHỌN chia **W8** (5 hạng mục ~150 file, giao code) và **W8b** (`blocked`, chờ Owner chọn — Q-160). Q-124 đổi theo nguồn: Super Admin không đọc Request kèm giá. Câu cần Owner: **TẠM CHỌN (chờ Owner)**.
+
+### 5. Câu tạm chọn bản cuối — chỉ câu cần Owner
+
+| ID       | Câu                                                | Tạm chọn                                                                     | Gói |
+| -------- | -------------------------------------------------- | ---------------------------------------------------------------------------- | --- |
+| Q-160    | Mở gói W8b nào?                                    | Không giao đêm nay; khuyến nghị B (phần nhỏ)                                 | W8b |
+| Q-120    | Request tiếp tục nhóm vào phạm vi?                 | W8b, chờ Owner (nguồn nói có)                                                | W8b |
+| Q-130    | Mô hình Request tiếp tục nhóm                      | A loại `GROUP_RENEWAL` có dòng                                               | W8b |
+| Q-131    | Ngày kết thúc khác nhau trong một nhóm (DA8-10)    | chưa tạm chọn — A nối `extensionMonths` từng dòng / C một `newEndDate` chung | W8b |
+| Q-142(a) | Trưởng phòng thấy cột GTGT phòng mình? (`OQ-F-02`) | **Không** (`null`) tới khi Owner trả lời (đổi từ _có_)                       | W8b |
+| Q-145    | Kỳ phát hành báo cáo (`OQ-F-14`)                   | B chỉ tháng (đổi từ tháng + quý)                                             | W8b |
+
+Gói W8 **không** còn câu cần Owner chặn việc giao code.
+
+### 6. Câu theo nguồn / kỹ thuật (chat review ghi `QUESTIONS.md`, không chặn)
+
+| ID                  | Phân loại            | Kết luận (gói)                                                                                                                                                                        |
+| ------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q-121               | theo nguồn           | Finance thấy Request đã duyệt chi (`US-06-09` AC-2, `SoD-3`) (W8)                                                                                                                     |
+| Q-122               | theo nguồn           | Người duyệt chi thấy Request đã tới bước chi (`US-05-15`, `FR-3.11`) (W8)                                                                                                             |
+| Q-123               | kỹ thuật             | IT Admin toàn tổ chức — giữ hành vi `access-request.policy.ts` (W8)                                                                                                                   |
+| Q-124               | theo nguồn — **đổi** | Super Admin **không** đọc danh sách/chi tiết/dòng thời gian Request; chỉ route cờ `accessRequestAuditFlagList` không tiền (`US-05-24` _Phạm vi quyền_, AC-4; BRD 5.5.3; `SoD-1`) (W8) |
+| Q-125               | kỹ thuật             | theo `department_id` lúc gửi (`FR-3.3`) (W8)                                                                                                                                          |
+| Q-126               | kỹ thuật             | `involvement` mặc định `SENT`; `myLine` chỉ dòng của mình (W8)                                                                                                                        |
+| Q-127               | kỹ thuật + nguồn     | Audit Trail + allowlist; người thụ hưởng chỉ dòng của mình (DA8-11) (W8)                                                                                                              |
+| Q-128               | kỹ thuật             | 403 danh sách / 404 chi tiết (W8)                                                                                                                                                     |
+| Q-129               | theo nguồn           | không số tiền trên dòng (BRD 5.5.3) (W8)                                                                                                                                              |
+| Q-132               | theo nguồn           | chỉ phần mềm trả phí (`QĐ-100ab`) (W8b)                                                                                                                                               |
+| Q-133               | kỹ thuật             | lưu nháp `RENEWAL` không chạy cổng (W8)                                                                                                                                               |
+| Q-134               | kỹ thuật             | ứng viên quyền theo vai không lọc theo phụ trách (W8)                                                                                                                                 |
+| Q-135, Q-136, Q-137 | theo nguồn           | Finance đánh dấu + nhập số phía hóa đơn (`US-12-17` AC-5); chỉ IT Admin đóng 3 kết luận (`US-12-02` AC-7, AC-9); route hẹp Super Admin không tiền (`SoD-1`) (W8)                      |
+| Q-138               | kỹ thuật             | `netAmount` sau credit (W8)                                                                                                                                                           |
+| Q-139               | kỹ thuật — **đổi**   | việc cần nộp tính khi đọc, cửa sổ ứng viên từ 01/01 năm trước; phạm vi IT theo người (`US-12-17` AC-8) (W8)                                                                           |
+| Q-140, Q-141        | theo nguồn           | dòng tiền = ngày hóa đơn (`FR-5.3`); chia đều theo tháng (`US-12-01` AC-2, `US-12-11` AC-11) (W8b)                                                                                    |
+| Q-142(b)            | theo nguồn           | Người duyệt chi xem từng khoản chưa phân bổ (BRD 5.5.3) (W8b)                                                                                                                         |
+| Q-143               | kỹ thuật             | `committedYearStartAuto` thay route (W8b)                                                                                                                                             |
+| Q-144               | kỹ thuật — **đổi**   | lịch sử kỳ đọc Audit Trail, không bảng (DA8-18) (W8b)                                                                                                                                 |
+| Q-146               | theo nguồn           | bản trưởng phòng chỉ dòng Cost Center (`US-12-14` AC-7, AC-17) (W8b)                                                                                                                  |
+| Q-147               | kỹ thuật             | khoản bù âm, một năm (W8b)                                                                                                                                                            |
+| Q-148, Q-149        | theo nguồn           | tiềm năng `G1`–`G4` (`US-12-04`); `K1` thực (`US-12-04` AC-11, L3-32) (W8b)                                                                                                           |
+| Q-150, Q-152, Q-154 | kỹ thuật             | đếm việc cần làm; không route tóm tắt, không bảng (DA8-17); thông báo theo phòng (W8b)                                                                                                |
+| Q-151, Q-153, Q-155 | theo nguồn           | Người duyệt chi đọc điều chỉnh (BRD 5.5.4); 4 việc + cảnh báo đỏ; chỉ lúc xác nhận hóa đơn (W8b)                                                                                      |
+| Q-156               | theo nguồn           | một khóa `BUSINESS_EMAIL_ENABLED`, mặc định `OFF` (`US-11-08` AC-9, `US-12-15` AC-15) (W8)                                                                                            |
+| Q-157               | kỹ thuật             | báo theo dõi lúc cấp chỉ `PERSONAL` (W8)                                                                                                                                              |
+| Q-158, Q-159        | **đóng**             | báo cáo hiệu suất sử dụng ra ledger `NGOÀI-PHẠM-VI` (DA8-07)                                                                                                                          |
+
+Kỹ thuật thêm (không cần Owner): route cờ Super Admin tách theo module sở hữu (`requests`, `budgets`) thay vì một route gộp (DA8-20); nguồn thực
+chi W8b là một đoạn SQL L0 dùng chung với hàm tổng (DA8-05).

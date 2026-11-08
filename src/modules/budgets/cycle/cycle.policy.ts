@@ -184,3 +184,7 @@ export function changesNumbers(
     )
   );
 }
+
+/** Whether a division leaves a ceiling with no explanation: it cannot stay published, because it could not be published (W2-N4, QT 4.3). */
+export const leavesUnexplained = (rows: readonly { explanation: string | null }[]): boolean =>
+  rows.some((row) => (row.explanation ?? '').trim() === '');
