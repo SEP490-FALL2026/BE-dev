@@ -101,6 +101,8 @@ export const versionBodySchema = z.strictObject({
 export const versionPatchSchema = z
   .strictObject({
     base: versionFigures.base,
+    /** Why the base is changed: required when `base` differs from the one the draft has (`QĐ-100v`). */
+    baseReason: text(REASON_MAX),
     reserve: versionFigures.reserve,
     /** `null` takes the reason away: the reserve is the default share again, or is sent with another reason. */
     reserveReason: versionFigures.reserveReason.nullable(),
@@ -224,6 +226,10 @@ const versionSchema = z.strictObject({
   /** The refused version this one follows when it is made again from the same proposal; set by the system. */
   rejectedPredecessorId: z.uuid().nullable(),
   base: moneyView,
+  /** Why Finance moved the base, when it did (`QĐ-100v`). */
+  baseReason: z.string().nullable(),
+  /** Where the version came from: the head's proposal, or the baseline Finance built when nobody headed the department (`QĐ-100h`). */
+  origin: z.enum(['PROPOSAL', 'BASELINE_NO_HEAD']),
   reserve: moneyView,
   /** The share of the base the reserve defaults to when the version was made; null for a version made before `QĐ-98`. */
   reservePercent: z.number().int().nullable(),

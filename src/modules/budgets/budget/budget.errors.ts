@@ -312,3 +312,33 @@ export class BudgetCycleNotPublishedError extends Error {
     this.name = 'BudgetCycleNotPublishedError';
   }
 }
+
+/** The versions of the year (this one included) add up to more than the annual ceiling less the shared-pool reserve (`R-I06`, `QĐ-103i`). */
+export class BudgetOverAnnualCeilingError extends Error {
+  constructor(
+    readonly gapMinor: bigint,
+    readonly availableMinor: bigint,
+  ) {
+    super('The versions of the year add up to more than the annual ceiling less the shared-pool reserve.');
+    this.name = 'BudgetOverAnnualCeilingError';
+  }
+}
+
+/** A version of the year is in another currency than the cycle: the annual check cannot add them up. */
+export class BudgetCycleCurrencyMismatchError extends Error {
+  constructor(
+    readonly cycleCurrency: string,
+    readonly versionCurrency: string,
+  ) {
+    super('A version of the year is not in the currency of the budget cycle.');
+    this.name = 'BudgetCycleCurrencyMismatchError';
+  }
+}
+
+/** Finance changed the base of a version without saying why (`QĐ-100v`). */
+export class BudgetBaseReasonRequiredError extends Error {
+  constructor() {
+    super('Say why the base is changed.');
+    this.name = 'BudgetBaseReasonRequiredError';
+  }
+}

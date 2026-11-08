@@ -255,3 +255,39 @@ export const reserveReasonMissing = (version: {
   version.reservePercent !== null &&
   version.reserveMinor !== defaultReserveOf(version.baseMinor, version.reservePercent) &&
   !version.reserveReason;
+
+/** A version as the annual check reads it. */
+export interface CountedVersion {
+  id: string;
+  costCenterId: string;
+  number: number;
+  baseMinor: bigint;
+  reserveMinor: bigint;
+  currency: string;
+}
+
+/**
+ * The versions the annual check adds up (`R-I06`, `QĐ-103i`): the newest of each Cost Center among those sent, asked for changes or
+ * approved (the caller reads only those), and the one being sent in the place of its own Cost Center's. A version in another currency
+ * than the cycle is not added up with the others: it is named.
+ */
+export function annualCheck(input: {
+  cycleCurrency: string;
+  availableMinor: bigint;
+  counted: readonly CountedVersion[];
+  sending: CountedVersion;
+}): { kind: 'OK'; totalMinor: bigint } | { kind: 'OVER'; gapMinor: bigint } | { kind: 'CURRENCY'; currency: string } {
+  const newest = new Map<string, CountedVersion>();
+  for (const version of input.counted) {
+    const kept = newest.get(version.costCenterId);
+    if (kept === undefined || version.number > kept.number) newest.set(version.costCenterId, version);
+  }
+  newest.set(input.sending.costCenterId, input.sending);
+  const mismatched = [...newest.values()].find((version) => version.currency !== input.cycleCurrency);
+  if (mismatched) return { kind: 'CURRENCY', currency: mismatched.currency };
+  const total = [...newest.values()].reduce((sum, version) => sum + version.baseMinor + version.reserveMinor, 0n);
+
+  return total > input.availableMinor
+    ? { kind: 'OVER', gapMinor: total - input.availableMinor }
+    : { kind: 'OK', totalMinor: total };
+}

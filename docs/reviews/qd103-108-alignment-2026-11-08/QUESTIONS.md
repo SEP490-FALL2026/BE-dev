@@ -399,7 +399,7 @@ Phát sinh khi soạn và audit thiết kế W4 (MF-1 cấp quyền), 08/11/2026
 - Phương án: A. Không cần xác nhận. B. Cần `CONFIRMED` (khác ⟹ 422 `DEVICE_NOT_ACKNOWLEDGED`).
 - **Chọn A** — đúng chữ AC-10; không chặn MF-1 bởi việc của luồng thiết bị.
 - Đổi lại: bật điều kiện acknowledgement trong `judgeKeyBinding` (`device-binding.policy.ts:66`).
-- **W2-N4 — diễn giải Trần phòng. ĐÃ QUYẾT (chat review, QT 4.3 thắng US):** bắt buộc cho mỗi Trần phòng khi phát hành; thiếu ⟹ `BUDGET.CEILINGS_INCOMPLETE` với `details.explanationMissingDepartmentIds`. Chỉ đổi diễn giải không bỏ phát hành (F-032). Đã cài ở `fix(qd103-w2): cycle-ceilings R3`.
+- **W2-N4 — diễn giải Trần phòng. TẠM CHỌN (chờ Owner) — chat review, QT 4.3 thắng US:** bắt buộc cho mỗi Trần phòng khi phát hành; thiếu ⟹ `BUDGET.CEILINGS_INCOMPLETE` với `details.explanationMissingDepartmentIds`. Chỉ đổi diễn giải không bỏ phát hành (F-032). Đã cài ở `fix(qd103-w2): cycle-ceilings R3`.
 
 ## Câu khi thiết kế W5 (Q-52 → Q-81)
 
@@ -502,7 +502,7 @@ Câu W0 W5 dùng tiếp, không đổi: Q-07 = C (thêm vế thời điểm kỹ
   trước R hoặc khi sự cố _hết hạn chưa gia hạn_ còn mở; audit trước/sau, Finance được báo lại.
 - **Chọn B** — khớp US-11-04 AC-12, không ngõ cụt; vẫn ngừng cấp mới cho tới khi thay.
 - Đổi lại: điều kiện thay trong `record/subscription-adjustment-record.policy.ts` + trigger cột kết quả (A: bỏ nhánh thay, giữ `stopGrants`).
-- **W2-N5 — vai MANAGER cho trưởng phòng sắp nhậm chức. ĐÃ QUYẾT (chat review, phương án hẹp):** không nới vai ở token (`QĐ-93a`/`QĐ-95e`); route B3 dùng `RequireRolesOrGrants` (guard kiểm grant) và service xét đơn vị; `/me.upcomingUnits`. Đổi lại phương án: nới guard như `46b6a94e`.
+- **W2-N5 — vai MANAGER cho trưởng phòng sắp nhậm chức. TẠM CHỌN (chờ Owner) — chat review, phương án hẹp:** không nới vai ở token (`QĐ-93a`/`QĐ-95e`); route B3 dùng `RequireRolesOrGrants` (guard kiểm grant) và service xét đơn vị; `/me.upcomingUnits`. Đổi lại phương án: nới guard như `46b6a94e`.
 - **W2-N6 — reschedule transfer vào phòng chưa hiệu lực. ĐÃ SỬA** (`fix(qd103-w2): department-effective-year F-033…F-045`). Còn lại: trigger DB làm lớp chặn thứ hai chưa làm (fixture SQL cũ).
 
 ## Câu khi thiết kế W6 (Q-82 → Q-96)

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { VersionBodyDto, VersionPatchDto } from '../budget/budget.dto';
-import { BudgetQuartersMismatchError } from '../budget/budget.errors';
+import { BudgetBaseReasonRequiredError, BudgetQuartersMismatchError } from '../budget/budget.errors';
 import { defaultReserveOf, quartersMatch, quartersMismatchAfter } from '../budget/budget.policy';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import type { VersionPatch, VersionRecord } from '../budget/version.repo';
@@ -52,18 +52,35 @@ export class VersionFigures {
   async patchOf(tx: DbTx, version: VersionRecord, patch: VersionPatchDto): Promise<VersionPatch> {
     const reporting = version.currency;
     const next: VersionPatch = {};
+    await this.moneyPatch(tx, version, patch, next);
+    if (patch.reserveReason !== undefined) next.reserveReason = patch.reserveReason?.trim() || null;
+    if (patch.quarters !== undefined) next.quarters = await this.quarters(tx, patch.quarters, reporting);
+    if (quartersMismatchAfter(version, next)) throw new BudgetQuartersMismatchError();
+
+    return next;
+  }
+
+  /** The base and the reserve of an edit: the base moves with its reason, and the reserve follows it while it is the default share. */
+  private async moneyPatch(
+    tx: DbTx,
+    version: VersionRecord,
+    patch: VersionPatchDto,
+    next: VersionPatch,
+  ): Promise<void> {
+    const reporting = version.currency;
     if (patch.base) next.baseMinor = await this.facts.money(patch.base, reporting, tx);
+    // The base moves only with the reason why (`QĐ-100v`): a base the draft already has needs none.
+    if (next.baseMinor !== undefined && next.baseMinor !== version.baseMinor) {
+      const reason = patch.baseReason?.trim();
+      if (!reason) throw new BudgetBaseReasonRequiredError();
+      next.baseReason = reason;
+    }
     if (patch.reserve) next.reserveMinor = await this.facts.money(patch.reserve, reporting, tx);
     // A reserve that is still the default share of the base follows the base when only the base changes: it stays the default (B-M3).
     if (next.baseMinor !== undefined && next.reserveMinor === undefined && version.reservePercent !== null) {
       const wasDefault = version.reserveMinor === defaultReserveOf(version.baseMinor, version.reservePercent);
       if (wasDefault) next.reserveMinor = defaultReserveOf(next.baseMinor, version.reservePercent);
     }
-    if (patch.reserveReason !== undefined) next.reserveReason = patch.reserveReason?.trim() || null;
-    if (patch.quarters !== undefined) next.quarters = await this.quarters(tx, patch.quarters, reporting);
-    if (quartersMismatchAfter(version, next)) throw new BudgetQuartersMismatchError();
-
-    return next;
   }
 
   private async quarters(tx: DbTx, input: QuartersBody | null, currency: string): Promise<Quarters | null> {

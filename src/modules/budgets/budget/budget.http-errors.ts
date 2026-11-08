@@ -38,7 +38,10 @@ import {
   BudgetCurrentExistsError,
   BudgetImportFileInvalidError,
   BudgetLineNotFoundError,
+  BudgetBaseReasonRequiredError,
   BudgetCostCenterRequiredError,
+  BudgetCycleCurrencyMismatchError,
+  BudgetOverAnnualCeilingError,
   BudgetNotYourCostCenterError,
   BudgetProposalNotFoundError,
   BudgetProposalOpenError,
@@ -128,6 +131,21 @@ export function toBudgetApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.PLAN_NOT_FOUND', error.message, {
       planIds: error.planIds,
     });
+  }
+  if (error instanceof BudgetOverAnnualCeilingError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET.OVER_ANNUAL_CEILING', error.message, {
+      gapMinor: error.gapMinor.toString(),
+      availableMinor: error.availableMinor.toString(),
+    });
+  }
+  if (error instanceof BudgetCycleCurrencyMismatchError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET.CYCLE_CURRENCY_MISMATCH', error.message, {
+      cycleCurrency: error.cycleCurrency,
+      versionCurrency: error.versionCurrency,
+    });
+  }
+  if (error instanceof BudgetBaseReasonRequiredError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.BASE_REASON_REQUIRED', error.message);
   }
   if (error instanceof BudgetCostCenterRequiredError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.COST_CENTER_REQUIRED', error.message);
@@ -295,6 +313,9 @@ export const BUDGET_ERROR_EXAMPLES = {
   VERSION_NUMBER_TAKEN: example(new BudgetVersionNumberTakenError()),
   NOT_YOUR_COST_CENTER: example(new BudgetNotYourCostCenterError()),
   COST_CENTER_REQUIRED: example(new BudgetCostCenterRequiredError()),
+  OVER_ANNUAL_CEILING: example(new BudgetOverAnnualCeilingError(1n, 100n)),
+  CYCLE_CURRENCY_MISMATCH: example(new BudgetCycleCurrencyMismatchError('VND', 'USD')),
+  BASE_REASON_REQUIRED: example(new BudgetBaseReasonRequiredError()),
   YEAR_ENDED: example(new BudgetYearEndedError(2025)),
   CYCLE_NOT_FOUND: example(new BudgetCycleNotFoundError()),
   CYCLE_EXISTS: example(new BudgetCycleExistsError(2027)),

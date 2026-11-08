@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `9c7f386`, BE `d9c46552`.
 - Phụ trách: chat code `SEP-Start 75: coder mainflow`. Thiết kế ban đầu bởi: AI chat review (W2, 08/11/2026).
 - Owner review: chưa review. Peer review: chat review (R2).
-- Triển khai: `not-started`. PR: chưa có.
+- Triển khai: `in-progress` (09/11/2026: Task 1 và phần kiểm B4 + `baseReason` của Task 3 xong; còn Task 2, phiên bản từ số liệu nền, Task 4). PR: chưa có.
 
 ## Before coding
 
@@ -69,9 +69,17 @@ Sau Task 3 và Task 4: kiểm tra nhanh tracker §4.5; `openapi:export` drift đ
 
 ## Verification and handoff
 
-| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại |
-| ------------------ | --------------------- | ----------------- | ----------------------- |
+| Lệnh / kiểm tra AC                                                                                          | Revision / môi trường | Kết quả thực chạy                                                                                                                    | Giới hạn / việc còn lại |
+| ----------------------------------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
+| `prisma migrate deploy` + `migrate diff --from-config-datasource --to-schema prisma --exit-code`            | DB sạch               | _No difference detected_                                                                                                             | —                       |
+| jest `src/modules/budgets` (gồm `annualCheck` unit)                                                         | unit                  | 17 file / 230 test xanh (trước khi thêm unit mới), `budget.policy.spec` 56 xanh                                                      | —                       |
+| `budget-annual-check.integration-spec` (mới, 6 test) + `budget-version-history`, `requests/budget-versions` | integration           | 3 file / 53 test xanh                                                                                                                | —                       |
+| integration `budgets` + `requests` (lượt rộng)                                                              | integration           | 122/124 file xanh; 2 file đỏ do PATCH `base` thiếu `baseReason` ⟹ sửa helper `updateVersion` (mặc định lý do khi có `base`) rồi xanh | —                       |
+| `test:http` platform + budgets; `test:gates`; lint, typecheck, arch:check, rules:check, openapi:export      | local                 | xanh                                                                                                                                 | —                       |
+
+Phần đã làm: Task 1 (migration `budget_version_origin`), Task 3 (kiểm B4 lúc gửi: khóa kỳ `FOR UPDATE` trước đề xuất/phiên bản, `BUDGET.OVER_ANNUAL_CEILING`, `CYCLE_CURRENCY_MISMATCH`, `CYCLE_NOT_PUBLISHED`; `baseReason` bắt buộc khi đổi `base`, lưu cột và lịch sử).
+Còn lại: Task 2 (`budgetCycleBaseline`, `budgetCyclePackage`), phiên bản từ số liệu nền (`source: BASELINE`, `BUDGET.BASELINE_VERSION_NOT_ALLOWED`), Task 4 (job nhắc hạn, 6 mã thông báo, báo trưởng phòng mới).
 
 - [ ] AC trong scope có bằng chứng.
 - [ ] Spec/plan phản ánh implementation cuối.
-- [ ] `pnpm check` và full suite CHƯA chạy (ghi rõ).
+- [ ] `pnpm check` và full suite CHƯA chạy.

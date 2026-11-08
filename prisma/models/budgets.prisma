@@ -23,6 +23,12 @@ enum BudgetRepeatCycle {
   ONE_TIME
 }
 
+// Where a version came from (QĐ-100h): the proposal of the head, or the baseline Finance built when nobody headed the department at the deadline.
+enum BudgetVersionOrigin {
+  PROPOSAL
+  BASELINE_NO_HEAD
+}
+
 enum BudgetVersionKind {
   // The first version of a Cost Center and year, built from a proposal.
   INITIAL
@@ -125,6 +131,9 @@ model BudgetVersion {
   // The version that was current when this revision was made.
   basedOnVersionId      String?            @map("based_on_version_id") @db.Uuid
   baseMinor             BigInt             @map("base_minor")
+  // Why Finance moved the base (QĐ-100v); set when a draft's base is changed.
+  baseReason            String?            @map("base_reason")
+  origin                BudgetVersionOrigin @default(PROPOSAL)
   reserveMinor          BigInt             @map("reserve_minor")
   // The share of the base the reserve defaults to, as it stood when the version was made; null before QĐ-98 (no reason is asked then).
   reservePercent        Int?               @map("reserve_percent") @db.SmallInt

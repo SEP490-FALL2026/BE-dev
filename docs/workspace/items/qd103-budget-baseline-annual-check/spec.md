@@ -134,3 +134,4 @@ hiệu lực 01/01 qua `ceilingDepartments` — AC-16; nhiệm kỳ tương lai 
 định nghĩa rõ + khác đồng tiền, `baseReason`, gói có tổng đề xuất so Trần năm (cờ/hạng giao `lines-cleanup`), nhắc hạn có
 Finance/Super Admin và nhắc lại khi đổi hạn (eventKey thay cột dấu), báo trưởng phòng mới, nhắc Finance liên kết Cost Center,
 Người duyệt chi đọc số liệu nền, ghi rõ lý do phụ thuộc `department-effective-year`, Verify đúng file.
+09/11/2026 (code, đợt 1/3): Task 1 và phần kiểm B4 + `baseReason` đã cài. Chi tiết cài: `annualCheck` ở `budget.policy.ts` (tập B4 = bản mới nhất mỗi Cost Center trong `SENT/CHANGES_REQUESTED/APPROVED`, không detached, bản đang gửi thay bản cùng Cost Center); khóa kỳ `FOR UPDATE` ở `VersionAccessService.lockCycleOf` (bỏ qua năm đã kết thúc để vẫn báo `YEAR_ENDED`); `baseReason` ≤ 1000 ký tự, CHECK ở DB, hiện ở `VersionWire`, lịch sử `FIGURES_UPDATED`.

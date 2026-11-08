@@ -70,6 +70,8 @@ export class VersionService {
       const approver = await this.access.usableApproverLocked(tx);
       const known = await this.versions.findById(id, tx);
       if (!known) throw new BudgetVersionNotFoundError();
+      // The cycle of the year first, before the proposal and the version (the order of the module: cycle, proposal, version, year).
+      const cycle = await this.access.lockCycleOf(tx, known);
       const proposal = known.proposalId ? await this.proposals.lockById(tx, known.proposalId) : null;
       const version = await this.access.lockEditable(tx, id);
       // A revision of the budget of a year is gone (`QĐ-97b`): one that an older release left is neither sent nor decided.
@@ -80,6 +82,7 @@ export class VersionService {
         throw new BudgetProposalStateError('REVIEW', proposal?.state ?? 'MISSING');
       }
       await this.yearLock.lock(tx, version.costCenterId, [version.year]);
+      await this.access.requireWithinAnnualCeiling(tx, cycle, version);
       if (proposal) await this.proposals.setReviewed(tx, proposal.id);
 
       await this.versions.setSent(tx, id, actor.employeeId, new Date());

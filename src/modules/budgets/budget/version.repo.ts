@@ -18,6 +18,10 @@ export interface VersionRecord {
   proposalId: string | null;
   basedOnVersionId: string | null;
   baseMinor: bigint;
+  /** Why Finance moved the base, when it did (`QĐ-100v`). */
+  baseReason: string | null;
+  /** Where the version came from: the head's proposal, or the baseline Finance built when nobody headed the department (`QĐ-100h`). */
+  origin: 'PROPOSAL' | 'BASELINE_NO_HEAD';
   reserveMinor: bigint;
   totalMinor: bigint;
   currency: string;
@@ -65,6 +69,7 @@ export interface NewVersion {
 /** The fields of a version Finance changes while it is a draft: a key that is present is written. */
 export interface VersionPatch {
   baseMinor?: bigint;
+  baseReason?: string | null;
   reserveMinor?: bigint;
   reserveReason?: string | null;
   quarters?: [bigint, bigint, bigint, bigint] | null;
@@ -82,6 +87,8 @@ const toRecord = (row: Prisma.BudgetVersionGetPayload<object>): VersionRecord =>
   proposalId: row.proposalId,
   basedOnVersionId: row.basedOnVersionId,
   baseMinor: row.baseMinor,
+  baseReason: row.baseReason,
+  origin: row.origin,
   reserveMinor: row.reserveMinor,
   totalMinor: row.totalMinor,
   currency: row.currency,
@@ -371,8 +378,22 @@ export class VersionRepo {
         totalMinor: nextBase + nextReserve,
         ...(patch.quarters !== undefined ? quarterColumns(patch.quarters) : {}),
         ...(patch.reserveReason !== undefined ? { reserveReason: patch.reserveReason } : {}),
+        ...(patch.baseReason !== undefined ? { baseReason: patch.baseReason } : {}),
       },
     });
+  }
+
+  /**
+   * The versions of the year the annual check counts (`QĐ-103i`): those that were sent, asked for changes or approved and were not
+   * detached, newest first. The caller keeps the newest of each Cost Center.
+   */
+  async countedInYear(organizationId: string, year: number, tx?: DbTx): Promise<VersionRecord[]> {
+    const rows = await (tx ?? this.prisma).budgetVersion.findMany({
+      where: { organizationId, year, state: { in: ['SENT', 'CHANGES_REQUESTED', 'APPROVED'] }, detachedAt: null },
+      orderBy: [{ number: 'desc' }, { id: 'asc' }],
+    });
+
+    return rows.map(toRecord);
   }
 
   async setState(tx: DbTx, id: string, state: VersionState): Promise<void> {

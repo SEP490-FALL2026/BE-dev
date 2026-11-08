@@ -23,6 +23,8 @@ export interface FigureFacts {
   quarters: readonly [bigint, bigint, bigint, bigint] | null;
   /** Why the reserve is not the default share of the base. */
   reserveReason: string | null;
+  /** Why Finance moved the base (`QĐ-100v`). */
+  baseReason?: string | null;
 }
 
 export interface LineFacts {
@@ -46,6 +48,7 @@ const FIELD_ORDER: readonly string[] = [
   // An entry written before QĐ-97b can still carry the reason of a revision.
   'reason',
   'reserveReason',
+  'baseReason',
   'description',
   'planId',
   'seats',
@@ -92,6 +95,7 @@ export function figureChange(
     ['q3', quarter(before, 2), quarter(after, 2)],
     ['q4', quarter(before, 3), quarter(after, 3)],
     ['reserveReason', before.reserveReason, after.reserveReason],
+    ['baseReason', before.baseReason ?? null, after.baseReason ?? null],
   ]);
 }
 

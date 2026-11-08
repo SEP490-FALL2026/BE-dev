@@ -56902,7 +56902,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED) or the quarters do not add up (BUDGET.QUARTERS_MISMATCH).",
+            "description": "The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the quarters do not add up (BUDGET.QUARTERS_MISMATCH) or the base is changed with no reason (BUDGET.BASE_REASON_REQUIRED, `baseReason`).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -56938,6 +56938,17 @@
                       "error": {
                         "code": "BUDGET.QUARTERS_MISMATCH",
                         "message": "The four quarters do not add up to the total of the version.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.BASE_REASON_REQUIRED": {
+                    "summary": "Say why the base is changed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.BASE_REASON_REQUIRED",
+                        "message": "Say why the base is changed.",
                         "requestId": "req_example"
                       }
                     }
@@ -57060,7 +57071,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The version waits for the spending approver. A reserve that is not the default share of the base is sent with its reason.",
+            "description": "The version waits for the spending approver. A reserve that is not the default share of the base is sent with its reason. The versions of the year (this one in the place of the one of its own Cost Center) must add up to no more than the annual ceiling less the shared-pool reserve of the budget cycle.",
             "content": {
               "application/json": {
                 "schema": {
@@ -57172,6 +57183,42 @@
                         "code": "BUDGET.PROPOSAL_NOT_SUBMITTED",
                         "message": "The proposal cannot be changed this way while it is WITHDRAWN.",
                         "details": { "state": "WITHDRAWN" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.CYCLE_NOT_PUBLISHED": {
+                    "summary": "The budget cycle of 2027 was not published yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.CYCLE_NOT_PUBLISHED",
+                        "message": "The budget cycle of 2027 was not published yet.",
+                        "details": { "year": 2027 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.OVER_ANNUAL_CEILING": {
+                    "summary": "The versions of the year add up to more than the annual ceiling less the shared-pool reserve.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.OVER_ANNUAL_CEILING",
+                        "message": "The versions of the year add up to more than the annual ceiling less the shared-pool reserve.",
+                        "details": { "gapMinor": "1", "availableMinor": "100" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.CYCLE_CURRENCY_MISMATCH": {
+                    "summary": "A version of the year is not in the currency of the budget cycle.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.CYCLE_CURRENCY_MISMATCH",
+                        "message": "A version of the year is not in the currency of the budget cycle.",
+                        "details": { "cycleCurrency": "VND", "versionCurrency": "USD" },
                         "requestId": "req_example"
                       }
                     }
@@ -98044,6 +98091,8 @@
                     "required": ["amount", "currency"],
                     "additionalProperties": false
                   },
+                  "baseReason": { "type": "string", "nullable": true },
+                  "origin": { "type": "string", "enum": ["PROPOSAL", "BASELINE_NO_HEAD"] },
                   "reserve": {
                     "type": "object",
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -98153,6 +98202,8 @@
                   "proposalId",
                   "rejectedPredecessorId",
                   "base",
+                  "baseReason",
+                  "origin",
                   "reserve",
                   "reservePercent",
                   "defaultReserve",
@@ -98378,6 +98429,7 @@
             "required": ["amount"],
             "additionalProperties": false
           },
+          "baseReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "reserve": {
             "type": "object",
             "properties": { "amount": { "type": "string", "maxLength": 40 } },

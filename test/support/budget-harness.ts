@@ -166,8 +166,12 @@ export class BudgetHarness extends RequestHarness {
     request(this.server()).get('/api/v1/budget-versions').query(query).set(this.as(account));
   versionLines = (id: string, account: ApiAccount = this.finance, query: Record<string, string | number> = {}) =>
     request(this.server()).get(`/api/v1/budget-versions/${id}/lines`).query(query).set(this.as(account));
+  /** An edit of a draft; a change of the base carries the reason it needs (`QĐ-100v`) unless the test names one (or none, with `baseReason: undefined`). */
   updateVersion = (id: string, body: object, account: ApiAccount = this.finance) =>
-    request(this.server()).put(`/api/v1/budget-versions/${id}`).set(this.as(account)).send(body);
+    request(this.server())
+      .put(`/api/v1/budget-versions/${id}`)
+      .set(this.as(account))
+      .send('base' in body && !('baseReason' in body) ? { baseReason: 'Finance moved the base', ...body } : body);
   updateLine = (id: string, position: number, body: object, account: ApiAccount = this.finance) =>
     request(this.server()).put(`/api/v1/budget-versions/${id}/lines/${position}`).set(this.as(account)).send(body);
   addLines = (id: string, lines: object[], account: ApiAccount = this.finance) =>

@@ -119,6 +119,8 @@ export class VersionViewService {
           defaultReserve:
             version.reservePercent === null ? null : money(defaultReserveOf(version.baseMinor, version.reservePercent)),
           reserveReason: version.reserveReason,
+          baseReason: version.baseReason,
+          origin: version.origin,
           total: money(version.totalMinor),
           quarters:
             q1 === undefined || q2 === undefined || q3 === undefined || q4 === undefined

@@ -211,8 +211,14 @@ export class BudgetVersionsController {
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED) or the quarters do not add up (BUDGET.QUARTERS_MISMATCH).',
-    examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED, EXAMPLES.QUARTERS_MISMATCH, ...MONEY_EXAMPLES],
+      'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the quarters do not add up (BUDGET.QUARTERS_MISMATCH) or the base is changed with no reason (BUDGET.BASE_REASON_REQUIRED, `baseReason`).',
+    examples: [
+      VALIDATION_EXAMPLE,
+      EXAMPLES.YEAR_ENDED,
+      EXAMPLES.QUARTERS_MISMATCH,
+      EXAMPLES.BASE_REASON_REQUIRED,
+      ...MONEY_EXAMPLES,
+    ],
   })
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -232,7 +238,7 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(VersionResponseDto, {
     message: 'BUDGET_VERSION.SENT',
     description:
-      'The version waits for the spending approver. A reserve that is not the default share of the base is sent with its reason.',
+      'The version waits for the spending approver. A reserve that is not the default share of the base is sent with its reason. The versions of the year (this one in the place of the one of its own Cost Center) must add up to no more than the annual ceiling less the shared-pool reserve of the budget cycle.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -242,7 +248,13 @@ export class BudgetVersionsController {
       status: HttpStatus.CONFLICT,
       description: NOT_EDITABLE_DESCRIPTION,
       // The proposal behind a first version was taken back or given back while it was being built.
-      examples: [EXAMPLES.VERSION_NOT_EDITABLE, EXAMPLES.PROPOSAL_NOT_SUBMITTED],
+      examples: [
+        EXAMPLES.VERSION_NOT_EDITABLE,
+        EXAMPLES.PROPOSAL_NOT_SUBMITTED,
+        EXAMPLES.CYCLE_NOT_PUBLISHED,
+        EXAMPLES.OVER_ANNUAL_CEILING,
+        EXAMPLES.CYCLE_CURRENCY_MISMATCH,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
