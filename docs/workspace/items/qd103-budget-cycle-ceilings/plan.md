@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `9c7f386`, BE `d9c46552`.
 - Phụ trách: chat code `SEP-Start 75: coder mainflow`. Thiết kế ban đầu bởi: AI chat review (W2, 08/11/2026).
 - Owner review: chưa review. Peer review: chat review (R2).
-- Triển khai: `not-started`. PR: chưa có.
+- Triển khai: `in-progress` (Task 1 xong 08/11/2026; Task 2–4 chưa làm). PR: chưa có.
 
 ## Before coding
 
@@ -79,3 +79,9 @@ Kiểm tra nhanh tracker §4.5; `openapi:export` thêm 6 operation. Tự review 
 - [ ] AC trong scope có bằng chứng.
 - [ ] Spec/plan phản ánh implementation cuối.
 - [ ] `pnpm check` và full suite CHƯA chạy (ghi rõ).
+
+### Tiến độ (08/11/2026, chat code)
+
+- Task 1 xong: migration `20261108520000_budget_cycles`, hai model Prisma, `budget-cycle-constraints.integration-spec.ts` (6 test xanh trên PostgreSQL 17 riêng). Lệch nhỏ: hai bảng không khai quan hệ Prisma tới `Organization`/`Employee`/`Department` (chỉ FK trong SQL) để không đụng các model của module khác.
+- Task 2 chưa làm. Phát hiện khi đọc code: `OrganizationReadApi` chưa có phép liệt kê phòng đang hoạt động cho `ceilingDepartments`; cần thêm một phương thức đọc (Task 2) trước khi viết `budgets/cycle`.
+- Task 3–4 (nộp `BM-10` cần kỳ, quyền theo khóa tham số, fixture của test cũ, seed) chưa làm.
