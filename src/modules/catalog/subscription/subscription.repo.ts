@@ -4,6 +4,7 @@ import { formatRate, parseRate } from '../../../core/money/rate';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { BaselineSubscription } from '../public/catalog.types';
 import type {
   NewSubscription,
   PriceSnapshotRecord,
@@ -361,6 +362,39 @@ export class SubscriptionRepo {
   }
 
   /** The ids of every subscription and purchase a department owns, by id. */
+  /** The active subscriptions owned by any of these owners, with their plan and application, by owner and id: one statement. */
+  async baselineRowsOf(departmentIds: readonly string[], tx?: DbTx): Promise<BaselineSubscription[]> {
+    if (departmentIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: { ownerDepartmentId: { in: [...departmentIds] }, status: 'ACTIVE' },
+      select: {
+        id: true,
+        ownerDepartmentId: true,
+        planId: true,
+        purchasedQuantity: true,
+        priceReportingMinor: true,
+        billingCycle: true,
+        startDate: true,
+        endDate: true,
+        plan: { select: { name: true, application: { select: { name: true } } } },
+      },
+      orderBy: [{ ownerDepartmentId: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => ({
+      subscriptionId: row.id,
+      departmentId: row.ownerDepartmentId,
+      planId: row.planId,
+      planName: row.plan.name,
+      applicationName: row.plan.application.name,
+      purchasedQuantity: row.purchasedQuantity,
+      unitPriceReportingMinor: row.priceReportingMinor,
+      billingCycle: row.billingCycle,
+      startDate: row.startDate ? fromDateColumn(row.startDate) : null,
+      endDate: row.endDate ? fromDateColumn(row.endDate) : null,
+    }));
+  }
+
   async idsOwnedBy(departmentId: string, tx?: DbTx): Promise<string[]> {
     const rows = await (tx ?? this.prisma).subscription.findMany({
       where: { ownerDepartmentId: departmentId },

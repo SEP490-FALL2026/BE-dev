@@ -3,12 +3,18 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { Money } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { SubscriptionRepo } from './subscription.repo';
+import type { BaselineSubscription } from '../public/catalog.types';
 import type { SubscriptionKind } from './subscription.types';
 
 /** What the rules of another capability need to know of the subscriptions of some plans: their kind and their end. */
 @Injectable()
 export class SubscriptionFactsService {
   constructor(private readonly subscriptions: SubscriptionRepo) {}
+
+  /** The active subscriptions these departments own, for the baseline of the budget: one statement for any number of departments. */
+  baselineOf(departmentIds: readonly string[], tx?: DbTx): Promise<BaselineSubscription[]> {
+    return this.subscriptions.baselineRowsOf(departmentIds, tx);
+  }
 
   /**
    * What a plan is bought at for a department, from the newest priced active subscription that department owns; null when it

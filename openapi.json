@@ -62122,6 +62122,384 @@
         "tags": ["budget-cycles"]
       }
     },
+    "/api/v1/budget-cycles/{year}/baseline": {
+      "get": {
+        "operationId": "budgetCycleBaseline",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "path",
+            "schema": { "minimum": 2000, "maximum": 2999, "type": "integer" }
+          },
+          {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "description": "Only this department: the head of a department reads the baseline of their own department by naming it.",
+            "schema": { "format": "uuid", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What runs today, department by department: the active subscriptions each owns, the seats held and idle, the price of a seat by the month (an annual price divided by 12), the months of the year it runs and what the year is estimated to cost, the spend of the year so far, and whether a Renew line is suggested. Finance and the spending approver read every department; the head of a department reads their own by naming it (departmentId). KPI-3 is null until usage is collected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/BaselineResponseDto" },
+                    { "properties": { "message": { "example": "BUDGET_CYCLE.BASELINE_FETCHED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not Finance, the spending approver or a head, or a head asks for a department that is not theirs (BUDGET.NOT_YOUR_COST_CENTER).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.NOT_YOUR_COST_CENTER": {
+                    "summary": "Only the head of the department proposes a budget for its Cost Center.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.NOT_YOUR_COST_CENTER",
+                        "message": "Only the head of the department proposes a budget for its Cost Center.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The budget cycle of the year does not exist (BUDGET.CYCLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "BUDGET.CYCLE_NOT_FOUND": {
+                    "summary": "The budget cycle of that year does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.CYCLE_NOT_FOUND",
+                        "message": "The budget cycle of that year does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The year or the query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read the baseline of a budget cycle",
+        "tags": ["budget-cycles"]
+      }
+    },
+    "/api/v1/budget-cycles/{year}/package": {
+      "get": {
+        "operationId": "budgetCyclePackage",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "path",
+            "schema": { "minimum": 2000, "maximum": 2999, "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The year against its annual ceiling: the annual ceiling, the shared-pool reserve, what is available (the ceiling less the reserve), the proposals added up and whether they are over it, the versions counted at the annual check added up and by how much they are over, and for each department its ceiling, its open proposal and the version counted for it (with its origin).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PackageResponseDto" },
+                    { "properties": { "message": { "example": "BUDGET_CYCLE.PACKAGE_FETCHED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance and the spending approver read the budget cycle.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The budget cycle of the year does not exist (BUDGET.CYCLE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "BUDGET.CYCLE_NOT_FOUND": {
+                    "summary": "The budget cycle of that year does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.CYCLE_NOT_FOUND",
+                        "message": "The budget cycle of that year does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The year is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read the package of a budget cycle",
+        "tags": ["budget-cycles"]
+      }
+    },
     "/api/v1/budget-cycles/{year}/publish": {
       "post": {
         "operationId": "budgetCyclePublish",
@@ -63220,7 +63598,7 @@
             }
           },
           "403": {
-            "description": "You do not hold the required role for this attachment.",
+            "description": "You do not hold the required role for this attachment, or you no longer answer for a unit that may propose (BUDGET.NOT_YOUR_COST_CENTER).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -63232,6 +63610,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.NOT_YOUR_COST_CENTER": {
+                    "summary": "Only the head of the department proposes a budget for its Cost Center.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.NOT_YOUR_COST_CENTER",
+                        "message": "Only the head of the department proposes a budget for its Cost Center.",
                         "requestId": "req_example"
                       }
                     }
@@ -63262,7 +63651,7 @@
             }
           },
           "409": {
-            "description": "The upload is still pending, expired, not awaiting upload, or the version is not editable.",
+            "description": "The upload is still pending, expired, not awaiting upload, the version is not editable, or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -63275,6 +63664,17 @@
                         "code": "BUDGET.VERSION_NOT_EDITABLE",
                         "message": "The version is SENT, so it is not changed.",
                         "details": { "state": "SENT" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "FINANCE.SETUP_INCOMPLETE": {
+                    "summary": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "FINANCE.SETUP_INCOMPLETE",
+                        "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
                         "requestId": "req_example"
                       }
                     }
@@ -100071,6 +100471,261 @@
           }
         },
         "required": ["sharedPoolReserve", "departments"],
+        "additionalProperties": false
+      },
+      "BaselineResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              "currency": { "type": "string" },
+              "computedAt": { "type": "string", "format": "date-time" },
+              "kpi3": {
+                "description": "KPI-3 needs usage, which is not collected yet: always null.",
+                "type": "number",
+                "nullable": true
+              },
+              "departments": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "departmentCode": { "type": "string" },
+                    "departmentName": { "type": "string" },
+                    "costCenterId": { "type": "string", "format": "uuid", "nullable": true },
+                    "spentThisYear": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "estimatedAnnualCost": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "seatsPurchased": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                    "seatsAssigned": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                    "software": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "application": { "type": "string" },
+                          "plan": { "type": "string" },
+                          "seatsPurchased": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "seatsAssigned": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "seatsIdle": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Purchased and not assigned; null when the purchase has no seats.",
+                            "nullable": true
+                          },
+                          "monthlyUnitPrice": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false,
+                            "nullable": true
+                          },
+                          "monthsRunning": { "type": "integer", "minimum": 0, "maximum": 12 },
+                          "estimatedAnnualCost": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false,
+                            "nullable": true
+                          },
+                          "suggestRenewal": {
+                            "type": "boolean",
+                            "description": "The term ends within the year: a Renew line is suggested."
+                          }
+                        },
+                        "required": [
+                          "application",
+                          "plan",
+                          "seatsPurchased",
+                          "seatsAssigned",
+                          "seatsIdle",
+                          "monthlyUnitPrice",
+                          "monthsRunning",
+                          "estimatedAnnualCost",
+                          "suggestRenewal"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The active subscriptions the department owns, by subscription id (the subscriptions of one department)."
+                    }
+                  },
+                  "required": [
+                    "departmentCode",
+                    "departmentName",
+                    "costCenterId",
+                    "spentThisYear",
+                    "estimatedAnnualCost",
+                    "seatsPurchased",
+                    "seatsAssigned",
+                    "software"
+                  ],
+                  "additionalProperties": false
+                },
+                "description": "The departments of the year, by department id: at most 500, the bound of budgetDepartmentCeilingsSet."
+              }
+            },
+            "required": ["year", "currency", "computedAt", "kpi3", "departments"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "PackageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              "annualCeiling": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false
+              },
+              "sharedPoolReserve": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "available": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "The annual ceiling less the shared-pool reserve: what the versions may add up to."
+              },
+              "proposalsTotal": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false
+              },
+              "proposalsOverAnnual": { "type": "boolean" },
+              "versionsTotal": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false
+              },
+              "overBy": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "What the versions are over `available` by; zero when they are not."
+              },
+              "departments": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "departmentCode": { "type": "string" },
+                    "departmentName": { "type": "string" },
+                    "ceiling": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "proposal": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "total": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "state": { "type": "string", "enum": ["SUBMITTED", "REVIEWED"] }
+                      },
+                      "required": ["id", "total", "state"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "version": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "base": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "reserve": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "total": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "state": { "type": "string", "enum": ["SENT", "CHANGES_REQUESTED", "APPROVED"] },
+                        "origin": { "type": "string", "enum": ["PROPOSAL", "BASELINE_NO_HEAD"] }
+                      },
+                      "required": ["id", "base", "reserve", "total", "state", "origin"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    }
+                  },
+                  "required": ["departmentCode", "departmentName", "ceiling", "proposal", "version"],
+                  "additionalProperties": false
+                },
+                "description": "The departments of the year, by department id: at most 500, the bound of budgetDepartmentCeilingsSet."
+              }
+            },
+            "required": [
+              "year",
+              "annualCeiling",
+              "sharedPoolReserve",
+              "available",
+              "proposalsTotal",
+              "proposalsOverAnnual",
+              "versionsTotal",
+              "overBy",
+              "departments"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "CreateBudgetAttachmentDto": {

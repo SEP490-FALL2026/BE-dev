@@ -88,3 +88,19 @@ export interface WorkspaceDuty {
   /** The plan declares an emergency account: only that it exists, never its name, its holder or any secret. */
   emergencyAccountDeclared: boolean;
 }
+
+/** An active subscription a department owns, as the baseline of the budget reads it (`FR-5.15`): what runs, at what price, for how long. */
+export interface BaselineSubscription {
+  subscriptionId: string;
+  departmentId: string;
+  planId: string;
+  planName: string;
+  applicationName: string;
+  /** The seats bought; null for a purchase that has none (perpetual, or priced another way). */
+  purchasedQuantity: number | null;
+  /** The unit price in the reporting currency as recorded when the price was; null when it has none. */
+  unitPriceReportingMinor: bigint | null;
+  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null;
+  startDate: string | null;
+  endDate: string | null;
+}

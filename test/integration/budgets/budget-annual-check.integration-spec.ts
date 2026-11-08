@@ -1,5 +1,7 @@
+import { Client } from 'pg';
 import request from 'supertest';
 import { BudgetHarness } from '../../support/budget-harness';
+import { waitForLockWaiters } from '../../support/lock-wait';
 
 const h = new BudgetHarness();
 
@@ -63,6 +65,115 @@ describe('the annual check of a version and the reason of the base (integration,
 
     expect(h.codeOf(over)).toBe('BUDGET.OVER_ANNUAL_CEILING');
     expect(h.detailsOf(over)).toMatchObject({ gapMinor: '1' });
+  });
+
+  describe('the versions the check counts (Q-22)', () => {
+    /** Takes every version of the year out of the count (and out of the way of the next case). */
+    const clear = (year: number) =>
+      h.ctx.sql.query(
+        `UPDATE budget_versions SET state = 'REJECTED', sent_at = COALESCE(sent_at, now()),
+                sent_by_employee_id = COALESCE(sent_by_employee_id, $2), detached_at = NULL, expired_at = NULL, never_current = false
+          WHERE year = $1 AND state <> 'REJECTED'`,
+        [year, h.finance.employeeId],
+      );
+    // A neighbour of 80M and a version being sent of 80M do not fit in 100M: the neighbour is counted or the sending passes.
+    const neighbour = async (year: number, set: string) => {
+      const other = await built(year);
+      await h.ctx.sql.query(
+        `UPDATE budget_versions SET ${set}, sent_at = now(), sent_by_employee_id = $2 WHERE id = $1`,
+        [other.id, h.finance.employeeId],
+      );
+    };
+    const sendWithNeighbour = async (set: string) => {
+      const year = h.year + 2;
+      await clear(year);
+      await cycleOf(year, 100_000_000);
+      await neighbour(year, set);
+      const a = await built(year);
+      const response = await h.sendVersion(a.id);
+      await clear(year);
+
+      return response;
+    };
+
+    it.each([
+      ['SENT', "state = 'SENT'"],
+      ['CHANGES_REQUESTED', "state = 'CHANGES_REQUESTED'"],
+      ['APPROVED', "state = 'APPROVED'"],
+    ])('counts a version of another Cost Center that is %s', async (_state, set) => {
+      const response = await sendWithNeighbour(set);
+
+      expect(response.status).toBe(409);
+      expect(h.codeOf(response)).toBe('BUDGET.OVER_ANNUAL_CEILING');
+    });
+
+    it.each([
+      ['REJECTED', "state = 'REJECTED'"],
+      ['EXPIRED', "state = 'EXPIRED', expired_at = now(), never_current = true"],
+      ['a draft', "state = 'DRAFT', sent_at = NULL, sent_by_employee_id = NULL"],
+    ])('does not count a version of another Cost Center that is %s', async (_state, set) => {
+      const year = h.year + 2;
+      await clear(year);
+      await cycleOf(year, 100_000_000);
+      const other = await built(year);
+      if (set.includes('DRAFT')) {
+        await h.ctx.sql.query(`UPDATE budget_versions SET ${set} WHERE id = $1`, [other.id]);
+      } else {
+        await h.ctx.sql.query(
+          `UPDATE budget_versions SET ${set}, sent_at = now(), sent_by_employee_id = $2 WHERE id = $1`,
+          [other.id, h.finance.employeeId],
+        );
+      }
+      const a = await built(year);
+
+      const response = await h.sendVersion(a.id);
+
+      expect(response.status).toBe(200);
+      await clear(year);
+    });
+
+    it('does not count a draft that was detached from its proposal (the database allows a detached version only as a draft or expired)', async () => {
+      const year = h.year + 2;
+      await clear(year);
+      await cycleOf(year, 100_000_000);
+      const other = await built(year);
+      await h.ctx.sql.query(`UPDATE budget_versions SET detached_at = now() WHERE id = $1`, [other.id]);
+      const a = await built(year);
+
+      const response = await h.sendVersion(a.id);
+
+      expect(response.status).toBe(200);
+      await clear(year);
+    });
+  });
+
+  it('waits for the cycle before it locks the version, so a sending never holds a version while it waits for the cycle (R-I06, lock order)', async () => {
+    const year = h.year + 3;
+    await cycleOf(year, 10 * VERSION_TOTAL);
+    const a = await built(year);
+    const holder = new Client({ connectionString: h.ctx.database.url });
+    const observer = new Client({ connectionString: h.ctx.database.url });
+    await holder.connect();
+    await observer.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query(`SELECT id FROM budget_cycles WHERE year = $1 FOR UPDATE`, [year]);
+
+      const sent = h.sendVersion(a.id).then((response) => response);
+      await waitForLockWaiters(observer, 1);
+      // The sending waits for the cycle and holds nothing of the version yet: anybody else can lock it.
+      await observer.query('BEGIN');
+      const free = await observer.query(`SELECT id FROM budget_versions WHERE id = $1 FOR UPDATE NOWAIT`, [a.id]);
+      await observer.query('ROLLBACK');
+      await holder.query('COMMIT');
+
+      expect(free.rows).toHaveLength(1);
+      expect((await sent).status).toBe(200);
+    } finally {
+      await holder.query('ROLLBACK').catch(() => undefined);
+      await holder.end();
+      await observer.end();
+    }
   });
 
   it('takes one of two sendings made at once when together they go over, never both (R-I06, concurrency)', async () => {

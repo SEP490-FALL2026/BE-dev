@@ -65,6 +65,16 @@ describe('the figures an edit of a version changed (F66, spec J.4)', () => {
     });
   });
 
+  it('shows the reason of the base again when a second change of the base is given with the same reason (QĐ-100v)', () => {
+    const before: FigureFacts = { ...figures, baseReason: 'The licences cost more' };
+    const after: FigureFacts = { ...before, baseMinor: 55_000_000n, totalMinor: 75_000_000n };
+
+    expect(figureChange(before, after, money)).toEqual({
+      before: { base: '60000000', total: '80000000', baseReason: 'The licences cost more' },
+      after: { base: '55000000', total: '75000000', baseReason: 'The licences cost more' },
+    });
+  });
+
   it('is nothing when the edit gave the values the version already had', () => {
     expect(figureChange(figures, { ...figures }, money)).toBeNull();
   });

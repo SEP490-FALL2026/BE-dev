@@ -86,7 +86,7 @@ export function figureChange(
   const amount = (minor: bigint | null) => (minor === null ? null : money(minor));
   const quarter = (facts: FigureFacts, index: 0 | 1 | 2 | 3) => amount(facts.quarters?.[index] ?? null);
 
-  return changeOf([
+  const change = changeOf([
     ['base', amount(before.baseMinor), amount(after.baseMinor)],
     ['reserve', amount(before.reserveMinor), amount(after.reserveMinor)],
     ['total', amount(before.totalMinor), amount(after.totalMinor)],
@@ -97,6 +97,16 @@ export function figureChange(
     ['reserveReason', before.reserveReason, after.reserveReason],
     ['baseReason', before.baseReason ?? null, after.baseReason ?? null],
   ]);
+
+  // The same reason given again for a second change of the base is still the reason of that change (`QĐ-100v`).
+  if (change && 'base' in change.after && !('baseReason' in change.after) && after.baseReason) {
+    return {
+      before: { ...change.before, baseReason: before.baseReason ?? null },
+      after: { ...change.after, baseReason: after.baseReason },
+    };
+  }
+
+  return change;
 }
 
 /** The fields an edit of one line changed (`VersionLineService.updateLine` and the move of a window). */

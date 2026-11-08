@@ -171,8 +171,9 @@ export class BudgetAttachmentUploadsController {
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'You do not hold the required role for this attachment.',
-      examples: [FORBIDDEN_EXAMPLE],
+      description:
+        'You do not hold the required role for this attachment, or you no longer answer for a unit that may propose (BUDGET.NOT_YOUR_COST_CENTER).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_YOUR_COST_CENTER],
     },
     {
       status: HttpStatus.NOT_FOUND,
@@ -181,9 +182,11 @@ export class BudgetAttachmentUploadsController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description: 'The upload is still pending, expired, not awaiting upload, or the version is not editable.',
+      description:
+        'The upload is still pending, expired, not awaiting upload, the version is not editable, or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
       examples: [
         EXAMPLES.VERSION_NOT_EDITABLE,
+        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
         ATTACHMENT_EXAMPLES.LIMIT_REACHED,
         ATTACHMENT_EXAMPLES.NOT_AWAITING_UPLOAD,
         ATTACHMENT_EXAMPLES.UPLOAD_PENDING,

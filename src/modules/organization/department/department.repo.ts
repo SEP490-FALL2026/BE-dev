@@ -144,15 +144,24 @@ export class DepartmentRepo {
     /** The day the person is placed: a department that takes effect later takes nobody in, and is told as one that does not take people. */
     onDay?: BusinessDate,
   ): Promise<{ id: string; code: string; name: string; active: boolean } | null> {
-    const rows = await tx.$queryRaw<
-      { id: string; code: string; name: string; status: string; effective_from: string }[]
-    >`
-      SELECT id, code, name, status::text AS status, effective_from::text AS effective_from FROM departments
-       WHERE organization_id = ${organizationId}::uuid AND code = ${code} FOR SHARE`;
+    // The day it takes effect is read only for a person who is to be placed in it: the other callers (the compatibility release of
+    // the owner of a subscription) run on a schema that may not have the column yet.
+    const rows =
+      onDay === undefined
+        ? (
+            await tx.$queryRaw<{ id: string; code: string; name: string; status: string }[]>`
+              SELECT id, code, name, status::text AS status FROM departments
+               WHERE organization_id = ${organizationId}::uuid AND code = ${code} FOR SHARE`
+          ).map((row) => ({ ...row, effective_from: null as string | null }))
+        : await tx.$queryRaw<
+            { id: string; code: string; name: string; status: string; effective_from: string | null }[]
+          >`
+              SELECT id, code, name, status::text AS status, effective_from::text AS effective_from FROM departments
+               WHERE organization_id = ${organizationId}::uuid AND code = ${code} FOR SHARE`;
     const department = rows[0];
     if (!department) return null;
 
-    const taking = onDay === undefined || department.effective_from <= onDay;
+    const taking = onDay === undefined || department.effective_from === null || department.effective_from <= onDay;
 
     return {
       id: department.id,
@@ -316,6 +325,17 @@ export class DepartmentRepo {
       effectiveFrom: row.effective_from,
       costCenter: row.cc_id === null ? null : { id: row.cc_id, status: row.cc_status ?? 'ACTIVE' },
     }));
+  }
+
+  /** The Cost Center in use that each of these departments is charged to (a Unit), by department; a department with none is absent. */
+  async unitCostCenterIds(departmentIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    if (departmentIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).costCenter.findMany({
+      where: { departmentId: { in: [...departmentIds] }, kind: 'UNIT', status: 'ACTIVE' },
+      select: { id: true, departmentId: true },
+    });
+
+    return new Map(rows.map((row) => [row.departmentId, row.id]));
   }
 
   /** Who is to head a department that is not yet in effect from the day it takes effect, or null (`QĐ-106k`). */

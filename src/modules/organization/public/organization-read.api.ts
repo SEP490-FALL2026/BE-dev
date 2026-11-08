@@ -73,6 +73,11 @@ export class OrganizationReadApi {
     return this.departments.headedDepartment(employeeId, onDate ?? (await this.businessToday()));
   }
 
+  /** The Cost Center in use each of these departments is charged to, by department id (a department with none is absent). */
+  getUnitCostCenterIds(departmentIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    return this.departments.unitCostCenterIds(departmentIds, tx);
+  }
+
   /** Who is to head a department that is not yet in effect, from the day it takes effect; null when nobody or when it is in effect (`QĐ-106k`). */
   getUpcomingHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
     return this.departments.upcomingHeadOf(departmentId, today, tx);

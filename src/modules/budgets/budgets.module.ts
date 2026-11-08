@@ -4,6 +4,7 @@ import { ObjectStorageModule } from '../../infrastructure/object-storage/object-
 import { AuditModule } from '../audit/audit.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { FinanceModule } from '../finance/finance.module';
+import { LicensingModule } from '../licensing/licensing.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
@@ -33,7 +34,9 @@ import { CommitmentService } from './commitment/commitment.service';
 import { InvoiceRepo } from './budget/invoice.repo';
 import { BudgetInvoicesController } from './invoice/budget-invoices.controller';
 import { BudgetCyclesController } from './cycle/budget-cycles.controller';
+import { BaselineService } from './cycle/baseline.service';
 import { CycleRepo } from './cycle/cycle.repo';
+import { PackageService } from './cycle/package.service';
 import { CycleService } from './cycle/cycle.service';
 import { DepartmentCreationWindowListener } from './cycle/department-creation-window.listener';
 import { InvoiceService } from './invoice/invoice.service';
@@ -91,6 +94,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     IdentityAccessFacadeModule,
     FinanceModule,
     CatalogModule,
+    LicensingModule,
     NotificationsModule,
     OperatingParametersModule,
     ObjectStorageModule,
@@ -150,6 +154,8 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetFactsRepo,
     CycleRepo,
     CycleService,
+    BaselineService,
+    PackageService,
     DepartmentCreationWindowListener,
     BudgetChangeListeners,
     CommitmentReleaseGuardHook,

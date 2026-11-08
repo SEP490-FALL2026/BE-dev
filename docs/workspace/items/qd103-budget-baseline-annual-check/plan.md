@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `9c7f386`, BE `d9c46552`.
 - Phụ trách: chat code `SEP-Start 75: coder mainflow`. Thiết kế ban đầu bởi: AI chat review (W2, 08/11/2026).
 - Owner review: chưa review. Peer review: chat review (R2).
-- Triển khai: `in-progress` (09/11/2026: Task 1 và phần kiểm B4 + `baseReason` của Task 3 xong; còn Task 2, phiên bản từ số liệu nền, Task 4). PR: chưa có.
+- Triển khai: `in-progress` (09/11/2026: Task 1, kiểm B4 + `baseReason`, và Task 2 (`budgetCycleBaseline`, `budgetCyclePackage`) xong; còn phiên bản từ số liệu nền và Task 4). PR: chưa có.
 
 ## Before coding
 
@@ -78,7 +78,7 @@ Sau Task 3 và Task 4: kiểm tra nhanh tracker §4.5; `openapi:export` drift đ
 | `test:http` platform + budgets; `test:gates`; lint, typecheck, arch:check, rules:check, openapi:export      | local                 | xanh                                                                                                                                 | —                       |
 
 Phần đã làm: Task 1 (migration `budget_version_origin`), Task 3 (kiểm B4 lúc gửi: khóa kỳ `FOR UPDATE` trước đề xuất/phiên bản, `BUDGET.OVER_ANNUAL_CEILING`, `CYCLE_CURRENCY_MISMATCH`, `CYCLE_NOT_PUBLISHED`; `baseReason` bắt buộc khi đổi `base`, lưu cột và lịch sử).
-Còn lại: Task 2 (`budgetCycleBaseline`, `budgetCyclePackage`), phiên bản từ số liệu nền (`source: BASELINE`, `BUDGET.BASELINE_VERSION_NOT_ALLOWED`), Task 4 (job nhắc hạn, 6 mã thông báo, báo trưởng phòng mới).
+Đợt 2 (reads): `budgetCycleBaseline` và `budgetCyclePackage` (`BaselineService`, `PackageService`, `baseline.policy`; đọc qua `CatalogApi.getBaselineSubscriptions`, `LicensingApi.countSeatsOfSubscriptions`, `OrganizationReadApi.getUnitCostCenterIds`; dạng map theo id nên không vào registry mảng). Test: `baseline.policy.spec` (8), `budget-cycle-baseline.integration-spec` (7), `budget-cycles.http-spec` (thêm 401/403/422). Đã sửa thêm: `lockByCode` chỉ đọc `effective_from` khi có `onDay` (CLI `ops:assign-subscription-owner` chạy trên schema cũ). Còn lại: phiên bản từ số liệu nền (`source: BASELINE`, `BUDGET.BASELINE_VERSION_NOT_ALLOWED`), Task 4 (job nhắc hạn, 6 mã thông báo, báo trưởng phòng mới).
 
 - [ ] AC trong scope có bằng chứng.
 - [ ] Spec/plan phản ánh implementation cuối.

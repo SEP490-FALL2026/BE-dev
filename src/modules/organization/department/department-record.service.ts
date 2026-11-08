@@ -51,6 +51,10 @@ export class DepartmentRecordService {
     return this.departments.activeDepartmentIds(year, tx);
   }
 
+  unitCostCenterIds(departmentIds: readonly string[], tx?: DbTx) {
+    return this.departments.unitCostCenterIds(departmentIds, tx);
+  }
+
   upcomingHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx) {
     return this.departments.upcomingHeadOf(departmentId, today, tx);
   }

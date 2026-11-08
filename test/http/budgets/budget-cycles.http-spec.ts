@@ -39,6 +39,8 @@ describe('budget cycle routes (HTTP contract, no database)', () => {
     ['post', '/api/v1/budget-cycles', OPEN],
     ['get', '/api/v1/budget-cycles', undefined],
     ['get', '/api/v1/budget-cycles/2031', undefined],
+    ['get', '/api/v1/budget-cycles/2031/baseline', undefined],
+    ['get', '/api/v1/budget-cycles/2031/package', undefined],
     ['patch', '/api/v1/budget-cycles/2031', { priorities: 'x' }],
     ['put', '/api/v1/budget-cycles/2031/department-ceilings', DIVISION],
     ['post', '/api/v1/budget-cycles/2031/publish', undefined],
@@ -65,9 +67,13 @@ describe('budget cycle routes (HTTP contract, no database)', () => {
     }
   });
 
-  it('refuses the two reads to every role but Finance and the spending approver with 403', async () => {
+  it('refuses the reads of the cycle and of its package to every role but Finance and the spending approver with 403', async () => {
     for (const roles of [['SUPER_ADMIN'], ['IT_ADMIN'], ['EMPLOYEE'], ['MANAGER'], []]) {
-      for (const path of ['/api/v1/budget-cycles', '/api/v1/budget-cycles/2031']) {
+      for (const path of [
+        '/api/v1/budget-cycles',
+        '/api/v1/budget-cycles/2031',
+        '/api/v1/budget-cycles/2031/package',
+      ]) {
         const response = await request(app.getHttpServer())
           .get(path)
           .set('Authorization', bearer(principal(roles)))
@@ -83,6 +89,14 @@ describe('budget cycle routes (HTTP contract, no database)', () => {
     ['a year out of range', 'get', '/api/v1/budget-cycles/1999', undefined],
     ['page 0', 'get', '/api/v1/budget-cycles?page=0', undefined],
     ['a page size of 101', 'get', '/api/v1/budget-cycles?pageSize=101', undefined],
+    ['a baseline of a year that is not a number', 'get', '/api/v1/budget-cycles/next/baseline', undefined],
+    [
+      'a baseline of a department that is not an id',
+      'get',
+      '/api/v1/budget-cycles/2031/baseline?departmentId=x',
+      undefined,
+    ],
+    ['a package of a year out of range', 'get', '/api/v1/budget-cycles/1999/package', undefined],
     ['an opening with no ceiling', 'post', '/api/v1/budget-cycles', { ...OPEN, annualCeiling: undefined }],
     [
       'an opening that names a currency',

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type {
+  BaselineSubscription,
   CatalogOnboardingFacts,
   PlanRevocationInfo,
   PlanSummary,
@@ -101,6 +102,11 @@ export class CatalogApi {
    */
   getPlanPrice(planId: string, ownerDepartmentId: string, tx?: DbTx) {
     return this.subscriptions.priceOfPlan(planId, ownerDepartmentId, tx);
+  }
+
+  /** The active subscriptions these departments own with their price and term: what the baseline of the budget starts from (`FR-5.15`). */
+  getBaselineSubscriptions(departmentIds: readonly string[], tx?: DbTx): Promise<BaselineSubscription[]> {
+    return this.subscriptions.baselineOf(departmentIds, tx);
   }
 
   /** The ids of every subscription and purchase a department owns, by id: for a module that finds what belongs to the department through them. */

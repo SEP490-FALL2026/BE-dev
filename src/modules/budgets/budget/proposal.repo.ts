@@ -252,6 +252,24 @@ export class ProposalRepo {
   }
 
   /** The proposals of a Cost Center and a year, newest first: the history of what was sent, given back and sent again. */
+  /** The newest proposal that waits or is being reviewed of each of these Cost Centers for the year, by Cost Center: one statement. */
+  async openOfCostCenters(
+    costCenterIds: readonly string[],
+    year: number,
+    tx?: DbTx,
+  ): Promise<Map<string, ProposalRecord>> {
+    if (costCenterIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).budgetProposal.findMany({
+      where: { costCenterId: { in: [...costCenterIds] }, year, state: { in: ['SUBMITTED', 'REVIEWED'] } },
+      include: WITH_SUCCESSOR,
+      orderBy: [{ submittedAt: 'desc' }, { id: 'asc' }],
+    });
+    const newest = new Map<string, ProposalRecord>();
+    for (const row of rows) if (!newest.has(row.costCenterId)) newest.set(row.costCenterId, toRecord(row));
+
+    return newest;
+  }
+
   async chainOf(costCenterId: string, year: number, tx?: DbTx): Promise<ProposalRecord[]> {
     const rows = await (tx ?? this.prisma).budgetProposal.findMany({
       where: { costCenterId, year },

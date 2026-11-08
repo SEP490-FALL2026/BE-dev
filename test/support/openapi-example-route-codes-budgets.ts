@@ -9,9 +9,11 @@ import type { RouteErrorStatus } from './openapi-example-manifest';
 export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> =
   {
     budgetAttachmentComplete: {
+      '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
       '404': ['BUDGET_ATTACHMENT.NOT_FOUND'],
       '409': [
         'BUDGET.VERSION_NOT_EDITABLE',
+        'FINANCE.SETUP_INCOMPLETE',
         'BUDGET_ATTACHMENT.LIMIT_REACHED',
         'BUDGET_ATTACHMENT.NOT_AWAITING_UPLOAD',
         'BUDGET_ATTACHMENT.UPLOAD_EXPIRED',
@@ -41,7 +43,14 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetCommitmentReleases: {
       '404': ['BUDGET.COMMITMENT_NOT_FOUND'],
     },
+    budgetCycleBaseline: {
+      '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
+      '404': ['BUDGET.CYCLE_NOT_FOUND'],
+    },
     budgetCycleGet: {
+      '404': ['BUDGET.CYCLE_NOT_FOUND'],
+    },
+    budgetCyclePackage: {
       '404': ['BUDGET.CYCLE_NOT_FOUND'],
     },
     budgetCycleOpen: {

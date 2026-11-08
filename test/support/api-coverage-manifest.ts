@@ -110,6 +110,8 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/budget-cycles',
   'POST /api/v1/budget-cycles',
   'GET /api/v1/budget-cycles/{year}',
+  'GET /api/v1/budget-cycles/{year}/baseline',
+  'GET /api/v1/budget-cycles/{year}/package',
   'PATCH /api/v1/budget-cycles/{year}',
   'PUT /api/v1/budget-cycles/{year}/department-ceilings',
   'POST /api/v1/budget-cycles/{year}/publish',

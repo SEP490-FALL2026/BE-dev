@@ -8,11 +8,14 @@ import {
   VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
-import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
+import { RequireRoles, RequireRolesOrGrants } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BUDGET_ERROR_EXAMPLES as EXAMPLES, toBudgetApiException } from '../budget/budget.http-errors';
 import {
+  BaselineQueryDto,
+  BaselineResponseDto,
+  PackageResponseDto,
   CycleListResponseDto,
   CycleResponseDto,
   CycleYearParamDto,
@@ -21,7 +24,9 @@ import {
   SetCeilingsBodyDto,
   UpdateCycleBodyDto,
 } from './cycle.dto';
+import { BaselineService } from './baseline.service';
 import { CycleService } from './cycle.service';
+import { PackageService } from './package.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const FINANCE_ONLY = {
@@ -48,7 +53,11 @@ const NOT_FOUND = {
 @ApiTags('budget-cycles')
 @Controller({ path: 'budget-cycles', version: '1' })
 export class BudgetCyclesController {
-  constructor(private readonly cycles: CycleService) {}
+  constructor(
+    private readonly cycles: CycleService,
+    private readonly baselines: BaselineService,
+    private readonly packages: PackageService,
+  ) {}
 
   @Post()
   @RequireRoles('FINANCE')
@@ -196,6 +205,62 @@ export class BudgetCyclesController {
   ) {
     try {
       return await this.cycles.setCeilings(actor, params.year, body);
+    } catch (error) {
+      throw toBudgetApiException(error);
+    }
+  }
+
+  @Get(':year/baseline')
+  @RequireRolesOrGrants(['FINANCE', 'SPENDING_APPROVER', 'MANAGER'], ['MANAGER'])
+  @ApiOperation({ operationId: 'budgetCycleBaseline', summary: 'Read the baseline of a budget cycle' })
+  @ApiSuccessResponse(BaselineResponseDto, {
+    message: 'BUDGET_CYCLE.BASELINE_FETCHED',
+    description:
+      'What runs today, department by department: the active subscriptions each owns, the seats held and idle, the price of a seat by the month (an annual price divided by 12), the months of the year it runs and what the year is estimated to cost, the spend of the year so far, and whether a Renew line is suggested. Finance and the spending approver read every department; the head of a department reads their own by naming it (departmentId). KPI-3 is null until usage is collected.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'The caller is not Finance, the spending approver or a head, or a head asks for a department that is not theirs (BUDGET.NOT_YOUR_COST_CENTER).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_YOUR_COST_CENTER],
+    },
+    NOT_FOUND,
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The year or the query is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
+  )
+  async baseline(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: CycleYearParamDto,
+    @Query() query: BaselineQueryDto,
+  ) {
+    try {
+      return await this.baselines.read(actor, params.year, query.departmentId);
+    } catch (error) {
+      throw toBudgetApiException(error);
+    }
+  }
+
+  @Get(':year/package')
+  @RequireRoles('FINANCE', 'SPENDING_APPROVER')
+  @ApiOperation({ operationId: 'budgetCyclePackage', summary: 'Read the package of a budget cycle' })
+  @ApiSuccessResponse(PackageResponseDto, {
+    message: 'BUDGET_CYCLE.PACKAGE_FETCHED',
+    description:
+      'The year against its annual ceiling: the annual ceiling, the shared-pool reserve, what is available (the ceiling less the reserve), the proposals added up and whether they are over it, the versions counted at the annual check added up and by how much they are over, and for each department its ceiling, its open proposal and the version counted for it (with its origin).',
+  })
+  @ApiErrorResponses(...AUTH_ERRORS, READERS, NOT_FOUND, {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description: 'The year is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
+  })
+  async package(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: CycleYearParamDto) {
+    try {
+      return await this.packages.read(actor, params.year);
     } catch (error) {
       throw toBudgetApiException(error);
     }

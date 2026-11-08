@@ -127,13 +127,13 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
     });
   });
 
-  describe('F4-01 chỉ số tiền: Cost Center và tiền tệ không do client gửi @MF4 @D1', () => {
-    it('đề xuất hoặc phiên bản gửi costCenterId, currency (kể cả trong tiền) ⟹ 422 chỉ đúng key đó, không ghi gì #14 @B2', async () => {
+  describe('F4-01 chỉ số tiền: Cost Center chỉ để chọn đơn vị của chính mình, tiền tệ không do client gửi @MF4 @D1', () => {
+    it('đề xuất gửi Cost Center của phòng khác ⟹ 403; phiên bản gửi costCenterId, mọi chỗ gửi currency ⟹ 422 chỉ đúng key đó; không ghi gì #14 @B2', async () => {
       const issuesOf = (response: Response) =>
         (call().detailsOf(response) as { issues: { path: string }[] }).issues.map((issue) => issue.path);
       const proposals = await world.facts.count('budget_proposals');
       const versions = await world.facts.count('budget_versions');
-      const costCenter = (await world.facts.one<{ id: string }>(`SELECT id FROM cost_centers WHERE code = 'CC-FIN'`))
+      const costCenter = (await world.facts.one<{ id: string }>(`SELECT id FROM cost_centers WHERE code = 'CC-DES'`))
         .id;
       const valid = {
         year,
@@ -156,11 +156,13 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
         costCenterId: costCenter,
       });
 
-      for (const response of [withCostCenter, withCurrency, baseWithCurrency, versionWithCostCenter]) {
+      // A head may name a Cost Center only to choose among the units they answer for (`QĐ-106k`): the Cost Center of another department is refused.
+      expect(withCostCenter.status).toBe(403);
+      expect(call().codeOf(withCostCenter)).toBe('BUDGET.NOT_YOUR_COST_CENTER');
+      for (const response of [withCurrency, baseWithCurrency, versionWithCostCenter]) {
         expect(response.status).toBe(422);
         expect(call().codeOf(response)).toBe('VALIDATION_ERROR');
       }
-      expect(issuesOf(withCostCenter)).toEqual(['']);
       expect(issuesOf(versionWithCostCenter)).toEqual(['']);
       expect(issuesOf(withCurrency)).toEqual(['lines.0.amount']);
       expect(issuesOf(baseWithCurrency)).toEqual(['base']);
