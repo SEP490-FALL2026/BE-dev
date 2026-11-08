@@ -30,9 +30,13 @@ export async function approvedBudget<T>(ctx: HttpTestApp, input: ApprovedBudgetI
     .submit(await principalOf(ctx, input.headToken), BudgetProposalBodyDto.create(sent(input.proposal)));
   const versions = ctx.app.get(VersionService, { strict: false });
   const finance = await principalOf(ctx, input.financeToken);
-  const version = await ctx.app
-    .get(VersionCreationService, { strict: false })
-    .createFromProposal(finance, VersionBodyDto.create(sent({ proposalId: proposal.id, ...input.version })));
+  const version = await ctx.app.get(VersionCreationService, { strict: false }).createFromProposal(
+    finance,
+    VersionBodyDto.create(sent({ proposalId: proposal.id, ...input.version })) as VersionBodyDto & {
+      proposalId: string;
+      base: { amount: string };
+    },
+  );
   await versions.send(finance, version.id);
   await ctx.app
     .get(VersionDecisionService, { strict: false })

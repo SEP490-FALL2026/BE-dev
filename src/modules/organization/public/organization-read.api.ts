@@ -78,6 +78,11 @@ export class OrganizationReadApi {
     return this.departments.unitCostCenterIds(departmentIds, tx);
   }
 
+  /** Whether somebody is named to head the department from a day after `today`: a successor, or the head of a department that starts later. */
+  hasHeadStartingAfter(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<boolean> {
+    return this.departments.hasHeadStartingAfter(departmentId, today, tx);
+  }
+
   /** Who is to head a department that is not yet in effect, from the day it takes effect; null when nobody or when it is in effect (`QĐ-106k`). */
   getUpcomingHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
     return this.departments.upcomingHeadOf(departmentId, today, tx);

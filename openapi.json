@@ -55824,7 +55824,7 @@
         },
         "responses": {
           "201": {
-            "description": "A draft with the base and the reserve (the default share of the base unless Finance gives another with its reason), and the lines of the proposal copied to be reviewed; the proposal itself is not changed. A proposal whose latest version was refused is made again the same way: the new draft points at the refused one (rejectedPredecessorId).",
+            "description": "A draft with the base and the reserve (the default share of the base unless Finance gives another with its reason), and the lines of the proposal copied to be reviewed; the proposal itself is not changed. A proposal whose latest version was refused is made again the same way: the new draft points at the refused one (rejectedPredecessorId). With source BASELINE (costCenterId and year, no proposal and no base) the draft is built from the baseline of the department when nobody heads it at the deadline: one Renew line for each subscription that runs in the year, the base is their sum, origin is BASELINE_NO_HEAD.",
             "content": {
               "application/json": {
                 "schema": {
@@ -55932,7 +55932,7 @@
             }
           },
           "409": {
-            "description": "The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT).",
+            "description": "The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the deadline has not passed, somebody heads the department or is to, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -55967,6 +55967,18 @@
                       "error": {
                         "code": "BUDGET.VERSION_IN_FLIGHT",
                         "message": "The Cost Center already has a version for this year that is not decided.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.BASELINE_VERSION_NOT_ALLOWED": {
+                    "summary": "A version is built from the baseline only after the deadline, for a department nobody heads and nobody proposed for.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.BASELINE_VERSION_NOT_ALLOWED",
+                        "message": "A version is built from the baseline only after the deadline, for a department nobody heads and nobody proposed for.",
+                        "details": { "reason": "HAS_HEAD" },
                         "requestId": "req_example"
                       }
                     }
@@ -56164,7 +56176,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Build the first version of a budget from a proposal",
+        "summary": "Build the first version of a budget",
         "tags": ["budget-versions"]
       },
       "get": {
@@ -98404,7 +98416,10 @@
       "VersionBodyDto": {
         "type": "object",
         "properties": {
+          "source": { "type": "string", "enum": ["PROPOSAL", "BASELINE"] },
           "proposalId": { "type": "string", "format": "uuid" },
+          "costCenterId": { "type": "string", "format": "uuid" },
+          "year": { "type": "integer", "minimum": 2000, "maximum": 2200 },
           "base": {
             "type": "object",
             "properties": { "amount": { "type": "string", "maxLength": 40 } },
@@ -98451,7 +98466,6 @@
             "nullable": true
           }
         },
-        "required": ["proposalId", "base"],
         "additionalProperties": false
       },
       "VersionResponseDto": {

@@ -54,6 +54,8 @@ export interface NewVersion {
   proposalId: string | null;
   basedOnVersionId: string | null;
   rejectedPredecessorId?: string | null;
+  /** Built from the baseline (`QĐ-100h`) rather than from a proposal; the default is a proposal. */
+  origin?: 'PROPOSAL' | 'BASELINE_NO_HEAD';
   baseMinor: bigint;
   reserveMinor: bigint;
   currency: string;
@@ -172,6 +174,7 @@ export class VersionRepo {
         proposalId: input.proposalId,
         basedOnVersionId: input.basedOnVersionId,
         rejectedPredecessorId: input.rejectedPredecessorId ?? null,
+        origin: input.origin ?? 'PROPOSAL',
         baseMinor: input.baseMinor,
         reserveMinor: input.reserveMinor,
         totalMinor: total,

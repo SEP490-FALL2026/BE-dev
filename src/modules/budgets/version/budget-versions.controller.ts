@@ -31,6 +31,7 @@ import { VersionDecisionService } from './version-decision.service';
 import { VersionHistoryViewService } from './version-history-view.service';
 import { LineImportService } from './line-import.service';
 import { VersionLineService } from './version-line.service';
+import { VersionBaselineCreationService } from './version-baseline-creation.service';
 import { VersionCreationService } from './version-creation.service';
 import { VersionService } from './version.service';
 import { VersionViewService } from '../budget/version-view.service';
@@ -97,16 +98,20 @@ export class BudgetVersionsController {
     private readonly views: VersionViewService,
     private readonly history: VersionHistoryViewService,
     private readonly imports: LineImportService,
+    private readonly baselineCreations: VersionBaselineCreationService,
   ) {}
 
   @Post()
   @RequireRoles('FINANCE')
-  @ApiOperation({ operationId: 'budgetVersionCreate', summary: 'Build the first version of a budget from a proposal' })
+  @ApiOperation({
+    operationId: 'budgetVersionCreate',
+    summary: 'Build the first version of a budget',
+  })
   @ApiSuccessResponse(VersionResponseDto, {
     status: HttpStatus.CREATED,
     message: 'BUDGET_VERSION.CREATED',
     description:
-      'A draft with the base and the reserve (the default share of the base unless Finance gives another with its reason), and the lines of the proposal copied to be reviewed; the proposal itself is not changed. A proposal whose latest version was refused is made again the same way: the new draft points at the refused one (rejectedPredecessorId).',
+      'A draft with the base and the reserve (the default share of the base unless Finance gives another with its reason), and the lines of the proposal copied to be reviewed; the proposal itself is not changed. A proposal whose latest version was refused is made again the same way: the new draft points at the refused one (rejectedPredecessorId). With source BASELINE (costCenterId and year, no proposal and no base) the draft is built from the baseline of the department when nobody heads it at the deadline: one Renew line for each subscription that runs in the year, the base is their sum, origin is BASELINE_NO_HEAD.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -119,9 +124,14 @@ export class BudgetVersionsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT).',
+        'The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the deadline has not passed, somebody heads the department or is to, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).',
       // CURRENT_EXISTS is not shown: a current budget keeps the proposal behind it REVIEWED, so none can wait beside it.
-      examples: [EXAMPLES.FINANCE_SETUP_INCOMPLETE, EXAMPLES.PROPOSAL_NOT_SUBMITTED, EXAMPLES.VERSION_IN_FLIGHT],
+      examples: [
+        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+        EXAMPLES.PROPOSAL_NOT_SUBMITTED,
+        EXAMPLES.VERSION_IN_FLIGHT,
+        EXAMPLES.BASELINE_VERSION_NOT_ALLOWED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -132,7 +142,15 @@ export class BudgetVersionsController {
   )
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: VersionBodyDto) {
     try {
-      return { version: await this.creations.createFromProposal(actor, body) };
+      if (body.source === 'BASELINE') {
+        // The body schema has judged that a baseline version names its Cost Center and year.
+        const { costCenterId, year } = body as { costCenterId: string; year: number };
+
+        return { version: await this.baselineCreations.create(actor, { costCenterId, year }) };
+      }
+      const fromProposal = body as VersionBodyDto & { proposalId: string; base: NonNullable<VersionBodyDto['base']> };
+
+      return { version: await this.creations.createFromProposal(actor, fromProposal) };
     } catch (error) {
       throw toBudgetApiException(error);
     }

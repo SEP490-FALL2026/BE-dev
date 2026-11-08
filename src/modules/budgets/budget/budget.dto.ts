@@ -90,14 +90,37 @@ const versionFigures = {
   /** A forecast by quarter, never a limit: the four add up to the total or it is not saved (`US-06-09` AC-6). */
   quarters: quarters.nullable(),
 };
-/** A first version of a Cost Center and year, built from the proposal that waits for Finance. */
-export const versionBodySchema = z.strictObject({
-  proposalId: z.uuid(),
-  base: versionFigures.base,
-  reserve: versionFigures.reserve.optional(),
-  reserveReason: versionFigures.reserveReason.optional(),
-  quarters: versionFigures.quarters.optional(),
-});
+/**
+ * A first version of a Cost Center and year: from the proposal that waits for Finance (`source` PROPOSAL, the default: `proposalId` and
+ * `base`), or from the baseline when nobody heads the department at the deadline (`source` BASELINE: `costCenterId` and `year`; the base
+ * and the lines come from the baseline, `QĐ-100h`).
+ */
+export const versionBodySchema = z
+  .strictObject({
+    source: z.enum(['PROPOSAL', 'BASELINE']).optional(),
+    proposalId: z.uuid().optional(),
+    costCenterId: z.uuid().optional(),
+    year: z.number().int().min(2000).max(2200).optional(),
+    base: versionFigures.base.optional(),
+    reserve: versionFigures.reserve.optional(),
+    reserveReason: versionFigures.reserveReason.optional(),
+    quarters: versionFigures.quarters.optional(),
+  })
+  .superRefine((body, ctx) => {
+    const issue = (path: string[], message: string) => ctx.addIssue({ code: 'custom', path, message });
+    if (body.source === 'BASELINE') {
+      if (body.costCenterId === undefined) issue(['costCenterId'], 'Required for a version built from the baseline.');
+      if (body.year === undefined) issue(['year'], 'Required for a version built from the baseline.');
+      if (body.proposalId !== undefined || body.base !== undefined)
+        issue([], 'A baseline version has no proposal and no base: both come from the baseline.');
+
+      return;
+    }
+    if (body.proposalId === undefined) issue(['proposalId'], 'Required.');
+    if (body.base === undefined) issue(['base'], 'Required.');
+    if (body.costCenterId !== undefined || body.year !== undefined)
+      issue([], 'A version of a proposal names neither a Cost Center nor a year.');
+  });
 export const versionPatchSchema = z
   .strictObject({
     base: versionFigures.base,

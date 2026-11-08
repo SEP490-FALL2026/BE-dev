@@ -38,6 +38,7 @@ import {
   BudgetCurrentExistsError,
   BudgetImportFileInvalidError,
   BudgetLineNotFoundError,
+  BudgetBaselineVersionNotAllowedError,
   BudgetBaseReasonRequiredError,
   BudgetCostCenterRequiredError,
   BudgetCycleCurrencyMismatchError,
@@ -131,6 +132,9 @@ export function toBudgetApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.PLAN_NOT_FOUND', error.message, {
       planIds: error.planIds,
     });
+  }
+  if (error instanceof BudgetBaselineVersionNotAllowedError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET.BASELINE_VERSION_NOT_ALLOWED', error.message, { reason: error.reason });
   }
   if (error instanceof BudgetOverAnnualCeilingError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET.OVER_ANNUAL_CEILING', error.message, {
@@ -314,6 +318,7 @@ export const BUDGET_ERROR_EXAMPLES = {
   NOT_YOUR_COST_CENTER: example(new BudgetNotYourCostCenterError()),
   COST_CENTER_REQUIRED: example(new BudgetCostCenterRequiredError()),
   OVER_ANNUAL_CEILING: example(new BudgetOverAnnualCeilingError(1n, 100n)),
+  BASELINE_VERSION_NOT_ALLOWED: example(new BudgetBaselineVersionNotAllowedError('HAS_HEAD')),
   CYCLE_CURRENCY_MISMATCH: example(new BudgetCycleCurrencyMismatchError('VND', 'USD')),
   BASE_REASON_REQUIRED: example(new BudgetBaseReasonRequiredError()),
   YEAR_ENDED: example(new BudgetYearEndedError(2025)),

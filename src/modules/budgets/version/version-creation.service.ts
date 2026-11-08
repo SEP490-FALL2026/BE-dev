@@ -40,7 +40,10 @@ export class VersionCreationService {
    * Throws BudgetNotFinanceError, BudgetProposalNotFoundError, FinanceSetupIncompleteError, BudgetYearEndedError,
    * BudgetProposalStateError, BudgetCurrentExistsError, BudgetVersionInFlightError, BudgetQuartersMismatchError and the money errors.
    */
-  async createFromProposal(actor: AuthenticatedPrincipal, body: VersionBodyDto): Promise<VersionWire> {
+  async createFromProposal(
+    actor: AuthenticatedPrincipal,
+    body: VersionBodyDto & { proposalId: string; base: NonNullable<VersionBodyDto['base']> },
+  ): Promise<VersionWire> {
     this.facts.requireFinance(actor);
     const defaultPercent = await this.facts.reserveDefaultPercent();
 

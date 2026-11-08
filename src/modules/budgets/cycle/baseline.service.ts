@@ -1,13 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
+import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { BudgetCycleNotFoundError, BudgetNotYourCostCenterError } from '../budget/budget.errors';
+import {
+  BudgetBaselineVersionNotAllowedError,
+  BudgetCycleNotFoundError,
+  BudgetNotYourCostCenterError,
+} from '../budget/budget.errors';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
-import { estimatedCost, monthlyUnitPrice, monthsRunning, shouldSuggestRenewal } from './baseline.policy';
+import { ProposalRepo } from '../budget/proposal.repo';
+import { baselineVersionRefusal, shouldSuggestRenewal, subscriptionCost } from './baseline.policy';
 import type { BaselineSubscription } from '../../catalog/public/catalog.types';
 import type { BaselineWire } from './cycle.dto';
 import { CycleRepo } from './cycle.repo';
@@ -34,9 +40,7 @@ function departmentOf(
   let assigned = 0;
   for (const subscription of subscriptions) {
     const held = seats.get(subscription.subscriptionId) ?? 0;
-    const monthly = monthlyUnitPrice(subscription.unitPriceReportingMinor, subscription.billingCycle);
-    const months = monthsRunning(year, subscription.startDate, subscription.endDate);
-    const cost = estimatedCost(subscription.purchasedQuantity, monthly, months);
+    const { monthlyMinor: monthly, months, costMinor: cost } = subscriptionCost(year, subscription);
     total += cost ?? 0n;
     purchased += subscription.purchasedQuantity ?? 0;
     assigned += held;
@@ -81,6 +85,7 @@ export class BaselineService {
     private readonly catalog: CatalogApi,
     private readonly licensing: LicensingApi,
     private readonly commitments: CommitmentRepo,
+    private readonly proposals: ProposalRepo,
   ) {}
 
   /** Throws BudgetCycleNotFoundError and BudgetNotYourCostCenterError (a head asking for a department that is not theirs, or for none). */
@@ -119,6 +124,62 @@ export class BaselineService {
     }
 
     return { year, currency: cycle.currency, computedAt: new Date().toISOString(), kpi3: null, departments };
+  }
+
+  /**
+   * Whether Finance may build the first version of the department of this Cost Center for `year` from the baseline (`QĐ-100h`,
+   * `R-I05`). The cycle is locked `FOR UPDATE` first (the order of the module). Throws FinanceSetupIncompleteError and
+   * BudgetCostCenterNotFoundError (the Cost Center is not in use), and BudgetBaselineVersionNotAllowedError naming the first thing
+   * that is wrong.
+   */
+  async requireVersionAllowed(
+    tx: DbTx,
+    costCenterId: string,
+    year: number,
+  ): Promise<{ departmentId: string; currency: string }> {
+    const today = await this.facts.today(new Date(), tx);
+    const cycle = await this.cycles.lockByYear(tx, await this.facts.organizationId(tx), year, 'UPDATE');
+    const unit = await this.facts.costCenterInUse(costCenterId, tx);
+    const heads = await this.organizationReads.getDepartmentHeads([unit.departmentId], today, tx);
+    const refusal = baselineVersionRefusal({
+      cyclePublishedOnce: cycle !== null && cycle.firstPublishedAt !== null,
+      today,
+      submissionDeadline: cycle?.submissionDeadline ?? today,
+      headsToday: heads.has(unit.departmentId),
+      headToCome: await this.organizationReads.hasHeadStartingAfter(unit.departmentId, today, tx),
+      openProposal: (await this.proposals.openOfCostCenters([costCenterId], year, tx)).has(costCenterId),
+    });
+    if (refusal !== null || cycle === null)
+      throw new BudgetBaselineVersionNotAllowedError(refusal ?? 'CYCLE_NOT_PUBLISHED');
+
+    return { departmentId: unit.departmentId, currency: cycle.currency };
+  }
+
+  /**
+   * The lines of a first version built from the baseline (`QĐ-100h`): one `Renew` line for each active subscription of the department
+   * that runs in the year at a known price, as the baseline estimates it. Throws nothing; a department that runs nothing gives none.
+   */
+  async renewalLinesOf(
+    departmentId: string,
+    year: number,
+    tx?: DbTx,
+  ): Promise<{ description: string; planId: string; seats: number | null; amountMinor: bigint }[]> {
+    const subscriptions = await this.catalog.getBaselineSubscriptions([departmentId], tx);
+
+    return subscriptions.flatMap((subscription) => {
+      const { costMinor } = subscriptionCost(year, subscription);
+
+      return costMinor === null || costMinor <= 0n
+        ? []
+        : [
+            {
+              description: `Renew ${subscription.applicationName} ${subscription.planName}`.slice(0, 200),
+              planId: subscription.planId,
+              seats: subscription.purchasedQuantity,
+              amountMinor: costMinor,
+            },
+          ];
+    });
   }
 
   /** A head reads the baseline of their own department only, and names it. */

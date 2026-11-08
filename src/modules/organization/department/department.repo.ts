@@ -338,6 +338,17 @@ export class DepartmentRepo {
     return new Map(rows.map((row) => [row.departmentId, row.id]));
   }
 
+  /** Whether somebody is named to head the department from a day after `today` (a successor, or the head of a department that starts later). */
+  async hasHeadStartingAfter(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<boolean> {
+    const rows = await (tx ?? this.prisma).$queryRaw<{ one: number }[]>`
+      SELECT 1 AS one FROM department_head_periods
+       WHERE department_id = ${departmentId}::uuid AND valid_from > ${toDateColumn(today)}::date
+         AND (valid_to IS NULL OR valid_to > valid_from)
+       LIMIT 1`;
+
+    return rows.length > 0;
+  }
+
   /** Who is to head a department that is not yet in effect from the day it takes effect, or null (`QĐ-106k`). */
   async upcomingHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
     const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string }[]>`

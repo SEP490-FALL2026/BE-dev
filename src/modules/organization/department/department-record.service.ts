@@ -55,6 +55,10 @@ export class DepartmentRecordService {
     return this.departments.unitCostCenterIds(departmentIds, tx);
   }
 
+  hasHeadStartingAfter(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<boolean> {
+    return this.departments.hasHeadStartingAfter(departmentId, today, tx);
+  }
+
   upcomingHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx) {
     return this.departments.upcomingHeadOf(departmentId, today, tx);
   }
