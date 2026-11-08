@@ -62236,6 +62236,7 @@
                         "details": {
                           "missingDepartmentIds": ["<department-id>"],
                           "staleDepartmentIds": [],
+                          "explanationMissingDepartmentIds": [],
                           "reserveMissing": true
                         },
                         "requestId": "req_example"
@@ -68624,7 +68625,7 @@
             }
           },
           "403": {
-            "description": "Only the role that owns a parameter sets it: the Super Admin the parameters of the system, Finance the ones that carry the owner FINANCE (a request for another role is refused).",
+            "description": "Only the Super Admin configures the operating parameters.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -68898,7 +68899,7 @@
             }
           },
           "403": {
-            "description": "Only the role that owns a parameter sets it: the Super Admin the parameters of the system, Finance the ones that carry the owner FINANCE (a request for another role is refused).",
+            "description": "Only the Super Admin configures the operating parameters.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -69143,7 +69144,7 @@
             }
           },
           "403": {
-            "description": "Only the role that owns a parameter sets it: the Super Admin the parameters of the system, Finance the ones that carry the owner FINANCE (a request for another role is refused).",
+            "description": "Only the Super Admin configures the operating parameters.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },

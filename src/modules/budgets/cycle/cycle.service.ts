@@ -29,6 +29,7 @@ import {
   ceilingAuditValue,
   ceilingTotal,
   changedCeilings,
+  changesNumbers,
   planUpdate,
   departmentsToTell,
   isPastYear,
@@ -270,7 +271,8 @@ export class CycleService {
       // The same division again changes nothing: the cycle stays published and nothing is recorded.
       if (changes.length === 0 && !reserveChanged) return cycle;
 
-      await this.cycles.replaceCeilings(tx, cycle, reserve, rows, true);
+      // A change of the explanation alone keeps the cycle published; a change of a number takes it back (R-I04).
+      await this.cycles.replaceCeilings(tx, cycle, reserve, rows, changesNumbers(changes, reserveChanged));
       await this.audit.record(
         tx,
         budgetAuditEvent(
@@ -372,6 +374,7 @@ export class CycleService {
           verdict.missingDepartmentIds,
           verdict.staleDepartmentIds,
           verdict.reserveMissing,
+          verdict.explanationMissingDepartmentIds,
         )
       : new BudgetCeilingsOverAnnualError(verdict.gapMinor);
   }

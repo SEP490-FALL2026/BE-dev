@@ -1,6 +1,7 @@
 import {
   ceilingTotal,
   changedCeilings,
+  changesNumbers,
   cycleAcceptsWork,
   departmentsToTell,
   isPastYear,
@@ -30,18 +31,24 @@ describe('the budget cycle policy (QĐ-103i)', () => {
   });
 
   describe('whether a division can be published (R-I04, QT 4.3)', () => {
+    const explained = (departmentId: string, total: bigint) => ({
+      ...ceiling(departmentId, total),
+      explanation: 'basis',
+    });
     const base = {
       departmentIds: ['a', 'b'],
-      ceilings: [ceiling('a', 40n), ceiling('b', 50n)],
+      ceilings: [explained('a', 40n), explained('b', 50n)],
       annualCeilingMinor: 100n,
     };
 
     it('accepts a division that adds up to the annual ceiling exactly, and a zero reserve', () => {
       expect(judgePublish({ ...base, reserveMinor: 10n })).toEqual({ kind: 'OK', totalMinor: 100n });
-      expect(judgePublish({ ...base, ceilings: [ceiling('a', 40n), ceiling('b', 60n)], reserveMinor: 0n })).toEqual({
-        kind: 'OK',
-        totalMinor: 100n,
-      });
+      expect(judgePublish({ ...base, ceilings: [explained('a', 40n), explained('b', 60n)], reserveMinor: 0n })).toEqual(
+        {
+          kind: 'OK',
+          totalMinor: 100n,
+        },
+      );
     });
 
     it('refuses a division one unit over the annual ceiling, and says by how much', () => {
@@ -49,19 +56,45 @@ describe('the budget cycle policy (QĐ-103i)', () => {
     });
 
     it('refuses a division with a department missing, a ceiling for a department that left, or no reserve entered', () => {
-      expect(judgePublish({ ...base, ceilings: [ceiling('a', 40n)], reserveMinor: 10n })).toEqual({
+      expect(judgePublish({ ...base, ceilings: [explained('a', 40n)], reserveMinor: 10n })).toEqual({
         kind: 'INCOMPLETE',
         missingDepartmentIds: ['b'],
         staleDepartmentIds: [],
+        explanationMissingDepartmentIds: [],
         reserveMissing: false,
       });
-      expect(judgePublish({ ...base, ceilings: [...base.ceilings, ceiling('z', 1n)], reserveMinor: 0n })).toMatchObject(
-        {
-          kind: 'INCOMPLETE',
-          staleDepartmentIds: ['z'],
-        },
-      );
+      expect(
+        judgePublish({ ...base, ceilings: [...base.ceilings, explained('z', 1n)], reserveMinor: 0n }),
+      ).toMatchObject({
+        kind: 'INCOMPLETE',
+        staleDepartmentIds: ['z'],
+      });
       expect(judgePublish({ ...base, reserveMinor: null })).toMatchObject({ kind: 'INCOMPLETE', reserveMissing: true });
+    });
+
+    it('refuses a ceiling with no explanation (blank counts as none), and names the departments (W2-N4, QT 4.3)', () => {
+      const ceilings = [explained('a', 40n), { ...ceiling('b', 50n), explanation: '   ' }];
+
+      expect(judgePublish({ ...base, ceilings, reserveMinor: 10n })).toMatchObject({
+        kind: 'INCOMPLETE',
+        explanationMissingDepartmentIds: ['b'],
+        missingDepartmentIds: [],
+      });
+    });
+  });
+
+  describe('whether a change of the division changes a number (R-I04)', () => {
+    const figures = { signedCommitmentsMinor: 5n, plannedSeatsMinor: 0n, priorityMinor: 0n, explanation: 'old' };
+
+    it('does not for a new explanation alone', () => {
+      expect(changesNumbers([{ before: figures, after: { ...figures, explanation: 'new' } }], false)).toBe(false);
+    });
+
+    it('does for a part, the reserve, a department added or one taken out', () => {
+      expect(changesNumbers([{ before: figures, after: { ...figures, priorityMinor: 5n } }], false)).toBe(true);
+      expect(changesNumbers([], true)).toBe(true);
+      expect(changesNumbers([{ before: null, after: figures }], false)).toBe(true);
+      expect(changesNumbers([{ before: figures, after: null }], false)).toBe(true);
     });
   });
 

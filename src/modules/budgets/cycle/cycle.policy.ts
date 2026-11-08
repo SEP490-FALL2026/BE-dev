@@ -25,13 +25,19 @@ export interface StoredCeiling extends CeilingParts {
 
 export type PublishVerdict =
   | { kind: 'OK'; totalMinor: bigint }
-  | { kind: 'INCOMPLETE'; missingDepartmentIds: string[]; staleDepartmentIds: string[]; reserveMissing: boolean }
+  | {
+      kind: 'INCOMPLETE';
+      missingDepartmentIds: string[];
+      staleDepartmentIds: string[];
+      explanationMissingDepartmentIds: string[];
+      reserveMissing: boolean;
+    }
   | { kind: 'OVER_ANNUAL'; gapMinor: bigint };
 
 /**
  * Whether the division can be published (`QĐ-103i`): every department of the year has a ceiling, none belongs to a department that
- * left the set, the shared-pool reserve was entered (an explicit zero counts), and the ceilings and the reserve add up to no more than
- * the annual ceiling (`R-I04`).
+ * left the set, every ceiling says what it rests on (the explanation of QT 4.3 is required to publish), the shared-pool reserve was
+ * entered (an explicit zero counts), and the ceilings and the reserve add up to no more than the annual ceiling (`R-I04`).
  */
 export function judgePublish(input: {
   departmentIds: readonly string[];
@@ -46,9 +52,19 @@ export function judgePublish(input: {
     .map((ceiling) => ceiling.departmentId)
     .filter((id) => !inSet.has(id))
     .sort();
+  const unexplained = input.ceilings
+    .filter((ceiling) => (ceiling.explanation ?? '').trim() === '')
+    .map((ceiling) => ceiling.departmentId)
+    .sort();
   const reserveMissing = input.reserveMinor === null;
-  if (missing.length > 0 || stale.length > 0 || reserveMissing) {
-    return { kind: 'INCOMPLETE', missingDepartmentIds: missing, staleDepartmentIds: stale, reserveMissing };
+  if (missing.length > 0 || stale.length > 0 || unexplained.length > 0 || reserveMissing) {
+    return {
+      kind: 'INCOMPLETE',
+      missingDepartmentIds: missing,
+      staleDepartmentIds: stale,
+      explanationMissingDepartmentIds: unexplained,
+      reserveMissing,
+    };
   }
   const total = input.ceilings.reduce((sum, ceiling) => sum + ceiling.totalMinor, 0n) + (input.reserveMinor as bigint);
   if (total > input.annualCeilingMinor) return { kind: 'OVER_ANNUAL', gapMinor: total - input.annualCeilingMinor };
@@ -146,4 +162,25 @@ export function windowOf(input: {
   }
 
   return input.anyCycle ? { kind: 'CLOSED' } : { kind: 'NO_CYCLE_YET' };
+}
+
+/**
+ * Whether a change of a division changes a number a head was told: a part of a ceiling, a department added or taken out, or the
+ * reserve. A change of the explanation alone does not take the publication back (`R-I04`); the audit record still shows it.
+ */
+export function changesNumbers(
+  changes: readonly { before: CeilingFigures | null; after: CeilingFigures | null }[],
+  reserveChanged: boolean,
+): boolean {
+  return (
+    reserveChanged ||
+    changes.some(
+      ({ before, after }) =>
+        before === null ||
+        after === null ||
+        before.signedCommitmentsMinor !== after.signedCommitmentsMinor ||
+        before.plannedSeatsMinor !== after.plannedSeatsMinor ||
+        before.priorityMinor !== after.priorityMinor,
+    )
+  );
 }

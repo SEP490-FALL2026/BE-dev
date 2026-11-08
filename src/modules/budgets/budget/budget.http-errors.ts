@@ -162,6 +162,7 @@ export function toBudgetApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CEILINGS_INCOMPLETE', error.message, {
       missingDepartmentIds: error.missingDepartmentIds,
       staleDepartmentIds: error.staleDepartmentIds,
+      explanationMissingDepartmentIds: error.explanationMissingDepartmentIds,
       reserveMissing: error.reserveMissing,
     });
   }
@@ -301,7 +302,7 @@ export const BUDGET_ERROR_EXAMPLES = {
   CYCLE_DEADLINES_INVALID: example(new BudgetCycleDeadlinesInvalidError()),
   CYCLE_REASON_REQUIRED: example(new BudgetCycleReasonRequiredError()),
   CEILING_DEPARTMENT_INVALID: example(new BudgetCeilingDepartmentInvalidError(['<department-id>'])),
-  CEILINGS_INCOMPLETE: example(new BudgetCeilingsIncompleteError(['<department-id>'], [], true)),
+  CEILINGS_INCOMPLETE: example(new BudgetCeilingsIncompleteError(['<department-id>'], [], true, [])),
   CEILINGS_OVER_ANNUAL: example(new BudgetCeilingsOverAnnualError(1n)),
   CYCLE_NOT_PUBLISHED: example(new BudgetCycleNotPublishedError(2027)),
   CURRENCY_NOT_REPORTING: example(new BudgetCurrencyError('USD', 'VND')),

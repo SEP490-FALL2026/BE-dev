@@ -365,6 +365,7 @@ async function oneCycle(ctx: DemoRunContext, finance: string, year: number): Pro
       signedCommitments: money('0'),
       plannedSeats: money('0'),
       priority: money(evenShare),
+      explanation: 'Chia đều phần còn lại của Trần năm cho các phòng (dữ liệu demo)',
     })),
   });
   await ctx.api.call(finance, 'POST', `/budget-cycles/${year}/publish`);

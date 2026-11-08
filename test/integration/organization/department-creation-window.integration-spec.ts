@@ -96,6 +96,7 @@ describe('the window a department is made in (integration, real PostgreSQL)', ()
         signedCommitments: h.money(1),
         plannedSeats: h.money(0),
         priority: h.money(0),
+        explanation: 'Basis of the ceiling',
       })),
     });
     const put = (year: number, body: object) =>
@@ -130,6 +131,7 @@ describe('the window a department is made in (integration, real PostgreSQL)', ()
         signedCommitments: h.money(1),
         plannedSeats: h.money(0),
         priority: h.money(0),
+        explanation: 'Basis of the ceiling',
       })),
     };
     await request(h.server())

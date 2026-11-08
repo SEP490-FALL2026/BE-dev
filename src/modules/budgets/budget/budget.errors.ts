@@ -284,12 +284,13 @@ export class BudgetCeilingDepartmentInvalidError extends Error {
   }
 }
 
-/** The division cannot be published: a department has no ceiling, a ceiling is for a department that left, or the reserve is not entered. */
+/** The division cannot be published: a department has no ceiling, a ceiling is for a department that left, a ceiling has no explanation, or the reserve is not entered. */
 export class BudgetCeilingsIncompleteError extends Error {
   constructor(
     readonly missingDepartmentIds: string[],
     readonly staleDepartmentIds: string[],
     readonly reserveMissing: boolean,
+    readonly explanationMissingDepartmentIds: string[] = [],
   ) {
     super('The division of the ceiling is not complete.');
     this.name = 'BudgetCeilingsIncompleteError';

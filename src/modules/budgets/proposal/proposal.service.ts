@@ -61,11 +61,12 @@ export class ProposalService {
     attachmentIds?: readonly string[],
   ): Promise<ProposalWire> {
     return this.runner.run(async (tx) => {
-      // The cycle of the year first (the order of the module), then the proposal: the year is read without a lock.
-      const year = (await this.proposals.findById(id, tx))?.year;
-      // A year that has ended is refused as ended below, before the cycle is asked about.
-      if (year !== undefined && !yearHasEnded(year, await this.facts.today(new Date(), tx))) {
-        await this.sender.requirePublishedCycle(tx, year);
+      // Who may touch the proposal is judged first, without a lock: anybody else finds nothing, whatever the state of the cycle.
+      const seen = await this.ownedUnlocked(tx, actor, id, true);
+      // Then the cycle of the year (the order of the module: cycle, proposal, version, year); a year that has ended is refused as
+      // ended below, before the cycle is asked about.
+      if (!yearHasEnded(seen.year, await this.facts.today(new Date(), tx))) {
+        await this.sender.requirePublishedCycle(tx, seen.year);
       }
       const previous = await this.ownedLocked(tx, actor, id, true);
       const today = await this.facts.today(new Date(), tx);
@@ -149,19 +150,43 @@ export class ProposalService {
     keepWhenNoneInUse = false,
   ): Promise<ProposalRecord> {
     const proposal = await this.proposals.lockById(tx, id);
+    if (!proposal || !(await this.owns(tx, actor, proposal, keepWhenNoneInUse)))
+      throw new BudgetProposalNotFoundError();
+
+    return proposal;
+  }
+
+  /** The same, read without a lock: what a head may see of a proposal before the cycle is taken (lock order). */
+  private async ownedUnlocked(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    id: string,
+    keepWhenNoneInUse = false,
+  ): Promise<ProposalRecord> {
+    const proposal = await this.proposals.findById(id, tx);
+    if (!proposal || !(await this.owns(tx, actor, proposal, keepWhenNoneInUse)))
+      throw new BudgetProposalNotFoundError();
+
+    return proposal;
+  }
+
+  /**
+   * Whether the head answers for the Cost Center of the proposal. The head of a department whose Cost Center was retired still owns
+   * the proposal that was given back, with `keepWhenNoneInUse`: sending it again meets the 409 FINANCE.SETUP_INCOMPLETE of `send`,
+   * not a 404.
+   */
+  private async owns(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    proposal: ProposalRecord,
+    keepWhenNoneInUse: boolean,
+  ): Promise<boolean> {
     const today = await this.facts.today(new Date(), tx);
-    if (!proposal) throw new BudgetProposalNotFoundError();
-    if ((await this.facts.headedCostCenters(actor.employeeId, today, tx)).includes(proposal.costCenterId))
-      return proposal;
-    // The head of a department whose Cost Center was retired still owns the proposal that was given back: sending it again meets
-    // the 409 FINANCE.SETUP_INCOMPLETE of `send`, not a 404.
-    if (
+    if ((await this.facts.headedCostCenters(actor.employeeId, today, tx)).includes(proposal.costCenterId)) return true;
+
+    return (
       keepWhenNoneInUse &&
       (await this.facts.headsDepartmentWithNoneInUse(actor.employeeId, proposal.costCenterId, today, tx))
-    ) {
-      return proposal;
-    }
-
-    throw new BudgetProposalNotFoundError();
+    );
   }
 }

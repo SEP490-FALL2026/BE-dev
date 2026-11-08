@@ -45,6 +45,7 @@ describe('the budget cycle: edges (integration, real PostgreSQL)', () => {
       signedCommitments: money(each),
       plannedSeats: money(0),
       priority: money(0),
+      explanation: 'Basis of the ceiling',
       ...extra,
     })),
   });
@@ -165,6 +166,14 @@ describe('the budget cycle: edges (integration, real PostgreSQL)', () => {
       perDepartment.set(id, (perDepartment.get(id) ?? 0) + 1);
     }
     expect([...perDepartment.values()].every((count) => count === 1)).toBe(true);
+    // Exactly one notice for each department that has a head: the number told is the number of heads.
+    const heads = await h.ctx.sql.query<{ n: number }>(
+      `SELECT count(DISTINCT p.department_id)::int AS n
+         FROM department_head_periods p JOIN departments d ON d.id = p.department_id
+        WHERE d.status = 'ACTIVE' AND p.valid_from <= (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AND (p.valid_to IS NULL OR p.valid_to > (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)`,
+    );
+    expect(notices).toHaveLength(heads.rows[0].n);
+    expect(perDepartment.size).toBe(heads.rows[0].n);
     expect((await audit(y, 'BUDGET_CYCLE.PUBLISHED')).length).toBeGreaterThanOrEqual(1);
   });
 

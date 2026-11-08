@@ -121,6 +121,14 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
       { year: 2026, n: 3 },
       { year: 2027, n: 3 },
     ]);
+    // The seed opened and published the cycle of the year and of the next one (a head proposes only once it was published).
+    const cycles = await ctx.sql.query<{ year: number; published: boolean }>(
+      'SELECT year, first_published_at IS NOT NULL AS published FROM budget_cycles ORDER BY year',
+    );
+    expect(cycles.rows).toEqual([
+      { year: 2026, published: true },
+      { year: 2027, published: true },
+    ]);
 
     expect(await requestStates()).toEqual({
       R1: 'COMPLETED',

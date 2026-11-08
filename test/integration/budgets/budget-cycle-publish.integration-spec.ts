@@ -57,6 +57,7 @@ describe('the budget cycle: open, divide, publish (integration, real PostgreSQL)
       signedCommitments: money(each),
       plannedSeats: money(0),
       priority: money(0),
+      explanation: 'Basis of the ceiling',
     })),
   });
   const cycleOf = (response: request.Response) => h.dataOf<CycleWire>(response);

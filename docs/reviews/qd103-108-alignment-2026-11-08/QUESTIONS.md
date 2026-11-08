@@ -399,7 +399,7 @@ Phát sinh khi soạn và audit thiết kế W4 (MF-1 cấp quyền), 08/11/2026
 - Phương án: A. Không cần xác nhận. B. Cần `CONFIRMED` (khác ⟹ 422 `DEVICE_NOT_ACKNOWLEDGED`).
 - **Chọn A** — đúng chữ AC-10; không chặn MF-1 bởi việc của luồng thiết bị.
 - Đổi lại: bật điều kiện acknowledgement trong `judgeKeyBinding` (`device-binding.policy.ts:66`).
-- **W2-N4 — diễn giải Trần phòng.** `explanation` tùy chọn, publish không đòi (QT 4.3 nói "kèm diễn giải"). Đổi lại: thêm `explanationMissingDepartmentIds` vào `CEILINGS_INCOMPLETE` và kiểm ở `judgePublish`. **Chat review (R3): QT 4.3 (_kèm diễn giải_ ở chính sách và điều kiện tối thiểu) thắng `EP-06.md:503` ⟹ TẠM CHỌN (chờ Owner): diễn giải bắt buộc cho mỗi Trần phòng khi phát hành (`CEILINGS_INCOMPLETE` kèm `explanationMissingDepartmentIds`).**
+- **W2-N4 — diễn giải Trần phòng. ĐÃ QUYẾT (chat review, QT 4.3 thắng US):** bắt buộc cho mỗi Trần phòng khi phát hành; thiếu ⟹ `BUDGET.CEILINGS_INCOMPLETE` với `details.explanationMissingDepartmentIds`. Chỉ đổi diễn giải không bỏ phát hành (F-032). Đã cài ở `fix(qd103-w2): cycle-ceilings R3`.
 
 ## Câu khi thiết kế W5 (Q-52 → Q-81)
 
@@ -502,5 +502,66 @@ Câu W0 W5 dùng tiếp, không đổi: Q-07 = C (thêm vế thời điểm kỹ
   trước R hoặc khi sự cố _hết hạn chưa gia hạn_ còn mở; audit trước/sau, Finance được báo lại.
 - **Chọn B** — khớp US-11-04 AC-12, không ngõ cụt; vẫn ngừng cấp mới cho tới khi thay.
 - Đổi lại: điều kiện thay trong `record/subscription-adjustment-record.policy.ts` + trigger cột kết quả (A: bỏ nhánh thay, giữ `stopGrants`).
-- **W2-N5 — vai trò MANAGER cho trưởng phòng sắp nhậm chức.** Token chỉ tính MANAGER khi đang làm trưởng phòng hôm nay (QĐ-93a). Để trưởng phòng phòng mới làm B3 trước 01/01 (FR-5.15(1)), code tạm cho MANAGER tính khi người đó có nhiệm kỳ trưởng phòng bắt đầu đúng ngày hiệu lực của phòng chưa hiệu lực (`getUpcomingHeadedUnits`). Phương án khác: chỉ mở các route ngân sách cho nhóm này, hoặc chờ đến 01/01.
+- **W2-N5 — vai trò MANAGER cho trưởng phòng sắp nhậm chức.** Token chỉ tính MANAGER khi đang làm trưởng phòng hôm nay (QĐ-93a). Để trưởng phòng phòng mới làm B3 trước 01/01 (FR-5.15(1)), code tạm cho MANAGER tính khi người đó có nhiệm kỳ trưởng phòng bắt đầu đúng ngày hiệu lực của phòng chưa hiệu lực (`getUpcomingHeadedUnits`). Phương án khác: chỉ mở các route ngân sách cho nhóm này, hoặc chờ đến 01/01. **Chat review (R2, 09/11): TẠM CHỌN (chờ Owner) phương án hẹp — không nới vai `MANAGER` ở guard/JWT; chỉ các route B3 (`budgetProposalSubmit/Resubmit/Withdraw`, `budgetMine*`, đính kèm đề xuất) nhận người có nhiệm kỳ trưởng phòng sắp tới; `/me` trả `managerScope` kèm `upcoming` để FE hiện `BM-10`. Đổi lại = nới guard như C1 (`46b6a94e`).**
 - **W2-N6 — reschedule transfer vào phòng chưa hiệu lực.** Chưa kiểm `effective_from` khi dời ngày một transfer đã ghi; chỉ kiểm lúc ghi mới.
+
+## Câu khi thiết kế W6 (Q-82 → Q-96)
+
+Phát sinh khi soạn và audit thiết kế W6 (MF-5), 09/11/2026; bản cuối sau audit (41 finding, 6 Cao). Q-84, 85, 86, 87, 89, 91, 93, 95, 96 **theo nguồn**; Q-88, 90, 92, 94 **kỹ thuật** (chốt trong spec); Q-82, Q-83 **TẠM CHỌN (chờ Owner)**. Q-12 giữ `TẠM CHỌN (chờ Owner): A`.
+
+### 4. Câu hỏi Q-82 → Q-96 sau audit
+
+### 4.1. Câu đã có nguồn (thiết kế theo nguồn, không hỏi Owner)
+
+| ID / câu                      | Thiết kế                                                                                                         | Nguồn                                                            |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Q-84 sai lệch `FR-4.8`        | danh sách phát hiện + số đếm dashboard IT; hồ sơ `SBF-08` NGOÀI-PHẠM-VI (LEDGER)                                 | README tracker §1 (`SBF-08` ngoài phạm vi), BRD `FR-4.8`         |
+| Q-85 lần nhập đầu             | chặn ghi tới khi IT xác nhận đã báo hoặc hệ thống gửi; **người được cấp sau**: gửi ở mọi lần xác nhận (làm ở W6) | `US-08-05` AC-1→AC-4 (`EP-08:184-187`), `SBF-04a` `a_notice`     |
+| Q-86 định danh chưa khớp      | không xuất hiện + ứng dụng còn định danh mở ⟹ `UNMATCHED_IDENTITY`; mở rộng: ứng viên `AMBIGUOUS`, CF-7          | `FR-4.10`, `TC-4`, `US-08-04` AC-2, AC-7                         |
+| Q-87 hạn sau điều chuyển      | hạn = ngày vào hàng trưởng phòng mới + 5 ngày làm việc; không trưởng phòng ⟹ hạn giữ                             | `US-10-06` AC-16, AC-19, AC-9                                    |
+| Q-89 đã quyết rồi điều chuyển | không tạm dừng                                                                                                   | `FR-3.10` _đang chờ_, `QĐ-90c` _chưa được quyết_                 |
+| Q-91 người nhận lỗi thời      | IT Admin (mọi IT Admin dùng được), một lần mỗi (nguồn, `coverage_to`)                                            | BRD bảng thông báo dòng 1077 (`OQ-E-11` ở EP-10/EP-12 lệch — §9) |
+| Q-93 tiềm năng                | `monthlyAmountMinor` + `amountAtPointMinor` (`K2` năm ×12 tại gia hạn; tháng; `K1` kỳ thu kế; `K4` `NEVER`)      | `FR-4.14` (180 USD), `FR-4.15`, `US-10-04` AC-3                  |
+| Q-95 tác vụ đóng thất bại     | giữ _đã quyết Thu hồi_, IT mở lại bằng quyết định _Thu hồi_ cuối (không ân hạn mới, không báo lại)               | `MF-5.md:60` (`QĐ-62i`), `SBF-18`, `QĐ-64a`                      |
+| Q-96 gộp thông báo            | gộp theo tuần ISO mỗi người nhận (trưởng phòng; IT cho `ACTION`)                                                 | `SBF-04.md` bước 5 _gộp theo tuần_                               |
+| Q-12 (W0) `G1` cho `K4`       | giữ **TẠM CHỌN A** của QUESTIONS (chờ Owner, không phải câu mới)                                                 | `QUESTIONS.md:25`                                                |
+
+Khác (đã theo nguồn từ bản nháp): ân hạn 7 ngày lịch từ ngày quyết (`US-10-07` AC-18), `G2` không ân hạn; luật _còn trên 1 tháng_ chỉ quyền có thời
+hạn, lúc quét, lúc quyết **và khuyến nghị đang chờ tự đóng** (QT ngoại lệ MF-5); `G2` thay khuyến nghị tạm dừng (`QĐ-108i`); `G2` hiện tới khi thu hồi
+xong (`US-07-05` AC-12, AC-15); tạm dừng khi điều chuyển **đã hiệu lực** (`EP-10:258`); mất trưởng phòng ⟹ chờ có kiểm soát (`SBF-04` bước 5); cổng 5
+so `review`; độ mới 7/14 theo loại nguồn (`QĐ-101b`); collector không kết luận một mình; seat trưởng phòng tự quyết (`QĐ-104h`); chặn ứng dụng liên lạc
+(`US-08-02` AC-3); `AUTH_ONLY` = xuất hiện, không hoạt động (`US-10-03` AC-10); ngày ngoài bao phủ không đếm (`FR-4.14a`(3)); `KPI-5` chỉ Super Admin.
+
+### 4.2. Lựa chọn kỹ thuật (ghi trong spec, không hỏi)
+
+Q-88 (gỡ lý do ngay khi IT trả lại; quyết lại `notBefore = max(mốc đầu, hôm nay)`, báo một lần — lệch chữ L4-08(5)); Q-90 (nhắc quá hạn một lần + cờ);
+Q-92 (đã quyết _Thu hồi_ không tự đóng khi có hoạt động mới, cờ `activity_after_decision_on`); Q-94 (hàng loạt tất cả hoặc không); module `optimization`
+T7 + `dashboards` T8; gắn nhân viên vào usage **lúc đọc** + `usageIdentityMappingEnd`; độ mới là hằng theo loại nguồn (không cột sửa được); `MONITOR`
+chụp lại bằng chứng khi lên tầng; `seat_chain_id` = Assignment gốc; facade `listSeatsForRules`, `getRevocationTaskStatuses`, `getSeatPricingFacts` ở
+`LicensingApi`; listener `SKIP LOCKED` + đối soát lượt ngày, service khóa khuyến nghị trước; mẫu số `KPI-5` bỏ tầng _Theo dõi_; CF-6 trên ngày bao phủ;
+lý do không mốc thắng ân hạn; báo người giữ opt-in.
+
+### 4.3. Câu tạm chọn (bản cuối) — chỉ câu cần Owner
+
+**Q-82 — `G2` có thay khuyến nghị `G3`/`G4` _chưa quyết_ (không tạm dừng) trên cùng seat không?**
+
+- _Bối cảnh:_ cổng 8 (`FR-4.9`) loại seat đã có khuyến nghị mở; ngoại lệ duy nhất là `G2` thay khuyến nghị **tạm dừng** (`QĐ-108i`). Nguồn không nói
+  khuyến nghị đang chờ trưởng phòng khi người giữ nghỉ việc.
+- _Ví dụ:_ `G4` Figma của `E1` chờ `H1` từ 01/10; `E1` nghỉ việc 05/10, seat còn gán. Lượt ngày 06/10 gặp seat có `G4` đang mở.
+- _Phương án:_ **A** — `G2` thay `G4`: `G4` đóng _bị thay thế_ (tính `KPI-5`), `G2` gửi thẳng IT. **B** — như A nhưng `G4` đóng lý do riêng
+  _người giữ đã nghỉ_, **không** tính `KPI-5`. **C** — theo chữ cổng 8: không sinh `G2`, `G4` ở lại hàng `H1` (MF-2 vẫn thu hồi theo luồng nghỉ việc).
+- _Chọn:_ **A** — một luật với `QĐ-108i`, người đã nghỉ không nằm chờ trưởng phòng (`QT 5.3` _`G2` gửi thẳng IT_). Nhược: `KPI-5` tính cả khuyến nghị
+  không sai. Khuyến nghị đã quyết _Thu hồi_ thì không thay (đặt nhãn _người giữ đã nghỉ_).
+- _Đổi lại:_ B — migration `*_values` thêm `HOLDER_LEFT` vào `GhostSeatCloseReason`, nhánh trong `internal-rules.policy.ts`, bỏ khỏi tập `KPI-5` ở
+  `ghost-seat-state.policy.ts`; C — nhánh policy trả `OPEN_RECOMMENDATION`. A/B cần Owner sửa chữ cổng 8 ở Docs (§9).
+
+**Q-83 — Thu hồi `G2` mở `SBF-18` với nguồn nào?**
+
+- _Bối cảnh:_ nguồn quyết định ai xác nhận bàn giao: `DEPARTURE` **luôn** đòi trưởng phòng xác nhận (`QĐ-66p`, `handover-confirmer.policy.ts:56-58`) với
+  hạn ngắn; `ABRUPT_DEPARTURE` chỉ đòi khi gói _mất dữ liệu khi gỡ_ và có giữ gỡ `ABRUPT_DEPARTURE_HOLD_WORKING_DAYS`.
+- _Ví dụ:_ `E3` nghỉ từ tháng 3 (dữ liệu khởi tạo `FR-9.5`), còn seat Jira (không mất dữ liệu). IT bấm _Thu hồi_ trên `G2` hôm nay.
+- _Phương án:_ **A** `DEPARTURE` — `H1` có duty xác nhận bàn giao, quá hạn gần như ngay. **B** `ABRUPT_DEPARTURE` — không duty với Jira; gói mất dữ
+  liệu thì `H1` xác nhận, gỡ giữ chờ N ngày làm việc. **C** nguồn mới `LEAVER_SEAT` với luật bàn giao riêng.
+- _Chọn:_ **B** — người đã nghỉ từ lâu không còn gì để bàn giao trừ gói mất dữ liệu; không thêm nguồn mới. Hủy nghỉ việc gỡ theo `(DEPARTURE, caseId)` sẽ
+  không đụng tác vụ `G2` (tham chiếu khuyến nghị) — cố ý.
+- _Đổi lại:_ A — một hằng trong `board-reclaim.service.ts`; C — migration `*_values` cho `RevocationSource` + nhánh `handover-confirmer.policy.ts`.
