@@ -128,3 +128,22 @@ export const ceilingAuditValue = (figures: CeilingFigures) => ({
   totalMinor: ceilingTotal(figures).toString(),
   explanation: figures.explanation,
 });
+
+/**
+ * Where a department may be made (`QĐ-104e(3)`, `R-I10`): while the cycle of the next year exists and was never published, the new
+ * department takes effect on 1 January of that year. A cycle of this year does not open the window (no department is made in the
+ * middle of a year); an organization with no cycle at all is still being installed.
+ */
+export function windowOf(input: {
+  nextYear: number;
+  nextCycle: { neverPublished: boolean } | null;
+  anyCycle: boolean;
+}): { kind: 'OPEN'; effectiveFrom: string } | { kind: 'CLOSED' } | { kind: 'NO_CYCLE_YET' } {
+  if (input.nextCycle) {
+    return input.nextCycle.neverPublished
+      ? { kind: 'OPEN', effectiveFrom: `${input.nextYear}-01-01` }
+      : { kind: 'CLOSED' };
+  }
+
+  return input.anyCycle ? { kind: 'CLOSED' } : { kind: 'NO_CYCLE_YET' };
+}

@@ -160,6 +160,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'OrganizationModule: DepartmentUseContributions',
   'OrganizationModule: CostCenterUseContributions',
   'OrganizationModule: DepartmentServiceAccountReaderHook',
+  'OrganizationModule: DepartmentCreationWindowHook',
   'OrganizationModule: EmployeeAccountsHook',
   // G6 (ADR-0017): the writes of history (a placement and a head period written ahead of their day) the personnel context calls.
   'OrganizationModule: OrganizationHistoryApi',

@@ -39,13 +39,13 @@ export class BudgetViewService {
   ) {}
 
   /** Throws BudgetNotYourCostCenterError when the caller heads no department. */
-  async mine(actor: AuthenticatedPrincipal, year: number): Promise<MineWire> {
-    const costCenterId = await this.ownCostCenter(actor);
+  async mine(actor: AuthenticatedPrincipal, year: number, costCenterId?: string): Promise<MineWire> {
+    const ownId = await this.ownCostCenter(actor, { year, costCenterId });
     const [costCenter, current, history, latest] = await Promise.all([
-      this.facts.costCenter(costCenterId),
-      this.versions.reference(costCenterId, year),
-      this.proposals.chainOf(costCenterId, year),
-      this.versions.latestOf(costCenterId, year),
+      this.facts.costCenter(ownId),
+      this.versions.reference(ownId, year),
+      this.proposals.chainOf(ownId, year),
+      this.versions.latestOf(ownId, year),
     ]);
     // Why the latest version was refused, for the head who sent the proposal behind it.
     const refusal =
@@ -73,9 +73,9 @@ export class BudgetViewService {
   async mineLines(
     actor: AuthenticatedPrincipal,
     year: number,
-    query: { page: number; pageSize: number },
+    query: { page: number; pageSize: number; costCenterId?: string },
   ): Promise<Page<VersionLineWire>> {
-    const costCenterId = await this.ownCostCenter(actor);
+    const costCenterId = await this.ownCostCenter(actor, { year, costCenterId: query.costCenterId });
     const current = await this.versions.reference(costCenterId, year);
     if (!current) return pageOf([], 0, query.page, query.pageSize);
     const { items, total } = await this.lineRepo.pageLines(
@@ -184,9 +184,9 @@ export class BudgetViewService {
 
   async mineVersions(
     actor: AuthenticatedPrincipal,
-    query: { year?: number; page: number; pageSize: number },
+    query: { year?: number; page: number; pageSize: number; costCenterId?: string },
   ): Promise<Page<MineVersionSummaryWire>> {
-    const costCenterId = await this.ownCostCenter(actor);
+    const costCenterId = await this.ownCostCenter(actor, { year: query.year, costCenterId: query.costCenterId });
     const { items, total } = await this.versions.pageSentOf(costCenterId, {
       year: query.year,
       skip: (query.page - 1) * query.pageSize,
@@ -204,11 +204,15 @@ export class BudgetViewService {
     return pageOf(wires, total, query.page, query.pageSize);
   }
 
-  private async ownCostCenter(actor: AuthenticatedPrincipal): Promise<string> {
-    const own = await this.facts.headedCostCenter(actor.employeeId, await this.facts.today(new Date()));
-    if (own === null) throw new BudgetNotYourCostCenterError();
+  /** The Cost Center the caller asks about: the one they answer for, or the one they name when they answer for more than one that year. */
+  private async ownCostCenter(
+    actor: AuthenticatedPrincipal,
+    pick: { year?: number; costCenterId?: string },
+  ): Promise<string> {
+    const unit = await this.facts.pickHeadedUnit(actor.employeeId, await this.facts.today(new Date()), pick);
+    if (unit.costCenter === null) throw new BudgetNotYourCostCenterError();
 
-    return own;
+    return unit.costCenter.id;
   }
 }
 

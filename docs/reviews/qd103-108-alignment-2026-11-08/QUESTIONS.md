@@ -399,4 +399,108 @@ Phát sinh khi soạn và audit thiết kế W4 (MF-1 cấp quyền), 08/11/2026
 - Phương án: A. Không cần xác nhận. B. Cần `CONFIRMED` (khác ⟹ 422 `DEVICE_NOT_ACKNOWLEDGED`).
 - **Chọn A** — đúng chữ AC-10; không chặn MF-1 bởi việc của luồng thiết bị.
 - Đổi lại: bật điều kiện acknowledgement trong `judgeKeyBinding` (`device-binding.policy.ts:66`).
-- **W2-N4 — diễn giải Trần phòng.** `explanation` tùy chọn, publish không đòi (QT 4.3 nói "kèm diễn giải"). Đổi lại: thêm `explanationMissingDepartmentIds` vào `CEILINGS_INCOMPLETE` và kiểm ở `judgePublish`.
+- **W2-N4 — diễn giải Trần phòng.** `explanation` tùy chọn, publish không đòi (QT 4.3 nói "kèm diễn giải"). Đổi lại: thêm `explanationMissingDepartmentIds` vào `CEILINGS_INCOMPLETE` và kiểm ở `judgePublish`. **Chat review (R3): QT 4.3 (_kèm diễn giải_ ở chính sách và điều kiện tối thiểu) thắng `EP-06.md:503` ⟹ TẠM CHỌN (chờ Owner): diễn giải bắt buộc cho mỗi Trần phòng khi phát hành (`CEILINGS_INCOMPLETE` kèm `explanationMissingDepartmentIds`).**
+
+## Câu khi thiết kế W5 (Q-52 → Q-81)
+
+Phát sinh khi soạn và audit thiết kế W5 (`SBF-20` + `SBF-11`), 08/11/2026; bản cuối sau audit. Q-53, 54, 55, 57, 59, 64, 65, 66, 67, 69, 73, 75, 76, 80 **theo nguồn**; Q-52, 56, 62, 63, 74, 79 **kỹ thuật** (chat review chọn, ghi trong spec, không mở); Q-77 là **lệch Docs** (xem cuối mục). Q-07 thêm vế: thời điểm phát hiện qua hóa đơn = lúc Finance xác nhận (kỹ thuật). Các câu còn cần Owner: **TẠM CHỌN (chờ Owner)**.
+
+### Câu đã có nguồn (không còn là tạm chọn — bỏ khỏi danh sách hỏi Owner)
+
+| Câu                                      | Nguồn (`file:dòng`)                                                                                                                                                    | Spec theo thế nào                                                                  |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Q-53 không carry seat đã quyết thu hồi   | `Docs/Decisions/project-decisions.md:289` (`QĐ-103v`(2) _không gồm quyền đã quyết thu hồi_); `Docs/BE-UserStory/epics/EP-11.md:59` (US-11-03 AC-5 không vượt sức chứa) | AP mục 7; rủi ro kẹt kỳ cũ xử lý ở mục 8 (DA5-02)                                  |
+| Q-54 gói tháng đã mặc định không ghi lại | `project-decisions.md:289` (`QĐ-103v`(5)); `EP-11.md:135` (US-11-04 AC-19); `EP-11.md:217` (US-11-08 AC-24)                                                            | AI mục 4: điểm đóng sau mặc định                                                   |
+| Q-55 kỳ nhắc `K1`                        | `EP-11.md:237` (US-11-09 _Dữ liệu nghiệp vụ_: ngày kỳ kế tiếp — US-04-03); người nhận `EP-11.md:252` (AC-1)                                                            | AI mục 10: `renewal_date` của thuê bao `K1`; `valid_from` chỉ là dự phòng kỹ thuật |
+| Q-57 điều kiện đóng                      | `project-decisions.md:283` (`QĐ-99i`); BRD dòng 441 (`FR-1.12`(10)); `Quy trình và chính sách theo main flow.md:1035-1043` (C.2.3, A/R IT Admin phụ trách)             | CK mục 1 (+ ca dữ liệu cũ DA5-12)                                                  |
+| Q-59 vế `K1`                             | BRD dòng 904; QT dòng 1051 (_K1 có thực khi kỳ sau không còn bị trừ tiền_)                                                                                             | có nguồn; hoãn W8 là phạm vi ⟹ ledger. Hủy `K2` làm ở CK mục 5                     |
+| Q-64 vế từng kho                         | `EP-12.md:900` (US-12-18 AC-8: IT Admin phụ trách); QT dòng 145; `project-decisions.md:356` (`QĐ-106h`(2))                                                             | SM mục 7                                                                           |
+| Q-65 lũy kế + báo lại                    | `EP-12.md:979-980` (US-12-20 AC-5, AC-6); `project-decisions.md:451` (`QĐ-106k`)                                                                                       | SM mục 4, 8                                                                        |
+| Q-61 vế thu hồi giữa tháng               | `EP-12.md:902` (US-12-18 AC-10: 7,50 thành chi phí, phần còn lại giải phóng)                                                                                           | SM mục 2, 5                                                                        |
+| Q-66 bỏ ý kiến điều khoản                | `project-decisions.md:568` (`QĐ-104l`(1)); BRD dòng 326, 430 (`FR-1.10` không có ý kiến)                                                                               | BO mục 7                                                                           |
+| Q-67 ngừng dùng không xác nhận           | BRD dòng 409 (`FR-1.1`)                                                                                                                                                | BO mục 3                                                                           |
+| Q-73 PATCH giảm gói tháng chặn           | `project-decisions.md:287` (`QĐ-103e` _giảm ở mỗi kỳ_ = tại điểm); BRD dòng 433 (`FR-1.12`(2))                                                                         | AP mục 9                                                                           |
+| Q-75 tự gắn Request khi tăng             | `EP-11.md:204` (US-11-08 AC-11 _kèm 6 Request làm căn cứ_)                                                                                                             | AP mục 5                                                                           |
+| Q-76 bằng chứng mức tối thiểu            | `project-decisions.md:290` (`QĐ-104d`(1)); `EP-11.md:206` (AC-13)                                                                                                      | AP mục 5                                                                           |
+| Q-80 tự gia hạn _chưa rõ_                | `EP-11.md:121` (US-11-04 AC-5: cảnh báo chất lượng dữ liệu, không sự cố)                                                                                               | AI: `auto_renew` nullable + cảnh báo, không sự cố                                  |
+| Q-69 chuyển IT Admin phụ trách           | BRD dòng 326; `project-decisions.md:568` (`SBF-16` chuyển trước ngày hiệu lực)                                                                                         | ngoài phạm vi W5 ⟹ ledger `NGOÀI-PHẠM-VI`                                          |
+| Q-77 tên nguồn `KPI-4`                   | không phải câu chọn — `EP-12.md:936,941,943` (US-12-19 AC-1/6/8) trái `project-decisions.md:290` (`QĐ-104d`(1))                                                        | giữ ánh xạ sang mặc định/`deviation`; báo Owner sửa Docs (dưới)                    |
+
+**Kỹ thuật — đã chốt trong spec, bỏ khỏi `QUESTIONS.md`:** Q-52 (vế thời điểm của Q-07 C = lúc Finance xác nhận — AI mục 5c), Q-56 (`nextBillingDate` — AI mục 11),
+Q-62 (tháng bắt đầu, hóa đơn cũ — SM mục 1, 6), Q-63 (làm tròn, chênh vào tháng xác nhận — SM mục 3, 4), Q-64 vế toàn kho (mọi IT Admin dùng được — SM mục 7),
+Q-74 (mở ở `point_date`, chụp tham số + `opening_seats_needed` — AP mục 3), Q-79 (số đã trả = kỳ cũ; tháng hiện hành `NOT_COMPUTED` — CK mục 2, 3).
+
+### Câu tạm chọn (bản cuối) — còn cần Owner
+
+Câu W0 W5 dùng tiếp, không đổi: Q-07 = C (thêm vế thời điểm kỹ thuật ở trên), Q-08 = A, Q-09, Q-11 = A, Q-43 = A (W4; W5 thay nguồn số bằng điểm chi phối).
+
+### Q-58 — Tiết kiệm thực so giá trước thuế hay chi phí thực chịu (thu hẹp)
+
+- Bối cảnh: _cùng độ dài kỳ_, _mỗi kỳ sau_, baseline trước lần giảm đã có nguồn (BRD dòng 906; `EP-12.md:178,181`); `QĐ-60a` định nghĩa thực chi = giá + thuế không
+  khấu trừ + phí; nguồn tiết kiệm không nói so cột nào.
+- Ví dụ: Figma kỳ cũ 12 000 + 1 200 thuế nhà thầu (không khấu trừ); kỳ mới 10 560 + 1 584 (thuế suất đổi). Trước thuế ⟹ 1 440; thực chịu ⟹ 1 056.
+- Phương án: A. `net_minor` (trước thuế). B. `net + thuế không khấu trừ` (thực chịu, khớp thực chi).
+- **Chọn A** — tách hiệu quả giảm seat khỏi biến động thuế/tỷ giá; khớp ví dụ US-11-03 AC-3, AC-21.
+- Đổi lại: hàm so trong `budgets/realised-saving/realised-saving.policy.ts` (đổi cột, không đổi bảng).
+
+### Q-60 — Nhà cung cấp **từ chối** giảm có đếm `KPI-4` không (gộp Q-78)
+
+- Bối cảnh: `KPI-4` chỉ loại _gói năm giữa kỳ, mức tối thiểu_ (BRD dòng 98); US-11-03 AC-18 nói seat-tháng thừa được đo khi nhà cung cấp gia hạn khác số
+  (`EP-11.md:72`), AC-15 gần cùng ca nhưng là _từ chối_ (`EP-11.md:69`). Thiết kế phân `deviation` `VENDOR_REFUSED` (không sự cố) và `AUTO_RENEWED` (sự cố — `QĐ-106i`(4)).
+- Ví dụ: Figma cần 88, IT đề nghị giảm 100 → 88 trước hạn chót, nhà cung cấp từ chối, kỳ mới 100; 12 seat Trống cả năm.
+- Phương án: A. `VENDOR_REFUSED` không đếm (IT đã làm đúng hạn — không phải _lỡ điểm_). B. Đếm như `AUTO_RENEWED`. C. Không phân hai loại, mọi lệch đều đếm.
+- **Chọn A** — `KPI-4` đo việc lỡ điểm điều chỉnh, không đo việc nhà cung cấp từ chối.
+- Đổi lại: thêm nguồn `VENDOR_REFUSED` vào enum `Kpi4Source` + nhánh trong `licensing/kpi4/kpi4.policy.ts` (migration `ADD VALUE` riêng).
+
+### Q-61 — Khoản cam kết `K2`: phần tháng **trước ngày cấp** của Request đã duyệt (thu hẹp)
+
+- Bối cảnh: vế thu hồi giữa tháng đã có nguồn (`EP-12.md:902`); nguồn không nói tháng mà Request đã duyệt nhưng cấp giữa tháng.
+- Ví dụ: Request duyệt 01/10 khoản 15/tháng, cấp 16/10; seat-tháng tháng 10 = 7,74.
+- Phương án: A. Giải phóng 7,26 (chỉ seat-tháng thật thành chi phí). B. Giữ cả 15 thành chi phí tháng 10.
+- **Chọn A** — thực chi phòng = seat-tháng ở mọi nơi (`QĐ-104c`(1)).
+- Đổi lại: `slice` trong `budgets/seat-cost/seat-cost.policy.ts` (B: `accrued = slice` khi có Assignment trong tháng).
+
+### Q-68 — IT Admin phụ trách của ứng dụng cũ (thêm bước theo DA5-37)
+
+- Bối cảnh: `INV-06` đòi mỗi mục có một IT Admin phụ trách; dữ liệu cũ chỉ có Business Owner; phần mềm nội bộ không có thuê bao.
+- Ví dụ: _Cổng báo cáo nội bộ_ (`K5`, Business Owner `A1` là IT Admin); Office 2021 (`K4` chỉ khóa, Business Owner `E2` là Employee).
+- Phương án: A. Thuê bao `ACTIVE` mới nhất → Business Owner cũ nếu là IT Admin dùng được → NULL + cảnh báo. B. Chỉ thuê bao → NULL. C. Gán mọi NULL cho một IT Admin
+  mặc định (Super Admin chọn khi migration).
+- **Chọn A** — có căn cứ, không đoán; NULL hiện cảnh báo và `ops:inspect`.
+- Đổi lại: khối backfill trong migration `<ts>_application_responsible_it_admin` (trước khi deploy; sau deploy chỉ sửa qua `applicationUpdate`).
+
+### Q-70 — Liên kết Request với gói khi ứng dụng thiếu IT Admin phụ trách dùng được (đổi theo DA5-37)
+
+- Bối cảnh: `INV-06` (`QĐ-103v`(4)) bắt buộc có người phụ trách nhưng không nói chặn luồng; chặn sẽ làm `MF-1`/`SBF-15` tắc cho mọi ứng dụng NULL sau migration.
+- Ví dụ: Request phần mềm nội bộ _Cổng báo cáo_ (NULL) chờ IT liên kết gói.
+- Phương án: A. Không chặn — 200 + cảnh báo `RESPONSIBLE_IT_ADMIN_MISSING`, audit. B. Chặn 409 `ACCESS_REQUEST.RESPONSIBLE_IT_ADMIN_REQUIRED` (bản nháp cũ).
+- **Chọn A** — không làm vỡ luồng chính; cảnh báo + `ops:inspect` đẩy IT điền.
+- Đổi lại: điều kiện trong `requests/assessment/catalog-link.service.ts` (B thêm lỗi + mã HTTP).
+
+### Q-71 — Dữ liệu `subscription_renewals` cũ (giữ)
+
+- Bối cảnh: chuỗi propose/decide bị bỏ; bảng cũ có ca đã đề xuất/quyết; drop là không hoàn tác (DB-05).
+- Ví dụ: ca Figma 2026 đã _quyết giảm_ nhưng chưa ghi kết quả lúc triển khai W5.
+- Phương án: A. Không chép, drop ở contract (lịch sử ở Audit Trail). B. Bảng lưu trữ chỉ đọc trước khi drop. C. Chuyển ca mở thành điểm điều chỉnh mở.
+- **Chọn A** — nhánh chưa phát hành, dữ liệu demo; Audit Trail giữ dấu vết.
+- Đổi lại: thêm `CREATE TABLE … AS SELECT` vào migration contract trước DROP (B) hoặc bước chuyển trong Task 10 (C).
+
+### Q-72 — IT Admin không phải người phụ trách có ghi kết quả/đóng được không (đổi chiều theo nguồn)
+
+- Bối cảnh: nguồn nghiêng về chỉ người phụ trách (BRD dòng 435 `FR-1.12`(4); `EP-11.md:216` AC-23); người phụ trách vắng thì tắc. Cùng luật cho ghi kết quả và
+  đóng (DA5-13).
+- Ví dụ: `IT2` phụ trách Figma nghỉ phép dài (vẫn dùng được); `IT1` muốn ghi kết quả trước hạn chót.
+- Phương án: A. Chỉ người phụ trách; người phụ trách **không dùng được** ⟹ IT Admin dùng được bất kỳ (audit `byResponsible:false`). B. Mọi IT Admin dùng được.
+- **Chọn A** — đúng AC-23; vẫn có lối thoát khi người phụ trách nghỉ/khóa.
+- Đổi lại: một hàm quyền dùng chung trong `subscription-adjustment` (record + closure).
+
+### Q-81 — Sau khi IT đã ghi _hủy_ mà có Request được duyệt (mới, DA5-03)
+
+- Bối cảnh: `FR-1.12`(10) _ngừng cấp mới_; US-11-04 AC-12 (`EP-11.md:128`) cho IT _ghi gia hạn_ sau khi đã ghi hủy khi có Request mới được duyệt; một kết quả mỗi kỳ.
+- Ví dụ: Loom ghi `CANCEL` 01/11 (cần 0); 15/12 Request của `E5` được duyệt; kỳ kết thúc 31/12.
+- Phương án: A. Chặn cấp từ thuê bao đã hủy, không cho thay — Request phải chờ thuê bao/gói mới. B. Chặn cấp, nhưng cho IT **thay** `CANCEL` một lần bằng kết quả đúng số
+  trước R hoặc khi sự cố _hết hạn chưa gia hạn_ còn mở; audit trước/sau, Finance được báo lại.
+- **Chọn B** — khớp US-11-04 AC-12, không ngõ cụt; vẫn ngừng cấp mới cho tới khi thay.
+- Đổi lại: điều kiện thay trong `record/subscription-adjustment-record.policy.ts` + trigger cột kết quả (A: bỏ nhánh thay, giữ `stopGrants`).
+- **W2-N5 — vai trò MANAGER cho trưởng phòng sắp nhậm chức.** Token chỉ tính MANAGER khi đang làm trưởng phòng hôm nay (QĐ-93a). Để trưởng phòng phòng mới làm B3 trước 01/01 (FR-5.15(1)), code tạm cho MANAGER tính khi người đó có nhiệm kỳ trưởng phòng bắt đầu đúng ngày hiệu lực của phòng chưa hiệu lực (`getUpcomingHeadedUnits`). Phương án khác: chỉ mở các route ngân sách cho nhóm này, hoặc chờ đến 01/01.
+- **W2-N6 — reschedule transfer vào phòng chưa hiệu lực.** Chưa kiểm `effective_from` khi dời ngày một transfer đã ghi; chỉ kiểm lúc ghi mới.

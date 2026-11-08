@@ -5,6 +5,7 @@ import {
   departmentsToTell,
   isPastYear,
   judgePublish,
+  windowOf,
 } from './cycle.policy';
 
 const ceiling = (departmentId: string, total: bigint, published: bigint | null = null) => ({
@@ -99,5 +100,28 @@ describe('the budget cycle policy (QĐ-103i)', () => {
     expect(changedCeilings(before, [same])).toEqual([]);
     expect(changedCeilings(before, [{ ...same, explanation: 'why' }])).toHaveLength(1);
     expect(changedCeilings(before, [{ ...same, signedCommitmentsMinor: 0n, priorityMinor: 5n }])).toHaveLength(1);
+  });
+});
+
+describe('windowOf (the window a department may be made in, QĐ-104e(3), R-I10)', () => {
+  it('opens on 1 January of next year while the cycle of that year was never published', () => {
+    expect(windowOf({ nextYear: 2027, nextCycle: { neverPublished: true }, anyCycle: true })).toEqual({
+      kind: 'OPEN',
+      effectiveFrom: '2027-01-01',
+    });
+  });
+
+  it('is closed once next year was published (even when it was taken back to be changed)', () => {
+    expect(windowOf({ nextYear: 2027, nextCycle: { neverPublished: false }, anyCycle: true })).toEqual({
+      kind: 'CLOSED',
+    });
+  });
+
+  it('is not opened by the cycle of this year: no department is made in the middle of a year', () => {
+    expect(windowOf({ nextYear: 2027, nextCycle: null, anyCycle: true })).toEqual({ kind: 'CLOSED' });
+  });
+
+  it('leaves an organization with no cycle at all to the installation', () => {
+    expect(windowOf({ nextYear: 2027, nextCycle: null, anyCycle: false })).toEqual({ kind: 'NO_CYCLE_YET' });
   });
 });

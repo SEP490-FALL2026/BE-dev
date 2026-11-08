@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `9c7f386`, BE `d9c46552`.
 - Phụ trách: chat code `SEP-Start 75: coder mainflow`. Thiết kế ban đầu bởi: AI chat review (W2, 08/11/2026).
 - Owner review: chưa review. Peer review: chat review (R2).
-- Triển khai: `not-started`. PR: chưa có.
+- Triển khai: `verified` (08/11/2026, kiểm tra nhanh §4.5, chưa commit lúc ghi). PR: chưa có.
 
 ## Before coding
 
@@ -73,9 +73,19 @@ Kiểm tra nhanh tracker §4.5. Tự review diff.
 
 ## Verification and handoff
 
-| Lệnh / kiểm tra AC | Revision / môi trường | Kết quả thực chạy | Giới hạn / việc còn lại |
-| ------------------ | --------------------- | ----------------- | ----------------------- |
+| Lệnh / kiểm tra AC                                                                                                                            | Revision / môi trường            | Kết quả thực chạy                                 | Giới hạn / việc còn lại                     |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------- | ------------------------------------------- |
+| `prisma migrate deploy` + `prisma migrate diff --from-config-datasource --to-schema prisma --exit-code`                                       | DB sạch (Docker Postgres)        | _No difference detected_                          | —                                           |
+| `department-effective-from-migration` (5 test)                                                                                                | integration                      | xanh                                              | —                                           |
+| `department-creation-window` (7), `department-not-yet-effective` (5), `new-department-head-b3` (4)                                            | integration                      | xanh                                              | transfer reschedule chưa kiểm ngày hiệu lực |
+| Integration các file bị ảnh hưởng (organization, budgets, installation, identity-access, dashboards, data-import, requests, department-tools) | integration, `--maxWorkers=2..3` | 16 file đỏ do fixture đã sửa, rồi xanh (190 test) | không chạy full suite                       |
+| jest `organization personnel budgets identity-access data-import requests cli`                                                                | unit                             | 203 file / 2598 test xanh                         | —                                           |
+| `test:gates` (module-graph, extension-wiring, collection contract)                                                                            | gates                            | 330 xanh                                          | —                                           |
+| `test:http` organization, budgets, personnel, platform                                                                                        | http                             | xanh (sau khi sửa ví dụ lỗi)                      | —                                           |
+| typecheck, lint, `arch:check`, `rules:check`, `arch:graph`, `openapi:export`                                                                  | local                            | xanh                                              | —                                           |
 
-- [ ] AC trong scope có bằng chứng.
-- [ ] Spec/plan phản ánh implementation cuối.
-- [ ] `pnpm check` và full suite CHƯA chạy (ghi rõ).
+Lệch spec / câu tạm chọn: (1) cột `effective_from` có `DEFAULT CURRENT_DATE` (đường cài đặt và fixture SQL = hiệu lực hôm nay), không chỉ NOT NULL; (2) nhập tay / import nhân viên vào phòng chưa hiệu lực báo `DEPARTMENT_INACTIVE` (dùng lại lý do sẵn có) thay vì mã mới; (3) token `MANAGER` tính cả cho người sắp làm trưởng phòng phòng chưa hiệu lực (cần để làm B3 trước 01/01) — QUESTIONS W2-N5; (4) `ceilingDepartments(tx, year)` đổi chữ ký; (5) điều chỉnh ngày hiệu lực của transfer đã ghi (reschedule) chưa kiểm `effective_from`.
+
+- [x] AC trong scope có bằng chứng.
+- [x] Spec/plan phản ánh implementation cuối.
+- [x] `pnpm check` và full suite CHƯA chạy.

@@ -10,6 +10,7 @@ import { DepartmentHeadsController } from './department-management/department-he
 import { DepartmentTechnicalMembersRepo } from './department-management/department-technical-members.repo';
 import { HeldNoticeHandoverListener } from './department/held-notice-handover.listener';
 import { DepartmentQueryService } from './department-management/department-query.service';
+import { DepartmentItAdminService } from './department-management/department-it-admin.service';
 import { DepartmentService } from './department-management/department.service';
 import { DepartmentsController } from './department-management/departments.controller';
 import { EmployeeMaintenanceController } from './employee/employee-maintenance.controller';
@@ -45,6 +46,7 @@ import { OrganizationModule } from './organization.module';
     CostCenterService,
     DepartmentQueryService,
     DepartmentService,
+    DepartmentItAdminService,
     DepartmentHeadService,
     // Hands the notices kept for a department with no head to the head whose period starts, added to the change listeners.
     HeldNoticeHandoverListener,

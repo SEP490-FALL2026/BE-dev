@@ -6,14 +6,19 @@ import { EmployeeNotFoundError } from '../public/organization.errors';
 import { OrganizationContextService } from '../organization-context.service';
 import { EmployeeRecordService } from '../employee/employee-record.service';
 import { DepartmentUseService } from '../department/department-use.service';
-import { DepartmentServiceAccountReaderHook } from '../public/organization.extension-points';
+import {
+  DepartmentCreationWindowHook,
+  DepartmentServiceAccountReaderHook,
+} from '../public/organization.extension-points';
 import { EmployeeAccountsHook, type EmployeeAccounts } from '../public/organization.extension-points';
 import {
   DepartmentForbiddenError,
   DepartmentInUseError,
   DepartmentItAdminInvalidError,
+  DepartmentOutsideBudgetPeriodError,
 } from '../department/department.errors';
 import { DepartmentRepo } from '../department/department.repo';
+import { DepartmentItAdminService } from './department-it-admin.service';
 import { DepartmentService } from './department.service';
 
 const principal = (role: string): AuthenticatedPrincipal => ({
@@ -56,6 +61,7 @@ describe('DepartmentService', () => {
     deactivate: jest.fn(),
   };
   const identity = { inspectEmployeeAccount: jest.fn() };
+  const creationWindow = { windowOn: jest.fn() };
   const audit = { record: jest.fn() };
   const runner = { run: jest.fn((work: (transaction: unknown) => Promise<unknown>) => work(tx)) };
 
@@ -63,6 +69,7 @@ describe('DepartmentService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         DepartmentService,
+        DepartmentItAdminService,
         { provide: DepartmentRepo, useValue: departments },
         {
           provide: OrganizationContextService,
@@ -89,6 +96,7 @@ describe('DepartmentService', () => {
             return hook;
           },
         },
+        { provide: DepartmentCreationWindowHook, useValue: { get: () => creationWindow } },
         { provide: AuditApi, useValue: audit },
         { provide: TransactionRunner, useValue: runner },
       ],
@@ -113,6 +121,7 @@ describe('DepartmentService', () => {
       itAdmin: null,
     });
     departments.insert.mockResolvedValue('dep-new');
+    creationWindow.windowOn.mockResolvedValue({ kind: 'NO_CYCLE_YET' });
     departments.members.mockResolvedValue(noGroup);
     identity.inspectEmployeeAccount.mockResolvedValue({ usable: true, roles: ['IT_ADMIN'] });
   });
@@ -150,6 +159,42 @@ describe('DepartmentService', () => {
           after: containing({ code: 'P-NEW' }),
         }),
       );
+    });
+
+    it('takes effect on 1 January of the next year when the cycle of that year is open, and today at the installation (R-I10)', async () => {
+      const departmentService = await service();
+      creationWindow.windowOn.mockResolvedValueOnce({ kind: 'OPEN', effectiveFrom: '2027-01-01' });
+
+      await departmentService.create(superAdmin, { code: 'P-NEXT', name: 'Next' });
+      await departmentService.create(superAdmin, { code: 'P-FIRST', name: 'First' });
+
+      expect(departments.insert).toHaveBeenNthCalledWith(
+        1,
+        tx,
+        expect.objectContaining({ effectiveFrom: '2027-01-01' }),
+      );
+      expect(departments.insert).toHaveBeenNthCalledWith(
+        2,
+        tx,
+        expect.objectContaining({ effectiveFrom: '2026-10-19' }),
+      );
+      expect(creationWindow.windowOn).toHaveBeenCalledWith(tx, 'org-1', '2026-10-19');
+      expect(audit.record).toHaveBeenNthCalledWith(
+        1,
+        tx,
+        expect.objectContaining({ after: containing({ effectiveFrom: '2027-01-01' }) }),
+      );
+    });
+
+    it('makes nothing outside the budgeting period, and records nothing', async () => {
+      creationWindow.windowOn.mockResolvedValue({ kind: 'CLOSED' });
+
+      await expect((await service()).create(superAdmin, { code: 'P-LATE', name: 'Late' })).rejects.toBeInstanceOf(
+        DepartmentOutsideBudgetPeriodError,
+      );
+
+      expect(departments.insert).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
     });
 
     it('records the basis with a change, and nothing for a change that changes nothing', async () => {

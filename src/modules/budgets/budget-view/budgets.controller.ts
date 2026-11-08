@@ -32,6 +32,13 @@ const INVALID = {
   description: 'The query is invalid (VALIDATION_ERROR).',
   examples: [VALIDATION_EXAMPLE],
 } as const;
+/** The three reads of the caller's own budget also ask which Cost Center when they answer for two that year. */
+const MINE_INVALID = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description:
+    'The query is invalid (VALIDATION_ERROR), or the caller answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).',
+  examples: [VALIDATION_EXAMPLE, EXAMPLES.COST_CENTER_REQUIRED],
+} as const;
 const HEADS_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: 'The caller heads no department (BUDGET.NOT_YOUR_COST_CENTER).',
@@ -56,10 +63,10 @@ export class BudgetsController {
     description:
       'The Cost Center of the department the caller heads, the year, whether it has a current budget (ACTIVE) or not (NO_ACTIVE_BUDGET), the total, and the proposal behind it. No part of this says what is left.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, INVALID)
+  @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, MINE_INVALID)
   async mine(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineQueryDto) {
     try {
-      return { budget: await this.budgets.mine(actor, query.year) };
+      return { budget: await this.budgets.mine(actor, query.year, query.costCenterId) };
     } catch (error) {
       throw toBudgetApiException(error);
     }
@@ -73,7 +80,7 @@ export class BudgetsController {
     description:
       'The lines of the current version: what is planned to be bought, its amount, its window, and whether the window has gone by. Without the comments Finance made.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, INVALID)
+  @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, MINE_INVALID)
   async mineLines(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineLinesQueryDto) {
     try {
       return await this.budgets.mineLines(actor, query.year, query);
@@ -89,7 +96,7 @@ export class BudgetsController {
     message: 'BUDGET.VERSIONS_LISTED',
     description: 'The sent versions of the Cost Center the caller heads today, newest first, without amounts.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, INVALID)
+  @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, MINE_INVALID)
   async mineVersions(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineVersionsQueryDto) {
     try {
       return await this.budgets.mineVersions(actor, query);

@@ -38,6 +38,14 @@ export class BudgetNotYourCostCenterError extends Error {
   }
 }
 
+/** The person heads a department now and another one that starts next year: the Cost Center the work is for must be named. */
+export class BudgetCostCenterRequiredError extends Error {
+  constructor() {
+    super('The person answers for more than one Cost Center for that year: name the one the work is for.');
+    this.name = 'BudgetCostCenterRequiredError';
+  }
+}
+
 /** A year that has ended takes no new proposal or version (`US-06-10` AC-9, `US-06-09` AC-11). */
 export class BudgetYearEndedError extends Error {
   constructor(readonly year: number) {

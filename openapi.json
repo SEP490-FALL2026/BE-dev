@@ -588,7 +588,7 @@
             }
           },
           "422": {
-            "description": "Invalid date or body.",
+            "description": "Invalid date or body, or the department takes effect later than the day (DEPARTMENT.NOT_YET_EFFECTIVE: a department made for next year takes nobody in before 1 January).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -612,6 +612,18 @@
                       "error": {
                         "code": "EMPLOYEE.DATE_INVALID",
                         "message": "Effective date must be on or after today and hire date.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.NOT_YET_EFFECTIVE": {
+                    "summary": "The department takes effect on 2027-01-01.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.NOT_YET_EFFECTIVE",
+                        "message": "The department takes effect on 2027-01-01.",
+                        "details": { "effectiveFrom": "2027-01-01" },
                         "requestId": "req_example"
                       }
                     }
@@ -2964,7 +2976,7 @@
             }
           },
           "409": {
-            "description": "The code is taken (DEPARTMENT.CODE_TAKEN).",
+            "description": "The code is taken (DEPARTMENT.CODE_TAKEN), or the budget cycle of the next year is not open or was published, so a department made now would have no budget (DEPARTMENT.OUTSIDE_BUDGET_PERIOD).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -2976,6 +2988,17 @@
                       "error": {
                         "code": "DEPARTMENT.CODE_TAKEN",
                         "message": "A department with the code D01 already exists.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.OUTSIDE_BUDGET_PERIOD": {
+                    "summary": "A department is made only while the budget cycle of the next year is open and was never published.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.OUTSIDE_BUDGET_PERIOD",
+                        "message": "A department is made only while the budget cycle of the next year is open and was never published.",
                         "requestId": "req_example"
                       }
                     }
@@ -4739,6 +4762,18 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "DEPARTMENT.NOT_YET_EFFECTIVE": {
+                    "summary": "The department takes effect on 2027-01-01.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.NOT_YET_EFFECTIVE",
+                        "message": "The department takes effect on 2027-01-01.",
+                        "details": { "effectiveFrom": "2027-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
@@ -5920,7 +5955,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), the basis is the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR, or the head of the department they leave is not provided for (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE).",
+            "description": "The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), the destination takes effect later than the day (DEPARTMENT_NOT_YET_EFFECTIVE), the basis is the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR, or the head of the department they leave is not provided for (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -5980,6 +6015,18 @@
                         "code": "DEPARTMENT_TRANSFER.DEPARTMENT_NOT_FOUND",
                         "message": "The transfer was refused (DEPARTMENT_NOT_FOUND).",
                         "details": { "subject": "DEPARTMENT" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_TRANSFER.DEPARTMENT_NOT_YET_EFFECTIVE": {
+                    "summary": "The destination department takes effect later than the day of the change.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.DEPARTMENT_NOT_YET_EFFECTIVE",
+                        "message": "The destination department takes effect later than the day of the change.",
+                        "details": { "effectiveFrom": "2027-01-01" },
                         "requestId": "req_example"
                       }
                     }
@@ -54236,7 +54283,7 @@
             }
           },
           "422": {
-            "description": "The form is invalid (VALIDATION_ERROR), a line lacks its window, service period or repeat cycle, with the line and the fields in details.lines (BUDGET.PROPOSAL_INCOMPLETE), a window runs backwards (BUDGET.WINDOW_BACKWARDS), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND), the year has ended (BUDGET.YEAR_ENDED) or an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING).",
+            "description": "The form is invalid (VALIDATION_ERROR), a line lacks its window, service period or repeat cycle, with the line and the fields in details.lines (BUDGET.PROPOSAL_INCOMPLETE), a window runs backwards (BUDGET.WINDOW_BACKWARDS), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND), the year has ended (BUDGET.YEAR_ENDED) an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING), or the head answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -54332,6 +54379,17 @@
                         "code": "BUDGET_ATTACHMENT.NOT_ATTACHABLE",
                         "message": "Some documents cannot be attached.",
                         "details": { "attachmentIds": ["<attachment-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.COST_CENTER_REQUIRED": {
+                    "summary": "The person answers for more than one Cost Center for that year: name the one the work is for.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.COST_CENTER_REQUIRED",
+                        "message": "The person answers for more than one Cost Center for that year: name the one the work is for.",
                         "requestId": "req_example"
                       }
                     }
@@ -58696,6 +58754,13 @@
             "required": true,
             "in": "query",
             "schema": { "minimum": 2000, "maximum": 2200, "type": "integer" }
+          },
+          {
+            "name": "costCenterId",
+            "required": false,
+            "in": "query",
+            "description": "The Cost Center asked about, when the caller answers for more than one that year (a department they head and one that starts on 1 January).",
+            "schema": { "format": "uuid", "type": "string" }
           }
         ],
         "responses": {
@@ -58777,7 +58842,7 @@
             }
           },
           "422": {
-            "description": "The query is invalid (VALIDATION_ERROR).",
+            "description": "The query is invalid (VALIDATION_ERROR), or the caller answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -58790,6 +58855,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.COST_CENTER_REQUIRED": {
+                    "summary": "The person answers for more than one Cost Center for that year: name the one the work is for.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.COST_CENTER_REQUIRED",
+                        "message": "The person answers for more than one Cost Center for that year: name the one the work is for.",
                         "requestId": "req_example"
                       }
                     }
@@ -58866,6 +58942,13 @@
             "required": true,
             "in": "query",
             "schema": { "minimum": 2000, "maximum": 2200, "type": "integer" }
+          },
+          {
+            "name": "costCenterId",
+            "required": false,
+            "in": "query",
+            "description": "The Cost Center asked about, when the caller answers for more than one that year (a department they head and one that starts on 1 January).",
+            "schema": { "format": "uuid", "type": "string" }
           },
           {
             "name": "page",
@@ -58965,7 +59048,7 @@
             }
           },
           "422": {
-            "description": "The query is invalid (VALIDATION_ERROR).",
+            "description": "The query is invalid (VALIDATION_ERROR), or the caller answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -58978,6 +59061,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.COST_CENTER_REQUIRED": {
+                    "summary": "The person answers for more than one Cost Center for that year: name the one the work is for.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.COST_CENTER_REQUIRED",
+                        "message": "The person answers for more than one Cost Center for that year: name the one the work is for.",
                         "requestId": "req_example"
                       }
                     }
@@ -59054,6 +59148,13 @@
             "required": false,
             "in": "query",
             "schema": { "minimum": 2000, "maximum": 2200, "type": "integer" }
+          },
+          {
+            "name": "costCenterId",
+            "required": false,
+            "in": "query",
+            "description": "The Cost Center asked about, when the caller answers for more than one that year (a department they head and one that starts on 1 January).",
+            "schema": { "format": "uuid", "type": "string" }
           },
           {
             "name": "page",
@@ -59153,7 +59254,7 @@
             }
           },
           "422": {
-            "description": "The query is invalid (VALIDATION_ERROR).",
+            "description": "The query is invalid (VALIDATION_ERROR), or the caller answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -59166,6 +59267,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.COST_CENTER_REQUIRED": {
+                    "summary": "The person answers for more than one Cost Center for that year: name the one the work is for.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.COST_CENTER_REQUIRED",
+                        "message": "The person answers for more than one Cost Center for that year: name the one the work is for.",
                         "requestId": "req_example"
                       }
                     }
@@ -80777,6 +80889,11 @@
                       "type": "array",
                       "items": { "type": "string", "enum": ["MISSING_HEAD", "MISSING_IT_ADMIN", "MISSING_COST_CENTER"] }
                     },
+                    "effectiveFrom": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD."
+                    },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "updatedAt": { "type": "string", "format": "date-time" },
                     "deactivatedAt": { "type": "string", "format": "date-time", "nullable": true }
@@ -80792,6 +80909,7 @@
                     "head",
                     "memberCount",
                     "warnings",
+                    "effectiveFrom",
                     "createdAt",
                     "updatedAt",
                     "deactivatedAt"
@@ -80895,6 +81013,7 @@
                 "type": "array",
                 "items": { "type": "string", "enum": ["MISSING_HEAD", "MISSING_IT_ADMIN", "MISSING_COST_CENTER"] }
               },
+              "effectiveFrom": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
               "createdAt": { "type": "string", "format": "date-time" },
               "updatedAt": { "type": "string", "format": "date-time" },
               "deactivatedAt": { "type": "string", "format": "date-time", "nullable": true },
@@ -80938,6 +81057,7 @@
               "head",
               "memberCount",
               "warnings",
+              "effectiveFrom",
               "createdAt",
               "updatedAt",
               "deactivatedAt",
@@ -97522,6 +97642,11 @@
         "type": "object",
         "properties": {
           "year": { "type": "integer", "minimum": 2000, "maximum": 2200 },
+          "costCenterId": {
+            "description": "The Cost Center the work is for, when the person answers for more than one that year (a department they head and one that starts on 1 January).",
+            "type": "string",
+            "format": "uuid"
+          },
           "lines": {
             "minItems": 1,
             "maxItems": 200,

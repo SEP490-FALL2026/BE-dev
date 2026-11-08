@@ -33,6 +33,10 @@ const lineBody = lineBodyShape
 
 export const proposalBodySchema = z.strictObject({
   year,
+  costCenterId: z.uuid().optional().meta({
+    description:
+      'The Cost Center the work is for, when the person answers for more than one that year (a department they head and one that starts on 1 January).',
+  }),
   lines: z.array(lineBody).min(1).max(LINES_MAX),
   attachmentIds: z
     .array(z.uuid())
@@ -134,10 +138,22 @@ export const versionListQuerySchema = z.strictObject({
   ...pageQuery,
 });
 export const pageQuerySchema = z.strictObject(pageQuery);
-export const mineQuerySchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2200) });
-export const mineLinesQuerySchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2200), ...pageQuery });
+const mineCostCenter = z.uuid().optional().meta({
+  description:
+    'The Cost Center asked about, when the caller answers for more than one that year (a department they head and one that starts on 1 January).',
+});
+export const mineQuerySchema = z.strictObject({
+  year: z.coerce.number().int().min(2000).max(2200),
+  costCenterId: mineCostCenter,
+});
+export const mineLinesQuerySchema = z.strictObject({
+  year: z.coerce.number().int().min(2000).max(2200),
+  costCenterId: mineCostCenter,
+  ...pageQuery,
+});
 export const mineVersionsQuerySchema = z.strictObject({
   year: z.coerce.number().int().min(2000).max(2200).optional(),
+  costCenterId: mineCostCenter,
   ...pageQuery,
 });
 export const budgetsQuerySchema = z.strictObject({

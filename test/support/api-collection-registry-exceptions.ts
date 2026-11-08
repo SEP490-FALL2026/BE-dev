@@ -264,6 +264,7 @@ export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
       'costCenter',
       'createdAt',
       'deactivatedAt',
+      'effectiveFrom',
       'function',
       'head',
       'id',

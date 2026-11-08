@@ -24,8 +24,8 @@ export class ImportLookupRepo {
       names.departmentCodes.length === 0
         ? []
         : // Whether the department has a Cost Center is not asked: a department with none takes people in (`QĐ-87d(3)`).
-          await db.$queryRaw<{ id: string; code: string; status: string }[]>`
-            SELECT d.id, d.code, d.status::text AS status
+          await db.$queryRaw<{ id: string; code: string; status: string; effective_from: string }[]>`
+            SELECT d.id, d.code, d.status::text AS status, d.effective_from::text AS effective_from
               FROM departments d
              WHERE d.code = ANY(${names.departmentCodes}::text[])`;
     const employees =
@@ -61,7 +61,8 @@ export class ImportLookupRepo {
       departments: departments.map((row) => ({
         id: row.id,
         code: row.code,
-        active: row.status === 'ACTIVE',
+        // A department that takes effect after today takes nobody in (`QĐ-104e(3)`): it is told as one that does not take people.
+        active: row.status === 'ACTIVE' && row.effective_from <= today,
       })),
       employees: employees.map((row) => ({
         id: row.id,

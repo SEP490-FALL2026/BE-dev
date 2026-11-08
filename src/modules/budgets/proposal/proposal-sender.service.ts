@@ -26,6 +26,8 @@ export interface ProposalSendInput {
   lines: LineBody[];
   previous: string | null;
   attachmentIds?: readonly string[];
+  /** The Cost Center the work is for: needed only when the head answers for more than one that year. */
+  costCenterId?: string;
 }
 
 @Injectable()
@@ -56,7 +58,10 @@ export class ProposalSender {
     const now = new Date();
     const today = await this.facts.today(now, tx);
 
-    const own = await this.facts.requireHeadedCostCenter(actor.employeeId, today, tx);
+    const own = await this.facts.requireHeadedCostCenter(actor.employeeId, today, tx, {
+      year: input.year,
+      costCenterId: input.costCenterId,
+    });
     const costCenter = await this.facts.costCenter(own, tx);
     if (!yearIsOpen(input.year, today)) throw new BudgetYearEndedError(input.year);
     await this.requirePublishedCycle(tx, input.year);

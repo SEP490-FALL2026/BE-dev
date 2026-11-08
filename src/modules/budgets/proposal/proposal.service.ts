@@ -46,6 +46,7 @@ export class ProposalService {
         lines: body.lines,
         previous: null,
         attachmentIds: body.attachmentIds,
+        costCenterId: body.costCenterId,
       });
 
       return this.views.wire(await this.require(id, tx));
@@ -75,6 +76,7 @@ export class ProposalService {
         lines,
         previous: previous.id,
         attachmentIds,
+        costCenterId: previous.costCenterId,
       });
 
       return this.views.wire(await this.require(created, tx));
@@ -149,7 +151,8 @@ export class ProposalService {
     const proposal = await this.proposals.lockById(tx, id);
     const today = await this.facts.today(new Date(), tx);
     if (!proposal) throw new BudgetProposalNotFoundError();
-    if ((await this.facts.headedCostCenter(actor.employeeId, today, tx)) === proposal.costCenterId) return proposal;
+    if ((await this.facts.headedCostCenters(actor.employeeId, today, tx)).includes(proposal.costCenterId))
+      return proposal;
     // The head of a department whose Cost Center was retired still owns the proposal that was given back: sending it again meets
     // the 409 FINANCE.SETUP_INCOMPLETE of `send`, not a 404.
     if (

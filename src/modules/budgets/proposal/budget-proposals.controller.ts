@@ -113,8 +113,8 @@ export class BudgetProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is invalid (VALIDATION_ERROR), a line lacks its window, service period or repeat cycle, with the line and the fields in details.lines (BUDGET.PROPOSAL_INCOMPLETE), a window runs backwards (BUDGET.WINDOW_BACKWARDS), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND), the year has ended (BUDGET.YEAR_ENDED) or an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING).',
-      examples: [VALIDATION_EXAMPLE, ...SEND_EXAMPLES],
+        'The form is invalid (VALIDATION_ERROR), a line lacks its window, service period or repeat cycle, with the line and the fields in details.lines (BUDGET.PROPOSAL_INCOMPLETE), a window runs backwards (BUDGET.WINDOW_BACKWARDS), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND), the year has ended (BUDGET.YEAR_ENDED) an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING), or the head answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).',
+      examples: [VALIDATION_EXAMPLE, ...SEND_EXAMPLES, EXAMPLES.COST_CENTER_REQUIRED],
     },
   )
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: BudgetProposalBodyDto) {

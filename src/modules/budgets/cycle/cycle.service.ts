@@ -55,9 +55,9 @@ export class CycleService {
     private readonly runner: TransactionRunner,
   ) {}
 
-  /** The departments a division of the year is made among (`QĐ-103i`); the departments that are not yet effective join this rule later. */
-  ceilingDepartments(tx: DbTx): Promise<string[]> {
-    return this.organizationReads.getActiveDepartmentIds(tx);
+  /** The departments a division of the year is made among (`QĐ-103i`): the active ones that take effect by the end of that year. */
+  ceilingDepartments(tx: DbTx, year: number): Promise<string[]> {
+    return this.organizationReads.getActiveDepartmentIds(year, tx);
   }
 
   /** Throws BudgetNotFinanceError, BudgetCycleYearPastError, BudgetCycleExistsError, BudgetCycleDeadlinesInvalidError and the money errors. */
@@ -95,7 +95,7 @@ export class CycleService {
         }),
       );
       const heads: (string | null)[] = [];
-      for (const departmentId of await this.ceilingDepartments(tx)) {
+      for (const departmentId of await this.ceilingDepartments(tx, body.year)) {
         heads.push(await this.facts.currentHeadOf(departmentId, today, tx));
       }
       await this.notifier.cycleOpened(tx, cycle, heads);
@@ -245,7 +245,7 @@ export class CycleService {
       const cycle = await this.cycles.lockByYear(tx, organizationId, year, 'UPDATE');
       if (!cycle) throw new BudgetCycleNotFoundError();
       if (isPastYear(year, currentYear)) throw new BudgetCycleYearPastError(year);
-      const inSet = new Set(await this.ceilingDepartments(tx));
+      const inSet = new Set(await this.ceilingDepartments(tx, year));
       const strangers = [
         ...new Set(body.departments.map((row) => row.departmentId).filter((id) => !inSet.has(id))),
       ].sort();
@@ -328,7 +328,7 @@ export class CycleService {
     if (!cycle) throw new BudgetCycleNotFoundError();
     if (isPastYear(year, Number(today.slice(0, 4)))) throw new BudgetCycleYearPastError(year);
     const verdict = judgePublish({
-      departmentIds: await this.ceilingDepartments(tx),
+      departmentIds: await this.ceilingDepartments(tx, year),
       ceilings: cycle.ceilings,
       reserveMinor: cycle.sharedPoolReserveMinor,
       annualCeilingMinor: cycle.annualCeilingMinor,

@@ -16,6 +16,7 @@ import {
   BudgetCurrencyError,
   BudgetNotAReaderError,
   BudgetNotFinanceError,
+  BudgetCostCenterRequiredError,
   BudgetNotYourCostCenterError,
   BudgetPlanNotFoundError,
 } from './budget.errors';
@@ -187,24 +188,81 @@ export class BudgetFactsService {
   }
 
   /**
-   * The Cost Center whose department the person heads today, or null: only the head of a department answers for the
-   * Cost Center of that department (`US-06-10` AC-3).
+   * The units the person answers for in `year`: the department they head today and, for a department made for that year, the one
+   * they are to head from the day it takes effect, 1 January of the year (`QĐ-106k`, R-I05). With no `year`, every upcoming unit.
    */
-  async headedCostCenter(employeeId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
-    return (await this.headedUnit(employeeId, today, tx))?.costCenter?.id ?? null;
+  async headedUnitsFor(employeeId: string, today: BusinessDate, year?: number, tx?: DbTx): Promise<HeadedUnit[]> {
+    const current = await this.headedUnit(employeeId, today, tx);
+    const upcoming = (await this.organizationReads.getUpcomingHeadedUnits(employeeId, today, tx))
+      .filter((unit) => year === undefined || unit.effectiveFrom === `${year}-01-01`)
+      .map((unit) => ({
+        departmentId: unit.departmentId,
+        costCenter: unit.costCenter && { id: unit.costCenter.id, inUse: unit.costCenter.status === 'ACTIVE' },
+      }));
+
+    return [...(current ? [current] : []), ...upcoming];
   }
 
   /**
-   * The Cost Center the person answers for as the head of its department. Throws BudgetNotYourCostCenterError when they head no
-   * department, and FinanceSetupIncompleteError when the department has no Cost Center in use yet: that is told before
-   * anything else is looked at, because the head cannot propose until Finance has made one.
+   * The Cost Centers the person answers for (`US-06-10` AC-3): the one of the department they head today, and the one of a department
+   * they are to head from the day it takes effect. Only the head of a department answers for the Cost Center of that department.
    */
-  async requireHeadedCostCenter(employeeId: string, today: BusinessDate, tx?: DbTx): Promise<string> {
-    const unit = await this.headedUnit(employeeId, today, tx);
-    if (unit === null) throw new BudgetNotYourCostCenterError();
+  async headedCostCenters(employeeId: string, today: BusinessDate, tx?: DbTx): Promise<string[]> {
+    const units = await this.headedUnitsFor(employeeId, today, undefined, tx);
+
+    return units.flatMap((unit) => (unit.costCenter ? [unit.costCenter.id] : []));
+  }
+
+  /**
+   * The unit the work of `year` is for: the only one the person answers for, or the one they name. Throws
+   * BudgetNotYourCostCenterError when they answer for none (or not for the one they name) and BudgetCostCenterRequiredError when
+   * they answer for more than one and name none.
+   */
+  async pickHeadedUnit(
+    employeeId: string,
+    today: BusinessDate,
+    pick: { year?: number; costCenterId?: string },
+    tx?: DbTx,
+  ): Promise<HeadedUnit> {
+    const units = await this.headedUnitsFor(employeeId, today, pick.year, tx);
+    if (units.length === 0) throw new BudgetNotYourCostCenterError();
+    if (pick.costCenterId !== undefined) {
+      const named = units.find((unit) => unit.costCenter?.id === pick.costCenterId);
+      if (named) return named;
+      // The only unit they answer for has no Cost Center in use (it was retired): the work is still theirs, and the caller tells the setup is incomplete.
+      if (units.length === 1 && units[0].costCenter === null) return units[0];
+      throw new BudgetNotYourCostCenterError();
+    }
+    if (units.length > 1) throw new BudgetCostCenterRequiredError();
+
+    return units[0];
+  }
+
+  /**
+   * The Cost Center the person answers for as the head of its department in `pick.year`. Throws BudgetNotYourCostCenterError when
+   * they head no department, BudgetCostCenterRequiredError and FinanceSetupIncompleteError when the department has no Cost Center in
+   * use yet: that is told before anything else is looked at, because the head cannot propose until Finance has made one.
+   */
+  async requireHeadedCostCenter(
+    employeeId: string,
+    today: BusinessDate,
+    tx?: DbTx,
+    pick: { year?: number; costCenterId?: string } = {},
+  ): Promise<string> {
+    const unit = await this.pickHeadedUnit(employeeId, today, pick, tx);
     if (unit.costCenter === null || !unit.costCenter.inUse) throw new FinanceSetupIncompleteError(unit.departmentId);
 
     return unit.costCenter.id;
+  }
+
+  /**
+   * That the person heads a unit with a Cost Center in use, whichever: a document is declared before the proposal it goes with, so
+   * it does not yet say which. Throws BudgetNotYourCostCenterError and FinanceSetupIncompleteError.
+   */
+  async requireHeadOfAnyUnit(employeeId: string, today: BusinessDate, tx?: DbTx): Promise<void> {
+    const units = await this.headedUnitsFor(employeeId, today, undefined, tx);
+    if (units.length === 0) throw new BudgetNotYourCostCenterError();
+    if (!units.some((unit) => unit.costCenter?.inUse)) throw new FinanceSetupIncompleteError(units[0].departmentId);
   }
 
   /**
@@ -222,11 +280,6 @@ export class BudgetFactsService {
     const [found] = await this.organizationReads.costCentersByIds([costCenterId], tx);
 
     return found?.departmentId === unit.departmentId;
-  }
-
-  /** Throws BudgetNotYourCostCenterError. */
-  async requireHead(employeeId: string, costCenterId: string, today: BusinessDate, tx?: DbTx): Promise<void> {
-    if ((await this.headedCostCenter(employeeId, today, tx)) !== costCenterId) throw new BudgetNotYourCostCenterError();
   }
 
   /** Who heads the department today, or null when nobody does (`QĐ-92d(1)`). */

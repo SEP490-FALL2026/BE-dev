@@ -42,12 +42,17 @@ export class DepartmentRecordService {
     tx: DbTx,
     organizationId: string,
     code: string,
+    onDay?: BusinessDate,
   ): Promise<{ id: string; code: string; name: string; active: boolean } | null> {
-    return this.departments.lockByCode(tx, organizationId, code);
+    return this.departments.lockByCode(tx, organizationId, code, onDay);
   }
 
-  activeIds(tx?: DbTx): Promise<string[]> {
-    return this.departments.activeDepartmentIds(tx);
+  activeIds(year: number, tx?: DbTx): Promise<string[]> {
+    return this.departments.activeDepartmentIds(year, tx);
+  }
+
+  upcomingHeadedUnits(employeeId: string, today: BusinessDate, tx?: DbTx) {
+    return this.departments.upcomingHeadedUnits(employeeId, today, tx);
   }
 
   countActive(tx?: DbTx): Promise<number> {

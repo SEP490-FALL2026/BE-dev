@@ -50,7 +50,11 @@ describe('JwtAccessTokenVerifier — the roles of the caller (US-01-02, QĐ-93a)
     absoluteExpiresAt: new Date(NOW + 120_000),
     directRoles,
   });
-  const verifier = (directRoles: string[], headed: { departmentId: string } | null) => {
+  const verifier = (
+    directRoles: string[],
+    headed: { departmentId: string } | null,
+    upcoming: { departmentId: string }[] = [],
+  ) => {
     const headedDepartment = jest.fn(() => Promise.resolve(headed));
     const tokens = { verifyAccessToken: () => Promise.resolve({ sub: SUB, sid: SID }) } as unknown as TokenService;
     const sessions = {
@@ -59,6 +63,8 @@ describe('JwtAccessTokenVerifier — the roles of the caller (US-01-02, QĐ-93a)
     const organization = {
       getEmployee: () => Promise.resolve({ status: 'ACTIVE', workState: 'WORKING' }),
       getHeadedDepartment: headedDepartment,
+      businessToday: () => Promise.resolve('2026-11-08'),
+      getUpcomingHeadedUnits: () => Promise.resolve(upcoming),
     } as unknown as OrganizationReadApi;
 
     return { headedDepartment, verifier: new JwtAccessTokenVerifier(tokens, sessions, organization) };
@@ -81,6 +87,14 @@ describe('JwtAccessTokenVerifier — the roles of the caller (US-01-02, QĐ-93a)
 
     expect(principal.directRoles).toEqual(['MANAGER']);
     expect(principal.roles).toEqual([]);
+  });
+
+  it('keeps MANAGER for the person who is to head a department that starts later, before it starts (QĐ-106k)', async () => {
+    const { verifier: subject } = verifier(['MANAGER'], null, [{ departmentId: 'department-next' }]);
+
+    const principal = await subject.verify('token');
+
+    expect(principal.roles).toEqual(['MANAGER']);
   });
 
   it('never derives a role: a head without the grant is no MANAGER, and the spending approver is the grant only', async () => {

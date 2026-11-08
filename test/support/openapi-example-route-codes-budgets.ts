@@ -74,12 +74,15 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     },
     budgetMine: {
       '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
+      '422': ['BUDGET.COST_CENTER_REQUIRED'],
     },
     budgetMineLineList: {
       '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
+      '422': ['BUDGET.COST_CENTER_REQUIRED'],
     },
     budgetMineVersionList: {
       '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
+      '422': ['BUDGET.COST_CENTER_REQUIRED'],
     },
     budgetProposalAttachmentDeclare: {
       '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
@@ -123,6 +126,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '404': ['BUDGET.COST_CENTER_NOT_FOUND'],
       '409': ['BUDGET.CYCLE_NOT_PUBLISHED', 'BUDGET.PROPOSAL_ALREADY_OPEN', 'FINANCE.SETUP_INCOMPLETE'],
       '422': [
+        'BUDGET.COST_CENTER_REQUIRED',
         'BUDGET.CURRENCY_NOT_REPORTING',
         'BUDGET.PLAN_NOT_FOUND',
         'BUDGET.YEAR_ENDED',

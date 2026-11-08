@@ -19,6 +19,7 @@ interface DepartmentRow {
   created_at: Date;
   updated_at: Date;
   deactivated_at: Date | null;
+  effective_from: Date;
   cc_id: string | null;
   cc_code: string | null;
   cc_name: string | null;
@@ -30,7 +31,7 @@ interface DepartmentRow {
 }
 
 const SELECT_DEPARTMENT = Prisma.sql`
-  SELECT d.id, d.code, d.name, d.function_description, d.status, d.created_at, d.updated_at, d.deactivated_at,
+  SELECT d.id, d.code, d.name, d.function_description, d.status, d.created_at, d.updated_at, d.deactivated_at, d.effective_from,
          c.id AS cc_id, c.code AS cc_code, c.name AS cc_name, c.status AS cc_status,
          e.id AS it_id, e.employee_code AS it_code, e.full_name AS it_name, e.status AS it_status
     FROM departments d
@@ -56,6 +57,7 @@ function toRecord(row: DepartmentRow): DepartmentRecord {
             fullName: row.it_name ?? '',
             employeeStatus: row.it_status ?? 'ACTIVE',
           },
+    effectiveFrom: fromDateColumn(row.effective_from),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deactivatedAt: row.deactivated_at,
@@ -90,10 +92,15 @@ export class DepartmentRepo {
       name: string;
       functionDescription: string | null;
       itAdminEmployeeId: string | null;
+      effectiveFrom: BusinessDate;
     },
   ): Promise<string> {
     try {
-      const created = await tx.department.create({ data: input, select: { id: true } });
+      const { effectiveFrom, ...rest } = input;
+      const created = await tx.department.create({
+        data: { ...rest, effectiveFrom: toDateColumn(effectiveFrom) },
+        select: { id: true },
+      });
 
       return created.id;
     } catch (error) {
@@ -126,14 +133,25 @@ export class DepartmentRepo {
     tx: DbTx,
     organizationId: string,
     code: string,
+    /** The day the person is placed: a department that takes effect later takes nobody in, and is told as one that does not take people. */
+    onDay?: BusinessDate,
   ): Promise<{ id: string; code: string; name: string; active: boolean } | null> {
-    const rows = await tx.$queryRaw<{ id: string; code: string; name: string; status: string }[]>`
-      SELECT id, code, name, status::text AS status FROM departments
+    const rows = await tx.$queryRaw<
+      { id: string; code: string; name: string; status: string; effective_from: string }[]
+    >`
+      SELECT id, code, name, status::text AS status, effective_from::text AS effective_from FROM departments
        WHERE organization_id = ${organizationId}::uuid AND code = ${code} FOR SHARE`;
     const department = rows[0];
     if (!department) return null;
 
-    return { id: department.id, code: department.code, name: department.name, active: department.status === 'ACTIVE' };
+    const taking = onDay === undefined || department.effective_from <= onDay;
+
+    return {
+      id: department.id,
+      code: department.code,
+      name: department.name,
+      active: department.status === 'ACTIVE' && taking,
+    };
   }
 
   /** The department each of these employees was placed in on `onDate`, in one read. */
@@ -247,15 +265,48 @@ export class DepartmentRepo {
     }));
   }
 
-  /** The ids of the departments that are not stopped, by id: the departments a budget cycle divides its ceiling among. */
-  async activeDepartmentIds(tx?: DbTx): Promise<string[]> {
+  /**
+   * The ids of the departments that are not stopped and take effect by the end of `year`, by id: the departments the budget cycle of
+   * that year divides its ceiling among (a department made for next year belongs to next year's cycle, not to this one).
+   */
+  async activeDepartmentIds(year: number, tx?: DbTx): Promise<string[]> {
     const rows = await (tx ?? this.prisma).department.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', effectiveFrom: { lte: toDateColumn(`${year}-12-31`) } },
       select: { id: true },
       orderBy: { id: 'asc' },
     });
 
     return rows.map((row) => row.id);
+  }
+
+  /**
+   * The departments not yet in effect whose head term of this person opens on the very day the department takes effect (`QĐ-106k`):
+   * the head of a department made for next year works for it before it starts, with its Cost Center when Finance made one.
+   */
+  async upcomingHeadedUnits(
+    employeeId: string,
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<
+    { departmentId: string; effectiveFrom: BusinessDate; costCenter: { id: string; status: CostCenterStatus } | null }[]
+  > {
+    const db = tx ?? this.prisma;
+    const rows = await db.$queryRaw<
+      { department_id: string; effective_from: string; cc_id: string | null; cc_status: CostCenterStatus | null }[]
+    >`
+      SELECT d.id AS department_id, d.effective_from::text AS effective_from, c.id AS cc_id, c.status::text AS cc_status
+        FROM departments d
+        JOIN department_head_periods h ON h.department_id = d.id AND h.employee_id = ${employeeId}::uuid
+         AND h.valid_from = d.effective_from AND (h.valid_to IS NULL OR h.valid_to > h.valid_from)
+        LEFT JOIN cost_centers c ON c.department_id = d.id AND c.kind = 'UNIT' AND c.status = 'ACTIVE'
+       WHERE d.status = 'ACTIVE' AND d.effective_from > ${toDateColumn(today)}::date
+       ORDER BY d.effective_from, d.id`;
+
+    return rows.map((row) => ({
+      departmentId: row.department_id,
+      effectiveFrom: row.effective_from,
+      costCenter: row.cc_id === null ? null : { id: row.cc_id, status: row.cc_status ?? 'ACTIVE' },
+    }));
   }
 
   async countActiveDepartments(tx?: DbTx): Promise<number> {

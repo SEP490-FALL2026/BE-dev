@@ -74,6 +74,14 @@ export class OrganizationReadApi {
   }
 
   /**
+   * The departments not yet in effect that the employee is to head from the day they take effect, each with the day and the Cost Center
+   * in use when there is one: the head of a department made for next year works for it before it starts (`QĐ-106k`).
+   */
+  getUpcomingHeadedUnits(employeeId: string, today: BusinessDate, tx?: DbTx) {
+    return this.departments.upcomingHeadedUnits(employeeId, today, tx);
+  }
+
+  /**
    * The periods in which the employee heads a department that have not ended on `onDate` (default today in the organization's
    * calendar), oldest first, each with the code of its department and `CURRENT` or `UPCOMING`. Empty when there is none. `tx` reads
    * in the caller's transaction (the revoke of `MANAGER` and the grant of `SPENDING_APPROVER` give the periods in their refusal).
@@ -271,9 +279,12 @@ export class OrganizationReadApi {
     return this.employees.profileNotices(tx, request);
   }
 
-  /** The ids of the departments that are not stopped, by id; `tx` reads in the caller's transaction (a budget cycle divides among them). */
-  getActiveDepartmentIds(tx?: DbTx): Promise<string[]> {
-    return this.departments.activeIds(tx);
+  /**
+   * The ids of the departments that are not stopped and take effect by the end of `year`, by id; `tx` reads in the caller's
+   * transaction (the budget cycle of that year divides among them).
+   */
+  getActiveDepartmentIds(year: number, tx?: DbTx): Promise<string[]> {
+    return this.departments.activeIds(year, tx);
   }
 
   /** The numbers and gaps of the onboarding checklist (US-02-04 AC-1, AC-6); with `tx`, in order in that transaction. */

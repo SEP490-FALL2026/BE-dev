@@ -88,6 +88,11 @@ export const figuresOf = (cycle: CycleRecord): CycleFigures => {
 export class CycleRepo {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Whether the organization has any cycle at all, whatever the year or the state. */
+  async anyExists(organizationId: string, tx?: DbTx): Promise<boolean> {
+    return (await (tx ?? this.prisma).budgetCycle.count({ where: { organizationId }, take: 1 })) > 0;
+  }
+
   async findByYear(organizationId: string, year: number, tx?: DbTx): Promise<CycleRecord | null> {
     const row = await (tx ?? this.prisma).budgetCycle.findUnique({
       where: { organizationId_year: { organizationId, year } },

@@ -74,7 +74,16 @@ export class JwtAccessTokenVerifier implements AccessTokenVerifierPort {
     let headsDepartmentToday = false;
     if (context.directRoles.includes('MANAGER')) {
       try {
-        headsDepartmentToday = (await this.organizationReads.getHeadedDepartment(context.employeeId)) !== null;
+        headsDepartmentToday =
+          (await this.organizationReads.getHeadedDepartment(context.employeeId)) !== null ||
+          // The head of a department that starts next year works for it before it starts (`QĐ-106k`): MANAGER counts from the day
+          // they are named, the budget services say which unit each piece of work is for.
+          (
+            await this.organizationReads.getUpcomingHeadedUnits(
+              context.employeeId,
+              await this.organizationReads.businessToday(),
+            )
+          ).length > 0;
       } catch (error) {
         if (toTransientError(error)) throw new TokenVerificationUnavailableError(error);
         throw error;

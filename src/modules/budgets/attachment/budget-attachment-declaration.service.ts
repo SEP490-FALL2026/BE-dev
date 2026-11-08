@@ -109,7 +109,7 @@ export class BudgetAttachmentDeclarationService {
     input: CreateBudgetAttachmentDto,
   ): Promise<DeclareAttachmentResult> {
     const today = await this.facts.today(new Date());
-    await this.facts.requireHeadedCostCenter(actor.employeeId, today);
+    await this.facts.requireHeadOfAnyUnit(actor.employeeId, today);
     const organizationId = await this.facts.organizationId();
 
     const maxBytes = Number(await this.parameters.getValue('DOCUMENT_MAX_SIZE_MB')) * 1024 * 1024;

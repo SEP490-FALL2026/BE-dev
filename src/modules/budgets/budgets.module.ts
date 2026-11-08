@@ -35,6 +35,7 @@ import { BudgetInvoicesController } from './invoice/budget-invoices.controller';
 import { BudgetCyclesController } from './cycle/budget-cycles.controller';
 import { CycleRepo } from './cycle/cycle.repo';
 import { CycleService } from './cycle/cycle.service';
+import { DepartmentCreationWindowListener } from './cycle/department-creation-window.listener';
 import { InvoiceService } from './invoice/invoice.service';
 import { DecisionRepo } from './budget/decision.repo';
 import { LineImportService } from './version/line-import.service';
@@ -149,6 +150,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetFactsRepo,
     CycleRepo,
     CycleService,
+    DepartmentCreationWindowListener,
     BudgetChangeListeners,
     CommitmentReleaseGuardHook,
     CommitmentRequestFactsHook,

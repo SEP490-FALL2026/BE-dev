@@ -23,7 +23,7 @@ const facts = (patch: Partial<NewTransferFacts> = {}): NewTransferFacts => ({
   employee: { status: 'ACTIVE', workState: 'WORKING' },
   current: { departmentId: 'dep-des', validFrom: '2026-01-01' },
   target: { departmentId: 'dep-fin' },
-  destinationDepartment: { active: true },
+  destinationDepartment: { active: true, effectiveFrom: '2026-01-01' },
   grounds: GROUNDS,
   pending: null,
   successor: NO_SUCCESSOR,
@@ -51,7 +51,16 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
       'EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD',
     ],
     ['the destination does not exist', { destinationDepartment: null }, 'DEPARTMENT_NOT_FOUND'],
-    ['the destination is retired', { destinationDepartment: { active: false } }, 'DEPARTMENT_INACTIVE'],
+    [
+      'the destination takes effect after the day (a department made for next year)',
+      { destinationDepartment: { active: true, effectiveFrom: '2027-01-01' } },
+      'DEPARTMENT_NOT_YET_EFFECTIVE',
+    ],
+    [
+      'the destination is retired',
+      { destinationDepartment: { active: false, effectiveFrom: '2026-01-01' } },
+      'DEPARTMENT_INACTIVE',
+    ],
     ['the grounds are empty (AC-18)', { grounds: undefined }, 'GROUNDS_REQUIRED'],
     ['the grounds are a notice', { grounds: { ...GROUNDS, reference: 'BM09-2026-000001' } }, 'GROUNDS_IS_NOTICE'],
     ['another transfer waits (AC-21)', { pending: { effectiveOn: '2026-12-01' } }, 'PENDING_EVENT_EXISTS'],
@@ -67,8 +76,10 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
 
   it('records a transfer into a department that has no Cost Center like any other (QĐ-87d(3), F44)', () => {
     // The destination is judged by whether it exists and takes people; the policy is not told of a Cost Center at all.
-    expect(Object.keys(facts().destinationDepartment ?? {})).toEqual(['active']);
-    expect(newTransferRefusal(facts({ destinationDepartment: { active: true } }))).toBeNull();
+    expect(Object.keys(facts().destinationDepartment ?? {})).toEqual(['active', 'effectiveFrom']);
+    expect(
+      newTransferRefusal(facts({ destinationDepartment: { active: true, effectiveFrom: '2026-01-01' } })),
+    ).toBeNull();
   });
 
   it('allows today, and a person on a long leave', () => {
@@ -90,7 +101,7 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
 
   it('says the same as the policy does when the database finds the destination retired', () => {
     expect(retiredDestinationRefusal()).toEqual(
-      newTransferRefusal(facts({ destinationDepartment: { active: false } })),
+      newTransferRefusal(facts({ destinationDepartment: { active: false, effectiveFrom: '2026-01-01' } })),
     );
   });
 });

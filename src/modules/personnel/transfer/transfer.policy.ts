@@ -40,7 +40,7 @@ export interface NewTransferFacts {
   /** Where the person is to be; what the caller did not name stays as it is. */
   target: { departmentId: string };
   /** The department the person is to join: whether it exists and takes people. Its Cost Center is not asked (`QĐ-87d`(3)). */
-  destinationDepartment: { active: boolean } | null;
+  destinationDepartment: { active: boolean; effectiveFrom: BusinessDate } | null;
   grounds: GroundsInput | undefined;
   pending: { effectiveOn: BusinessDate } | null;
   /** Another waiting transfer names this person to follow the head of its department: they stay until it is settled. */
@@ -97,6 +97,24 @@ function dateRefusal(today: BusinessDate, day: BusinessDate, periodStart: Busine
 }
 
 /**
+ * What is wrong with the department a person is to join: it takes effect after the day of the change (a department made for next
+ * year takes nobody in before 1 January, `QĐ-104e(3)`), or the shared placement policy finds it unknown or retired. A transfer is a
+ * change of place, not a charge: a department with no Cost Center takes people like any other (`QĐ-87d`(3)).
+ * The code the shared policy gives is the code on the wire (`DEPARTMENT_TRANSFER.<code>`): this file writes none of its own for it.
+ */
+function destinationRefusal(
+  destination: NewTransferFacts['destinationDepartment'],
+  effectiveOn: BusinessDate,
+): TransferRefusal | null {
+  if (destination && effectiveOn < destination.effectiveFrom) {
+    return { code: 'DEPARTMENT_NOT_YET_EFFECTIVE', details: { effectiveFrom: destination.effectiveFrom } };
+  }
+  const [reason] = placementReasons({ department: { named: true, found: destination } });
+
+  return reason ? { code: reason.code, details: { subject: reason.subject } } : null;
+}
+
+/**
  * Whether a transfer may be recorded (`US-03-01` AC-14 -> AC-18, AC-21, AC-22): the person works for the organization and has no
  * other event waiting, the department changes, the day is today or later, the destination can take people, the basis is whole,
  * nobody else has to act in their place, and the head of the department they leave is provided for.
@@ -108,13 +126,8 @@ export function newTransferRefusal(facts: NewTransferFacts): TransferRefusal | n
   const late = dateRefusal(facts.today, facts.effectiveOn, current.validFrom);
   if (late) return late;
 
-  const reasons = placementReasons({
-    // A transfer is a change of place, not a charge: a department with no Cost Center takes people like any other (`QĐ-87d`(3)).
-    department: { named: true, found: facts.destinationDepartment },
-  });
-  const reason = reasons[0];
-  // The code the shared policy gives is the code on the wire (`DEPARTMENT_TRANSFER.<code>`): this file writes none of them.
-  if (reason) return { code: reason.code, details: { subject: reason.subject } };
+  const destination = destinationRefusal(facts.destinationDepartment, facts.effectiveOn);
+  if (destination) return destination;
   const grounds = groundsRefusal(facts.grounds);
   if (grounds)
     return { code: grounds.reason, details: 'missing' in grounds ? { missing: grounds.missing } : undefined };

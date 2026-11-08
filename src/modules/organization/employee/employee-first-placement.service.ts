@@ -1,11 +1,15 @@
 ﻿import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { DepartmentRepo } from '../department/department.repo';
-import { DepartmentInactiveError, DepartmentNotFoundError } from '../department/department.errors';
+import {
+  DepartmentInactiveError,
+  DepartmentNotFoundError,
+  DepartmentNotYetEffectiveError,
+} from '../department/department.errors';
 import { organizationAuditEvent } from '../organization-audit-event.mapper';
 import { OrganizationContextService } from '../organization-context.service';
 import { EmployeeNotFoundError } from '../public/organization.errors';
@@ -32,9 +36,7 @@ export class EmployeeFirstPlacementService {
   ) {
     assertMayEnterEmployees(actor.roles);
     return this.runner.run(async (tx) => {
-      const department = await this.departments.lock(tx, input.departmentId, 'UPDATE');
-      if (!department) throw new DepartmentNotFoundError();
-      if (department.status !== 'ACTIVE') throw new DepartmentInactiveError();
+      const department = await this.lockPlaceable(tx, input);
       await this.employees.lock(tx, employeeId, 'UPDATE');
       const employee = await this.employees.find(employeeId, tx);
       if (!employee) throw new EmployeeNotFoundError(employeeId);
@@ -49,6 +51,7 @@ export class EmployeeFirstPlacementService {
         today,
       });
       if (problem) throw new FirstPlacementError(problem);
+      this.requireEffective(department, input.effectiveFrom);
       await this.employees.insertFirstPlacement(tx, {
         organizationId: employee.organizationId,
         employeeId,
@@ -84,5 +87,18 @@ export class EmployeeFirstPlacementService {
         jobTitle: employee.jobTitle ?? null,
       };
     });
+  }
+
+  /** Locks the department the person is placed in: it exists, is in use and takes effect by the day (`QĐ-104e(3)`). */
+  private async lockPlaceable(tx: DbTx, input: { departmentId: string; effectiveFrom: BusinessDate }) {
+    const department = await this.departments.lock(tx, input.departmentId, 'UPDATE');
+    if (!department) throw new DepartmentNotFoundError();
+    if (department.status !== 'ACTIVE') throw new DepartmentInactiveError();
+    return department;
+  }
+
+  /** A department made for next year takes nobody in before the day it takes effect (`QĐ-104e(3)`). */
+  private requireEffective(department: { effectiveFrom: BusinessDate }, day: BusinessDate): void {
+    if (day < department.effectiveFrom) throw new DepartmentNotYetEffectiveError(department.effectiveFrom);
   }
 }

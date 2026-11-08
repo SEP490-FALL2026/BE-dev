@@ -45,7 +45,7 @@ const lookups = (extra: Partial<NeedQueueLookups> = {}): NeedQueueLookups => ({
   ]),
   plans: [{ planId: 'plan-1', planName: 'Team', applicationName: 'Wiki' }] as unknown as NeedQueueLookups['plans'],
   departments: [
-    { id: 'dep-1', code: 'P-DES', name: 'Design', active: true, costCenterActive: true },
+    { id: 'dep-1', code: 'P-DES', name: 'Design', active: true, effectiveFrom: '2026-01-01', costCenterActive: true },
   ] as NeedQueueLookups['departments'],
   units: new Map([['VND', 0]]),
   due: new Map([['step-1', '2026-10-05']]),

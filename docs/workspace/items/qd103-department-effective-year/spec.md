@@ -122,3 +122,4 @@ budget-attachment-query}.service.ts`, `budget-view/budget-view.service.ts`.
 hành, hook kiểu union có `tx` chỉ ở `departmentCreate`, bỏ _chưa bind ⟹ từ chối_, phép tra trưởng phòng theo (Cost Center,
 năm) cho mọi việc B3, backfill theo placement/nhiệm kỳ, thêm test và file cụ thể; ngoại lệ khởi tạo và một người hai nhiệm
 kỳ là câu tạm chọn; nhắc Finance liên kết Cost Center chuyển sang job của `baseline-annual-check`.
+08/11/2026 (code): cài đặt xong 4 task. Lệch spec: cột có `DEFAULT CURRENT_DATE`; nhập tay/import vào phòng chưa hiệu lực dùng lý do `DEPARTMENT_INACTIVE`; token `MANAGER` tính cho người sắp làm trưởng phòng phòng chưa hiệu lực (W2-N5); reschedule transfer chưa kiểm ngày hiệu lực. Bằng chứng ở bảng Verification của plan.

@@ -163,7 +163,7 @@ request_id IS NOT NULL)` (DA4-03). Partial unique _một `GRANT` đang mở mỗ
 ## Definition of Done
 
 - [ ] Test matrix xanh; OpenAPI có 3 operation mới + lỗi; `test/support/api-coverage-manifest.ts` có 3 operation; `pnpm arch:capabilities --module
-    licensing` không vòng (`role-based` L3, không capability nào import).
+  licensing` không vòng (`role-based` L3, không capability nào import).
 - [ ] README `licensing` (capability `role-based`, sweeper, tác vụ chuyển căn cứ, `ROLE_ENDED`), `identity-access` (extension point),
       `docs/rules/security-jobs.md` (sweeper mới, mẫu `licensing/expiry/expiry-reminder.job.ts`) cập nhật.
 - [ ] Kiểm tra nhanh tracker §4.5 xanh; `pnpm check` và full suite **chưa chạy**.
