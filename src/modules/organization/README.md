@@ -62,6 +62,7 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
   - `DepartmentServiceAccountReaderHook` (`organization.department-service-account-reader`) — licensing
     `assignment/assignment-service-account`; chỉ `department-management/department.service.ts` đọc (ngừng phòng ban, API), không qua facade.
   - `EmployeeAccountsHook` (`organization.employee-accounts`) — identity-access `accounts/employee-accounts`.
+  - `DepartmentCreationWindowHook` (`organization.department-creation-window`) — budgets `cycle/department-creation-window`; chỉ `department-management/department.service.ts` hỏi lúc tạo phòng (API), không hỏi ở đường cài đặt.
 - Đăng ký vào: chỉ point của chính module (`department/held-notice-handover.listener.ts`).
 
 ## Hướng phụ thuộc giữa capability (R6)
@@ -111,6 +112,7 @@ Từ vựng trạng thái nhân viên (`EmployeeStatus`, `EmployeeWorkState`, `E
   Xếp phòng lần đầu: `POST /employees/{id}/first-placements` (`EmployeeFirstPlacementService`); đọc người chưa xếp phòng qua
   `OrganizationReadApi.unplacedAmong`, lần xếp phòng chưa hiệu lực qua `getScheduledFirstPlacement`; người đang bàn giao bị từ
   chối `EMPLOYEE.EMPLOYEE_LEAVING`.
+- Ngày hiệu lực của phòng (`departments.effective_from`, `QĐ-104e(3)`): phòng chỉ được tạo (API) khi kỳ ngân sách năm sau tồn tại và chưa từng phát hành (hook trên); khi đó hiệu lực 01/01 năm sau. Kỳ năm hiện tại không mở cửa sổ (giữa năm không tạo phòng); chưa có kỳ nào (cài đặt) thì hiệu lực hôm nay, đường cài đặt truyền ngày theo múi giờ tổ chức. Phòng chưa hiệu lực không nhận người (xếp lần đầu, transfer ghi mới và dời ngày: 422 `DEPARTMENT.NOT_YET_EFFECTIVE` / `DEPARTMENT_TRANSFER.DEPARTMENT_NOT_YET_EFFECTIVE`; nhập tay và import báo phòng không nhận người), trưởng phòng bắt đầu đúng ngày hiệu lực; tập phòng chia Trần của một năm chỉ gồm phòng hiệu lực trong năm đó. **Rủi ro (Q-14):** Finance chậm mở/phát hành kỳ năm sau thì cửa sổ tạo phòng mở lâu; chưa có kỳ nào thì tạo phòng không bị chặn (race với lần mở kỳ đầu chỉ ở lúc khởi tạo, Finance vẫn phải chia Trần nên không lọt). Cột có `DEFAULT CURRENT_DATE` chỉ cho SQL thuần; ứng dụng luôn ghi ngày tường minh.
 - INV-19: mỗi ngày một phòng có tối đa một trưởng, một người là trưởng tối đa một phòng (EXCLUDE trên
   `department_head_periods`); INV-20: trưởng thuộc phòng suốt kỳ (trigger `department_head_requires_membership`).
 - Thứ tự khóa: các phòng theo id, rồi nhân viên (`OrganizationHistoryApi.lockDepartments`).

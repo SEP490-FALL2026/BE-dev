@@ -8,7 +8,11 @@ import {
   VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
-import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
+import {
+  AuthenticatedOnly,
+  RequireRoles,
+  RequireRolesOrGrants,
+} from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdParamDto } from '../budget/budget.dto';
@@ -100,7 +104,7 @@ export class BudgetAttachmentUploadsController {
   }
 
   @Post('budget-proposals/attachments')
-  @RequireRoles('MANAGER')
+  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
   @HttpCode(HttpStatus.CREATED)
   @Header('Cache-Control', 'no-store')
   @ApiOperation({
@@ -152,7 +156,7 @@ export class BudgetAttachmentUploadsController {
   }
 
   @Post('budget-attachments/:id/complete')
-  @RequireRoles('MANAGER', 'FINANCE')
+  @RequireRolesOrGrants(['MANAGER', 'FINANCE'], ['MANAGER'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     operationId: 'budgetAttachmentComplete',

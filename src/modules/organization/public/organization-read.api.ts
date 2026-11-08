@@ -73,6 +73,11 @@ export class OrganizationReadApi {
     return this.departments.headedDepartment(employeeId, onDate ?? (await this.businessToday()));
   }
 
+  /** Who is to head a department that is not yet in effect, from the day it takes effect; null when nobody or when it is in effect (`QĐ-106k`). */
+  getUpcomingHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
+    return this.departments.upcomingHeadOf(departmentId, today, tx);
+  }
+
   /**
    * The departments not yet in effect that the employee is to head from the day they take effect, each with the day and the Cost Center
    * in use when there is one: the head of a department made for next year works for it before it starts (`QĐ-106k`).

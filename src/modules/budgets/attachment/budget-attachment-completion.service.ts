@@ -98,7 +98,8 @@ export class BudgetAttachmentCompletionService {
     if (record.target === 'VERSION' && !actor.roles.includes('FINANCE')) {
       throw new BudgetAttachmentForbiddenRoleError();
     }
-    if (record.target === 'PROPOSAL' && !actor.roles.includes('MANAGER')) {
+    // A file of a proposal is a head's: the grant counts, because the head of a department that starts next year holds it before the role is effective (`QĐ-106k`); the declaration judged the units.
+    if (record.target === 'PROPOSAL' && !actor.directRoles.includes('MANAGER')) {
       throw new BudgetAttachmentForbiddenRoleError();
     }
   }

@@ -103497,9 +103497,29 @@
                 "required": ["departmentId", "departmentCode", "departmentName"],
                 "additionalProperties": false,
                 "nullable": true
+              },
+              "upcomingUnits": {
+                "maxItems": 5,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "departmentId": { "type": "string", "format": "uuid" },
+                    "departmentCode": { "type": "string" },
+                    "departmentName": { "type": "string" },
+                    "effectiveFrom": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD."
+                    },
+                    "costCenterId": { "type": "string", "format": "uuid", "nullable": true }
+                  },
+                  "required": ["departmentId", "departmentCode", "departmentName", "effectiveFrom", "costCenterId"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["appUserId", "loginEmail", "employee", "roles", "managerScope"],
+            "required": ["appUserId", "loginEmail", "employee", "roles", "managerScope", "upcomingUnits"],
             "additionalProperties": false,
             "nullable": true
           }

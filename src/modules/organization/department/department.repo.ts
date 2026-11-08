@@ -64,6 +64,9 @@ function toRecord(row: DepartmentRow): DepartmentRecord {
   };
 }
 
+/** At most this many departments not yet in effect that one person is to head are told (the contract of `/me.upcomingUnits`). */
+export const UPCOMING_UNITS_LIMIT = 5;
+
 export interface DepartmentListFilter {
   status?: DepartmentStatus;
   search?: string;
@@ -111,7 +114,12 @@ export class DepartmentRepo {
 
   /** The installation's first department (`FR-9.8`): written as given, a database error is not translated. */
   async createForInstallation(tx: DbTx, input: CreateDepartmentInput): Promise<{ id: string }> {
-    return tx.department.create({ data: input, select: { id: true } });
+    const { effectiveFrom, ...rest } = input;
+
+    return tx.department.create({
+      data: { ...rest, ...(effectiveFrom ? { effectiveFrom: toDateColumn(effectiveFrom) } : {}) },
+      select: { id: true },
+    });
   }
 
   /** Takes the row lock (`FOR UPDATE` to change it or what hangs on it, `FOR SHARE` to rely on it), then reads it. Null when absent. */
@@ -300,13 +308,27 @@ export class DepartmentRepo {
          AND h.valid_from = d.effective_from AND (h.valid_to IS NULL OR h.valid_to > h.valid_from)
         LEFT JOIN cost_centers c ON c.department_id = d.id AND c.kind = 'UNIT' AND c.status = 'ACTIVE'
        WHERE d.status = 'ACTIVE' AND d.effective_from > ${toDateColumn(today)}::date
-       ORDER BY d.effective_from, d.id`;
+       ORDER BY d.effective_from, d.id
+       LIMIT ${UPCOMING_UNITS_LIMIT}`;
 
     return rows.map((row) => ({
       departmentId: row.department_id,
       effectiveFrom: row.effective_from,
       costCenter: row.cc_id === null ? null : { id: row.cc_id, status: row.cc_status ?? 'ACTIVE' },
     }));
+  }
+
+  /** Who is to head a department that is not yet in effect from the day it takes effect, or null (`QĐ-106k`). */
+  async upcomingHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
+    const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string }[]>`
+      SELECT h.employee_id
+        FROM departments d
+        JOIN department_head_periods h ON h.department_id = d.id AND h.valid_from = d.effective_from
+         AND (h.valid_to IS NULL OR h.valid_to > h.valid_from)
+       WHERE d.id = ${departmentId}::uuid AND d.status = 'ACTIVE' AND d.effective_from > ${toDateColumn(today)}::date
+       LIMIT 1`;
+
+    return rows[0]?.employee_id ?? null;
   }
 
   async countActiveDepartments(tx?: DbTx): Promise<number> {

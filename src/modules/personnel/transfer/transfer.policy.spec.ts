@@ -187,8 +187,18 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
     grounds: GROUNDS,
     ...patch,
   });
-  const move = (patch: Partial<PendingTransferFacts> = {}, newEffectiveOn = '2026-12-15') =>
-    rescheduleRefusal({ ...pending(patch), newEffectiveOn, successor: NO_SUCCESSOR })?.code;
+  const move = (
+    patch: Partial<PendingTransferFacts> = {},
+    newEffectiveOn = '2026-12-15',
+    destinationEffectiveFrom: string | null = null,
+  ) =>
+    rescheduleRefusal({ ...pending(patch), newEffectiveOn, successor: NO_SUCCESSOR, destinationEffectiveFrom })?.code;
+
+  it('turns away a move to a day before the destination takes effect, and accepts the day it does (QĐ-104e(3))', () => {
+    expect(move({}, '2026-12-15', '2027-01-01')).toBe('DEPARTMENT_NOT_YET_EFFECTIVE');
+    expect(move({}, '2027-01-01', '2027-01-01')).toBeUndefined();
+    expect(move({}, '2026-12-15', null)).toBeUndefined();
+  });
 
   it('moves a waiting transfer to a later day, with a reason and a basis', () => {
     expect(move()).toBeUndefined();
@@ -224,9 +234,10 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
         hasPendingTransfer: false,
       },
     };
-    expect(rescheduleRefusal({ ...pending(), newEffectiveOn: '2026-12-15', successor })?.code).toBe(
-      'SUCCESSOR_NOT_A_MEMBER_ON_DATE',
-    );
+    expect(
+      rescheduleRefusal({ ...pending(), newEffectiveOn: '2026-12-15', successor, destinationEffectiveFrom: null })
+        ?.code,
+    ).toBe('SUCCESSOR_NOT_A_MEMBER_ON_DATE');
   });
 
   it('cancels a waiting transfer, and says the same things about the day, the reason and the basis', () => {

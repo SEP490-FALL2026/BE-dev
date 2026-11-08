@@ -8,7 +8,7 @@ import {
   VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
-import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
+import { RequireRoles, RequireRolesOrGrants } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
@@ -56,7 +56,7 @@ export class BudgetsController {
   constructor(private readonly budgets: BudgetViewService) {}
 
   @Get('mine')
-  @RequireRoles('MANAGER')
+  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
   @ApiOperation({ operationId: 'budgetMine', summary: 'Get the budget of my department' })
   @ApiSuccessResponse(MineResponseDto, {
     message: 'BUDGET.FETCHED',
@@ -73,7 +73,7 @@ export class BudgetsController {
   }
 
   @Get('mine/lines')
-  @RequireRoles('MANAGER')
+  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
   @ApiOperation({ operationId: 'budgetMineLineList', summary: 'List the lines of the budget of my department' })
   @ApiSuccessResponse(MineLinePageResponseDto, {
     message: 'BUDGET.LINES_LISTED',
@@ -90,7 +90,7 @@ export class BudgetsController {
   }
 
   @Get('mine/versions')
-  @RequireRoles('MANAGER')
+  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
   @ApiOperation({ operationId: 'budgetMineVersionList', summary: 'List sent versions for the cost center' })
   @ApiSuccessResponse(MineVersionPageResponseDto, {
     message: 'BUDGET.VERSIONS_LISTED',

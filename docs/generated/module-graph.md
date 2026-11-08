@@ -100,7 +100,7 @@ flowchart BT
   personnel -->|30| licensing
   personnel -->|5| notifications
   personnel -->|4| operating_parameters
-  personnel -->|87| organization
+  personnel -->|88| organization
   personnel -->|6| requests
   requests -->|55| audit
   requests -->|17| budgets

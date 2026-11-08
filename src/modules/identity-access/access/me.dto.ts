@@ -1,3 +1,4 @@
+import { responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
@@ -23,6 +24,22 @@ export const meSchema = z.strictObject({
   managerScope: z
     .strictObject({ departmentId: z.uuid(), departmentCode: z.string(), departmentName: z.string() })
     .nullable(),
+  /**
+   * The departments the caller is to head that have not taken effect yet (a department made for next year), each with the day it takes
+   * effect and the Cost Center Finance made for it (null until then). The role MANAGER is not effective for them and `managerScope`
+   * stays null, but they send and read the proposal of the next year (`BM-10`) for these units: the screen shows when this list is not empty.
+   */
+  upcomingUnits: z
+    .array(
+      z.strictObject({
+        departmentId: z.uuid(),
+        departmentCode: z.string(),
+        departmentName: z.string(),
+        effectiveFrom: responseBusinessDate,
+        costCenterId: z.uuid().nullable(),
+      }),
+    )
+    .max(5),
 });
 
 export class MeResponseDto extends createZodDto(successEnvelopeSchema(meSchema)) {}

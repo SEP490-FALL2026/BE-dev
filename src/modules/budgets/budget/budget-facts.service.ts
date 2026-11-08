@@ -282,11 +282,17 @@ export class BudgetFactsService {
     return found?.departmentId === unit.departmentId;
   }
 
-  /** Who heads the department today, or null when nobody does (`QĐ-92d(1)`). */
+  /**
+   * Who answers for the budget of the department today, or null when nobody does (`QĐ-92d(1)`): the head of today and, for a department
+   * that is not yet in effect, the person who is to head it from the day it takes effect (`QĐ-106k`: they send, withdraw and send again
+   * before it starts, so the notices of that work are theirs).
+   */
   async currentHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
-    return (
-      (await this.organizationReads.getDepartmentHeads([departmentId], today, tx)).get(departmentId)?.employeeId ?? null
-    );
+    const head =
+      (await this.organizationReads.getDepartmentHeads([departmentId], today, tx)).get(departmentId)?.employeeId ??
+      null;
+
+    return head ?? (await this.organizationReads.getUpcomingHeadOf(departmentId, today, tx));
   }
 
   /**

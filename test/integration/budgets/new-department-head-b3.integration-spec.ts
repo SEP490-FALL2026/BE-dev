@@ -79,6 +79,22 @@ describe('the head of a department that starts next year does the budget work (i
     await h.resubmit(again.id, { lines: h.twoLines() }, head.account).expect(201);
   });
 
+  it('completes, links and reads the documents of the proposal, and reads its own lines and versions, before the department starts (DA2-09)', async () => {
+    const department = await upcoming();
+    const head = await futureHead(department);
+    const file = await h.uploaded(SAMPLE_PDF, head.account);
+
+    const sent = h.dataOf<{ proposal: ProposalWire }>(
+      await h.submitProposal({ year: h.next, lines: h.twoLines(), attachmentIds: [file] }, head.account).expect(201),
+    ).proposal;
+    const listed = await h.listProposalAttachments(sent.id, '', head.account).expect(200);
+    await h.linkAttachment(file, head.account).expect(200);
+
+    expect(h.dataOf<{ items: { id: string }[] }>(listed).items.map((item) => item.id)).toEqual([file]);
+    await h.mineLines(head.account, h.next).expect(200);
+    await h.listMineVersions(`?year=${h.next}`, head.account).expect(200);
+  });
+
   it('has nothing to do for this year: the department has not started (403 NOT_YOUR_COST_CENTER)', async () => {
     const department = await upcoming();
     const head = await futureHead(department);

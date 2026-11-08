@@ -148,6 +148,7 @@ model Department {
   updatedAt           DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   deactivatedAt       DateTime?        @map("deactivated_at") @db.Timestamptz(3)
   // The day the department takes effect (QĐ-104e(3)): one made in the budgeting period takes effect on 1 January of the next year.
+  // The application always names it (the installation too, in the calendar of the organization); the default is only for plain SQL.
   effectiveFrom       DateTime         @default(dbgenerated("CURRENT_DATE")) @map("effective_from") @db.Date
 
   organization            Organization                  @relation(fields: [organizationId], references: [id])

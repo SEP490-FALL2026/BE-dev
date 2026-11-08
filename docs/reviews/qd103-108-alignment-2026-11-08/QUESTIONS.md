@@ -502,8 +502,8 @@ Câu W0 W5 dùng tiếp, không đổi: Q-07 = C (thêm vế thời điểm kỹ
   trước R hoặc khi sự cố _hết hạn chưa gia hạn_ còn mở; audit trước/sau, Finance được báo lại.
 - **Chọn B** — khớp US-11-04 AC-12, không ngõ cụt; vẫn ngừng cấp mới cho tới khi thay.
 - Đổi lại: điều kiện thay trong `record/subscription-adjustment-record.policy.ts` + trigger cột kết quả (A: bỏ nhánh thay, giữ `stopGrants`).
-- **W2-N5 — vai trò MANAGER cho trưởng phòng sắp nhậm chức.** Token chỉ tính MANAGER khi đang làm trưởng phòng hôm nay (QĐ-93a). Để trưởng phòng phòng mới làm B3 trước 01/01 (FR-5.15(1)), code tạm cho MANAGER tính khi người đó có nhiệm kỳ trưởng phòng bắt đầu đúng ngày hiệu lực của phòng chưa hiệu lực (`getUpcomingHeadedUnits`). Phương án khác: chỉ mở các route ngân sách cho nhóm này, hoặc chờ đến 01/01. **Chat review (R2, 09/11): TẠM CHỌN (chờ Owner) phương án hẹp — không nới vai `MANAGER` ở guard/JWT; chỉ các route B3 (`budgetProposalSubmit/Resubmit/Withdraw`, `budgetMine*`, đính kèm đề xuất) nhận người có nhiệm kỳ trưởng phòng sắp tới; `/me` trả `managerScope` kèm `upcoming` để FE hiện `BM-10`. Đổi lại = nới guard như C1 (`46b6a94e`).**
-- **W2-N6 — reschedule transfer vào phòng chưa hiệu lực.** Chưa kiểm `effective_from` khi dời ngày một transfer đã ghi; chỉ kiểm lúc ghi mới.
+- **W2-N5 — vai MANAGER cho trưởng phòng sắp nhậm chức. ĐÃ QUYẾT (chat review, phương án hẹp):** không nới vai ở token (`QĐ-93a`/`QĐ-95e`); route B3 dùng `RequireRolesOrGrants` (guard kiểm grant) và service xét đơn vị; `/me.upcomingUnits`. Đổi lại phương án: nới guard như `46b6a94e`.
+- **W2-N6 — reschedule transfer vào phòng chưa hiệu lực. ĐÃ SỬA** (`fix(qd103-w2): department-effective-year F-033…F-045`). Còn lại: trigger DB làm lớp chặn thứ hai chưa làm (fixture SQL cũ).
 
 ## Câu khi thiết kế W6 (Q-82 → Q-96)
 
@@ -565,3 +565,88 @@ lý do không mốc thắng ân hạn; báo người giữ opt-in.
 - _Chọn:_ **B** — người đã nghỉ từ lâu không còn gì để bàn giao trừ gói mất dữ liệu; không thêm nguồn mới. Hủy nghỉ việc gỡ theo `(DEPARTURE, caseId)` sẽ
   không đụng tác vụ `G2` (tham chiếu khuyến nghị) — cố ý.
 - _Đổi lại:_ A — một hằng trong `board-reclaim.service.ts`; C — migration `*_values` cho `RevocationSource` + nhánh `handover-confirmer.policy.ts`.
+
+## Câu khi thiết kế W7 (Q-97 → Q-110)
+
+Phát sinh khi soạn và audit thiết kế W7 (seed/demo), 09/11/2026; bản cuối sau audit (28 finding, 6 Cao). Câu theo nguồn và câu kỹ thuật ghi riêng bên dưới; câu cần Owner: **TẠM CHỌN (chờ Owner)**.
+
+### 2. Câu tạm chọn (bản cuối) — cần Owner
+
+Năm câu dưới cần Owner vì quyết định thứ Owner **thấy** khi demo. Mỗi câu đang TẠM CHỌN theo chế độ tự chạy; đổi lại chỉ chạm fixture + bảng kịch bản.
+
+### Q-101 — Loom _hết hạn chưa gia hạn_ có hiện ngay khi demo không?
+
+- **Bối cảnh:** sự cố `EXPIRED_NOT_RENEWED` (QT C.2, R-G06) chỉ sinh khi **hôm nay ≥ ngày gia hạn** mà chưa ghi kết quả và còn quyền mở. Seed không giả
+  ngày (Q-100).
+- **Ví dụ:** Loom gia hạn `D0+3` ⟹ seed ngày 10/11 thì sự cố có từ 13/11. W9 gọi tay ở `D0` không thấy; flow thấy ở DS20-18, DS20-22 (gia hạn trễ).
+- **Phương án:** (A) gia hạn `D0+3`, sự cố chỉ qua flow — dữ liệu luôn là _kỳ đang chạy_; (B) tạo kỳ Loom đã qua ngày gia hạn (`renewalInDays` = −2) ⟹ sự
+  cố có ngay ở lượt quét đầu, W9 thấy ở `D0`; phải kiểm luật khai thuê bao W1 có nhận kỳ không chứa hôm nay; (C) hai thuê bao Loom — trái R-E02, loại.
+- **Chọn:** A.
+- **Cách đổi lại:** `fixture/shared-demo-v4/catalog.ts` Loom `renewalInDays` = −2; DS20-18, DS20-22 đổi _Khi_ thành `D0`; unit _tham số_.
+
+### Q-103 — Giữ ba kết quả ngân sách (trong cơ sở / dùng dự phòng / bị chặn) ổn định qua các tháng thế nào?
+
+- **Bối cảnh:** kiểm tra ngân sách tính `cơ sở − thực chi − đang giữ − chờ`; từ tháng thứ hai sau seed, thực chi `K2` của phòng = seat-tháng của người
+  giữ trong phòng (W5 `seat-month-cost-pool-line`). Bản nháp chỉ đúng trong tháng seed.
+- **Ví dụ:** MKT có 14 người giữ Google Workspace 150.000 ⟹ hết tháng đầu thực chi 2,1 triệu ≫ cơ sở 240.000 ⟹ R10 thành _bị chặn_ thay vì _dùng dự
+  phòng_. Reset VPS cuối tháng rồi trình bày đầu tháng sau sẽ lệch kịch bản.
+- **Phương án:** (A) MKT, SAL **không** giữ seat trả phí nền (không Google Workspace/Jira/Figma/Loom; Loom chuyển NV-DES5; NV-MOV1 điều chuyển sang ENG);
+  SAL 290.000 để thêm ca _Request một bước dùng dự phòng_ (DM1-53) — ổn định tới 31/12, đổi lại hai phòng "không dùng phần mềm trả phí" (kém thực tế);
+  (B) giữ seat nền, nâng cơ sở theo seat-tháng tới 31/12 — kết quả vẫn trôi vì thực chi tăng dần còn cơ sở cố định, chỉ đúng một tháng; (C) giữ nguyên,
+  README ghi "chỉ đúng trong tháng seed" — W9 và mọi buổi demo phải reset trong tháng.
+- **Chọn:** A.
+- **Cách đổi lại:** quy tắc seat nền ở `fixture/shared-demo-v4/catalog.ts` + số cơ sở ở `finance.ts` + unit bất đẳng thức _ba kết quả ngân sách_.
+
+### Q-104 — Phòng mới DAT có trưởng phòng trước 01/01 không?
+
+- **Bối cảnh:** phòng mới chỉ tạo trong kỳ lập ngân sách, hiệu lực 01/01 năm sau (R-I10); trưởng phòng đã gán nộp `BM-10` được trước, phòng không trưởng
+  phòng tới hạn ⟹ Finance lập phiên bản từ số liệu nền (R-I05).
+- **Ví dụ:** không gán ⟹ demo cửa sổ tạo phòng, Trần `Y+1` của DAT, từ chối xếp người trước 01/01 (DM4-22), Finance lập phiên bản số liệu nền DAT (DM4-13,
+  khi `D0` đã qua hạn nộp `Y+1`). Gán ⟹ demo "trưởng phòng phòng mới nộp trước".
+- **Phương án:** (A) không gán; (B) gán một người làm trưởng phòng DAT hiệu lực 01/01/`Y+1` — cần thêm điều chuyển hiệu lực 01/01 và mất ca số liệu nền.
+- **Chọn:** A.
+- **Cách đổi lại:** step `budget.next-cycle` thêm gán trưởng phòng + điều chuyển; DM4-13 đổi thành nộp đề xuất DAT.
+
+### Q-106 — Chạy lại seed ở ngày khác cùng năm (sau buổi demo) thì sao?
+
+- **Bối cảnh:** W9 hoặc buổi demo đẩy dữ liệu đi tiếp (duyệt Request, ghi điểm điều chỉnh, sửa Trần, đóng Notion…); sau đó có thể chạy lại seed để bù dữ
+  liệu thiếu (ví dụ lỗi mạng giữa chừng).
+- **Ví dụ:** seed 05/11; W9 duyệt R02, ghi điểm Figma, phát hành lại kỳ `Y+1`, đóng Notion; chạy lại seed 10/11.
+- **Phương án:** (A) tìm theo khóa bền, không so ngày; bản ghi **đã đi tiếp ⟹ `present`** theo bảng từng loại (Request theo đường kịch bản; thuê bao
+  theo chuỗi kỳ kể cả `CLOSED`; kỳ/Trần đã phát hành một lần; đề xuất/phiên bản, hóa đơn, khóa, quyền theo vai, usage, nhân sự có bất kỳ trạng thái);
+  mốc ngày giữ của lần đầu; muốn làm mới ⟹ reset; (B) chạy lại "làm mới" theo `D0` mới — trùng thuê bao bị chặn (R-E02), không làm được; (C) chạy lại
+  khác ngày ⟹ từ chối, buộc reset — an toàn nhưng mất khả năng bù dữ liệu.
+- **Chọn:** A. **Sửa so với nháp:** bỏ "so _số lượng khai báo ban đầu_" (không có trường lưu); không so trường demo có thể đổi.
+- **Cách đổi lại:** luật `present` nằm ở `isPastTarget` (`scenario-path.ts`) + hàm tìm của từng step; C = thêm kiểm ngày dataset ở `seed-run.ts`.
+
+### Q-108 — Bộ hóa đơn `SBF-19` của dataset
+
+- **Bối cảnh:** `SBF-19` cần hóa đơn ở các trạng thái (xác nhận, chờ, bị trả lại) và cờ _vượt_; tiết kiệm thực khi hủy thuê bao chỉ ghi khi có hóa đơn
+  `CONFIRMED` phủ kỳ cam kết cuối (W5).
+- **Ví dụ:** hủy và đóng Notion (DS20-13) mà không có hóa đơn Notion ⟹ báo cáo tiết kiệm thực trống.
+- **Phương án:** (A) 5 hóa đơn: SV-HD1 `K1` xác nhận một phần, SV-HD2 `K1` có thuế chờ xác nhận, SV-HD3 kho Jira cờ _vượt_ số tiền, SV-HD4 Slack bị trả
+  lại, SV-HD5 Notion xác nhận; trùng/`K4` vượt/mua thêm làm trực tiếp ở W9; (B) 4 hóa đơn như nháp, DS20-13 khẳng định "không dòng" — mất minh họa
+  tiết kiệm thực; (C) hóa đơn cho mọi thuê bao — nhiều dữ liệu, ít giá trị demo.
+- **Chọn:** A. **Sửa so với nháp:** SV-HD3 là cờ _vượt_ số tiền (không phải "vượt kỳ"); quá hạn xác nhận (DM1-52) dùng SV-HD4, không dùng SV-HD2.
+- **Cách đổi lại:** `fixture/shared-demo-v4/invoices.ts` + DS20-13.
+
+### 3. Câu theo nguồn (không hỏi Owner)
+
+| Câu   | Chọn                                                                                                       | Nguồn                                                                                                          |
+| ----- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Q-97  | 120 người (36 persona + 84 nền), 15 SaaS + `K4` + `K5`, 2 IT Admin; 10 phòng nghiệp vụ + ADMIN             | BRD 3.4 dòng 235–238 (100–500 người, 15–40 SaaS, 1–3 IT Admin)                                                 |
+| Q-102 | `G2` dựng bằng ghi nghỉ việc _chặn ngay_ ngày cuối `D0`, không gọi mở thu hồi                              | `offboarding-case-writer.service.ts:33`, `:86-90` (`LEFT` ngay, không tự mở thu hồi); `ghost-seat-g1-g2` mục 3 |
+| Q-105 | thêm LGL (không trưởng phòng, có Cost Center): phiên bản `BASELINE`, Request một bước `NO_DEPARTMENT_HEAD` | RULES R-A07, R-I05                                                                                             |
+
+### 4. Câu kỹ thuật (chat review tự chọn, ghi ở spec)
+
+| Câu   | Chọn                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q-98  | Giữ: fixture mới `shared-demo-v4`, xóa v3; DB có Audit `DEMO_DATASET:` của fixture khác ⟹ từ chối (`seed-run.ts:184-195`); Owner reset VPS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Q-99  | **Đổi.** Job điểm/đỏ/sự cố/`G1`–`G4` chạy trong **tiến trình API** (`worker.module.ts:22` chỉ có email + request work), lần đầu 5 phút sau khi API khởi động; lượt rule claim một lần mỗi kỳ ⟹ lượt chạy giữa lúc seed khóa kỳ với dữ liệu thiếu, khởi động lại không cứu. Chọn: API phục vụ apply mới khởi động ngay trước apply (local giữ; VPS nhánh không reset thêm `compose restart api`); apply ≤ 4 phút (đo ở integration, vượt ⟹ báo chat review — dự phòng: biến env lùi lượt đầu, đổi `src`, hạng mục riêng); step `jobs.first-pass-guard` (`-mf5`) phát hiện lượt chạy giữa lúc seed ⟹ exit 1; README: chờ 5 phút sau khi API demo khởi động. Bỏ mọi thay đổi về worker. Đổi lại: `seed.sh` + guard. |
+| Q-100 | Giữ + bổ sung: seed không giả ngày; dòng `D0+n` chỉ chạy trong flow; flow sắp dòng theo `scenarioDay` (FlowClock chỉ đi tới); dòng đổi trạng thái dùng chung chạy world riêng.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Q-107 | Giữ + bổ sung: `Y` chia đều cho mọi phòng `ACTIVE` (gồm ADMIN — như seed hiện tại); `Y+1` theo fixture cho **đủ tập phòng của năm** (gồm ADMIN 0, DAT); phòng thiếu số ⟹ step `conflict`. DM4-04 làm kỳ bỏ phát hành rồi phát hành lại.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Q-109 | Giữ: 4 file `demo-{mf4,sbf20,mf1,mf5}.flow-spec.ts`; flow cũ chỉ là consumer phải xanh; `describe` world riêng cho DS20-17, DM1-57, DM1-58, DM5-35, DM5-37.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Q-110 | Giữ: tách 3 hạng mục, tuần tự (cùng sửa `seed-steps.ts`, README).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+
+- **Q-19 (ghi thêm, F-043):** năm Y+1 luôn gồm đơn vị hôm nay của người đó; họ còn nộp được `BM-10` Y+1 cho phòng cũ dù nhiệm kỳ kết thúc 31/12 (hành vi cũ, giữ).

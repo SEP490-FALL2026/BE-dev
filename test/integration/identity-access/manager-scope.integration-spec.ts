@@ -49,8 +49,11 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
     ['the people of the department', 'get', () => `/api/v1/departments/${departmentId()}/employees`],
   ];
 
+  /** The budget work of the head admits whoever holds the grant (the coming head of a department that starts later): the service judges the unit. */
+  const BUDGET_WORK = new Set(['the budget of the department', 'a budget proposal']);
+
   describe('routes open to the Manager alone', () => {
-    it.each(MANAGER_ONLY)(
+    it.each(MANAGER_ONLY.filter(([group]) => !BUDGET_WORK.has(group)))(
       'refuses a MANAGER who heads nothing with 403 AUTHORIZATION.FORBIDDEN: %s',
       async (_group, method, path) => {
         const response = await call(method, path(), holder.account);
@@ -58,6 +61,18 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
         expect([response.status, h.codeOf(response)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
       },
     );
+
+    it('admits the grant on the budget work and then refuses a MANAGER who heads nothing, and nothing is made (QĐ-106k)', async () => {
+      const year = new Date().getUTCFullYear() + 1;
+      const mine = await call('get', `/api/v1/budgets/mine?year=${year}`, holder.account);
+      const sent = await request(h.server())
+        .post('/api/v1/budget-proposals')
+        .set(h.as(holder.account))
+        .send({ year, lines: [{ description: 'Seats', seats: 1, amount: { amount: '1' } }] });
+
+      expect([mine.status, h.codeOf(mine)]).toEqual([403, 'BUDGET.NOT_YOUR_COST_CENTER']);
+      expect([sent.status, h.codeOf(sent)]).toEqual([403, 'BUDGET.NOT_YOUR_COST_CENTER']);
+    });
 
     it.each(MANAGER_ONLY)(
       'lets the head through the same route, which proves the route and not the 403: %s',

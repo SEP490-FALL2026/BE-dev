@@ -28,6 +28,9 @@ export async function enterEmployee(ctx: HttpTestApp, adminToken: string, body: 
   return ctx.app.get(EmployeeManualService, { strict: false }).create(actor, CreateEmployeeBodyDto.create(sent(body)));
 }
 
+/** The fixtures that make a department take turns (see `createDepartment`). */
+let fixtureTurn: Promise<void> = Promise.resolve();
+
 /** The Super Admin creates a department with no Cost Center (`POST /departments`). */
 export async function createDepartment(
   ctx: HttpTestApp,
@@ -37,25 +40,34 @@ export async function createDepartment(
   const actor = await principalOf(ctx, adminToken);
   const parsed = CreateDepartmentBodyDto.create(sent(body));
   // A fixture department is a precondition, not the creation the budgeting period rules (`QĐ-104e(3)`): the suites that publish the
-  // cycles of next year (the budget harness) still need departments after it. The suites of the window call the route.
-  const window = ctx.app.get(DepartmentCreationWindowHook, { strict: false }).get();
-  const windowOn = window.windowOn.bind(window);
-  window.windowOn = () => Promise.resolve({ kind: 'NO_CYCLE_YET' });
-  try {
-    const id = await ctx.app.get(DepartmentService, { strict: false }).create(actor, {
-      code: parsed.code,
-      name: parsed.name,
-      functionDescription: parsed.function,
-      itAdminEmployeeId: parsed.itAdminEmployeeId,
-    });
+  // cycles of next year (the budget harness) still need departments after it. The suites of the window call the route. The hook is
+  // shared by the whole application, so the fixtures take it one at a time: a department made while another is being made (Promise.all)
+  // never sees, or leaves behind, a stand-in the other put there.
+  const made = fixtureTurn.then(async () => {
+    const window = ctx.app.get(DepartmentCreationWindowHook, { strict: false }).get();
+    const windowOn = window.windowOn.bind(window);
+    window.windowOn = () => Promise.resolve({ kind: 'NO_CYCLE_YET' });
+    try {
+      const id = await ctx.app.get(DepartmentService, { strict: false }).create(actor, {
+        code: parsed.code,
+        name: parsed.name,
+        functionDescription: parsed.function,
+        itAdminEmployeeId: parsed.itAdminEmployeeId,
+      });
+      // It has existed since long ago: suites that move the clock back must still find it in effect (the window suites call the route).
+      await ctx.sql.query(`UPDATE departments SET effective_from = DATE '2020-01-01' WHERE id = $1`, [id]);
 
-    // It has existed since long ago: suites that move the clock back must still find it in effect (the window suites call the route).
-    await ctx.sql.query(`UPDATE departments SET effective_from = DATE '2020-01-01' WHERE id = $1`, [id]);
+      return { id, code: parsed.code };
+    } finally {
+      window.windowOn = windowOn;
+    }
+  });
+  fixtureTurn = made.then(
+    () => undefined,
+    () => undefined,
+  );
 
-    return { id, code: parsed.code };
-  } finally {
-    window.windowOn = windowOn;
-  }
+  return made;
 }
 
 /** Finance creates the Cost Center of a department (`POST /cost-centers`). */

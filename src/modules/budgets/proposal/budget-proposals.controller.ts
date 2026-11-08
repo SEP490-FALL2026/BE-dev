@@ -8,7 +8,11 @@ import {
   VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
-import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
+import {
+  AuthenticatedOnly,
+  RequireRoles,
+  RequireRolesOrGrants,
+} from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
@@ -88,7 +92,7 @@ export class BudgetProposalsController {
   ) {}
 
   @Post()
-  @RequireRoles('MANAGER')
+  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
   @ApiOperation({ operationId: 'budgetProposalSubmit', summary: 'Send a budget proposal' })
   @ApiSuccessResponse(ProposalResponseDto, {
     status: HttpStatus.CREATED,
@@ -180,7 +184,7 @@ export class BudgetProposalsController {
   }
 
   @Post(':id/withdrawal')
-  @RequireRoles('MANAGER')
+  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
   @ApiOperation({ operationId: 'budgetProposalWithdraw', summary: 'Take a budget proposal back' })
   @ApiSuccessResponse(ProposalResponseDto, {
     message: 'BUDGET_PROPOSAL.WITHDRAWN',
@@ -243,7 +247,7 @@ export class BudgetProposalsController {
   }
 
   @Post(':id/resubmission')
-  @RequireRoles('MANAGER')
+  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
   @ApiOperation({
     operationId: 'budgetProposalResubmit',
     summary: 'Send a budget proposal again after it was given back',

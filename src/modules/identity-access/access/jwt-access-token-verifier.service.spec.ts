@@ -89,12 +89,14 @@ describe('JwtAccessTokenVerifier — the roles of the caller (US-01-02, QĐ-93a)
     expect(principal.roles).toEqual([]);
   });
 
-  it('keeps MANAGER for the person who is to head a department that starts later, before it starts (QĐ-106k)', async () => {
+  it('does not make MANAGER effective for the person who is only to head a department that starts later (QĐ-93a, QĐ-95e)', async () => {
     const { verifier: subject } = verifier(['MANAGER'], null, [{ departmentId: 'department-next' }]);
 
     const principal = await subject.verify('token');
 
-    expect(principal.roles).toEqual(['MANAGER']);
+    // The grant is theirs and the budget services admit the work of the coming term; the role of the token is not widened.
+    expect(principal.directRoles).toEqual(['MANAGER']);
+    expect(principal.roles).toEqual([]);
   });
 
   it('never derives a role: a head without the grant is no MANAGER, and the spending approver is the grant only', async () => {
