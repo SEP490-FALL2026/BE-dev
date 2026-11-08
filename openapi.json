@@ -55911,7 +55911,7 @@
             }
           },
           "404": {
-            "description": "The proposal does not exist (BUDGET.PROPOSAL_NOT_FOUND).",
+            "description": "The proposal does not exist (BUDGET.PROPOSAL_NOT_FOUND), or the Cost Center of a version built from the baseline does not (BUDGET.COST_CENTER_NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -55926,13 +55926,24 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "BUDGET.COST_CENTER_NOT_FOUND": {
+                    "summary": "The Cost Center does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.COST_CENTER_NOT_FOUND",
+                        "message": "The Cost Center does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
             }
           },
           "409": {
-            "description": "The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the deadline has not passed, somebody heads the department or is to, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).",
+            "description": "The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the department is not in the cycle of the year (DEPARTMENT_NOT_IN_CYCLE), the deadline has not passed, somebody heads the department or is to, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -98414,59 +98425,72 @@
         "additionalProperties": false
       },
       "VersionBodyDto": {
-        "type": "object",
-        "properties": {
-          "source": { "type": "string", "enum": ["PROPOSAL", "BASELINE"] },
-          "proposalId": { "type": "string", "format": "uuid" },
-          "costCenterId": { "type": "string", "format": "uuid" },
-          "year": { "type": "integer", "minimum": 2000, "maximum": 2200 },
-          "base": {
-            "type": "object",
-            "properties": { "amount": { "type": "string", "maxLength": 40 } },
-            "required": ["amount"],
-            "additionalProperties": false
-          },
-          "reserve": {
-            "type": "object",
-            "properties": { "amount": { "type": "string", "maxLength": 40 } },
-            "required": ["amount"],
-            "additionalProperties": false
-          },
-          "reserveReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "quarters": {
+        "oneOf": [
+          {
             "type": "object",
             "properties": {
-              "q1": {
+              "source": { "type": "string", "enum": ["PROPOSAL"] },
+              "proposalId": { "type": "string", "format": "uuid" },
+              "base": {
                 "type": "object",
                 "properties": { "amount": { "type": "string", "maxLength": 40 } },
                 "required": ["amount"],
                 "additionalProperties": false
               },
-              "q2": {
+              "reserve": {
                 "type": "object",
                 "properties": { "amount": { "type": "string", "maxLength": 40 } },
                 "required": ["amount"],
                 "additionalProperties": false
               },
-              "q3": {
+              "reserveReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+              "quarters": {
                 "type": "object",
-                "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                "required": ["amount"],
-                "additionalProperties": false
-              },
-              "q4": {
-                "type": "object",
-                "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                "required": ["amount"],
-                "additionalProperties": false
+                "properties": {
+                  "q1": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string", "maxLength": 40 } },
+                    "required": ["amount"],
+                    "additionalProperties": false
+                  },
+                  "q2": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string", "maxLength": 40 } },
+                    "required": ["amount"],
+                    "additionalProperties": false
+                  },
+                  "q3": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string", "maxLength": 40 } },
+                    "required": ["amount"],
+                    "additionalProperties": false
+                  },
+                  "q4": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string", "maxLength": 40 } },
+                    "required": ["amount"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["q1", "q2", "q3", "q4"],
+                "additionalProperties": false,
+                "nullable": true
               }
             },
-            "required": ["q1", "q2", "q3", "q4"],
-            "additionalProperties": false,
-            "nullable": true
+            "required": ["proposalId", "base"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "source": { "type": "string", "enum": ["BASELINE"] },
+              "costCenterId": { "type": "string", "format": "uuid" },
+              "year": { "type": "integer", "minimum": 2000, "maximum": 2200 }
+            },
+            "required": ["source", "costCenterId", "year"],
+            "additionalProperties": false
           }
-        },
-        "additionalProperties": false
+        ]
       },
       "VersionResponseDto": {
         "type": "object",
@@ -100503,11 +100527,19 @@
                 "type": "number",
                 "nullable": true
               },
+              "departmentsTotal": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "The departments of the year; the first 500 by id are listed."
+              },
               "departments": {
-                "type": "object",
-                "additionalProperties": {
+                "maxItems": 500,
+                "type": "array",
+                "items": {
                   "type": "object",
                   "properties": {
+                    "departmentId": { "type": "string", "format": "uuid" },
                     "departmentCode": { "type": "string" },
                     "departmentName": { "type": "string" },
                     "costCenterId": { "type": "string", "format": "uuid", "nullable": true },
@@ -100515,7 +100547,8 @@
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "The invoices recorded this year against every Cost Center the department ever had (the seat-months of K2 are not in it yet)."
                     },
                     "estimatedAnnualCost": {
                       "type": "object",
@@ -100523,13 +100556,20 @@
                       "required": ["amount", "currency"],
                       "additionalProperties": false
                     },
+                    "hasUnknownCost": {
+                      "type": "boolean",
+                      "description": "A subscription of the department has no price the baseline can use: its cost is left out of the total."
+                    },
                     "seatsPurchased": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
                     "seatsAssigned": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                    "softwareTotal": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
                     "software": {
-                      "type": "object",
-                      "additionalProperties": {
+                      "maxItems": 50,
+                      "type": "array",
+                      "items": {
                         "type": "object",
                         "properties": {
+                          "subscriptionId": { "type": "string", "format": "uuid" },
                           "application": { "type": "string" },
                           "plan": { "type": "string" },
                           "seatsPurchased": {
@@ -100541,7 +100581,8 @@
                           "seatsAssigned": {
                             "type": "integer",
                             "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
+                            "maximum": 9007199254740991,
+                            "description": "The seats held (what the warehouse counts: a future start and a service account included)."
                           },
                           "seatsIdle": {
                             "type": "integer",
@@ -100563,14 +100604,16 @@
                             "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
+                            "description": "Seats assigned × monthly price × months running; the seats idle belong to the shared pool. Null when the price is not known.",
                             "nullable": true
                           },
                           "suggestRenewal": {
                             "type": "boolean",
-                            "description": "The term ends within the year: a Renew line is suggested."
+                            "description": "The term ends within the year, or ends before it and still runs today: a Renew line is suggested."
                           }
                         },
                         "required": [
+                          "subscriptionId",
                           "application",
                           "plan",
                           "seatsPurchased",
@@ -100583,25 +100626,28 @@
                         ],
                         "additionalProperties": false
                       },
-                      "description": "The active subscriptions the department owns, by subscription id (the subscriptions of one department)."
+                      "description": "The active subscriptions the department owns, by id: at most 50 are listed (the bound of the baseline); softwareTotal says how many there are."
                     }
                   },
                   "required": [
+                    "departmentId",
                     "departmentCode",
                     "departmentName",
                     "costCenterId",
                     "spentThisYear",
                     "estimatedAnnualCost",
+                    "hasUnknownCost",
                     "seatsPurchased",
                     "seatsAssigned",
+                    "softwareTotal",
                     "software"
                   ],
                   "additionalProperties": false
                 },
-                "description": "The departments of the year, by department id: at most 500, the bound of budgetDepartmentCeilingsSet."
+                "description": "The departments of the year, by id: at most 500 are listed (the most a division of the ceiling names); departmentsTotal says how many there are."
               }
             },
-            "required": ["year", "currency", "computedAt", "kpi3", "departments"],
+            "required": ["year", "currency", "computedAt", "kpi3", "departmentsTotal", "departments"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -100644,12 +100690,29 @@
                 "required": ["amount", "currency"],
                 "additionalProperties": false
               },
-              "proposalsOverAnnual": { "type": "boolean" },
+              "proposalsOverAvailable": {
+                "type": "boolean",
+                "description": "The proposals add up to more than `available` (the annual ceiling less the shared-pool reserve)."
+              },
               "versionsTotal": {
                 "type": "object",
                 "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                 "required": ["amount", "currency"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "The versions counted at the annual check, in the currency of the cycle, whether or not their department is listed below."
+              },
+              "versionsOutsideListed": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "Of versionsTotal, what belongs to a Cost Center whose department is not listed (a department that stopped)."
+              },
+              "versionsInOtherCurrency": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "Counted versions left out of the sums because they are not in the currency of the cycle."
               },
               "overBy": {
                 "type": "object",
@@ -100658,11 +100721,14 @@
                 "additionalProperties": false,
                 "description": "What the versions are over `available` by; zero when they are not."
               },
+              "departmentsTotal": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
               "departments": {
-                "type": "object",
-                "additionalProperties": {
+                "maxItems": 500,
+                "type": "array",
+                "items": {
                   "type": "object",
                   "properties": {
+                    "departmentId": { "type": "string", "format": "uuid" },
                     "departmentCode": { "type": "string" },
                     "departmentName": { "type": "string" },
                     "ceiling": {
@@ -100718,10 +100784,10 @@
                       "nullable": true
                     }
                   },
-                  "required": ["departmentCode", "departmentName", "ceiling", "proposal", "version"],
+                  "required": ["departmentId", "departmentCode", "departmentName", "ceiling", "proposal", "version"],
                   "additionalProperties": false
                 },
-                "description": "The departments of the year, by department id: at most 500, the bound of budgetDepartmentCeilingsSet."
+                "description": "The departments of the year, by id: at most 500 are listed (the most a division of the ceiling names); departmentsTotal says how many there are."
               }
             },
             "required": [
@@ -100730,9 +100796,12 @@
               "sharedPoolReserve",
               "available",
               "proposalsTotal",
-              "proposalsOverAnnual",
+              "proposalsOverAvailable",
               "versionsTotal",
+              "versionsOutsideListed",
+              "versionsInOtherCurrency",
               "overBy",
+              "departmentsTotal",
               "departments"
             ],
             "additionalProperties": false,

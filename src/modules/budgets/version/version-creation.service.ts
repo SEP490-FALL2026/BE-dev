@@ -42,7 +42,7 @@ export class VersionCreationService {
    */
   async createFromProposal(
     actor: AuthenticatedPrincipal,
-    body: VersionBodyDto & { proposalId: string; base: NonNullable<VersionBodyDto['base']> },
+    body: Extract<VersionBodyDto, { proposalId: string }>,
   ): Promise<VersionWire> {
     this.facts.requireFinance(actor);
     const defaultPercent = await this.facts.reserveDefaultPercent();

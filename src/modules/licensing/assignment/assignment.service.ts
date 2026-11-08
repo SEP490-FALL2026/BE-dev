@@ -44,6 +44,11 @@ interface EndWithoutSeatInput {
  */
 @Injectable()
 export class AssignmentService {
+  /** How many seats each of these subscriptions holds as of `day`: the count of the seats of the warehouse (INV-01), in one statement. */
+  countHoldingOfSubscriptions(ids: readonly string[], day: BusinessDate, tx?: DbTx): Promise<Map<string, number>> {
+    return this.repo.countHoldingOfSubscriptions(ids, day, tx);
+  }
+
   constructor(
     private readonly repo: AssignmentRepo,
     private readonly byDepartment: AssignmentDepartmentRepo,

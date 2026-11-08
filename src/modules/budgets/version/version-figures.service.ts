@@ -7,7 +7,7 @@ import { BudgetFactsService } from '../budget/budget-facts.service';
 import type { VersionPatch, VersionRecord } from '../budget/version.repo';
 
 type Quarters = [bigint, bigint, bigint, bigint];
-type QuartersBody = NonNullable<VersionBodyDto['quarters']>;
+type QuartersBody = NonNullable<Extract<VersionBodyDto, { proposalId: string }>['quarters']>;
 type MoneyBody = { amount: string; currency?: string };
 
 /**

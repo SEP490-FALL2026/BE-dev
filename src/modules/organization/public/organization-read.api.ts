@@ -73,6 +73,11 @@ export class OrganizationReadApi {
     return this.departments.headedDepartment(employeeId, onDate ?? (await this.businessToday()));
   }
 
+  /** Every Unit Cost Center each of these departments ever had, in use or retired, by department id. */
+  getUnitCostCenterHistory(departmentIds: readonly string[], tx?: DbTx): Promise<Map<string, string[]>> {
+    return this.departments.unitCostCenterHistory(departmentIds, tx);
+  }
+
   /** The Cost Center in use each of these departments is charged to, by department id (a department with none is absent). */
   getUnitCostCenterIds(departmentIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
     return this.departments.unitCostCenterIds(departmentIds, tx);

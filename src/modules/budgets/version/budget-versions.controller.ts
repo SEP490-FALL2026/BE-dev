@@ -118,13 +118,14 @@ export class BudgetVersionsController {
     FINANCE_ONLY,
     {
       status: HttpStatus.NOT_FOUND,
-      description: 'The proposal does not exist (BUDGET.PROPOSAL_NOT_FOUND).',
-      examples: [EXAMPLES.PROPOSAL_NOT_FOUND],
+      description:
+        'The proposal does not exist (BUDGET.PROPOSAL_NOT_FOUND), or the Cost Center of a version built from the baseline does not (BUDGET.COST_CENTER_NOT_FOUND).',
+      examples: [EXAMPLES.PROPOSAL_NOT_FOUND, EXAMPLES.COST_CENTER_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the deadline has not passed, somebody heads the department or is to, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).',
+        'The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the department is not in the cycle of the year (DEPARTMENT_NOT_IN_CYCLE), the deadline has not passed, somebody heads the department or is to, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).',
       // CURRENT_EXISTS is not shown: a current budget keeps the proposal behind it REVIEWED, so none can wait beside it.
       examples: [
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
@@ -143,14 +144,10 @@ export class BudgetVersionsController {
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: VersionBodyDto) {
     try {
       if (body.source === 'BASELINE') {
-        // The body schema has judged that a baseline version names its Cost Center and year.
-        const { costCenterId, year } = body as { costCenterId: string; year: number };
-
-        return { version: await this.baselineCreations.create(actor, { costCenterId, year }) };
+        return { version: await this.baselineCreations.create(actor, body) };
       }
-      const fromProposal = body as VersionBodyDto & { proposalId: string; base: NonNullable<VersionBodyDto['base']> };
 
-      return { version: await this.creations.createFromProposal(actor, fromProposal) };
+      return { version: await this.creations.createFromProposal(actor, body) };
     } catch (error) {
       throw toBudgetApiException(error);
     }

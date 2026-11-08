@@ -90,37 +90,26 @@ const versionFigures = {
   /** A forecast by quarter, never a limit: the four add up to the total or it is not saved (`US-06-09` AC-6). */
   quarters: quarters.nullable(),
 };
+/** A first version from the proposal that waits for Finance (`source` PROPOSAL, the default): the proposal and the base. */
+const proposalVersionBody = z.strictObject({
+  source: z.literal('PROPOSAL').optional(),
+  proposalId: z.uuid(),
+  base: versionFigures.base,
+  reserve: versionFigures.reserve.optional(),
+  reserveReason: versionFigures.reserveReason.optional(),
+  quarters: versionFigures.quarters.optional(),
+});
+/** A first version built from the baseline (`source` BASELINE): only the Cost Center and the year; the base and the lines are the baseline's. */
+const baselineVersionBody = z.strictObject({
+  source: z.literal('BASELINE'),
+  costCenterId: z.uuid(),
+  year: z.number().int().min(2000).max(2200),
+});
 /**
- * A first version of a Cost Center and year: from the proposal that waits for Finance (`source` PROPOSAL, the default: `proposalId` and
- * `base`), or from the baseline when nobody heads the department at the deadline (`source` BASELINE: `costCenterId` and `year`; the base
- * and the lines come from the baseline, `QĐ-100h`).
+ * A first version of a Cost Center and year: from the proposal that waits for Finance (`source` PROPOSAL, the default), or from the
+ * baseline when nobody heads the department at the deadline (`source` BASELINE, `QĐ-100h`). A field of the other source is a 422 naming it.
  */
-export const versionBodySchema = z
-  .strictObject({
-    source: z.enum(['PROPOSAL', 'BASELINE']).optional(),
-    proposalId: z.uuid().optional(),
-    costCenterId: z.uuid().optional(),
-    year: z.number().int().min(2000).max(2200).optional(),
-    base: versionFigures.base.optional(),
-    reserve: versionFigures.reserve.optional(),
-    reserveReason: versionFigures.reserveReason.optional(),
-    quarters: versionFigures.quarters.optional(),
-  })
-  .superRefine((body, ctx) => {
-    const issue = (path: string[], message: string) => ctx.addIssue({ code: 'custom', path, message });
-    if (body.source === 'BASELINE') {
-      if (body.costCenterId === undefined) issue(['costCenterId'], 'Required for a version built from the baseline.');
-      if (body.year === undefined) issue(['year'], 'Required for a version built from the baseline.');
-      if (body.proposalId !== undefined || body.base !== undefined)
-        issue([], 'A baseline version has no proposal and no base: both come from the baseline.');
-
-      return;
-    }
-    if (body.proposalId === undefined) issue(['proposalId'], 'Required.');
-    if (body.base === undefined) issue(['base'], 'Required.');
-    if (body.costCenterId !== undefined || body.year !== undefined)
-      issue([], 'A version of a proposal names neither a Cost Center nor a year.');
-  });
+export const versionBodySchema = z.discriminatedUnion('source', [proposalVersionBody, baselineVersionBody]);
 export const versionPatchSchema = z
   .strictObject({
     base: versionFigures.base,
@@ -371,7 +360,11 @@ export class BudgetProposalBodyDto extends createZodDto(proposalBodySchema) {}
 export class ResubmissionBodyDto extends createZodDto(resubmissionBodySchema) {}
 export class BudgetProposalReturnBodyDto extends createZodDto(returnBodySchema) {}
 export class DecisionBodyDto extends createZodDto(decisionBodySchema) {}
-export class VersionBodyDto extends createZodDto(versionBodySchema) {}
+/** A union is not a class to extend: the value makes the DTO of the route and the same name is the type of what it validates. */
+export const VersionBodyDto = Object.defineProperty(createZodDto(versionBodySchema), 'name', {
+  value: 'VersionBodyDto',
+});
+export type VersionBodyDto = z.infer<typeof versionBodySchema>;
 export class VersionPatchDto extends createZodDto(versionPatchSchema) {}
 export class LinePatchDto extends createZodDto(linePatchSchema) {}
 export class AddLinesBodyDto extends createZodDto(addLinesBodySchema) {}

@@ -99,10 +99,13 @@ export const baselineQuerySchema = z.strictObject({
 });
 
 const softwareView = z.strictObject({
+  subscriptionId: z.uuid(),
   application: z.string(),
   plan: z.string(),
   seatsPurchased: z.number().int().nullable(),
-  seatsAssigned: z.number().int(),
+  seatsAssigned: z.number().int().meta({
+    description: 'The seats held (what the warehouse counts: a future start and a service account included).',
+  }),
   seatsIdle: z
     .number()
     .int()
@@ -110,20 +113,34 @@ const softwareView = z.strictObject({
     .meta({ description: 'Purchased and not assigned; null when the purchase has no seats.' }),
   monthlyUnitPrice: moneyView.nullable(),
   monthsRunning: z.number().int().min(0).max(12),
-  estimatedAnnualCost: moneyView.nullable(),
-  suggestRenewal: z.boolean().meta({ description: 'The term ends within the year: a Renew line is suggested.' }),
+  estimatedAnnualCost: moneyView.nullable().meta({
+    description:
+      'Seats assigned × monthly price × months running; the seats idle belong to the shared pool. Null when the price is not known.',
+  }),
+  suggestRenewal: z.boolean().meta({
+    description: 'The term ends within the year, or ends before it and still runs today: a Renew line is suggested.',
+  }),
 });
 const baselineDepartmentView = z.strictObject({
+  departmentId: z.uuid(),
   departmentCode: z.string(),
   departmentName: z.string(),
   costCenterId: z.uuid().nullable(),
-  spentThisYear: moneyView,
+  spentThisYear: moneyView.meta({
+    description:
+      'The invoices recorded this year against every Cost Center the department ever had (the seat-months of K2 are not in it yet).',
+  }),
   estimatedAnnualCost: moneyView,
+  hasUnknownCost: z.boolean().meta({
+    description:
+      'A subscription of the department has no price the baseline can use: its cost is left out of the total.',
+  }),
   seatsPurchased: z.number().int(),
   seatsAssigned: z.number().int(),
-  software: z.record(z.uuid(), softwareView).meta({
+  softwareTotal: z.number().int(),
+  software: z.array(softwareView).max(50).meta({
     description:
-      'The active subscriptions the department owns, by subscription id (the subscriptions of one department).',
+      'The active subscriptions the department owns, by id: at most 50 are listed (the bound of the baseline); softwareTotal says how many there are.',
   }),
 });
 /** What runs today, department by department, and what it is estimated to cost over the year (`FR-5.15`, `R-I03`). */
@@ -132,13 +149,18 @@ export const baselineSchema = z.strictObject({
   currency: z.string(),
   computedAt: z.iso.datetime(),
   kpi3: z.number().nullable().meta({ description: 'KPI-3 needs usage, which is not collected yet: always null.' }),
-  departments: z.record(z.uuid(), baselineDepartmentView).meta({
+  departmentsTotal: z
+    .number()
+    .int()
+    .meta({ description: 'The departments of the year; the first 500 by id are listed.' }),
+  departments: z.array(baselineDepartmentView).max(500).meta({
     description:
-      'The departments of the year, by department id: at most 500, the bound of budgetDepartmentCeilingsSet.',
+      'The departments of the year, by id: at most 500 are listed (the most a division of the ceiling names); departmentsTotal says how many there are.',
   }),
 });
 
 const packageDepartmentView = z.strictObject({
+  departmentId: z.uuid(),
   departmentCode: z.string(),
   departmentName: z.string(),
   ceiling: moneyView.nullable(),
@@ -163,12 +185,26 @@ export const packageSchema = z.strictObject({
     description: 'The annual ceiling less the shared-pool reserve: what the versions may add up to.',
   }),
   proposalsTotal: moneyView,
-  proposalsOverAnnual: z.boolean(),
-  versionsTotal: moneyView,
-  overBy: moneyView.meta({ description: 'What the versions are over `available` by; zero when they are not.' }),
-  departments: z.record(z.uuid(), packageDepartmentView).meta({
+  proposalsOverAvailable: z.boolean().meta({
+    description: 'The proposals add up to more than `available` (the annual ceiling less the shared-pool reserve).',
+  }),
+  versionsTotal: moneyView.meta({
     description:
-      'The departments of the year, by department id: at most 500, the bound of budgetDepartmentCeilingsSet.',
+      'The versions counted at the annual check, in the currency of the cycle, whether or not their department is listed below.',
+  }),
+  versionsOutsideListed: moneyView.meta({
+    description:
+      'Of versionsTotal, what belongs to a Cost Center whose department is not listed (a department that stopped).',
+  }),
+  versionsInOtherCurrency: z
+    .number()
+    .int()
+    .meta({ description: 'Counted versions left out of the sums because they are not in the currency of the cycle.' }),
+  overBy: moneyView.meta({ description: 'What the versions are over `available` by; zero when they are not.' }),
+  departmentsTotal: z.number().int(),
+  departments: z.array(packageDepartmentView).max(500).meta({
+    description:
+      'The departments of the year, by id: at most 500 are listed (the most a division of the ceiling names); departmentsTotal says how many there are.',
   }),
 });
 

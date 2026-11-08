@@ -236,14 +236,7 @@ const DROPPED: Call[] = [
       [field]: field === 'highValuePercent' ? 10 : field === 'reason' ? 'x' : { amount: '1' },
     },
   })),
-  {
-    name: 'budgetProposalSubmit: costCenterId (step 11)',
-    method: 'post',
-    path: '/api/v1/budget-proposals',
-    role: 'MANAGER',
-    body: { year: 2027, lines: [{ description: 'Tool', amount: { amount: '100' } }] },
-    dropped: { costCenterId: ID },
-  },
+  // `costCenterId` of the proposal is no longer dropped: a head who answers for two departments names the one (QĐ-106k, BUDGET.COST_CENTER_REQUIRED).
   {
     name: 'budgetProposalSubmit: lines[].amount.currency (step 11)',
     method: 'post',

@@ -361,7 +361,6 @@ export class SubscriptionRepo {
     return rows.map((row) => row.id);
   }
 
-  /** The ids of every subscription and purchase a department owns, by id. */
   /** The active subscriptions owned by any of these owners, with their plan and application, by owner and id: one statement. */
   async baselineRowsOf(departmentIds: readonly string[], tx?: DbTx): Promise<BaselineSubscription[]> {
     if (departmentIds.length === 0) return [];
@@ -395,6 +394,7 @@ export class SubscriptionRepo {
     }));
   }
 
+  /** The ids of every subscription and purchase a department owns, by id. */
   async idsOwnedBy(departmentId: string, tx?: DbTx): Promise<string[]> {
     const rows = await (tx ?? this.prisma).subscription.findMany({
       where: { ownerDepartmentId: departmentId },

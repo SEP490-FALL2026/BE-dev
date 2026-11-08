@@ -170,7 +170,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '422': ['BUDGET.YEAR_ENDED'],
     },
     budgetVersionCreate: {
-      '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
+      '404': ['BUDGET.COST_CENTER_NOT_FOUND', 'BUDGET.PROPOSAL_NOT_FOUND'],
       '409': [
         'BUDGET.BASELINE_VERSION_NOT_ALLOWED',
         'BUDGET.PROPOSAL_NOT_SUBMITTED',

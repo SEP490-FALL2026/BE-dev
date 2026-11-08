@@ -205,6 +205,22 @@ export class AssignmentRepo {
     return (tx ?? this.prisma).licenseAssignment.count({ where: { subscriptionId, ...HOLDING(day) } });
   }
 
+  /** How many seats each of these purchases has held as of `day` (`HOLDING`: a future start and a service account included), one statement. */
+  async countHoldingOfSubscriptions(
+    ids: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, number>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).licenseAssignment.groupBy({
+      by: ['subscriptionId'],
+      where: { subscriptionId: { in: [...ids] }, ...HOLDING(day) },
+      _count: { _all: true },
+    });
+
+    return new Map(rows.flatMap((row) => (row.subscriptionId === null ? [] : [[row.subscriptionId, row._count._all]])));
+  }
+
   /** Which of these ids have an assignment that has not ended and has not failed as of `day`, in one statement. */
   async subscriptionIdsHolding(ids: readonly string[], day: BusinessDate, tx?: DbTx): Promise<Set<string>> {
     if (ids.length === 0) return new Set();

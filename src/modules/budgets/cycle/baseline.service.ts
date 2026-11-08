@@ -13,7 +13,13 @@ import {
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
-import { baselineVersionRefusal, shouldSuggestRenewal, subscriptionCost } from './baseline.policy';
+import {
+  DEPARTMENTS_LISTED_MAX,
+  SOFTWARE_LISTED_MAX,
+  baselineVersionRefusal,
+  shouldSuggestRenewal,
+  subscriptionCost,
+} from './baseline.policy';
 import type { BaselineSubscription } from '../../catalog/public/catalog.types';
 import type { BaselineWire } from './cycle.dto';
 import { CycleRepo } from './cycle.repo';
@@ -22,29 +28,33 @@ type Reading = {
   year: number;
   today: BusinessDate;
   seats: Map<string, number>;
-  spent: Map<string, { spent: bigint }>;
+  spent: bigint;
   format: (minor: bigint) => { amount: string; currency: string };
 };
 
 /** One department of the baseline: its subscriptions, the seats they hold and what the year is estimated to cost at today's prices. */
 function departmentOf(
-  brief: { code: string; name: string },
+  brief: { id: string; code: string; name: string },
   costCenterId: string | null,
   subscriptions: readonly BaselineSubscription[],
   reading: Reading,
-): BaselineWire['departments'][string] {
+): BaselineWire['departments'][number] {
   const { year, today, seats, spent, format } = reading;
-  const software: BaselineWire['departments'][string]['software'] = {};
+  const software: BaselineWire['departments'][number]['software'] = [];
   let total = 0n;
   let purchased = 0;
   let assigned = 0;
+  let unknown = false;
   for (const subscription of subscriptions) {
     const held = seats.get(subscription.subscriptionId) ?? 0;
-    const { monthlyMinor: monthly, months, costMinor: cost } = subscriptionCost(year, subscription);
+    const { monthlyMinor: monthly, months, costMinor: cost } = subscriptionCost(year, today, held, subscription);
     total += cost ?? 0n;
+    unknown ||= cost === null;
     purchased += subscription.purchasedQuantity ?? 0;
     assigned += held;
-    software[subscription.subscriptionId] = {
+    if (software.length >= SOFTWARE_LISTED_MAX) continue;
+    software.push({
+      subscriptionId: subscription.subscriptionId,
       application: subscription.applicationName,
       plan: subscription.planName,
       seatsPurchased: subscription.purchasedQuantity,
@@ -53,19 +63,21 @@ function departmentOf(
       monthlyUnitPrice: monthly === null ? null : format(monthly),
       monthsRunning: months,
       estimatedAnnualCost: cost === null ? null : format(cost),
-      suggestRenewal: shouldSuggestRenewal(year, subscription.endDate),
-    };
+      suggestRenewal: shouldSuggestRenewal(year, subscription.endDate, today),
+    });
   }
-  const thisYear = Number(today.slice(0, 4));
 
   return {
+    departmentId: brief.id,
     departmentCode: brief.code,
     departmentName: brief.name,
     costCenterId,
-    spentThisYear: format(costCenterId === null ? 0n : (spent.get(heldKey(costCenterId, thisYear))?.spent ?? 0n)),
+    spentThisYear: format(spent),
     estimatedAnnualCost: format(total),
+    hasUnknownCost: unknown,
     seatsPurchased: purchased,
     seatsAssigned: assigned,
+    softwareTotal: subscriptions.length,
     software,
   };
 }
@@ -97,10 +109,14 @@ export class BaselineService {
     if (!cycle) throw new BudgetCycleNotFoundError();
 
     const inYear = await this.organizationReads.getActiveDepartmentIds(year);
-    const wanted = departmentId === undefined ? inYear : inYear.filter((id) => id === departmentId);
-    const [briefs, costCenters, subscriptions, format] = await Promise.all([
+    const wanted = (departmentId === undefined ? inYear : inYear.filter((id) => id === departmentId)).slice(
+      0,
+      DEPARTMENTS_LISTED_MAX,
+    );
+    const [briefs, costCenters, history, subscriptions, format] = await Promise.all([
       this.organizationReads.getDepartmentBriefs(wanted),
       this.organizationReads.getUnitCostCenterIds(wanted),
+      this.organizationReads.getUnitCostCenterHistory(wanted),
       this.catalog.getBaselineSubscriptions(wanted),
       this.facts.formatter(cycle.currency),
     ]);
@@ -108,22 +124,36 @@ export class BaselineService {
       subscriptions.map((subscription) => subscription.subscriptionId),
       today,
     );
+    const thisYear = Number(today.slice(0, 4));
+    // The spend of the year sits on whichever Cost Center the department was charged to when it was recorded: all of them count.
     const spent = await this.commitments.totals(
-      [...costCenters.values()].map((costCenterId) => ({ costCenterId, year: Number(today.slice(0, 4)) })),
+      [...history.values()].flat().map((costCenterId) => ({ costCenterId, year: thisYear })),
     );
 
-    const reading: Reading = { year, today, seats, spent, format };
-    const departments: BaselineWire['departments'] = {};
-    for (const brief of briefs) {
-      departments[brief.id] = departmentOf(
-        brief,
-        costCenters.get(brief.id) ?? null,
-        subscriptions.filter((row) => row.departmentId === brief.id),
-        reading,
-      );
-    }
+    const byDepartment = new Map<string, BaselineSubscription[]>();
+    for (const row of subscriptions)
+      byDepartment.set(row.departmentId, [...(byDepartment.get(row.departmentId) ?? []), row]);
+    const departments = briefs.map((brief) =>
+      departmentOf(brief, costCenters.get(brief.id) ?? null, byDepartment.get(brief.id) ?? [], {
+        year,
+        today,
+        seats,
+        spent: (history.get(brief.id) ?? []).reduce(
+          (sum, costCenterId) => sum + (spent.get(heldKey(costCenterId, thisYear))?.spent ?? 0n),
+          0n,
+        ),
+        format,
+      }),
+    );
 
-    return { year, currency: cycle.currency, computedAt: new Date().toISOString(), kpi3: null, departments };
+    return {
+      year,
+      currency: cycle.currency,
+      computedAt: new Date().toISOString(),
+      kpi3: null,
+      departmentsTotal: departmentId === undefined ? inYear.length : wanted.length,
+      departments,
+    };
   }
 
   /**
@@ -140,6 +170,12 @@ export class BaselineService {
     const today = await this.facts.today(new Date(), tx);
     const cycle = await this.cycles.lockByYear(tx, await this.facts.organizationId(tx), year, 'UPDATE');
     const unit = await this.facts.costCenterInUse(costCenterId, tx);
+    if (
+      cycle !== null &&
+      cycle.firstPublishedAt !== null &&
+      !(await this.isInCycle(cycle, unit.departmentId, year, tx))
+    )
+      throw new BudgetBaselineVersionNotAllowedError('DEPARTMENT_NOT_IN_CYCLE');
     const heads = await this.organizationReads.getDepartmentHeads([unit.departmentId], today, tx);
     const refusal = baselineVersionRefusal({
       cyclePublishedOnce: cycle !== null && cycle.firstPublishedAt !== null,
@@ -155,6 +191,19 @@ export class BaselineService {
     return { departmentId: unit.departmentId, currency: cycle.currency };
   }
 
+  /** Whether the department is in the cycle of the year: it has a ceiling there and takes effect no later than the year ends. */
+  private async isInCycle(
+    cycle: { ceilings: readonly { departmentId: string }[] },
+    departmentId: string,
+    year: number,
+    tx: DbTx,
+  ): Promise<boolean> {
+    if (!cycle.ceilings.some((ceiling) => ceiling.departmentId === departmentId)) return false;
+    const [brief] = await this.organizationReads.getDepartmentBriefs([departmentId], tx);
+
+    return brief !== undefined && brief.effectiveFrom <= `${year}-12-31`;
+  }
+
   /**
    * The lines of a first version built from the baseline (`QĐ-100h`): one `Renew` line for each active subscription of the department
    * that runs in the year at a known price, as the baseline estimates it. Throws nothing; a department that runs nothing gives none.
@@ -164,10 +213,17 @@ export class BaselineService {
     year: number,
     tx?: DbTx,
   ): Promise<{ description: string; planId: string; seats: number | null; amountMinor: bigint }[]> {
+    const today = await this.facts.today(new Date(), tx);
     const subscriptions = await this.catalog.getBaselineSubscriptions([departmentId], tx);
+    const seats = await this.licensing.countSeatsOfSubscriptions(
+      subscriptions.map((subscription) => subscription.subscriptionId),
+      today,
+      tx,
+    );
 
     return subscriptions.flatMap((subscription) => {
-      const { costMinor } = subscriptionCost(year, subscription);
+      const held = seats.get(subscription.subscriptionId) ?? 0;
+      const { costMinor } = subscriptionCost(year, today, held, subscription);
 
       return costMinor === null || costMinor <= 0n
         ? []
@@ -175,7 +231,7 @@ export class BaselineService {
             {
               description: `Renew ${subscription.applicationName} ${subscription.planName}`.slice(0, 200),
               planId: subscription.planId,
-              seats: subscription.purchasedQuantity,
+              seats: held,
               amountMinor: costMinor,
             },
           ];

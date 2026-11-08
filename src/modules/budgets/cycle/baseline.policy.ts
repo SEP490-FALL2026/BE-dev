@@ -36,15 +36,31 @@ export function estimatedCost(seats: number | null, monthlyMinor: bigint | null,
   return seats === null || monthlyMinor === null ? null : BigInt(seats) * monthlyMinor * BigInt(months);
 }
 
-/** Whether the budget of `year` should propose to renew a subscription: its term ends within the year (a `Renew` line, `FR-5.15`). */
-export const shouldSuggestRenewal = (year: number, endDate: BusinessDate | null): boolean =>
-  endDate !== null && endDate >= `${year}-01-01` && endDate <= `${year}-12-31`;
+/**
+ * Whether a subscription that ends before the year is still running when the baseline is read (`today`): it will be renewed at its
+ * price today, so it counts for the whole of the year to come (`FR-5.15`(0): what runs, priced at today's prices).
+ */
+export const continuesIntoYear = (year: number, endDate: BusinessDate | null, today: BusinessDate): boolean =>
+  endDate !== null && endDate >= today && endDate < `${year}-01-01`;
 
-/** What one subscription costs over a year at the prices of today: the monthly price of a seat, the months it runs and the estimate. */
+/**
+ * Whether the budget of `year` should propose to renew a subscription (a `Renew` line, `FR-5.15`): its term ends within the year, or it
+ * ends before the year but still runs today (the case of a term that ends on 31 December, read in the autumn).
+ */
+export const shouldSuggestRenewal = (year: number, endDate: BusinessDate | null, today: BusinessDate): boolean =>
+  (endDate !== null && endDate >= `${year}-01-01` && endDate <= `${year}-12-31`) ||
+  continuesIntoYear(year, endDate, today);
+
+/**
+ * What one subscription is estimated to cost over a year at the prices of today (`R-I03`): the seats it HOLDS (what is assigned; the
+ * seats bought and idle are the shared pool's, `QĐ-103k`), the monthly price of a seat and the months it runs; a term that ends before
+ * the year and still runs today counts for the twelve months of the year.
+ */
 export function subscriptionCost(
   year: number,
+  today: BusinessDate,
+  seatsHeld: number,
   subscription: {
-    purchasedQuantity: number | null;
     unitPriceReportingMinor: bigint | null;
     billingCycle: string | null;
     startDate: BusinessDate | null;
@@ -52,9 +68,11 @@ export function subscriptionCost(
   },
 ): { monthlyMinor: bigint | null; months: number; costMinor: bigint | null } {
   const monthlyMinor = monthlyUnitPrice(subscription.unitPriceReportingMinor, subscription.billingCycle);
-  const months = monthsRunning(year, subscription.startDate, subscription.endDate);
+  const months = continuesIntoYear(year, subscription.endDate, today)
+    ? 12
+    : monthsRunning(year, subscription.startDate, subscription.endDate);
 
-  return { monthlyMinor, months, costMinor: estimatedCost(subscription.purchasedQuantity, monthlyMinor, months) };
+  return { monthlyMinor, months, costMinor: estimatedCost(seatsHeld, monthlyMinor, months) };
 }
 
 export type BaselineVersionRefusal =
@@ -81,3 +99,11 @@ export function baselineVersionRefusal(input: {
 
   return null;
 }
+
+/**
+ * The most departments a baseline or a package lists: a division of the ceiling names at most this many (`budgetDepartmentCeilingsSet`),
+ * and the answer says how many there are in all (`departmentsTotal`) when it lists fewer.
+ */
+export const DEPARTMENTS_LISTED_MAX = 500;
+/** The most subscriptions the baseline lists for one department; `softwareTotal` says how many it owns. */
+export const SOFTWARE_LISTED_MAX = 50;

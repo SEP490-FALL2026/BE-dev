@@ -702,3 +702,9 @@ Gói W8 **không** còn câu cần Owner chặn việc giao code.
 
 Kỹ thuật thêm (không cần Owner): route cờ Super Admin tách theo module sở hữu (`requests`, `budgets`) thay vì một route gộp (DA8-20); nguồn thực
 chi W8b là một đoạn SQL L0 dùng chung với hàm tổng (DA8-05).
+
+## Câu phát sinh khi review code W2
+
+| Câu   | Trạng thái                  | Nội dung và lựa chọn                                                                                                                                                                                          |
+| ----- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q-161 | **TẠM CHỌN (chờ Owner)**    | Phòng không trưởng phòng, không có thuê bao trả phí nào: Finance lập phiên bản từ số liệu nền vẫn được, `base` = 0, chỉ dự phòng mặc định (F-086). Đảo lại: thêm `details.reason` `NO_BASELINE_LINES` ⟹ 409. |

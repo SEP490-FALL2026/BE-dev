@@ -164,10 +164,16 @@ describe('the annual check of a version and the reason of the base (integration,
       // The sending waits for the cycle and holds nothing of the version yet: anybody else can lock it.
       await observer.query('BEGIN');
       const free = await observer.query(`SELECT id FROM budget_versions WHERE id = $1 FOR UPDATE NOWAIT`, [a.id]);
+      // Nor the proposal it is made from: the cycle comes before the proposal in the order of the module (cycle, proposal, version, year).
+      const freeProposal = await observer.query(
+        `SELECT p.id FROM budget_proposals p JOIN budget_versions v ON v.proposal_id = p.id WHERE v.id = $1 FOR UPDATE OF p NOWAIT`,
+        [a.id],
+      );
       await observer.query('ROLLBACK');
       await holder.query('COMMIT');
 
       expect(free.rows).toHaveLength(1);
+      expect(freeProposal.rows).toHaveLength(1);
       expect((await sent).status).toBe(200);
     } finally {
       await holder.query('ROLLBACK').catch(() => undefined);

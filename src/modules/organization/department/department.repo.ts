@@ -327,6 +327,20 @@ export class DepartmentRepo {
     }));
   }
 
+  /** Every Unit Cost Center each of these departments ever had, in use or retired, by department: where a year's spend may sit. */
+  async unitCostCenterHistory(departmentIds: readonly string[], tx?: DbTx): Promise<Map<string, string[]>> {
+    const history = new Map<string, string[]>();
+    if (departmentIds.length === 0) return history;
+    const rows = await (tx ?? this.prisma).costCenter.findMany({
+      where: { departmentId: { in: [...departmentIds] }, kind: 'UNIT' },
+      select: { id: true, departmentId: true },
+      orderBy: { id: 'asc' },
+    });
+    for (const row of rows) history.set(row.departmentId, [...(history.get(row.departmentId) ?? []), row.id]);
+
+    return history;
+  }
+
   /** The Cost Center in use that each of these departments is charged to (a Unit), by department; a department with none is absent. */
   async unitCostCenterIds(departmentIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
     if (departmentIds.length === 0) return new Map();

@@ -130,29 +130,6 @@ export class RevocationReadRepo {
       : this.prisma.$transaction(read, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
-  /** How many seats each of these subscriptions has held on `day` or will (a seat given up or taken back is not held), one statement. */
-  async countSeatsOfSubscriptions(
-    subscriptionIds: readonly string[],
-    day: BusinessDate,
-    tx?: DbTx,
-  ): Promise<Map<string, number>> {
-    if (subscriptionIds.length === 0) return new Map();
-    const rows = await (tx ?? this.prisma).licenseAssignment.groupBy({
-      by: ['subscriptionId'],
-      where: {
-        subscriptionId: { in: [...subscriptionIds] },
-        kind: 'PERSONAL',
-        failedAt: null,
-        cancelledAt: null,
-        validFrom: { lte: toDateColumn(day) },
-        OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
-      },
-      _count: { _all: true },
-    });
-
-    return new Map(rows.flatMap((row) => (row.subscriptionId === null ? [] : [[row.subscriptionId, row._count._all]])));
-  }
-
   /** How many personal seats each of these people holds on `day` or will, in one statement (the people with none are absent). */
   async countPersonalSeats(employeeIds: readonly string[], day: BusinessDate, tx?: DbTx): Promise<Map<string, number>> {
     if (employeeIds.length === 0) return new Map();

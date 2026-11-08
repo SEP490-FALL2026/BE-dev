@@ -1,4 +1,5 @@
 import { ROLE_GRANTS, type NestedArrayEntry } from './api-collection-registry';
+import { NESTED_ARRAYS_W2 } from './api-collection-registry-nested-w2';
 
 /**
  * Every array below `data` other than a collection's own array (Prompt 09B, LD-R2-RV-02), in the order of the recursive
@@ -335,4 +336,6 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     rationale: 'The first similar approved applications of the functional group.',
     removeWhen: 'Review when SIMILAR_APPLICATION_LIMIT changes.',
   },
+  // The arrays of the answers of the wave W2 (their own file: this one is at the line limit of the support files).
+  ...NESTED_ARRAYS_W2,
 ];

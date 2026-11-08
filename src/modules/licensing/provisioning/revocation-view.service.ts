@@ -90,15 +90,6 @@ export class RevocationViewService {
     };
   }
 
-  /** How many seats each subscription holds on `onDate`, one statement for any number of subscriptions (none: absent). */
-  countSeatsOfSubscriptions(
-    subscriptionIds: readonly string[],
-    onDate: BusinessDate,
-    tx?: DbTx,
-  ): Promise<Map<string, number>> {
-    return this.reads.countSeatsOfSubscriptions(subscriptionIds, onDate, tx);
-  }
-
   /** How many personal seats each person holds on `onDate` or will, one statement for any number of people (none: absent). */
   countPersonalSeats(employeeIds: readonly string[], onDate: BusinessDate, tx?: DbTx): Promise<Map<string, number>> {
     return this.reads.countPersonalSeats(employeeIds, onDate, tx);

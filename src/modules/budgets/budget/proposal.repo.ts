@@ -251,7 +251,6 @@ export class ProposalRepo {
     return { items: rows.map(toRecord), total };
   }
 
-  /** The proposals of a Cost Center and a year, newest first: the history of what was sent, given back and sent again. */
   /** The newest proposal that waits or is being reviewed of each of these Cost Centers for the year, by Cost Center: one statement. */
   async openOfCostCenters(
     costCenterIds: readonly string[],
@@ -270,6 +269,7 @@ export class ProposalRepo {
     return newest;
   }
 
+  /** The proposals of a Cost Center and a year, newest first: the history of what was sent, given back and sent again. */
   async chainOf(costCenterId: string, year: number, tx?: DbTx): Promise<ProposalRecord[]> {
     const rows = await (tx ?? this.prisma).budgetProposal.findMany({
       where: { costCenterId, year },

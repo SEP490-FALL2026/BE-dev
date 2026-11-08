@@ -53,25 +53,51 @@ describe('the baseline of the budget (R-I03)', () => {
     expect(estimatedCost(10, null, 12)).toBeNull();
   });
 
-  it('suggests a renewal for a term that ends within the year only', () => {
-    expect(shouldSuggestRenewal(2027, '2027-12-31')).toBe(true);
-    expect(shouldSuggestRenewal(2027, '2028-01-01')).toBe(false);
-    expect(shouldSuggestRenewal(2027, '2026-12-31')).toBe(false);
-    expect(shouldSuggestRenewal(2027, null)).toBe(false);
+  it('suggests a renewal for a term that ends within the year, or ends before it and still runs today (F-068)', () => {
+    expect(shouldSuggestRenewal(2027, '2027-12-31', '2026-11-09')).toBe(true);
+    expect(shouldSuggestRenewal(2027, '2028-01-01', '2026-11-09')).toBe(false);
+    // Read in November 2026, a term that ends on 31 December 2026 runs on into 2027 at today's price.
+    expect(shouldSuggestRenewal(2027, '2026-12-31', '2026-11-09')).toBe(true);
+    expect(shouldSuggestRenewal(2027, '2026-12-31', '2027-01-15')).toBe(false);
+    expect(shouldSuggestRenewal(2027, null, '2026-11-09')).toBe(false);
   });
 });
 
 describe('the cost of one subscription over a year (R-I03)', () => {
-  it('puts the monthly price, the months and the estimate together', () => {
-    expect(
-      subscriptionCost(2027, {
-        purchasedQuantity: 10,
-        unitPriceReportingMinor: 1200n,
-        billingCycle: 'ANNUAL',
-        startDate: '2026-01-01',
-        endDate: '2027-06-30',
-      }),
-    ).toEqual({ monthlyMinor: 100n, months: 6, costMinor: 6000n });
+  const annual = {
+    unitPriceReportingMinor: 1200n,
+    billingCycle: 'ANNUAL',
+    startDate: '2026-01-01',
+    endDate: '2027-06-30',
+  };
+
+  it('puts the monthly price, the months and the estimate together, for the seats held and not the seats bought (F-066)', () => {
+    expect(subscriptionCost(2027, '2026-11-09', 6, annual)).toEqual({
+      monthlyMinor: 100n,
+      months: 6,
+      costMinor: 3600n,
+    });
+    expect(subscriptionCost(2027, '2026-11-09', 0, annual)).toEqual({ monthlyMinor: 100n, months: 6, costMinor: 0n });
+  });
+
+  it('counts the twelve months for a term that ends before the year and still runs today (F-068)', () => {
+    const endsInDecember = { ...annual, endDate: '2026-12-31' };
+
+    expect(subscriptionCost(2027, '2026-11-09', 6, endsInDecember)).toEqual({
+      monthlyMinor: 100n,
+      months: 12,
+      costMinor: 7200n,
+    });
+    // Ended already when it is read: it is not running any more.
+    expect(subscriptionCost(2027, '2027-02-01', 6, endsInDecember)).toEqual({
+      monthlyMinor: 100n,
+      months: 0,
+      costMinor: 0n,
+    });
+  });
+
+  it('has no estimate when the price is not known', () => {
+    expect(subscriptionCost(2027, '2026-11-09', 6, { ...annual, unitPriceReportingMinor: null }).costMinor).toBeNull();
   });
 });
 

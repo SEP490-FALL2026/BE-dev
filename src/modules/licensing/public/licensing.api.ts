@@ -74,13 +74,13 @@ export class LicensingApi {
     return this.revocationView.heldSoftwareOf(employeeId, onDate, page, tx);
   }
 
-  /** How many seats each of these subscriptions holds on `onDate`, in one statement (the subscriptions with none are absent). */
+  /** How many seats each of these subscriptions holds as of `onDate`, the way the warehouse counts them (a service account and a future start included), in one statement. */
   countSeatsOfSubscriptions(
     subscriptionIds: readonly string[],
     onDate: BusinessDate,
     tx?: DbTx,
   ): Promise<Map<string, number>> {
-    return this.revocationView.countSeatsOfSubscriptions(subscriptionIds, onDate, tx);
+    return this.assignments.countHoldingOfSubscriptions(subscriptionIds, onDate, tx);
   }
 
   /** How many personal seats each of these people holds on `onDate` or will, in one statement (the people with none are absent). */
