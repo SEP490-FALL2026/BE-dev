@@ -79,6 +79,7 @@ export class SubscriptionPoolService {
    * Throws the errors of `assert` and SubscriptionResponsibleNotItAdminError.
    */
   async assertActivation(
+    tx: DbTx,
     plan: LockedPlan,
     kind: SubscriptionKind,
     state: {
@@ -88,7 +89,7 @@ export class SubscriptionPoolService {
     },
   ): Promise<void> {
     this.assert(plan, kind, state, true);
-    await this.requireItAdmin(state.responsibleItAdminEmployeeId as string);
+    await this.requireItAdmin(state.responsibleItAdminEmployeeId as string, tx);
   }
 
   /**
@@ -102,7 +103,7 @@ export class SubscriptionPoolService {
     const activating = current.status === 'DRAFT' && state.status === 'ACTIVE';
     // Changing only the person who answers does not judge a commitment and cycle the write did not touch (F-009).
     const touches = input.billingCycle !== undefined || input.commitmentTermMonths !== undefined;
-    if (activating) await this.assertActivation(plan, current.kind, state);
+    if (activating) await this.assertActivation(tx, plan, current.kind, state);
     else if (touches) this.assert(plan, current.kind, state, false);
     if (input.isPrimaryForPlan) await this.makePrimary(tx, change);
   }
@@ -140,9 +141,9 @@ export class SubscriptionPoolService {
   }
 
   /** Throws SubscriptionResponsibleNotItAdminError unless the person works, holds the IT Admin role and can sign in. */
-  async requireItAdmin(employeeId: string): Promise<void> {
-    const usable = await this.identity.findUsableItAdminEmployeeIds([employeeId]);
-    const employee = usable.has(employeeId) ? await this.organizationReads.getEmployee(employeeId) : null;
+  async requireItAdmin(employeeId: string, tx?: DbTx): Promise<void> {
+    const usable = await this.identity.findUsableItAdminEmployeeIds([employeeId], tx);
+    const employee = usable.has(employeeId) ? await this.organizationReads.getEmployee(employeeId, tx) : null;
     if (employee?.status !== 'ACTIVE' || employee.workState !== 'WORKING') {
       throw new SubscriptionResponsibleNotItAdminError();
     }

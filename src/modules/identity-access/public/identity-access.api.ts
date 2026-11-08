@@ -136,8 +136,8 @@ export class IdentityAccessApi {
   }
 
   /** Among these employees, those who hold the IT Admin role on a usable account (an unlocked read, for lists). */
-  findUsableItAdminEmployeeIds(employeeIds: readonly string[]): Promise<Set<string>> {
-    return this.accounts.findUsableItAdminEmployeeIds(employeeIds);
+  findUsableItAdminEmployeeIds(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.accounts.findUsableItAdminEmployeeIds(employeeIds, tx);
   }
 
   /** The usable IT Admin with the smallest employee code, or null: who a report is given to when nobody is in charge. */

@@ -456,3 +456,46 @@ model BudgetAttachment {
   @@index([uploadedByEmployeeId, status, createdAt], map: "budget_attachments_uploaded_by_status_created_at_idx")
   @@map("budget_attachments")
 }
+
+/// The budget cycle of a year (QĐ-103i, BR-MF4-01): the deadlines, the annual ceiling of the software budget, the shared-pool reserve
+/// and the ceilings of the departments. Finance opens, changes and publishes it. `publishedAt` is set while it is published and cleared
+/// when a ceiling is changed; `firstPublishedAt` is never cleared (from it a department head may submit the proposal of the year).
+model BudgetCycle {
+  id                    String    @id @default(uuid(7)) @db.Uuid
+  organizationId        String    @map("organization_id") @db.Uuid
+  year                  Int
+  submissionDeadline    DateTime  @map("submission_deadline") @db.Date
+  decisionDeadline      DateTime  @map("decision_deadline") @db.Date
+  annualCeilingMinor    BigInt    @map("annual_ceiling_minor")
+  sharedPoolReserveMinor BigInt?  @map("shared_pool_reserve_minor")
+  currency              String    @db.Char(3)
+  priorities            String?
+  openedByEmployeeId    String    @map("opened_by_employee_id") @db.Uuid
+  openedAt              DateTime  @map("opened_at") @db.Timestamptz(3)
+  publishedByEmployeeId String?   @map("published_by_employee_id") @db.Uuid
+  publishedAt           DateTime? @map("published_at") @db.Timestamptz(3)
+  firstPublishedAt      DateTime? @map("first_published_at") @db.Timestamptz(3)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  ceilings BudgetDepartmentCeiling[]
+
+  @@unique([organizationId, year])
+  @@map("budget_cycles")
+}
+
+/// The ceiling of one department in a cycle (FR-5.16(2)): the commitments already signed, the seats planned at their monthly price and
+/// the priority items; `totalMinor` is their sum. `publishedTotalMinor` is the total the head was told at the last publication.
+model BudgetDepartmentCeiling {
+  cycleId                String  @map("cycle_id") @db.Uuid
+  departmentId           String  @map("department_id") @db.Uuid
+  signedCommitmentsMinor BigInt  @map("signed_commitments_minor")
+  plannedSeatsMinor      BigInt  @map("planned_seats_minor")
+  priorityMinor          BigInt  @map("priority_minor")
+  totalMinor             BigInt  @map("total_minor")
+  publishedTotalMinor    BigInt? @map("published_total_minor")
+
+  cycle BudgetCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  @@id([cycleId, departmentId])
+  @@map("budget_department_ceilings")
+}
