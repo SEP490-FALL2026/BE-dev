@@ -24,7 +24,7 @@ export class SupplementPricing {
   async repriceFor(
     tx: DbTx,
     request: AccessRequestRecord,
-    input: { dropped: readonly string[]; fiscalYearStartMonth: number; now: Date },
+    input: { dropped: readonly string[]; now: Date },
   ): Promise<{ repriced: PricingRecord; change: NonNullable<ReturnType<typeof supplementChangeOf>> }> {
     const { pricing } = request;
     const today = await this.organizationReads.businessToday(input.now, tx);
@@ -32,7 +32,7 @@ export class SupplementPricing {
       tx,
       this.groups.withoutPeople(request, input.dropped),
       pricing.expectedSpendOn as string,
-      { today, fiscalYearStartMonth: input.fiscalYearStartMonth },
+      { today },
     );
     if (input.dropped.length === 0) {
       throw new SpendSupplementRefusedError('NO_CHANGE');

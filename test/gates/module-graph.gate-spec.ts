@@ -147,8 +147,6 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // G5 (FR-3.11): the inbox the routes of `NotificationsHttpModule` read, held once in the module that gives the notices.
   'NotificationsModule: InboxService',
   'OperatingParametersModule: OperatingParametersApi',
-  // B-01 (US-01-04): the extension point the budgets module binds its fiscal-year-start lock to.
-  'OperatingParametersModule: ParameterLockContributions',
   // G6 (ADR-0017): the extension point the flows that follow a personnel file (the owner of a service account) add their hooks to.
   'PersonnelModule: PersonnelFileHookContributions',
   // G6 (US-03-03): the days a person was on long leave, read by the rules of the recommendations of G7.

@@ -81,7 +81,7 @@ export class ServiceAccountRequestService {
         chargedToUnit: true,
       });
       if (assessed.termBeyondLimit) {
-        throw new AccessRequestTermBeyondLimitError(assessed.termLimit.maxMonths, assessed.termLimit.endsBy);
+        throw new AccessRequestTermBeyondLimitError(assessed.termLimit.maxMonths);
       }
       const refusal = submitRefusal({
         baselineClosed: baseline.closed,

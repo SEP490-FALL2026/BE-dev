@@ -65,12 +65,9 @@ export class AccessRequestNotPriceableError extends Error {
   }
 }
 
-/** The term asked for is longer than a request may ask for, or a flexible plan would run past the end of the fiscal year (`US-05-01` AC-4, `QĐ-98`). */
+/** The term asked for is longer than a request may ask for, (`US-05-01` AC-4, `QĐ-98`). */
 export class AccessRequestTermBeyondLimitError extends Error {
-  constructor(
-    readonly maxMonths: number,
-    readonly endsBy: string | null,
-  ) {
+  constructor(readonly maxMonths: number) {
     super(
       'The term is longer than a request may ask for: at most 12 months. A draft saved with a longer term must be saved again with a shorter one.',
     );

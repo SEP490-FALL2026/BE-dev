@@ -44,7 +44,7 @@ export interface GroupCheck {
   plan: { eligible: boolean; reason: PlanRefusal | null };
   tooManyLines: { max: number } | null;
   tooFewLines: { min: number } | null;
-  termLimit: { maxMonths: number; endsBy: string | null };
+  termLimit: { maxMonths: number };
   termBeyondLimit: boolean;
   lines: { employeeId: string; ok: boolean; reason: LineReason | 'DUPLICATE_LINE' | null }[];
   pricing: PricingRecord;
@@ -176,7 +176,7 @@ export class GroupRequestService {
     if (judged.planRefusal !== null) throw new GroupRequestPlanNotEligibleError(judged.planRefusal);
     if (judged.count.tooMany !== null) throw new GroupRequestTooManyLinesError(judged.count.tooMany.max);
     if (judged.assessed.termBeyondLimit) {
-      throw new GroupRequestTermBeyondLimitError(judged.assessed.termLimit.maxMonths, judged.assessed.termLimit.endsBy);
+      throw new GroupRequestTermBeyondLimitError(judged.assessed.termLimit.maxMonths);
     }
     if (judged.count.tooFew !== null) throw new GroupRequestTooFewLinesError(judged.count.tooFew.min);
     if (judged.count.duplicates.length > 0) throw new GroupRequestDuplicateLineError(judged.count.duplicates);

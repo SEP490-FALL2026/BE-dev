@@ -18,6 +18,13 @@ function catalogAdmin(ctx: DemoRunContext): string {
   return it?.itAdmin ?? ctx.fixture.people.find((person) => person.account === 'IT_ADMIN')?.code ?? '';
 }
 
+/** Who answers for a subscription: the IT Admin in charge of its owner department, else the one the catalog is written as. */
+function responsibleOf(ctx: DemoRunContext, subscription: DemoSubscription): string {
+  const owner = ctx.fixture.departments.find((department) => department.code === subscription.ownerDepartment);
+
+  return owner?.itAdmin ?? catalogAdmin(ctx);
+}
+
 async function applications(ctx: DemoRunContext): Promise<StepOutcome> {
   const admin = await as(ctx, catalogAdmin(ctx));
   const results: Result[] = [];
@@ -197,6 +204,9 @@ function subscriptionBody(
     purchasedQuantity: subscription.quantity,
     unitPrice: { amount: subscription.unitPrice, currency: ctx.fixture.currency },
     billingCycle: subscription.billingCycle,
+    // A month for a subscription paid by the month, a year otherwise; the IT Admin of the owner department answers for it (QĐ-103e).
+    commitmentTermMonths: subscription.billingCycle === 'MONTHLY' ? 1 : 12,
+    responsibleItAdminEmployeeId: ctx.ids.employees.get(responsibleOf(ctx, subscription)),
     startDate: `${year}-01-01`,
     endDate: `${year}-12-31`,
     noticePeriodDays: subscription.noticePeriodDays,

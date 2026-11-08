@@ -50,8 +50,7 @@ export class BudgetYearEndService {
 
   /** Closes every Cost Center and year that has ended by `now` and still holds something to close. `now` is a parameter for tests. */
   async closeEndedYears(now: Date = new Date()): Promise<YearEndResult> {
-    const fiscalStart = await this.facts.fiscalYearStartMonth();
-    const fiscalYear = fiscalYearOf(await this.facts.today(now), fiscalStart);
+    const fiscalYear = fiscalYearOf(await this.facts.today(now));
     const pairs = new Map<string, { costCenterId: string; year: number }>();
     for (const pair of [
       ...(await this.versions.endedYearsToClose(fiscalYear)),
@@ -64,7 +63,7 @@ export class BudgetYearEndService {
     for (const pair of [...pairs.values()].sort(
       (a, b) => a.year - b.year || a.costCenterId.localeCompare(b.costCenterId),
     )) {
-      const done = await this.closeYear(pair.costCenterId, pair.year, now, fiscalStart);
+      const done = await this.closeYear(pair.costCenterId, pair.year, now);
       total.years += done.years;
       total.expired += done.expired;
       total.closedUnapproved += done.closedUnapproved;
@@ -74,10 +73,10 @@ export class BudgetYearEndService {
     return total;
   }
 
-  private async closeYear(costCenterId: string, year: number, now: Date, fiscalStart: number): Promise<YearEndResult> {
+  private async closeYear(costCenterId: string, year: number, now: Date): Promise<YearEndResult> {
     return this.runner.run(async (tx) => {
       const today = await this.facts.today(now, tx);
-      if (!yearHasEnded(year, today, fiscalStart)) return NOTHING;
+      if (!yearHasEnded(year, today)) return NOTHING;
       const proposals = await this.proposals.lockAllOfYear(tx, costCenterId, year);
       const versions = await this.versions.lockAllOfYear(tx, costCenterId, year);
       // A version that never became current tells the requests that waited for it: they are locked before the year (F31).

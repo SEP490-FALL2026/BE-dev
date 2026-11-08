@@ -56,6 +56,7 @@ import { SubscriptionRepo } from './subscription/subscription.repo';
 import { SubscriptionChangeGuard } from './subscription/subscription-change-guard.service';
 import { SubscriptionChangeService } from './subscription/subscription-change.service';
 import { SubscriptionService } from './subscription/subscription.service';
+import { SubscriptionPoolService } from './subscription/pool/subscription-pool.service';
 import { SubscriptionPricingService } from './subscription/subscription-pricing.service';
 import { SubscriptionViewService } from './subscription/subscription-view.service';
 import { SubscriptionsController } from './subscription/subscriptions.controller';
@@ -138,6 +139,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionChangeGuard,
     SubscriptionChangeService,
     SubscriptionService,
+    SubscriptionPoolService,
     SubscriptionPricingService,
     SubscriptionObligationService,
     SubscriptionDepartmentUseReader,

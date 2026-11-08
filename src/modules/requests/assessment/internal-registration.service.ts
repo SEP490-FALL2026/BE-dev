@@ -7,7 +7,6 @@ import { accessRequestAuditEvent } from '../access-request/access-request-audit-
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { RequestFactsService } from '../access-request/request-facts.service';
 import type { InternalRegistrationBodyDto } from './assessment.dto';
 import { AssessmentIncompleteError, InternalRegistrationRefusedError } from './assessment.errors';
 import { internalRegistrationBasis, registeredShapeOf } from './assessment.policy';
@@ -33,7 +32,6 @@ export class InternalRegistrationService {
     private readonly gate: AssessmentGate,
     private readonly catalog: CatalogApi,
     private readonly pricing: AssessmentPricingService,
-    private readonly settings: RequestFactsService,
     private readonly audit: AuditApi,
   ) {}
 
@@ -46,8 +44,6 @@ export class InternalRegistrationService {
     requestId: string,
     body: InternalRegistrationBodyDto,
   ): Promise<AccessRequestRecord> {
-    const { fiscalYearStartMonth } = await this.settings.settings();
-
     return this.runner.run(async (tx) => {
       const request = await this.requests.lockById(tx, requestId);
       if (!request) throw new AccessRequestNotFoundError();
@@ -60,7 +56,6 @@ export class InternalRegistrationService {
       const now = new Date();
       const { quote, pricing } = await this.pricing.registrationPricing(tx, request, body.spend?.quote, {
         now,
-        fiscalYearStartMonth,
       });
       const registered = await this.catalog.registerInternalSoftware(tx, actor, {
         name: body.softwareName ?? proposal.softwareName,

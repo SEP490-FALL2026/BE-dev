@@ -96,7 +96,7 @@ export class AccessRequestService {
       throw new AccessRequestAlreadyHoldsAccessError(assessed.heldAccess);
     }
     if (assessed.termBeyondLimit) {
-      throw new AccessRequestTermBeyondLimitError(assessed.termLimit.maxMonths, assessed.termLimit.endsBy);
+      throw new AccessRequestTermBeyondLimitError(assessed.termLimit.maxMonths);
     }
     const sent: SubmittedRequest = {
       actor,

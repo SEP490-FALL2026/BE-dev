@@ -383,6 +383,7 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
           purchasedQuantity: 3,
           unitPrice: { amount: '5000000', currency: 'VND' },
           startDate: '2026-01-05',
+          responsibleItAdminEmployeeId: h.it1.employeeId,
         })
         .expect(201),
     ).id;

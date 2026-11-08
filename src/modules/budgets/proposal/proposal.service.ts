@@ -40,14 +40,11 @@ export class ProposalService {
    * BudgetCurrencyError, the money errors and, with `attachmentIds`, BudgetAttachmentNotAttachableError.
    */
   async submit(actor: AuthenticatedPrincipal, body: BudgetProposalBodyDto): Promise<ProposalWire> {
-    const fiscalStart = await this.facts.fiscalYearStartMonth();
-
     return this.runner.run(async (tx) => {
       const id = await this.sender.send(tx, actor, {
         year: body.year,
         lines: body.lines,
         previous: null,
-        fiscalStart,
         attachmentIds: body.attachmentIds,
       });
 
@@ -62,18 +59,15 @@ export class ProposalService {
     lines: LineBody[],
     attachmentIds?: readonly string[],
   ): Promise<ProposalWire> {
-    const fiscalStart = await this.facts.fiscalYearStartMonth();
-
     return this.runner.run(async (tx) => {
       const previous = await this.ownedLocked(tx, actor, id, true);
       const today = await this.facts.today(new Date(), tx);
-      if (yearHasEnded(previous.year, today, fiscalStart)) throw new BudgetYearEndedError(previous.year);
+      if (yearHasEnded(previous.year, today)) throw new BudgetYearEndedError(previous.year);
       if (!canResubmit(previous.state)) throw new BudgetProposalStateError('RESUBMIT', previous.state);
       const created = await this.sender.send(tx, actor, {
         year: previous.year,
         lines,
         previous: previous.id,
-        fiscalStart,
         attachmentIds,
       });
 
@@ -83,12 +77,10 @@ export class ProposalService {
 
   /** The head takes the proposal back while Finance has not sent a version made from it (`US-06-10` AC-4). */
   async withdraw(actor: AuthenticatedPrincipal, id: string): Promise<ProposalWire> {
-    const fiscalStart = await this.facts.fiscalYearStartMonth();
-
     return this.runner.run(async (tx) => {
       const proposal = await this.ownedLocked(tx, actor, id);
       const today = await this.facts.today(new Date(), tx);
-      if (yearHasEnded(proposal.year, today, fiscalStart)) throw new BudgetYearEndedError(proposal.year);
+      if (yearHasEnded(proposal.year, today)) throw new BudgetYearEndedError(proposal.year);
       if (!canWithdraw(proposal.state)) throw new BudgetProposalStateError('WITHDRAW', proposal.state);
 
       const now = new Date();
@@ -109,13 +101,11 @@ export class ProposalService {
   /** Finance gives the proposal back with the reason that must go with it (`US-06-09` AC-15). */
   async giveBack(actor: AuthenticatedPrincipal, id: string, reason: string): Promise<ProposalWire> {
     this.facts.requireFinance(actor);
-    const fiscalStart = await this.facts.fiscalYearStartMonth();
-
     return this.runner.run(async (tx) => {
       const proposal = await this.proposals.lockById(tx, id);
       if (!proposal) throw new BudgetProposalNotFoundError();
       const today = await this.facts.today(new Date(), tx);
-      if (yearHasEnded(proposal.year, today, fiscalStart)) throw new BudgetYearEndedError(proposal.year);
+      if (yearHasEnded(proposal.year, today)) throw new BudgetYearEndedError(proposal.year);
       if (!canReturn(proposal.state)) throw new BudgetProposalStateError('RETURN', proposal.state);
 
       const now = new Date();

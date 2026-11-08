@@ -156,7 +156,6 @@ async function runAgainst(input: DemoRunInput, fixture: DemoFixture, facts: Fact
     const calendar = calendarRefusal({
       mode: args.mode === 'apply' ? 'apply' : 'plan',
       today: facts.today,
-      fiscalYearStartMonth: await fiscalYearStartMonth(api, facts.superAdmin.loginEmail),
       datasetYear: await datasetYear(api, facts, fixture.id),
     });
     if (calendar !== null) return { refused: calendar };
@@ -176,13 +175,6 @@ async function runAgainst(input: DemoRunInput, fixture: DemoFixture, facts: Fact
   } finally {
     await api.signOutAll();
   }
-}
-
-/** The operating parameter `FISCAL_YEAR_START_MONTH`, read as the Super Admin. */
-async function fiscalYearStartMonth(api: DemoApiClient, email: string): Promise<number> {
-  const data = await api.call<{ items: { key: string; value: unknown }[] }>(email, 'GET', '/operating-parameters');
-
-  return Number(data.items.find((item) => item.key === 'FISCAL_YEAR_START_MONTH')?.value);
 }
 
 /**

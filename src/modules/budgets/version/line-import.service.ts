@@ -47,10 +47,8 @@ export class LineImportService {
   async load(actor: AuthenticatedPrincipal, id: string, text: string): Promise<ImportWire> {
     this.facts.requireFinance(actor);
     const table = this.read(text);
-    const fiscalStart = await this.facts.fiscalYearStartMonth();
-
     return this.runner.run(async (tx) => {
-      const version = await this.access.lockEditable(tx, id, fiscalStart);
+      const version = await this.access.lockEditable(tx, id);
 
       const own = await this.facts.costCenter(version.costCenterId, tx);
       const codes = [...new Set(table.rows.map((row) => row.cost_center_code).filter((code) => code !== ''))];

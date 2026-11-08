@@ -159,9 +159,9 @@ export class BudgetAttachmentCompletionService {
     record: BudgetAttachmentRecord,
     finalObjectKey: string,
   ): Promise<void> {
-    const fiscalStart = await this.access.begin(actor);
+    this.access.begin(actor);
     await this.runner.run(async (tx) => {
-      const version = await this.access.lockEditable(tx, record.versionId!, fiscalStart);
+      const version = await this.access.lockEditable(tx, record.versionId!);
       const locked = await this.attachments.lock(tx, record.id);
       if (!locked) throw new BudgetAttachmentNotFoundError();
       if (locked.status !== 'AWAITING_UPLOAD') throw new BudgetAttachmentNotAwaitingUploadError();

@@ -54,7 +54,7 @@ const checkSchema = z.strictObject({
   /** The fewest different people a request for a group names, when fewer were named. */
   tooFewLines: z.strictObject({ min: z.number().int().positive() }).nullable(),
   /** The longest term the plan takes from today, and whether the term asked for is beyond it. */
-  termLimit: z.strictObject({ maxMonths: z.number().int().positive(), endsBy: z.string().nullable() }),
+  termLimit: z.strictObject({ maxMonths: z.number().int().positive() }),
   termBeyondLimit: z.boolean(),
   lines: z.array(
     z.strictObject({

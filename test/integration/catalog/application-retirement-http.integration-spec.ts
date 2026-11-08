@@ -51,6 +51,8 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
           purchasedQuantity: 5,
           unitPrice: { amount: '1000000', currency: 'VND' },
           billingCycle: 'MONTHLY',
+          commitmentTermMonths: 1,
+          responsibleItAdminEmployeeId: h.it1.employeeId,
           startDate: '2025-01-05',
           ...extra,
         })
@@ -287,6 +289,7 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
         purchasedQuantity: 50,
         unitPrice: { amount: '500000', currency: 'VND' },
         startDate: '2026-03-15',
+        responsibleItAdminEmployeeId: h.it1.employeeId,
       })
       .expect(201);
     const assignmentId = await insertAssignment(people[3], planId, null, { from: '2026-04-01' });

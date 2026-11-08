@@ -66,10 +66,8 @@ export interface ParameterDefinition {
  *
  * The list is ordered by group (the order of {@link PARAMETER_GROUPS}), so the screen shows it as it comes.
  *
- * The budget period is the fiscal year (`FR-5.1`, `QĐ-82e`), so there is no parameter for its kind and none for a
- * high-value threshold or a 50 % rate (`QĐ-82c`). The two choices that remain are when the fiscal year begins and how
- * long a request may wait to be submitted; the lock on the month once a budget version exists belongs to the budget
- * (G5), which does not exist yet.
+ * The budget period is the calendar year (`FR-5.1`, `QĐ-104e`(1)), so there is no parameter for when it begins, none for
+ * its kind and none for a high-value threshold or a 50 % rate (`QĐ-82c`).
  *
  * Not here on purpose: the time zone (set once at installation, `QĐ-47d`), and the reporting currency, which lock
  * once rates or priced subscriptions exist (AC-9) — it joins when the slice that holds those exists. The same goes
@@ -108,17 +106,6 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     unitLabel: 'ngày làm việc',
     description: 'How long a spending request may wait to be submitted for approval before it is reminded.',
     source: 'FR-8.2, QĐ-82e',
-  },
-  {
-    key: 'FISCAL_YEAR_START_MONTH',
-    label: 'Tháng bắt đầu năm tài chính',
-    group: 'BUDGET',
-    shape: { kind: 'int', min: 1, max: 12 },
-    default: 1,
-    unit: 'month of the year',
-    unitLabel: 'tháng trong năm',
-    description: 'The month the fiscal year, which is the budget period of the whole organization, begins.',
-    source: 'FR-8.2, FR-5.1, QĐ-82c',
   },
   {
     key: 'FORECAST_ERROR_THRESHOLD_PERCENT',

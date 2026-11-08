@@ -30,9 +30,8 @@ export class VersionDecisionService {
 
   /** Throws BudgetVersionNotFoundError, BudgetDecisionRefusedError and BudgetYearEndedError. */
   async decide(actor: AuthenticatedPrincipal, id: string, body: DecisionBodyDto): Promise<VersionWire> {
-    const fiscalStart = await this.facts.fiscalYearStartMonth();
     const decided = await this.runner.run(async (tx) => {
-      const judged = await this.judge.judge(tx, actor, id, fiscalStart);
+      const judged = await this.judge.judge(tx, actor, id);
 
       return this.writer.write(tx, actor, judged, body);
     });

@@ -17,6 +17,11 @@ export class PlanFactsService implements ApplicationPlans {
     return this.plans.lockSharedLookup(tx, id);
   }
 
+  /** The plan, locked `FOR UPDATE` until the transaction ends; null if absent. */
+  lockExclusive(tx: DbTx, id: string): Promise<LockedPlan | null> {
+    return this.plans.lockExclusiveLookup(tx, id);
+  }
+
   /** The plans with these ids as `LockedPlan`s without a lock, in one read. */
   lookups(ids: readonly string[], tx?: DbTx): Promise<LockedPlan[]> {
     return this.plans.findLookups(ids, tx);

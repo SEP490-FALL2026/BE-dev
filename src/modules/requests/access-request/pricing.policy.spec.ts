@@ -10,7 +10,6 @@ const input = (patch: Partial<PricingInput> = {}): PricingInput => ({
   termMonths: 6,
   beneficiaries: 1,
   expectedSpendOn: '2026-10-23',
-  fiscalYearStartMonth: 1,
   ...patch,
 });
 
@@ -74,10 +73,9 @@ describe('the budget year of a request (US-05-02 AC-11, QĐ-82e)', () => {
     expect(priced).toMatchObject({ status: 'PRICED', budgetYear: 2027 });
   });
 
-  it('follows the month the fiscal year begins in', () => {
-    expect(
-      priceRequest(input({ termMonths: 1, expectedSpendOn: '2027-03-31', fiscalYearStartMonth: 4 })),
-    ).toMatchObject({ budgetYear: 2026 });
+  it('is the calendar year: the 31st of March and the 1st of January fall in their own years (R-I01)', () => {
+    expect(priceRequest(input({ termMonths: 1, expectedSpendOn: '2027-03-31' }))).toMatchObject({ budgetYear: 2027 });
+    expect(priceRequest(input({ termMonths: 1, expectedSpendOn: '2026-12-31' }))).toMatchObject({ budgetYear: 2026 });
   });
 });
 

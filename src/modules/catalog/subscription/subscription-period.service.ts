@@ -119,7 +119,15 @@ export class SubscriptionPeriodService {
     const plan = await this.plans.lockShared(tx, previous.planId);
     if (!plan || plan.applicationStatus === 'RETIRED') throw new SubscriptionPeriodRefusedError('APPLICATION_RETIRED');
 
-    const state = declaredStateOf(input);
+    // The new period carries what the rules of the shared pool made the old one hold: the commitment, the IT Admin who answers for
+    // it and the vendor's minimum; the flag that prices the plan moves to it (QĐ-103e).
+    const state = {
+      ...declaredStateOf(input),
+      commitmentTermMonths: previous.commitmentTermMonths,
+      responsibleItAdminEmployeeId: previous.responsibleItAdminEmployeeId,
+      vendorMinimumSeats: previous.vendorMinimumSeats,
+      isPrimaryForPlan: previous.isPrimaryForPlan,
+    };
     try {
       assertSubscriptionShape({
         kind: 'TERM',
@@ -135,6 +143,7 @@ export class SubscriptionPeriodService {
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A renewal was recorded before installation');
 
+    if (previous.isPrimaryForPlan) await this.subscriptions.clearPrimary(tx, previous.id);
     const created = await this.subscriptions.insert(tx, {
       organizationId: organization.id,
       planId: previous.planId,

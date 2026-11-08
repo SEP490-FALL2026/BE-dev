@@ -142,7 +142,6 @@ export class GroupSubmissionFactsService {
             beneficiaries: lines.length,
             expectedSpendOn: input.expectedSpendOn,
             today,
-            fiscalYearStartMonth: input.settings.fiscalYearStartMonth,
           })
         : assessed.pricing;
 

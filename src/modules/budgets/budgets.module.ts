@@ -11,7 +11,6 @@ import { OrganizationModule } from '../organization/organization.module';
 import { BudgetCostCenterUseReader } from './commitment/budget-cost-center-use.listener';
 import { BudgetHeadChangeListener } from './proposal/budget-head-change.listener';
 import { BudgetSpendingApproverGrantCheck } from './proposal/spending-approver-grant.listener';
-import { FiscalYearStartLockReader } from './version/fiscal-year-start-lock.listener';
 import { SpendingApproverWaitListener } from './budget/spending-approver-wait.listener';
 import { BudgetFactsRepo } from './budget/budget-facts.repo';
 import { BudgetNotifierService } from './budget/budget-notifier.service';
@@ -150,7 +149,6 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetCostCenterUseReader,
     BudgetHeadChangeListener,
     BudgetSpendingApproverGrantCheck,
-    FiscalYearStartLockReader,
     SpendingApproverWaitListener,
     CommitmentService,
     InvoiceService,

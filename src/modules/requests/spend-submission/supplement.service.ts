@@ -4,7 +4,6 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { hasSpendStep } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
-import { RequestFactsService } from '../access-request/request-facts.service';
 import { GroupSupplementService } from '../group-request/group-supplement.service';
 import { checkSupplement } from '../spend/spend-submission.policy';
 import { SpendSupplementRefusedError } from '../spend/spend.errors';
@@ -27,7 +26,6 @@ export class SupplementService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly requests: AccessRequestRepo,
-    private readonly settings: RequestFactsService,
     private readonly head: SpendHeadService,
     private readonly groups: GroupSupplementService,
     private readonly pricing: SupplementPricing,
@@ -40,8 +38,6 @@ export class SupplementService {
    */
   async add(actor: AuthenticatedPrincipal, requestId: string, body: SupplementBodyDto): Promise<SupplementWire> {
     const departmentId = await this.head.departmentOf(actor);
-    const { fiscalYearStartMonth } = await this.settings.settings();
-
     const record = await this.runner.run(async (tx) => {
       const request = await this.requests.lockById(tx, requestId);
       if (!request || request.departmentId !== departmentId || !hasSpendStep(request.policy)) {
@@ -60,7 +56,6 @@ export class SupplementService {
       const now = new Date();
       const { repriced, change } = await this.pricing.repriceFor(tx, request, {
         dropped,
-        fiscalYearStartMonth,
         now,
       });
 

@@ -10,8 +10,18 @@ import {
   ReportingCurrencyNotSupportedError,
 } from '../../../core/money/money.errors';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import {
   SubscriptionApplicationRetiredError,
+  SubscriptionBillingCycleUnsupportedError,
+  SubscriptionBillingLongerThanCommitmentError,
+  SubscriptionCommitmentTermNotAllowedError,
+  SubscriptionCommitmentTermRequiredError,
+  SubscriptionK1MonthlyOnlyError,
+  SubscriptionPrimaryConflictError,
+  SubscriptionPrimaryNotEligibleError,
+  SubscriptionResponsibleNotItAdminError,
+  SubscriptionResponsibleRequiredError,
   SubscriptionDatesInvalidError,
   SubscriptionNotFoundError,
   SubscriptionOwnerDepartmentInactiveError,
@@ -74,6 +84,39 @@ export function toSubscriptionApiException(error: unknown): unknown {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.STILL_DRAFT', error.message, { missing: error.missing });
   }
 
+  if (error instanceof SubscriptionCommitmentTermRequiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.COMMITMENT_TERM_REQUIRED', error.message);
+  }
+  if (error instanceof SubscriptionCommitmentTermNotAllowedError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.COMMITMENT_TERM_NOT_ALLOWED', error.message);
+  }
+  if (error instanceof SubscriptionK1MonthlyOnlyError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.K1_MONTHLY_ONLY', error.message);
+  }
+  if (error instanceof SubscriptionBillingLongerThanCommitmentError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.BILLING_LONGER_THAN_COMMITMENT', error.message);
+  }
+  if (error instanceof SubscriptionBillingCycleUnsupportedError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.BILLING_CYCLE_UNSUPPORTED', error.message, {
+      billingCycle: error.billingCycle,
+    });
+  }
+  if (error instanceof SubscriptionResponsibleRequiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.RESPONSIBLE_REQUIRED', error.message);
+  }
+  if (error instanceof SubscriptionResponsibleNotItAdminError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN', error.message);
+  }
+  if (error instanceof SubscriptionPrimaryNotEligibleError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PRIMARY_NOT_ELIGIBLE', error.message, { reason: error.reason });
+  }
+  if (
+    error instanceof SubscriptionPrimaryConflictError ||
+    isUniqueViolation(error, 'subscriptions_one_primary_per_plan')
+  ) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.PRIMARY_CONFLICT', new SubscriptionPrimaryConflictError().message);
+  }
+
   const money = toMoneyApiException(error);
   if (money !== error) return money;
 
@@ -96,6 +139,15 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   UPDATE_EMPTY: example(new SubscriptionUpdateEmptyError()),
   QUANTITY_BELOW_OCCUPIED: example(new SubscriptionQuantityBelowOccupiedError(3, 2)),
   STILL_DRAFT: example(new SubscriptionStillDraftError(['EXCHANGE_RATE'])),
+  COMMITMENT_TERM_REQUIRED: example(new SubscriptionCommitmentTermRequiredError()),
+  COMMITMENT_TERM_NOT_ALLOWED: example(new SubscriptionCommitmentTermNotAllowedError()),
+  K1_MONTHLY_ONLY: example(new SubscriptionK1MonthlyOnlyError()),
+  BILLING_LONGER_THAN_COMMITMENT: example(new SubscriptionBillingLongerThanCommitmentError()),
+  BILLING_CYCLE_UNSUPPORTED: example(new SubscriptionBillingCycleUnsupportedError('QUARTERLY')),
+  RESPONSIBLE_REQUIRED: example(new SubscriptionResponsibleRequiredError()),
+  RESPONSIBLE_NOT_IT_ADMIN: example(new SubscriptionResponsibleNotItAdminError()),
+  PRIMARY_NOT_ELIGIBLE: example(new SubscriptionPrimaryNotEligibleError('NOT_ACTIVE')),
+  PRIMARY_CONFLICT: example(new SubscriptionPrimaryConflictError()),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
   CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),

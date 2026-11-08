@@ -139,6 +139,8 @@ describe('the owner department of a subscription: the finance gate of a change a
             purchasedQuantity: 5,
             unitPrice: { amount, currency: 'VND' },
             billingCycle: 'MONTHLY',
+            commitmentTermMonths: 1,
+            responsibleItAdminEmployeeId: h.it1.employeeId,
             startDate: '2026-01-05',
           })
           .expect(201),

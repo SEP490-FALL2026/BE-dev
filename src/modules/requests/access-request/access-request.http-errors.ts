@@ -76,7 +76,7 @@ export function toAccessRequestApiException(error: unknown): unknown {
     return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
       code: 'ACCESS_REQUEST.TERM_BEYOND_LIMIT',
       message: error.message,
-      details: { maxMonths: error.maxMonths, endsBy: error.endsBy },
+      details: { maxMonths: error.maxMonths },
     });
   }
   if (error instanceof AccessRequestAlreadyHoldsAccessError) {
@@ -146,7 +146,7 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
-  TERM_BEYOND_LIMIT: example(new AccessRequestTermBeyondLimitError(12, '2026-12-31')),
+  TERM_BEYOND_LIMIT: example(new AccessRequestTermBeyondLimitError(12)),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({

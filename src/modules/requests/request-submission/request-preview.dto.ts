@@ -40,8 +40,8 @@ const previewSchema = z.strictObject({
    * department has none in use and the request is free internal software, which is judged without it (`QĐ-87g(2)`).
    */
   costCenter: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
-  /** The longest term the plan takes from today: a year, and for a flexible plan not past the end of the fiscal year (`endsBy`). */
-  termLimit: z.strictObject({ maxMonths: z.number().int().positive(), endsBy: z.string().nullable() }),
+  /** The longest term the plan takes from today: a year. */
+  termLimit: z.strictObject({ maxMonths: z.number().int().positive() }),
   /** The seat the person already holds of the plan; when present, the request cannot be sent. */
   existingAccess: z
     .strictObject({ assignmentId: z.uuid(), effectiveFrom: z.string(), validUntil: z.string().nullable() })

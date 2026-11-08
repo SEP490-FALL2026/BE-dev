@@ -339,9 +339,8 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
           [employeeId],
         )
       ).rows.map((row) => row.expected_end_date);
-    /** The last day of the term the request asked for (6 months in `grantable`), cut at the end of the fiscal year for a flexible plan. */
-    const termEnd = (flexible: boolean) =>
-      effectiveEndOf({ start: h.today(), months: 6, flexible, fiscalYearStartMonth: 1 });
+    /** The last day of the term the request asked for (6 months in `grantable`): never cut at the end of the calendar year (`QĐ-104a`). */
+    const termEnd = () => effectiveEndOf({ start: h.today(), months: 6 });
 
     it.each([
       ['a contractor', 'CONTRACTOR'],
@@ -354,7 +353,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
 
       await h.grant({ requestId: h.gate.grantable(person, planId), subscriptionId }).expect(201);
 
-      expect(await seatEndOf(person)).toEqual([termEnd(false)]);
+      expect(await seatEndOf(person)).toEqual([termEnd()]);
     });
 
     it('gives the seat of free internal software no end by term: it costs nothing and has no term to bind (R-H1)', async () => {
@@ -376,7 +375,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
       expect(await seatEndOf(person)).toEqual([null]);
     });
 
-    it('cuts the end at the end of the fiscal year when the subscription the seat is taken on is flexible, and no later (R-M1)', async () => {
+    it('does not cut the end at the end of the calendar year, even when the subscription the seat is taken on is flexible (R-D03)', async () => {
       const { subscriptionId, planId } = await k2();
       await h.ctx.sql.query(`UPDATE subscriptions SET allows_mid_term_reduction = true WHERE id = $1`, [
         subscriptionId,
@@ -385,8 +384,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
 
       await h.grant({ requestId: h.gate.grantable(person, planId), subscriptionId }).expect(201);
 
-      expect(await seatEndOf(person)).toEqual([termEnd(true)]);
-      expect(termEnd(true) <= `${h.today().slice(0, 4)}-12-31`).toBe(true);
+      expect(await seatEndOf(person)).toEqual([termEnd()]);
     });
 
     it('takes no end day in the body of the grant: the IT Admin has no authority to set the approved term', async () => {

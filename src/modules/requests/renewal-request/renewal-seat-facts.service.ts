@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { CatalogApi } from '../../catalog/public/catalog.api';
 import { RequestPartyEligibilityApi } from '../../identity-access/public/request-party-eligibility.api';
 import { AssignmentNotFoundError } from '../../licensing/public/licensing.errors';
 import { LicensingRenewalApi } from '../../licensing/public/licensing-renewal.api';
@@ -19,15 +18,7 @@ export class RenewalSeatFactsService {
     private readonly licensingRenewals: LicensingRenewalApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly requestParties: RequestPartyEligibilityApi,
-    private readonly catalog: CatalogApi,
   ) {}
-
-  /** Whether the subscription the seat is taken on can be cut mid-term: a renewal of it ends at the fiscal year (`QĐ-98`, R-15). */
-  async isFlexible(tx: DbTx, subscriptionId: string | null): Promise<boolean> {
-    if (subscriptionId === null) return false;
-
-    return (await this.catalog.findSeatTarget({ subscriptionId }, tx))?.allowsMidTermReduction ?? false;
-  }
 
   /** Throws RenewalRequestRefusedError (the seat is not there) and RequestPartyIneligibleError. */
   async lockedFactsOf(tx: DbTx, senderEmployeeId: string, assignmentId: string): Promise<AssignmentFacts> {

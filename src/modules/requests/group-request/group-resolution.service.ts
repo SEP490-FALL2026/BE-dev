@@ -96,10 +96,8 @@ export class GroupResolutionService {
     )
       return;
 
-    const settings = await this.assessment.settings();
     const repriced = await this.repricing.reprice(tx, request, pricing.expectedSpendOn, {
       today: await this.organizationReads.businessToday(now, tx),
-      fiscalYearStartMonth: settings.fiscalYearStartMonth,
     });
     await this.requests.setPricing(tx, request.id, repriced);
   }

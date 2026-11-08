@@ -18,12 +18,7 @@ describe('requests over HTTP: the amount of a request (integration, real Postgre
     internalPlan = await h.plan('K5');
     pricedPlan = await h.planOf(await h.subscription(10)); // 1 000 000 VND per seat per month, billed monthly
     unpricedPlan = await h.plan('K2'); // in the catalog, with no subscription to price it from
-    await h.setParameter('FISCAL_YEAR_START_MONTH', 1).expect(200);
   }, 240000);
-
-  afterEach(async () => {
-    await h.setParameter('FISCAL_YEAR_START_MONTH', 1);
-  });
 
   afterAll(async () => {
     await h.stop();
@@ -108,12 +103,10 @@ describe('requests over HTTP: the amount of a request (integration, real Postgre
       }
     });
 
-    it('follows the month the fiscal year begins in: a day before April still belongs to the year that began the April before', async () => {
-      await h.setParameter('FISCAL_YEAR_START_MONTH', 4).expect(200);
-
+    it('is the calendar year of today whatever the month, with no parameter that moves where the year begins (R-I01)', async () => {
       const sent = await h.sent(designer, pricedPlan, { termMonths: 1 });
 
-      expect(sent.budgetYear).toBe(Number(h.today().slice(5, 7)) >= 4 ? year : year - 1);
+      expect(sent.budgetYear).toBe(year);
     });
   });
 

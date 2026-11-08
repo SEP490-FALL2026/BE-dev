@@ -31,15 +31,13 @@ const day = (value: string): BusinessDate => value;
 
 describe('which fiscal years take a proposal (US-06-10 AC-9)', () => {
   it.each([
-    ['a year to come', 2027, '2026-06-15', 1, true],
-    ['the year that is running', 2026, '2026-06-15', 1, true],
-    ['a year that has ended', 2025, '2026-06-15', 1, false],
-    ['the last day of a year', 2026, '2026-12-31', 1, true],
-    ['the first day after it', 2026, '2027-01-01', 1, false],
-    ['a year that begins in April: March still belongs to the year before', 2026, '2027-03-31', 4, true],
-    ['a year that begins in April: April is the next year', 2026, '2027-04-01', 4, false],
-  ])('%s', (_name, year, today, startMonth, open) => {
-    expect(yearIsOpen(year, day(today), startMonth)).toBe(open);
+    ['a year to come', 2027, '2026-06-15', true],
+    ['the year that is running', 2026, '2026-06-15', true],
+    ['a year that has ended', 2025, '2026-06-15', false],
+    ['the last day of a year', 2026, '2026-12-31', true],
+    ['the first day after it', 2026, '2027-01-01', false],
+  ])('%s', (_name, year, today, open) => {
+    expect(yearIsOpen(year, day(today))).toBe(open);
   });
 });
 
@@ -82,13 +80,10 @@ describe('what can be done to a proposal that was sent (US-06-10 AC-4, AC-5, AC-
 });
 
 describe('the year that has ended (F62, QĐ-91c)', () => {
-  it('has ended once the fiscal year after it has begun, whatever the month the fiscal year begins in', () => {
-    expect(yearHasEnded(2026, day('2027-01-01'), 1)).toBe(true);
-    expect(yearHasEnded(2026, day('2026-12-31'), 1)).toBe(false);
-    // With a year that begins in April, the fiscal year 2026 runs to the 31st of March 2027.
-    expect(yearHasEnded(2026, day('2027-03-31'), 4)).toBe(false);
-    expect(yearHasEnded(2026, day('2027-04-01'), 4)).toBe(true);
-    expect(yearHasEnded(2027, day('2027-04-01'), 4)).toBe(false);
+  it('has ended once the calendar year after it has begun', () => {
+    expect(yearHasEnded(2026, day('2027-01-01'))).toBe(true);
+    expect(yearHasEnded(2026, day('2026-12-31'))).toBe(false);
+    expect(yearHasEnded(2027, day('2027-04-01'))).toBe(false);
   });
 
   it('keeps the current version as the reference budget and closes the ones that never became current', () => {

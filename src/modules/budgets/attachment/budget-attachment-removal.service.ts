@@ -23,10 +23,10 @@ export class BudgetAttachmentRemovalService {
   ) {}
 
   async remove(actor: AuthenticatedPrincipal, versionId: string, attachmentId: string): Promise<BudgetAttachmentWire> {
-    const fiscalStart = await this.access.begin(actor);
+    this.access.begin(actor);
 
     const updated = await this.runner.run(async (tx) => {
-      const version = await this.access.lockEditable(tx, versionId, fiscalStart);
+      const version = await this.access.lockEditable(tx, versionId);
       const record = await this.attachments.lock(tx, attachmentId);
 
       this.assertValidForRemoval(record, versionId);

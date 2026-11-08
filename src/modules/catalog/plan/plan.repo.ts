@@ -286,6 +286,17 @@ export class PlanRepo {
   }
 
   /**
+   * The same, locked `FOR UPDATE` for the rest of the transaction: two writers that decide something across the subscriptions of a
+   * plan (which one prices it) take turns, and a reader that holds the plan `FOR SHARE` waits for them.
+   */
+  async lockExclusiveLookup(tx: DbTx, id: string): Promise<PlanLookup | null> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM plans WHERE id = ${id}::uuid FOR UPDATE`;
+    if (locked.length === 0) return null;
+
+    return this.findLookup(id, tx);
+  }
+
+  /**
    * One page by application name then plan name, and the total for the same filter, from one snapshot. The revocation note
    * (up to 2000 characters a plan) is not selected: the list does not show it (`LD-05`).
    */

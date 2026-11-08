@@ -91,6 +91,8 @@ function toRecord(row: Row): SubscriptionRecord {
     unitPrice,
     priceSnapshot,
     billingCycle: row.billingCycle,
+    commitmentTermMonths:
+      row.commitmentTermMonths === 1 || row.commitmentTermMonths === 12 ? row.commitmentTermMonths : null,
     startDate: date(row.startDate),
     endDate: date(row.endDate),
     renewalDate: date(row.renewalDate),
@@ -98,6 +100,9 @@ function toRecord(row: Row): SubscriptionRecord {
     noticePeriodDays: row.noticePeriodDays,
     autoRenew: row.autoRenew,
     allowsMidTermReduction: row.allowsMidTermReduction,
+    responsibleItAdminEmployeeId: row.responsibleItAdminEmployeeId,
+    vendorMinimumSeats: row.vendorMinimumSeats,
+    isPrimaryForPlan: row.isPrimaryForPlan,
     renewedFromId: row.renewedFromId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -119,6 +124,7 @@ function columnsOf(state: SubscriptionState) {
     priceReportingCurrency: state.priceSnapshot?.reportingCurrency ?? null,
     priceExchangeRateId: state.priceSnapshot?.exchangeRateId ?? null,
     billingCycle: state.billingCycle,
+    commitmentTermMonths: state.commitmentTermMonths,
     startDate: column(state.startDate),
     endDate: column(state.endDate),
     renewalDate: column(state.renewalDate),
@@ -126,6 +132,9 @@ function columnsOf(state: SubscriptionState) {
     noticePeriodDays: state.noticePeriodDays,
     autoRenew: state.autoRenew,
     allowsMidTermReduction: state.allowsMidTermReduction,
+    responsibleItAdminEmployeeId: state.responsibleItAdminEmployeeId,
+    vendorMinimumSeats: state.vendorMinimumSeats,
+    isPrimaryForPlan: state.isPrimaryForPlan,
   };
 }
 
@@ -149,6 +158,21 @@ export class SubscriptionRepo {
     });
 
     return toRecord(row);
+  }
+
+  /** Takes the flag of the subscription that prices its plan off every other subscription of the plan (Q-04); returns how many had it. */
+  async clearPrimaryOfPlan(tx: DbTx, planId: string, exceptId: string): Promise<number> {
+    const cleared = await tx.subscription.updateMany({
+      where: { planId, isPrimaryForPlan: true, id: { not: exceptId } },
+      data: { isPrimaryForPlan: false },
+    });
+
+    return cleared.count;
+  }
+
+  /** Takes the flag off one subscription: the period a renewal continues hands it to the new period. */
+  async clearPrimary(tx: DbTx, id: string): Promise<void> {
+    await tx.subscription.update({ where: { id }, data: { isPrimaryForPlan: false } });
   }
 
   /** The period that continues each of these, by the id of the one it continues; a period not renewed is absent. */

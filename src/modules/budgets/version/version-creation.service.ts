@@ -46,13 +46,12 @@ export class VersionCreationService {
 
     return this.runner.run(async (tx) => {
       // The month is read here and held until the commit: a change of it waits for this version, and finds it (`US-01-04` AC-8).
-      const fiscalStart = await this.facts.holdFiscalYearStartMonth(tx);
       // The proposal row is locked first, as the head's successor and the sending of a version lock it, so they queue.
       const proposal = await this.proposals.lockById(tx, body.proposalId);
       if (!proposal) throw new BudgetProposalNotFoundError();
       await this.facts.costCenterInUse(proposal.costCenterId, tx);
       const today = await this.facts.today(new Date(), tx);
-      if (yearHasEnded(proposal.year, today, fiscalStart)) throw new BudgetYearEndedError(proposal.year);
+      if (yearHasEnded(proposal.year, today)) throw new BudgetYearEndedError(proposal.year);
       const latest = await this.versions.latestOfProposal(proposal.id, tx);
       const source = versionSourceOf(proposal, latest?.state ?? null);
       if (source === null) throw new BudgetProposalStateError('REVIEW', proposal.state);

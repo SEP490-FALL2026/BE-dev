@@ -55,7 +55,7 @@ export function toGroupRequestApiException(error: unknown): unknown {
     return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
       code: 'GROUP_REQUEST.TERM_BEYOND_LIMIT',
       message: error.message,
-      details: { maxMonths: error.maxMonths, endsBy: error.endsBy },
+      details: { maxMonths: error.maxMonths },
     });
   }
   if (error instanceof GroupRequestTooFewLinesError) {
@@ -125,7 +125,7 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   PLAN_NOT_ELIGIBLE: example(new GroupRequestPlanNotEligibleError('KIND_NOT_MULTI_SEAT')),
   TOO_MANY_LINES: example(new GroupRequestTooManyLinesError(GROUP_EMPLOYEE_MAX)),
   TOO_FEW_LINES: example(new GroupRequestTooFewLinesError(GROUP_LINES_MIN)),
-  TERM_BEYOND_LIMIT: example(new GroupRequestTermBeyondLimitError(12, '2026-12-31')),
+  TERM_BEYOND_LIMIT: example(new GroupRequestTermBeyondLimitError(12)),
   DUPLICATE_LINE: example(new GroupRequestDuplicateLineError([PERSON])),
   LINES_REFUSED: example(new GroupRequestLinesRefusedError([{ employeeId: PERSON, reason: 'OUTSIDE_DEPARTMENT' }])),
   REQUEST_NOT_FOUND: example(new AccessRequestNotFoundError()),

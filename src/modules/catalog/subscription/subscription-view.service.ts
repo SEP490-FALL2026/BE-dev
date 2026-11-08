@@ -5,6 +5,7 @@ import { FinanceApi } from '../../finance/public/finance.api';
 import type { TaxEstimateResult } from '../../finance/public/finance.types';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
+import { poolWarnings } from './pool/subscription-pool.policy';
 import type { SubscriptionRecord, SubscriptionView, TaxEstimateSummary } from './subscription.types';
 
 /**
@@ -113,15 +114,19 @@ export class SubscriptionViewService {
         unitPrice,
         priceSnapshot,
         billingCycle: record.billingCycle,
+        commitmentTermMonths: record.commitmentTermMonths,
         startDate: record.startDate,
         endDate: record.endDate,
         renewalDate: record.renewalDate,
         noticePeriodDays: record.noticePeriodDays,
         autoRenew: record.autoRenew,
         allowsMidTermReduction: record.allowsMidTermReduction,
+        responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
+        vendorMinimumSeats: record.vendorMinimumSeats,
+        isPrimaryForPlan: record.isPrimaryForPlan,
         noticeDeadline: { value: notice.deadline, source: notice.source },
         alerts: { baseDate: notice.baseDate, dates: alertDates(notice.baseDate, daysBefore) },
-        warnings: noticeWarnings(notice.source),
+        warnings: [...noticeWarnings(notice.source), ...poolWarnings(record)],
         taxProfile: { status: group ? 'DECLARED' : 'MISSING', group },
         taxEstimate,
         createdAt: record.createdAt,

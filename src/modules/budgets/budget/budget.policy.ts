@@ -16,8 +16,7 @@ export const LINE_DESCRIPTION_MAX = 200;
  * Whether a fiscal year still takes a proposal or a version: the year that is running and the years to come do, a year
  * that has ended does not (`US-06-10` AC-9, `US-06-09` AC-11).
  */
-export const yearIsOpen = (year: number, today: BusinessDate, fiscalYearStartMonth: number): boolean =>
-  year >= fiscalYearOf(today, fiscalYearStartMonth);
+export const yearIsOpen = (year: number, today: BusinessDate): boolean => year >= fiscalYearOf(today);
 
 export const totalOf = (lines: readonly { amountMinor: bigint }[]): bigint =>
   lines.reduce((sum, line) => sum + line.amountMinor, 0n);
@@ -106,8 +105,7 @@ export function versionWaitingReason(
 }
 
 /** Whether the fiscal year has ended, so that nothing of it is written any more (`QĐ-91c`, `US-06-09` AC-11, `US-06-10` AC-9). */
-export const yearHasEnded = (year: number, today: BusinessDate, fiscalYearStartMonth: number): boolean =>
-  !yearIsOpen(year, today, fiscalYearStartMonth);
+export const yearHasEnded = (year: number, today: BusinessDate): boolean => !yearIsOpen(year, today);
 
 /**
  * What a version becomes when its fiscal year ends (`QĐ-91c`, `QĐ-91e`): the current one stays as the reference budget of the

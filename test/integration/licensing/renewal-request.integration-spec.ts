@@ -55,8 +55,8 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
     ...extra,
   });
   /** The last day of a renewal of `months` months of a right that ends on `previousEnd`, as the server works it out. */
-  const endAfter = (previousEnd: string | undefined, months: number, flexible = false) =>
-    renewalEndOf({ previousEnd: previousEnd ?? '', today: h.today(), months, flexible, fiscalYearStartMonth: 1 });
+  const endAfter = (previousEnd: string | undefined, months: number) =>
+    renewalEndOf({ previousEnd: previousEnd ?? '', today: h.today(), months });
   const approve = (id: string, unit: Unit) => h.decide(id, { decision: 'APPROVE' }, unit.head.account);
   /** The head confirms the need of a paid renewal, sends it on, and the approver decides it. */
   const approvePaid = async (id: string, unit: Unit, amount = 5 * M) => {

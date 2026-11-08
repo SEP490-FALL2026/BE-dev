@@ -1,9 +1,3 @@
-import type { ParameterLockReason } from './public/operating-parameters.extension-points';
-
-const PARAMETER_LOCK_TEXT: Record<ParameterLockReason, string> = {
-  BUDGET_VERSION_EXISTS: 'a budget version already exists',
-};
-
 export class ParameterNotFoundError extends Error {
   constructor(readonly key: string) {
     super(`There is no operating parameter ${key}.`);
@@ -21,17 +15,6 @@ export class ParameterValueInvalidError extends Error {
   ) {
     super(`The value is not allowed for ${key}: ${problem}.`);
     this.name = 'ParameterValueInvalidError';
-  }
-}
-
-/** A budget version exists, so the month the fiscal year begins stays as it is (US-01-04 AC-8). Nothing was changed. */
-export class ParameterLockedError extends Error {
-  constructor(
-    readonly key: string,
-    readonly reason: ParameterLockReason,
-  ) {
-    super(`The value of ${key} can no longer change: ${PARAMETER_LOCK_TEXT[reason]}.`);
-    this.name = 'ParameterLockedError';
   }
 }
 

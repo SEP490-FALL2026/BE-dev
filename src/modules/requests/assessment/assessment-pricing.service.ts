@@ -32,7 +32,7 @@ export class AssessmentPricingService {
     tx: DbTx,
     request: AccessRequestRecord,
     quote: Quote,
-    when: { now: Date; fiscalYearStartMonth: number },
+    when: { now: Date },
   ): Promise<PricingRecord> {
     const today = await this.organizationReads.businessToday(when.now, tx);
 
@@ -43,7 +43,7 @@ export class AssessmentPricingService {
         beneficiaries: request.beneficiaryEmployeeIds.length,
         expectedSpendOn: request.pricing.expectedSpendOn ?? today,
       },
-      { today, fiscalYearStartMonth: when.fiscalYearStartMonth },
+      { today },
     );
   }
 
@@ -55,7 +55,7 @@ export class AssessmentPricingService {
     tx: DbTx,
     request: AccessRequestRecord,
     spendQuote: Parameters<QuoteService['read']>[0] | undefined,
-    when: { now: Date; fiscalYearStartMonth: number },
+    when: { now: Date },
   ): Promise<{ quote: Quote | null; pricing: PricingRecord }> {
     const today = await this.organizationReads.businessToday(when.now, tx);
     const quote = spendQuote ? await this.quotes.read(spendQuote) : null;
@@ -67,7 +67,7 @@ export class AssessmentPricingService {
         beneficiaries: request.beneficiaryEmployeeIds.length,
         expectedSpendOn: request.pricing.expectedSpendOn ?? today,
       },
-      { today, fiscalYearStartMonth: when.fiscalYearStartMonth },
+      { today },
     );
 
     return { quote, pricing };

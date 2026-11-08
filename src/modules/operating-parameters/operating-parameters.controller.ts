@@ -131,12 +131,6 @@ export class OperatingParametersController {
       examples: [VALIDATION_EXAMPLE, OPERATING_PARAMETERS_ERROR_EXAMPLES.PARAMETER_VALUE_INVALID],
     },
     PARAMETER_NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The value is locked because something was already made under it: the month the fiscal year begins cannot change once a budget version exists (PARAMETER.LOCKED).',
-      examples: [OPERATING_PARAMETERS_ERROR_EXAMPLES.PARAMETER_LOCKED],
-    },
   )
   async set(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,

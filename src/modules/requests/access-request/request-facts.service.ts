@@ -21,13 +21,10 @@ import { routeNeedStep, type RoutingDecision } from './routing.policy';
 
 /** The parameter that says how long an approval step may wait; read when a request is sent and fixed in its policy. */
 const APPROVAL_SLA_PARAMETER = 'APPROVAL_SLA_WORKING_DAYS';
-/** The month the fiscal year begins in: it gives the budget year of the day the money is expected to go out. */
-const FISCAL_YEAR_PARAMETER = 'FISCAL_YEAR_START_MONTH';
 
 /** The operating parameters a request is judged by, read once before the transaction opens. */
 export interface RequestSettings {
   slaWorkingDays: number;
-  fiscalYearStartMonth: number;
 }
 
 /**
@@ -105,7 +102,6 @@ export class RequestFactsService {
   async settings(): Promise<RequestSettings> {
     return {
       slaWorkingDays: Number(await this.parameters.getValue(APPROVAL_SLA_PARAMETER)),
-      fiscalYearStartMonth: Number(await this.parameters.getValue(FISCAL_YEAR_PARAMETER)),
     };
   }
 
@@ -139,7 +135,6 @@ export class RequestFactsService {
       beneficiaries: 1,
       expectedSpendOn: input.expectedSpendOn,
       today,
-      fiscalYearStartMonth: input.settings.fiscalYearStartMonth,
     });
     const gathered = await this.routing.gather(tx, {
       requesterEmployeeId: input.requesterEmployeeId ?? input.employeeId,
@@ -156,14 +151,7 @@ export class RequestFactsService {
       pricing,
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
       heldAccess: await this.heldAccess(input.employeeId, input.planId),
-      ...(await this.termCheck(tx, {
-        planId: input.planId,
-        departmentId: unit.departmentId,
-        free: policy.branch === 'INTERNAL_FREE',
-        termMonths: input.termMonths,
-        today,
-        fiscalYearStartMonth: input.settings.fiscalYearStartMonth,
-      })),
+      ...this.termCheck({ termMonths: input.termMonths }),
     };
   }
 
@@ -199,7 +187,7 @@ export class RequestFactsService {
         status: 'MISSING',
         missingReason: 'AWAITING_QUOTE',
         expectedSpendOn,
-        budgetYear: fiscalYearOf(expectedSpendOn, input.settings.fiscalYearStartMonth),
+        budgetYear: fiscalYearOf(expectedSpendOn),
         amount: null,
         unitPrice: null,
         billingCycle: null,
@@ -209,29 +197,9 @@ export class RequestFactsService {
     };
   }
 
-  /** The term limit of the plan from today, and whether the term asked for breaks it; a flexible plan is the one the department can cut mid-term. */
-  async termCheck(
-    tx: DbTx,
-    input: {
-      planId: string;
-      departmentId: string;
-      free: boolean;
-      termMonths: number;
-      today: BusinessDate;
-      fiscalYearStartMonth: number;
-    },
-  ): Promise<{ termLimit: TermLimit; termBeyondLimit: boolean }> {
-    const flexible = input.free
-      ? false
-      : ((await this.catalog.getPlanPrice(input.planId, input.departmentId, tx))?.allowsMidTermReduction ?? false);
-    const facts = {
-      start: input.today,
-      months: input.termMonths,
-      flexible,
-      fiscalYearStartMonth: input.fiscalYearStartMonth,
-    };
-
-    return { termLimit: termLimitOf(facts), termBeyondLimit: checkTerm(facts) !== null };
+  /** The term limit of a request, and whether the term asked for breaks it (`US-05-01` AC-4). */
+  termCheck(input: { termMonths: number }): { termLimit: TermLimit; termBeyondLimit: boolean } {
+    return { termLimit: termLimitOf(), termBeyondLimit: checkTerm({ months: input.termMonths }) !== null };
   }
 
   /**
@@ -261,7 +229,6 @@ export class RequestFactsService {
       beneficiaries: number;
       expectedSpendOn: BusinessDate | undefined;
       today: BusinessDate;
-      fiscalYearStartMonth: number;
     },
   ): Promise<PricingRecord> {
     if (input.free) {
@@ -284,7 +251,6 @@ export class RequestFactsService {
       termMonths: input.termMonths,
       beneficiaries: input.beneficiaries,
       expectedSpendOn,
-      fiscalYearStartMonth: input.fiscalYearStartMonth,
     });
     if (priced.status === 'MISSING') {
       return {

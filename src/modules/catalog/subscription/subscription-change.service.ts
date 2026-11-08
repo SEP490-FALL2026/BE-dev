@@ -19,6 +19,7 @@ import {
   sameUnitPrice,
   subscriptionStatusOf,
 } from './subscription.policy';
+import { assertDeclarableCycle } from './pool/subscription-pool.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import { SubscriptionChangeGuard } from './subscription-change-guard.service';
 import { SubscriptionObligationService } from './subscription-obligation.service';
@@ -54,8 +55,10 @@ export class SubscriptionChangeService {
    */
   async update(actor: AuthenticatedPrincipal, id: string, input: UpdateSubscriptionInput): Promise<SubscriptionView> {
     if (Object.values(input).every((value) => value === undefined)) throw new SubscriptionUpdateEmptyError();
+    assertDeclarableCycle(input.billingCycle);
     const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
     const organizationId = await this.guard.requireOrganizationId();
+    await this.guard.requireResponsible(input.responsibleItAdminEmployeeId);
 
     const record = await this.runner.run((tx) => this.changeIn(tx, actor, id, { input, money, organizationId }));
 
@@ -75,7 +78,10 @@ export class SubscriptionChangeService {
     const { input, money, organizationId } = change;
     const current = await this.subscriptions.lock(tx, id);
     if (!current) throw new SubscriptionNotFoundError();
-    const plan = await this.plans.lockShared(tx, current.planId);
+    // The plan is locked for writing when this subscription is to price it: the subscriptions of one plan take turns (Q-04).
+    const plan = input.isPrimaryForPlan
+      ? await this.plans.lockExclusive(tx, current.planId)
+      : await this.plans.lockShared(tx, current.planId);
     if (!plan) throw new SubscriptionPlanNotFoundError();
     await this.guard.assertNotBelowOccupied(tx, id, current.purchasedQuantity, input.purchasedQuantity);
 
@@ -99,6 +105,7 @@ export class SubscriptionChangeService {
       ...priced,
       status: subscriptionStatusOf(plan, current.kind, { ...next, ...priced }),
     };
+    await this.guard.judgePool(tx, { plan, current, state, input });
     if (sameState(state, stateOf(current))) return current;
     // What is owed cannot be created, raised or extended for a department with no Cost Center in use.
     await this.obligation.assertChargeable(tx, current.ownerDepartmentId, stateOf(current), state);

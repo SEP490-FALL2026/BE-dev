@@ -37,7 +37,7 @@ describe('RequestFactsService.assess', () => {
     termMonths: 6,
     expectedSpendOn: undefined,
     now: new Date('2026-10-28T03:00:00Z'),
-    settings: { slaWorkingDays: 2, fiscalYearStartMonth: 1 },
+    settings: { slaWorkingDays: 2 },
     lockDepartment: true,
     ...over,
   });

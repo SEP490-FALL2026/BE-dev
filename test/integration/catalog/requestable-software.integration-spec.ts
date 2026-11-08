@@ -82,15 +82,19 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       ...(kind === 'INTERNAL' ? {} : { pricingModel: 'PER_SEAT', controlLevel: 'FULL' }),
     });
     for (const { departmentId, cycle } of pricedFor) {
-      await declareSubscription(h.ctx, h.it1.accessToken, {
+      const subscriptionId = await declareSubscription(h.ctx, h.it1.accessToken, {
         ownerDepartmentId: departmentId,
         planId,
         kind: 'TERM',
         unitPrice: { amount: '1000000', currency: 'VND' },
-        billingCycle: cycle ?? 'MONTHLY',
+        // A new write takes only MONTHLY or ANNUAL: a cycle that cannot be counted in months is data written earlier.
+        billingCycle: cycle === 'OTHER' ? 'MONTHLY' : (cycle ?? 'MONTHLY'),
         startDate: '2026-01-05',
         purchasedQuantity: 10,
       });
+      if (cycle === 'OTHER') {
+        await h.ctx.sql.query(`UPDATE subscriptions SET billing_cycle = 'OTHER' WHERE id = $1`, [subscriptionId]);
+      }
     }
 
     return { applicationId, planId };

@@ -22854,7 +22854,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it) and RESPONSIBLE_NOT_IT_ADMIN, and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -22946,6 +22946,84 @@
                         "code": "SUBSCRIPTION.DATES_INVALID",
                         "message": "The dates are not in order.",
                         "details": { "reason": "START_AFTER_END" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.COMMITMENT_TERM_REQUIRED": {
+                    "summary": "A term subscription needs the months it commits to: 1 or 12.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.COMMITMENT_TERM_REQUIRED",
+                        "message": "A term subscription needs the months it commits to: 1 or 12.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.COMMITMENT_TERM_NOT_ALLOWED": {
+                    "summary": "A perpetual purchase commits to no term.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.COMMITMENT_TERM_NOT_ALLOWED",
+                        "message": "A perpetual purchase commits to no term.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.K1_MONTHLY_ONLY": {
+                    "summary": "A plan of provisioning type K1 commits to one month and is paid by the month.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.K1_MONTHLY_ONLY",
+                        "message": "A plan of provisioning type K1 commits to one month and is paid by the month.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.BILLING_LONGER_THAN_COMMITMENT": {
+                    "summary": "The billing cycle cannot be longer than the commitment.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.BILLING_LONGER_THAN_COMMITMENT",
+                        "message": "The billing cycle cannot be longer than the commitment.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.BILLING_CYCLE_UNSUPPORTED": {
+                    "summary": "A subscription is paid by the month (MONTHLY) or by the year (ANNUAL).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.BILLING_CYCLE_UNSUPPORTED",
+                        "message": "A subscription is paid by the month (MONTHLY) or by the year (ANNUAL).",
+                        "details": { "billingCycle": "QUARTERLY" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.RESPONSIBLE_REQUIRED": {
+                    "summary": "An active subscription needs the IT Admin who answers for it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.RESPONSIBLE_REQUIRED",
+                        "message": "An active subscription needs the IT Admin who answers for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN": {
+                    "summary": "The person who answers for the subscription must be an IT Admin who works and can sign in.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN",
+                        "message": "The person who answers for the subscription must be an IT Admin who works and can sign in.",
                         "requestId": "req_example"
                       }
                     }
@@ -23341,7 +23419,7 @@
             }
           },
           "409": {
-            "description": "The department that owns the subscription has no Cost Center in use yet and the change creates, raises or extends what is owed: a higher quantity, a later end or renewal date (or one where there was none), auto renewal switched on or a higher unit price (FINANCE.SETUP_INCOMPLETE, nothing is written). A price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency): a fault of the configuration, not of the request.",
+            "description": "The department that owns the subscription has no Cost Center in use yet and the change creates, raises or extends what is owed: a higher quantity, a later end or renewal date (or one where there was none), auto renewal switched on or a higher unit price (FINANCE.SETUP_INCOMPLETE, nothing is written). A price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency): a fault of the configuration, not of the request. The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -23365,6 +23443,17 @@
                         "code": "REPORTING_CURRENCY_NOT_SUPPORTED",
                         "message": "The reporting currency XYZ is not in the currency table.",
                         "details": { "currency": "XYZ" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.PRIMARY_CONFLICT": {
+                    "summary": "Another subscription of the plan was made the primary one at the same time. Read it again and retry.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.PRIMARY_CONFLICT",
+                        "message": "Another subscription of the plan was made the primary one at the same time. Read it again and retry.",
                         "requestId": "req_example"
                       }
                     }
@@ -23416,7 +23505,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED. An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested).",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it) and RESPONSIBLE_NOT_IT_ADMIN, and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED. An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -23488,6 +23577,96 @@
                         "code": "SUBSCRIPTION.STILL_DRAFT",
                         "message": "The subscription still lacks data to be complete.",
                         "details": { "missing": ["EXCHANGE_RATE"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.COMMITMENT_TERM_REQUIRED": {
+                    "summary": "A term subscription needs the months it commits to: 1 or 12.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.COMMITMENT_TERM_REQUIRED",
+                        "message": "A term subscription needs the months it commits to: 1 or 12.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.COMMITMENT_TERM_NOT_ALLOWED": {
+                    "summary": "A perpetual purchase commits to no term.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.COMMITMENT_TERM_NOT_ALLOWED",
+                        "message": "A perpetual purchase commits to no term.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.K1_MONTHLY_ONLY": {
+                    "summary": "A plan of provisioning type K1 commits to one month and is paid by the month.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.K1_MONTHLY_ONLY",
+                        "message": "A plan of provisioning type K1 commits to one month and is paid by the month.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.BILLING_LONGER_THAN_COMMITMENT": {
+                    "summary": "The billing cycle cannot be longer than the commitment.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.BILLING_LONGER_THAN_COMMITMENT",
+                        "message": "The billing cycle cannot be longer than the commitment.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.BILLING_CYCLE_UNSUPPORTED": {
+                    "summary": "A subscription is paid by the month (MONTHLY) or by the year (ANNUAL).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.BILLING_CYCLE_UNSUPPORTED",
+                        "message": "A subscription is paid by the month (MONTHLY) or by the year (ANNUAL).",
+                        "details": { "billingCycle": "QUARTERLY" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.RESPONSIBLE_REQUIRED": {
+                    "summary": "An active subscription needs the IT Admin who answers for it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.RESPONSIBLE_REQUIRED",
+                        "message": "An active subscription needs the IT Admin who answers for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN": {
+                    "summary": "The person who answers for the subscription must be an IT Admin who works and can sign in.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN",
+                        "message": "The person who answers for the subscription must be an IT Admin who works and can sign in.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.PRIMARY_NOT_ELIGIBLE": {
+                    "summary": "Only an active subscription that is not renewed can price its plan.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.PRIMARY_NOT_ELIGIBLE",
+                        "message": "Only an active subscription that is not renewed can price its plan.",
+                        "details": { "reason": "NOT_ACTIVE" },
                         "requestId": "req_example"
                       }
                     }
@@ -23707,7 +23886,7 @@
             }
           },
           "422": {
-            "description": "The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or the rate of its price day (SUBSCRIPTION.STILL_DRAFT, details.missing).",
+            "description": "The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or the rate of its price day (SUBSCRIPTION.STILL_DRAFT, details.missing), or the shared-pool rules refuse it: COMMITMENT_TERM_REQUIRED, K1_MONTHLY_ONLY, RESPONSIBLE_REQUIRED, RESPONSIBLE_NOT_IT_ADMIN.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -23732,6 +23911,50 @@
                         "code": "SUBSCRIPTION.STILL_DRAFT",
                         "message": "The subscription still lacks data to be complete.",
                         "details": { "missing": ["EXCHANGE_RATE"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.COMMITMENT_TERM_REQUIRED": {
+                    "summary": "A term subscription needs the months it commits to: 1 or 12.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.COMMITMENT_TERM_REQUIRED",
+                        "message": "A term subscription needs the months it commits to: 1 or 12.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.K1_MONTHLY_ONLY": {
+                    "summary": "A plan of provisioning type K1 commits to one month and is paid by the month.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.K1_MONTHLY_ONLY",
+                        "message": "A plan of provisioning type K1 commits to one month and is paid by the month.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.RESPONSIBLE_REQUIRED": {
+                    "summary": "An active subscription needs the IT Admin who answers for it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.RESPONSIBLE_REQUIRED",
+                        "message": "An active subscription needs the IT Admin who answers for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN": {
+                    "summary": "The person who answers for the subscription must be an IT Admin who works and can sign in.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN",
+                        "message": "The person who answers for the subscription must be an IT Admin who works and can sign in.",
                         "requestId": "req_example"
                       }
                     }
@@ -39470,7 +39693,7 @@
             }
           },
           "422": {
-            "description": "The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with a term of more than 12 months, which no request may ask for any more: ACCESS_REQUEST.TERM_BEYOND_LIMIT (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxMonths, endsBy }. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. Nothing changes: the draft stays, to be saved again with a shorter term.",
+            "description": "The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with a term of more than 12 months, which no request may ask for any more: ACCESS_REQUEST.TERM_BEYOND_LIMIT (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxMonths }. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. Nothing changes: the draft stays, to be saved again with a shorter term.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -39510,7 +39733,7 @@
                       "error": {
                         "code": "ACCESS_REQUEST.TERM_BEYOND_LIMIT",
                         "message": "The term is longer than a request may ask for: at most 12 months. A draft saved with a longer term must be saved again with a shorter one.",
-                        "details": { "maxMonths": 12, "endsBy": "2026-12-31" },
+                        "details": { "maxMonths": 12 },
                         "requestId": "req_example"
                       }
                     }
@@ -39522,7 +39745,7 @@
                       "error": {
                         "code": "GROUP_REQUEST.TERM_BEYOND_LIMIT",
                         "message": "The term is longer than a request for a group may ask for.",
-                        "details": { "maxMonths": 12, "endsBy": "2026-12-31" },
+                        "details": { "maxMonths": 12 },
                         "requestId": "req_example"
                       }
                     }
@@ -51882,7 +52105,7 @@
                       "error": {
                         "code": "GROUP_REQUEST.TERM_BEYOND_LIMIT",
                         "message": "The term is longer than a request for a group may ask for.",
-                        "details": { "maxMonths": 12, "endsBy": "2026-12-31" },
+                        "details": { "maxMonths": 12 },
                         "requestId": "req_example"
                       }
                     }
@@ -66222,28 +66445,6 @@
                       "error": {
                         "code": "PARAMETER.NOT_FOUND",
                         "message": "There is no operating parameter <parameter-key>.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The value is locked because something was already made under it: the month the fiscal year begins cannot change once a budget version exists (PARAMETER.LOCKED).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "PARAMETER.LOCKED": {
-                    "summary": "The value of <parameter-key> can no longer change: a budget version already exists.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PARAMETER.LOCKED",
-                        "message": "The value of <parameter-key> can no longer change: a budget version already exists.",
-                        "details": { "key": "<parameter-key>", "reason": "BUDGET_VERSION_EXISTS" },
                         "requestId": "req_example"
                       }
                     }
@@ -84052,6 +84253,13 @@
                       "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
                       "nullable": true
                     },
+                    "commitmentTermMonths": {
+                      "anyOf": [
+                        { "type": "number", "enum": [1] },
+                        { "type": "number", "enum": [12] }
+                      ],
+                      "nullable": true
+                    },
                     "startDate": { "type": "string", "nullable": true },
                     "endDate": { "type": "string", "nullable": true },
                     "renewalDate": { "type": "string", "nullable": true },
@@ -84063,6 +84271,14 @@
                     },
                     "autoRenew": { "type": "boolean" },
                     "allowsMidTermReduction": { "type": "boolean" },
+                    "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
+                    "vendorMinimumSeats": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "nullable": true
+                    },
+                    "isPrimaryForPlan": { "type": "boolean" },
                     "noticeDeadline": {
                       "type": "object",
                       "properties": {
@@ -84084,7 +84300,13 @@
                       "required": ["baseDate", "dates"],
                       "additionalProperties": false
                     },
-                    "warnings": { "type": "array", "items": { "type": "string", "enum": ["NO_ALERT_ANCHOR"] } },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["NO_ALERT_ANCHOR", "RESPONSIBLE_MISSING", "BILLING_CYCLE_LEGACY"]
+                      }
+                    },
                     "taxProfile": {
                       "type": "object",
                       "properties": {
@@ -84136,12 +84358,16 @@
                     "unitPrice",
                     "priceSnapshot",
                     "billingCycle",
+                    "commitmentTermMonths",
                     "startDate",
                     "endDate",
                     "renewalDate",
                     "noticePeriodDays",
                     "autoRenew",
                     "allowsMidTermReduction",
+                    "responsibleItAdminEmployeeId",
+                    "vendorMinimumSeats",
+                    "isPrimaryForPlan",
                     "noticeDeadline",
                     "alerts",
                     "warnings",
@@ -84213,6 +84439,12 @@
             "additionalProperties": false
           },
           "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER"] },
+          "commitmentTermMonths": {
+            "anyOf": [
+              { "type": "number", "enum": [1] },
+              { "type": "number", "enum": [12] }
+            ]
+          },
           "startDate": {
             "type": "string",
             "format": "date",
@@ -84235,7 +84467,9 @@
           },
           "noticePeriodDays": { "type": "integer", "minimum": 0, "maximum": 3650 },
           "autoRenew": { "type": "boolean" },
-          "allowsMidTermReduction": { "type": "boolean" }
+          "allowsMidTermReduction": { "type": "boolean" },
+          "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid" },
+          "vendorMinimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000000 }
         },
         "required": ["planId", "ownerDepartmentId", "kind"],
         "additionalProperties": false
@@ -84311,6 +84545,13 @@
                 "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
                 "nullable": true
               },
+              "commitmentTermMonths": {
+                "anyOf": [
+                  { "type": "number", "enum": [1] },
+                  { "type": "number", "enum": [12] }
+                ],
+                "nullable": true
+              },
               "startDate": { "type": "string", "nullable": true },
               "endDate": { "type": "string", "nullable": true },
               "renewalDate": { "type": "string", "nullable": true },
@@ -84322,6 +84563,14 @@
               },
               "autoRenew": { "type": "boolean" },
               "allowsMidTermReduction": { "type": "boolean" },
+              "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
+              "vendorMinimumSeats": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "isPrimaryForPlan": { "type": "boolean" },
               "noticeDeadline": {
                 "type": "object",
                 "properties": {
@@ -84343,7 +84592,13 @@
                 "required": ["baseDate", "dates"],
                 "additionalProperties": false
               },
-              "warnings": { "type": "array", "items": { "type": "string", "enum": ["NO_ALERT_ANCHOR"] } },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["NO_ALERT_ANCHOR", "RESPONSIBLE_MISSING", "BILLING_CYCLE_LEGACY"]
+                }
+              },
               "taxProfile": {
                 "type": "object",
                 "properties": {
@@ -84395,12 +84650,16 @@
               "unitPrice",
               "priceSnapshot",
               "billingCycle",
+              "commitmentTermMonths",
               "startDate",
               "endDate",
               "renewalDate",
               "noticePeriodDays",
               "autoRenew",
               "allowsMidTermReduction",
+              "responsibleItAdminEmployeeId",
+              "vendorMinimumSeats",
+              "isPrimaryForPlan",
               "noticeDeadline",
               "alerts",
               "warnings",
@@ -84430,6 +84689,12 @@
             "additionalProperties": false
           },
           "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER"] },
+          "commitmentTermMonths": {
+            "anyOf": [
+              { "type": "number", "enum": [1] },
+              { "type": "number", "enum": [12] }
+            ]
+          },
           "startDate": {
             "type": "string",
             "format": "date",
@@ -84455,7 +84720,10 @@
           },
           "noticePeriodDays": { "type": "integer", "minimum": 0, "maximum": 3650, "nullable": true },
           "autoRenew": { "type": "boolean" },
-          "allowsMidTermReduction": { "type": "boolean" }
+          "allowsMidTermReduction": { "type": "boolean" },
+          "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid" },
+          "vendorMinimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000000, "nullable": true },
+          "isPrimaryForPlan": { "type": "boolean" }
         },
         "additionalProperties": false
       },
@@ -89951,10 +90219,9 @@
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
                         "minimum": 0
-                      },
-                      "endsBy": { "type": "string", "nullable": true }
+                      }
                     },
-                    "required": ["maxMonths", "endsBy"],
+                    "required": ["maxMonths"],
                     "additionalProperties": false
                   },
                   "existingAccess": {
@@ -94704,10 +94971,9 @@
                     "exclusiveMinimum": true,
                     "maximum": 9007199254740991,
                     "minimum": 0
-                  },
-                  "endsBy": { "type": "string", "nullable": true }
+                  }
                 },
-                "required": ["maxMonths", "endsBy"],
+                "required": ["maxMonths"],
                 "additionalProperties": false
               },
               "termBeyondLimit": { "type": "boolean" },

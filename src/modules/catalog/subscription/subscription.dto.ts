@@ -11,7 +11,10 @@ import { businessDate } from '../../../infrastructure/http/dto/business-date.dto
  */
 const kind = z.enum(['TERM', 'PERPETUAL']);
 const status = z.enum(['DRAFT', 'ACTIVE']);
+// Data written earlier may hold a quarterly or other cycle, so the answer names all four; a new write is refused the two others by the policy.
 const billingCycle = z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'OTHER']);
+const commitmentTermMonths = z.union([z.literal(1), z.literal(12)]);
+const vendorMinimumSeats = z.number().int().min(1).max(1_000_000_000);
 const quantity = z.number().int().min(0).max(1_000_000_000);
 const noticeDays = z.number().int().min(0).max(3650);
 const money = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
@@ -24,6 +27,7 @@ export const declareSubscriptionBodySchema = z.strictObject({
   purchasedQuantity: quantity.optional(),
   unitPrice: money.optional(),
   billingCycle: billingCycle.optional(),
+  commitmentTermMonths: commitmentTermMonths.optional(),
   startDate: businessDate.optional(),
   endDate: businessDate.optional(),
   renewalDate: businessDate.optional(),
@@ -31,12 +35,16 @@ export const declareSubscriptionBodySchema = z.strictObject({
   noticePeriodDays: noticeDays.optional(),
   autoRenew: z.boolean().optional(),
   allowsMidTermReduction: z.boolean().optional(),
+  // The IT Admin who answers for the subscription (QĐ-103v(4)): needed once it is active.
+  responsibleItAdminEmployeeId: z.uuid().optional(),
+  vendorMinimumSeats: vendorMinimumSeats.optional(),
 });
 
 export const updateSubscriptionBodySchema = z.strictObject({
   purchasedQuantity: quantity.optional(),
   unitPrice: money.optional(),
   billingCycle: billingCycle.optional(),
+  commitmentTermMonths: commitmentTermMonths.optional(),
   startDate: businessDate.optional(),
   endDate: businessDate.nullable().optional(),
   renewalDate: businessDate.nullable().optional(),
@@ -44,6 +52,10 @@ export const updateSubscriptionBodySchema = z.strictObject({
   noticePeriodDays: noticeDays.nullable().optional(),
   autoRenew: z.boolean().optional(),
   allowsMidTermReduction: z.boolean().optional(),
+  responsibleItAdminEmployeeId: z.uuid().optional(),
+  vendorMinimumSeats: vendorMinimumSeats.nullable().optional(),
+  // Makes this the subscription that prices its plan (Q-04); the flag of the other subscriptions of the plan is taken off.
+  isPrimaryForPlan: z.boolean().optional(),
 });
 
 export const listSubscriptionsQuerySchema = z.strictObject({
@@ -93,18 +105,22 @@ const subscriptionSchema = z.strictObject({
     })
     .nullable(),
   billingCycle: billingCycle.nullable(),
+  commitmentTermMonths: commitmentTermMonths.nullable(),
   startDate: z.string().nullable(),
   endDate: z.string().nullable(),
   renewalDate: z.string().nullable(),
   noticePeriodDays: z.number().int().nullable(),
   autoRenew: z.boolean(),
   allowsMidTermReduction: z.boolean(),
+  responsibleItAdminEmployeeId: z.uuid().nullable(),
+  vendorMinimumSeats: z.number().int().nullable(),
+  isPrimaryForPlan: z.boolean(),
   noticeDeadline: z.strictObject({
     value: z.string().nullable(),
     source: z.enum(['DECLARED', 'INFERRED_UNCONFIRMED', 'BY_END_DATE', 'MISSING', 'NOT_APPLICABLE']),
   }),
   alerts: z.strictObject({ baseDate: z.string().nullable(), dates: z.array(z.string()) }),
-  warnings: z.array(z.enum(['NO_ALERT_ANCHOR'])),
+  warnings: z.array(z.enum(['NO_ALERT_ANCHOR', 'RESPONSIBLE_MISSING', 'BILLING_CYCLE_LEGACY'])),
   taxProfile: z.strictObject({ status: z.enum(['DECLARED', 'MISSING']), group: z.enum(['T1', 'T2', 'T3']).nullable() }),
   taxEstimate: taxEstimate.nullable(),
   createdAt: z.iso.datetime(),

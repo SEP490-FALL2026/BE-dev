@@ -253,3 +253,13 @@ bằng chứng ở [H3c](h3c-forgot-password-during-recovery/plan.md#verificatio
 
 _Cập nhật 19/10/2026 (checkpoint):_ H1 ở commit `bd05007`; H2a → H3c (gồm bằng chứng AC-10 của H3c) ở commit `5aac33f`
 trên `dev`, Owner push trực tiếp, không PR — trạng thái và giới hạn ở [roadmap](../../roadmap.md#hạng-mục).
+
+## Đợt QĐ-103 → QĐ-108 (MF-1, MF-4, MF-5)
+
+Thứ tự, ledger và trạng thái từng đợt ở [tracker](../../reviews/qd103-108-alignment-2026-11-08/README.md) §5. Mỗi hạng mục
+đăng ký ở đây khi chat review viết spec/plan.
+
+| Hạng mục                                                                                                                  | Đợt | Nội dung                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------- | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [qd103-calendar-fiscal-year](qd103-calendar-fiscal-year/spec.md) · [plan](qd103-calendar-fiscal-year/plan.md)             | W1  | Enabler: năm tài chính = năm dương lịch, bỏ `FISCAL_YEAR_START_MONTH`, bỏ cắt quyền ở cuối năm                                                                       |
+| [qd103-shared-pool-subscription](qd103-shared-pool-subscription/spec.md) · [plan](qd103-shared-pool-subscription/plan.md) | W1  | Enabler: thuê bao dùng chung (kỳ cam kết, chu kỳ `MONTHLY`/`ANNUAL`, IT Admin phụ trách, mức tối thiểu NCC, thuê bao chính), chặn trùng (ứng dụng, gói) khi vận hành |

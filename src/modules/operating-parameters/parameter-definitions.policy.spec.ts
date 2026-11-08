@@ -14,7 +14,6 @@ describe('operating parameter definitions (US-01-04)', () => {
 
     expect(defaults.APPROVAL_SLA_WORKING_DAYS).toBe(2);
     expect(defaults.ACTIVITY_WINDOW_MINUTES).toBe(5);
-    expect(defaults.FISCAL_YEAR_START_MONTH).toBe(1);
     expect(defaults.SPEND_SUBMISSION_WAIT_WORKING_DAYS).toBe(2);
     expect(defaults.TRANSFER_REVIEW_WORKING_DAYS).toBe(5);
     expect(defaults.PERSONNEL_NOTICE_REVIEW_WORKING_DAYS).toBe(2);
@@ -35,7 +34,8 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(keys.filter((key) => /BUDGET_PERIOD|HIGH_VALUE|THRESHOLD_PERCENT/.test(key))).toEqual([
       'FORECAST_ERROR_THRESHOLD_PERCENT',
     ]);
-    expect(keys).toEqual(expect.arrayContaining(['FISCAL_YEAR_START_MONTH', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS']));
+    expect(keys).toEqual(expect.arrayContaining(['SPEND_SUBMISSION_WAIT_WORKING_DAYS']));
+    expect(definitionOf('FISCAL_YEAR_START_MONTH')).toBeUndefined();
   });
 
   it('gives every parameter a key, a unit, a description and a default that is itself valid', () => {
@@ -64,8 +64,6 @@ describe('operating parameter definitions (US-01-04)', () => {
     ['a fraction', 'APPROVAL_SLA_WORKING_DAYS', 2.5],
     ['zero days', 'APPROVAL_SLA_WORKING_DAYS', 0],
     ['no value', 'APPROVAL_SLA_WORKING_DAYS', null],
-    ['a month that does not exist', 'FISCAL_YEAR_START_MONTH', 13],
-    ['month zero', 'FISCAL_YEAR_START_MONTH', 0],
     ['no waiting days', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS', 0],
     ['more than thirty waiting days', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS', 31],
     ['a backlog threshold of none', 'BACKLOG_ALERT_THRESHOLD', 0],
@@ -113,7 +111,6 @@ const EXPECTED_KEYS = [
   'APPROVAL_SLA_WORKING_DAYS',
   'BACKLOG_ALERT_THRESHOLD',
   'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
-  'FISCAL_YEAR_START_MONTH',
   'FORECAST_ERROR_THRESHOLD_PERCENT',
   'BUDGET_RESERVE_DEFAULT_PERCENT',
   'TRANSFER_REVIEW_WORKING_DAYS',
@@ -196,7 +193,6 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['APPROVAL_SLA_WORKING_DAYS', 'Hạn xử lý một bước phê duyệt', 'WORKFLOW', 'working days', 'ngày làm việc'],
       ['BACKLOG_ALERT_THRESHOLD', 'Ngưỡng tồn đọng bước phê duyệt', 'WORKFLOW', 'steps', 'bước'],
       ['SPEND_SUBMISSION_WAIT_WORKING_DAYS', 'Hạn chờ trình duyệt chi', 'WORKFLOW', 'working days', 'ngày làm việc'],
-      ['FISCAL_YEAR_START_MONTH', 'Tháng bắt đầu năm tài chính', 'BUDGET', 'month of the year', 'tháng trong năm'],
       ['FORECAST_ERROR_THRESHOLD_PERCENT', 'Ngưỡng sai số dự báo chi phí', 'BUDGET', 'percent', '%'],
       ['BUDGET_RESERVE_DEFAULT_PERCENT', 'Tỷ lệ dự phòng mặc định của ngân sách năm', 'BUDGET', 'percent', '%'],
       [

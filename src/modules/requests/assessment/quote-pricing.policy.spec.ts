@@ -21,7 +21,6 @@ const input = (over: Partial<QuotePricingInput> = {}): QuotePricingInput => ({
   beneficiaries: 1,
   today: day('2026-10-23'),
   expectedSpendOn: day('2026-10-23'),
-  fiscalYearStartMonth: 1,
   ...over,
 });
 const priced = (over: Partial<QuotePricingInput> = {}) => {
@@ -95,10 +94,9 @@ describe('the amount of a request from a quote (US-05-06 AC-14, AC-15)', () => {
       expect(result.amount).toEqual(usd(144));
     });
 
-    it('names the fiscal year of every payment and of the request by the day of the first payment', () => {
+    it('names the calendar year of every payment and of the request by the day of the first payment (R-I01)', () => {
       const result = priced({
         termMonths: 24,
-        fiscalYearStartMonth: 4,
         quote: quote({
           paymentFrequency: 'ANNUAL',
           commitmentMonths: 24,
@@ -107,8 +105,8 @@ describe('the amount of a request from a quote (US-05-06 AC-14, AC-15)', () => {
         }),
       });
 
-      expect(result.periods.map((period) => period.budgetYear)).toEqual([2026, 2027]);
-      expect(result.budgetYear).toBe(2026);
+      expect(result.periods.map((period) => period.budgetYear)).toEqual([2027, 2028]);
+      expect(result.budgetYear).toBe(2027);
     });
   });
 

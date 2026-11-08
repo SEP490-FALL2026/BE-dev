@@ -28,7 +28,6 @@ export interface PricingInput {
   beneficiaries: number;
   /** The day the money is expected to go out: the first payment, and the day that fixes the budget year. */
   expectedSpendOn: BusinessDate;
-  fiscalYearStartMonth: number;
 }
 
 export type MissingPriceReason = 'NO_PRICED_SUBSCRIPTION' | 'CYCLE_UNKNOWN' | 'AMOUNT_TOO_LARGE' | 'AWAITING_QUOTE';
@@ -57,7 +56,7 @@ export type Pricing =
   | { status: 'MISSING'; reason: MissingPriceReason; budgetYear: number };
 
 export function priceRequest(input: PricingInput): Pricing {
-  const budgetYear = fiscalYearOf(input.expectedSpendOn, input.fiscalYearStartMonth);
+  const budgetYear = fiscalYearOf(input.expectedSpendOn);
   // A price of nothing is no price: a paid request never costs 0 (`FR-3.2`), so the price data is incomplete and the request is not
   // checked, instead of reaching an approval that cannot hold a commitment of 0.
   if (input.unitPrice === null || input.unitPrice.amountMinor <= 0n || input.billingCycle === null) {
@@ -74,7 +73,7 @@ export function priceRequest(input: PricingInput): Pricing {
     return {
       dueOn,
       amountMinor: perPeriod,
-      budgetYear: fiscalYearOf(dueOn, input.fiscalYearStartMonth),
+      budgetYear: fiscalYearOf(dueOn),
       binding: true,
     };
   });

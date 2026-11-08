@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import request from 'supertest';
 import { Client } from 'pg';
 import { OperatingParametersApi } from '../../../src/modules/operating-parameters/public/operating-parameters.api';
@@ -104,7 +106,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
 
       expect(parameters.get('APPROVAL_SLA_WORKING_DAYS')).toMatchObject({ value: 2, isDefault: true, changedAt: null });
       expect(parameters.get('ACTIVITY_WINDOW_MINUTES')?.value).toBe(5);
-      expect(parameters.get('FISCAL_YEAR_START_MONTH')?.value).toBe(1);
+      expect(parameters.has('FISCAL_YEAR_START_MONTH')).toBe(false);
       expect(parameters.get('SPEND_SUBMISSION_WAIT_WORKING_DAYS')?.value).toBe(2);
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
       expect([...parameters.keys()].filter((key) => /HIGH_VALUE/.test(key))).toEqual([]);
@@ -131,7 +133,6 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'APPROVAL_SLA_WORKING_DAYS',
         'BACKLOG_ALERT_THRESHOLD',
         'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
-        'FISCAL_YEAR_START_MONTH',
         'FORECAST_ERROR_THRESHOLD_PERCENT',
         'BUDGET_RESERVE_DEFAULT_PERCENT',
         'TRANSFER_REVIEW_WORKING_DAYS',
@@ -283,8 +284,6 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
     it.each([
       ['a number sent as text', 'APPROVAL_SLA_WORKING_DAYS', '3', 'WRONG_TYPE'],
       ['zero days', 'APPROVAL_SLA_WORKING_DAYS', 0, 'OUT_OF_RANGE'],
-      ['a month that does not exist', 'FISCAL_YEAR_START_MONTH', 13, 'OUT_OF_RANGE'],
-      ['month zero', 'FISCAL_YEAR_START_MONTH', 0, 'OUT_OF_RANGE'],
       ['no days to wait', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS', 0, 'OUT_OF_RANGE'],
       ['thresholds that do not rise', 'DETECTION_THRESHOLD_DAYS', [90, 60, 30], 'OUT_OF_RANGE'],
     ])('refuses %s and leaves the value as it was', async (_name, key, value, problem) => {
@@ -371,6 +370,38 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect((await list()).get(key)).toMatchObject({ value: 'OFF' });
     });
 
+    it('does not return the month the fiscal year began in, and the migration closes a stored value without deleting it (QĐ-104e(1))', async () => {
+      await ctx.sql.query(
+        `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
+         VALUES (gen_random_uuid(), $1, 'FISCAL_YEAR_START_MONTH', '4'::jsonb, now() - interval '1 day')`,
+        [seed.organizationId],
+      );
+      const migration = readFileSync(
+        join(
+          __dirname,
+          '..',
+          '..',
+          '..',
+          'prisma',
+          'migrations',
+          '20261108500000_drop_fiscal_year_start_month',
+          'migration.sql',
+        ),
+        'utf8',
+      );
+
+      await ctx.sql.query(migration);
+
+      expect((await list()).has('FISCAL_YEAR_START_MONTH')).toBe(false);
+      const rows = (
+        await ctx.sql.query<{ valid_to: Date | null }>(
+          `SELECT valid_to FROM parameter_values WHERE key = 'FISCAL_YEAR_START_MONTH'`,
+        )
+      ).rows;
+      expect(rows).toHaveLength(1);
+      expect(rows[0].valid_to).not.toBeNull();
+    });
+
     it('does not return, and does not fail on, a budget period kind stored before it was removed (AC-8)', async () => {
       await ctx.sql.query(
         `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
@@ -381,14 +412,24 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       const parameters = await list();
 
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
-      expect(parameters.size).toBe(23);
+      expect(parameters.size).toBe(22);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {
-      for (const key of ['NO_SUCH_PARAMETER', 'TIME_ZONE', 'REPORTING_CURRENCY', 'BUDGET_PERIOD_KIND']) {
+      for (const key of [
+        'NO_SUCH_PARAMETER',
+        'TIME_ZONE',
+        'REPORTING_CURRENCY',
+        'BUDGET_PERIOD_KIND',
+        'FISCAL_YEAR_START_MONTH',
+      ]) {
         expect(errorOf(await setParameter(key, 'x').expect(404)).code).toBe('PARAMETER.NOT_FOUND');
       }
       await request(server()).get('/api/v1/operating-parameters/NO_SUCH_PARAMETER/history').set(asAdmin()).expect(404);
+      await request(server())
+        .get('/api/v1/operating-parameters/FISCAL_YEAR_START_MONTH/history')
+        .set(asAdmin())
+        .expect(404);
       const organization = await ctx.sql.query('SELECT time_zone FROM organizations');
       expect(organization.rows).toEqual([{ time_zone: ORG_TIME_ZONE }]);
     });

@@ -47,10 +47,8 @@ export class VersionLineService {
     patch: LinePatchDto,
   ): Promise<VersionLineWire> {
     this.facts.requireFinance(actor);
-    const fiscalStart = await this.facts.fiscalYearStartMonth();
-
     return this.runner.run(async (tx) => {
-      const version = await this.access.lockEditable(tx, id, fiscalStart);
+      const version = await this.access.lockEditable(tx, id);
       const line = await this.lines.findLine(id, position, tx);
       if (!line) throw new BudgetLineNotFoundError();
 
@@ -90,10 +88,8 @@ export class VersionLineService {
   /** Finance adds lines of their own to a version being built; a line says a plan or a description (`QĐ-101n`). */
   async addLines(actor: AuthenticatedPrincipal, id: string, body: AddLinesBodyDto): Promise<VersionWire> {
     this.facts.requireFinance(actor);
-    const fiscalStart = await this.facts.fiscalYearStartMonth();
-
     return this.runner.run(async (tx) => {
-      const version = await this.access.lockEditable(tx, id, fiscalStart);
+      const version = await this.access.lockEditable(tx, id);
       await this.facts.requirePlans(body.lines.map((line) => line.planId));
 
       const lines: Omit<VersionLineRecord, 'position'>[] = [];

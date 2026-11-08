@@ -43,7 +43,7 @@ export class VersionDecisionJudge {
     private readonly listeners: BudgetChangeListeners,
   ) {}
 
-  async judge(tx: DbTx, actor: AuthenticatedPrincipal, id: string, fiscalStart: number): Promise<JudgedDecision> {
+  async judge(tx: DbTx, actor: AuthenticatedPrincipal, id: string): Promise<JudgedDecision> {
     const known = await this.versions.findById(id, tx);
     if (!known) throw new BudgetVersionNotFoundError();
     const siblings = await this.versions.lockAllOfYear(tx, known.costCenterId, known.year);
@@ -64,7 +64,7 @@ export class VersionDecisionJudge {
     // Who may not decide is told first; then a year that has ended, whether or not its closure has run; then the state.
     if (refusal && refusal !== 'NOT_SENT') throw new BudgetDecisionRefusedError(refusal);
     const today = await this.facts.today(new Date(), tx);
-    if (yearHasEnded(version.year, today, fiscalStart)) throw new BudgetYearEndedError(version.year);
+    if (yearHasEnded(version.year, today)) throw new BudgetYearEndedError(version.year);
     if (refusal) throw new BudgetDecisionRefusedError(refusal);
     refuseRevision(version);
     // The requests that wait on this budget are locked before the year, as every writer of the system does.

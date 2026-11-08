@@ -58,14 +58,8 @@ export class RenewalRequestService {
       if (!renewing) return this.redirect(tx, actor, { body, facts, settings, previousEnd });
       if (await this.renewals.hasOpenFor(facts.assignmentId, tx))
         throw new RenewalRequestRefusedError('ALREADY_REQUESTED');
-      // The new end runs from the day after the right ends and is cut at the fiscal year for a flexible subscription (`QĐ-98`, R-15).
-      const newEnd = renewalEndOf({
-        previousEnd,
-        today,
-        months: body.extensionMonths,
-        flexible: await this.seatFacts.isFlexible(tx, facts.subscriptionId),
-        fiscalYearStartMonth: settings.fiscalYearStartMonth,
-      });
+      // The new end runs from the day after the right ends, for the months asked, never cut at the end of a year (`QĐ-98`, R-15).
+      const newEnd = renewalEndOf({ previousEnd, today, months: body.extensionMonths });
 
       return this.writer.renew(tx, actor, {
         body,

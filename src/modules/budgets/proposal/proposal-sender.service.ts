@@ -18,7 +18,6 @@ export interface ProposalSendInput {
   year: number;
   lines: LineBody[];
   previous: string | null;
-  fiscalStart: number;
   attachmentIds?: readonly string[];
 }
 
@@ -40,7 +39,7 @@ export class ProposalSender {
 
     const own = await this.facts.requireHeadedCostCenter(actor.employeeId, today, tx);
     const costCenter = await this.facts.costCenter(own, tx);
-    if (!yearIsOpen(input.year, today, input.fiscalStart)) throw new BudgetYearEndedError(input.year);
+    if (!yearIsOpen(input.year, today)) throw new BudgetYearEndedError(input.year);
 
     await this.facts.requirePlans(input.lines.map((line) => line.planId));
 

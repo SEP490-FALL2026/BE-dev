@@ -23,11 +23,9 @@ export class VersionAccessService {
     private readonly facts: BudgetFactsService,
   ) {}
 
-  /** Only Finance changes a version; answers the month the fiscal year starts in, which every change is judged against. */
-  async begin(actor: AuthenticatedPrincipal): Promise<number> {
+  /** Only Finance changes a version. */
+  begin(actor: AuthenticatedPrincipal): void {
     this.facts.requireFinance(actor);
-
-    return this.facts.fiscalYearStartMonth();
   }
 
   /**
@@ -47,19 +45,19 @@ export class VersionAccessService {
   }
 
   /** The version, locked, if Finance may still change it. Throws BudgetVersionNotFoundError, BudgetYearEndedError, BudgetVersionNotEditableError. */
-  async lockEditable(tx: DbTx, id: string, fiscalStart: number): Promise<VersionRecord> {
-    const version = await this.lockOfOpenYear(tx, id, fiscalStart);
+  async lockEditable(tx: DbTx, id: string): Promise<VersionRecord> {
+    const version = await this.lockOfOpenYear(tx, id);
     if (!isEditable(version.state, version.detachedAt !== null)) throw new BudgetVersionNotEditableError(version.state);
 
     return version;
   }
 
   /** The version, locked, if its fiscal year is still open; the state is left to the caller. */
-  async lockOfOpenYear(tx: DbTx, id: string, fiscalStart: number): Promise<VersionRecord> {
+  async lockOfOpenYear(tx: DbTx, id: string): Promise<VersionRecord> {
     const version = await this.versions.lockById(tx, id);
     if (!version) throw new BudgetVersionNotFoundError();
     const today = await this.facts.today(new Date(), tx);
-    if (yearHasEnded(version.year, today, fiscalStart)) throw new BudgetYearEndedError(version.year);
+    if (yearHasEnded(version.year, today)) throw new BudgetYearEndedError(version.year);
 
     return version;
   }

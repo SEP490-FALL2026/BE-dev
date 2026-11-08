@@ -309,6 +309,8 @@ model Subscription {
   priceReportingCurrency String?            @map("price_reporting_currency") @db.Char(3)
   priceExchangeRateId    String?            @map("price_exchange_rate_id") @db.Uuid
   billingCycle           BillingCycle?      @map("billing_cycle")
+  // The months the purchase commits to, 1 or 12 (QĐ-103e); a perpetual purchase has none (a CHECK). A new active term needs it (checked by the application).
+  commitmentTermMonths   Int?               @map("commitment_term_months") @db.SmallInt
   startDate              DateTime?          @map("start_date") @db.Date
   endDate                DateTime?          @map("end_date") @db.Date
   renewalDate            DateTime?          @map("renewal_date") @db.Date
@@ -316,6 +318,12 @@ model Subscription {
   noticePeriodDays       Int?               @map("notice_period_days")
   autoRenew              Boolean            @default(false) @map("auto_renew")
   allowsMidTermReduction Boolean            @default(false) @map("allows_mid_term_reduction")
+  // The IT Admin who answers for the subscription (QĐ-103v(4)): set when it is declared; null only for data older than the rule or a draft.
+  responsibleItAdminEmployeeId String?      @map("responsible_it_admin_employee_id") @db.Uuid
+  // The least number of seats the vendor sells (QĐ-103e), when it says one.
+  vendorMinimumSeats     Int?               @map("vendor_minimum_seats")
+  // The subscription that prices the plan when there are several of it (Q-04): at most one per plan (a unique partial index).
+  isPrimaryForPlan       Boolean            @default(false) @map("is_primary_for_plan")
   // The department that owns the purchase (QĐ-89a): required, and never changed once set (a trigger).
   ownerDepartmentId      String             @map("owner_department_id") @db.Uuid
   // The period this one continues (QĐ-16): set once, when the outcome of a renewal is recorded; a period has at most one
@@ -327,6 +335,7 @@ model Subscription {
   organization        Organization                 @relation(fields: [organizationId], references: [id])
   plan                Plan                         @relation(fields: [planId], references: [id])
   ownerDepartment     Department                   @relation("SubscriptionOwnerDepartment", fields: [ownerDepartmentId], references: [id], onDelete: Restrict)
+  responsibleItAdmin  Employee?                    @relation("SubscriptionResponsibleItAdmin", fields: [responsibleItAdminEmployeeId], references: [id], onDelete: Restrict)
   renewedFrom         Subscription?                @relation("SubscriptionRenewalChain", fields: [renewedFromId], references: [id], onDelete: Restrict)
   renewedBy           Subscription?                @relation("SubscriptionRenewalChain")
   renewalCases        SubscriptionRenewal[]        @relation("RenewalOfPeriod")
@@ -341,6 +350,7 @@ model Subscription {
 
   @@index([planId])
   @@index([ownerDepartmentId])
+  @@index([responsibleItAdminEmployeeId])
   @@map("subscriptions")
 }
 

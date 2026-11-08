@@ -21,7 +21,6 @@ export interface QuotePricingInput {
   today: BusinessDate;
   /** The day the money is expected to go out, which stands in when the quote has no first payment day. */
   expectedSpendOn: BusinessDate;
-  fiscalYearStartMonth: number;
 }
 
 export type QuoteRefusal =
@@ -88,7 +87,7 @@ export function priceFromQuote(input: QuotePricingInput): QuotePricing {
     return {
       dueOn,
       amountMinor: payment,
-      budgetYear: fiscalYearOf(dueOn, input.fiscalYearStartMonth),
+      budgetYear: fiscalYearOf(dueOn),
       binding,
     };
   });
@@ -101,7 +100,7 @@ export function priceFromQuote(input: QuotePricingInput): QuotePricing {
     unitPrice: quote.unitPrice,
     billingCycle: quote.billingCycle,
     periods,
-    budgetYear: fiscalYearOf(firstPaymentOn, input.fiscalYearStartMonth),
+    budgetYear: fiscalYearOf(firstPaymentOn),
     firstPaymentOn,
   };
 }

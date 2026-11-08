@@ -16,12 +16,15 @@ import {
   SubscriptionStillDraftError,
 } from './subscription.errors';
 import { assertSubscriptionShape, declaredStateOf, missingData, subscriptionStatusOf } from './subscription.policy';
+import { assertDeclarableCycle } from './pool/subscription-pool.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import { snapshotOf, stateOf } from './subscription.mapper';
+import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import { SubscriptionViewService } from './subscription-view.service';
 import type {
   BillingCycle,
+  CommitmentTermMonths,
   SubscriptionRecord,
   SubscriptionKind,
   SubscriptionListFilter,
@@ -38,6 +41,7 @@ export interface DeclareSubscriptionInput {
   purchasedQuantity?: number;
   unitPrice?: { amount: string; currency: string };
   billingCycle?: BillingCycle;
+  commitmentTermMonths?: CommitmentTermMonths;
   startDate?: BusinessDate;
   endDate?: BusinessDate;
   renewalDate?: BusinessDate;
@@ -45,6 +49,8 @@ export interface DeclareSubscriptionInput {
   noticePeriodDays?: number;
   autoRenew?: boolean;
   allowsMidTermReduction?: boolean;
+  responsibleItAdminEmployeeId?: string;
+  vendorMinimumSeats?: number;
 }
 
 /** The change of a subscription: the plan and the kind are not fields; only the four dates and the notice period clear. */
@@ -52,6 +58,7 @@ export interface UpdateSubscriptionInput {
   purchasedQuantity?: number;
   unitPrice?: { amount: string; currency: string };
   billingCycle?: BillingCycle;
+  commitmentTermMonths?: CommitmentTermMonths;
   startDate?: BusinessDate;
   endDate?: BusinessDate | null;
   renewalDate?: BusinessDate | null;
@@ -59,6 +66,9 @@ export interface UpdateSubscriptionInput {
   noticePeriodDays?: number | null;
   autoRenew?: boolean;
   allowsMidTermReduction?: boolean;
+  responsibleItAdminEmployeeId?: string;
+  vendorMinimumSeats?: number | null;
+  isPrimaryForPlan?: boolean;
 }
 
 /**
@@ -75,6 +85,7 @@ export class SubscriptionService {
     private readonly pricing: SubscriptionPricingService,
     private readonly views: SubscriptionViewService,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly poolRules: SubscriptionPoolService,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -122,8 +133,10 @@ export class SubscriptionService {
    * `assertSubscriptionShape`, and the money errors of the finance facade for the unit price.
    */
   async declare(actor: AuthenticatedPrincipal, input: DeclareSubscriptionInput): Promise<SubscriptionView> {
+    assertDeclarableCycle(input.billingCycle);
     const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
     const organizationId = await this.requireOrganizationId();
+    if (input.responsibleItAdminEmployeeId) await this.poolRules.requireItAdmin(input.responsibleItAdminEmployeeId);
 
     const record = await this.runner.run((tx) => this.declareIn(tx, actor, input, { money, organizationId }));
 
@@ -148,6 +161,7 @@ export class SubscriptionService {
 
     const priced = await this.pricing.priceToday(tx, money);
     const complete = subscriptionStatusOf(plan, input.kind, { ...state, ...priced });
+    this.poolRules.assert(plan, input.kind, state, complete === 'ACTIVE');
     const created = await this.subscriptions.insert(tx, {
       organizationId,
       planId: plan.id,
@@ -195,6 +209,10 @@ export class SubscriptionService {
       const state = { ...stateOf(current), priceSnapshot };
       const missing = this.missingOf(plan, current.kind, state);
       if (missing.length > 0) throw new SubscriptionStillDraftError(missing);
+      this.poolRules.assert(plan, current.kind, state, true);
+      if (state.responsibleItAdminEmployeeId !== current.responsibleItAdminEmployeeId) {
+        await this.poolRules.requireItAdmin(state.responsibleItAdminEmployeeId as string);
+      }
 
       const completed = await this.subscriptions.update(tx, id, { ...state, status: 'ACTIVE' });
       await this.audit.record(
@@ -226,6 +244,7 @@ export class SubscriptionService {
       noticeDeadline: BusinessDate | null;
       noticePeriodDays: number | null;
       billingCycle: BillingCycle | null;
+      commitmentTermMonths: CommitmentTermMonths | null;
       autoRenew: boolean;
       allowsMidTermReduction: boolean;
     },

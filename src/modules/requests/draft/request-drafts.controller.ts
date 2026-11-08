@@ -167,7 +167,7 @@ export class RequestDraftsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with a term of more than 12 months, which no request may ask for any more: ACCESS_REQUEST.TERM_BEYOND_LIMIT (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxMonths, endsBy }. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. Nothing changes: the draft stays, to be saved again with a shorter term.',
+        'The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with a term of more than 12 months, which no request may ask for any more: ACCESS_REQUEST.TERM_BEYOND_LIMIT (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxMonths }. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. Nothing changes: the draft stays, to be saved again with a shorter term.',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.REQUEST_PARTY_INELIGIBLE,

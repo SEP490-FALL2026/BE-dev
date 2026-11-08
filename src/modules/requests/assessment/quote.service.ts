@@ -44,7 +44,7 @@ export class QuoteService {
   price(
     quote: Quote,
     request: { termMonths: number; beneficiaries: number; expectedSpendOn: BusinessDate },
-    context: { today: BusinessDate; fiscalYearStartMonth: number },
+    context: { today: BusinessDate },
   ): PricingRecord {
     const priced = priceFromQuote({
       quote,
@@ -52,7 +52,6 @@ export class QuoteService {
       beneficiaries: request.beneficiaries,
       today: context.today,
       expectedSpendOn: request.expectedSpendOn,
-      fiscalYearStartMonth: context.fiscalYearStartMonth,
     });
     if (priced.status === 'REFUSED') {
       if (priced.reason === 'SCHEDULE_REQUIRED' || priced.reason === 'PRICE_REQUIRED') {

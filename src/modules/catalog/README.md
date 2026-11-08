@@ -77,6 +77,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `SubscriptionService`, `SubscriptionChangeService` (đổi subscription; kiểm trước khi ghi ở `SubscriptionChangeGuard`),
   `SeatTargetService`, `seat-guard.policy.ts` (số lượng không dưới ghế đang chiếm); `nextStateOf`, `subscriptionStatusOf`,
   `sameUnitPrice` là hàm thuần trong `subscription.policy.ts`.
+  `SubscriptionPoolRulesService` giữ các luật kho dùng chung mà policy thuần không biết (ai được phụ trách thuê bao).
 - `contract/` — hợp đồng và file riêng tư trong object storage (US-04-04); `contracts.controller.ts`,
   `documents.controller.ts`; `ContractService`, `DocumentService`; `document-expiry.job.ts` chạy mỗi giờ (DB-13).
 - `subscription-owner-assignment/` — repo và Nest module riêng của lệnh CLI (`subscription-owner-assignment-cli.module.ts`); service nằm ở `public/`.
@@ -85,6 +86,19 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
 ## Bất biến quan trọng
 
 - Không route nào xóa vendor, nhóm chức năng, plan, subscription hay hợp đồng (JSDoc các controller).
+- Thuê bao kho dùng chung (`QĐ-103e`, `QĐ-103v`(4), `QĐ-104d`(3)): `commitment_term_months` (1 hoặc 12; `PERPETUAL` không có),
+  `responsible_it_admin_employee_id`, `vendor_minimum_seats` (> 0), `is_primary_for_plan` (unique partial theo
+  `(organization_id, plan_id)`). Ghi `TERM` thành `ACTIVE` cần kỳ cam kết và IT Admin phụ trách (`assertPoolTerms`,
+  `assertResponsibleNamed`): thiếu ⟹ 422 `COMMITMENT_TERM_REQUIRED` / `RESPONSIBLE_REQUIRED`; plan `K1` chỉ kỳ 1 + `MONTHLY`
+  (`K1_MONTHLY_ONLY`); kỳ 1 + `ANNUAL` bị chặn (`BILLING_LONGER_THAN_COMMITMENT`). Ghi mới chỉ nhận chu kỳ `MONTHLY`/`ANNUAL`
+  (`BILLING_CYCLE_UNSUPPORTED`); enum DB `BillingCycle` dùng chung với `requests` nên giữ nguyên, dữ liệu cũ
+  `QUARTERLY`/`OTHER` đọc được kèm cảnh báo `BILLING_CYCLE_LEGACY`, thiếu người phụ trách kèm `RESPONSIBLE_MISSING`. Dữ liệu cũ
+  không bị luật mới chặn khi ghi trường khác. Người phụ trách kiểm bằng `findUsableItAdminEmployeeIds` + nhân viên đang
+  `WORKING`, đọc không khóa (một vai bị thu ngay sau kiểm tra không bị chặn). Cờ thuê bao chính: `PATCH isPrimaryForPlan` khóa
+  `plans FOR UPDATE`, gỡ cờ ở thuê bao khác cùng gói rồi đặt; chỉ thuê bao `ACTIVE` chưa có kỳ kế tiếp
+  (`PRIMARY_NOT_ELIGIBLE`); unique index chặn đua còn lại (409 `PRIMARY_CONFLICT`). Kỳ gia hạn kế thừa kỳ cam kết, người phụ
+  trách, mức tối thiểu và cờ chính (`SubscriptionPeriodService.recordNext`). Cột phòng sở hữu và chặn trùng (ứng dụng, gói) chưa
+  đổi: W4/W5.
 - Chuỗi kỳ: `subscriptions.renewed_from_id` đặt một lần lúc tạo, cùng plan/phòng sở hữu, kỳ TERM, bắt đầu sau kỳ cũ (trigger
   `subscriptions_renewal_chain`); một kỳ có tối đa một kỳ nối tiếp (unique).
 - Số lượng subscription không thấp hơn số ghế đang chiếm (`assertQuantityNotBelowOccupied`, `seat-guard.policy.ts`);

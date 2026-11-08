@@ -35,7 +35,7 @@ export class RepricingService {
     tx: DbTx,
     request: AccessRequestRecord,
     expectedSpendOn: BusinessDate,
-    context: { today: BusinessDate; fiscalYearStartMonth: number },
+    context: { today: BusinessDate },
   ): Promise<PricingRecord> {
     if (request.branch === 'PAID_IN_CATALOG' && request.planId !== null) {
       return this.assessment.priceFor(tx, {
@@ -46,7 +46,6 @@ export class RepricingService {
         beneficiaries: peopleOf(request),
         expectedSpendOn,
         today: context.today,
-        fiscalYearStartMonth: context.fiscalYearStartMonth,
       });
     }
     if (request.branch !== 'NEW_SOFTWARE') throw new AccessRequestNotPriceableError();
@@ -57,7 +56,7 @@ export class RepricingService {
         status: 'MISSING',
         missingReason: 'AWAITING_QUOTE',
         expectedSpendOn,
-        budgetYear: fiscalYearOf(expectedSpendOn, context.fiscalYearStartMonth),
+        budgetYear: fiscalYearOf(expectedSpendOn),
         amount: null,
         unitPrice: null,
         billingCycle: null,

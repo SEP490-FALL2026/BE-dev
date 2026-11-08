@@ -45,7 +45,7 @@ const INVALID_UPDATE_NOTE =
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
-    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.',
+    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it) and RESPONSIBLE_NOT_IT_ADMIN, and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.',
   examples: [
     VALIDATION_EXAMPLE,
     SUBSCRIPTION_ERROR_EXAMPLES.PLAN_NOT_FOUND,
@@ -55,6 +55,13 @@ const INVALID = {
     SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_NEEDS_LICENSED_APPLICATION,
     SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_HAS_NO_TERM,
     SUBSCRIPTION_ERROR_EXAMPLES.DATES_INVALID,
+    SUBSCRIPTION_ERROR_EXAMPLES.COMMITMENT_TERM_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.COMMITMENT_TERM_NOT_ALLOWED,
+    SUBSCRIPTION_ERROR_EXAMPLES.K1_MONTHLY_ONLY,
+    SUBSCRIPTION_ERROR_EXAMPLES.BILLING_LONGER_THAN_COMMITMENT,
+    SUBSCRIPTION_ERROR_EXAMPLES.BILLING_CYCLE_UNSUPPORTED,
+    SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_NOT_IT_ADMIN,
     SUBSCRIPTION_ERROR_EXAMPLES.MONEY_SCALE_EXCEEDED,
     SUBSCRIPTION_ERROR_EXAMPLES.MONEY_OUT_OF_RANGE,
     SUBSCRIPTION_ERROR_EXAMPLES.CURRENCY_NOT_SUPPORTED,
@@ -70,6 +77,14 @@ const INVALID_UPDATE = {
     SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_HAS_NO_TERM,
     SUBSCRIPTION_ERROR_EXAMPLES.DATES_INVALID,
     SUBSCRIPTION_ERROR_EXAMPLES.STILL_DRAFT,
+    SUBSCRIPTION_ERROR_EXAMPLES.COMMITMENT_TERM_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.COMMITMENT_TERM_NOT_ALLOWED,
+    SUBSCRIPTION_ERROR_EXAMPLES.K1_MONTHLY_ONLY,
+    SUBSCRIPTION_ERROR_EXAMPLES.BILLING_LONGER_THAN_COMMITMENT,
+    SUBSCRIPTION_ERROR_EXAMPLES.BILLING_CYCLE_UNSUPPORTED,
+    SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_NOT_IT_ADMIN,
+    SUBSCRIPTION_ERROR_EXAMPLES.PRIMARY_NOT_ELIGIBLE,
     SUBSCRIPTION_ERROR_EXAMPLES.MONEY_SCALE_EXCEEDED,
     SUBSCRIPTION_ERROR_EXAMPLES.MONEY_OUT_OF_RANGE,
     SUBSCRIPTION_ERROR_EXAMPLES.CURRENCY_NOT_SUPPORTED,
@@ -87,10 +102,11 @@ const REPORTING_CURRENCY_CONFLICT = {
 const UPDATE_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
-    'The department that owns the subscription has no Cost Center in use yet and the change creates, raises or extends what is owed: a higher quantity, a later end or renewal date (or one where there was none), auto renewal switched on or a higher unit price (FINANCE.SETUP_INCOMPLETE, nothing is written). A price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency): a fault of the configuration, not of the request.',
+    'The department that owns the subscription has no Cost Center in use yet and the change creates, raises or extends what is owed: a higher quantity, a later end or renewal date (or one where there was none), auto renewal switched on or a higher unit price (FINANCE.SETUP_INCOMPLETE, nothing is written). A price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency): a fault of the configuration, not of the request. The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire.',
   examples: [
     SUBSCRIPTION_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
     SUBSCRIPTION_ERROR_EXAMPLES.REPORTING_CURRENCY_NOT_SUPPORTED,
+    SUBSCRIPTION_ERROR_EXAMPLES.PRIMARY_CONFLICT,
   ],
 } as const;
 
@@ -209,10 +225,14 @@ export class SubscriptionsController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, REPORTING_CURRENCY_CONFLICT, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or the rate of its price day (SUBSCRIPTION.STILL_DRAFT, details.missing).',
+      'The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or the rate of its price day (SUBSCRIPTION.STILL_DRAFT, details.missing), or the shared-pool rules refuse it: COMMITMENT_TERM_REQUIRED, K1_MONTHLY_ONLY, RESPONSIBLE_REQUIRED, RESPONSIBLE_NOT_IT_ADMIN.',
     examples: [
       VALIDATION_EXAMPLE,
       SUBSCRIPTION_ERROR_EXAMPLES.STILL_DRAFT,
+      SUBSCRIPTION_ERROR_EXAMPLES.COMMITMENT_TERM_REQUIRED,
+      SUBSCRIPTION_ERROR_EXAMPLES.K1_MONTHLY_ONLY,
+      SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_REQUIRED,
+      SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_NOT_IT_ADMIN,
       SUBSCRIPTION_ERROR_EXAMPLES.MONEY_OUT_OF_RANGE,
     ],
   })

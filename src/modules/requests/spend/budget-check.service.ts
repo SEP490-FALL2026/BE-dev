@@ -118,8 +118,7 @@ export class BudgetCheckService {
     if (binding.size === 0) return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
 
     const today = await this.organizationReads.businessToday(now, tx);
-    const startMonth = Number(await this.parameters.getValue('FISCAL_YEAR_START_MONTH'));
-    const currentYear = fiscalYearOf(today, startMonth);
+    const currentYear = fiscalYearOf(today);
     const assessment = request.branch === 'NEW_SOFTWARE' ? await this.assessments.findAssessment(request.id, tx) : null;
 
     const years = [...binding.keys()].sort((a, b) => a - b);

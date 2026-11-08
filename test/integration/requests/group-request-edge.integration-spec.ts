@@ -167,7 +167,7 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
       `SELECT employee_id, expected_end_date::text FROM license_assignments WHERE employee_id = ANY($1::uuid[])`,
       [[e1.employeeId, e2.employeeId]],
     );
-    const end = effectiveEndOf({ start: h.today(), months: 12, flexible: false, fiscalYearStartMonth: 1 });
+    const end = effectiveEndOf({ start: h.today(), months: 12 });
     expect(Object.fromEntries(seats.rows.map((row) => [row.employee_id, row.expected_end_date]))).toEqual({
       [e1.employeeId]: end,
       [e2.employeeId]: end,
