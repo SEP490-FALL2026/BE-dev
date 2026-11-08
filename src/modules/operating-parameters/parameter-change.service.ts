@@ -14,7 +14,7 @@ import {
 import { OperatingParametersApi, type ParameterView } from './public/operating-parameters.api';
 
 /**
- * The change of an operating parameter by the Super Admin (`US-01-04`), served by the API only..
+ * The change of an operating parameter by the Super Admin (`US-01-04`), served by the API only.
  */
 @Injectable()
 export class ParameterChangeService {

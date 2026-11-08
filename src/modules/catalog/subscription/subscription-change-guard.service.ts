@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import type { LockedPlan } from '../plan/plan-facts.service';
 import { SeatOccupancyHook } from '../public/catalog.extension-points';
 import { assertQuantityNotBelowOccupied } from './seat-guard.policy';
-import { SubscriptionPoolService, type PoolChangeInput } from './pool/subscription-pool.service';
-import type { SubscriptionRecord, SubscriptionState } from './subscription.types';
+import { SubscriptionPoolService, type PoolChange } from './pool/subscription-pool.service';
 
 /** What a change of a subscription asks of the others: the organization it is written for, and the seats that hold the quantity up (`US-04-03` AC-5). */
 @Injectable()
@@ -29,10 +27,7 @@ export class SubscriptionChangeGuard {
   }
 
   /** The rules of the shared pool on the state a change leaves (`QĐ-103e`): see `SubscriptionPoolService.judgeChange`. */
-  judgePool(
-    tx: DbTx,
-    change: { plan: LockedPlan; current: SubscriptionRecord; state: SubscriptionState; input: PoolChangeInput },
-  ): Promise<void> {
+  judgePool(tx: DbTx, change: PoolChange): Promise<void> {
     return this.poolRules.judgeChange(tx, change);
   }
 

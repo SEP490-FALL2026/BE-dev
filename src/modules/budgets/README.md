@@ -44,9 +44,8 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
   đoạn chờ — khi gửi lúc chưa có người giữ vai, khi vai bị thu hồi, khi người giữ vai nghỉ việc (QĐ-93c, D-S16).
 - Đăng ký vào: `organization.change-listeners` (`budgets.head-change`) —
   `proposal/budget-head-change.listener.ts`; `organization.cost-center-use-readers` (`budgets.commitments`) —
-  `commitment/budget-cost-center-use.listener.ts`; `operating-parameters.lock-readers` (`budgets.fiscal-year-start`) —
-  `version/fiscal-year-start-lock.listener.ts` (có phiên bản nào thì khóa tháng bắt đầu năm tài chính, US-01-04 AC-8;
-  `VersionCreationService` đọc tháng qua `OperatingParametersApi.holdValue` trong transaction tạo phiên bản).
+  `commitment/budget-cost-center-use.listener.ts`. Năm ngân sách là năm dương lịch: không còn tham số tháng bắt đầu
+  năm tài chính, không còn extension point khóa tham số (`QĐ-104e`(1)).
 
 ## Capability và file chính
 

@@ -8,6 +8,8 @@ import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { SubscriptionPeriodRefusedError } from '../public/subscription-period.errors';
 import type { NextPeriodInput, RenewalPeriodFacts } from '../public/subscription-period.types';
+import { assertPoolTerms } from './pool/subscription-pool.policy';
+import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { snapshotOf } from './subscription.mapper';
 import {
   assertSubscriptionShape,
@@ -18,7 +20,7 @@ import {
 } from './subscription.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import { SubscriptionPricingService } from './subscription-pricing.service';
-import type { SubscriptionRecord } from './subscription.types';
+import type { ApplicationKind, BillingCycle, ProvisioningType, SubscriptionRecord } from './subscription.types';
 
 /** How many periods one pass of the renewal sweep reads at most; the next pass takes the rest. */
 const SWEEP_LIMIT = 500;
@@ -64,6 +66,7 @@ export class SubscriptionPeriodService {
     private readonly pricing: SubscriptionPricingService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
+    private readonly pool: SubscriptionPoolService,
   ) {}
 
   /** The periods with these ids, by id; an id that does not exist is absent. */
@@ -128,22 +131,13 @@ export class SubscriptionPeriodService {
       vendorMinimumSeats: previous.vendorMinimumSeats,
       isPrimaryForPlan: previous.isPrimaryForPlan,
     };
-    try {
-      assertSubscriptionShape({
-        kind: 'TERM',
-        applicationKind: plan.applicationKind,
-        planProvisioningType: plan.provisioningType,
-        ...state,
-      });
-    } catch {
-      throw new SubscriptionPeriodRefusedError('INVALID_DATES');
-    }
+    this.assertNextPeriod(plan, state, input.billingCycle, previous);
     const money = await this.pricing.read(input.unitPrice);
     const priced = await this.pricing.priceToday(tx, money);
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A renewal was recorded before installation');
 
-    if (previous.isPrimaryForPlan) await this.subscriptions.clearPrimary(tx, previous.id);
+    if (previous.isPrimaryForPlan) await this.pool.releasePrimary(tx, actor, organization.id, previous.id);
     const created = await this.subscriptions.insert(tx, {
       organizationId: organization.id,
       planId: previous.planId,
@@ -163,6 +157,40 @@ export class SubscriptionPeriodService {
     );
 
     return factsOf(created, null);
+  }
+
+  /**
+   * The shape of the new period, then the commitment it inherits against the cycle the vendor confirmed as a new write would meet it
+   * (R-G01, R-E01); a cycle of the old kind (QUARTERLY, OTHER) is kept as it is declared until the renewal of W5.
+   * Throws SubscriptionPeriodRefusedError.
+   */
+  private assertNextPeriod(
+    plan: { applicationKind: ApplicationKind; provisioningType: ProvisioningType },
+    state: ReturnType<typeof declaredStateOf> & { commitmentTermMonths: number | null },
+    billingCycle: BillingCycle,
+    previous: SubscriptionRecord,
+  ): void {
+    try {
+      assertSubscriptionShape({
+        kind: 'TERM',
+        applicationKind: plan.applicationKind,
+        planProvisioningType: plan.provisioningType,
+        ...state,
+      });
+    } catch {
+      throw new SubscriptionPeriodRefusedError('INVALID_DATES');
+    }
+    try {
+      assertPoolTerms({
+        kind: 'TERM',
+        planProvisioningType: plan.provisioningType,
+        billingCycle,
+        commitmentTermMonths: previous.commitmentTermMonths,
+        activating: false,
+      });
+    } catch {
+      throw new SubscriptionPeriodRefusedError('INVALID_TERMS');
+    }
   }
 
   private async withSuccessors(records: SubscriptionRecord[], tx?: DbTx): Promise<RenewalPeriodFacts[]> {

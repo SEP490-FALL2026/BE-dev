@@ -50,4 +50,10 @@ export interface NextPeriodInput {
 
 /** Why a new period was not recorded: nothing is written. */
 export type PeriodRefusal =
-  'NOT_FOUND' | 'NOT_TERM' | 'ALREADY_RENEWED' | 'APPLICATION_RETIRED' | 'STARTS_TOO_EARLY' | 'INVALID_DATES';
+  | 'NOT_FOUND'
+  | 'NOT_TERM'
+  | 'ALREADY_RENEWED'
+  | 'APPLICATION_RETIRED'
+  | 'STARTS_TOO_EARLY'
+  | 'INVALID_DATES'
+  | 'INVALID_TERMS';

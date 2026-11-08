@@ -209,10 +209,7 @@ export class SubscriptionService {
       const state = { ...stateOf(current), priceSnapshot };
       const missing = this.missingOf(plan, current.kind, state);
       if (missing.length > 0) throw new SubscriptionStillDraftError(missing);
-      this.poolRules.assert(plan, current.kind, state, true);
-      if (state.responsibleItAdminEmployeeId !== current.responsibleItAdminEmployeeId) {
-        await this.poolRules.requireItAdmin(state.responsibleItAdminEmployeeId as string);
-      }
+      await this.poolRules.assertActivation(plan, current.kind, state);
 
       const completed = await this.subscriptions.update(tx, id, { ...state, status: 'ACTIVE' });
       await this.audit.record(

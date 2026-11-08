@@ -189,7 +189,7 @@ async function oneSubscription(ctx: DemoRunContext, admin: string, subscription:
   return { status: 'done', label };
 }
 
-function subscriptionBody(
+export function subscriptionBody(
   ctx: DemoRunContext,
   subscription: DemoSubscription,
   planId: string,

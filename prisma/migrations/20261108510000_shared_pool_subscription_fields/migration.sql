@@ -9,9 +9,10 @@ ALTER TABLE "subscriptions"
     ADD COLUMN "is_primary_for_plan" BOOLEAN NOT NULL DEFAULT false;
 
 -- A term already bought commits to a month when it is paid by the month and to a year otherwise; a K1 plan is by the month only.
+-- A draft that does not say how it is paid yet is not guessed at: it names its commitment when it is completed.
 UPDATE "subscriptions"
    SET "commitment_term_months" = CASE WHEN "billing_cycle" = 'MONTHLY' THEN 1 ELSE 12 END
- WHERE "kind" = 'TERM';
+ WHERE "kind" = 'TERM' AND "billing_cycle" IS NOT NULL;
 UPDATE "subscriptions" s
    SET "commitment_term_months" = 1
   FROM "plans" p

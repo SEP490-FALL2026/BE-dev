@@ -73,9 +73,9 @@ describe('the budget year of a request (US-05-02 AC-11, QĐ-82e)', () => {
     expect(priced).toMatchObject({ status: 'PRICED', budgetYear: 2027 });
   });
 
-  it('is the calendar year: the 31st of March and the 1st of January fall in their own years (R-I01)', () => {
-    expect(priceRequest(input({ termMonths: 1, expectedSpendOn: '2027-03-31' }))).toMatchObject({ budgetYear: 2027 });
+  it('is the calendar year: the 31st of December and the 1st of January fall in two years (R-I01)', () => {
     expect(priceRequest(input({ termMonths: 1, expectedSpendOn: '2026-12-31' }))).toMatchObject({ budgetYear: 2026 });
+    expect(priceRequest(input({ termMonths: 1, expectedSpendOn: '2027-01-01' }))).toMatchObject({ budgetYear: 2027 });
   });
 });
 

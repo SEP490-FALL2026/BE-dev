@@ -105,7 +105,7 @@ export class SubscriptionChangeService {
       ...priced,
       status: subscriptionStatusOf(plan, current.kind, { ...next, ...priced }),
     };
-    await this.guard.judgePool(tx, { plan, current, state, input });
+    await this.guard.judgePool(tx, { plan, current, state, input, actor, organizationId });
     if (sameState(state, stateOf(current))) return current;
     // What is owed cannot be created, raised or extended for a department with no Cost Center in use.
     await this.obligation.assertChargeable(tx, current.ownerDepartmentId, stateOf(current), state);

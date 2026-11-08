@@ -65,7 +65,7 @@ export class AccessRequestNotPriceableError extends Error {
   }
 }
 
-/** The term asked for is longer than a request may ask for, (`US-05-01` AC-4, `QĐ-98`). */
+/** The term asked for is longer than a request may ask for (`US-05-01` AC-4, `QĐ-98`). */
 export class AccessRequestTermBeyondLimitError extends Error {
   constructor(readonly maxMonths: number) {
     super(

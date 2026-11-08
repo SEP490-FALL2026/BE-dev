@@ -99,6 +99,8 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   (`PRIMARY_NOT_ELIGIBLE`); unique index chặn đua còn lại (409 `PRIMARY_CONFLICT`). Kỳ gia hạn kế thừa kỳ cam kết, người phụ
   trách, mức tối thiểu và cờ chính (`SubscriptionPeriodService.recordNext`). Cột phòng sở hữu và chặn trùng (ứng dụng, gói) chưa
   đổi: W4/W5.
+  Thứ tự khóa của `PATCH isPrimaryForPlan`: dòng thuê bao → `plans FOR UPDATE` → gỡ cờ ở thuê bao khác. Một ghi khác đang giữ
+  dòng thuê bao đang là chính và chờ plan có thể gây deadlock (`40P01` ⟹ 503 thử lại được, không phải 409): chấp nhận ở W1.
 - Chuỗi kỳ: `subscriptions.renewed_from_id` đặt một lần lúc tạo, cùng plan/phòng sở hữu, kỳ TERM, bắt đầu sau kỳ cũ (trigger
   `subscriptions_renewal_chain`); một kỳ có tối đa một kỳ nối tiếp (unique).
 - Số lượng subscription không thấp hơn số ghế đang chiếm (`assertQuantityNotBelowOccupied`, `seat-guard.policy.ts`);

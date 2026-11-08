@@ -104,6 +104,7 @@ describe('the migration of the shared-pool fields of a subscription (integration
         const other = await subscription(k2, 'TERM', 'OTHER');
         const k1Annual = await subscription(k1, 'TERM', 'ANNUAL');
         const perpetual = await subscription(k4, 'PERPETUAL', null);
+        const draftWithoutCycle = await subscription(k2, 'TERM', null);
 
         await sql.query(sqlOf(TARGET));
 
@@ -120,7 +121,18 @@ describe('the migration of the shared-pool fields of a subscription (integration
         expect(await commitment(quarterly)).toMatchObject({ commitment_term_months: 12, billing_cycle: 'QUARTERLY' });
         expect(await commitment(other)).toMatchObject({ commitment_term_months: 12, billing_cycle: 'OTHER' });
         expect(await commitment(k1Annual)).toMatchObject({ commitment_term_months: 1, billing_cycle: 'ANNUAL' });
+        // A draft that does not say how it is paid is not guessed at.
+        expect(await commitment(draftWithoutCycle)).toMatchObject({
+          commitment_term_months: null,
+          billing_cycle: null,
+        });
         expect(await commitment(perpetual)).toMatchObject({ commitment_term_months: null, primary: false });
+
+        // F-010: the shared cycle enum still holds its four values (the requests use them too).
+        const cycles = await sql.query<{ labels: string[] }>(
+          `SELECT enum_range(NULL::"BillingCycle")::text[] AS labels`,
+        );
+        expect(cycles.rows[0].labels).toEqual(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'OTHER']);
 
         // The constraints are in force.
         const set = (column: string, value: unknown, id: string) =>

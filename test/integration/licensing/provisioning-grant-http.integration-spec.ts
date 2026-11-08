@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount } from '../../support/api-accounts';
 import { effectiveEndOf } from '../../../src/core/term-limit';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
@@ -381,10 +382,15 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
         subscriptionId,
       ]);
       const person = await h.member('P-DES', 'E-END-FLEX', designer);
+      // A fixed day, so that the six months cross 31/12 whatever day the suite runs on (F-010).
+      pretendBusinessToday(h.ctx.app, '2026-11-15');
+      try {
+        await h.grant({ requestId: h.gate.grantable(person, planId), subscriptionId }).expect(201);
+      } finally {
+        jest.restoreAllMocks();
+      }
 
-      await h.grant({ requestId: h.gate.grantable(person, planId), subscriptionId }).expect(201);
-
-      expect(await seatEndOf(person)).toEqual([termEnd()]);
+      expect(await seatEndOf(person)).toEqual(['2027-05-14']);
     });
 
     it('takes no end day in the body of the grant: the IT Admin has no authority to set the approved term', async () => {

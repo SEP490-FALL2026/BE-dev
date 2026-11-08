@@ -5,7 +5,6 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { FinanceApi } from '../../finance/public/finance.api';
-import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { chargedCostCenterId } from '../access-request/access-request.policy';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
@@ -41,7 +40,6 @@ export class BudgetCheckService {
     private readonly finance: FinanceApi,
     private readonly catalog: CatalogApi,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly parameters: OperatingParametersApi,
     private readonly assessments: AssessmentReadRepo,
   ) {}
 

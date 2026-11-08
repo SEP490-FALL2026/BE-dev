@@ -160,14 +160,16 @@ export class SubscriptionRepo {
     return toRecord(row);
   }
 
-  /** Takes the flag of the subscription that prices its plan off every other subscription of the plan (Q-04); returns how many had it. */
-  async clearPrimaryOfPlan(tx: DbTx, planId: string, exceptId: string): Promise<number> {
-    const cleared = await tx.subscription.updateMany({
-      where: { planId, isPrimaryForPlan: true, id: { not: exceptId } },
+  /** Takes the flag of the subscription that prices its plan off every other subscription of the plan (Q-04); returns the ids that had it. */
+  async clearPrimaryOfPlan(tx: DbTx, planId: string, exceptId: string): Promise<string[]> {
+    const where = { planId, isPrimaryForPlan: true, id: { not: exceptId } };
+    const had = await tx.subscription.findMany({ where, select: { id: true }, orderBy: { id: 'asc' } });
+    await tx.subscription.updateMany({
+      where: { id: { in: had.map((row) => row.id) } },
       data: { isPrimaryForPlan: false },
     });
 
-    return cleared.count;
+    return had.map((row) => row.id);
   }
 
   /** Takes the flag off one subscription: the period a renewal continues hands it to the new period. */

@@ -134,3 +134,5 @@ Không đổi nghiệp vụ; các điểm kỹ thuật chọn theo spec, chat re
 - **W1-N3 — gỡ cơ chế khóa tham số.** Extension point `ParameterLockContributions`, `holdValue`, lỗi và mã 409 `PARAMETER.LOCKED` bị gỡ vì không còn key nào dùng (spec calendar §7). Đổi lại: khôi phục từ git `b9854ef5`.
 - **W1-N4 — chu kỳ cũ ở kỳ gia hạn.** DTO ghi kết quả gia hạn vẫn nhận `QUARTERLY`/`OTHER` (W5 thu hẹp); kỳ mới có thể mang chu kỳ cũ cùng cảnh báo `BILLING_CYCLE_LEGACY`.
 - **W1-N5 — cổng bố cục.** Luật kho đặt ở nhóm `catalog/subscription/pool/` vì thư mục đủ 25 file và spec policy vượt 400 dòng.
+- **W1-N6 — tổ hợp cũ.** Thuê bao K1 cũ `(1, ANNUAL)` sửa người phụ trách được 200 nhưng chưa có cảnh báo riêng cho tổ hợp; muốn cảnh báo thì thêm vào `poolWarnings` (Owner quyết).
+- **W1-N7 — chu kỳ cũ ở kỳ gia hạn.** `INVALID_TERMS` chỉ chặn tổ hợp (kỳ cam kết × chu kỳ) ghi mới bị cấm; `QUARTERLY`/`OTHER` vẫn nhận tới W5.

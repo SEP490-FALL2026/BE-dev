@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createActivatedAccount } from '../../support/api-accounts';
 import { SubscriptionHttpHarness, type SubscriptionWire } from '../../support/subscription-http-harness';
 
 interface PoolWire extends SubscriptionWire {
@@ -187,6 +188,111 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
       today('2026-03-15');
     });
 
+    describe('is judged again when a draft becomes active, whoever was named (F-001)', () => {
+      let second: Awaited<ReturnType<typeof createActivatedAccount>>;
+
+      beforeAll(async () => {
+        second = await createActivatedAccount(h.ctx, h.seed, {
+          code: 'E-IT2',
+          email: 'it2@acme.vn',
+          role: 'IT_ADMIN',
+          admin: h.admin,
+        });
+      });
+
+      /** A draft that names the second IT Admin and waits only for the rate of its price day. */
+      const waitingForRate = async (day: string) => {
+        const { planId } = await plan();
+        today(day);
+        const draft = dataOf<PoolWire>(
+          await create({
+            ...BASE,
+            planId,
+            startDate: day,
+            billingCycle: 'ANNUAL',
+            responsibleItAdminEmployeeId: second.employeeId,
+          }).expect(201),
+        );
+        expect(draft).toMatchObject({ status: 'DRAFT', missing: ['EXCHANGE_RATE'] });
+        await rate('USD', day, '25000');
+
+        return draft;
+      };
+      const restore = async () => {
+        await h.ctx.sql.query(`UPDATE role_grants SET revoked_at = NULL WHERE app_user_id = $1`, [second.appUserId]);
+        await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE', work_state = 'WORKING' WHERE id = $1`, [
+          second.employeeId,
+        ]);
+      };
+      const revokeRole = () =>
+        h.ctx.sql.query(`UPDATE role_grants SET revoked_at = now() WHERE app_user_id = $1 AND role = 'IT_ADMIN'`, [
+          second.appUserId,
+        ]);
+      const leave = () =>
+        h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED', work_state = 'LEFT' WHERE id = $1`, [
+          second.employeeId,
+        ]);
+
+      it.each([
+        ['lost the IT Admin role', revokeRole, '2026-03-17'],
+        ['left', leave, '2026-03-19'],
+      ])('refuses to complete a draft whose named person %s', async (_name, change, day) => {
+        const draft = await waitingForRate(day);
+        await change();
+        try {
+          expect(codeOf(await complete(draft.id).expect(422))).toBe('SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN');
+          expect(dataOf<PoolWire>(await get(draft.id).expect(200)).status).toBe('DRAFT');
+        } finally {
+          await restore();
+        }
+        expect(dataOf<PoolWire>(await complete(draft.id).expect(200)).status).toBe('ACTIVE');
+      });
+
+      it('refuses the update that makes a draft active when the person stored lost the role', async () => {
+        // A draft that waits only for the seats bought: the rate of its day is there, so naming them makes it active.
+        const { planId } = await plan();
+        const draft = dataOf<PoolWire>(
+          await create({
+            ...BASE,
+            planId,
+            billingCycle: 'ANNUAL',
+            purchasedQuantity: undefined,
+            responsibleItAdminEmployeeId: second.employeeId,
+          }).expect(201),
+        );
+        expect(draft).toMatchObject({ status: 'DRAFT', missing: ['QUANTITY'] });
+        await revokeRole();
+        try {
+          expect(codeOf(await patch(draft.id, { purchasedQuantity: 6 }).expect(422))).toBe(
+            'SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN',
+          );
+        } finally {
+          await restore();
+        }
+        expect(dataOf<PoolWire>(await patch(draft.id, { purchasedQuantity: 6 }).expect(200)).status).toBe('ACTIVE');
+      });
+
+      it('lets the person who answers be changed alone on an old K1 subscription whose cycle is no longer accepted (F-009)', async () => {
+        const { planId } = await plan({ type: 'K1', pricing: 'FLAT_RATE' });
+        const old = dataOf<PoolWire>(await create({ ...BASE, planId, billingCycle: 'MONTHLY' }).expect(201));
+        await h.ctx.sql.query(
+          `UPDATE subscriptions SET billing_cycle = 'ANNUAL', commitment_term_months = 1, responsible_it_admin_employee_id = NULL
+            WHERE id = $1`,
+          [old.id],
+        );
+
+        const changed = dataOf<PoolWire>(
+          await patch(old.id, { responsibleItAdminEmployeeId: h.it1.employeeId }).expect(200),
+        );
+
+        expect(changed).toMatchObject({ responsibleItAdminEmployeeId: h.it1.employeeId, billingCycle: 'ANNUAL' });
+        // Naming the cycle again judges the combination as a new write would.
+        expect(codeOf(await patch(old.id, { billingCycle: 'ANNUAL' }).expect(422))).toBe(
+          'SUBSCRIPTION.BILLING_LONGER_THAN_COMMITMENT',
+        );
+      });
+    });
+
     it('is left empty on data older than the rule: it is read and changed as before, with a warning', async () => {
       const { planId } = await plan();
       const old = dataOf<PoolWire>(await create({ ...BASE, planId, billingCycle: 'ANNUAL' }).expect(201));
@@ -240,6 +346,12 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
 
       expect((await stored(first.id)).primary).toBe(false);
       expect((await stored(second.id)).primary).toBe(true);
+      // The one that lost the flag has the change in its own history (F-005).
+      const release = (await h.auditOf(first.id)).find(
+        (event) =>
+          event.action === 'SUBSCRIPTION.UPDATED' && JSON.stringify(event.after) === '{"isPrimaryForPlan":false}',
+      );
+      expect(release?.before).toEqual({ isPrimaryForPlan: true });
     });
 
     it('leaves exactly one primary when two are set at the same moment, and never a 500', async () => {
