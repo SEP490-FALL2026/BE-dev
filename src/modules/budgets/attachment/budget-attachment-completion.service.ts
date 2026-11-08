@@ -53,7 +53,7 @@ export class BudgetAttachmentCompletionService {
       throw new BudgetAttachmentNotFoundError();
     }
 
-    this.assertTargetRole(actor, record);
+    await this.assertTargetRole(actor, record);
     if (record.status !== 'AWAITING_UPLOAD') {
       throw new BudgetAttachmentNotAwaitingUploadError();
     }
@@ -94,13 +94,18 @@ export class BudgetAttachmentCompletionService {
     return toBudgetAttachmentWire(updated ?? record, uploader);
   }
 
-  private assertTargetRole(actor: AuthenticatedPrincipal, record: BudgetAttachmentRecord): void {
+  /** Who may complete the file: Finance a version's, a head (or one to come) a proposal's, and they still answer for a unit (as at the declaration). */
+  private async assertTargetRole(actor: AuthenticatedPrincipal, record: BudgetAttachmentRecord): Promise<void> {
     if (record.target === 'VERSION' && !actor.roles.includes('FINANCE')) {
       throw new BudgetAttachmentForbiddenRoleError();
     }
     // A file of a proposal is a head's: the grant counts, because the head of a department that starts next year holds it before the role is effective (`QĐ-106k`); the declaration judged the units.
     if (record.target === 'PROPOSAL' && !actor.directRoles.includes('MANAGER')) {
       throw new BudgetAttachmentForbiddenRoleError();
+    }
+    // The same question as the declaration asked: a person who no longer answers for a unit completes nothing for a proposal.
+    if (record.target === 'PROPOSAL') {
+      await this.facts.requireHeadOfAnyUnit(actor.employeeId, await this.facts.today(new Date()));
     }
   }
 

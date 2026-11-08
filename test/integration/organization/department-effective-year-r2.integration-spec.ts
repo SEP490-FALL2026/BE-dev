@@ -165,7 +165,8 @@ describe('the head of a department that starts next year, after the review (inte
     );
     expect(
       notices.some(
-        (notice) => notice.recipient_employee_id === h.finance.employeeId && /HEAD|VACANT/i.test(notice.code),
+        (notice) =>
+          notice.recipient_employee_id === h.finance.employeeId && notice.code === 'BUDGET_PROPOSAL_TASK_WAITING',
       ),
     ).toBe(false);
   });

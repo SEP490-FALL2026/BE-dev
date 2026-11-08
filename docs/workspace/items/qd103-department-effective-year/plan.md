@@ -89,3 +89,5 @@ Lệch spec / câu tạm chọn: (1) cột `effective_from` có `DEFAULT CURRENT
 - [x] AC trong scope có bằng chứng.
 - [x] Spec/plan phản ánh implementation cuối.
 - [x] `pnpm check` và full suite CHƯA chạy.
+
+Ghi chú review R2 (F-044, F-055): `DepartmentItAdminService` (tách `assertUsableItAdmin` khỏi `DepartmentService`) là refactor ngoài phạm vi tính năng, làm để `DepartmentService` giữ ≤ 8 tham số constructor khi thêm hook cửa sổ tạo phòng; hành vi không đổi, có test sẵn ở `department.service.spec`.

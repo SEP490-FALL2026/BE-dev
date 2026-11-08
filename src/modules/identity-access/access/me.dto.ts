@@ -20,6 +20,8 @@ export const meSchema = z.strictObject({
   /**
    * The department the caller heads today, when they hold MANAGER; otherwise null. The Manager screens need both: `roles` has MANAGER
    * and `managerScope` is not null. A MANAGER who heads nothing today has the role and no scope, and the Manager routes refuse them.
+   * The one exception is the budget work (`BM-10`) of a department that starts later (`QĐ-106k`): the person holds the grant, the role is not
+   * effective and `managerScope` is null, and the routes of the budget admit the grant and judge the unit (see `upcomingUnits`).
    */
   managerScope: z
     .strictObject({ departmentId: z.uuid(), departmentCode: z.string(), departmentName: z.string() })

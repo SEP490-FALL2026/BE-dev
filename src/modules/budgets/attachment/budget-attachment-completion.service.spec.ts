@@ -55,7 +55,11 @@ describe('BudgetAttachmentCompletionService: the copy and the upload around the 
       {} as never,
       { inspect: jest.fn(() => Promise.resolve({ outcome: 'KEPT', finalObjectKey: FINAL_KEY })) } as never,
       {} as never,
-      { people: jest.fn(() => Promise.resolve(new Map())) } as never,
+      {
+        people: jest.fn(() => Promise.resolve(new Map())),
+        today: jest.fn(() => Promise.resolve('2026-11-09')),
+        requireHeadOfAnyUnit: jest.fn(() => Promise.resolve()),
+      } as never,
       storage as never,
     );
 
