@@ -67690,7 +67690,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Every parameter with the value in force, its default, its unit and the domain a value must stay in.",
+            "description": "The parameters the caller may read with the value in force, the default, the unit and the domain a value must stay in: every parameter for the Super Admin, only the ones Finance owns for Finance.",
             "content": {
               "application/json": {
                 "schema": {
@@ -67735,7 +67735,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin reads the operating parameters, their history and the non-working dates.",
+            "description": "Only the Super Admin and Finance read the operating parameters; Finance reads only the ones it owns and their history.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -67897,7 +67897,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters.",
+            "description": "Only the role that owns a parameter sets it: the Super Admin the parameters of the system, Finance the ones that carry the owner FINANCE (a request for another role is refused).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -68131,7 +68131,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin reads the operating parameters, their history and the non-working dates.",
+            "description": "Only the Super Admin and Finance read the operating parameters; Finance reads only the ones it owns and their history.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -68512,7 +68512,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters.",
+            "description": "Only the role that owns a parameter sets it: the Super Admin the parameters of the system, Finance the ones that carry the owner FINANCE (a request for another role is refused).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -68786,7 +68786,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters.",
+            "description": "Only the role that owns a parameter sets it: the Super Admin the parameters of the system, Finance the ones that carry the owner FINANCE (a request for another role is refused).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -69031,7 +69031,7 @@
             }
           },
           "403": {
-            "description": "Only the Super Admin configures the operating parameters.",
+            "description": "Only the role that owns a parameter sets it: the Super Admin the parameters of the system, Finance the ones that carry the owner FINANCE (a request for another role is refused).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -99668,6 +99668,7 @@
                 "additionalProperties": {
                   "type": "object",
                   "properties": {
+                    "explanation": { "type": "string", "nullable": true },
                     "signedCommitments": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -99693,10 +99694,10 @@
                       "additionalProperties": false
                     }
                   },
-                  "required": ["signedCommitments", "plannedSeats", "priority", "total"],
+                  "required": ["explanation", "signedCommitments", "plannedSeats", "priority", "total"],
                   "additionalProperties": false
                 },
-                "description": "The ceiling of each department, by department id."
+                "description": "The ceiling of each department, by department id: at most 500, the bound of the departments of budgetDepartmentCeilingsSet."
               }
             },
             "required": [
@@ -99883,7 +99884,8 @@
                   "properties": { "amount": { "type": "string", "maxLength": 40 } },
                   "required": ["amount"],
                   "additionalProperties": false
-                }
+                },
+                "explanation": { "type": "string", "minLength": 1, "maxLength": 2000 }
               },
               "required": ["departmentId", "signedCommitments", "plannedSeats", "priority"],
               "additionalProperties": false

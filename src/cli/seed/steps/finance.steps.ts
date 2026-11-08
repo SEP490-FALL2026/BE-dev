@@ -301,6 +301,7 @@ export function invoiceSteps(fixture: DemoFixture): DemoStep[] {
 
 interface CycleRow {
   status: 'NOT_PUBLISHED' | 'PUBLISHED' | 'CHANGED_AFTER_PUBLISH';
+  firstPublishedAt: string | null;
 }
 
 /** The day `days` before the first of January of `year`, as YYYY-MM-DD. */
@@ -323,6 +324,11 @@ async function cycles(ctx: DemoRunContext): Promise<StepOutcome> {
   return summarize(results);
 }
 
+/** What each of `count` departments gets of the annual ceiling less the reserve, in whole major units, rounded down. */
+export function evenShareOf(annualCeiling: string, reserve: string, count: number): string {
+  return (count === 0 ? 0n : (BigInt(annualCeiling) - BigInt(reserve)) / BigInt(count)).toString();
+}
+
 /** The cycle of the year, or null when Finance has not opened it. */
 async function existingCycle(ctx: DemoRunContext, finance: string, year: number): Promise<CycleRow | null> {
   try {
@@ -336,7 +342,8 @@ async function existingCycle(ctx: DemoRunContext, finance: string, year: number)
 async function oneCycle(ctx: DemoRunContext, finance: string, year: number): Promise<Result> {
   const label = `kỳ ngân sách ${year}`;
   const found = await existingCycle(ctx, finance, year);
-  if (found?.status === 'PUBLISHED') return { status: 'present', label };
+  // A cycle that was published once is the dataset's: it is left as it is, even when Finance changed it since.
+  if (found?.firstPublishedAt) return { status: 'present', label };
   if (ctx.mode === 'plan') return { status: 'planned', label };
   const plan = ctx.fixture.cycle;
   if (!found) {
@@ -350,13 +357,14 @@ async function oneCycle(ctx: DemoRunContext, finance: string, year: number): Pro
   // Every department of the installation that is not stopped gets a ceiling: the check before publishing asks for all of them.
   const rows = await listAll<{ id: string; status: string }>(ctx, ctx.superAdminEmail, '/departments');
   const departmentIds = rows.filter((row) => row.status === 'ACTIVE').map((row) => row.id);
+  const evenShare = evenShareOf(plan.annualCeiling, plan.sharedPoolReserve, departmentIds.length);
   await ctx.api.call(finance, 'PUT', `/budget-cycles/${year}/department-ceilings`, {
     sharedPoolReserve: money(plan.sharedPoolReserve),
     departments: departmentIds.map((departmentId) => ({
       departmentId,
       signedCommitments: money('0'),
       plannedSeats: money('0'),
-      priority: money(plan.departmentCeiling),
+      priority: money(evenShare),
     })),
   });
   await ctx.api.call(finance, 'POST', `/budget-cycles/${year}/publish`);

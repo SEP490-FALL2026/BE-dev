@@ -146,6 +146,9 @@ export function toBudgetApiException(error: unknown): unknown {
   if (error instanceof BudgetCycleReasonRequiredError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CYCLE_REASON_REQUIRED', error.message);
   }
+  if (isUniqueViolation(error, 'budget_department_ceilings_pkey')) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'VALIDATION_ERROR', 'A department is named once.');
+  }
   if (error instanceof BudgetCeilingDepartmentInvalidError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CEILING_DEPARTMENT_INVALID', error.message, {
       departmentIds: error.departmentIds,

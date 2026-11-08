@@ -45,12 +45,15 @@ CREATE TABLE "budget_department_ceilings" (
     "total_minor" BIGINT NOT NULL,
     -- The total the department head was told at the last publication; null before the first one.
     "published_total_minor" BIGINT,
+    -- What the total rests on, from the base figures (QT 4.3: a ceiling comes with its explanation).
+    "explanation" TEXT,
 
     CONSTRAINT "budget_department_ceilings_pkey" PRIMARY KEY ("cycle_id", "department_id"),
     CONSTRAINT "budget_department_ceilings_amounts_check" CHECK (
         "signed_commitments_minor" >= 0 AND "planned_seats_minor" >= 0 AND "priority_minor" >= 0
         AND ("published_total_minor" IS NULL OR "published_total_minor" >= 0)
     ),
+    CONSTRAINT "budget_department_ceilings_explanation_check" CHECK ("explanation" IS NULL OR char_length("explanation") <= 2000),
     CONSTRAINT "budget_department_ceilings_total_check" CHECK (
         "total_minor" = "signed_commitments_minor" + "planned_seats_minor" + "priority_minor"
     )

@@ -14,6 +14,7 @@ const ceiling = (departmentId: string, total: bigint, published: bigint | null =
   priorityMinor: 0n,
   totalMinor: total,
   publishedTotalMinor: published,
+  explanation: null as string | null,
 });
 
 describe('the budget cycle policy (QĐ-103i)', () => {
@@ -76,12 +77,27 @@ describe('the budget cycle policy (QĐ-103i)', () => {
   it('lists the ceilings that changed, added or removed', () => {
     const before = [ceiling('a', 5n), ceiling('b', 6n)];
     const after = [
-      { departmentId: 'a', signedCommitmentsMinor: 5n, plannedSeatsMinor: 0n, priorityMinor: 0n },
-      { departmentId: 'b', signedCommitmentsMinor: 7n, plannedSeatsMinor: 0n, priorityMinor: 0n },
-      { departmentId: 'c', signedCommitmentsMinor: 1n, plannedSeatsMinor: 0n, priorityMinor: 0n },
+      { departmentId: 'a', signedCommitmentsMinor: 5n, plannedSeatsMinor: 0n, priorityMinor: 0n, explanation: null },
+      { departmentId: 'b', signedCommitmentsMinor: 7n, plannedSeatsMinor: 0n, priorityMinor: 0n, explanation: null },
+      { departmentId: 'c', signedCommitmentsMinor: 1n, plannedSeatsMinor: 0n, priorityMinor: 0n, explanation: null },
     ];
 
     expect(changedCeilings(before, after).map((change) => change.departmentId)).toEqual(['b', 'c']);
     expect(changedCeilings(before, after.slice(0, 1)).map((change) => change.departmentId)).toEqual(['b']);
+  });
+
+  it('sees a change of the explanation, and of the parts that leaves the total as it was', () => {
+    const before = [ceiling('a', 5n)];
+    const same = {
+      departmentId: 'a',
+      signedCommitmentsMinor: 5n,
+      plannedSeatsMinor: 0n,
+      priorityMinor: 0n,
+      explanation: null,
+    };
+
+    expect(changedCeilings(before, [same])).toEqual([]);
+    expect(changedCeilings(before, [{ ...same, explanation: 'why' }])).toHaveLength(1);
+    expect(changedCeilings(before, [{ ...same, signedCommitmentsMinor: 0n, priorityMinor: 5n }])).toHaveLength(1);
   });
 });

@@ -70,13 +70,12 @@ export interface DemoBudgetLine {
 
 /**
  * The budget cycle of the year and of the year after it (`QĐ-103i`): the annual ceiling of the software budget, the shared-pool
- * reserve and the ceiling each department gets (all as priority items), in the reporting currency, major units. The sum must stay
+ * reserve and the rest is divided evenly among the departments of the installation (all as priority items), in the reporting currency, major units. The sum must stay
  * within the annual ceiling for every department of the dataset.
  */
 export interface DemoCycle {
   annualCeiling: string;
   sharedPoolReserve: string;
-  departmentCeiling: string;
   /** Days before the first of January of the year that the proposals and the decisions fall due. */
   submissionDaysBefore: number;
   decisionDaysBefore: number;

@@ -60,6 +60,12 @@ export class ProposalService {
     attachmentIds?: readonly string[],
   ): Promise<ProposalWire> {
     return this.runner.run(async (tx) => {
+      // The cycle of the year first (the order of the module), then the proposal: the year is read without a lock.
+      const year = (await this.proposals.findById(id, tx))?.year;
+      // A year that has ended is refused as ended below, before the cycle is asked about.
+      if (year !== undefined && !yearHasEnded(year, await this.facts.today(new Date(), tx))) {
+        await this.sender.requirePublishedCycle(tx, year);
+      }
       const previous = await this.ownedLocked(tx, actor, id, true);
       const today = await this.facts.today(new Date(), tx);
       if (yearHasEnded(previous.year, today)) throw new BudgetYearEndedError(previous.year);

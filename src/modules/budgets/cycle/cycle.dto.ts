@@ -39,14 +39,19 @@ export const setCeilingsBodySchema = z.strictObject({
         signedCommitments: amountInput,
         plannedSeats: amountInput,
         priority: amountInput,
+        explanation: z.string().trim().min(1).max(2000).optional(),
       }),
     )
-    .max(500),
+    .max(500)
+    .refine((rows) => new Set(rows.map((row) => row.departmentId)).size === rows.length, {
+      message: 'A department is named once.',
+    }),
 });
 
 export const cycleYearParamSchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2999) });
 
 const ceilingView = z.strictObject({
+  explanation: z.string().nullable(),
   signedCommitments: moneyView,
   plannedSeats: moneyView,
   priority: moneyView,
@@ -75,7 +80,10 @@ export const cycleSummarySchema = z.strictObject(cycleSummary);
 /** A cycle with its division: the ceiling of each department, by the id of the department. */
 export const cycleSchema = z.strictObject({
   ...cycleSummary,
-  ceilings: z.record(z.uuid(), ceilingView).meta({ description: 'The ceiling of each department, by department id.' }),
+  ceilings: z.record(z.uuid(), ceilingView).meta({
+    description:
+      'The ceiling of each department, by department id: at most 500, the bound of the departments of budgetDepartmentCeilingsSet.',
+  }),
 });
 
 export const listCyclesQuerySchema = z.strictObject({

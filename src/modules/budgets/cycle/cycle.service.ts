@@ -26,16 +26,18 @@ import type {
   UpdateCycleBodyDto,
 } from './cycle.dto';
 import {
+  ceilingAuditValue,
   ceilingTotal,
   changedCeilings,
-  deadlinesAfter,
+  planUpdate,
   departmentsToTell,
   isPastYear,
   judgePublish,
-  type CeilingParts,
   type PublishVerdict,
 } from './cycle.policy';
-import { CycleRepo, type CycleRecord } from './cycle.repo';
+import { CycleRepo, figuresOf, type CycleFigures, type CycleRecord } from './cycle.repo';
+
+type Formatter = Awaited<ReturnType<BudgetFactsService['formatter']>>;
 
 /**
  * The budget cycle of a year (`QĐ-103i`, `BR-MF4-01`, `BR-MF4-02`, `US-06-15`): Finance opens it, changes the annual ceiling with the
@@ -104,14 +106,25 @@ export class CycleService {
     return this.wire(created);
   }
 
-  /** The cycles, the latest year first, in pages. Throws BudgetNotAReaderError. */
+  /** The cycles, the latest year first, in pages: the page and the count are cut by the database. Throws BudgetNotAReaderError. */
   async list(actor: AuthenticatedPrincipal, query: ListCyclesQueryDto): Promise<Page<CycleSummaryWire>> {
     await this.facts.requireVersionReader(actor);
-    const cycles = await this.cycles.list(await this.facts.organizationId());
-    const start = (query.page - 1) * query.pageSize;
-    const items = await Promise.all(cycles.slice(start, start + query.pageSize).map((cycle) => this.summary(cycle)));
+    const { items, total } = await this.cycles.page(
+      await this.facts.organizationId(),
+      (query.page - 1) * query.pageSize,
+      query.pageSize,
+    );
+    const formats = new Map<string, Awaited<ReturnType<BudgetFactsService['formatter']>>>();
+    for (const currency of new Set(items.map((item) => item.currency))) {
+      formats.set(currency, await this.facts.formatter(currency));
+    }
 
-    return pageOf(items, cycles.length, query.page, query.pageSize);
+    return pageOf(
+      items.map((item) => this.summary(item, formats.get(item.currency) as Formatter)),
+      total,
+      query.page,
+      query.pageSize,
+    );
   }
 
   /** Throws BudgetNotAReaderError and BudgetCycleNotFoundError. */
@@ -130,13 +143,11 @@ export class CycleService {
    */
   async update(actor: AuthenticatedPrincipal, year: number, body: UpdateCycleBodyDto): Promise<CycleWire> {
     this.facts.requireFinance(actor);
-    const reporting = await this.facts.reportingCurrency();
-    const ceiling = body.annualCeiling ? await this.facts.money(body.annualCeiling, reporting) : undefined;
     const organizationId = await this.facts.organizationId();
     const currentYear = Number((await this.facts.today(new Date())).slice(0, 4));
 
     const updated = await this.runner.run((tx) =>
-      this.updateIn(tx, { actor, organizationId, year, currentYear, ceiling, body }),
+      this.updateIn(tx, { actor, organizationId, year, currentYear, body }),
     );
 
     return this.wire(updated);
@@ -149,27 +160,35 @@ export class CycleService {
       organizationId: string;
       year: number;
       currentYear: number;
-      ceiling: bigint | undefined;
       body: UpdateCycleBodyDto;
     },
   ): Promise<CycleRecord> {
-    const { organizationId, year, currentYear, ceiling, body } = call;
+    const { actor, organizationId, year, currentYear, body } = call;
     const cycle = await this.cycles.lockByYear(tx, organizationId, year, 'UPDATE');
     if (!cycle) throw new BudgetCycleNotFoundError();
     if (isPastYear(year, currentYear)) throw new BudgetCycleYearPastError(year);
-    const { submission, decision } = deadlinesAfter(body, cycle);
-    if (decision < submission) throw new BudgetCycleDeadlinesInvalidError();
-    const ceilingChanged = ceiling !== undefined && ceiling !== cycle.annualCeilingMinor;
-    if (ceilingChanged && !body.reason) throw new BudgetCycleReasonRequiredError();
+    // The amount is read in the currency the cycle was opened in, not in the reporting currency of today.
+    const ceiling = body.annualCeiling
+      ? (await this.facts.parserOf(cycle.currency, tx))(body.annualCeiling)
+      : undefined;
+    const plan = planUpdate(body, cycle, ceiling);
+    if (plan.decision < plan.submission) throw new BudgetCycleDeadlinesInvalidError();
+    if (plan.ceilingChanged && !body.reason) throw new BudgetCycleReasonRequiredError();
+    // Nothing to change: the cycle is answered as it is, with no write and no record.
+    if (!plan.changes) return cycle;
 
     await this.cycles.update(tx, cycle.id, {
       ...(body.submissionDeadline ? { submissionDeadline: body.submissionDeadline } : {}),
       ...(body.decisionDeadline ? { decisionDeadline: body.decisionDeadline } : {}),
       ...(body.priorities !== undefined ? { priorities: body.priorities } : {}),
-      ...(ceilingChanged ? { annualCeilingMinor: ceiling } : {}),
-      unpublish: ceilingChanged,
+      ...(plan.ceilingChanged ? { annualCeilingMinor: ceiling } : {}),
+      unpublish: plan.ceilingChanged,
     });
-    await this.recordUpdate(tx, call, cycle, { submission, decision, ceilingChanged });
+    await this.recordUpdate(tx, { actor, organizationId, ceiling, body }, cycle, {
+      submission: plan.submission,
+      decision: plan.decision,
+      ceilingChanged: plan.ceilingChanged,
+    });
 
     return (await this.cycles.findByYear(organizationId, year, tx)) as CycleRecord;
   }
@@ -219,18 +238,6 @@ export class CycleService {
    */
   async setCeilings(actor: AuthenticatedPrincipal, year: number, body: SetCeilingsBodyDto): Promise<CycleWire> {
     this.facts.requireFinance(actor);
-    const reporting = await this.facts.reportingCurrency();
-    const reserve = await this.facts.money(body.sharedPoolReserve, reporting);
-    const parts: (CeilingParts & { departmentId: string })[] = [];
-    for (const row of body.departments) {
-      parts.push({
-        departmentId: row.departmentId,
-        signedCommitmentsMinor: await this.facts.money(row.signedCommitments, reporting),
-        plannedSeatsMinor: await this.facts.money(row.plannedSeats, reporting),
-        priorityMinor: await this.facts.money(row.priority, reporting),
-      });
-    }
-    const rows = parts.map((part) => ({ ...part, totalMinor: ceilingTotal(part) }));
     const organizationId = await this.facts.organizationId();
     const currentYear = Number((await this.facts.today(new Date())).slice(0, 4));
 
@@ -239,10 +246,31 @@ export class CycleService {
       if (!cycle) throw new BudgetCycleNotFoundError();
       if (isPastYear(year, currentYear)) throw new BudgetCycleYearPastError(year);
       const inSet = new Set(await this.ceilingDepartments(tx));
-      const strangers = [...new Set(rows.map((row) => row.departmentId).filter((id) => !inSet.has(id)))].sort();
+      const strangers = [
+        ...new Set(body.departments.map((row) => row.departmentId).filter((id) => !inSet.has(id))),
+      ].sort();
       if (strangers.length > 0) throw new BudgetCeilingDepartmentInvalidError(strangers);
 
-      await this.cycles.replaceCeilings(tx, cycle, reserve, rows);
+      // The amounts are read in the currency of the cycle, the minor unit read once.
+      const parse = await this.facts.parserOf(cycle.currency, tx);
+      const reserve = parse(body.sharedPoolReserve);
+      const rows = body.departments.map((row) => {
+        const parts = {
+          departmentId: row.departmentId,
+          signedCommitmentsMinor: parse(row.signedCommitments),
+          plannedSeatsMinor: parse(row.plannedSeats),
+          priorityMinor: parse(row.priority),
+          explanation: row.explanation ?? null,
+        };
+
+        return { ...parts, totalMinor: ceilingTotal(parts) };
+      });
+      const changes = changedCeilings(cycle.ceilings, rows);
+      const reserveChanged = reserve !== cycle.sharedPoolReserveMinor;
+      // The same division again changes nothing: the cycle stays published and nothing is recorded.
+      if (changes.length === 0 && !reserveChanged) return cycle;
+
+      await this.cycles.replaceCeilings(tx, cycle, reserve, rows, true);
       await this.audit.record(
         tx,
         budgetAuditEvent(
@@ -253,10 +281,10 @@ export class CycleService {
           cycle.id,
           {
             sharedPoolReserveMinor: reserve.toString(),
-            changes: changedCeilings(cycle.ceilings, parts).map((change) => ({
+            changes: changes.map((change) => ({
               departmentId: change.departmentId,
-              before: change.before ? ceilingTotal(change.before).toString() : null,
-              after: change.after ? ceilingTotal(change.after).toString() : null,
+              before: change.before && ceilingAuditValue(change.before),
+              after: change.after && ceilingAuditValue(change.after),
             })),
           },
           { sharedPoolReserveMinor: cycle.sharedPoolReserveMinor?.toString() ?? null },
@@ -348,11 +376,9 @@ export class CycleService {
       : new BudgetCeilingsOverAnnualError(verdict.gapMinor);
   }
 
-  /** The figures of a cycle as they are answered; the sums are computed from the stored figures, never stored. */
-  private async summary(cycle: CycleRecord): Promise<CycleSummaryWire> {
-    const format = await this.facts.formatter(cycle.currency);
-    const allocated =
-      cycle.ceilings.reduce((sum, ceiling) => sum + ceiling.totalMinor, 0n) + (cycle.sharedPoolReserveMinor ?? 0n);
+  /** The figures of a cycle as they are answered; the sums come from the stored figures, never stored. */
+  private summary(cycle: CycleFigures, format: Formatter): CycleSummaryWire {
+    const allocated = cycle.ceilingsTotalMinor + (cycle.sharedPoolReserveMinor ?? 0n);
     const left = cycle.annualCeilingMinor - allocated;
     const status =
       cycle.publishedAt !== null
@@ -383,6 +409,7 @@ export class CycleService {
     const ceilings: CycleWire['ceilings'] = {};
     for (const ceiling of cycle.ceilings) {
       ceilings[ceiling.departmentId] = {
+        explanation: ceiling.explanation,
         signedCommitments: format(ceiling.signedCommitmentsMinor),
         plannedSeats: format(ceiling.plannedSeatsMinor),
         priority: format(ceiling.priorityMinor),
@@ -390,6 +417,6 @@ export class CycleService {
       };
     }
 
-    return { ...(await this.summary(cycle)), ceilings };
+    return { ...this.summary(figuresOf(cycle), format), ceilings };
   }
 }

@@ -6,11 +6,11 @@ export const FINANCE: Pick<DemoFixture, 'taxProfile' | 'cycle' | 'budgets' | 'pr
     group: 'T2',
     lines: [{ taxType: 'VAT', ratePercent: '10', deductible: true }],
   },
-  // A ceiling far above the budgets of the dataset, divided evenly so that the check of the whole division passes (QT 4.3).
+  // A ceiling far above the budgets of the dataset; what is left after the reserve is divided evenly among the departments, so the
+  // division always adds up to no more than the annual ceiling (QT 4.3).
   cycle: {
     annualCeiling: '20000000000',
     sharedPoolReserve: '1000000000',
-    departmentCeiling: '1000000000',
     submissionDaysBefore: 60,
     decisionDaysBefore: 30,
   },

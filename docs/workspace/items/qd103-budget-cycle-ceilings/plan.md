@@ -109,3 +109,7 @@ Kiểm tra nhanh tracker §4.5; `openapi:export` thêm 6 operation. Tự review 
 6. Seed: bước `budget.cycles` (mở, chia đều Trần cho mọi phòng đang hoạt động đọc qua `/departments`, phát hành) trước `budget.year`; fixture `cycle` mới.
 7. Test harness: `BudgetHarness.start` phát hành sẵn kỳ cho 4 năm bằng SQL (`publishedCycle`); các spec khác không đổi khẳng định.
 8. `docs/generated/module-graph.md` sinh lại.
+
+### Sau review W2 R2 (F-015…F-027, 08/11/2026)
+
+Sửa theo [FINDINGS](../../../reviews/qd103-108-alignment-2026-11-08/FINDINGS.md). Lệnh: `prisma migrate deploy` rồi `prisma migrate diff --from-config-datasource --to-schema prisma --exit-code` trên DB sạch ⟹ _No difference detected_; jest `src/cli/seed src/modules/budgets` 337 test xanh; `test:integration` `budgets` + `requests/budget*` + `installation/seed` + `operating-parameters` xanh (budget-cycle-edges 8, publish 13, constraints 6); `test:http` platform/budgets/operating-parameters 308 xanh (`budget-cycles.http-spec` 19); `test:gates` 330 xanh; `test:flows mf4-budget` 8 xanh; typecheck, lint, arch:check, rules:check xanh. Chưa chạy: `pnpm check`, full suite; chưa có test đếm câu lệnh của danh sách và test đổi đồng tiền báo cáo.

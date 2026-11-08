@@ -38,17 +38,29 @@ const AUTH_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
   {
     status: HttpStatus.FORBIDDEN,
-    description: 'Only the Super Admin configures the operating parameters.',
+    description:
+      'Only the role that owns a parameter sets it: the Super Admin the parameters of the system, Finance the ones that carry the owner FINANCE (a request for another role is refused).',
     examples: [FORBIDDEN_EXAMPLE],
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
-/** The three reads (the list, the history of a parameter, the non-working dates) are the Super Admin's, like the writes. */
+/** The reads of the non-working dates are the Super Admin's, like the writes. */
 const READ_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
   {
     status: HttpStatus.FORBIDDEN,
     description: 'Only the Super Admin reads the operating parameters, their history and the non-working dates.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+] as const;
+/** The reads of the parameters: the Super Admin reads every one, Finance only those it owns (`QĐ-103z`(1)). */
+const PARAMETER_READ_ERRORS = [
+  UNAUTHENTICATED_RESPONSE,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'Only the Super Admin and Finance read the operating parameters; Finance reads only the ones it owns and their history.',
     examples: [FORBIDDEN_EXAMPLE],
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
@@ -106,9 +118,10 @@ export class OperatingParametersController {
   @ApiOperation({ operationId: 'operatingParameterList', summary: 'List operating parameters' })
   @ApiSuccessResponse(ParameterListResponseDto, {
     message: 'PARAMETER.LISTED',
-    description: 'Every parameter with the value in force, its default, its unit and the domain a value must stay in.',
+    description:
+      'The parameters the caller may read with the value in force, the default, the unit and the domain a value must stay in: every parameter for the Super Admin, only the ones Finance owns for Finance.',
   })
-  @ApiErrorResponses(...READ_ERRORS)
+  @ApiErrorResponses(...PARAMETER_READ_ERRORS)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal) {
     try {
       // The Super Admin reads every parameter; Finance reads the ones Finance sets (QĐ-103z(1)).
@@ -156,7 +169,7 @@ export class OperatingParametersController {
     message: 'PARAMETER.HISTORY_LISTED',
     description: 'The values the parameter has had, newest first.',
   })
-  @ApiErrorResponses(...READ_ERRORS, VALIDATION_ERROR, PARAMETER_NOT_FOUND)
+  @ApiErrorResponses(...PARAMETER_READ_ERRORS, VALIDATION_ERROR, PARAMETER_NOT_FOUND)
   async history(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ParameterKeyParamDto) {
     try {
       if (!rolesMayRead(actor.roles, params.key)) throw new ParameterNotYoursError(params.key);

@@ -256,7 +256,17 @@ describe('the budget cycle: open, divide, publish (integration, real PostgreSQL)
       const [, second1] = await auditOf(year, 'BUDGET_CYCLE.CEILINGS_SET');
       expect(second1.after).toMatchObject({ sharedPoolReserveMinor: '5' });
       expect(second1.before).toEqual({ sharedPoolReserveMinor: '0' });
-      expect(second1.after.changes).toEqual([{ departmentId: first.department.id, before: '1', after: '8' }]);
+      const changes = second1.after.changes as {
+        departmentId: string;
+        before: { totalMinor: string };
+        after: { totalMinor: string };
+      }[];
+      expect(changes).toHaveLength(1);
+      expect(changes[0]).toMatchObject({
+        departmentId: first.department.id,
+        before: { totalMinor: '1' },
+        after: { totalMinor: '8', priorityMinor: '7' },
+      });
     });
 
     it('only reads the cycle of a year that has gone by (B7)', async () => {

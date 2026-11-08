@@ -41,6 +41,17 @@ export class ProposalSender {
     private readonly cycles: CycleRepo,
   ) {}
 
+  /**
+   * A head proposes only once the cycle of the year was published, and may go on while it is changed (`Q-02`). The cycle is read
+   * `FOR SHARE`, so a change of it waits for the sending. It is taken first, before the proposal and the year (the order of the
+   * module: cycle, proposal, version, year): sending again calls this before it locks the proposal it follows.
+   * Throws BudgetCycleNotPublishedError.
+   */
+  async requirePublishedCycle(tx: DbTx, year: number): Promise<void> {
+    const cycle = await this.cycles.lockByYear(tx, await this.facts.organizationId(tx), year, 'SHARE');
+    if (!cycle || !cycleAcceptsWork(cycle)) throw new BudgetCycleNotPublishedError(year);
+  }
+
   async send(tx: DbTx, actor: AuthenticatedPrincipal, input: ProposalSendInput): Promise<string> {
     const now = new Date();
     const today = await this.facts.today(now, tx);
@@ -48,11 +59,7 @@ export class ProposalSender {
     const own = await this.facts.requireHeadedCostCenter(actor.employeeId, today, tx);
     const costCenter = await this.facts.costCenter(own, tx);
     if (!yearIsOpen(input.year, today)) throw new BudgetYearEndedError(input.year);
-    // A head proposes only once the cycle of the year was published, and may go on while it is changed (`Q-02`). The cycle is read
-    // `FOR SHARE`, so a change of it waits for the sending. (A sending again has locked its proposal before this; the cycle write
-    // never locks a proposal, so the two orders cannot meet.)
-    const cycle = await this.cycles.lockByYear(tx, await this.facts.organizationId(tx), input.year, 'SHARE');
-    if (!cycle || !cycleAcceptsWork(cycle)) throw new BudgetCycleNotPublishedError(input.year);
+    await this.requirePublishedCycle(tx, input.year);
 
     await this.facts.requirePlans(input.lines.map((line) => line.planId));
 

@@ -84,6 +84,7 @@ model Organization {
   spendBatches                       SpendBatch[]
   requestSupplements                 RequestSupplement[]
   budgetProposals                    BudgetProposal[]
+  budgetCycles                       BudgetCycle[]
   budgetVersions                     BudgetVersion[]
   budgetCommitments                  BudgetCommitment[]
   invoices                           Invoice[]
@@ -149,6 +150,7 @@ model Department {
 
   organization            Organization                  @relation(fields: [organizationId], references: [id])
   costCenters             CostCenter[]                  @relation("CostCenterDepartment")
+  budgetCeilings          BudgetDepartmentCeiling[]     @relation("BudgetDepartmentCeilingDepartment")
   costCenterLinks         CostCenterDepartmentLink[]
   itAdmin                 Employee?                     @relation("DepartmentItAdmin", fields: [itAdminEmployeeId], references: [id], onDelete: Restrict)
   placements              EmployeePlacement[]
@@ -292,6 +294,8 @@ model Employee {
   budgetQuestionsAsked            BudgetInformationRequest[]          @relation("BudgetInformationAsker")
   commitmentReleases              BudgetCommitmentRelease[]           @relation("CommitmentReleaser")
   invoicesRecorded                Invoice[]                           @relation("InvoiceRecorder")
+  budgetCyclesOpened              BudgetCycle[]                       @relation("BudgetCycleOpener")
+  budgetCyclesPublished           BudgetCycle[]                       @relation("BudgetCyclePublisher")
   budgetQuestionsAnswered         BudgetInformationRequest[]          @relation("BudgetInformationAnswerer")
   stepSlaRemindersHeld            StepSlaReminder[]                   @relation("StepSlaReminderHolder")
   stepSlaRemindersReceived        StepSlaReminderRecipient[]          @relation("StepSlaReminderRecipient")

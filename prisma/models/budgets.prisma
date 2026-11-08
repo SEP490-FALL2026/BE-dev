@@ -477,7 +477,11 @@ model BudgetCycle {
   firstPublishedAt      DateTime? @map("first_published_at") @db.Timestamptz(3)
   updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  ceilings BudgetDepartmentCeiling[]
+  organization   Organization              @relation(fields: [organizationId], references: [id])
+  currencyRecord Currency                  @relation("BudgetCycleCurrency", fields: [currency], references: [code], onDelete: Restrict)
+  openedBy       Employee                  @relation("BudgetCycleOpener", fields: [openedByEmployeeId], references: [id], onDelete: Restrict)
+  publishedBy    Employee?                 @relation("BudgetCyclePublisher", fields: [publishedByEmployeeId], references: [id], onDelete: Restrict)
+  ceilings       BudgetDepartmentCeiling[]
 
   @@unique([organizationId, year])
   @@map("budget_cycles")
@@ -493,8 +497,10 @@ model BudgetDepartmentCeiling {
   priorityMinor          BigInt  @map("priority_minor")
   totalMinor             BigInt  @map("total_minor")
   publishedTotalMinor    BigInt? @map("published_total_minor")
+  explanation            String?
 
-  cycle BudgetCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  cycle      BudgetCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  department Department  @relation("BudgetDepartmentCeilingDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
 
   @@id([cycleId, departmentId])
   @@map("budget_department_ceilings")

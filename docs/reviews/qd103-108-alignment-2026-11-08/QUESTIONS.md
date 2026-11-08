@@ -261,3 +261,142 @@ Phát sinh khi soạn và audit thiết kế W3 (MF-1 lõi), 08/11/2026; bản c
 - **W2-N1 — danh sách và chi tiết kỳ.** `budgetCycleList` phân trang bản tóm tắt; chia Trần theo phòng chỉ ở `budgetCycleGet` (bản đồ theo `departmentId`). Đổi lại: thêm ngoại lệ vào sổ collection (có Owner) nếu muốn mảng.
 - **W2-N2 — tập phòng chia Trần.** Mọi phòng `ACTIVE`; ngày hiệu lực thêm ở `department-effective-year`.
 - **W2-N3 — kỳ năm hiện tại có thể mở khi hạn đã qua** (Q-02 = A); không chặn.
+
+## Câu khi thiết kế W4 (Q-35 → Q-51)
+
+Phát sinh khi soạn và audit thiết kế W4 (MF-1 cấp quyền), 08/11/2026; bản cuối sau audit. Câu đã có nguồn ghi rõ; câu còn lại **TẠM CHỌN (chờ Owner)**. Bổ sung Q-05: thu hồi đúng **ngày 1** ⟹ tháng đó được giải phóng (suy từ `US-07-05` AC-21); thu hồi giữa tháng vẫn theo A.
+
+### Câu đã có nguồn (không còn là tạm chọn)
+
+| Câu                                                                   | Nguồn (`file:dòng`)                                                                                                                                                                                        | Spec theo thế nào                                                                                                                                                                               |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q-37 thiết bị khi gắn khóa `K4`                                       | `Docs/BE-UserStory/epics/EP-07.md:52` (`US-07-01` AC-10: thiết bị không phải thiết bị công ty đã đăng ký ⟹ từ chối); BRD `FR-2.10` dòng 510 (_kèm thiết bị công ty đã cài_); QT dòng 322                   | `qd103-k4-key-pool` _Behavior_ 2: `deviceId` bắt buộc, kiểm qua `DeviceRegistryHook` (devices bind); 422 `DEVICE_NOT_ELIGIBLE`, 409 `DEVICE_REGISTRY_UNAVAILABLE`; lưu `license_keys.device_id` |
+| Q-41 IT ghi quyền theo vai cho chính mình                             | `Docs/Decisions/project-decisions.md:322` (`QĐ-77m`: chỉ chặn khi còn IT Admin khác dùng được; một IT ⟹ cờ _tự thực thi_ + báo Super Admin); `EP-07.md:595` (`SoD-1` chỉ nói Super Admin, Người duyệt chi) | `qd103-role-based-access` _Behavior_ 1: `ProvisioningTaskFrame.selfExecutionMode` — 403 `ANOTHER_IT_ADMIN_NEEDED` / ghi kèm `selfExecuted`                                                      |
+| Q-42 hết hạn giữ khi còn Request mở                                   | `project-decisions.md:190` (`QĐ-106f`: _không có Request thì IT thu hồi_); `EP-07.md:617` (`US-07-14` AC-9: tới hết 06/11 _không gửi Request nào_ ⟹ tác vụ thu hồi)                                        | role-based _Behavior_ 7: chưa thu hồi khi có Request cấp mới cùng gói gửi trong hạn giữ, ở mọi trạng thái chưa cuối (gồm _đã duyệt chờ cấp_); kết thúc ⟹ lượt quét sau mở thu hồi               |
+| Q-05 vế _thu hồi đúng ngày 1_                                         | `EP-07.md:274` (`US-07-05` AC-21: hoàn tất 01/09 ⟹ giải phóng 800 = 09→12); cùng dòng vế `K1`: _các tháng sau 30/09_ (ngày hết kỳ đã trả)                                                                  | `qd103-commitment-release-on-revocation` _Behavior_ 3–4: ngày 1 ⟹ tháng đó giải phóng; `K1` dùng `paidThroughOn`. Vế _giữa tháng_ vẫn tạm chọn (dưới)                                           |
+| Q-44 bỏ route Finance ghi hóa đơn trực tiếp (audit §4: _suy ra được_) | `project-decisions.md:518` (`QĐ-103l`: IT nộp mỗi hóa đơn một đề nghị, Finance xác nhận); QT dòng 66 (`C-16`), dòng 962-964 (`SBF-19`)                                                                     | `qd103-purchase-invoice-sbf19` _Behavior_ 13: gỡ `POST /budget-commitments/{id}/invoices`; breaking FE ghi API docs W8                                                                          |
+| (không đánh số) đích hóa đơn `K1` theo vai                            | `project-decisions.md:188` (`QĐ-104g`: chi phí về phòng người giữ, Người duyệt chi vào _Chưa phân bổ Cost Center_)                                                                                         | hóa đơn _Behavior_ 2: `HOLDER_DEPARTMENT` / `UNALLOCATED_COST_CENTER`                                                                                                                           |
+
+### Câu tạm chọn W4 (bản cuối) — TẠM CHỌN (chờ Owner)
+
+### Câu cũ ở `QUESTIONS.md` mà W4 dùng (giữ, không đổi)
+
+| Câu                                         | Chọn                                                                                          | Dùng ở                   | Cách đổi lại                                                          |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------- |
+| Q-01 khoản 01/01 của quyền không có Request | B — khoản theo Assignment (chỉ khi chuỗi `predecessor_id` không có tác vụ `GRANT` có Request) | new-year _Behavior_ 2    | A: bỏ nhánh `request_id IS NULL`, cột `assignment_id`, UNIQUE partial |
+| Q-04 giá Request khi thuê bao trùng         | C — thuê bao chính, không có thì giá cao nhất                                                 | grant _Behavior_ 2       | hàm `pickPriceSource`                                                 |
+| Q-05 vế giữa tháng                          | A — tháng thu hồi giữa chừng tính đủ (10/09 ⟹ 10→12)                                          | release _Behavior_ 4     | `firstMonth` trong `commitment-revocation.policy.ts`                  |
+| Q-10 khóa không chuyển máy                  | B — hai trạng thái + hành động rút khỏi kho                                                   | k4 _Behavior_ 4–5        | —                                                                     |
+| Q-27 khoản năm sau đã có                    | A — hai điều kiện bỏ qua                                                                      | new-year _Behavior_ 2, 4 | điều kiện trong `year-start-commitments.policy.ts`                    |
+| Q-29 Request tiếp tục duyệt tháng 12        | B'                                                                                            | new-year _Behavior_ 4    | như trên                                                              |
+
+### Q-35 — _Tránh được_ chỉ ghi cho cấp theo Request (giữ)
+
+- Bối cảnh: `QĐ-106e`/`QĐ-108d` _ghi một lần lúc IT cấp từ kho_, ví dụ đều là Request; `QĐ-106e` không giới hạn Request (`project-decisions.md:354`) — đây là diễn giải.
+- Ví dụ: `IT1` ghi quyền theo vai Slack cho `C1` từ seat Trống (12/tháng, tháng 07) — có ghi _tránh được_ 72 không?
+- Phương án: A. Chỉ tác vụ `GRANT` có Request, `K2`/`K4`, không mua. B. Mọi lần gán seat Trống (gồm quyền theo vai, Request tiếp tục).
+- **Chọn A** — chỉ số đo _không mua nhờ kho_ cho nhu cầu đã duyệt chi; quyền theo vai không có số tiền đã duyệt để so.
+- Đổi lại: điều kiện `requestId != null` trong `licensing/shared-pool/shared-pool.policy.ts` (grant _Behavior_ 6).
+
+### Q-36 — _Seat còn trong ân hạn thu hồi_ ở W4 (giữ)
+
+- Bối cảnh: `FR-3.23`/`US-07-13` AC-3: seat trong ân hạn không chặn mua nếu IT ghi lý do; ân hạn 7 ngày của `MF-5` ở W6; BRD đòi điều kiện _chờ vượt SLA cấp_.
+- Ví dụ: kho Figma hết Trống; seat của `E3` có tác vụ thu hồi (nghỉ việc) chưa xong; `IT1` mua cho `R8`.
+- Phương án: A. _Đang trong thu hồi_ = Assignment mở có tác vụ thu hồi chưa đóng (mọi nguồn); lý do của IT là bằng chứng _chờ sẽ vượt SLA_. B. Chỉ nguồn ghost seat.
+- **Chọn A** — gồm cả ân hạn W6 khi có; không đợi W6.
+- Đổi lại: truy vấn `inRevocation` trong `shared-pool-capacity.repo.ts`.
+
+### Q-38 — Khóa đã _rút khỏi kho_ có khôi phục được không (giữ)
+
+- Bối cảnh: Q-10 B thêm hành động rút; nguồn không nói thao tác ngược.
+- Ví dụ: `IT1` rút nhầm `KEY-5` (tưởng máy đã thanh lý).
+- Phương án: A. Không có thao tác ngược (trigger giữ `withdrawn_*` bất biến). B. `licenseKeyRestore` có lý do + audit.
+- **Chọn A** — ít operation, khớp _không cấp lại khóa đã chết_.
+- Đổi lại: thêm `POST /license-keys/{id}/restoration`, nới `license_key_guard` cho đúng operation đó.
+
+### Q-39 — Giá một seat của khoản cam kết cũ (sửa theo DA4-18)
+
+- Bối cảnh: khoản ghi trước W4 không có `seat_monthly_minor`; Request nhóm một khoản nhiều seat; quyền có thời hạn có khoản ngắn hơn 12 tháng.
+- Ví dụ: khoản 2 000 tạo 03/2026, 1 người, không thời hạn, thu hồi 01/09; khoản 800 tạo 03/2026, quyền tới 30/06, thu hồi 01/05.
+- Phương án: A. `floor(amount / số người thụ hưởng / số tháng phủ)`, tháng phủ = từ tháng tạo khoản tới tháng `coverEndOn` nếu trong năm, không thì 12. B. Không
+  giải phóng tự động khoản cũ (Finance `REMAINDER`). C. Giải phóng toàn bộ phần đang giữ.
+- **Chọn A** — 200 × 4 = 800 / 200 × 2 = 400; làm tròn xuống nên không giải phóng quá phần một seat.
+- Đổi lại: nhánh `seat_monthly_minor IS NULL` trong `budgets/commitment/commitment-revocation.policy.ts`.
+
+### Q-40 — Ai là _admin workspace_ được ghi quyền theo vai; khi nào thôi vai (giữ)
+
+- Bối cảnh: `QĐ-104g` _seat của admin workspace_; `QĐ-77d` quản trị workspace đứng tên từng IT Admin; `WorkspaceDuty` theo gói; không có sự kiện _thôi quản trị_.
+- Ví dụ: `IT2` quản trị Slack; tháng 11 giao Slack cho `IT3`, `IT2` vẫn là IT Admin.
+- Phương án: A. Giữ `IT_ADMIN` **và** có `WorkspaceDuty` đúng gói; thôi vai khi mất `IT_ADMIN` hoặc IT gọi `licenseAssignmentRoleBasedEnd`. B. Mọi IT Admin. C. Tự theo dõi `WorkspaceDuty`.
+- **Chọn A** — khớp `US-07-14` AC-3; không cần sự kiện mới ở catalog.
+- Đổi lại: `role-based.policy.ts` (`eligibleKinds`); C = listener ở catalog khi trách nhiệm đổi.
+
+### Q-43 — Cờ _vượt_ của hóa đơn kỳ thuê bao trước điểm điều chỉnh (làm rõ theo DA4-33)
+
+- Bối cảnh: R-F02 so hóa đơn gia hạn với số seat hệ thống tính ở điểm điều chỉnh (W5); gói năm có thể trả theo tháng.
+- Ví dụ: Figma 20 seat × 180/năm; hóa đơn kỳ năm 3 800; hóa đơn một tháng của gói năm trả tháng 320.
+- Phương án: A. `purchased_quantity × đơn giá kỳ giá × tháng kỳ dịch vụ / tháng chu kỳ giá` (3 600 / 300 ⟹ cả hai có cờ). B. Không gắn cờ tới W5.
+- **Chọn A** — vẫn bắt được hóa đơn lạ; W5 thay nguồn số seat.
+- Đổi lại: `expectedOfSubscriptionPeriod` trong `budgets/purchase-invoice/purchase-invoice.policy.ts`.
+
+### Q-45 — Biết `K1` _đã mua_ khi tác vụ cấp thất bại (đổi A → B theo DA4-30)
+
+- Bối cảnh: `QĐ-104k`(4) _IT đã mua `K1` mà cấp thất bại ⟹ hóa đơn vào Chưa phân bổ Cost Center phòng người dùng_. A cũ bắt IT khai cờ lúc đóng thất bại ⟹ khai sai
+  là kẹt (`TASK_NOT_A_PURCHASE`), và hóa đơn nộp trước khi thất bại bị kẹt ở `COMMITMENT_RELEASED`.
+- Ví dụ: `IT1` đăng ký ChatGPT Plus cho `E1`, nộp hóa đơn liên kết `R6`; tài khoản bị khóa, tác vụ đóng thất bại; Finance xác nhận sau đó.
+- Phương án: A. `provisioningTaskCloseFailed` `K1` bắt buộc `purchasedBeforeFailure`. B. Suy ra từ hóa đơn: hóa đơn liên kết tác vụ/Request `K1` có tác vụ `CLOSED_FAILED`
+  ⟹ đích `UNALLOCATED_COST_CENTER`; đích tính lại ở nộp, nộp lại, xác nhận. C. Mặc định đã mua.
+- **Chọn B** — có hóa đơn chính là bằng chứng đã mua; không thêm trường; không kẹt.
+- Đổi lại: thêm lại `purchasedBeforeFailure` ở `provisioning.dto.ts` và điều kiện trong `targetOf`.
+
+### Q-46 — Hóa đơn `K1`/`K4` áp vào khoản năm nào (đổi A → B' theo DA4-31)
+
+- Bối cảnh: R-H04 thực chi theo năm kỳ dịch vụ; `C-16` hóa đơn năm sau về trước khi có ngân sách ⟹ ghi thực chi, _chưa có ngân sách_; vế dự phòng _HELD gần nhất_ của A
+  làm 2026 _còn lại_ tăng giả.
+- Ví dụ: `K1` `R6`, hóa đơn kỳ 01/2027 nộp 28/12/2026; job 01/01/2027 tạo khoản (`R6`, 2027) `NO_BUDGET`.
+- Phương án: A. Khoản năm kỳ dịch vụ; không có ⟹ khoản `HELD` gần nhất. B'. Khoản năm kỳ dịch vụ; chưa có lúc nộp ⟹ vẫn nhận; lúc xác nhận năm chưa tới ⟹ 409
+  `COMMITMENT_YEAR_NOT_OPEN`, năm đã tới mà không có khoản (job bỏ mục) ⟹ `UNALLOCATED_COST_CENTER` phòng của Request. C. Đích mới `ACTUAL_ONLY` (dòng `invoices` không khoản).
+- **Chọn B'** — không áp vào năm khác; không cần đổi `invoices.commitment_id` NOT NULL (`budgets.prisma:351`).
+- Đổi lại: `commitmentFor` trong `purchase-invoice.policy.ts`; C cần migration `invoices.commitment_id` nullable + `spentOf`.
+
+### Q-47 — Giá cho khoản 01/01 (đổi A → B theo DA4-37)
+
+- Bối cảnh: `FR-5.8`(6) _giá tháng × số tháng năm mới_, `QĐ-106c` không tính lại; mốc nguồn là 01/01, lượt có thể chạy trễ.
+- Ví dụ: Figma 15, kỳ mới giá 18 từ 20/12/2026; lượt chạy 05/02/2027 khi kỳ giá 22 đã bắt đầu 01/02.
+- Phương án: A. Giá hiện hành ngày chạy (⟹ 22). B. Giá hiệu lực ngày 01/01/`Y` (⟹ 18); thiếu ⟹ giá một seat của khoản năm trước. C. Giá Request lúc duyệt.
+- **Chọn B** — lượt trễ không đổi kết quả; đúng mốc nguồn.
+- Đổi lại: tham số `on` của `CatalogApi.getPlanPrice` trong `year-start-commitments.policy.ts`.
+
+### Q-48 — Năm đầu cài đặt và triển khai giữa năm (giữ)
+
+- Bối cảnh: job tạo khoản _ngày 01/01_; tổ chức cài giữa năm hoặc W4 triển khai tháng 11 sẽ tạo hồi tố.
+- Ví dụ: triển khai W4 ngày 20/11/2026; seed tạo tổ chức hôm nay.
+- Phương án: A. Bỏ năm `Y` nếu tổ chức tạo sau 01/01/`Y`; migration đánh dấu năm hiện hành đã chạy. B. Chỉ chạy trong tháng 01.
+- **Chọn A** — không hồi tố, không phụ thuộc thời điểm khởi động.
+- Đổi lại: điều kiện `createdAt` (`OrganizationReadApi.getOrganization`) trong `year-start-commitments.service.ts` + khối `INSERT` trong migration.
+
+### Q-49 — Ai xác nhận bàn giao khi thu hồi nguồn `ROLE_ENDED` (mới, DA4-07)
+
+- Bối cảnh: `handover-confirmer.policy.ts:36-63` — nguồn không có trong bảng rơi về `DEPARTMENT_HEAD`; gói mất dữ liệu (hộp thư) sẽ chờ trưởng phòng của người thôi vai.
+- Ví dụ: `C1` thôi vai Người duyệt chi, hết hạn giữ hộp thư Google Workspace (`dataLossOnRemoval`).
+- Phương án: A. `IT_ADMIN` (thêm vào `IT_SOURCES`, như `TIME_LIMITED_EXPIRY`). B. Chính người giữ (như `RETURN`). C. Trưởng phòng (mặc định hiện tại).
+- **Chọn A** — một dòng; IT là người mở việc thu hồi theo `QĐ-106f`.
+- Đổi lại: `roleOf` trong `handover-confirmer.policy.ts` (B: `{ role: 'REQUESTER', fixedEmployeeId: holder }`).
+
+### Q-50 — Khóa `K4` khi thu hồi mà gói chưa có điều khoản chuyển máy (mới, DA4-24)
+
+- Bối cảnh: `FR-2.10` _về kho nếu cho chuyển máy, nếu không thì không về kho_; catalog chưa lưu điều khoản (`transferAllowed` luôn null).
+- Ví dụ: Office 2021 OEM gắn máy cũ của `E1`; IT gỡ kích hoạt `KEY-8`.
+- Phương án: A. `keyDisposition` bắt buộc với `K4` (`RETURN_TO_STORE` | `WITHDRAW` + lý do), rút trong cùng transaction. B. Mặc định về kho, IT có thể rút. C. Thêm điều
+  khoản vào gói (catalog) rồi tự quyết.
+- **Chọn A** — không bao giờ có khóa chết ở _Trống_; không đổi catalog.
+- Đổi lại: B = `keyDisposition` tùy chọn mặc định `RETURN_TO_STORE`; C = cột điều khoản ở plan + `releaseKeyOnRevocation`.
+
+### Q-51 — Thiết bị chưa xác nhận `BM-06` có gắn khóa `K4` được không (mới, DA4-02)
+
+- Bối cảnh: `device-binding.types.ts:15-19` để xác nhận của người giữ thiết bị là _câu mở của Owner_; `US-07-01` AC-10 chỉ đòi _thiết bị công ty đã đăng ký_.
+- Ví dụ: `E2` vừa nhận laptop `D2`, chưa ký `BM-06`; `IT1` gắn `KEY-9`.
+- Phương án: A. Không cần xác nhận. B. Cần `CONFIRMED` (khác ⟹ 422 `DEVICE_NOT_ACKNOWLEDGED`).
+- **Chọn A** — đúng chữ AC-10; không chặn MF-1 bởi việc của luồng thiết bị.
+- Đổi lại: bật điều kiện acknowledgement trong `judgeKeyBinding` (`device-binding.policy.ts:66`).
+- **W2-N4 — diễn giải Trần phòng.** `explanation` tùy chọn, publish không đòi (QT 4.3 nói "kèm diễn giải"). Đổi lại: thêm `explanationMissingDepartmentIds` vào `CEILINGS_INCOMPLETE` và kiểm ở `judgePublish`.

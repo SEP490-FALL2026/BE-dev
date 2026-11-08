@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import { formatAmount } from '../../../core/money/money';
-import { MoneyOutOfRangeError } from '../../../core/money/money.errors';
+import { formatAmount, parseDecimalAmount } from '../../../core/money/money';
+import { CurrencyNotSupportedError, MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditEventInput, AuditValue } from '../../audit/public/audit.types';
@@ -296,6 +296,20 @@ export class BudgetFactsService {
     if (minor <= 0n) throw new MoneyOutOfRangeError();
 
     return minor;
+  }
+
+  /** Reads amounts in whole minor units of one currency, the minor unit read once: a cycle keeps the currency it was opened in. */
+  async parserOf(currency: string, tx?: DbTx): Promise<(input: { amount: string }) => bigint> {
+    const found = await this.finance.findCurrency(currency, tx);
+    if (!found) throw new CurrencyNotSupportedError(currency);
+
+    return (input) => {
+      const minor = parseDecimalAmount(input.amount, found.minorUnit);
+      // A budget never holds a negative amount.
+      if (minor < 0n) throw new MoneyOutOfRangeError();
+
+      return minor;
+    };
   }
 
   async formatter(currency: string): Promise<(minor: bigint) => MoneyView> {

@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { INSTALLATION } from './shared-demo-v3/installation';
 import { SHARED_DEMO_V3 } from './shared-demo-v3';
+import { evenShareOf } from '../steps/finance.steps';
 
 describe('shared dataset v3 single-role accounts', () => {
   it('has 23 employees and 21 accounts, each with one initial role', () => {
@@ -48,6 +49,16 @@ describe('shared dataset v3 single-role accounts', () => {
       expect(SHARED_DEMO_V3.departments.some((department) => department.code === subscription.ownerDepartment)).toBe(
         true,
       );
+  });
+  it('divides the annual ceiling so that the departments and the reserve never add up to more, whatever their number', () => {
+    const { annualCeiling, sharedPoolReserve } = SHARED_DEMO_V3.cycle;
+
+    for (const departments of [1, 7, 19, 200, 5000]) {
+      const share = BigInt(evenShareOf(annualCeiling, sharedPoolReserve, departments));
+
+      expect(share * BigInt(departments) + BigInt(sharedPoolReserve)).toBeLessThanOrEqual(BigInt(annualCeiling));
+    }
+    expect(evenShareOf(annualCeiling, sharedPoolReserve, 0)).toBe('0');
   });
   it('sends nothing the API dropped in Wave 1: no plan line, terms of at most 12 months, a reserve that is the default share', () => {
     for (const request of SHARED_DEMO_V3.requests) {

@@ -19,6 +19,8 @@ export interface StoredCeiling extends CeilingParts {
   departmentId: string;
   totalMinor: bigint;
   publishedTotalMinor: bigint | null;
+  /** What the total rests on, from the base figures (QT 4.3); optional. */
+  explanation: string | null;
 }
 
 export type PublishVerdict =
@@ -64,17 +66,23 @@ export const departmentsToTell = (ceilings: readonly StoredCeiling[]): string[] 
 /** The cycle accepts the proposals of its year once it was published, and keeps accepting them while it is changed (`Q-02`). */
 export const cycleAcceptsWork = (cycle: { firstPublishedAt: Date | null }): boolean => cycle.firstPublishedAt !== null;
 
-/** The ceilings whose parts differ between two divisions, by department: what the audit record shows before and after. */
+/** A ceiling as the audit record shows it: the three parts, their total and the explanation. */
+export interface CeilingFigures extends CeilingParts {
+  explanation: string | null;
+}
+
+/** The ceilings whose parts or explanation differ between two divisions, by department: what the audit record shows before and after. */
 export function changedCeilings(
   before: readonly StoredCeiling[],
-  after: readonly (CeilingParts & { departmentId: string })[],
-): { departmentId: string; before: CeilingParts | null; after: CeilingParts | null }[] {
+  after: readonly (CeilingFigures & { departmentId: string })[],
+): { departmentId: string; before: CeilingFigures | null; after: CeilingFigures | null }[] {
   const was = new Map(before.map((ceiling) => [ceiling.departmentId, ceiling]));
   const now = new Map(after.map((ceiling) => [ceiling.departmentId, ceiling]));
-  const same = (a: CeilingParts, b: CeilingParts) =>
+  const same = (a: CeilingFigures, b: CeilingFigures) =>
     a.signedCommitmentsMinor === b.signedCommitmentsMinor &&
     a.plannedSeatsMinor === b.plannedSeatsMinor &&
-    a.priorityMinor === b.priorityMinor;
+    a.priorityMinor === b.priorityMinor &&
+    (a.explanation ?? null) === (b.explanation ?? null);
   const ids = [...new Set([...was.keys(), ...now.keys()])].sort();
 
   return ids.flatMap((departmentId) => {
@@ -85,13 +93,38 @@ export function changedCeilings(
   });
 }
 
-/** The two deadlines a cycle has once an update is applied: each the update gives, else the stored one. */
-export function deadlinesAfter(
-  update: { submissionDeadline?: string; decisionDeadline?: string },
-  stored: { submissionDeadline: string; decisionDeadline: string },
-): { submission: string; decision: string } {
-  return {
-    submission: update.submissionDeadline ?? stored.submissionDeadline,
-    decision: update.decisionDeadline ?? stored.decisionDeadline,
-  };
+/**
+ * What an update of a cycle makes of it: the two deadlines (each the update gives, else the stored one), whether the annual ceiling
+ * is a new one, and whether anything at all changes (an update that changes nothing is answered without a write or a record).
+ */
+export function planUpdate(
+  update: { submissionDeadline?: string; decisionDeadline?: string; priorities?: string | null },
+  stored: {
+    submissionDeadline: string;
+    decisionDeadline: string;
+    annualCeilingMinor: bigint;
+    priorities: string | null;
+  },
+  ceiling: bigint | undefined,
+): { submission: string; decision: string; ceilingChanged: boolean; changes: boolean } {
+  const submission = update.submissionDeadline ?? stored.submissionDeadline;
+  const decision = update.decisionDeadline ?? stored.decisionDeadline;
+  const ceilingChanged = ceiling !== undefined && ceiling !== stored.annualCeilingMinor;
+  const priorities = update.priorities !== undefined ? update.priorities : stored.priorities;
+  const changes =
+    ceilingChanged ||
+    submission !== stored.submissionDeadline ||
+    decision !== stored.decisionDeadline ||
+    priorities !== stored.priorities;
+
+  return { submission, decision, ceilingChanged, changes };
 }
+
+/** A ceiling as the Audit Trail keeps it: every figure as text, the total and the explanation. */
+export const ceilingAuditValue = (figures: CeilingFigures) => ({
+  signedCommitmentsMinor: figures.signedCommitmentsMinor.toString(),
+  plannedSeatsMinor: figures.plannedSeatsMinor.toString(),
+  priorityMinor: figures.priorityMinor.toString(),
+  totalMinor: ceilingTotal(figures).toString(),
+  explanation: figures.explanation,
+});
