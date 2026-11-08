@@ -55,3 +55,11 @@ export class ReportingCurrencyLockedError extends Error {
     this.name = 'ReportingCurrencyLockedError';
   }
 }
+
+/** The parameter is set by another role: the Super Admin sets its own and Finance sets Finance's (`QĐ-103z`(1)). */
+export class ParameterNotYoursError extends Error {
+  constructor(readonly key: string) {
+    super(`The parameter ${key} is not set by your role.`);
+    this.name = 'ParameterNotYoursError';
+  }
+}

@@ -101,6 +101,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_PROPOSAL_CLOSED_YEAR_END',
   'BUDGET_PROPOSAL_TASK_ASSIGNED',
   'BUDGET_PROPOSAL_TASK_WAITING',
+  'BUDGET_CYCLE_OPENED',
+  'BUDGET_DEPARTMENT_CEILING_PUBLISHED',
   // The alerts of the rights (`a03-license-inbox-alerts`, `FR-5.14`): a right about to end, a handover not confirmed, a service
   // account whose person leaves, a person who left and keeps a K1 access to the end of the paid period. Ids, codes and days only.
   'LICENSE_EXPIRY_REMINDER',

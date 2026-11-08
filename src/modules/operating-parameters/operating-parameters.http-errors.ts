@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import { FORBIDDEN_ERROR } from '../../infrastructure/http/errors/access-errors';
 import { ApiException } from '../../infrastructure/http/errors/api.exception';
 import { toMoneyApiException } from '../../infrastructure/http/errors/money-errors';
 import { toUnavailableApiException } from '../../infrastructure/http/errors/service-unavailable';
@@ -10,6 +11,7 @@ import {
   NonWorkingDateReasonInvalidError,
   NonWorkingDateTakenError,
   ParameterNotFoundError,
+  ParameterNotYoursError,
   ReportingCurrencyLockedError,
   ParameterValueInvalidError,
 } from './operating-parameters.errors';
@@ -21,6 +23,9 @@ function refuse(status: HttpStatus, code: string, message: string, details?: Rec
 /** The one place the errors of the parameter routes become HTTP answers; anything else reaches the global filter. */
 export function toOperatingParametersApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  if (error instanceof ParameterNotYoursError) {
+    return refuse(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR.code, FORBIDDEN_ERROR.message);
+  }
   if (error instanceof ParameterNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'PARAMETER.NOT_FOUND', error.message);
   }

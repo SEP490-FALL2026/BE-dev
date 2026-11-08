@@ -93,6 +93,21 @@ export class BudgetHarness extends RequestHarness {
     this.reporting = (
       await this.ctx.sql.query<{ reporting_currency: string }>(`SELECT reporting_currency FROM organizations LIMIT 1`)
     ).rows[0].reporting_currency;
+    // A head proposes only once the cycle of the year was published (Q-02): the years the suites use have one, written as a fixture.
+    for (let year = this.year; year <= this.year + 3; year += 1) await this.publishedCycle(year);
+  }
+
+  /** The budget cycle of a year as a fixture: published once, a ceiling no division reaches, no division. Idempotent. */
+  async publishedCycle(year: number): Promise<void> {
+    await this.ctx.sql.query(
+      `INSERT INTO budget_cycles (id, organization_id, year, submission_deadline, decision_deadline, annual_ceiling_minor,
+         shared_pool_reserve_minor, currency, opened_by_employee_id, opened_at, published_by_employee_id, published_at,
+         first_published_at, updated_at)
+       SELECT gen_random_uuid(), o.id, $1, make_date($1, 12, 1), make_date($1, 12, 15), 100000000000000, 0, $2, $3, now(), $3, now(), now(), now()
+         FROM organizations o
+       ON CONFLICT (organization_id, year) DO NOTHING`,
+      [year, this.reporting, this.finance.employeeId],
+    );
   }
 
   money = (amount: string | number) => ({ amount: String(amount) });

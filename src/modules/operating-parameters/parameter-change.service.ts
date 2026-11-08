@@ -3,10 +3,15 @@ import { TransactionRunner } from '../../infrastructure/database/transaction-run
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../audit/public/audit.api';
 import { OrganizationReadApi } from '../organization/public/organization-read.api';
-import { ParameterNotFoundError, ParameterValueInvalidError } from './operating-parameters.errors';
+import {
+  ParameterNotFoundError,
+  ParameterNotYoursError,
+  ParameterValueInvalidError,
+} from './operating-parameters.errors';
 import { OperatingParametersRepo } from './operating-parameters.repo';
 import {
   definitionOf,
+  rolesMaySet,
   effectiveValues,
   validateParameterValue,
   type ParameterValue,
@@ -32,6 +37,7 @@ export class ParameterChangeService {
    */
   async set(actor: AuthenticatedPrincipal, key: string, value: unknown): Promise<ParameterView> {
     if (!definitionOf(key)) throw new ParameterNotFoundError(key);
+    if (!rolesMaySet(actor.roles, key)) throw new ParameterNotYoursError(key);
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The operating parameters were used before installation');
 

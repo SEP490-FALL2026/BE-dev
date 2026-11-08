@@ -271,6 +271,11 @@ export class OrganizationReadApi {
     return this.employees.profileNotices(tx, request);
   }
 
+  /** The ids of the departments that are not stopped, by id; `tx` reads in the caller's transaction (a budget cycle divides among them). */
+  getActiveDepartmentIds(tx?: DbTx): Promise<string[]> {
+    return this.departments.activeIds(tx);
+  }
+
   /** The numbers and gaps of the onboarding checklist (US-02-04 AC-1, AC-6); with `tx`, in order in that transaction. */
   async getOnboardingFacts(tx?: DbTx): Promise<OnboardingFacts> {
     const today = await this.businessToday(new Date(), tx);

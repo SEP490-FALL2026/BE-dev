@@ -245,3 +245,5 @@ Nhật ký vận hành VPS demo:
 | —          | 3, 4 — seed và kiểm tra | Chờ                                                                                                                                                                                                                    |
 
 Lượt `seed:local` có reset thật và Task 9 tài liệu demo ở repo Docs vẫn **chờ Owner**.
+
+**Kỳ lập ngân sách (bước `budget.cycles`).** Trước ngân sách năm, Finance mở kỳ của năm hiện tại và năm sau, chia Trần năm (`cycle` trong `fixture/shared-demo-v3/finance.ts`: Trần năm, dự phòng kho, Trần mỗi phòng) cho mọi phòng đang hoạt động rồi phát hành (`QĐ-103i`): trưởng phòng chỉ nộp `BM-10` khi kỳ đã từng phát hành. Chạy lại không ghi thêm khi kỳ đã phát hành. Trên một database đã có đề xuất ngân sách nhưng chưa có kỳ, nộp đề xuất mới bị 409 `BUDGET.CYCLE_NOT_PUBLISHED` cho tới khi chạy seed (hoặc Finance mở và phát hành kỳ bằng API).

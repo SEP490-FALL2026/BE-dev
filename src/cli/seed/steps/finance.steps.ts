@@ -299,6 +299,71 @@ export function invoiceSteps(fixture: DemoFixture): DemoStep[] {
   ];
 }
 
+interface CycleRow {
+  status: 'NOT_PUBLISHED' | 'PUBLISHED' | 'CHANGED_AFTER_PUBLISH';
+}
+
+/** The day `days` before the first of January of `year`, as YYYY-MM-DD. */
+function dayBeforeNewYear(year: number, days: number): string {
+  return new Date(Date.UTC(year, 0, 1 - days)).toISOString().slice(0, 10);
+}
+
+/**
+ * Finance opens the budget cycle of the year and of the next one, divides the annual ceiling among the departments and the reserve,
+ * and publishes it: a head proposes only once it is published (`Q-02`). A cycle already published is left; one that exists but was
+ * not published goes on from its division.
+ */
+async function cycles(ctx: DemoRunContext): Promise<StepOutcome> {
+  const finance = await as(ctx, personWith(ctx, 'FINANCE'));
+  const results: Result[] = [];
+  for (const year of [yearOf(ctx).year, yearOf(ctx).year + 1]) {
+    results.push(await oneCycle(ctx, finance, year));
+  }
+
+  return summarize(results);
+}
+
+/** The cycle of the year, or null when Finance has not opened it. */
+async function existingCycle(ctx: DemoRunContext, finance: string, year: number): Promise<CycleRow | null> {
+  try {
+    return await ctx.api.call<CycleRow>(finance, 'GET', `/budget-cycles/${year}`);
+  } catch (error) {
+    if (error instanceof DemoApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+async function oneCycle(ctx: DemoRunContext, finance: string, year: number): Promise<Result> {
+  const label = `kỳ ngân sách ${year}`;
+  const found = await existingCycle(ctx, finance, year);
+  if (found?.status === 'PUBLISHED') return { status: 'present', label };
+  if (ctx.mode === 'plan') return { status: 'planned', label };
+  const plan = ctx.fixture.cycle;
+  if (!found) {
+    await ctx.api.call(finance, 'POST', '/budget-cycles', {
+      year,
+      submissionDeadline: dayBeforeNewYear(year, plan.submissionDaysBefore),
+      decisionDeadline: dayBeforeNewYear(year, plan.decisionDaysBefore),
+      annualCeiling: money(plan.annualCeiling),
+    });
+  }
+  // Every department of the installation that is not stopped gets a ceiling: the check before publishing asks for all of them.
+  const rows = await listAll<{ id: string; status: string }>(ctx, ctx.superAdminEmail, '/departments');
+  const departmentIds = rows.filter((row) => row.status === 'ACTIVE').map((row) => row.id);
+  await ctx.api.call(finance, 'PUT', `/budget-cycles/${year}/department-ceilings`, {
+    sharedPoolReserve: money(plan.sharedPoolReserve),
+    departments: departmentIds.map((departmentId) => ({
+      departmentId,
+      signedCommitments: money('0'),
+      plannedSeats: money('0'),
+      priority: money(plan.departmentCeiling),
+    })),
+  });
+  await ctx.api.call(finance, 'POST', `/budget-cycles/${year}/publish`);
+
+  return { status: 'done', label };
+}
+
 export const FINANCE_STEPS: readonly DemoStep[] = [
   { key: 'finance.cost-centers', title: 'Cost Center của phòng (Finance)', needs: ['org.accounts'], run: costCenters },
   {
@@ -308,15 +373,21 @@ export const FINANCE_STEPS: readonly DemoStep[] = [
     run: taxProfile,
   },
   {
+    key: 'budget.cycles',
+    title: 'Kỳ lập ngân sách năm hiện hành và năm sau: mở, chia Trần, phát hành (Finance)',
+    needs: ['finance.cost-centers', 'org.heads'],
+    run: cycles,
+  },
+  {
     key: 'budget.year',
     title: 'Ngân sách năm của Kỹ thuật, Marketing, Kinh doanh (trưởng phòng → Finance → Người duyệt chi)',
-    needs: ['finance.cost-centers', 'catalog.plans', 'org.heads', 'org.approval-roles'],
+    needs: ['budget.cycles', 'finance.cost-centers', 'catalog.plans', 'org.heads', 'org.approval-roles'],
     run: budgets,
   },
   {
     key: 'budget.next-year',
     title: 'Đề xuất ngân sách năm sau của Công nghệ thông tin chờ Finance (trưởng phòng gửi)',
-    needs: ['finance.cost-centers', 'catalog.plans', 'org.heads'],
+    needs: ['budget.cycles', 'finance.cost-centers', 'catalog.plans', 'org.heads'],
     run: nextYearProposals,
   },
 ];

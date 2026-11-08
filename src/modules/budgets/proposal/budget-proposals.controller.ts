@@ -107,8 +107,8 @@ export class BudgetProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), or a proposal for the Cost Center and the year already waits or is being reviewed and no refused version leaves room for a successor (BUDGET.PROPOSAL_ALREADY_OPEN).',
-      examples: [EXAMPLES.FINANCE_SETUP_INCOMPLETE, EXAMPLES.PROPOSAL_ALREADY_OPEN],
+        'The department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), a proposal for the Cost Center and the year already waits or is being reviewed and no refused version leaves room for a successor (BUDGET.PROPOSAL_ALREADY_OPEN), or Finance has not published the budget cycle of the year yet (BUDGET.CYCLE_NOT_PUBLISHED).',
+      examples: [EXAMPLES.FINANCE_SETUP_INCOMPLETE, EXAMPLES.PROPOSAL_ALREADY_OPEN, EXAMPLES.CYCLE_NOT_PUBLISHED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -260,8 +260,13 @@ export class BudgetProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), another waits (BUDGET.PROPOSAL_ALREADY_OPEN), or the Cost Center of the department was retired and has none in use yet, though the head still owns the proposal given back (FINANCE.SETUP_INCOMPLETE).',
-      examples: [EXAMPLES.PROPOSAL_CANNOT_RESUBMIT, EXAMPLES.PROPOSAL_ALREADY_OPEN, EXAMPLES.FINANCE_SETUP_INCOMPLETE],
+        'The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), another waits (BUDGET.PROPOSAL_ALREADY_OPEN), the Cost Center of the department was retired and has none in use yet, though the head still owns the proposal given back (FINANCE.SETUP_INCOMPLETE), or the budget cycle of the year was never published (BUDGET.CYCLE_NOT_PUBLISHED).',
+      examples: [
+        EXAMPLES.PROPOSAL_CANNOT_RESUBMIT,
+        EXAMPLES.PROPOSAL_ALREADY_OPEN,
+        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+        EXAMPLES.CYCLE_NOT_PUBLISHED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

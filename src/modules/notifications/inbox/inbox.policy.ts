@@ -94,6 +94,9 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_PROPOSAL_CLOSED_YEAR_END: ['proposalId', 'costCenterId', 'year'],
   BUDGET_PROPOSAL_TASK_ASSIGNED: ['costCenterId', 'departmentId', 'year'],
   BUDGET_PROPOSAL_TASK_WAITING: ['proposalId', 'costCenterId', 'year'],
+  // The cycle of a year opened and a department ceiling published: the year and the department, never the figure (FIGURE_WORDS).
+  BUDGET_CYCLE_OPENED: ['cycleId', 'year', 'submissionDeadline'],
+  BUDGET_DEPARTMENT_CEILING_PUBLISHED: ['cycleId', 'year', 'departmentId'],
   // The alerts of the rights (`a03-license-inbox-alerts`): the right, the person, the day and the role asked; never a key, an
   // account identifier, a price or the text of a note.
   LICENSE_EXPIRY_REMINDER: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'audience'],

@@ -247,6 +247,17 @@ export class DepartmentRepo {
     }));
   }
 
+  /** The ids of the departments that are not stopped, by id: the departments a budget cycle divides its ceiling among. */
+  async activeDepartmentIds(tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).department.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => row.id);
+  }
+
   async countActiveDepartments(tx?: DbTx): Promise<number> {
     return (tx ?? this.prisma).department.count({ where: { status: 'ACTIVE' } });
   }

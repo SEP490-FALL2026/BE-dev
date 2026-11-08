@@ -24,6 +24,7 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     step(FINANCE_STEPS, 'finance.cost-centers'),
     ...CATALOG_STEPS,
     step(FINANCE_STEPS, 'finance.tax-profile'),
+    step(FINANCE_STEPS, 'budget.cycles'),
     step(FINANCE_STEPS, 'budget.year'),
     step(FINANCE_STEPS, 'budget.next-year'),
     ...requestSteps(fixture.requests),

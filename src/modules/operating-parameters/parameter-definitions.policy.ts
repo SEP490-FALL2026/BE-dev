@@ -57,6 +57,8 @@ export interface ParameterDefinition {
   description: string;
   /** Where the story that fixes it says so. */
   source: string;
+  /** Who sets it (`QĐ-103z`(1), L1-19): the Super Admin unless the definition says Finance. */
+  owner?: 'SUPER_ADMIN' | 'FINANCE';
 }
 
 /**
@@ -128,6 +130,7 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     unitLabel: '%',
     description: 'The share of the base budget a new version sets aside as its reserve when Finance gives none.',
     source: 'QĐ-98, US-06-09 AC-30',
+    owner: 'FINANCE',
   },
   {
     key: 'TRANSFER_REVIEW_WORKING_DAYS',
@@ -338,6 +341,16 @@ const BY_KEY = new Map(PARAMETER_DEFINITIONS.map((definition) => [definition.key
 export function definitionOf(key: string): ParameterDefinition | undefined {
   return BY_KEY.get(key);
 }
+
+/** Who sets the parameter: the role named by its definition, the Super Admin by default. */
+export const parameterOwnerOf = (key: string): 'SUPER_ADMIN' | 'FINANCE' => definitionOf(key)?.owner ?? 'SUPER_ADMIN';
+
+/** Whether a holder of these roles sets the parameter: only the role that owns it does (the Super Admin does not set Finance's). */
+export const rolesMaySet = (roles: readonly string[], key: string): boolean => roles.includes(parameterOwnerOf(key));
+
+/** Whether a holder of these roles reads the parameter and its history: the Super Admin reads all, Finance only its own. */
+export const rolesMayRead = (roles: readonly string[], key: string): boolean =>
+  roles.includes('SUPER_ADMIN') || rolesMaySet(roles, key);
 
 export function defaultValues(): ParameterValues {
   return Object.fromEntries(PARAMETER_DEFINITIONS.map((definition) => [definition.key, definition.default]));

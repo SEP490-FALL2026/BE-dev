@@ -68,6 +68,20 @@ export interface DemoBudgetLine {
   amount: string;
 }
 
+/**
+ * The budget cycle of the year and of the year after it (`QĐ-103i`): the annual ceiling of the software budget, the shared-pool
+ * reserve and the ceiling each department gets (all as priority items), in the reporting currency, major units. The sum must stay
+ * within the annual ceiling for every department of the dataset.
+ */
+export interface DemoCycle {
+  annualCeiling: string;
+  sharedPoolReserve: string;
+  departmentCeiling: string;
+  /** Days before the first of January of the year that the proposals and the decisions fall due. */
+  submissionDaysBefore: number;
+  decisionDaysBefore: number;
+}
+
 export interface DemoBudget {
   department: string;
   lines: DemoBudgetLine[];
@@ -150,6 +164,8 @@ export interface DemoFixture {
     group: 'T2';
     lines: { taxType: string; ratePercent: string; deductible: boolean }[];
   };
+  /** The budget cycle opened and published for the year and the next, before any proposal (`Q-02`). */
+  cycle: DemoCycle;
   /** The budgets of the year, one per department that has one; a department left out has none (R9 counts on it). */
   budgets: DemoBudget[];
   /** Proposals for a later year that wait for Finance; a department with one has no budget of that year. */

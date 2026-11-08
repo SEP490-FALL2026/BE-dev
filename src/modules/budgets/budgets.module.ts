@@ -32,6 +32,9 @@ import { CommitmentRepo } from './budget/commitment.repo';
 import { CommitmentService } from './commitment/commitment.service';
 import { InvoiceRepo } from './budget/invoice.repo';
 import { BudgetInvoicesController } from './invoice/budget-invoices.controller';
+import { BudgetCyclesController } from './cycle/budget-cycles.controller';
+import { CycleRepo } from './cycle/cycle.repo';
+import { CycleService } from './cycle/cycle.service';
 import { InvoiceService } from './invoice/invoice.service';
 import { DecisionRepo } from './budget/decision.repo';
 import { LineImportService } from './version/line-import.service';
@@ -98,6 +101,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetsController,
     BudgetCommitmentsController,
     BudgetInvoicesController,
+    BudgetCyclesController,
     BudgetAttachmentUploadsController,
     BudgetAttachmentReadsController,
   ],
@@ -143,6 +147,8 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetAttachmentExpirySweeper,
     BudgetViewService,
     BudgetFactsRepo,
+    CycleRepo,
+    CycleService,
     BudgetChangeListeners,
     CommitmentReleaseGuardHook,
     CommitmentRequestFactsHook,

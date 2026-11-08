@@ -146,3 +146,4 @@ thêm điều kiện ngày hiệu lực vào luật chọn phòng của PUT/publ
 08/11/2026: sửa theo audit thiết kế W2 (DA2-02…08, 30, 31; luật bỏ sót 3): tập phòng + `CEILINGS_INCOMPLETE`, năm đã qua
 chỉ đọc, `first_published_at` + bỏ phát hành không chặn nộp (tạm chọn), audit trước/sau mọi số, người nhận thông báo theo
 QT 4.1, thứ tự khóa kỳ → proposal → version → năm, quyền theo khóa tham số, task seed tối thiểu, Verify đúng file.
+08/11/2026 (chat code): thêm `OrganizationReadApi.getActiveDepartmentIds(tx?)` (liệt kê phòng chưa ngừng) cho `ceilingDepartments`; `budgetCycleList` phân trang và trả bản tóm tắt không kèm chia Trần, `budgetCycleGet` trả `ceilings` dạng bản đồ theo `departmentId` (tránh mảng lồng và ngoại lệ đã đóng băng của sổ collection).

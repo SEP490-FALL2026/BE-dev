@@ -136,3 +136,128 @@ Không đổi nghiệp vụ; các điểm kỹ thuật chọn theo spec, chat re
 - **W1-N5 — cổng bố cục.** Luật kho đặt ở nhóm `catalog/subscription/pool/` vì thư mục đủ 25 file và spec policy vượt 400 dòng.
 - **W1-N6 — tổ hợp cũ.** Thuê bao K1 cũ `(1, ANNUAL)` sửa người phụ trách được 200 nhưng chưa có cảnh báo riêng cho tổ hợp; muốn cảnh báo thì thêm vào `poolWarnings` (Owner quyết). **TẠM CHỌN (chat review, R3): không thêm cảnh báo riêng; W5 dọn tổ hợp cũ khi viết lại thuê bao.**
 - **W1-N7** — gộp vào W1-N4 (R3): `INVALID_TERMS` chặn tổ hợp (kỳ cam kết × chu kỳ) mà ghi mới bị cấm; `QUARTERLY`/`OTHER` vẫn nhận tới W5 **trừ gói K1** (K1 chỉ `MONTHLY`).
+
+## Câu tạm chọn khi thiết kế W3 (Q-23 → Q-34)
+
+Phát sinh khi soạn và audit thiết kế W3 (MF-1 lõi), 08/11/2026; bản cuối sau audit. Tất cả **TẠM CHỌN (chờ Owner)**.
+
+### Q-23 — Thời hạn của quyền _có thời hạn_: số tháng hay ngày kết thúc _(đổi — nay theo nguồn)_
+
+- Bối cảnh: QT 1.1 _người xin chọn có thời hạn (ngày kết thúc)_, `US-05-23` AC-2/AC-9 nhập ngày kết thúc; R-B01 _tới ngày kết thúc_ +
+  `QĐ-104k`(1) làm tròn lên theo tháng; cột `access_requests.expected_end_date` đã có, grant đã đọc nó (`endOfSeat`).
+- Ví dụ: gửi 10/07, chọn kết thúc 19/10 — A tính 3 tháng, B tính 4 (07→10).
+- Phương án: A. Giữ `termMonths`, `min(termMonths, tháng còn lại)`. B. Body `expectedEndDate`; số tháng = tháng gốc → tháng kết thúc
+  (≤ 31/12); trần 12 tháng. C. `termMonths + 1` khi gốc không là ngày 1.
+- **Chọn: B** (suy ra từ QT + US; không còn là tạm chọn). Phần chi tiết **TẠM CHỌN**: Request tiếp tục giữ `extensionMonths`; ngày kết
+  thúc trước ngày gốc (duyệt muộn) ⟹ 1 tháng; trần lúc gửi `hôm nay + 12 tháng − 1 ngày`, lúc cấp `min(ngày chọn, ngày cấp + 12 tháng)`.
+- Đổi lại: `requestAmountOf` (`access-request/pricing.policy.ts`); body ở `access-request.dto.ts`, `group-request.dto.ts`; `grant.policy.ts`
+  - `provisioning-grant-writer.service.ts` (`endOfSeat`). Về A: lại trường `termMonths` + một biểu thức `min`.
+
+### Q-24 — Request dở theo định tuyến cũ (dòng 2/4/8) khi triển khai _(cải tiến)_
+
+- Bối cảnh: dữ liệu có Request của trưởng phòng chờ Người duyệt chi duyệt **nhu cầu**, Request phòng không trưởng phòng chờ
+  `NO_DEPARTMENT_HEAD`, và Request dòng 2 bị migration Finance (budget-check) đưa về hàng đợi của chính trưởng phòng.
+- Ví dụ: `R40` của `H1` chờ `C1` ở bước nhu cầu; `R41` của `E4` (`P-HR`) chờ `NO_DEPARTMENT_HEAD`.
+- Phương án: A. Migration chuyển thẳng, trả phí ⟹ `AWAITING_REQUESTER_REVISION` **không lý do**. A'. Migration chỉ **đánh dấu**
+  `ONE_STEP` + lý do, bước nhu cầu `NOT_REQUIRED`, state giữ; lượt _hoàn tất_ của sweep chạy kiểm như Request vừa chuyển (cùng mã, có
+  lý do chặn, có thông báo). B. `ops:preflight` chặn, seed lại. C. Để nguyên.
+- **TẠM CHỌN: A'** — không mất dữ liệu; người yêu cầu thấy lý do thật; một đường mã với chuyển khi mất trưởng phòng.
+- Đổi lại: khối đánh dấu trong migration B `<ts>_request_one_step`; `OneStepConversionService.finishPending`
+  (`reassignment/one-step-conversion.service.ts`). B: thay khối bằng judgement preflight.
+
+### Q-25 — Phòng mất trưởng phòng nhưng **đã ghi** kế nhiệm từ ngày sau _(giữ, mở rộng áp lúc gửi)_
+
+- Bối cảnh: `QĐ-104f` _chưa có kế nhiệm ⟹ chuyển một bước_; `QĐ-103u`(7) _có kế nhiệm ⟹ chuyển ở ngày hiệu lực_; L1 bước 2.
+- Ví dụ: `H7` nghỉ 20/07, `H8` được ghi trưởng phòng từ 01/08; `E5` gửi Request ngày 25/07.
+- Phương án: A. Đã ghi kế nhiệm ⟹ không chuyển, Request mới gửi cũng `VIA_HEAD` chờ `NO_DEPARTMENT_HEAD`, giao `H8` ngày 01/08. B.
+  Chuyển một bước ngay. C. Chuyển nếu khoảng trống > N ngày.
+- **TẠM CHỌN: A** (áp cả lúc gửi — DA3-08).
+- Đổi lại: điều kiện `successorRecorded` trong `access-request/routing.policy.ts` và `step-routing/one-step-conversion.policy.ts`;
+  nguồn đọc `OrganizationReadApi.nextHeadPeriodOf`.
+
+### Q-26 — Dữ liệu Finance rà soát / hỏi Finance cũ _(giữ)_
+
+- Bối cảnh: gỡ đường Finance (`QĐ-97c`); DB có Request `AWAITING_FINANCE_REVIEW`/`AWAITING_BUDGET`, câu hỏi mở. Ví dụ: seed `R9`.
+- Phương án: A. Migration về hàng đợi trưởng phòng, đóng bước/câu hỏi, CHECK cấm, giữ bảng chỉ đọc. B. Như A và drop bảng. C. Chặn preflight.
+- **TẠM CHỌN: A** — không xóa dữ liệu không đảo được.
+- Đổi lại: migration `<ts>_finance_review_retired`; drop là migration riêng sau.
+
+### Q-27 — Khoản cam kết cũ của năm sau và khoản `NO_BUDGET` từ duyệt chi _(giữ, thêm điều kiện)_
+
+- Bối cảnh: trước W3 duyệt chi ghi một khoản mỗi năm có kỳ trả. Ví dụ: `R12` duyệt 10/2026, lịch trả tới 03/2027 ⟹ có khoản 2027.
+- Phương án: A. Giữ nguyên; job 01/01 (W4) bỏ qua (Request, năm) đã có khoản. B. Migration giải phóng khoản năm sau. C. Gộp vào năm hiện hành.
+- **TẠM CHỌN: A**, điều kiện bắt buộc ghi vào ledger L1-13 / spec W4: job 01/01 bỏ qua (Request, năm) đã có khoản **và** quyền đang
+  giữ chờ quyết định Request tiếp tục (tránh hai khoản khi Request tiếp tục duyệt sau 01/01).
+- Đổi lại: thêm migration giải phóng (B) — một `UPDATE … state = 'RELEASED'` có điều kiện năm.
+
+### Q-28 — GH-1/GH-2 áp cho loại Request nào _(giữ)_
+
+- Bối cảnh: nguồn nói _Request cấp mới_; code có `GRANT`, `GROUP_GRANT`, `NEW_SOFTWARE`, `SERVICE_ACCOUNT`, `RENEWAL`, Request hệ
+  thống tạo. Ví dụ: `E1` có 2 Request Figma/Miro mở + 1 Request tài khoản dịch vụ bot CI, xin Jira.
+- Phương án: A. Đếm `GRANT`, dòng nhóm, đề xuất; không đếm tài khoản dịch vụ, tiếp tục, Request hệ thống. B. Mọi loại trừ tiếp tục. C. Chỉ `GRANT` + dòng nhóm.
+- **TẠM CHỌN: A**.
+- Đổi lại: tập loại trong `requests/request-limits/request-limits.repo.ts` (đường dẫn mới sau DA3-07).
+
+### Q-29 — Số tiền Request tiếp tục có kỳ mới bắt đầu ở năm sau _(đổi)_
+
+- Bối cảnh: `FR-3.22`(1) _số tiền tới ngày kết thúc mới, không quá 31/12 của năm, phần năm sau là khoản cam kết tự tạo 01/01_; L1
+  bước 9 _kiểm chỉ năm hiện hành_; `QĐ-30b` _không có cam kết chuyển tiếp_; nhưng `QĐ-106d` có câu _không còn Request số tiền 0_ (ngữ
+  cảnh `K4` cấp từ kho) — không suy ra trọn vẹn ⟹ tạm chọn.
+- Ví dụ: quyền hết 31/12/2026, gửi 10/12/2026 tiếp tục 3 tháng ⟹ kỳ mới 01→03/2027.
+- Phương án: A (cũ). Tính năm 2027, kiểm ngân sách 2027 ⟹ duyệt tháng 12 bị 409 `NOT_CURRENT_YEAR` ở hạng mục cam kết. B'. Chỉ phần
+  năm hiện hành: kỳ mới trọn năm sau ⟹ 0 tháng; vẫn qua kiểm (số 0 không xét vượt) và Người duyệt chi; không giữ khoản; khoản 2027 do
+  job 01/01 (W4) vì Assignment kế tiếp đã ghi (Q-03 = A); duyệt sau 01/01 ⟹ tính lại năm mới, khoản năm mới. C. Không cho gửi tới khi
+  sang năm — vô hiệu cửa sổ của quyền kết thúc 31/12.
+- **TẠM CHỌN: B'** — khớp `FR-3.22`(1), L1, `QĐ-30b`; không chặn duyệt tháng 12.
+- Đổi lại: nhánh `year(start) > Y` trong `requestAmountOf` (`access-request/pricing.policy.ts`); điều kiện `cost = 0` trong
+  `spend/budget-check.policy.ts`; bỏ qua `hold` khi 0 trong `requests/spend-effects/spend-effects.service.ts`.
+
+### Q-30 — Lý do GH-3 của Request nhóm _(giữ)_
+
+- Bối cảnh: GH-3 bắt buộc lý do theo người; nhóm nhiều người. Ví dụ: `H1` gửi nhóm Miro 5 người, 2 người ≥ 10 phần mềm trả phí.
+- Phương án: A. Một `manyPaidSoftwareReason` chung, dòng vượt mang cờ. B. Mỗi dòng một lý do. C. Không đòi lý do ở nhóm.
+- **TẠM CHỌN: A**.
+- Đổi lại: schema `group-request.dto.ts` + điều kiện ở `group-request-submission/group-request.service.ts` (B: trường vào dòng).
+
+### Q-31 — Request một bước thiếu giá/tỷ giá khi gửi _(giữ, thêm điều kiện)_
+
+- Bối cảnh: BRD `FR-3.2` _chưa trình được tới khi IT bổ sung_ (dòng 587); Request một bước không có hàng đợi. Ví dụ: `H1` xin gói Miro chưa có giá.
+- Phương án: A. `AWAITING_REQUESTER_REVISION` lý do `PRICE_MISSING`/`RATE_MISSING`, báo IT Admin phụ trách; người yêu cầu gửi lại. B.
+  Tự chạy lại khi IT cập nhật giá. C. Từ chối gửi (422).
+- **TẠM CHỌN: A** với điều kiện: không ghi kiểm tra ngân sách; lý do hiện cho người yêu cầu kèm _chờ IT cập nhật giá_; gửi lại khi
+  giá vẫn thiếu ⟹ 200, vẫn `PRICE_MISSING` (có test).
+- Đổi lại: nhánh `NOT_CHECKABLE` trong `spend/spend-routing.service.ts` (B: listener khi giá đổi).
+
+### Q-32 — GH-3 khi xin gói khác của phần mềm đang dùng _(giữ)_
+
+- Bối cảnh: GH-3 đếm **theo phần mềm**. Ví dụ: `E2` dùng đúng 10 phần mềm trả phí, có Figma Professional, xin Figma Organization.
+- Phương án: A. Không gắn cờ (số phần mềm không tăng). B. Gắn cờ vì đã ở ngưỡng.
+- **TẠM CHỌN: A**.
+- Đổi lại: điều kiện `!holdsSameApplication` trong `requests/request-limits/request-limits.policy.ts`.
+
+### Q-33 — Request **nội bộ** đang chờ bước nhu cầu khi phòng mất trưởng phòng, chưa có kế nhiệm _(mới, DA3-09)_
+
+- Bối cảnh: `QĐ-104f`, `QĐ-62c` chỉ nói **Request trả phí** chuyển một bước; _việc khác vốn giao trưởng phòng — chờ_; định tuyến chốt
+  lúc gửi (`QĐ-106h`(1)). Request nội bộ gửi khi phòng **chưa** có trưởng phòng thì IT cấp thẳng (`QĐ-103p`) — khác ca này.
+- Ví dụ: `E3` xin _Cổng báo cáo nội bộ_ (`K5`) đang chờ `H7` duyệt; `H7` nghỉ 20/07, chưa ghi kế nhiệm.
+- Phương án: A. Không chuyển; bước chờ (`REWAIT`), giao trưởng phòng mới/kế nhiệm khi có; Super Admin nhận cảnh báo _phòng thiếu
+  trưởng phòng_ như hiện có. B. Chuyển một bước ⟹ IT cấp thẳng có cờ `NO_NEED_APPROVER`. C. Tự đóng Request.
+- **TẠM CHỌN: A** — an toàn: không cấp quyền khi không ai duyệt nhu cầu mà nguồn không cho phép; đổi được không mất dữ liệu.
+- Đổi lại: bộ lọc _trả phí_ trong `step-routing/one-step-conversion.policy.ts` (bỏ lọc ⟹ B; lượt hoàn tất đã có nhánh nội bộ).
+
+### Q-34 — Lượt quét cửa sổ tiếp tục trễ đúng lúc tham số vừa giảm _(mới, DA3-22)_
+
+- Bối cảnh: `QĐ-108b` _cửa sổ đã mở giữ nguyên_; bảng `assignment_renewal_windows` chỉ có dòng khi lượt quét hằng ngày đã chạy.
+- Ví dụ: kết thúc 30/06, `W` = 30 ⟹ mở 31/05 theo lịch; lượt quét 31/05 chưa chạy; Super Admin đổi `W` = 15 lúc 31/05; `E1` gửi 31/05
+  ⟹ kiểm theo 15 ⟹ 409 tới 15/06.
+- Phương án: A. Chấp nhận giới hạn (khoảng hở ≤ 1 ngày, cần đổi tham số đúng lúc đó), ghi README `licensing` (đổi tham số sau lượt
+  quét trong ngày). B. Khi chưa có dòng: `opensOn = min(theo giá trị hiện hành, theo giá trị liền trước trong lịch sử parameter_values)`.
+  C. Ghi dòng cửa sổ ngay khi đổi tham số — cạnh `operating-parameters` (T3) → `licensing` (T4) ngược tầng, không được.
+- **TẠM CHỌN: A** — đơn giản, ca hiếm, có test unit ghi rõ hành vi.
+- Đổi lại: `checkRenewalWindow` (`requests/renewal-request/renewal-request.policy.ts`) nhận thêm `previousWindowDays` đọc từ lịch sử (B).
+
+## Ghi chú của chat code — W2 `cycle-ceilings`
+
+- **W2-N1 — danh sách và chi tiết kỳ.** `budgetCycleList` phân trang bản tóm tắt; chia Trần theo phòng chỉ ở `budgetCycleGet` (bản đồ theo `departmentId`). Đổi lại: thêm ngoại lệ vào sổ collection (có Owner) nếu muốn mảng.
+- **W2-N2 — tập phòng chia Trần.** Mọi phòng `ACTIVE`; ngày hiệu lực thêm ở `department-effective-year`.
+- **W2-N3 — kỳ năm hiện tại có thể mở khi hạn đã qua** (Q-02 = A); không chặn.

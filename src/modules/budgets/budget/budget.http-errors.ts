@@ -12,6 +12,15 @@ import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examp
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import {
+  BudgetCeilingDepartmentInvalidError,
+  BudgetCeilingsIncompleteError,
+  BudgetCeilingsOverAnnualError,
+  BudgetCycleDeadlinesInvalidError,
+  BudgetCycleExistsError,
+  BudgetCycleNotFoundError,
+  BudgetCycleNotPublishedError,
+  BudgetCycleReasonRequiredError,
+  BudgetCycleYearPastError,
   BudgetCommitmentExistsError,
   BudgetCommitmentNotFoundError,
   BudgetCommitmentRefusedError,
@@ -121,6 +130,41 @@ export function toBudgetApiException(error: unknown): unknown {
   }
   if (error instanceof BudgetNotYourCostCenterError) {
     return refuse(HttpStatus.FORBIDDEN, 'BUDGET.NOT_YOUR_COST_CENTER', error.message);
+  }
+  if (error instanceof BudgetCycleNotFoundError) {
+    return refuse(HttpStatus.NOT_FOUND, 'BUDGET.CYCLE_NOT_FOUND', error.message);
+  }
+  if (error instanceof BudgetCycleExistsError || isUniqueViolation(error, 'budget_cycles_organization_id_year_key')) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET.CYCLE_EXISTS', 'The budget cycle of that year is already open.');
+  }
+  if (error instanceof BudgetCycleYearPastError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CYCLE_YEAR_PAST', error.message, { year: error.year });
+  }
+  if (error instanceof BudgetCycleDeadlinesInvalidError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CYCLE_DEADLINES_INVALID', error.message);
+  }
+  if (error instanceof BudgetCycleReasonRequiredError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CYCLE_REASON_REQUIRED', error.message);
+  }
+  if (error instanceof BudgetCeilingDepartmentInvalidError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CEILING_DEPARTMENT_INVALID', error.message, {
+      departmentIds: error.departmentIds,
+    });
+  }
+  if (error instanceof BudgetCeilingsIncompleteError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CEILINGS_INCOMPLETE', error.message, {
+      missingDepartmentIds: error.missingDepartmentIds,
+      staleDepartmentIds: error.staleDepartmentIds,
+      reserveMissing: error.reserveMissing,
+    });
+  }
+  if (error instanceof BudgetCeilingsOverAnnualError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET.CEILINGS_OVER_ANNUAL', error.message, {
+      gapMinor: error.gapMinor.toString(),
+    });
+  }
+  if (error instanceof BudgetCycleNotPublishedError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET.CYCLE_NOT_PUBLISHED', error.message, { year: error.year });
   }
   if (error instanceof BudgetYearEndedError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.YEAR_ENDED', error.message, { year: error.year });
@@ -243,6 +287,15 @@ export const BUDGET_ERROR_EXAMPLES = {
   VERSION_NUMBER_TAKEN: example(new BudgetVersionNumberTakenError()),
   NOT_YOUR_COST_CENTER: example(new BudgetNotYourCostCenterError()),
   YEAR_ENDED: example(new BudgetYearEndedError(2025)),
+  CYCLE_NOT_FOUND: example(new BudgetCycleNotFoundError()),
+  CYCLE_EXISTS: example(new BudgetCycleExistsError(2027)),
+  CYCLE_YEAR_PAST: example(new BudgetCycleYearPastError(2025)),
+  CYCLE_DEADLINES_INVALID: example(new BudgetCycleDeadlinesInvalidError()),
+  CYCLE_REASON_REQUIRED: example(new BudgetCycleReasonRequiredError()),
+  CEILING_DEPARTMENT_INVALID: example(new BudgetCeilingDepartmentInvalidError(['<department-id>'])),
+  CEILINGS_INCOMPLETE: example(new BudgetCeilingsIncompleteError(['<department-id>'], [], true)),
+  CEILINGS_OVER_ANNUAL: example(new BudgetCeilingsOverAnnualError(1n)),
+  CYCLE_NOT_PUBLISHED: example(new BudgetCycleNotPublishedError(2027)),
   CURRENCY_NOT_REPORTING: example(new BudgetCurrencyError('USD', 'VND')),
   QUARTERS_MISMATCH: example(new BudgetQuartersMismatchError()),
   RESERVE_REASON_REQUIRED: example(new BudgetReasonRequiredError('RESERVE')),

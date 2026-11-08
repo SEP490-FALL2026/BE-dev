@@ -1,10 +1,18 @@
 import type { DemoFixture } from '../demo-fixture.types';
 
-export const FINANCE: Pick<DemoFixture, 'taxProfile' | 'budgets' | 'proposals' | 'invoices'> = {
+export const FINANCE: Pick<DemoFixture, 'taxProfile' | 'cycle' | 'budgets' | 'proposals' | 'invoices'> = {
   taxProfile: {
     application: 'figma',
     group: 'T2',
     lines: [{ taxType: 'VAT', ratePercent: '10', deductible: true }],
+  },
+  // A ceiling far above the budgets of the dataset, divided evenly so that the check of the whole division passes (QT 4.3).
+  cycle: {
+    annualCeiling: '20000000000',
+    sharedPoolReserve: '1000000000',
+    departmentCeiling: '1000000000',
+    submissionDaysBefore: 60,
+    decisionDaysBefore: 30,
   },
   budgets: [
     {

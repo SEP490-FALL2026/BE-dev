@@ -25,6 +25,8 @@ import {
   SetParameterBodyDto,
 } from './operating-parameters.dto';
 import { NonWorkingDatesService } from './non-working-dates.service';
+import { ParameterNotYoursError } from './operating-parameters.errors';
+import { rolesMayRead } from './parameter-definitions.policy';
 import {
   OPERATING_PARAMETERS_ERROR_EXAMPLES,
   toOperatingParametersApiException,
@@ -100,23 +102,26 @@ export class OperatingParametersController {
   ) {}
 
   @Get('operating-parameters')
-  @RequireRoles('SUPER_ADMIN')
+  @RequireRoles('SUPER_ADMIN', 'FINANCE')
   @ApiOperation({ operationId: 'operatingParameterList', summary: 'List operating parameters' })
   @ApiSuccessResponse(ParameterListResponseDto, {
     message: 'PARAMETER.LISTED',
     description: 'Every parameter with the value in force, its default, its unit and the domain a value must stay in.',
   })
   @ApiErrorResponses(...READ_ERRORS)
-  async list() {
+  async list(@CurrentPrincipal() actor: AuthenticatedPrincipal) {
     try {
-      return { items: (await this.parameters.list()).map(toWire) };
+      // The Super Admin reads every parameter; Finance reads the ones Finance sets (QĐ-103z(1)).
+      const visible = (await this.parameters.list()).filter((view) => rolesMayRead(actor.roles, view.key));
+
+      return { items: visible.map(toWire) };
     } catch (error) {
       throw toOperatingParametersApiException(error);
     }
   }
 
   @Put('operating-parameters/:key')
-  @RequireRoles('SUPER_ADMIN')
+  @RequireRoles('SUPER_ADMIN', 'FINANCE')
   @ApiOperation({ operationId: 'operatingParameterSet', summary: 'Set an operating parameter' })
   @ApiSuccessResponse(ParameterResponseDto, {
     message: 'PARAMETER.SET',
@@ -145,15 +150,16 @@ export class OperatingParametersController {
   }
 
   @Get('operating-parameters/:key/history')
-  @RequireRoles('SUPER_ADMIN')
+  @RequireRoles('SUPER_ADMIN', 'FINANCE')
   @ApiOperation({ operationId: 'operatingParameterHistory', summary: 'Show the history of an operating parameter' })
   @ApiSuccessResponse(ParameterHistoryResponseDto, {
     message: 'PARAMETER.HISTORY_LISTED',
     description: 'The values the parameter has had, newest first.',
   })
   @ApiErrorResponses(...READ_ERRORS, VALIDATION_ERROR, PARAMETER_NOT_FOUND)
-  async history(@Param() params: ParameterKeyParamDto) {
+  async history(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ParameterKeyParamDto) {
     try {
+      if (!rolesMayRead(actor.roles, params.key)) throw new ParameterNotYoursError(params.key);
       const history = await this.parameters.history(params.key);
 
       return {

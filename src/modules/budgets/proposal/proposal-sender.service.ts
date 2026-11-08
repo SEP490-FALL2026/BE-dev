@@ -10,7 +10,14 @@ import { ProposalRepo, type ProposalLineRecord, type ProposalRecord } from '../b
 import { VersionRepo } from '../budget/version.repo';
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
 import { proposalIsSucceedable, totalOf, yearIsOpen } from '../budget/budget.policy';
-import { BudgetProposalNotFoundError, BudgetProposalOpenError, BudgetYearEndedError } from '../budget/budget.errors';
+import {
+  BudgetCycleNotPublishedError,
+  BudgetProposalNotFoundError,
+  BudgetProposalOpenError,
+  BudgetYearEndedError,
+} from '../budget/budget.errors';
+import { cycleAcceptsWork } from '../cycle/cycle.policy';
+import { CycleRepo } from '../cycle/cycle.repo';
 
 type LineBody = BudgetProposalBodyDto['lines'][number];
 
@@ -31,6 +38,7 @@ export class ProposalSender {
     private readonly yearLock: BudgetYearLockRepo,
     private readonly audit: AuditApi,
     private readonly binder: ProposalAttachmentBinder,
+    private readonly cycles: CycleRepo,
   ) {}
 
   async send(tx: DbTx, actor: AuthenticatedPrincipal, input: ProposalSendInput): Promise<string> {
@@ -40,6 +48,11 @@ export class ProposalSender {
     const own = await this.facts.requireHeadedCostCenter(actor.employeeId, today, tx);
     const costCenter = await this.facts.costCenter(own, tx);
     if (!yearIsOpen(input.year, today)) throw new BudgetYearEndedError(input.year);
+    // A head proposes only once the cycle of the year was published, and may go on while it is changed (`Q-02`). The cycle is read
+    // `FOR SHARE`, so a change of it waits for the sending. (A sending again has locked its proposal before this; the cycle write
+    // never locks a proposal, so the two orders cannot meet.)
+    const cycle = await this.cycles.lockByYear(tx, await this.facts.organizationId(tx), input.year, 'SHARE');
+    if (!cycle || !cycleAcceptsWork(cycle)) throw new BudgetCycleNotPublishedError(input.year);
 
     await this.facts.requirePlans(input.lines.map((line) => line.planId));
 

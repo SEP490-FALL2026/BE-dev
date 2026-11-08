@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `9c7f386`, BE `d9c46552`.
 - Phụ trách: chat code `SEP-Start 75: coder mainflow`. Thiết kế ban đầu bởi: AI chat review (W2, 08/11/2026).
 - Owner review: chưa review. Peer review: chat review (R2).
-- Triển khai: `in-progress` (Task 1 xong 08/11/2026; Task 2–4 chưa làm). PR: chưa có.
+- Triển khai: `verified` (kiểm local 08/11/2026, chat code; commit cục bộ, chưa push). PR: chưa có.
 
 ## Before coding
 
@@ -80,8 +80,32 @@ Kiểm tra nhanh tracker §4.5; `openapi:export` thêm 6 operation. Tự review 
 - [ ] Spec/plan phản ánh implementation cuối.
 - [ ] `pnpm check` và full suite CHƯA chạy (ghi rõ).
 
-### Tiến độ (08/11/2026, chat code)
+## Verification and handoff
 
-- Task 1 xong: migration `20261108520000_budget_cycles`, hai model Prisma, `budget-cycle-constraints.integration-spec.ts` (6 test xanh trên PostgreSQL 17 riêng). Lệch nhỏ: hai bảng không khai quan hệ Prisma tới `Organization`/`Employee`/`Department` (chỉ FK trong SQL) để không đụng các model của module khác.
-- Task 2 chưa làm. Phát hiện khi đọc code: `OrganizationReadApi` chưa có phép liệt kê phòng đang hoạt động cho `ceilingDepartments`; cần thêm một phương thức đọc (Task 2) trước khi viết `budgets/cycle`.
-- Task 3–4 (nộp `BM-10` cần kỳ, quyền theo khóa tham số, fixture của test cũ, seed) chưa làm.
+| Lệnh / kiểm tra AC                                                                                                                                                                                 | Revision / môi trường                                             | Kết quả thực chạy                                                                                                                      | Giới hạn / việc còn lại                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `pnpm exec jest src/modules/budgets/cycle src/cli/seed` (`cycle.policy.spec` 8 test: R-I04, QT 4.3, B7, người nhận thông báo)                                                                      | `feat/qd103-108-mf145` trên `aa1e56c1` + diff W2 `cycle-ceilings` | 116 test seed + policy xanh                                                                                                            | —                                                                                        |
+| `pnpm test:integration -- test/integration/budgets/budget-cycle-constraints` (Task 1)                                                                                                              | PostgreSQL 17 riêng                                               | 6 test xanh                                                                                                                            | —                                                                                        |
+| `pnpm test:integration -- test/integration/budgets/budget-cycle-publish` (R-I03, AC-10, quyền đọc, R-I04, QT 4.3, AC-8, AC-15, AC-1, B7, Q-02, L1-19)                                              | như trên                                                          | 13 test xanh                                                                                                                           | song song publish/PUT: chỉ kiểm tuần tự (khóa `FOR UPDATE` của kỳ), **chưa có test đua** |
+| `pnpm test:integration` budgets + requests + operating-parameters + organization + installation/seed + notifications + identity-access + catalog/shared-pool + licensing/subscription-renewal-pool | như trên                                                          | 202 file: 194 xanh, 8 đỏ do tải (`TransientDatabaseError` 503, "template"); chạy lại riêng 8 file `--maxWorkers=3`: 8/8 xanh (55 test) | —                                                                                        |
+| `pnpm test:integration -- test/integration/installation/seed` (seed trên DB sạch, chạy lại không đổi)                                                                                              | như trên                                                          | 4 file / 16 test xanh                                                                                                                  | —                                                                                        |
+| `pnpm test:http` platform, budgets, operating-parameters, catalog, data-import                                                                                                                     | như trên                                                          | xanh (operating-parameters 37 test gồm ca Finance 403 và khóa Finance)                                                                 | —                                                                                        |
+| `pnpm test:e2e`                                                                                                                                                                                    | như trên                                                          | 11 file / 50 test xanh                                                                                                                 | —                                                                                        |
+| `pnpm test:flows -- mf1-request-contract mf4-budget`                                                                                                                                               | như trên                                                          | 2 file / 18 test xanh                                                                                                                  | các flow khác chưa chạy                                                                  |
+| typecheck, lint, `arch:check`, `arch:docs:check`, `rules:check`, `test:gates`                                                                                                                      | như trên                                                          | xanh (gates 16 file / 330 test; cập nhật chủ model, mã thông báo, catalog mã lỗi, ngoại lệ presentation, manifest)                     | —                                                                                        |
+| `pnpm openapi:export`                                                                                                                                                                              | như trên                                                          | thêm 6 operation, lỗi mới, mã thông báo; `openapi.json` đã sinh lại                                                                    | —                                                                                        |
+
+- [x] AC trong scope có bằng chứng (trừ đua đồng thời — xem dòng trên).
+- [x] Spec/plan phản ánh implementation cuối.
+- [x] `pnpm check`, `test:integration:serial`, `test:scripts` và toàn bộ suite CHƯA chạy.
+
+### Lệch so với thiết kế
+
+1. Hai bảng không khai quan hệ Prisma tới Organization/Employee/Department (chỉ FK SQL).
+2. Thêm `OrganizationReadApi.getActiveDepartmentIds(tx?)`; `ceilingDepartments` ở `CycleService` (chưa có hàm riêng ở `cycle.policy`).
+3. `budgetCycleList` phân trang, trả bản tóm tắt không kèm chia Trần; `budgetCycleGet` trả `ceilings` dạng bản đồ theo `departmentId` — để khỏi thêm ngoại lệ vào sổ collection/mảng lồng đã đóng băng.
+4. Người nhận `BUDGET_CYCLE_OPENED`: trưởng phòng hiện tại của từng phòng trong tập; `eventKey` kèm id người nhận.
+5. Quyền theo khóa tham số: `owner?` ở định nghĩa; `PUT`/`GET`/history cho cả Super Admin và Finance, service/controller kiểm theo `owner`; Finance gọi khóa của Super Admin ⟹ 403, đọc danh sách chỉ thấy khóa Finance.
+6. Seed: bước `budget.cycles` (mở, chia đều Trần cho mọi phòng đang hoạt động đọc qua `/departments`, phát hành) trước `budget.year`; fixture `cycle` mới.
+7. Test harness: `BudgetHarness.start` phát hành sẵn kỳ cho 4 năm bằng SQL (`publishedCycle`); các spec khác không đổi khẳng định.
+8. `docs/generated/module-graph.md` sinh lại.

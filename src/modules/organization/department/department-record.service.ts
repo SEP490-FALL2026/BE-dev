@@ -46,6 +46,10 @@ export class DepartmentRecordService {
     return this.departments.lockByCode(tx, organizationId, code);
   }
 
+  activeIds(tx?: DbTx): Promise<string[]> {
+    return this.departments.activeDepartmentIds(tx);
+  }
+
   countActive(tx?: DbTx): Promise<number> {
     return this.departments.countActiveDepartments(tx);
   }

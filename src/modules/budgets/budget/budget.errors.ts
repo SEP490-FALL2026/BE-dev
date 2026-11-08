@@ -228,3 +228,78 @@ export class InvoiceCommitmentReleasedError extends Error {
     this.name = 'InvoiceCommitmentReleasedError';
   }
 }
+
+/** The budget cycle of the year does not exist (`QĐ-103i`). */
+export class BudgetCycleNotFoundError extends Error {
+  constructor() {
+    super('The budget cycle of that year does not exist.');
+    this.name = 'BudgetCycleNotFoundError';
+  }
+}
+
+/** A year has one budget cycle. */
+export class BudgetCycleExistsError extends Error {
+  constructor(readonly year: number) {
+    super(`The budget cycle of ${year} is already open.`);
+    this.name = 'BudgetCycleExistsError';
+  }
+}
+
+/** The cycle of a year before the current one is read, never opened or changed (`QĐ-82l`(4), B7). */
+export class BudgetCycleYearPastError extends Error {
+  constructor(readonly year: number) {
+    super(`The year ${year} has passed: its budget cycle can only be read.`);
+    this.name = 'BudgetCycleYearPastError';
+  }
+}
+
+export class BudgetCycleDeadlinesInvalidError extends Error {
+  constructor() {
+    super('The decision deadline cannot be before the submission deadline.');
+    this.name = 'BudgetCycleDeadlinesInvalidError';
+  }
+}
+
+/** A new annual ceiling is entered with the reason the leaders changed it (`US-06-15` AC-8). */
+export class BudgetCycleReasonRequiredError extends Error {
+  constructor() {
+    super('Changing the annual ceiling needs the reason.');
+    this.name = 'BudgetCycleReasonRequiredError';
+  }
+}
+
+/** A ceiling is named for a department that is not among the departments of the year. */
+export class BudgetCeilingDepartmentInvalidError extends Error {
+  constructor(readonly departmentIds: string[]) {
+    super('A ceiling names a department that is not among the departments of the year.');
+    this.name = 'BudgetCeilingDepartmentInvalidError';
+  }
+}
+
+/** The division cannot be published: a department has no ceiling, a ceiling is for a department that left, or the reserve is not entered. */
+export class BudgetCeilingsIncompleteError extends Error {
+  constructor(
+    readonly missingDepartmentIds: string[],
+    readonly staleDepartmentIds: string[],
+    readonly reserveMissing: boolean,
+  ) {
+    super('The division of the ceiling is not complete.');
+    this.name = 'BudgetCeilingsIncompleteError';
+  }
+}
+
+/** The ceilings and the shared-pool reserve add up to more than the annual ceiling (`R-I04`). */
+export class BudgetCeilingsOverAnnualError extends Error {
+  constructor(readonly gapMinor: bigint) {
+    super('The ceilings of the departments and the shared-pool reserve are more than the annual ceiling.');
+    this.name = 'BudgetCeilingsOverAnnualError';
+  }
+}
+
+/** The department head proposes only once the cycle of the year was published (`Q-02`). */
+export class BudgetCycleNotPublishedError extends Error {
+  constructor(readonly year: number) {
+    super(`The budget cycle of ${year} was not published yet.`);
+    this.name = 'BudgetCycleNotPublishedError';
+  }
+}
