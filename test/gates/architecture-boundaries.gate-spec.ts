@@ -67,6 +67,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   VendorTaxProfileLine: 'finance',
   LicenseAssignment: 'licensing',
   ProvisioningTask: 'licensing',
+  PoolGrantAvoidedCost: 'licensing',
   ProvisioningTaskReason: 'licensing',
   HandoverDuty: 'licensing',
   ServiceAccountDutyNotice: 'licensing',

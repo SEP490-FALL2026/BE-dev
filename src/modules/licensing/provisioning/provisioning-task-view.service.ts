@@ -85,6 +85,8 @@ export interface TaskSummaryView {
   closedAt: Date | null;
   /** Present on a revocation only. */
   revocation: RevocationSummaryView | null;
+  /** What was bought with the grant when the pool had nothing free; null when the seat came from the pool (`BR-MF1-09b`). */
+  purchase: ProvisioningTaskRecord['purchase'];
   /** Seconds from the making of the task to its end, or to now while it is open: the same measure on both channels. */
   elapsedSeconds: number;
 }
@@ -281,6 +283,7 @@ export class ProvisioningTaskViewService {
               : null,
           }
         : null,
+      purchase: task.purchase,
       elapsedSeconds: Math.max(0, Math.floor(((ended ? ended.getTime() : now) - task.createdAt.getTime()) / 1000)),
     };
   }

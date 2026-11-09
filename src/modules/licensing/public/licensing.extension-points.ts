@@ -157,7 +157,7 @@ export class SeatBaselineClosedListeners extends Listeners<SeatBaselineClosedEve
  * **Gói 9 (MF1-F):** Kiểm tra trạng thái đóng baseline cho các hạn chế (ví dụ chặn trùng `QĐ-104k`).
  * Bind trong licensing.seat-baseline module; nếu không bind ⟹ coi như đã đóng (chặn tạo mới).
  */
-export interface SeatBaselinePhaseHook {
+export interface SeatBaselinePhase {
   /**
    * Coi baseline của org đã đóng hay chưa. Nếu hook không bind ⟹ true (chặn).
    */
@@ -166,7 +166,7 @@ export interface SeatBaselinePhaseHook {
 
 /** Hook cho SeatBaselinePhase (bind từ licensing.seat-baseline). */
 @Injectable()
-export class SeatBaselinePhaseHook extends Hook<SeatBaselinePhaseHook> {
+export class SeatBaselinePhaseHook extends Hook<SeatBaselinePhase> {
   constructor() {
     super('licensing.seat-baseline-phase');
   }

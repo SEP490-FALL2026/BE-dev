@@ -79,11 +79,11 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
       const noHead = await noticesOf('BUDGET_NO_HEAD_AT_DEADLINE');
       // C4-03: Each headless department gets 1 notice to Finance and 1 to Super Admin (2 per department)
       const financeNotices = toDepartment(noHead, headless.id).filter(
-        (notice) => notice.recipient_employee_id === h.finance.employeeId
+        (notice) => notice.recipient_employee_id === h.finance.employeeId,
       );
       const superAdminId_val = await superAdminId();
       const superAdminNotices = toDepartment(noHead, headless.id).filter(
-        (notice) => notice.recipient_employee_id === superAdminId_val
+        (notice) => notice.recipient_employee_id === superAdminId_val,
       );
       expect(financeNotices).toHaveLength(1);
       expect(superAdminNotices).toHaveLength(1);
@@ -116,7 +116,7 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
       await setDeadlines(firstDay, addDays(h.today(), 20));
       await service().run();
       const before = await noHeadOn(firstDay);
-      expect(before).toHaveLength(2);  // C4-03: 1 to Finance, 1 to Super Admin
+      expect(before).toHaveLength(2); // C4-03: 1 to Finance, 1 to Super Admin
       await h.ctx.sql.query(
         `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
          VALUES (gen_random_uuid(), $1, $2, $3, $4::date)`,

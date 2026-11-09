@@ -56,4 +56,5 @@ export type PeriodRefusal =
   | 'APPLICATION_RETIRED'
   | 'STARTS_TOO_EARLY'
   | 'INVALID_DATES'
-  | 'INVALID_TERMS';
+  | 'INVALID_TERMS'
+  | 'NO_OWNER_DEPARTMENT';

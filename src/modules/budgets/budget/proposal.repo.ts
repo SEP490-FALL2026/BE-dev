@@ -116,6 +116,7 @@ export class ProposalRepo {
         lines: {
           create: input.lines.map((line, index) => ({
             position: index + 1,
+            priorityRank: index + 1,
             description: line.description,
             planId: line.planId,
             seats: line.seats,

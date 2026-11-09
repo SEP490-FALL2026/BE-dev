@@ -187,7 +187,7 @@ export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     findings: ['LD-13'],
     owner: 'licensing-provisioning-task-read-contracts',
     rationale:
-      'Decision 5: which identity fields of the beneficiary, default owner and claimant a task card shows. Since LD-08 (23/10/2026) the card is a summary whose beneficiary carries {employeeId, employeeCode, fullName} and whose defaultResponsibleEmployeeId and claimedBy are ids only: the spec default, not an Owner decision. Reviewed after the G5/G6 merge (Prompt 02, 26/10/2026): the row gained `revocation` (the source and state of a revocation task), no identity field; decision 5 is still open.',
+      'Decision 5: which identity fields of the beneficiary, default owner and claimant a task card shows. Since LD-08 (23/10/2026) the card is a summary whose beneficiary carries {employeeId, employeeCode, fullName} and whose defaultResponsibleEmployeeId and claimedBy are ids only: the spec default, not an Owner decision. Reviewed after the G5/G6 merge (Prompt 02, 26/10/2026): the row gained `revocation` (the source and state of a revocation task), no identity field; decision 5 is still open. The row also carries `purchase` (what was bought with a grant, `BR-MF1-09b`), no identity field.',
     removeWhen: 'The Owner decides point 5 of LD-13 and the chosen contract ships.',
     itemProperties: [
       'accountIdentifier',
@@ -211,6 +211,7 @@ export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
       'maxAttempts',
       'nextRetryAt',
       'plan',
+      'purchase',
       'requestId',
       'revocation',
       'status',

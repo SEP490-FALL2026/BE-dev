@@ -16,11 +16,13 @@ export class SubscriptionObligationService {
   /** Throws FinanceSetupIncompleteError (409 `FINANCE.SETUP_INCOMPLETE`) with nothing written. */
   async assertChargeable(
     tx: DbTx,
-    ownerDepartmentId: string,
+    ownerDepartmentId: string | null,
     current: ObligationState,
     next: ObligationState,
   ): Promise<void> {
     if (!increasesObligation(current, next)) return;
+    // A subscription of the shared pool (K2, K4) has no owning department: what is owed is charged by the request that asked for the seat.
+    if (ownerDepartmentId === null) return;
     const department = await this.organizationReads.getDepartmentBrief(ownerDepartmentId, tx);
     if (!department?.costCenterActive) throw new FinanceSetupIncompleteError(ownerDepartmentId);
   }

@@ -25,7 +25,14 @@ import type { ApplicationKind, BillingCycle, ProvisioningType, SubscriptionRecor
 /** How many periods one pass of the renewal sweep reads at most; the next pass takes the rest. */
 const SWEEP_LIMIT = 500;
 
-function factsOf(record: SubscriptionRecord, renewedById: string | null): RenewalPeriodFacts {
+/** A period that a department head decides on: the subscriptions of the shared pool (K2, K4) have no owner department and are not decided here. */
+type OwnedRecord = SubscriptionRecord & { ownerDepartmentId: string };
+
+function isOwned(record: SubscriptionRecord): record is OwnedRecord {
+  return record.ownerDepartmentId !== null;
+}
+
+function factsOf(record: OwnedRecord, renewedById: string | null): RenewalPeriodFacts {
   const notice = deriveNotice(noticeInputOf(record));
 
   return {
@@ -113,6 +120,7 @@ export class SubscriptionPeriodService {
     const previous = await this.subscriptions.find(input.previousSubscriptionId, tx);
     if (!previous) throw new SubscriptionPeriodRefusedError('NOT_FOUND');
     if (previous.kind !== 'TERM') throw new SubscriptionPeriodRefusedError('NOT_TERM');
+    if (!isOwned(previous)) throw new SubscriptionPeriodRefusedError('NO_OWNER_DEPARTMENT');
     if ((await this.subscriptions.successorsOf([previous.id], tx)).has(previous.id)) {
       throw new SubscriptionPeriodRefusedError('ALREADY_RENEWED');
     }
@@ -156,7 +164,7 @@ export class SubscriptionPeriodService {
       }),
     );
 
-    return factsOf(created, null);
+    return factsOf({ ...created, ownerDepartmentId: previous.ownerDepartmentId }, null);
   }
 
   /**
@@ -199,6 +207,6 @@ export class SubscriptionPeriodService {
       tx,
     );
 
-    return records.map((record) => factsOf(record, successors.get(record.id) ?? null));
+    return records.filter(isOwned).map((record) => factsOf(record, successors.get(record.id) ?? null));
   }
 }

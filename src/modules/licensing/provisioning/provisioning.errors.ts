@@ -8,23 +8,3 @@ export class ProvisioningItAdminRequiredError extends Error {
     this.name = 'ProvisioningItAdminRequiredError';
   }
 }
-
-/**
- * Pkg 9 (MF1-F): Pool has free seats; purchase not allowed (AC-2, QĐ-104j).
- */
-export class PurchaseNotAllowedError extends Error {
-  constructor(freeSeats: number) {
-    super(`Cannot purchase when pool has ${freeSeats} free seats available.`);
-    this.name = 'PurchaseNotAllowedError';
-  }
-}
-
-/**
- * Pkg 9 (MF1-F): Pool exhausted but no purchase reason given (AC-3, QĐ-104k).
- */
-export class PurchaseReasonRequiredError extends Error {
-  constructor() {
-    super('Purchase reason is required when pool is exhausted and pending revocation exists.');
-    this.name = 'PurchaseReasonRequiredError';
-  }
-}

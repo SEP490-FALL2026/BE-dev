@@ -40,6 +40,19 @@ export interface SeatTarget {
   allowsMidTermReduction: boolean;
 }
 
+/** A subscription a seat can be taken from today, with the seats bought; a draft takes no seat (`US-04-03` AC-6). */
+export interface PoolSubscription {
+  subscriptionId: string;
+  purchasedQuantity: number | null;
+}
+
+/** What one subscription is bought at: the price a seat granted from it would have cost (`QĐ-106e`). */
+export interface SubscriptionPrice {
+  kind: 'RECURRING' | 'ONE_TIME';
+  unitPrice: { amountMinor: bigint; currency: string };
+  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+}
+
 /** How much of the catalog exists, for the onboarding checklist: judged from the data, not from how it was entered. */
 export interface CatalogOnboardingFacts {
   applications: number;

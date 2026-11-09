@@ -30019,7 +30019,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3, K4), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY.",
+            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3, K4), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -30184,7 +30184,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, ACCOUNT_IDENTIFIER_REQUIRED (a service account without the identifier the IT Admin enters), RESPONSIBLE_INVALID (the person named is not active in the owning department, or the request is not for a service account), REQUEST_PARTY.INELIGIBLE (the person named is the spending approver, who answers for no account of a request), SUBSCRIPTION_REQUIRED, SUBSCRIPTION_NOT_ALLOWED, SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_QUANTITY_UNKNOWN, SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP or IDENTIFIER_IN_USE. The IT Admin gives no end day: a body with `expectedEndDate` is a VALIDATION_ERROR, and the seat ends on the day of the request or, when it names none, when its term ends.",
+            "description": "The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, ACCOUNT_IDENTIFIER_REQUIRED (a service account without the identifier the IT Admin enters), RESPONSIBLE_INVALID (the person named is not active in the owning department, or the request is not for a service account), REQUEST_PARTY.INELIGIBLE (the person named is the spending approver, who answers for no account of a request), SUBSCRIPTION_REQUIRED, SUBSCRIPTION_NOT_ALLOWED, SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_QUANTITY_UNKNOWN, PURCHASE_NOT_APPLICABLE (a `purchase` for a plan that is not K2 or K4), PURCHASE_REASON_REQUIRED (the pool is empty but a seat is still being taken back: say why buying cannot wait), SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP or IDENTIFIER_IN_USE. The IT Admin gives no end day: a body with `expectedEndDate` is a VALIDATION_ERROR, and the seat ends on the day of the request or, when it names none, when its term ends.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -88513,7 +88513,12 @@
           "subscriptionId": { "type": "string", "format": "uuid" },
           "accountIdentifier": { "type": "string", "maxLength": 254 },
           "responsibleEmployeeId": { "type": "string", "format": "uuid" },
-          "beneficiaryEmployeeId": { "type": "string", "format": "uuid" }
+          "beneficiaryEmployeeId": { "type": "string", "format": "uuid" },
+          "purchase": {
+            "type": "object",
+            "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 500 } },
+            "additionalProperties": false
+          }
         },
         "required": ["requestId"],
         "additionalProperties": false
@@ -88684,6 +88689,17 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "purchase": {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["POOL_TOP_UP", "KEY_PURCHASE", "K1_SUBSCRIPTION"] },
+                      "reason": { "type": "string", "nullable": true },
+                      "purchasedAt": { "type": "string", "format": "date-time" }
+                    },
+                    "required": ["kind", "reason", "purchasedAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "steps": {
                     "type": "array",
@@ -88762,6 +88778,7 @@
                   "availableDecisions",
                   "closedAt",
                   "revocation",
+                  "purchase",
                   "elapsedSeconds",
                   "steps",
                   "doneWhen",
@@ -88923,6 +88940,17 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
+                    "purchase": {
+                      "type": "object",
+                      "properties": {
+                        "kind": { "type": "string", "enum": ["POOL_TOP_UP", "KEY_PURCHASE", "K1_SUBSCRIPTION"] },
+                        "reason": { "type": "string", "nullable": true },
+                        "purchasedAt": { "type": "string", "format": "date-time" }
+                      },
+                      "required": ["kind", "reason", "purchasedAt"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
                     "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                   },
                   "required": [
@@ -88950,6 +88978,7 @@
                     "availableDecisions",
                     "closedAt",
                     "revocation",
+                    "purchase",
                     "elapsedSeconds"
                   ],
                   "additionalProperties": false
@@ -89146,6 +89175,17 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "purchase": {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["POOL_TOP_UP", "KEY_PURCHASE", "K1_SUBSCRIPTION"] },
+                      "reason": { "type": "string", "nullable": true },
+                      "purchasedAt": { "type": "string", "format": "date-time" }
+                    },
+                    "required": ["kind", "reason", "purchasedAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "steps": {
                     "type": "array",
@@ -89224,6 +89264,7 @@
                   "availableDecisions",
                   "closedAt",
                   "revocation",
+                  "purchase",
                   "elapsedSeconds",
                   "steps",
                   "doneWhen",

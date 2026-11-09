@@ -44,6 +44,30 @@ export class SubscriptionFactsService {
     );
   }
 
+  /** The subscriptions of a plan a seat can be taken from today (the shared pool of the plan). */
+  grantableOfPlan(planId: string, today: BusinessDate, tx?: DbTx) {
+    return this.subscriptions.findGrantableOfPlan(planId, today, tx);
+  }
+
+  /** What this one subscription is bought at; null when it does not exist or has no price yet. */
+  async priceOfSubscription(
+    subscriptionId: string,
+    tx?: DbTx,
+  ): Promise<{
+    kind: 'RECURRING' | 'ONE_TIME';
+    unitPrice: Money;
+    billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+  } | null> {
+    const record = await this.subscriptions.find(subscriptionId, tx);
+    if (!record?.unitPrice || !record.billingCycle) return null;
+
+    return {
+      kind: record.kind === 'PERPETUAL' ? 'ONE_TIME' : 'RECURRING',
+      unitPrice: { amountMinor: record.unitPrice.amountMinor, currency: record.unitPrice.currency },
+      billingCycle: record.billingCycle,
+    };
+  }
+
   /**
    * For each of these plans that the department can price, the billing cycle of the subscription `priceOfPlan` would use, in
    * one read: what tells whether a price exists for a plan without reading or showing the price itself.

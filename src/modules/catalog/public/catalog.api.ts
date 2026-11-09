@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type {
@@ -6,6 +7,8 @@ import type {
   CatalogOnboardingFacts,
   PlanRevocationInfo,
   PlanSummary,
+  PoolSubscription,
+  SubscriptionPrice,
   WorkspaceDuty,
   SeatTarget,
   SeatTargetRef,
@@ -102,6 +105,16 @@ export class CatalogApi {
    */
   getPlanPrice(planId: string, ownerDepartmentId: string, tx?: DbTx) {
     return this.subscriptions.priceOfPlan(planId, ownerDepartmentId, tx);
+  }
+
+  /** The subscriptions of the plan a seat can be taken from today: the shared pool of the plan (`QĐ-103d`). */
+  getGrantableSubscriptions(planId: string, today: BusinessDate, tx?: DbTx): Promise<PoolSubscription[]> {
+    return this.subscriptions.grantableOfPlan(planId, today, tx);
+  }
+
+  /** What one subscription is bought at (unit price and billing cycle); null when it has no price. */
+  getSubscriptionPrice(subscriptionId: string, tx?: DbTx): Promise<SubscriptionPrice | null> {
+    return this.subscriptions.priceOfSubscription(subscriptionId, tx);
   }
 
   /** The active subscriptions these departments own with their price and term: what the baseline of the budget starts from (`FR-5.15`). */

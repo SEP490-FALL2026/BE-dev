@@ -111,6 +111,9 @@ import { SaasIssueViewService } from './saas-issue/saas-issue-view.service';
 import { SaasIssuesController } from './saas-issue/saas-issues.controller';
 import { SeatBaselineController } from './seat-baseline/seat-baseline.controller';
 import { SeatBaselinePhaseListener } from './seat-baseline/seat-baseline-phase.listener';
+import { SharedPoolAvoidedCostRepo } from './shared-pool/shared-pool-avoided-cost.repo';
+import { SharedPoolCapacityRepo } from './shared-pool/shared-pool-capacity.repo';
+import { SharedPoolService } from './shared-pool/shared-pool.service';
 import { SeatBaselineRepo } from './seat-baseline/seat-baseline.repo';
 import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
 import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
@@ -187,6 +190,9 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     SeatBaselineService,
     SeatBaselinePhaseListener,
     SeatBaselineClosedListeners,
+    SharedPoolCapacityRepo,
+    SharedPoolAvoidedCostRepo,
+    SharedPoolService,
     ProvisioningTaskRepo,
     ProvisioningTaskFrame,
     ProvisioningHolderService,

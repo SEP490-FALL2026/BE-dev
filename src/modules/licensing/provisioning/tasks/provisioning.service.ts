@@ -103,8 +103,7 @@ export class ProvisioningService {
    * Completes the task of a grant with the note of what was done; a revocation has its own completion. Throws
    * ProvisioningEvidenceRequiredError, the errors of `claim` except the departed beneficiary, and ProvisioningTaskStateError
    * (`IS_REVOCATION` for a revocation).
-   * 
-   * Pkg 9 (MF1-F): Records pool_grant_avoided_costs if purchase was requested (AC-3).
+   * A grant taken from the pool, with nothing bought for it, records the cost it avoided once (`BR-MF1-09c`).
    */
   async complete(actor: AuthenticatedPrincipal, id: string, input: { evidence: string }): Promise<TaskView> {
     const evidence = cleanEvidence(input.evidence);
@@ -113,18 +112,22 @@ export class ProvisioningService {
         assertNotRevocationTask(locked.kind);
         nextStatus(locked.status, 'COMPLETE', locked.channel);
       },
-      write: async ({ tx, task: locked, now }) => {
-        // Pkg 9: Compute avoided costs if purchased from pool
-        let avoidedCosts: bigint | undefined;
-        if (locked.assignment.subscription?.unitPrice && locked.purchaseKind) {
-          // avoidedCosts = unitPrice * 1 seat
-          const minor = BigInt(locked.assignment.subscription.unitPrice.amountMinor);
-          avoidedCosts = minor;
-        }
-
-        await this.repo.markCompleted(tx, locked.id, actor.appUserId, evidence, now, avoidedCosts);
+      write: async ({ tx, task: locked, now, organizationId }) => {
+        await this.repo.markCompleted(tx, locked.id, actor.appUserId, evidence, now);
         if (locked.requestId !== null) {
           await this.gate.get().reportOutcome(tx, locked.requestId, 'COMPLETED', locked.assignment.employeeId);
+          await this.sharedPool.recordAvoided(tx, {
+            organizationId,
+            completedOn: await this.organizationReads.businessToday(),
+            task: {
+              id: locked.id,
+              assignmentId: locked.assignmentId,
+              requestId: locked.requestId,
+              planId: locked.assignment.planId,
+              subscriptionId: locked.assignment.subscriptionId,
+              purchased: locked.purchase !== null,
+            },
+          });
         }
 
         return { action: 'COMPLETED', after: { status: 'COMPLETED', completedBy: actor.appUserId } };

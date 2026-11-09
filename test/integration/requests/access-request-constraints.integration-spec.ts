@@ -641,8 +641,8 @@ describe('requests (integration, PostgreSQL constraints)', () => {
             6,
             'RECURRING',
             person.employeeId,
-          ]
-        )
+          ],
+        ),
       ).toBeNull();
 
       // Invalid: 13 should violate CHECK
@@ -663,19 +663,9 @@ describe('requests (integration, PostgreSQL constraints)', () => {
             13,
             'RECURRING',
             person.employeeId,
-          ]
-        )
+          ],
+        ),
       ).toBe(CHECK);
-    });
-  });
-
-  describe('RequestSupplement new fields: before/after EndDate, nullable amounts', () => {
-    it('schema accepts NULL for before/after dates and amounts columns', async () => {
-      // Verify schema (pragmatic check — if NULL failed, alter table would already catch in other tests)
-      // This suite just verifies the columns exist and are typed correctly in Prisma.
-      // Actual supplement insertion is tested by other suites (spend-supplements.integration-spec.ts).
-      // For this quick check, just verify we have the new columns in generated schema.
-      expect(true).toBe(true); // placeholder: columns added in migration 20261109000000
     });
   });
 });

@@ -234,8 +234,31 @@ export class SubscriptionRepo {
   }
 
   /**
-   * The price a plan is bought at (kho dùng chung, không lọc theo phòng sở hữu): 
-   * the unit price and billing cycle of the newest active subscription with price. 
+   * The subscriptions of a plan a seat can be taken from on `today`: active, not continued by a later period and not ended. A draft
+   * is left out (its seats cannot be granted), and so is a subscription whose period already ended.
+   */
+  async findGrantableOfPlan(
+    planId: string,
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ subscriptionId: string; purchasedQuantity: number | null }[]> {
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: {
+        planId,
+        status: 'ACTIVE',
+        renewedBy: null,
+        OR: [{ endDate: null }, { endDate: { gte: toDateColumn(today) } }],
+      },
+      select: { id: true, purchasedQuantity: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => ({ subscriptionId: row.id, purchasedQuantity: row.purchasedQuantity }));
+  }
+
+  /**
+   * The price a plan is bought at (kho dùng chung, không lọc theo phòng sở hữu):
+   * the unit price and billing cycle of the newest active subscription with price.
    * **Gói 9:** Không kiểm department — chọn từ kho dùng chung cho mọi phòng.
    */
   async findPricedOfPlan(
@@ -252,7 +275,13 @@ export class SubscriptionRepo {
     const row = await (tx ?? this.prisma).subscription.findFirst({
       where: { planId, ...pricedOf() },
       orderBy: PRICED_FIRST,
-      select: { kind: true, unitPriceMinor: true, unitPriceCurrency: true, billingCycle: true, allowsMidTermReduction: true },
+      select: {
+        kind: true,
+        unitPriceMinor: true,
+        unitPriceCurrency: true,
+        billingCycle: true,
+        allowsMidTermReduction: true,
+      },
     });
     if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null || row.billingCycle === null) return null;
 

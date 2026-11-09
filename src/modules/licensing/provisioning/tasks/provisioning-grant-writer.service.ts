@@ -21,6 +21,7 @@ import { claimMatchesAnswer, grantTaskAudit } from './provisioning-grant.policy'
 import { effectiveEndOf } from '../../../../core/term-limit';
 import type { GrantRequestAnswer } from '../../public/licensing.types';
 import { ProvisioningHolderService } from './provisioning-holder.service';
+import { SharedPoolService } from '../../shared-pool/shared-pool.service';
 
 type Planned = Awaited<ReturnType<ProvisioningGrantPlanner['plan']>>;
 
@@ -39,6 +40,7 @@ export class ProvisioningGrantWriter {
     private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
     private readonly gate: GrantRequestGateHook,
+    private readonly sharedPool: SharedPoolService,
   ) {}
 
   async write(
@@ -54,21 +56,14 @@ export class ProvisioningGrantWriter {
     if (claimed.status !== 'GRANTABLE') throw new GrantRequestRefusedError(claimed.status);
     if (!claimMatchesAnswer(claimed, answer)) throw new GrantRequestRefusedError('NOT_APPROVED');
     const target = await this.lockTarget(tx, plan, input.subscriptionId);
-    const holder =
-      claimed.seat === 'SERVICE' && serviceIdentifier !== null
-        ? await this.holders.service(tx, actor, {
-            requested: { employeeId: claimed.employeeId, account: claimed.serviceAccount },
-            named: input.responsibleEmployeeId,
-            accountIdentifier: serviceIdentifier,
-            today,
-          })
-        : await this.holders.personal(tx, actor, {
-            requestId: input.requestId,
-            employeeId: answer.employeeId,
-            accountIdentifier: input.accountIdentifier,
-            today,
-          });
-
+    // Judged under the locks of the grant, so the count of the free seats cannot change before the seat is written (`BR-MF1-09a`).
+    const purchase = await this.sharedPool.judgePurchase(tx, {
+      planId: plan.planId,
+      provisioningType: plan.provisioningType,
+      today,
+      purchase: input.purchase,
+    });
+    const holder = await this.holderOf(tx, actor, { input, answer, claimed, serviceIdentifier, today });
     const assignment = await this.assignments.createFromRequest(tx, actor, {
       organizationId: organization.id,
       requestId: input.requestId,
@@ -78,15 +73,7 @@ export class ProvisioningGrantWriter {
       effectiveFrom: today,
       expectedEndDate: this.endOfSeat(claimed, today),
     });
-    
-    // Pkg 9 (MF1-F): Determine purchase kind (POOL_TOP_UP for K2, KEY_PURCHASE for K4)
-    let purchaseKind: 'POOL_TOP_UP' | 'KEY_PURCHASE' | undefined;
-    let purchaseReason: string | undefined;
-    if (input.purchase) {
-      purchaseKind = plan.provisioningType === 'K2' ? 'POOL_TOP_UP' : plan.provisioningType === 'K4' ? 'KEY_PURCHASE' : undefined;
-      purchaseReason = input.purchase.reason;
-    }
-    
+
     const task = await this.repo.insert(tx, {
       organizationId: organization.id,
       assignmentId: assignment.id,
@@ -95,8 +82,9 @@ export class ProvisioningGrantWriter {
       defaultResponsibleEmployeeId: inCharge?.itAdminEmployeeId ?? null,
       createdByAppUserId: actor.appUserId,
       maxAttempts,
-      purchaseKind,
-      purchaseReason,
+      ...(purchase.purchased && {
+        purchase: { kind: purchase.kind, reason: purchase.reason, purchasedAt: new Date() },
+      }),
     });
     await this.audit.record(
       tx,
@@ -114,6 +102,35 @@ export class ProvisioningGrantWriter {
     if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
 
     return task;
+  }
+
+  /** The person or the service account the seat is for: a service account has the identifier and the responsible person the IT Admin gave. */
+  private holderOf(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: {
+      input: GrantInput;
+      answer: Planned['answer'];
+      claimed: Extract<GrantRequestAnswer, { status: 'GRANTABLE' }>;
+      serviceIdentifier: string | null;
+      today: string;
+    },
+  ) {
+    const { input, answer, claimed, serviceIdentifier, today } = facts;
+
+    return claimed.seat === 'SERVICE' && serviceIdentifier !== null
+      ? this.holders.service(tx, actor, {
+          requested: { employeeId: claimed.employeeId, account: claimed.serviceAccount },
+          named: input.responsibleEmployeeId,
+          accountIdentifier: serviceIdentifier,
+          today,
+        })
+      : this.holders.personal(tx, actor, {
+          requestId: input.requestId,
+          employeeId: answer.employeeId,
+          accountIdentifier: input.accountIdentifier,
+          today,
+        });
   }
 
   /**

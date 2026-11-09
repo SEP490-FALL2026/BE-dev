@@ -26,7 +26,7 @@ export interface GrantInput {
   responsibleEmployeeId?: string;
   /** The person of a request for a group this grant is for; a request for one person has none to name. */
   beneficiaryEmployeeId?: string;
-  /** Pkg 9 (MF1-F): Purchase additional seats when pool is exhausted (AC-2/3). */
+  /** Record a purchase with the grant when the pool of the plan has nothing free (`BR-MF1-09b`). */
   purchase?: { reason?: string };
 }
 

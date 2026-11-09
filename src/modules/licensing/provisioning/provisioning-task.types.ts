@@ -49,6 +49,12 @@ export interface ProvisioningTaskRecord {
   accessCutOn: BusinessDate | null;
   accessEvidence: string | null;
   completionNote: string | null;
+  /** What was bought with the grant when the pool had nothing free (`BR-MF1-09b`); null when the seat came from the pool. */
+  purchase: {
+    kind: 'POOL_TOP_UP' | 'KEY_PURCHASE' | 'K1_SUBSCRIPTION';
+    reason: string | null;
+    purchasedAt: Date;
+  } | null;
   createdAt: Date;
   assignment: {
     employeeId: string;
@@ -96,6 +102,9 @@ export const SUMMARY_SELECT = {
   paidThroughOn: true,
   accessState: true,
   accessCutOn: true,
+  purchaseKind: true,
+  purchaseReason: true,
+  purchasedAt: true,
   createdByAppUserId: true,
   createdAt: true,
   updatedAt: true,
@@ -141,6 +150,10 @@ export const toRecord = (row: Row): ProvisioningTaskRecord => ({
   accessCutOn: dayOf(row.accessCutOn),
   accessEvidence: row.accessEvidence,
   completionNote: row.completionNote,
+  purchase:
+    row.purchaseKind !== null && row.purchasedAt !== null
+      ? { kind: row.purchaseKind, reason: row.purchaseReason, purchasedAt: row.purchasedAt }
+      : null,
   createdAt: row.createdAt,
   assignment: {
     employeeId: row.assignment.employeeId,

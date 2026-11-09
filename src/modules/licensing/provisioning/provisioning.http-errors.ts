@@ -34,6 +34,11 @@ import {
   SeatTargetNotFoundError,
 } from '../public/licensing.errors';
 import { toLicensingApiException } from '../licensing.http-errors';
+import {
+  PurchaseNotAllowedError,
+  PurchaseNotApplicableError,
+  PurchaseReasonRequiredError,
+} from '../shared-pool/shared-pool.errors';
 import { ProvisioningItAdminRequiredError } from './provisioning.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
@@ -138,6 +143,18 @@ export function toProvisioningApiException(error: unknown): unknown {
   }
   if (error instanceof ProvisioningAnotherItAdminNeededError) {
     return refuse(HttpStatus.FORBIDDEN, 'PROVISIONING.ANOTHER_IT_ADMIN_NEEDED', error.message);
+  }
+  if (error instanceof PurchaseNotApplicableError) {
+    return refuse(UNPROCESSABLE, 'PROVISIONING.PURCHASE_NOT_APPLICABLE', error.message);
+  }
+  if (error instanceof PurchaseNotAllowedError) {
+    return refuse(CONFLICT, 'PROVISIONING.PURCHASE_NOT_ALLOWED', error.message, {
+      freeSeats: error.freeSeats,
+      subscriptionIds: error.subscriptionIds,
+    });
+  }
+  if (error instanceof PurchaseReasonRequiredError) {
+    return refuse(UNPROCESSABLE, 'PROVISIONING.PURCHASE_REASON_REQUIRED', error.message);
   }
   // The same answer as the role guard of the route: the policy of the work refuses what the guard would have refused.
   if (error instanceof ProvisioningItAdminRequiredError) return new ApiException(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR);

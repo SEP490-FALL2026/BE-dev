@@ -1,5 +1,4 @@
 import request from 'supertest';
-import * as policy from '../../../src/modules/licensing/assignment/assignment.policy';
 import { ServiceAccountHarness } from '../../support/service-account-harness';
 import type { Unit } from '../../support/spend-harness';
 

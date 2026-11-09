@@ -22,31 +22,33 @@ BEGIN
   END IF;
 END $$;
 
--- Thêm cột vào budget_proposal_lines
+-- Proposal lines: add nullable, backfill, then tighten (order matters on a database that already holds multi-line proposals)
 ALTER TABLE budget_proposal_lines
   ADD COLUMN line_type "BudgetLineType" NOT NULL DEFAULT 'NEW',
   ADD COLUMN zbb jsonb,
-  ADD COLUMN priority_rank int NOT NULL DEFAULT 1,
+  ADD COLUMN priority_rank int,
   ADD COLUMN over_ceiling_minor bigint;
 
--- Thêm cột vào budget_version_lines
+-- position starts at 1 (budget_proposal_lines_position_check), unique per proposal, so it is a valid initial rank
+UPDATE budget_proposal_lines SET priority_rank = "position";
+
+ALTER TABLE budget_proposal_lines ALTER COLUMN priority_rank SET NOT NULL;
+
+ALTER TABLE budget_proposal_lines
+  ADD CONSTRAINT budget_proposal_lines_priority_rank_unique UNIQUE (proposal_id, priority_rank),
+  ADD CONSTRAINT budget_proposal_lines_priority_rank_min CHECK (priority_rank >= 1);
+
+-- Version lines copy the rank of the proposal line they came from; Finance-added lines stay NULL
 ALTER TABLE budget_version_lines
   ADD COLUMN line_type "BudgetLineType" NOT NULL DEFAULT 'NEW',
   ADD COLUMN zbb jsonb,
   ADD COLUMN priority_rank int;
 
--- Tạo constraint duy nhất cho priority_rank theo proposal (budget_proposal_lines)
-ALTER TABLE budget_proposal_lines
-  ADD CONSTRAINT budget_proposal_lines_priority_rank_unique
-    UNIQUE (proposal_id, priority_rank);
-
--- Tạo constraint cho priority_rank >= 1
-ALTER TABLE budget_proposal_lines
-  ADD CONSTRAINT budget_proposal_lines_priority_rank_min
-    CHECK (priority_rank >= 1);
-
--- Backfill mặc định: priority_rank = position (duy nhất theo proposal)
--- (Mặc định đã là 1, sau này phải được ghi đúng khi nộp)
+UPDATE budget_version_lines vl
+   SET priority_rank = pl.priority_rank
+  FROM budget_proposal_lines pl
+ WHERE pl.proposal_id = vl.proposal_id
+   AND pl."position" = vl.proposal_position;
 
 -- Thêm CHECK constraint trên budget_versions để SUPERSEDED không dùng được nữa
 ALTER TABLE budget_versions

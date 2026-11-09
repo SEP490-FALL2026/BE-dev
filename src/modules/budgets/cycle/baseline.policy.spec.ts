@@ -148,15 +148,21 @@ describe('the cost of one subscription over a year (R-I03)', () => {
     // Case 2: ordered to end (months remaining)
     expect(subscriptionCost(2027, '2026-11-09', 2, annual, true)).toEqual({
       monthlyMinor: 100n,
-      months: 6,  // From Nov 2026 to June 2027 (where annual ends)
+      months: 6, // From Nov 2026 to June 2027 (where annual ends)
       costMinor: 1200n,
     });
     // Case 3: ends today (willRenew = false, 6 months June to Nov)
-    const endsToday = { ...annual, endDate: '2026-11-09', startDate: '2026-06-01', billingCycle: 'ANNUAL', hasSuccessor: false };
+    const endsToday = {
+      ...annual,
+      endDate: '2026-11-09',
+      startDate: '2026-06-01',
+      billingCycle: 'ANNUAL',
+      hasSuccessor: false,
+    };
     expect(subscriptionCost(2026, '2026-11-09', 3, endsToday, true)).toEqual({
       monthlyMinor: 100n,
-      months: 6,  // June to Nov (6 months)
-      costMinor: 1800n,  // 3 seats × 100 × 6 months
+      months: 6, // June to Nov (6 months)
+      costMinor: 1800n, // 3 seats × 100 × 6 months
     });
   });
 });

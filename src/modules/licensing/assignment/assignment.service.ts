@@ -8,7 +8,6 @@ import type { SeatTarget, SeatTargetRef } from '../../catalog/public/catalog.typ
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError } from '../public/licensing.errors';
-import type { SeatBaselineClosedHolder } from '../public/licensing-seat-baseline.types';
 import type {
   AssignmentHolder,
   AssignmentRecord,
@@ -20,9 +19,7 @@ import type {
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { toAssignmentFailure } from './assignment-conflicts.repo';
 import { AssignmentDepartmentRepo } from './assignment-department.repo';
-import {
-  assignmentCreatedSnapshot,
-} from './assignment.policy';
+import { assignmentCreatedSnapshot } from './assignment.policy';
 import { assertBaselineTarget, assertSeatTargetUsable, toSeatTargetRef } from './baseline-target.policy';
 import { AssignmentRepo } from './assignment.repo';
 
@@ -107,18 +104,6 @@ export class AssignmentService {
 
   countBaseline(): Promise<number> {
     return this.repo.countBaseline();
-  }
-
-  /**
-   * The people who hold, on `day`, a seat the baseline wrote on a subscription owned by another department than the one they are in
-   * (`QĐ-89e`), read in the transaction that closes the baseline. A seat written before a personal seat carried its department
-   * is judged against the owner of its subscription.
-   * 
-   * **Gói 9 (MF1-F): Phần cấp từ kho được phép cấp qua phòng ⟹ không cần tìm người khác phòng — trả `[]` (QĐ-103d).**
-   */
-  async baselineHoldersOfOtherDepartments(tx: DbTx, day: BusinessDate): Promise<SeatBaselineClosedHolder[]> {
-    // Gói 9: cấp từ kho không chặn theo phòng, nên không còn người khác phòng để kiểm soát (QĐ-89e hết đối tượng).
-    return [];
   }
 
   existingOf(target: SeatTarget, tx?: DbTx): Promise<ExistingAssignment[]> {

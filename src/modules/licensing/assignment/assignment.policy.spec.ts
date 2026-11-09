@@ -1,5 +1,4 @@
 import {
-  AssignmentConflictError,
   AssignmentEffectiveDateInvalidError,
   AssignmentExpectedEndRequiredError,
   AssignmentNotOpenError,
@@ -8,11 +7,7 @@ import {
 } from '../public/licensing.errors';
 import type { AssignmentRecord } from '../public/licensing.types';
 import { AssignmentResponsibleAfterDeadlineError } from './service-account.errors';
-import {
-  assertResponsibleChange,
-  effectiveFromLabel,
-  toAssignmentView,
-} from './assignment.policy';
+import { assertResponsibleChange, effectiveFromLabel, toAssignmentView } from './assignment.policy';
 
 const bot: AssignmentRecord = {
   id: 'a1',

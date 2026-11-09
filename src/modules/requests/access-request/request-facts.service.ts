@@ -88,6 +88,21 @@ export interface AssessmentInput {
  * person already holds, and who the routing table gives the need step to.
  * It writes nothing and decides nothing: the callers refuse or record.
  */
+/** What a request for internal software costs: nothing, and no day the money goes out. */
+const NOT_APPLICABLE_PRICING: PricingRecord = {
+  status: 'NOT_APPLICABLE',
+  missingReason: null,
+  kind: null,
+  expectedSpendOn: null,
+  expectedEndDate: null,
+  amountMonths: null,
+  budgetYear: null,
+  amount: null,
+  unitPrice: null,
+  billingCycle: null,
+  schedule: null,
+};
+
 @Injectable()
 export class RequestFactsService {
   constructor(
@@ -234,25 +249,12 @@ export class RequestFactsService {
       today: BusinessDate;
     },
   ): Promise<PricingRecord> {
-    if (input.free) {
-      return {
-        status: 'NOT_APPLICABLE',
-        missingReason: null,
-        kind: null,
-        expectedSpendOn: null,
-        expectedEndDate: null,
-        amountMonths: null,
-        budgetYear: null,
-        amount: null,
-        unitPrice: null,
-        billingCycle: null,
-        schedule: null,
-      };
-    }
+    if (input.free) return NOT_APPLICABLE_PRICING;
     const expectedSpendOn = input.expectedSpendOn ?? input.today;
     const price = await this.catalog.getPlanPrice(input.planId, input.departmentId, tx);
+    const kind = price?.kind ?? 'RECURRING';
     const priced = priceRequest({
-      kind: price?.kind ?? 'RECURRING',
+      kind,
       unitPrice: price?.unitPrice ?? null,
       billingCycle: price?.billingCycle ?? null,
       termMonths: input.termMonths,
@@ -278,7 +280,7 @@ export class RequestFactsService {
     return {
       status: 'PRICED',
       missingReason: null,
-      kind: price?.kind ?? 'RECURRING',
+      kind,
       expectedSpendOn,
       budgetYear: priced.budgetYear,
       expectedEndDate: null,

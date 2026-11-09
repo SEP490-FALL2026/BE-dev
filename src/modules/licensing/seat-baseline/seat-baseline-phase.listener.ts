@@ -1,18 +1,16 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { SeatBaselinePhaseHook } from '../public/licensing.extension-points';
 import { SeatBaselineRepo } from './seat-baseline.repo';
 
 /**
- * Gói 9 (MF1-F): Bind `SeatBaselinePhaseHook` để kiểm baseline đã đóng.
- * Dùng trong quy tắc chặn trùng `QĐ-104k`: tạo thuê bao `K2`/`K4` thứ hai cùng gói khi baseline đã đóng ⟹ 409.
- * Nếu hook không bind ⟹ coi như đã đóng (chặn mọi tạo mới).
+ * Tells the catalog whether the seat baseline of the organization is closed: while it is open a second subscription of the same
+ * K2 or K4 plan is only warned about, and once it is closed it is refused (`QĐ-104k`(3)).
  */
 @Injectable()
 export class SeatBaselinePhaseListener implements OnModuleInit {
-  private impl: { isClosed(tx: DbTx, organizationId: string): Promise<boolean> } = {
-    isClosed: (tx, organizationId) => this.isClosed(tx, organizationId),
-  };
+  /** The extension points this class registers with (gate extension-wiring, R1). */
+  static readonly binds = [SeatBaselinePhaseHook] as const;
 
   constructor(
     private readonly repo: SeatBaselineRepo,
@@ -20,15 +18,12 @@ export class SeatBaselinePhaseListener implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.hook.bind(this.impl);
+    this.hook.bind({ isClosed: (tx, organizationId) => this.isClosed(tx, organizationId) });
   }
 
-  /**
-   * Coi baseline của org đã đóng hay chưa.
-   * @returns true nếu đã đóng, false nếu chưa đóng
-   */
-  async isClosed(tx: DbTx, organizationId: string): Promise<boolean> {
+  private async isClosed(tx: DbTx, organizationId: string): Promise<boolean> {
     const state = await this.repo.read(organizationId, tx);
+
     return state.closedAt !== null;
   }
 }

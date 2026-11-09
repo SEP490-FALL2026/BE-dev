@@ -185,7 +185,9 @@ describe('paymentScheduleJson (the codec of access_requests.payment_schedule)', 
 
   describe('BR-MF1-07: ONE_TIME pricing (perpetual licenses)', () => {
     it('is the unit price times the people, one payment period (R-B01 ca 1)', () => {
-      const priced = priceRequest(input({ kind: 'ONE_TIME', beneficiaries: 3, unitPrice: { amountMinor: 5000n, currency: 'USD' } }));
+      const priced = priceRequest(
+        input({ kind: 'ONE_TIME', beneficiaries: 3, unitPrice: { amountMinor: 5000n, currency: 'USD' } }),
+      );
 
       expect(priced).toMatchObject({
         status: 'PRICED',

@@ -9,6 +9,7 @@ export const toSummaryWire = (view: TaskSummaryView) => ({
   failedAt: view.failedAt?.toISOString() ?? null,
   nextRetryAt: view.nextRetryAt?.toISOString() ?? null,
   closedAt: view.closedAt?.toISOString() ?? null,
+  purchase: view.purchase && { ...view.purchase, purchasedAt: view.purchase.purchasedAt.toISOString() },
 });
 
 export const toWire = (view: TaskView) => ({ ...toSummaryWire(view), ...detailOf(view) });

@@ -13,6 +13,9 @@ import { businessDate, responseBusinessDate } from '../../../infrastructure/http
  * the policy and the service and answers with its own code.
  */
 
+/** What the IT Admin says when buying: only why. The kind of purchase (a seat of K2, a key of K4) follows from the plan, never from the client. */
+const purchaseBodySchema = z.strictObject({ reason: z.string().trim().min(1).max(500).optional() });
+
 export const grantBodySchema = z.strictObject({
   requestId: z.uuid(),
   subscriptionId: z.uuid().optional(),
@@ -21,10 +24,8 @@ export const grantBodySchema = z.strictObject({
   responsibleEmployeeId: z.uuid().optional(),
   /** Only for a request for a group, which is granted one person at a time: the person of the request this grant is for. */
   beneficiaryEmployeeId: z.uuid().optional(),
-  /** Pkg 9 (MF1-F): Purchase additional seats when pool is exhausted (AC-2/3). */
-  purchase: z.object({
-    reason: z.string().min(1).max(500).optional(),
-  }).optional(),
+  /** Record a purchase with the grant when the pool has nothing free; the kind of purchase follows from the plan (`BR-MF1-09b`). */
+  purchase: purchaseBodySchema.optional(),
 });
 export const completeBodySchema = z.strictObject({ evidence: z.string().max(EVIDENCE_MAX_LENGTH).default('') });
 export const failureBodySchema = z.strictObject({ reason: z.string().max(FAILURE_REASON_MAX_LENGTH).default('') });
@@ -147,11 +148,14 @@ const taskSummarySchema = z.strictObject({
   availableDecisions: z.array(z.enum(['RETRY', 'HAND_OFF', 'CLOSE_FAILED'])),
   closedAt: z.iso.datetime().nullable(),
   revocation: revocationSummarySchema.nullable(),
-  /** Pkg 9 (MF1-F): Purchase from pool when exhausted. */
-  purchase: z.strictObject({
-    kind: z.enum(['POOL_TOP_UP', 'KEY_PURCHASE']).optional(),
-    reason: z.string().optional(),
-  }).optional(),
+  /** What was bought with the grant when the pool had nothing free; null when the seat came from the pool. */
+  purchase: z
+    .strictObject({
+      kind: z.enum(['POOL_TOP_UP', 'KEY_PURCHASE', 'K1_SUBSCRIPTION']),
+      reason: z.string().nullable(),
+      purchasedAt: z.iso.datetime(),
+    })
+    .nullable(),
   elapsedSeconds: z.number().int().nonnegative(),
 });
 const taskSchema = taskSummarySchema.extend({
@@ -178,8 +182,6 @@ const taskSchema = taskSummarySchema.extend({
   closedBy: z.uuid().nullable(),
   closeReason: z.string().nullable(),
   revocation: revocationDetailSchema.nullable(),
-  /** Pkg 9 (MF1-F): Cost avoided by granting from pool when exhausted (unitPrice * quantity). */
-  poolGrantAvoidedCosts: z.string().nullable(),
 });
 const pagination = z.strictObject({
   page: z.number().int().positive(),
