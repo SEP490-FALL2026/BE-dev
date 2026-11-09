@@ -1,0 +1,1097 @@
+{
+  "referenceAuthor": "AI draft by Claude Sonnet — not reviewed by a human; Opus coordinator spot-check pending",
+  "direction": "vi-en",
+  "note": "SYNTHETIC data: invented people, companies, codes; *.example e-mail domains. References are AI drafts, not human gold.",
+  "items": [
+    {
+      "id": "vi-001",
+      "source": "Tôi không cần cài đặt thêm phần mềm nào khác cho dự án này.",
+      "reference": "I do not need any other software installed for this project.",
+      "categories": ["negation", "plain"],
+      "protected": [],
+      "mustContain": [["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-002",
+      "source": "Yêu cầu của Nguyễn Văn An chưa được duyệt vì thiếu lý do chi tiết.",
+      "reference": "The request from Nguyễn Văn An has not been approved because detailed justification is missing.",
+      "categories": ["negation", "name"],
+      "protected": ["Nguyễn Văn An"],
+      "mustContain": [["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-003",
+      "source": "Công cụ này không nằm trong danh mục chuẩn của công ty.",
+      "reference": "This tool is not in the company's standard catalogue.",
+      "categories": ["negation", "plain"],
+      "protected": [],
+      "mustContain": [["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-004",
+      "source": "Tôi không đồng ý với đề xuất thu hồi seat của Trần Thị Bích.",
+      "reference": "I do not agree with the proposal to revoke Trần Thị Bích's seat.",
+      "categories": ["negation", "revoke", "name", "glossary"],
+      "protected": ["Trần Thị Bích"],
+      "mustContain": [
+        ["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"],
+        ["revok", "revocation"],
+        ["seat"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-005",
+      "source": "Không được phép chia sẻ tài khoản Figma giữa các thành viên.",
+      "reference": "Sharing a Figma account between members is not allowed.",
+      "categories": ["negation", "software"],
+      "protected": ["Figma"],
+      "mustContain": [["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-006",
+      "source": "Đội ngũ không thể hoàn thành bàn giao trước ngày 30/11/2026.",
+      "reference": "The team cannot complete the handover before 30/11/2026.",
+      "categories": ["negation", "date", "glossary"],
+      "protected": ["30/11/2026"],
+      "mustContain": [
+        ["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"],
+        ["hand over", "handed over", "handover", "hands over", "handing over", "hand-over"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-007",
+      "source": "Chúng tôi chưa gia hạn giấy phép Jira vì ngân sách chưa được phê duyệt.",
+      "reference": "We have not renewed the Jira license because the budget has not been approved.",
+      "categories": ["negation", "software", "glossary"],
+      "protected": ["Jira"],
+      "mustContain": [
+        ["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"],
+        ["renew"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-008",
+      "source": "Nhân viên này không còn làm việc ở phòng Kỹ thuật nữa.",
+      "reference": "This employee no longer works in the Engineering department.",
+      "categories": ["negation", "glossary"],
+      "protected": [],
+      "mustContain": [
+        ["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"],
+        ["department"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-009",
+      "source": "Không có seat nào còn trống trong gói Slack hiện tại.",
+      "reference": "There are no seats available in the current Slack plan.",
+      "categories": ["negation", "software", "glossary"],
+      "protected": ["Slack"],
+      "mustContain": [
+        ["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"],
+        ["seat"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-010",
+      "source": "Yêu cầu này không được tự động duyệt; trưởng phòng phải xác nhận trước.",
+      "reference": "This request is not approved automatically; the department head must confirm first.",
+      "categories": ["negation", "glossary"],
+      "protected": [],
+      "mustContain": [
+        ["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"],
+        ["department head", "head of department", "head of the department"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-011",
+      "source": "Đừng thu hồi tài khoản của Lê Hoàng Nam trước khi bàn giao dữ liệu.",
+      "reference": "Do not revoke Lê Hoàng Nam's account before handing over the data.",
+      "categories": ["negation", "revoke", "name", "glossary"],
+      "protected": ["Lê Hoàng Nam"],
+      "mustContain": [
+        ["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"],
+        ["revok", "revocation"],
+        ["hand over", "handed over", "handover", "hands over", "handing over", "hand-over"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-012",
+      "source": "Báo cáo này không chứa dữ liệu cá nhân của khách hàng.",
+      "reference": "This report does not contain any personal customer data.",
+      "categories": ["negation", "plain"],
+      "protected": [],
+      "mustContain": [["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-013",
+      "source": "Tôi đã duyệt yêu cầu cài đặt Visual Studio Code cho cả nhóm.",
+      "reference": "I have approved the request to install Visual Studio Code for the whole team.",
+      "categories": ["approve", "software"],
+      "protected": ["Visual Studio Code"],
+      "mustContain": [["approv"]],
+      "mustNotContain": ["reject", "declin", "denied", "refus", "turned down"]
+    },
+    {
+      "id": "vi-014",
+      "source": "Yêu cầu REQ-2026-0042 được phê duyệt.",
+      "reference": "Request REQ-2026-0042 is approved.",
+      "categories": ["approve", "code"],
+      "protected": ["REQ-2026-0042"],
+      "mustContain": [["approv"]],
+      "mustNotContain": ["reject", "declin", "denied", "refus", "turned down"]
+    },
+    {
+      "id": "vi-015",
+      "source": "Trưởng phòng đã phê duyệt ngoại lệ cho công cụ Notion vì nhóm marketing cần cộng tác theo thời gian thực.",
+      "reference": "The department head approved the exception for Notion because the marketing team needs real-time collaboration.",
+      "categories": ["approve", "software", "glossary"],
+      "protected": ["Notion"],
+      "mustContain": [["approv"], ["department head", "head of department", "head of the department"]],
+      "mustNotContain": ["reject", "declin", "denied", "refus", "turned down"]
+    },
+    {
+      "id": "vi-016",
+      "source": "Người duyệt chi đã phê duyệt khoản chi 2.400.000 đồng cho giấy phép Postman.",
+      "reference": "The Spending Approver approved the expense of 2.400.000 đồng for the Postman license.",
+      "categories": ["approve", "number", "software", "glossary"],
+      "protected": ["Postman", "2.400.000 đồng"],
+      "mustContain": [["approv"], ["spending approver"]],
+      "mustNotContain": ["reject", "declin", "denied", "refus", "turned down"]
+    },
+    {
+      "id": "vi-017",
+      "source": "Đã duyệt: gia hạn Slack thêm 12 tháng.",
+      "reference": "Approved: renew Slack for another 12 months.",
+      "categories": ["approve", "software", "glossary"],
+      "protected": ["Slack"],
+      "mustContain": [["approv"], ["renew"]],
+      "mustNotContain": ["reject", "declin", "denied", "refus", "turned down"]
+    },
+    {
+      "id": "vi-018",
+      "source": "Chúng tôi chấp thuận đề xuất của Phạm Quỳnh Anh về việc dùng Figma thay cho Adobe XD.",
+      "reference": "We approve Phạm Quỳnh Anh's proposal to use Figma instead of Adobe XD.",
+      "categories": ["approve", "name", "software"],
+      "protected": ["Phạm Quỳnh Anh", "Figma", "Adobe XD"],
+      "mustContain": [["approv"]],
+      "mustNotContain": ["reject", "declin", "denied", "refus", "turned down"]
+    },
+    {
+      "id": "vi-019",
+      "source": "Yêu cầu hợp lệ nên tôi duyệt ngay.",
+      "reference": "The request is valid, so I approve it immediately.",
+      "categories": ["approve", "plain"],
+      "protected": [],
+      "mustContain": [["approv"]],
+      "mustNotContain": ["reject", "declin", "denied", "refus", "turned down"]
+    },
+    {
+      "id": "vi-020",
+      "source": "Phê duyệt có điều kiện: chỉ cấp 3 seat cho nhóm thiết kế đến hết 31/12/2026.",
+      "reference": "Conditionally approved: only 3 seats granted to the design team until 31/12/2026.",
+      "categories": ["approve", "number", "date", "glossary"],
+      "protected": ["31/12/2026"],
+      "mustContain": [["approv"], ["seat"]],
+      "mustNotContain": ["reject", "declin", "denied", "refus", "turned down"]
+    },
+    {
+      "id": "vi-021",
+      "source": "Yêu cầu bị từ chối vì công cụ trùng với Microsoft Teams đang có.",
+      "reference": "The request is rejected because the tool duplicates Microsoft Teams, which we already have.",
+      "categories": ["reject", "software"],
+      "protected": ["Microsoft Teams"],
+      "mustContain": [
+        [
+          "reject",
+          "declin",
+          "denied",
+          "deny",
+          "refus",
+          "turned down",
+          "not approv",
+          "disapprov",
+          "not accept",
+          "dismiss",
+          "cannot approve",
+          "unable to approve",
+          "not be approved",
+          "unable to accept"
+        ]
+      ],
+      "mustNotContain": ["has been approved", "is approved", "was approved"]
+    },
+    {
+      "id": "vi-022",
+      "source": "Từ chối: Jira đã được cấp cho phòng Kỹ thuật, không cần mua thêm.",
+      "reference": "Rejected: Jira has already been provided to the Engineering department, no need to buy more.",
+      "categories": ["reject", "negation", "software", "glossary"],
+      "protected": ["Jira"],
+      "mustContain": [
+        ["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"],
+        [
+          "reject",
+          "declin",
+          "denied",
+          "deny",
+          "refus",
+          "turned down",
+          "not approv",
+          "disapprov",
+          "not accept",
+          "dismiss",
+          "cannot approve",
+          "unable to approve",
+          "not be approved",
+          "unable to accept"
+        ],
+        ["department"]
+      ],
+      "mustNotContain": ["has been approved", "is approved", "was approved"]
+    },
+    {
+      "id": "vi-023",
+      "source": "Tôi từ chối đề xuất mua Tableau vì ngân sách quý này đã hết.",
+      "reference": "I reject the proposal to buy Tableau because this quarter's budget has run out.",
+      "categories": ["reject", "software"],
+      "protected": ["Tableau"],
+      "mustContain": [
+        [
+          "reject",
+          "declin",
+          "denied",
+          "deny",
+          "refus",
+          "turned down",
+          "not approv",
+          "disapprov",
+          "not accept",
+          "dismiss",
+          "cannot approve",
+          "unable to approve",
+          "not be approved",
+          "unable to accept"
+        ]
+      ],
+      "mustNotContain": ["has been approved", "is approved", "was approved"]
+    },
+    {
+      "id": "vi-024",
+      "source": "Trưởng phòng từ chối yêu cầu REQ-2026-0107, lý do: chưa có Cost Center.",
+      "reference": "The department head rejected request REQ-2026-0107, reason: no Cost Center yet.",
+      "categories": ["reject", "code", "glossary"],
+      "protected": ["REQ-2026-0107", "Cost Center"],
+      "mustContain": [
+        [
+          "reject",
+          "declin",
+          "denied",
+          "deny",
+          "refus",
+          "turned down",
+          "not approv",
+          "disapprov",
+          "not accept",
+          "dismiss",
+          "cannot approve",
+          "unable to approve",
+          "not be approved",
+          "unable to accept"
+        ],
+        ["department head", "head of department", "head of the department"]
+      ],
+      "mustNotContain": ["has been approved", "is approved", "was approved"]
+    },
+    {
+      "id": "vi-025",
+      "source": "Người duyệt chi từ chối khoản 18.000.000 đồng vì vượt hạn mức.",
+      "reference": "The Spending Approver rejected the 18.000.000 đồng expense because it exceeds the limit.",
+      "categories": ["reject", "number", "glossary"],
+      "protected": ["18.000.000 đồng"],
+      "mustContain": [
+        [
+          "reject",
+          "declin",
+          "denied",
+          "deny",
+          "refus",
+          "turned down",
+          "not approv",
+          "disapprov",
+          "not accept",
+          "dismiss",
+          "cannot approve",
+          "unable to approve",
+          "not be approved",
+          "unable to accept"
+        ],
+        ["spending approver"]
+      ],
+      "mustNotContain": ["has been approved", "is approved", "was approved"]
+    },
+    {
+      "id": "vi-026",
+      "source": "Yêu cầu không được chấp nhận do thiếu chữ ký của Đặng Minh Khoa.",
+      "reference": "The request is not accepted due to the missing signature of Đặng Minh Khoa.",
+      "categories": ["reject", "negation", "name"],
+      "protected": ["Đặng Minh Khoa"],
+      "mustContain": [
+        ["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"],
+        [
+          "reject",
+          "declin",
+          "denied",
+          "deny",
+          "refus",
+          "turned down",
+          "not approv",
+          "disapprov",
+          "not accept",
+          "dismiss",
+          "cannot approve",
+          "unable to approve",
+          "not be approved",
+          "unable to accept"
+        ]
+      ],
+      "mustNotContain": ["has been approved", "is approved", "was approved"]
+    },
+    {
+      "id": "vi-027",
+      "source": "Đề xuất bị bác bỏ vì rủi ro bảo mật của phần mềm này.",
+      "reference": "The proposal is rejected because of the security risk of this software.",
+      "categories": ["reject", "plain"],
+      "protected": [],
+      "mustContain": [
+        [
+          "reject",
+          "declin",
+          "denied",
+          "deny",
+          "refus",
+          "turned down",
+          "not approv",
+          "disapprov",
+          "not accept",
+          "dismiss",
+          "cannot approve",
+          "unable to approve",
+          "not be approved",
+          "unable to accept"
+        ]
+      ],
+      "mustNotContain": ["has been approved", "is approved", "was approved"]
+    },
+    {
+      "id": "vi-028",
+      "source": "Rất tiếc, chúng tôi không thể duyệt yêu cầu cài Docker Desktop trên máy cá nhân.",
+      "reference": "Unfortunately, we cannot approve the request to install Docker Desktop on personal computers.",
+      "categories": ["reject", "negation", "software"],
+      "protected": ["Docker Desktop"],
+      "mustContain": [
+        ["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"],
+        [
+          "reject",
+          "declin",
+          "denied",
+          "deny",
+          "refus",
+          "turned down",
+          "not approv",
+          "disapprov",
+          "not accept",
+          "dismiss",
+          "cannot approve",
+          "unable to approve",
+          "not be approved",
+          "unable to accept"
+        ]
+      ],
+      "mustNotContain": ["has been approved", "is approved", "was approved"]
+    },
+    {
+      "id": "vi-029",
+      "source": "Thu hồi seat GitHub của Võ Thanh Hà vì nghỉ việc.",
+      "reference": "Revoke Võ Thanh Hà's GitHub seat because of resignation.",
+      "categories": ["revoke", "name", "software", "glossary"],
+      "protected": ["Võ Thanh Hà", "GitHub"],
+      "mustContain": [["revok", "revocation"], ["seat"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-030",
+      "source": "Quyền truy cập Confluence của Bùi Gia Huy sẽ bị thu hồi vào ngày 15/11/2026.",
+      "reference": "Bùi Gia Huy's Confluence access will be revoked on 15/11/2026.",
+      "categories": ["revoke", "name", "software", "date"],
+      "protected": ["Bùi Gia Huy", "Confluence", "15/11/2026"],
+      "mustContain": [["revok", "revocation"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-031",
+      "source": "Đã thu hồi giấy phép Adobe Photoshop và bàn giao lại cho phòng IT.",
+      "reference": "The Adobe Photoshop license has been revoked and handed over to the IT department.",
+      "categories": ["revoke", "software", "glossary"],
+      "protected": ["Adobe Photoshop"],
+      "mustContain": [
+        ["revok", "revocation"],
+        ["hand over", "handed over", "handover", "hands over", "handing over", "hand-over"],
+        ["department"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-032",
+      "source": "Hoàng Ngọc Lan chuyển sang phòng Kinh doanh nên cần thu hồi seat Slack cũ và cấp seat mới.",
+      "reference": "Hoàng Ngọc Lan moved to the Sales department, so the old Slack seat must be revoked and a new seat issued.",
+      "categories": ["revoke", "name", "software", "glossary"],
+      "protected": ["Hoàng Ngọc Lan", "Slack"],
+      "mustContain": [["revok", "revocation"], ["seat"], ["department"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-033",
+      "source": "Không thu hồi tài khoản trước khi bàn giao xong.",
+      "reference": "Do not revoke the account before the handover is complete.",
+      "categories": ["revoke", "negation", "glossary"],
+      "protected": [],
+      "mustContain": [
+        ["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"],
+        ["revok", "revocation"],
+        ["hand over", "handed over", "handover", "hands over", "handing over", "hand-over"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-034",
+      "source": "Yêu cầu thu hồi toàn bộ seat chưa dùng trong 90 ngày.",
+      "reference": "Request to revoke all seats unused for 90 days.",
+      "categories": ["revoke", "number", "glossary"],
+      "protected": [],
+      "mustContain": [["revok", "revocation"], ["seat"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-035",
+      "source": "Việc thu hồi seat Figma của Đỗ Thế Vinh đã được trưởng phòng xác nhận.",
+      "reference": "The revocation of Đỗ Thế Vinh's Figma seat has been confirmed by the department head.",
+      "categories": ["revoke", "name", "software", "glossary"],
+      "protected": ["Đỗ Thế Vinh", "Figma"],
+      "mustContain": [
+        ["revok", "revocation"],
+        ["seat"],
+        ["department head", "head of department", "head of the department"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-036",
+      "source": "Phạm Quỳnh Anh bàn giao toàn bộ tài khoản Jira cho Ngô Phương Thảo trước ngày 20/11/2026.",
+      "reference": "Phạm Quỳnh Anh hands over all Jira accounts to Ngô Phương Thảo before 20/11/2026.",
+      "categories": ["name", "software", "date", "glossary"],
+      "protected": ["Phạm Quỳnh Anh", "Ngô Phương Thảo", "Jira", "20/11/2026"],
+      "mustContain": [["hand over", "handed over", "handover", "hands over", "handing over", "hand-over"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-037",
+      "source": "Hạn báo hủy của giấy phép Zoom là 01/10/2026.",
+      "reference": "The cancellation deadline for the Zoom license is 01/10/2026.",
+      "categories": ["glossary", "date", "software"],
+      "protected": ["Zoom", "01/10/2026"],
+      "mustContain": [["cancellation deadline"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-038",
+      "source": "Hạn báo hủy là 30 ngày trước khi gia hạn.",
+      "reference": "The cancellation deadline is 30 days before renewal.",
+      "categories": ["glossary", "number"],
+      "protected": [],
+      "mustContain": [["cancellation deadline"], ["renew"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-039",
+      "source": "Cần gia hạn Microsoft Office 365 trước ngày 15 tháng 12 năm 2026, nếu không giấy phép sẽ hết hạn.",
+      "reference": "Microsoft Office 365 must be renewed before December 15, 2026, otherwise the license will expire.",
+      "categories": ["date", "software", "glossary"],
+      "protected": ["Microsoft Office 365"],
+      "mustContain": [["renew"], ["december"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-040",
+      "source": "Nhắc: hạn báo hủy Tableau còn 5 ngày, nếu không hủy sẽ tự động gia hạn 12 tháng.",
+      "reference": "Reminder: the Tableau cancellation deadline is 5 days away; if not cancelled it will renew automatically for 12 months.",
+      "categories": ["glossary", "number", "software"],
+      "protected": ["Tableau"],
+      "mustContain": [["cancellation deadline"], ["renew"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-041",
+      "source": "Chi phí gia hạn năm nay là 36.500.000 đồng, tăng 8,5% so với năm trước.",
+      "reference": "This year's renewal cost is 36.500.000 đồng, up 8,5% from last year.",
+      "categories": ["number", "glossary"],
+      "protected": ["36.500.000 đồng", "8,5%"],
+      "mustContain": [["renew"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-042",
+      "source": "Tổng ngân sách đề xuất: 12.000.000 đồng cho 5 seat Notion.",
+      "reference": "Total proposed budget: 12.000.000 đồng for 5 Notion seats.",
+      "categories": ["number", "software", "glossary"],
+      "protected": ["12.000.000 đồng", "Notion"],
+      "mustContain": [["seat"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-043",
+      "source": "Mỗi seat JetBrains IntelliJ IDEA có giá 649 USD mỗi năm.",
+      "reference": "Each JetBrains IntelliJ IDEA seat costs 649 USD per year.",
+      "categories": ["number", "software", "glossary"],
+      "protected": ["JetBrains IntelliJ IDEA", "649 USD"],
+      "mustContain": [["seat"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-044",
+      "source": "Giảm giá 15% nếu mua từ 10 seat trở lên.",
+      "reference": "A 15% discount applies when buying 10 seats or more.",
+      "categories": ["number", "glossary"],
+      "protected": ["15%"],
+      "mustContain": [["seat"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-045",
+      "source": "Tổng chi phí là 1.250.000 đồng, chưa gồm VAT 10%.",
+      "reference": "The total cost is 1.250.000 đồng, excluding 10% VAT.",
+      "categories": ["number"],
+      "protected": ["1.250.000 đồng", "10%"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-046",
+      "source": "Nhân viên bắt đầu dùng công cụ từ 01/10/2026.",
+      "reference": "The employee has been using the tool since 01/10/2026.",
+      "categories": ["date", "plain"],
+      "protected": ["01/10/2026"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-047",
+      "source": "Hạn xử lý yêu cầu là 25/11/2026 và hạn báo cáo là 05/12/2026.",
+      "reference": "The request processing deadline is 25/11/2026 and the reporting deadline is 05/12/2026.",
+      "categories": ["date"],
+      "protected": ["25/11/2026", "05/12/2026"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-048",
+      "source": "Giấy phép có hiệu lực từ 2026-10-01 đến 2027-09-30.",
+      "reference": "The license is valid from 2026-10-01 to 2027-09-30.",
+      "categories": ["date"],
+      "protected": ["2026-10-01", "2027-09-30"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-049",
+      "source": "Cuộc họp duyệt ngân sách diễn ra vào ngày 3 tháng 11.",
+      "reference": "The budget approval meeting takes place on November 3.",
+      "categories": ["date"],
+      "protected": [],
+      "mustContain": [["november"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-050",
+      "source": "Vui lòng hoàn tất trước 17:00 ngày 28/11/2026.",
+      "reference": "Please complete before 17:00 on 28/11/2026.",
+      "categories": ["date"],
+      "protected": ["28/11/2026"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-051",
+      "source": "Vui lòng gửi lý do qua email an.nguyen@acme-demo.example hoặc it-helpdesk@acme-demo.example.",
+      "reference": "Please send your justification by email to an.nguyen@acme-demo.example or it-helpdesk@acme-demo.example.",
+      "categories": ["email"],
+      "protected": ["an.nguyen@acme-demo.example", "it-helpdesk@acme-demo.example"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-052",
+      "source": "Liên hệ Trần Thị Bích (bich.tran@acme-demo.example) để bàn giao tài khoản.",
+      "reference": "Contact Trần Thị Bích (bich.tran@acme-demo.example) to hand over the account.",
+      "categories": ["email", "name", "glossary"],
+      "protected": ["Trần Thị Bích", "bich.tran@acme-demo.example"],
+      "mustContain": [["hand over", "handed over", "handover", "hands over", "handing over", "hand-over"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-053",
+      "source": "Thông báo đã gửi tới finance-approvers@acme-demo.example và trưởng phòng.",
+      "reference": "A notification was sent to finance-approvers@acme-demo.example and the department head.",
+      "categories": ["email", "glossary"],
+      "protected": ["finance-approvers@acme-demo.example"],
+      "mustContain": [["department head", "head of department", "head of the department"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-054",
+      "source": "Xem chi tiết yêu cầu REQ-2026-0042 và hợp đồng HD-2026-15.",
+      "reference": "See the details of request REQ-2026-0042 and contract HD-2026-15.",
+      "categories": ["code"],
+      "protected": ["REQ-2026-0042", "HD-2026-15"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-055",
+      "source": "Mã giấy phép LIC-2026-0007-2 thuộc Cost Center CC-0042.",
+      "reference": "License code LIC-2026-0007-2 belongs to Cost Center CC-0042.",
+      "categories": ["code", "glossary"],
+      "protected": ["LIC-2026-0007-2", "CC-0042", "Cost Center"],
+      "mustContain": [["cost center"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-056",
+      "source": "Đơn mua PO-2026-118 đã gửi cho nhà cung cấp.",
+      "reference": "Purchase order PO-2026-118 has been sent to the vendor.",
+      "categories": ["code"],
+      "protected": ["PO-2026-118"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-057",
+      "source": "Lê Hoàng Nam đề nghị cấp thêm seat Docker Desktop cho nhóm DevOps.",
+      "reference": "Lê Hoàng Nam asks for an additional Docker Desktop seat for the DevOps team.",
+      "categories": ["name", "software", "glossary"],
+      "protected": ["Lê Hoàng Nam", "Docker Desktop", "DevOps"],
+      "mustContain": [["seat"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-058",
+      "source": "Theo ý kiến của Đỗ Thế Vinh và Ngô Phương Thảo, công cụ này cần thiết cho quy trình kiểm thử.",
+      "reference": "According to Đỗ Thế Vinh and Ngô Phương Thảo, this tool is necessary for the testing process.",
+      "categories": ["name"],
+      "protected": ["Đỗ Thế Vinh", "Ngô Phương Thảo"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-059",
+      "source": "Chị Hoàng Ngọc Lan phụ trách ngân sách của Công ty TNHH Sao Mai Demo.",
+      "reference": "Ms. Hoàng Ngọc Lan is in charge of the budget of Công ty TNHH Sao Mai Demo.",
+      "categories": ["name"],
+      "protected": ["Hoàng Ngọc Lan", "Công ty TNHH Sao Mai Demo"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-060",
+      "source": "Ông Bùi Gia Huy là Người duyệt chi của Acme Demo Co.",
+      "reference": "Mr. Bùi Gia Huy is the Spending Approver of Acme Demo Co.",
+      "categories": ["name", "glossary"],
+      "protected": ["Bùi Gia Huy", "Acme Demo Co"],
+      "mustContain": [["spending approver"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-061",
+      "source": "Chúng tôi dùng GitHub Actions để chạy kiểm thử và Postman để kiểm thử API.",
+      "reference": "We use GitHub Actions to run tests and Postman to test APIs.",
+      "categories": ["software"],
+      "protected": ["GitHub Actions", "Postman"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-062",
+      "source": "Đề nghị cài MATLAB và AutoCAD cho phòng thí nghiệm.",
+      "reference": "Please install MATLAB and AutoCAD for the laboratory.",
+      "categories": ["software", "glossary"],
+      "protected": ["MATLAB", "AutoCAD"],
+      "mustContain": [["laborator", " lab"]],
+      "mustNotContain": ["department"]
+    },
+    {
+      "id": "vi-063",
+      "source": "Adobe Photoshop quá đắt so với Figma.",
+      "reference": "Adobe Photoshop is too expensive compared with Figma.",
+      "categories": ["software"],
+      "protected": ["Adobe Photoshop", "Figma"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-064",
+      "source": "Nhóm dữ liệu cần Tableau và Microsoft Power BI để làm dashboard.",
+      "reference": "The data team needs Tableau and Microsoft Power BI to build dashboards.",
+      "categories": ["software"],
+      "protected": ["Tableau", "Microsoft Power BI"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-065",
+      "source": "Chúng tôi đề xuất chuyển từ Slack sang Microsoft Teams để tiết kiệm chi phí.",
+      "reference": "We propose switching from Slack to Microsoft Teams to save costs.",
+      "categories": ["software"],
+      "protected": ["Slack", "Microsoft Teams"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-066",
+      "source": "Dùng ChatGPT cho công việc cần được xem xét bảo mật.",
+      "reference": "Using ChatGPT for work requires a security review.",
+      "categories": ["software"],
+      "protected": ["ChatGPT"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-067",
+      "source": "Phòng họp tầng 3 đã được đặt cho buổi duyệt ngân sách.",
+      "reference": "The meeting room on the 3rd floor has been booked for the budget review.",
+      "categories": ["glossary"],
+      "protected": [],
+      "mustContain": [["room"]],
+      "mustNotContain": ["department"]
+    },
+    {
+      "id": "vi-068",
+      "source": "Toi can cai dat Figma cho du an moi cua phong thiet ke.",
+      "reference": "I need to install Figma for the new project of the design department.",
+      "categories": ["unaccented", "software"],
+      "protected": ["Figma"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-069",
+      "source": "Yeu cau chua duoc duyet vi thieu ly do chi tiet.",
+      "reference": "The request has not been approved because detailed justification is missing.",
+      "categories": ["unaccented", "negation"],
+      "protected": [],
+      "mustContain": [["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-070",
+      "source": "Truong phong tu choi yeu cau REQ-2026-0042 vi vuot ngan sach.",
+      "reference": "The department head rejected request REQ-2026-0042 because it exceeds the budget.",
+      "categories": ["unaccented", "reject", "code", "glossary"],
+      "protected": ["REQ-2026-0042"],
+      "mustContain": [
+        [
+          "reject",
+          "declin",
+          "denied",
+          "deny",
+          "refus",
+          "turned down",
+          "not approv",
+          "disapprov",
+          "not accept",
+          "dismiss",
+          "cannot approve",
+          "unable to approve",
+          "not be approved",
+          "unable to accept"
+        ],
+        ["department head", "head of department", "head of the department"]
+      ],
+      "mustNotContain": ["has been approved", "is approved", "was approved"]
+    },
+    {
+      "id": "vi-071",
+      "source": "Han bao huy la 15/11/2026, can gia han som.",
+      "reference": "The cancellation deadline is 15/11/2026, renewal is needed soon.",
+      "categories": ["unaccented", "glossary", "date"],
+      "protected": ["15/11/2026"],
+      "mustContain": [["cancellation deadline"], ["renew"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-072",
+      "source": "Em cần request thêm 2 seat cho project Atlas, đã confirm với team lead.",
+      "reference": "I need to request 2 more seats for project Atlas, already confirmed with the team lead.",
+      "categories": ["mixed", "glossary"],
+      "protected": ["Atlas"],
+      "mustContain": [["seat"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-073",
+      "source": "Please approve giúp em yêu cầu REQ-2026-0042 nhé, deadline là 15/11/2026.",
+      "reference": "Please approve request REQ-2026-0042 for me, the deadline is 15/11/2026.",
+      "categories": ["mixed", "approve", "code", "date"],
+      "protected": ["REQ-2026-0042", "15/11/2026"],
+      "mustContain": [["approv"]],
+      "mustNotContain": ["reject", "declin", "denied", "refus", "turned down"]
+    },
+    {
+      "id": "vi-074",
+      "source": "Tool này không có trong catalog nên em xin exception từ trưởng phòng.",
+      "reference": "This tool is not in the catalog, so I am asking for an exception from the department head.",
+      "categories": ["mixed", "negation", "glossary"],
+      "protected": [],
+      "mustContain": [
+        ["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"],
+        ["department head", "head of department", "head of the department"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-075",
+      "source": "Mã tham chiếu <x0> trong bản ghi cũ vẫn dùng cho REQ-2026-0042.",
+      "reference": "The reference code <x0> in the old record is still used for REQ-2026-0042.",
+      "categories": ["collision", "code"],
+      "protected": ["<x0>", "REQ-2026-0042"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-076",
+      "source": "Biểu mẫu hiển thị <x1> thay vì tên Trần Thị Bích.",
+      "reference": "The form shows <x1> instead of the name Trần Thị Bích.",
+      "categories": ["collision", "name"],
+      "protected": ["<x1>", "Trần Thị Bích"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-077",
+      "source": "Giá trị mẫu: <x0>, <x1>, <x2> không phải là dữ liệu thật.",
+      "reference": "Sample values: <x0>, <x1>, <x2> are not real data.",
+      "categories": ["collision", "negation"],
+      "protected": ["<x0>", "<x1>", "<x2>"],
+      "mustContain": [["not", "n't", "no ", "never", "cannot", "unable", "without", "nobody", "none", "neither"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-078",
+      "source": "Tôi là kỹ sư phần mềm thuộc phòng Kỹ thuật. Dự án mới yêu cầu thiết kế giao diện trên Figma. Hiện nhóm chỉ có 2 seat nên không đủ. Đề nghị cấp thêm 3 seat đến hết 31/03/2027.",
+      "reference": "I am a software engineer in the Engineering department. The new project requires interface design in Figma. The team currently has only 2 seats, which is not enough. Please grant 3 more seats until 31/03/2027.",
+      "categories": ["plain", "software", "number", "date", "glossary"],
+      "protected": ["Figma", "31/03/2027"],
+      "mustContain": [["seat"], ["department"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-079",
+      "source": "Lý do từ chối: công cụ trùng chức năng với Slack. Vui lòng dùng Slack hiện có. Nếu vẫn cần, hãy gửi lại yêu cầu kèm báo giá.",
+      "reference": "Reason for rejection: the tool duplicates the functionality of Slack. Please use the existing Slack. If you still need it, resubmit the request with a quotation.",
+      "categories": ["reject", "software"],
+      "protected": ["Slack"],
+      "mustContain": [
+        [
+          "reject",
+          "declin",
+          "denied",
+          "deny",
+          "refus",
+          "turned down",
+          "not approv",
+          "disapprov",
+          "not accept",
+          "dismiss",
+          "cannot approve",
+          "unable to approve",
+          "not be approved",
+          "unable to accept"
+        ]
+      ],
+      "mustNotContain": ["has been approved", "is approved", "was approved"]
+    },
+    {
+      "id": "vi-080",
+      "source": "Bàn giao hoàn tất. Seat Jira đã chuyển cho Ngô Phương Thảo. Tài khoản cũ đã bị thu hồi.",
+      "reference": "Handover complete. The Jira seat has been transferred to Ngô Phương Thảo. The old account has been revoked.",
+      "categories": ["revoke", "name", "software", "glossary"],
+      "protected": ["Jira", "Ngô Phương Thảo"],
+      "mustContain": [
+        ["revok", "revocation"],
+        ["seat"],
+        ["hand over", "handed over", "handover", "hands over", "handing over", "hand-over"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-L1",
+      "source": "Tôi viết đề nghị này để giải trình việc cần cấp thêm giấy phép cho nhóm dự án của chúng tôi, và xin nêu thêm rằng nhóm thiết kế cần thêm giấy phép Figma để hoàn thiện giao diện mới, Trần Thị Bích sẽ nghỉ phép từ 10/11/2026 đến 24/11/2026, ngân sách dự kiến cho các giấy phép là 4200 USD mỗi năm, hạn báo hủy của hợp đồng hiện tại là 15/11/2026, Lê Hoàng Nam sẽ bàn giao các tài khoản Jira cho Ngô Phương Thảo, trưởng phòng đã xác nhận rằng công cụ này không trùng với phần mềm đang có, mỗi seat Slack hiện được dùng trung bình 6 giờ mỗi ngày, các seat không dùng trong 90 ngày sẽ bị thu hồi, GitHub Copilot giúp giảm 20% thời gian viết mã kiểm thử, Người duyệt chi cần xác nhận Cost Center CC-0042 trước khi mua, khoản chi này đã nằm trong kế hoạch ngân sách năm 2026, đội kiểm thử cần Postman để chạy bộ kiểm thử API tự động, nhà cung cấp đề nghị ký hợp đồng HD-2026-15 trước cuối tháng, quản trị viên sẽ cấp quyền sau khi yêu cầu được duyệt, Notion được dùng để quản lý tài liệu của dự án Atlas, nếu không gia hạn đúng hạn, nhóm sẽ mất quyền truy cập dữ liệu, Đặng Minh Khoa đề nghị dùng chung một tài khoản cho cả nhóm nhưng chính sách không cho phép, Docker Desktop cần được cài trên 8 máy của nhóm hạ tầng, vì vậy rất mong được xem xét sớm.",
+      "reference": "I am writing this request to justify the additional licenses for our project team, and I would like to add that the design team needs additional Figma licenses to complete the new interface, Trần Thị Bích will be on leave from 10/11/2026 to 24/11/2026, the planned budget for the licenses is 4200 USD per year, the cancellation deadline of the current contract is 15/11/2026, Lê Hoàng Nam will hand over the Jira accounts to Ngô Phương Thảo, the department head has confirmed that this tool does not overlap with existing software, each Slack seat is currently used for an average of 6 hours per day, seats unused for 90 days will be revoked, GitHub Copilot reduces test-writing time by 20%, the Spending Approver must confirm Cost Center CC-0042 before purchase, this expense is already included in the 2026 budget plan, the testing team needs Postman to run the automated API test suite, the vendor asks us to sign contract HD-2026-15 before the end of the month, the administrator will grant access once the request is approved, Notion is used to manage the documents of project Atlas, if we do not renew on time, the team will lose access to its data, Đặng Minh Khoa suggested sharing one account for the whole team, but the policy does not allow it, Docker Desktop must be installed on 8 machines of the infrastructure team, so we hope for an early review.",
+      "categories": ["long"],
+      "protected": [
+        "Figma",
+        "Trần Thị Bích",
+        "10/11/2026",
+        "24/11/2026",
+        "4200 USD",
+        "15/11/2026",
+        "Lê Hoàng Nam",
+        "Jira",
+        "Ngô Phương Thảo",
+        "Slack",
+        "GitHub Copilot",
+        "20%",
+        "CC-0042",
+        "Postman",
+        "HD-2026-15",
+        "Notion",
+        "Atlas",
+        "Đặng Minh Khoa",
+        "Docker Desktop"
+      ],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-L2",
+      "source": "Tôi viết đề nghị này để giải trình việc cần cấp thêm giấy phép cho nhóm dự án của chúng tôi, và xin nêu thêm rằng nhóm thiết kế cần thêm giấy phép Figma để hoàn thiện giao diện mới, Trần Thị Bích sẽ nghỉ phép từ 10/11/2026 đến 24/11/2026, ngân sách dự kiến cho các giấy phép là 4200 USD mỗi năm, hạn báo hủy của hợp đồng hiện tại là 15/11/2026, Lê Hoàng Nam sẽ bàn giao các tài khoản Jira cho Ngô Phương Thảo, trưởng phòng đã xác nhận rằng công cụ này không trùng với phần mềm đang có, mỗi seat Slack hiện được dùng trung bình 6 giờ mỗi ngày, các seat không dùng trong 90 ngày sẽ bị thu hồi, GitHub Copilot giúp giảm 20% thời gian viết mã kiểm thử, Người duyệt chi cần xác nhận Cost Center CC-0042 trước khi mua, khoản chi này đã nằm trong kế hoạch ngân sách năm 2026, đội kiểm thử cần Postman để chạy bộ kiểm thử API tự động, nhà cung cấp đề nghị ký hợp đồng HD-2026-15 trước cuối tháng, quản trị viên sẽ cấp quyền sau khi yêu cầu được duyệt, Notion được dùng để quản lý tài liệu của dự án Atlas, nếu không gia hạn đúng hạn, nhóm sẽ mất quyền truy cập dữ liệu, Đặng Minh Khoa đề nghị dùng chung một tài khoản cho cả nhóm nhưng chính sách không cho phép, Docker Desktop cần được cài trên 8 máy của nhóm hạ tầng, báo cáo quý trước cho thấy phòng Kinh doanh còn 4 seat chưa dùng, chúng tôi đã so sánh Figma với Adobe XD và thấy Figma phù hợp hơn, thời hạn xử lý yêu cầu này là 25/11/2026, Phạm Quỳnh Anh sẽ phụ trách quản lý giấy phép sau khi bàn giao, Tableau được dùng cho báo cáo tài chính hàng tháng, Hoàng Ngọc Lan đã gửi báo giá qua email ngoc.hoang@acme-demo.example, vì vậy rất mong được xem xét sớm.",
+      "reference": "I am writing this request to justify the additional licenses for our project team, and I would like to add that the design team needs additional Figma licenses to complete the new interface, Trần Thị Bích will be on leave from 10/11/2026 to 24/11/2026, the planned budget for the licenses is 4200 USD per year, the cancellation deadline of the current contract is 15/11/2026, Lê Hoàng Nam will hand over the Jira accounts to Ngô Phương Thảo, the department head has confirmed that this tool does not overlap with existing software, each Slack seat is currently used for an average of 6 hours per day, seats unused for 90 days will be revoked, GitHub Copilot reduces test-writing time by 20%, the Spending Approver must confirm Cost Center CC-0042 before purchase, this expense is already included in the 2026 budget plan, the testing team needs Postman to run the automated API test suite, the vendor asks us to sign contract HD-2026-15 before the end of the month, the administrator will grant access once the request is approved, Notion is used to manage the documents of project Atlas, if we do not renew on time, the team will lose access to its data, Đặng Minh Khoa suggested sharing one account for the whole team, but the policy does not allow it, Docker Desktop must be installed on 8 machines of the infrastructure team, last quarter's report shows that the Sales department still has 4 unused seats, we compared Figma with Adobe XD and found Figma more suitable, the processing deadline of this request is 25/11/2026, Phạm Quỳnh Anh will be in charge of license management after the handover, Tableau is used for monthly financial reports, Hoàng Ngọc Lan sent the quotation by email to ngoc.hoang@acme-demo.example, so we hope for an early review.",
+      "categories": ["long"],
+      "protected": [
+        "Figma",
+        "Trần Thị Bích",
+        "10/11/2026",
+        "24/11/2026",
+        "4200 USD",
+        "15/11/2026",
+        "Lê Hoàng Nam",
+        "Jira",
+        "Ngô Phương Thảo",
+        "Slack",
+        "GitHub Copilot",
+        "20%",
+        "CC-0042",
+        "Postman",
+        "HD-2026-15",
+        "Notion",
+        "Atlas",
+        "Đặng Minh Khoa",
+        "Docker Desktop",
+        "Adobe XD",
+        "25/11/2026",
+        "Phạm Quỳnh Anh",
+        "Tableau",
+        "Hoàng Ngọc Lan",
+        "ngoc.hoang@acme-demo.example"
+      ],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-L3",
+      "source": "Tôi viết đề nghị này để giải trình việc cần cấp thêm giấy phép cho nhóm dự án của chúng tôi, và xin nêu thêm rằng nhóm thiết kế cần thêm giấy phép Figma để hoàn thiện giao diện mới, Trần Thị Bích sẽ nghỉ phép từ 10/11/2026 đến 24/11/2026, ngân sách dự kiến cho các giấy phép là 4200 USD mỗi năm, hạn báo hủy của hợp đồng hiện tại là 15/11/2026, Lê Hoàng Nam sẽ bàn giao các tài khoản Jira cho Ngô Phương Thảo, trưởng phòng đã xác nhận rằng công cụ này không trùng với phần mềm đang có, mỗi seat Slack hiện được dùng trung bình 6 giờ mỗi ngày, các seat không dùng trong 90 ngày sẽ bị thu hồi, GitHub Copilot giúp giảm 20% thời gian viết mã kiểm thử, Người duyệt chi cần xác nhận Cost Center CC-0042 trước khi mua, khoản chi này đã nằm trong kế hoạch ngân sách năm 2026, đội kiểm thử cần Postman để chạy bộ kiểm thử API tự động, nhà cung cấp đề nghị ký hợp đồng HD-2026-15 trước cuối tháng, quản trị viên sẽ cấp quyền sau khi yêu cầu được duyệt, Notion được dùng để quản lý tài liệu của dự án Atlas, nếu không gia hạn đúng hạn, nhóm sẽ mất quyền truy cập dữ liệu, Đặng Minh Khoa đề nghị dùng chung một tài khoản cho cả nhóm nhưng chính sách không cho phép, Docker Desktop cần được cài trên 8 máy của nhóm hạ tầng, báo cáo quý trước cho thấy phòng Kinh doanh còn 4 seat chưa dùng, chúng tôi đã so sánh Figma với Adobe XD và thấy Figma phù hợp hơn, thời hạn xử lý yêu cầu này là 25/11/2026, Phạm Quỳnh Anh sẽ phụ trách quản lý giấy phép sau khi bàn giao, Tableau được dùng cho báo cáo tài chính hàng tháng, Hoàng Ngọc Lan đã gửi báo giá qua email ngoc.hoang@acme-demo.example, chi phí đào tạo người dùng mới ước tính 300 USD, nhóm bảo mật yêu cầu bật xác thực hai lớp cho mọi tài khoản, Visual Studio Code là công cụ chuẩn nên không cần phê duyệt riêng, lần gia hạn trước đã tăng giá 8% so với hợp đồng gốc, Võ Thanh Hà đã xác nhận danh sách người dùng cuối cùng, vì vậy rất mong được xem xét sớm.",
+      "reference": "I am writing this request to justify the additional licenses for our project team, and I would like to add that the design team needs additional Figma licenses to complete the new interface, Trần Thị Bích will be on leave from 10/11/2026 to 24/11/2026, the planned budget for the licenses is 4200 USD per year, the cancellation deadline of the current contract is 15/11/2026, Lê Hoàng Nam will hand over the Jira accounts to Ngô Phương Thảo, the department head has confirmed that this tool does not overlap with existing software, each Slack seat is currently used for an average of 6 hours per day, seats unused for 90 days will be revoked, GitHub Copilot reduces test-writing time by 20%, the Spending Approver must confirm Cost Center CC-0042 before purchase, this expense is already included in the 2026 budget plan, the testing team needs Postman to run the automated API test suite, the vendor asks us to sign contract HD-2026-15 before the end of the month, the administrator will grant access once the request is approved, Notion is used to manage the documents of project Atlas, if we do not renew on time, the team will lose access to its data, Đặng Minh Khoa suggested sharing one account for the whole team, but the policy does not allow it, Docker Desktop must be installed on 8 machines of the infrastructure team, last quarter's report shows that the Sales department still has 4 unused seats, we compared Figma with Adobe XD and found Figma more suitable, the processing deadline of this request is 25/11/2026, Phạm Quỳnh Anh will be in charge of license management after the handover, Tableau is used for monthly financial reports, Hoàng Ngọc Lan sent the quotation by email to ngoc.hoang@acme-demo.example, the cost of training new users is estimated at 300 USD, the security team requires two-factor authentication for every account, Visual Studio Code is a standard tool, so no separate approval is needed, the previous renewal raised the price by 8% compared with the original contract, Võ Thanh Hà confirmed the final list of users, so we hope for an early review.",
+      "categories": ["long"],
+      "protected": [
+        "Figma",
+        "Trần Thị Bích",
+        "10/11/2026",
+        "24/11/2026",
+        "4200 USD",
+        "15/11/2026",
+        "Lê Hoàng Nam",
+        "Jira",
+        "Ngô Phương Thảo",
+        "Slack",
+        "GitHub Copilot",
+        "20%",
+        "CC-0042",
+        "Postman",
+        "HD-2026-15",
+        "Notion",
+        "Atlas",
+        "Đặng Minh Khoa",
+        "Docker Desktop",
+        "Adobe XD",
+        "25/11/2026",
+        "Phạm Quỳnh Anh",
+        "Tableau",
+        "Hoàng Ngọc Lan",
+        "ngoc.hoang@acme-demo.example",
+        "300 USD",
+        "Visual Studio Code",
+        "8%",
+        "Võ Thanh Hà"
+      ],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "vi-L4",
+      "source": "Tôi viết đề nghị này để giải trình việc cần cấp thêm giấy phép cho nhóm dự án của chúng tôi, và xin nêu thêm rằng nhóm thiết kế cần thêm giấy phép Figma để hoàn thiện giao diện mới, Trần Thị Bích sẽ nghỉ phép từ 10/11/2026 đến 24/11/2026, ngân sách dự kiến cho các giấy phép là 4200 USD mỗi năm, hạn báo hủy của hợp đồng hiện tại là 15/11/2026, Lê Hoàng Nam sẽ bàn giao các tài khoản Jira cho Ngô Phương Thảo, trưởng phòng đã xác nhận rằng công cụ này không trùng với phần mềm đang có, mỗi seat Slack hiện được dùng trung bình 6 giờ mỗi ngày, các seat không dùng trong 90 ngày sẽ bị thu hồi, GitHub Copilot giúp giảm 20% thời gian viết mã kiểm thử, Người duyệt chi cần xác nhận Cost Center CC-0042 trước khi mua, khoản chi này đã nằm trong kế hoạch ngân sách năm 2026, đội kiểm thử cần Postman để chạy bộ kiểm thử API tự động, nhà cung cấp đề nghị ký hợp đồng HD-2026-15 trước cuối tháng, quản trị viên sẽ cấp quyền sau khi yêu cầu được duyệt, Notion được dùng để quản lý tài liệu của dự án Atlas, nếu không gia hạn đúng hạn, nhóm sẽ mất quyền truy cập dữ liệu, Đặng Minh Khoa đề nghị dùng chung một tài khoản cho cả nhóm nhưng chính sách không cho phép, Docker Desktop cần được cài trên 8 máy của nhóm hạ tầng, báo cáo quý trước cho thấy phòng Kinh doanh còn 4 seat chưa dùng, chúng tôi đã so sánh Figma với Adobe XD và thấy Figma phù hợp hơn, thời hạn xử lý yêu cầu này là 25/11/2026, Phạm Quỳnh Anh sẽ phụ trách quản lý giấy phép sau khi bàn giao, Tableau được dùng cho báo cáo tài chính hàng tháng, Hoàng Ngọc Lan đã gửi báo giá qua email ngoc.hoang@acme-demo.example, chi phí đào tạo người dùng mới ước tính 300 USD, nhóm bảo mật yêu cầu bật xác thực hai lớp cho mọi tài khoản, Visual Studio Code là công cụ chuẩn nên không cần phê duyệt riêng, lần gia hạn trước đã tăng giá 8% so với hợp đồng gốc, Võ Thanh Hà đã xác nhận danh sách người dùng cuối cùng, Microsoft Teams đã đáp ứng nhu cầu họp nhóm nên không cần thêm Zoom, JetBrains IntelliJ IDEA cần cho 5 lập trình viên của nhóm backend, Bùi Gia Huy sẽ kiểm tra việc sử dụng seat vào ngày 01/12/2026, MATLAB chỉ được dùng trong học kỳ này cho môn mô phỏng, Confluence lưu toàn bộ tài liệu quy trình của phòng Vận hành, Adobe Photoshop chỉ cần cho hai thiết kế viên trong ba tháng, AutoCAD được dùng cho bản vẽ kỹ thuật của dự án mới, Docker Desktop và Postman đều đã có trong danh mục chuẩn, vì vậy rất mong được xem xét sớm.",
+      "reference": "I am writing this request to justify the additional licenses for our project team, and I would like to add that the design team needs additional Figma licenses to complete the new interface, Trần Thị Bích will be on leave from 10/11/2026 to 24/11/2026, the planned budget for the licenses is 4200 USD per year, the cancellation deadline of the current contract is 15/11/2026, Lê Hoàng Nam will hand over the Jira accounts to Ngô Phương Thảo, the department head has confirmed that this tool does not overlap with existing software, each Slack seat is currently used for an average of 6 hours per day, seats unused for 90 days will be revoked, GitHub Copilot reduces test-writing time by 20%, the Spending Approver must confirm Cost Center CC-0042 before purchase, this expense is already included in the 2026 budget plan, the testing team needs Postman to run the automated API test suite, the vendor asks us to sign contract HD-2026-15 before the end of the month, the administrator will grant access once the request is approved, Notion is used to manage the documents of project Atlas, if we do not renew on time, the team will lose access to its data, Đặng Minh Khoa suggested sharing one account for the whole team, but the policy does not allow it, Docker Desktop must be installed on 8 machines of the infrastructure team, last quarter's report shows that the Sales department still has 4 unused seats, we compared Figma with Adobe XD and found Figma more suitable, the processing deadline of this request is 25/11/2026, Phạm Quỳnh Anh will be in charge of license management after the handover, Tableau is used for monthly financial reports, Hoàng Ngọc Lan sent the quotation by email to ngoc.hoang@acme-demo.example, the cost of training new users is estimated at 300 USD, the security team requires two-factor authentication for every account, Visual Studio Code is a standard tool, so no separate approval is needed, the previous renewal raised the price by 8% compared with the original contract, Võ Thanh Hà confirmed the final list of users, Microsoft Teams already meets the team meeting needs, so Zoom is not required, JetBrains IntelliJ IDEA is needed for 5 developers of the backend team, Bùi Gia Huy will review seat usage on 01/12/2026, MATLAB will only be used this semester for the simulation course, Confluence stores all process documents of the Operations department, Adobe Photoshop is needed only for two designers for three months, AutoCAD is used for the technical drawings of the new project, Docker Desktop and Postman are both already in the standard catalogue, so we hope for an early review.",
+      "categories": ["long"],
+      "protected": [
+        "Figma",
+        "Trần Thị Bích",
+        "10/11/2026",
+        "24/11/2026",
+        "4200 USD",
+        "15/11/2026",
+        "Lê Hoàng Nam",
+        "Jira",
+        "Ngô Phương Thảo",
+        "Slack",
+        "GitHub Copilot",
+        "20%",
+        "CC-0042",
+        "Postman",
+        "HD-2026-15",
+        "Notion",
+        "Atlas",
+        "Đặng Minh Khoa",
+        "Docker Desktop",
+        "Adobe XD",
+        "25/11/2026",
+        "Phạm Quỳnh Anh",
+        "Tableau",
+        "Hoàng Ngọc Lan",
+        "ngoc.hoang@acme-demo.example",
+        "300 USD",
+        "Visual Studio Code",
+        "8%",
+        "Võ Thanh Hà",
+        "Microsoft Teams",
+        "Zoom",
+        "JetBrains IntelliJ IDEA",
+        "Bùi Gia Huy",
+        "01/12/2026",
+        "MATLAB",
+        "Confluence",
+        "Adobe Photoshop",
+        "AutoCAD"
+      ],
+      "mustContain": [],
+      "mustNotContain": []
+    }
+  ]
+}

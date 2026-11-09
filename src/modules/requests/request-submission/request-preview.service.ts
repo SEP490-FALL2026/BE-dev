@@ -1,0 +1,154 @@
+import { Injectable } from '@nestjs/common';
+import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
+import { RequestPartyEligibilityApi } from '../../identity-access/public/request-party-eligibility.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccessRequestNoDepartmentError } from '../access-request/access-request.errors';
+import type { PreviewBodyDto, PreviewWire } from './request-preview.dto';
+import { buildChain, spendSubmissionOf } from './request-preview.policy';
+import { PricingViewService } from '../request-view/pricing-view.service';
+import { RequestFactsService } from '../access-request/request-facts.service';
+import type { PricingRecord } from '../access-request/access-request.types';
+import { annualVendorAmountOf } from '../access-request/pricing.policy';
+import { RequestLimitsService } from '../request-limits/request-limits.service';
+import type { LimitVerdict } from '../request-limits/request-limits.policy';
+
+/** The request can be sent as it is: nobody holds it already, nothing blocks the parties, and the end date fits (`FR-2.8`, `US-05-23` AC-9). */
+const canSubmitOf = (
+  assessed: { heldAccess: unknown; endDateOutOfRange: boolean; termRequired: boolean },
+  blockedBy: unknown,
+  limits: Pick<LimitVerdict, 'refusal'>,
+): boolean =>
+  assessed.heldAccess === null &&
+  blockedBy === null &&
+  !assessed.endDateOutOfRange &&
+  !assessed.termRequired &&
+  limits.refusal === null;
+
+/**
+ * What a person is shown before they send a request (`US-05-01`): the cost with its estimated tax, the chain of people who
+ * will decide it with the time each step may take, and whether they already hold it. It is a read: it takes no lock, writes no request, no audit event and no row of any kind, and it reads
+ * the facts through the same assessment that sending uses, so the answer is what sending would fix on the same day.
+ */
+@Injectable()
+export class RequestPreviewService {
+  constructor(
+    private readonly runner: TransactionRunner,
+    private readonly assessment: RequestFactsService,
+    private readonly organizationReads: OrganizationReadApi,
+    private readonly catalog: CatalogApi,
+    private readonly pricing: PricingViewService,
+    private readonly requestParties: RequestPartyEligibilityApi,
+    private readonly limits: RequestLimitsService,
+  ) {}
+
+  /** Throws RequestPartyIneligibleError (only `UNPLACED`), AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError and AccessRequestSpendDateNotAllowedError. */
+  async preview(actor: AuthenticatedPrincipal, body: PreviewBodyDto): Promise<PreviewWire> {
+    const { assessed, vendorId, blockedBy, limits, limitSettings } = await this.read(actor, body);
+    const { unit, target, policy, pricing, routing } = assessed;
+    // A plan of the catalog is always one of the first two branches; only a proposal takes the third.
+    if (policy.branch === 'NEW_SOFTWARE') throw new Error('A plan of the catalog cannot be a proposal.');
+    const chain = buildChain(policy, routing.decision, routing.facts);
+    const peopleIds = [...new Set(chain.flatMap((step) => (step.assigneeEmployeeId ? [step.assigneeEmployeeId] : [])))];
+
+    const [department, costCenters, people, priceView, costEstimate] = await Promise.all([
+      this.organizationReads.getDepartmentBrief(unit.departmentId),
+      unit.costCenter ? this.organizationReads.costCentersByIds([unit.costCenter.id]) : Promise.resolve([]),
+      this.organizationReads.getEmployees(peopleIds),
+      this.pricing.view(pricing),
+      this.pricing.costEstimate(pricing, vendorId),
+    ]);
+    const costCenter = costCenters[0] ?? null;
+    if (!department || (unit.costCenter && !costCenter)) throw new AccessRequestNoDepartmentError();
+    const person = (id: string | null) => {
+      const found = id === null ? undefined : people.find((candidate) => candidate.id === id);
+
+      return found ? { employeeId: found.id, employeeCode: found.employeeCode, fullName: found.fullName } : null;
+    };
+
+    return {
+      plan: {
+        planId: target.planId,
+        planName: target.planName,
+        applicationId: target.applicationId,
+        applicationName: target.applicationName,
+      },
+      branch: policy.branch,
+      expectedEndDate: body.expectedEndDate ?? null,
+      department: { id: department.id, code: department.code, name: department.name },
+      costCenter: costCenter && { id: costCenter.id, code: costCenter.code, name: costCenter.name },
+      maxEndDate: assessed.maxEndDate,
+      termRequired: assessed.termRequired,
+      annualVendorAmount: await this.annualVendorAmountOf(pricing),
+      existingAccess: assessed.heldAccess,
+      blockedBy,
+      limits: {
+        openNewCount: limits.openCount,
+        openNewMax: limitSettings.openLimit,
+        paidSoftwareCount: limits.paidSoftwareCount,
+        paidSoftwareThreshold: limitSettings.paidThreshold,
+        reasonRequired: limits.manyPaidSoftware !== null,
+        refusal: limits.refusal,
+        openRequestId: limits.openRequestId,
+      },
+      canSubmit: canSubmitOf(assessed, blockedBy, limits),
+      budgetYear: pricing.budgetYear,
+      pricing: priceView,
+      costEstimate,
+      spendSubmission: spendSubmissionOf(policy, pricing.status),
+      chain: chain.map(({ assigneeEmployeeId, ...step }) => ({ ...step, assignee: person(assigneeEmployeeId) })),
+      totalExpectedWorkingDays: chain.reduce((sum, step) => sum + step.expectedWorkingDays, 0),
+    };
+  }
+
+  /** The year of the price of the plan at the vendor, written for a reader; null when nothing is priced. */
+  private async annualVendorAmountOf(pricing: PricingRecord) {
+    if (pricing.status !== 'PRICED' || pricing.kind === null || pricing.unitPrice === null) return null;
+    const annual = annualVendorAmountOf({
+      kind: pricing.kind,
+      unitPrice: pricing.unitPrice,
+      billingCycle: pricing.billingCycle,
+    });
+
+    return annual && (await this.pricing.moneyView(annual));
+  }
+
+  /** What the preview is made of, read in one transaction that locks nothing: who is refused (before the department is read), the facts of sending and the vendor. */
+  private async read(actor: AuthenticatedPrincipal, body: PreviewBodyDto) {
+    const settings = await this.assessment.settings();
+    const limitSettings = await this.limits.settings();
+
+    return this.runner.run(async (tx) => {
+      const blockedBy = await this.requestParties.blockOf(
+        { requesterEmployeeId: actor.employeeId, beneficiaryEmployeeIds: [actor.employeeId] },
+        tx,
+      );
+      if (blockedBy?.reason === 'UNPLACED') throw new RequestPartyIneligibleError(blockedBy);
+      const assessed = await this.assessment.assess(tx, {
+        employeeId: actor.employeeId,
+        planId: body.planId,
+        expectedEndDate: body.expectedEndDate ?? null,
+        now: new Date(),
+        settings,
+        lockDepartment: false,
+      });
+      const limits = await this.limits.judgeOne(tx, {
+        employeeId: actor.employeeId,
+        planId: body.planId,
+        applicationId: assessed.target.applicationId,
+        today: assessed.today,
+        settings: limitSettings,
+      });
+
+      return {
+        blockedBy,
+        assessed,
+        limits,
+        limitSettings,
+        vendorId: await this.catalog.getPlanVendorId(body.planId, tx),
+      };
+    });
+  }
+}

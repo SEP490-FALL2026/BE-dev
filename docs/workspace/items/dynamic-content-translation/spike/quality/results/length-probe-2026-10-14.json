@@ -1,0 +1,136 @@
+{
+  "date": "2026-10-14",
+  "note": "raw translation of one sentence built from the first N clauses; batch size 1",
+  "directions": {
+    "vi-en": [
+      {
+        "clauses": 1,
+        "tokens": 53,
+        "chrF": 54.22,
+        "maxRepeated4gram": 1,
+        "outToRefLength": 0.96
+      },
+      {
+        "clauses": 2,
+        "tokens": 72,
+        "chrF": 51.3,
+        "maxRepeated4gram": 1,
+        "outToRefLength": 0.98
+      },
+      {
+        "clauses": 3,
+        "tokens": 87,
+        "chrF": 48.98,
+        "maxRepeated4gram": 1,
+        "outToRefLength": 0.81
+      },
+      {
+        "clauses": 4,
+        "tokens": 102,
+        "chrF": 52.84,
+        "maxRepeated4gram": 1,
+        "outToRefLength": 0.87
+      },
+      {
+        "clauses": 6,
+        "tokens": 135,
+        "chrF": 50.34,
+        "maxRepeated4gram": 1,
+        "outToRefLength": 0.87
+      },
+      {
+        "clauses": 8,
+        "tokens": 161,
+        "chrF": 48.69,
+        "maxRepeated4gram": 2,
+        "outToRefLength": 0.85
+      },
+      {
+        "clauses": 10,
+        "tokens": 192,
+        "chrF": 44.5,
+        "maxRepeated4gram": 16,
+        "outToRefLength": 1.07
+      },
+      {
+        "clauses": 14,
+        "tokens": 250,
+        "chrF": 43.86,
+        "maxRepeated4gram": 4,
+        "outToRefLength": 1.12
+      },
+      {
+        "clauses": 18,
+        "tokens": 314,
+        "chrF": 35.15,
+        "maxRepeated4gram": 27,
+        "outToRefLength": 1.45
+      }
+    ],
+    "en-vi": [
+      {
+        "clauses": 1,
+        "tokens": 48,
+        "chrF": 55.65,
+        "maxRepeated4gram": 1,
+        "outToRefLength": 1.07
+      },
+      {
+        "clauses": 2,
+        "tokens": 68,
+        "chrF": 48.99,
+        "maxRepeated4gram": 1,
+        "outToRefLength": 0.9
+      },
+      {
+        "clauses": 3,
+        "tokens": 82,
+        "chrF": 55.21,
+        "maxRepeated4gram": 1,
+        "outToRefLength": 1.05
+      },
+      {
+        "clauses": 4,
+        "tokens": 96,
+        "chrF": 57.49,
+        "maxRepeated4gram": 2,
+        "outToRefLength": 1.07
+      },
+      {
+        "clauses": 6,
+        "tokens": 126,
+        "chrF": 55.74,
+        "maxRepeated4gram": 2,
+        "outToRefLength": 0.97
+      },
+      {
+        "clauses": 8,
+        "tokens": 152,
+        "chrF": 48.12,
+        "maxRepeated4gram": 2,
+        "outToRefLength": 0.94
+      },
+      {
+        "clauses": 10,
+        "tokens": 183,
+        "chrF": 47.93,
+        "maxRepeated4gram": 2,
+        "outToRefLength": 0.97
+      },
+      {
+        "clauses": 14,
+        "tokens": 240,
+        "chrF": 41.29,
+        "maxRepeated4gram": 4,
+        "outToRefLength": 0.92
+      },
+      {
+        "clauses": 18,
+        "tokens": 304,
+        "chrF": 37.57,
+        "maxRepeated4gram": 3,
+        "outToRefLength": 0.78
+      }
+    ]
+  }
+}

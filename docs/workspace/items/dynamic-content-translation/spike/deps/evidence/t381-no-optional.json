@@ -1,0 +1,148 @@
+{
+  "label": "t381-no-optional",
+  "requestedVersion": "3.8.1",
+  "noOptional": true,
+  "generatedAt": "2026-10-14T13:49:48.388Z",
+  "platform": "win32-x64",
+  "node": "v24.0.1",
+  "pnpm": "11.1.3",
+  "steps": [
+    {
+      "step": "lockfile-only",
+      "command": "pnpm install --lockfile-only --ignore-scripts",
+      "exitCode": 0,
+      "seconds": 2.6
+    },
+    {
+      "step": "install",
+      "command": "pnpm install --prod --frozen-lockfile --ignore-scripts --no-optional",
+      "exitCode": 0,
+      "seconds": 7.2
+    },
+    {
+      "step": "audit",
+      "command": "pnpm audit --prod --json",
+      "exitCode": 1,
+      "seconds": 1.7
+    },
+    {
+      "step": "audit-high-gate",
+      "command": "pnpm audit --prod --audit-level high",
+      "exitCode": 1,
+      "seconds": 1.7
+    }
+  ],
+  "lockfile": {
+    "sha256": "c3006602e40f066cbad739550bf8d26482908709f407ad480bc8a4bbe7afc059",
+    "bytes": 21744
+  },
+  "resolved": {
+    "@huggingface/transformers": ["3.8.1", "3.8.1"],
+    "@huggingface/jinja": ["0.5.10", "0.5.10"],
+    "@huggingface/tokenizers": [],
+    "sharp": ["0.34.5", "0.34.5"],
+    "onnxruntime-node": ["1.21.0", "1.21.0"],
+    "onnxruntime-web": ["1.22.0-dev.20250409-89f8206ba4", "1.22.0-dev.20250409-89f8206ba4"],
+    "onnxruntime-common": ["1.21.0", "1.22.0-dev.20250409-89f8206ba4", "1.21.0", "1.22.0-dev.20250409-89f8206ba4"],
+    "protobufjs": ["7.6.6", "7.6.6"],
+    "sprintf-js": ["1.1.3", "1.1.3"]
+  },
+  "sharpPlatformPackagesInLockfile": 48,
+  "audit": {
+    "exitCode": 1,
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 1,
+      "high": 3,
+      "critical": 0
+    },
+    "totalDependencies": 78,
+    "advisories": [
+      {
+        "id": 1124066,
+        "ghsa": "GHSA-f88m-g3jw-g9cj",
+        "module": "sharp",
+        "severity": "high",
+        "vulnerable": "<0.35.0",
+        "patched": ">=0.35.0",
+        "findings": [
+          {
+            "version": "0.34.5",
+            "paths": [".>@huggingface/transformers>sharp"]
+          }
+        ]
+      },
+      {
+        "id": 1193725,
+        "ghsa": "GHSA-rgj7-g3m4-5g8c",
+        "module": "sharp",
+        "severity": "high",
+        "vulnerable": "<0.35.4",
+        "patched": ">=0.35.4",
+        "findings": [
+          {
+            "version": "0.34.5",
+            "paths": [".>@huggingface/transformers>sharp"]
+          }
+        ]
+      },
+      {
+        "id": 1241202,
+        "ghsa": "GHSA-hp3w-g68c-fv3c",
+        "module": "sprintf-js",
+        "severity": "moderate",
+        "vulnerable": "<=1.1.3",
+        "patched": ">=1.1.4",
+        "findings": [
+          {
+            "version": "1.1.3",
+            "paths": [".>@huggingface/transformers>onnxruntime-node>global-agent>roarr>sprintf-js"]
+          }
+        ]
+      },
+      {
+        "id": 1241331,
+        "ghsa": "GHSA-wq5f-xc86-pv6w",
+        "module": "sharp",
+        "severity": "high",
+        "vulnerable": "<0.35.5",
+        "patched": ">=0.35.5",
+        "findings": [
+          {
+            "version": "0.34.5",
+            "paths": [".>@huggingface/transformers>sharp"]
+          }
+        ]
+      }
+    ]
+  },
+  "auditHighGateExitCode": 1,
+  "pnpmWhySharp": [
+    "sharp@0.34.5",
+    "└─┬ @huggingface/transformers@3.8.1",
+    "  └── spike-t381-no-optional@0.0.0 (dependencies)",
+    "",
+    "Found 1 version of sharp"
+  ],
+  "minimumReleaseAgeEffective": "undefined",
+  "dropOnnxruntimeWeb": false,
+  "loadChecks": {
+    "node": "v24.0.1",
+    "cjsRequire": {
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "<scratch>\\t381-no-optional\\node_modules\\.pnpm\\sharp@0.34.5\\node_modules\\sharp\\lib\\sharp.js:120\r\n  throw new Error(help.join('\\n'));\r\n  ^\r\n\r\nError: Could not load the \"sharp\" module using the win32-x64 runtime\r\nPossible solutions:\r"
+    },
+    "esmDynamicImportFromCjs": {
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "<scratch>\\t381-no-optional\\node_modules\\.pnpm\\sharp@0.34.5\\node_modules\\sharp\\lib\\sharp.js:120\r\n  throw new Error(help.join('\\n'));\r\n        ^\r\n\r\nError: Could not load the \"sharp\" module using the win32-x64 runtime\r\nPossible solutions:\r"
+    },
+    "esmStaticImport": {
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "<scratch>\\t381-no-optional\\node_modules\\.pnpm\\sharp@0.34.5\\node_modules\\sharp\\lib\\sharp.js:120\r\n  throw new Error(help.join('\\n'));\r\n        ^\r\n\r\nError: Could not load the \"sharp\" module using the win32-x64 runtime\r\nPossible solutions:\r"
+    }
+  }
+}

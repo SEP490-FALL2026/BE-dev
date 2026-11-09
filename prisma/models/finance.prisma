@@ -1,16 +1,99 @@
-model FinancialTransaction {
-  id            String              @id @default(uuid()) @db.Uuid
-  applicationId String?             @db.Uuid
-  employeeId    String?             @db.Uuid
-  amount        Decimal             @db.Decimal(18, 2)
-  currency      String              @db.VarChar(3)
-  occurredAt    DateTime
-  externalRef   String?             @unique
-  createdAt     DateTime            @default(now())
-  application   CatalogApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
-  employee      Employee?           @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+enum ExchangeRateSource {
+  MANUAL
+}
 
-  @@index([applicationId, occurredAt])
-  @@index([employeeId])
-  @@map("financial_transactions")
+// Reference data: the currencies the system can price in, with their minor digits (ADR-0007). Seeded by migration.
+model Currency {
+  code      String @id @db.Char(3)
+  name      String
+  minorUnit Int    @map("minor_unit") @db.SmallInt
+
+  rates                ExchangeRate[]
+  subscriptions        Subscription[]            @relation("SubscriptionPriceCurrency")
+  accessRequestAmounts AccessRequest[]           @relation("AccessRequestAmountCurrency")
+  assessmentQuotes     AccessRequestAssessment[] @relation("AssessmentQuoteCurrency")
+  requestBudgetChecks  RequestBudgetCheck[]      @relation("RequestBudgetCheckCurrency")
+  requestSupplements   RequestSupplement[]       @relation("RequestSupplementCurrency")
+  lineAmounts          AccessRequestLineAmount[] @relation("LineAmountCurrency")
+  budgetProposals      BudgetProposal[]          @relation("BudgetProposalCurrency")
+  budgetCycles         BudgetCycle[]             @relation("BudgetCycleCurrency")
+  budgetVersions       BudgetVersion[]           @relation("BudgetVersionCurrency")
+  budgetCommitments    BudgetCommitment[]        @relation("BudgetCommitmentCurrency")
+  invoices             Invoice[]                 @relation("InvoiceCurrency")
+  organizations        Organization[]            @relation("OrganizationReportingCurrency")
+
+  @@map("currencies")
+}
+
+// One manually entered rate per currency and day: units of the organization's reporting currency for one unit of
+// `currency`. Never edited or deleted (US-04-05); a snapshot taken from it is frozen elsewhere.
+model ExchangeRate {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  currency       String             @db.Char(3)
+  rateDate       DateTime           @map("rate_date") @db.Date
+  rate           Decimal            @db.Decimal(20, 10)
+  source         ExchangeRateSource @default(MANUAL)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  currencyRef   Currency       @relation(fields: [currency], references: [code])
+  subscriptions Subscription[]
+
+  @@unique([organizationId, currency, rateDate])
+  @@map("exchange_rates")
+}
+
+enum TaxGroup {
+  T1
+  T2
+  T3
+}
+
+// The head of the tax profile of a vendor of the organization (US-12-09): which version is current. The only row of the
+// profile that is ever changed; the versions it points at never are. The vendor is a catalog table, so this is a database
+// foreign key only: the finance code does not read the vendor.
+model VendorTaxProfile {
+  vendorId       String   @id @map("vendor_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  currentVersion Int      @default(0) @map("current_version")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization              @relation(fields: [organizationId], references: [id])
+  vendor       Vendor                    @relation(fields: [vendorId], references: [id])
+  versions     VendorTaxProfileVersion[]
+
+  @@map("vendor_tax_profiles")
+}
+
+// One declaration of the profile: the group and the tax lines Finance entered, by whom and when. Immutable.
+model VendorTaxProfileVersion {
+  id                  String   @id @default(uuid()) @db.Uuid
+  vendorId            String   @map("vendor_id") @db.Uuid
+  version             Int
+  taxGroup            TaxGroup @map("tax_group")
+  declaredByAppUserId String   @map("declared_by_app_user_id") @db.Uuid
+  declaredAt          DateTime @default(now()) @map("declared_at") @db.Timestamptz(3)
+
+  profile VendorTaxProfile       @relation(fields: [vendorId], references: [vendorId])
+  lines   VendorTaxProfileLine[]
+
+  @@unique([vendorId, version])
+  @@map("vendor_tax_profile_versions")
+}
+
+// One tax of a version: its name, its estimated rate in hundredths of a percent, and the default deductible flag.
+model VendorTaxProfileLine {
+  versionId         String  @map("version_id") @db.Uuid
+  position          Int     @db.SmallInt
+  taxType           String  @map("tax_type")
+  normalizedTaxType String  @map("normalized_tax_type")
+  rateBp            Int     @map("rate_bp")
+  deductible        Boolean
+
+  version VendorTaxProfileVersion @relation(fields: [versionId], references: [id])
+
+  @@id([versionId, position])
+  @@unique([versionId, normalizedTaxType])
+  @@map("vendor_tax_profile_lines")
 }

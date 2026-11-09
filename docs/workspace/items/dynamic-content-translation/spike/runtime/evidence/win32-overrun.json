@@ -1,0 +1,78 @@
+{
+  "scenario": "overrun",
+  "profile": "win32",
+  "node": "v24.0.1",
+  "platform": "win32-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 9,
+  "cgroupAfter": {
+    "memoryPeakMb": null,
+    "memoryCurrentMb": null,
+    "memoryMax": null,
+    "cpuMax": null,
+    "cpuStat": null
+  },
+  "result": {
+    "requests": 10,
+    "deadlineHits": 10,
+    "cancelSent": 0,
+    "killSent": 0,
+    "workerReportedOverrunMs": {
+      "n": 10,
+      "min": 2,
+      "p50": 18,
+      "p95": 34,
+      "p99": 34,
+      "max": 34,
+      "mean": 17
+    },
+    "supervisorDeadlineToDoneMs": {
+      "n": 7,
+      "min": 9,
+      "p50": 12,
+      "p95": 20,
+      "p99": 20,
+      "max": 20,
+      "mean": 14
+    },
+    "maxStepGapMs": {
+      "n": 10,
+      "min": 36,
+      "p50": 38,
+      "p95": 42,
+      "p99": 42,
+      "max": 42,
+      "mean": 39
+    },
+    "firstStepMs": {
+      "n": 10,
+      "min": 42,
+      "p50": 44,
+      "p95": 51,
+      "p99": 51,
+      "max": 51,
+      "mean": 46
+    },
+    "byDirection": {
+      "vi-en": {
+        "n": 5,
+        "min": 12,
+        "p50": 23,
+        "p95": 34,
+        "p99": 34,
+        "max": 34,
+        "mean": 23
+      },
+      "en-vi": {
+        "n": 5,
+        "min": 2,
+        "p50": 10,
+        "p95": 22,
+        "p99": 22,
+        "max": 22,
+        "mean": 11
+      }
+    },
+    "killGraceMs": 3000
+  }
+}

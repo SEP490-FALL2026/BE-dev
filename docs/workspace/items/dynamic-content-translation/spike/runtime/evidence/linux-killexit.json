@@ -1,0 +1,55 @@
+{
+  "scenario": "killexit",
+  "profile": "linux",
+  "node": "v24.21.0",
+  "platform": "linux-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 50,
+  "cgroupAfter": {
+    "memoryPeakMb": 499.9,
+    "memoryCurrentMb": 26.8,
+    "memoryMax": "2147483648",
+    "cpuMax": "200000 100000",
+    "cpuStat": {
+      "nrPeriods": 505,
+      "nrThrottled": 76,
+      "throttledMs": 22904
+    }
+  },
+  "result": {
+    "trials": 12,
+    "statuses": {
+      "TIMEOUT/killed": 11,
+      "TIMEOUT/deadline": 1
+    },
+    "killsSent": 11,
+    "killReasons": ["unresponsive"],
+    "killToExitMs": {
+      "n": 11,
+      "min": 31.1,
+      "p50": 38.1,
+      "p95": 45.6,
+      "p99": 45.6,
+      "max": 45.6,
+      "mean": 37.3
+    },
+    "respawnAfterExitMs": {
+      "n": 10,
+      "min": 6.1,
+      "p50": 7.6,
+      "p95": 9.3,
+      "p99": 9.3,
+      "max": 9.3,
+      "mean": 7.7
+    },
+    "eventAnalysis": {
+      "violations": [],
+      "maxLive": 1,
+      "maxConcurrentRuns": 1,
+      "dispatches": 25,
+      "kills": 11,
+      "releasesByExit": 11,
+      "events": 205
+    }
+  }
+}

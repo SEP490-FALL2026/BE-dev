@@ -1,0 +1,517 @@
+import { Injectable } from '@nestjs/common';
+import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
+import { normalizeDisplayName } from '../../../core/display-name';
+import { normalizeEmail } from '../../../core/email';
+import { escapeLikePattern } from '../../../core/search-key';
+import { Prisma } from '../../../generated/prisma/client';
+import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
+import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
+import {
+  EmployeeCodeTakenError,
+  EmployeeEmailTakenError,
+  EmployeeNotFoundError,
+  EmployeeOpenSeatNeedsEndError,
+  PlacementDepartmentInactiveError,
+  PlacementOverlapError,
+} from '../public/organization.errors';
+import {
+  CreateEmployeeWithPlacementInput,
+  EmployeeCandidate,
+  EmployeeProfile,
+  EmployeeRecord,
+  EmployeeWorkState,
+  OfficialFieldsPatch,
+  PlacementInForce,
+  ScheduledStructureChange,
+  StructureChangeInput,
+} from '../public/organization.types';
+
+/** The employee as the facade shows it. */
+function toEmployeeRecord(row: {
+  id: string;
+  organizationId: string;
+  employeeCode: string;
+  fullName: string;
+  workEmail: string | null;
+  employmentType: EmployeeRecord['employmentType'];
+  status: EmployeeRecord['status'];
+  workState: EmployeeWorkState;
+  hireDate: Date;
+  jobTitle: string | null;
+}): EmployeeRecord {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    employeeCode: row.employeeCode,
+    fullName: row.fullName,
+    workEmail: row.workEmail,
+    employmentType: row.employmentType,
+    status: row.status,
+    workState: row.workState,
+    hireDate: fromDateColumn(row.hireDate),
+    jobTitle: row.jobTitle,
+  };
+}
+
+/**
+ * The single predicate for an employee having no placements (D-S25).
+ * Kept here so both candidate search and the employee directory evaluate the same SQL condition.
+ */
+export function unplacedEmployeeSql(employeeIdColumn = 'e.id'): Prisma.Sql {
+  return Prisma.sql`NOT EXISTS (SELECT 1 FROM employee_placements any_p WHERE any_p.employee_id = ${Prisma.raw(employeeIdColumn)})`;
+}
+
+/** Employees and their placements: the one writer of both tables, the employee locks and every employee read. */
+@Injectable()
+export class EmployeeRepo {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** The database clock at the start of the transaction: the instant `created_at` defaults to. */
+  async databaseNow(tx: DbTx): Promise<Date> {
+    const rows = await tx.$queryRaw<{ now: Date }[]>`SELECT now() AS now`;
+
+    return rows[0].now;
+  }
+
+  async employeeCodeExists(tx: DbTx, organizationId: string, employeeCode: string): Promise<boolean> {
+    const row = await tx.employee.findUnique({
+      where: { organizationId_employeeCode: { organizationId, employeeCode } },
+      select: { id: true },
+    });
+
+    return row !== null;
+  }
+
+  async workEmailExists(tx: DbTx, organizationId: string, normalizedWorkEmail: string): Promise<boolean> {
+    const row = await tx.employee.findUnique({
+      where: { organizationId_normalizedWorkEmail: { organizationId, normalizedWorkEmail } },
+      select: { id: true },
+    });
+
+    return row !== null;
+  }
+
+  /**
+   * The single writer of employees and their placements: every path opens exactly one placement, from the hire
+   * date (installation) or from the day the person is recorded (everything else, R-11).
+   */
+  async createEmployeeWithPlacement(tx: DbTx, input: CreateEmployeeWithPlacementInput): Promise<{ id: string }> {
+    const workEmail = input.workEmail?.trim() || null;
+
+    try {
+      const employee = await tx.employee.create({
+        data: {
+          organizationId: input.organizationId,
+          employeeCode: input.employeeCode,
+          fullName: input.fullName,
+          workEmail,
+          normalizedWorkEmail: workEmail === null ? null : normalizeEmail(workEmail),
+          // The display form (T-12) whoever calls: the free text of the person, or none.
+          jobTitle: normalizeDisplayName(input.jobTitle ?? '') || null,
+          employmentType: input.employmentType,
+          hireDate: toDateColumn(input.hireDate),
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+      if (input.departmentId !== null)
+        await tx.employeePlacement.create({
+          data: {
+            organizationId: input.organizationId,
+            employeeId: employee.id,
+            departmentId: input.departmentId,
+            validFrom: toDateColumn(input.memberSince ?? input.hireDate),
+          },
+        });
+
+      return employee;
+    } catch (error) {
+      if (isUniqueViolation(error, 'employee_code')) throw new EmployeeCodeTakenError(input.employeeCode);
+      if (isUniqueViolation(error, 'normalized_work_email')) throw new EmployeeEmailTakenError();
+      throw error;
+    }
+  }
+
+  /** Changes the official fields of the employee whose row the caller holds `FOR UPDATE`; the unique email is the last word. */
+  async updateOfficialFields(tx: DbTx, employeeId: string, patch: OfficialFieldsPatch): Promise<void> {
+    try {
+      await tx.employee.update({
+        where: { id: employeeId },
+        data: {
+          ...(patch.fullName !== undefined ? { fullName: patch.fullName } : {}),
+          ...(patch.workEmail !== undefined
+            ? {
+                workEmail: patch.workEmail,
+                normalizedWorkEmail: patch.workEmail === null ? null : normalizeEmail(patch.workEmail),
+              }
+            : {}),
+          ...(patch.employmentType !== undefined ? { employmentType: patch.employmentType } : {}),
+          ...(patch.hireDate !== undefined ? { hireDate: toDateColumn(patch.hireDate) } : {}),
+          // The display form (T-12) whoever calls; an empty one clears the title.
+          ...(patch.jobTitle !== undefined ? { jobTitle: normalizeDisplayName(patch.jobTitle ?? '') || null } : {}),
+        },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error, 'normalized_work_email')) throw new EmployeeEmailTakenError();
+      // The trigger of migration 20261023110000 (INV-07 from the side of the person).
+      if (isCheckViolation(error, 'on every open seat')) throw new EmployeeOpenSeatNeedsEndError();
+      throw error;
+    }
+  }
+
+  async unplacedAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    const rows = await (tx ?? this.prisma).employee.findMany({
+      where: { id: { in: [...employeeIds] }, placements: { none: {} } },
+      select: { id: true },
+    });
+    return new Set(rows.map((row) => row.id));
+  }
+
+  async insertFirstPlacement(
+    tx: DbTx,
+    input: { organizationId: string; employeeId: string; departmentId: string; effectiveFrom: BusinessDate },
+  ): Promise<void> {
+    await tx.employeePlacement.create({
+      data: {
+        organizationId: input.organizationId,
+        employeeId: input.employeeId,
+        departmentId: input.departmentId,
+        validFrom: toDateColumn(input.effectiveFrom),
+      },
+    });
+  }
+
+  async scheduledFirstPlacement(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ placementId: string; departmentId: string; validFrom: BusinessDate } | null> {
+    const client = tx ?? this.prisma;
+    const existing = await client.employeePlacement.findFirst({
+      where: {
+        employeeId,
+        validFrom: { lte: toDateColumn(onDate) },
+      },
+      select: { id: true },
+    });
+    if (existing) return null;
+
+    const future = await client.employeePlacement.findFirst({
+      where: {
+        employeeId,
+        validFrom: { gt: toDateColumn(onDate) },
+      },
+      orderBy: { validFrom: 'asc' },
+      select: { id: true, departmentId: true, validFrom: true },
+    });
+    if (!future) return null;
+
+    return {
+      placementId: future.id,
+      departmentId: future.departmentId,
+      validFrom: fromDateColumn(future.validFrom),
+    };
+  }
+
+  async cancelScheduledFirstPlacement(tx: DbTx, placementId: string): Promise<void> {
+    await tx.employeePlacement.delete({
+      where: { id: placementId },
+    });
+  }
+
+  async restoreFirstPlacement(
+    tx: DbTx,
+    input: {
+      placementId: string;
+      organizationId: string;
+      employeeId: string;
+      departmentId: string;
+      validFrom: BusinessDate;
+    },
+  ): Promise<void> {
+    await tx.employeePlacement.create({
+      data: {
+        id: input.placementId,
+        organizationId: input.organizationId,
+        employeeId: input.employeeId,
+        departmentId: input.departmentId,
+        validFrom: toDateColumn(input.validFrom),
+        validTo: null,
+      },
+    });
+  }
+
+  /** Locks the employee row so its status cannot change until commit. */
+  async lockEmployee(tx: DbTx, employeeId: string, mode: 'SHARE' | 'UPDATE'): Promise<void> {
+    const rows =
+      mode === 'SHARE'
+        ? await tx.$queryRaw<{ id: string }[]>`SELECT id FROM employees WHERE id = ${employeeId}::uuid FOR SHARE`
+        : await tx.$queryRaw<{ id: string }[]>`SELECT id FROM employees WHERE id = ${employeeId}::uuid FOR UPDATE`;
+
+    if (rows.length === 0) throw new EmployeeNotFoundError(employeeId);
+  }
+
+  /**
+   * Ends the placement the person has open on `effectiveOn` and opens the next one from that day, so every read by day is
+   * right from midnight of it (ADR-04). The caller holds the employee `FOR UPDATE`. The database is the last word on two
+   * placements meeting (`employee_placements_no_overlap`) and on a retired department taking a member.
+   */
+  async scheduleStructureChange(tx: DbTx, input: StructureChangeInput): Promise<ScheduledStructureChange> {
+    const open = (
+      await tx.$queryRaw<{ id: string; department_id: string; valid_from: Date }[]>`
+        SELECT id, department_id, valid_from FROM employee_placements
+         WHERE employee_id = ${input.employeeId}::uuid AND valid_to IS NULL FOR UPDATE`
+    )[0];
+    if (!open) throw new PlacementOverlapError('NO_OPEN_PLACEMENT');
+    const validFrom = fromDateColumn(open.valid_from);
+    if (validFrom >= input.effectiveOn) throw new PlacementOverlapError('NOT_AFTER_CURRENT_PERIOD');
+
+    try {
+      await tx.$executeRaw`UPDATE employee_placements SET valid_to = ${input.effectiveOn}::date WHERE id = ${open.id}::uuid`;
+      const opened = await tx.employeePlacement.create({
+        data: {
+          organizationId: input.organizationId,
+          employeeId: input.employeeId,
+          departmentId: input.departmentId,
+          validFrom: toDateColumn(input.effectiveOn),
+        },
+        select: { id: true },
+      });
+
+      return {
+        closedPlacementId: open.id,
+        openedPlacementId: opened.id,
+        from: { departmentId: open.department_id, validFrom },
+      };
+    } catch (error) {
+      if (readSqlState(error) === '23P01' || isUniqueViolation(error, 'valid_from')) {
+        throw new PlacementOverlapError('OVERLAP');
+      }
+      if (isCheckViolation(error)) throw new PlacementDepartmentInactiveError();
+      throw error;
+    }
+  }
+
+  /** Takes back a change that has not taken effect: removes the placement it opened and opens the one it ended again. */
+  async cancelStructureChange(
+    tx: DbTx,
+    change: Pick<ScheduledStructureChange, 'closedPlacementId' | 'openedPlacementId'>,
+  ): Promise<void> {
+    const removed = await tx.$executeRaw`DELETE FROM employee_placements WHERE id = ${change.openedPlacementId}::uuid`;
+    if (removed !== 1) throw new PlacementOverlapError('NO_OPEN_PLACEMENT');
+    await tx.$executeRaw`UPDATE employee_placements SET valid_to = NULL WHERE id = ${change.closedPlacementId}::uuid`;
+  }
+
+  /** The placement in force on `onDate` with its days, read in the caller's transaction; null when there is none. */
+  async placementInForce(tx: DbTx, employeeId: string, onDate: BusinessDate): Promise<PlacementInForce | null> {
+    const rows = await tx.$queryRaw<{ id: string; department_id: string; valid_from: Date; valid_to: Date | null }[]>`
+      SELECT id, department_id, valid_from, valid_to FROM employee_placements
+       WHERE employee_id = ${employeeId}::uuid AND valid_from <= ${onDate}::date
+         AND (valid_to IS NULL OR valid_to > ${onDate}::date)`;
+    const row = rows[0];
+
+    return row
+      ? {
+          placementId: row.id,
+          departmentId: row.department_id,
+          validFrom: fromDateColumn(row.valid_from),
+          validTo: row.valid_to ? fromDateColumn(row.valid_to) : null,
+        }
+      : null;
+  }
+
+  /** The first day of a placement, or null when it does not exist. */
+  async placementStart(tx: DbTx, placementId: string): Promise<BusinessDate | null> {
+    const rows = await tx.$queryRaw<{ valid_from: Date }[]>`
+      SELECT valid_from FROM employee_placements WHERE id = ${placementId}::uuid`;
+
+    return rows[0] ? fromDateColumn(rows[0].valid_from) : null;
+  }
+
+  /** Moves the work state of the employee whose row the caller holds `FOR UPDATE`; the database refuses a step off the graph. */
+  async setWorkState(tx: DbTx, employeeId: string, workState: EmployeeWorkState): Promise<void> {
+    await tx.$executeRaw`UPDATE employees SET work_state = ${workState}::"EmployeeWorkState", updated_at = now() WHERE id = ${employeeId}::uuid`;
+  }
+
+  /** Unlocked read: the per-request guard must not take locks (and must not deadlock with termination). */
+  async findEmployee(employeeId: string, tx?: DbTx): Promise<EmployeeRecord | null> {
+    const row = await (tx ?? this.prisma).employee.findUnique({ where: { id: employeeId } });
+    if (!row) return null;
+
+    return toEmployeeRecord(row);
+  }
+
+  /** Unlocked read by the code of the employee, for the operator procedures that name people by code. */
+  async findEmployeeByCode(employeeCode: string, tx?: DbTx): Promise<EmployeeRecord | null> {
+    const row = await (tx ?? this.prisma).employee.findFirst({ where: { employeeCode } });
+    if (!row) return null;
+
+    return toEmployeeRecord(row);
+  }
+
+  async findEmployees(employeeIds: string[], tx?: DbTx): Promise<EmployeeRecord[]> {
+    if (employeeIds.length === 0) return [];
+
+    const rows = await (tx ?? this.prisma).employee.findMany({ where: { id: { in: employeeIds } } });
+
+    return rows.map(toEmployeeRecord);
+  }
+
+  /** The department and the job title of the employee on `onDate`, by id; null when no placement holds that day. */
+  async placementIdsOn(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<{ departmentId: string } | null> {
+    const date = toDateColumn(onDate);
+    const row = await (tx ?? this.prisma).employeePlacement.findFirst({
+      where: { employeeId, validFrom: { lte: date }, OR: [{ validTo: null }, { validTo: { gt: date } }] },
+      select: { departmentId: true },
+    });
+
+    return row;
+  }
+
+  /** The department of the latest placement begun by `onDate`, ended or not: where a person who left last worked. */
+  async lastPlacementIdsBy(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ departmentId: string } | null> {
+    return (tx ?? this.prisma).employeePlacement.findFirst({
+      where: { employeeId, validFrom: { lte: toDateColumn(onDate) } },
+      orderBy: [{ validFrom: 'desc' }, { id: 'desc' }],
+      select: { departmentId: true },
+    });
+  }
+
+  /** The employees with these codes, as far as they exist; unlocked, for the import judgement that names people by code. */
+  async findEmployeesByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {
+    if (employeeCodes.length === 0) return [];
+    const rows = await (tx ?? this.prisma).employee.findMany({ where: { employeeCode: { in: [...employeeCodes] } } });
+
+    return rows.map(toEmployeeRecord);
+  }
+
+  /** The people whose normalized work email is one of these, those who left included: a vendor report names people who have left. */
+  async findEmployeesByNormalizedEmails(
+    normalizedEmails: readonly string[],
+    tx?: DbTx,
+  ): Promise<
+    {
+      id: string;
+      employeeCode: string;
+      workEmail: string;
+      normalizedWorkEmail: string;
+      status: EmployeeRecord['status'];
+    }[]
+  > {
+    if (normalizedEmails.length === 0) return [];
+    const rows = await (tx ?? this.prisma).employee.findMany({
+      where: { normalizedWorkEmail: { in: [...normalizedEmails] } },
+      select: { id: true, employeeCode: true, workEmail: true, normalizedWorkEmail: true, status: true },
+    });
+
+    return rows.flatMap((row) =>
+      row.workEmail !== null && row.normalizedWorkEmail !== null
+        ? [{ ...row, workEmail: row.workEmail, normalizedWorkEmail: row.normalizedWorkEmail }]
+        : [],
+    );
+  }
+
+  /** The distinct, lower-case domains of the work emails of everyone the organization has ever employed. */
+  async workEmailDomains(tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).$queryRaw<{ domain: string }[]>`
+      SELECT DISTINCT split_part(normalized_work_email, '@', 2) AS domain
+        FROM employees
+       WHERE normalized_work_email IS NOT NULL AND position('@' IN normalized_work_email) > 0
+       ORDER BY 1`;
+
+    return rows.map((row) => row.domain).filter((domain) => domain.length > 0);
+  }
+
+  /** How many employees have not left, for the onboarding checklist. */
+  async countActive(tx?: DbTx): Promise<number> {
+    return (tx ?? this.prisma).employee.count({ where: { status: 'ACTIVE' } });
+  }
+
+  async searchActiveEmployees(
+    search: string | undefined,
+    onDate: Date,
+    limit: number,
+    excludeEmployeeIds: readonly string[],
+  ): Promise<EmployeeCandidate[]> {
+    const term = search?.trim();
+    // Literal match: % and _ typed by the user are characters, not wildcards (Prisma `contains` does not
+    // escape them). The exclusion list travels as ONE uuid[] parameter: a Prisma `notIn` sends one bind
+    // parameter per id and fails beyond PostgreSQL's parameter limit.
+    const pattern = term ? `%${escapeLikePattern(term)}%` : null;
+    const day = fromDateColumn(onDate);
+    const rows = await this.prisma.$queryRaw<
+      {
+        id: string;
+        employee_code: string;
+        full_name: string;
+        work_email: string | null;
+        department: string | null;
+        unplaced: boolean;
+      }[]
+    >`
+      SELECT e.id, e.employee_code, e.full_name, e.work_email, placement.department, ${unplacedEmployeeSql('e.id')} AS unplaced
+        FROM employees e
+        LEFT JOIN LATERAL (
+          SELECT d.name AS department
+            FROM employee_placements p
+            JOIN departments d ON d.id = p.department_id
+           WHERE p.employee_id = e.id
+             AND p.valid_from <= ${day}::date
+             AND (p.valid_to IS NULL OR p.valid_to > ${day}::date)
+           ORDER BY p.valid_from DESC
+           LIMIT 1
+        ) placement ON true
+       WHERE e.status = 'ACTIVE'
+         AND e.id <> ALL (${[...excludeEmployeeIds]}::uuid[])
+         AND (${pattern}::text IS NULL
+              OR e.employee_code ILIKE ${pattern}
+              OR e.full_name ILIKE ${pattern}
+              OR e.work_email ILIKE ${pattern})
+       ORDER BY e.employee_code, e.id
+       LIMIT ${limit}`;
+
+    return rows.map((row) => ({
+      id: row.id,
+      employeeCode: row.employee_code,
+      fullName: row.full_name,
+      workEmail: row.work_email,
+      department: row.department,
+      unplaced: row.unplaced,
+    }));
+  }
+
+  /** Name, department and job title at `onDate` (a date-column value) for /me. */
+  async findProfile(employeeId: string, onDate: Date): Promise<EmployeeProfile | null> {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: {
+        id: true,
+        employeeCode: true,
+        fullName: true,
+        jobTitle: true,
+        _count: { select: { placements: true } },
+        placements: {
+          where: { validFrom: { lte: onDate }, OR: [{ validTo: null }, { validTo: { gt: onDate } }] },
+          select: { department: { select: { code: true, name: true } } },
+          take: 1,
+        },
+      },
+    });
+    if (!employee) return null;
+
+    const placement = employee.placements[0];
+    return {
+      id: employee.id,
+      employeeCode: employee.employeeCode,
+      fullName: employee.fullName,
+      department: placement?.department ?? null,
+      unplaced: employee._count.placements === 0,
+      jobTitle: employee.jobTitle,
+    };
+  }
+}

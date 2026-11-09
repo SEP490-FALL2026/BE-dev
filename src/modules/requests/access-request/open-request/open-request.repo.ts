@@ -1,0 +1,72 @@
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '../../../../generated/prisma/client';
+import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import type { AccessRequestKind, AccessRequestState } from '../access-request.types';
+import { NOT_OPEN_FOR_LEAVER } from '../access-request.types';
+import { currentStateOf } from '../access-request.policy';
+import { OPEN_LINE_STATES } from '../group-request.types';
+
+export interface OpenRequestRow {
+  id: string;
+  type: AccessRequestKind;
+  state: AccessRequestState;
+  planId: string | null;
+  requesterEmployeeId: string;
+  submittedAt: Date;
+}
+
+/**
+ * The requests a person is the beneficiary of that are still open (`US-03-04` AC-24): one of their own that has not ended, or a line of
+ * a request for a group that has not ended. A read that no write goes through (the writer is `AccessRequestRepo`). A page and its total
+ * are two statements, however many requests.
+ */
+@Injectable()
+export class OpenRequestRepo {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** `filter.departmentId` keeps only the requests sent from that department (a department head reads the open work of a member). */
+  async pageOf(
+    employeeId: string,
+    page: { skip: number; take: number },
+    tx?: DbTx,
+    filter: { departmentId?: string } = {},
+  ): Promise<{ items: OpenRequestRow[]; total: number }> {
+    const where = {
+      beneficiaries: { some: { employeeId } },
+      ...(filter.departmentId === undefined ? {} : { departmentId: filter.departmentId }),
+      // A request being drafted is written by the release after this one and is not read here.
+      state: { not: 'DRAFT' as const },
+      OR: [
+        { type: { not: 'GROUP_GRANT' as const }, state: { notIn: [...NOT_OPEN_FOR_LEAVER] } },
+        { type: 'GROUP_GRANT' as const, lines: { some: { employeeId, state: { in: [...OPEN_LINE_STATES] } } } },
+      ],
+    };
+    const read = async (client: DbTx) => {
+      const rows = await client.accessRequest.findMany({
+        where,
+        select: { id: true, type: true, state: true, planId: true, requesterEmployeeId: true, submittedAt: true },
+        orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
+        skip: page.skip,
+        take: page.take,
+      });
+      const total = await client.accessRequest.count({ where });
+
+      return {
+        items: rows.map((row) => {
+          // The filter above leaves drafts out, and only a draft has no moment it was sent.
+          if (row.submittedAt === null)
+            throw new Error(`The request ${row.id} is listed as open but has not been sent.`);
+
+          return { ...row, state: currentStateOf(row.state), submittedAt: row.submittedAt };
+        }),
+        total,
+      };
+    };
+
+    // The page and its total share one snapshot when the caller has no transaction of its own (`API-LIST-DETAIL.1`).
+    return tx
+      ? read(tx)
+      : this.prisma.$transaction(read, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "scenario": "longrun",
+  "profile": "linux",
+  "node": "v24.21.0",
+  "platform": "linux-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 1089,
+  "cgroupAfter": {
+    "memoryPeakMb": 960.1,
+    "memoryCurrentMb": 25.8,
+    "memoryMax": "2147483648",
+    "cpuMax": "200000 100000",
+    "cpuStat": {
+      "nrPeriods": 10899,
+      "nrThrottled": 957,
+      "throttledMs": 108678
+    }
+  },
+  "result": {
+    "jobs": 1000,
+    "latencyMs": {
+      "n": 1000,
+      "min": 561.8,
+      "p50": 1058.6,
+      "p95": 1530.2,
+      "p99": 1819.5,
+      "max": 4465.2,
+      "mean": 1086.1
+    },
+    "series": [
+      {
+        "job": 6,
+        "worker": {
+          "vmRssMb": 858.2,
+          "vmHwmMb": 861.3,
+          "threads": 18
+        },
+        "apiRssMb": 94.1
+      },
+      {
+        "job": 100,
+        "worker": {
+          "vmRssMb": 904.1,
+          "vmHwmMb": 957.5,
+          "threads": 18
+        },
+        "apiRssMb": 74.5
+      },
+      {
+        "job": 200,
+        "worker": {
+          "vmRssMb": 910.4,
+          "vmHwmMb": 957.5,
+          "threads": 18
+        },
+        "apiRssMb": 74.6
+      },
+      {
+        "job": 300,
+        "worker": {
+          "vmRssMb": 910.5,
+          "vmHwmMb": 957.5,
+          "threads": 18
+        },
+        "apiRssMb": 74.8
+      },
+      {
+        "job": 400,
+        "worker": {
+          "vmRssMb": 911.5,
+          "vmHwmMb": 957.5,
+          "threads": 18
+        },
+        "apiRssMb": 79.7
+      },
+      {
+        "job": 500,
+        "worker": {
+          "vmRssMb": 912.1,
+          "vmHwmMb": 957.5,
+          "threads": 18
+        },
+        "apiRssMb": 79.8
+      },
+      {
+        "job": 600,
+        "worker": {
+          "vmRssMb": 915.5,
+          "vmHwmMb": 957.5,
+          "threads": 18
+        },
+        "apiRssMb": 81.1
+      },
+      {
+        "job": 700,
+        "worker": {
+          "vmRssMb": 915.8,
+          "vmHwmMb": 957.5,
+          "threads": 18
+        },
+        "apiRssMb": 81.3
+      },
+      {
+        "job": 800,
+        "worker": {
+          "vmRssMb": 916.1,
+          "vmHwmMb": 957.5,
+          "threads": 18
+        },
+        "apiRssMb": 81.8
+      },
+      {
+        "job": 900,
+        "worker": {
+          "vmRssMb": 916.4,
+          "vmHwmMb": 957.5,
+          "threads": 18
+        },
+        "apiRssMb": 82
+      },
+      {
+        "job": 1000,
+        "worker": {
+          "vmRssMb": 916.9,
+          "vmHwmMb": 957.5,
+          "threads": 18
+        },
+        "apiRssMb": 82
+      }
+    ],
+    "workerRssGrowthMbFromJob6": 58.7,
+    "apiRssStartMb": 92.8,
+    "apiRssEndMb": 82,
+    "cgroup": {
+      "memoryPeakMb": 960.1,
+      "memoryCurrentMb": 908,
+      "memoryMax": "2147483648",
+      "cpuMax": "200000 100000",
+      "cpuStat": {
+        "nrPeriods": 10891,
+        "nrThrottled": 957,
+        "throttledMs": 108678
+      }
+    }
+  }
+}

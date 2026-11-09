@@ -1,0 +1,176 @@
+import { Injectable } from '@nestjs/common';
+import { formatAmount } from '../../../core/money/money';
+import { formatRate } from '../../../core/money/rate';
+import { FinanceApi } from '../../finance/public/finance.api';
+import type { TaxEstimateResult } from '../../finance/public/finance.types';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
+import { liveIdsByPlan, liveSiblingsOf, poolWarnings } from './pool/subscription-pool.policy';
+import { SubscriptionRepo } from './subscription.repo';
+import type { SubscriptionRecord, SubscriptionView, TaxEstimateSummary } from './subscription.types';
+
+type LiveOfPlans = { byPlan: Map<string, string[]>; has: (id: string) => boolean };
+
+/** The most live subscriptions of one plan an answer names: duplicates exist only while the seat baseline is open, a few at most. */
+const MERGE_CANDIDATES_MAX = 20;
+
+const mergeCandidatesOf = (live: LiveOfPlans, record: SubscriptionRecord): string[] =>
+  live.has(record.id) ? liveSiblingsOf(live.byPlan, record.planId, record.id).slice(0, MERGE_CANDIDATES_MAX) : [];
+
+const mergeWarnings = (mergeCandidateIds: readonly string[]): 'SHOULD_MERGE'[] =>
+  mergeCandidateIds.length > 0 ? ['SHOULD_MERGE'] : [];
+
+/**
+ * A subscription as it is answered: the stored data with everything derived when it is read — the notice deadline and
+ * its source, the alert dates the operating parameter sets now, the data-quality warning, the tax profile of the vendor
+ * and the tax estimate on the unit price. Nothing here is stored, so none of it can disagree with the data.
+ */
+@Injectable()
+export class SubscriptionViewService {
+  constructor(
+    private readonly finance: FinanceApi,
+    private readonly parameters: OperatingParametersApi,
+    private readonly subscriptions: SubscriptionRepo,
+    private readonly organizationReads: OrganizationReadApi,
+  ) {}
+
+  /** The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. */
+  async viewAll(records: SubscriptionRecord[]): Promise<SubscriptionView[]> {
+    if (records.length === 0) return [];
+    const daysBefore = await this.alertDays();
+    // A priced subscription answers its tax profile from the read its estimate came from, so the two are one version
+    //; only the vendors of the subscriptions without a price are read for their profile alone.
+    const unpricedVendors = records.filter((record) => record.unitPrice === null).map((record) => record.vendor.id);
+    const groups =
+      unpricedVendors.length === 0
+        ? new Map<string, { group: TaxEstimateResult['group']; version: number }>()
+        : await this.finance.taxProfileGroups([...new Set(unpricedVendors)]);
+    const minorUnits = new Map<string, number>();
+    const minorUnitOf = async (currency: string): Promise<number> => {
+      const cached = minorUnits.get(currency);
+      if (cached !== undefined) return cached;
+      const found = await this.finance.findCurrency(currency);
+      if (!found) throw new Error(`The currency ${currency} of a stored price is not in the currency table`);
+      minorUnits.set(currency, found.minorUnit);
+
+      return found.minorUnit;
+    };
+
+    const priced = records.filter((record) => record.unitPrice !== null);
+    const estimates = new Map(
+      (
+        await this.finance.estimateTaxMany(
+          priced.map((record) => ({
+            vendorId: record.vendor.id,
+            netMinor: (record.unitPrice as { amountMinor: bigint }).amountMinor,
+          })),
+        )
+      ).map((estimate, index) => [priced[index].id, estimate]),
+    );
+
+    const live = await this.liveOfPooledPlans(records);
+    const views: SubscriptionView[] = [];
+    for (const record of records) {
+      // The rule against a second live subscription of a K2 or K4 plan: answered at every phase of the baseline, so the IT Admin sees what to fold (`QĐ-104k`(3)).
+      const mergeCandidateIds = mergeCandidatesOf(live, record);
+      const notice = deriveNotice(noticeInputOf(record));
+      const missing = missingData({
+        kind: record.kind,
+        planPricingModel: record.planPricingModel,
+        quantity: record.purchasedQuantity,
+        startDate: record.startDate,
+        billingCycle: record.billingCycle,
+        hasPrice: record.unitPrice !== null,
+        hasSnapshot: record.priceSnapshot !== null,
+      });
+      let group: TaxEstimateResult['group'] | null = groups.get(record.vendor.id)?.group ?? null;
+      let taxEstimate: TaxEstimateSummary | null = null;
+      let unitPrice: SubscriptionView['unitPrice'] = null;
+      let priceSnapshot: SubscriptionView['priceSnapshot'] = null;
+      if (record.unitPrice) {
+        const units = await minorUnitOf(record.unitPrice.currency);
+        unitPrice = { amount: formatAmount(record.unitPrice.amountMinor, units), currency: record.unitPrice.currency };
+        const estimate = estimates.get(record.id) as TaxEstimateResult;
+        group = estimate.basis === 'PROFILE' ? estimate.group : null;
+        taxEstimate = {
+          basis: estimate.basis,
+          label: estimate.basis === 'PROFILE' ? 'ESTIMATE' : 'ESTIMATE_NO_PROFILE',
+          group: estimate.group,
+          taxAmount: formatAmount(estimate.taxMinor, units),
+          deductibleTaxAmount: formatAmount(estimate.deductibleMinor, units),
+          nonDeductibleTaxAmount: formatAmount(estimate.nonDeductibleMinor, units),
+          estimatedCost: formatAmount(estimate.estimatedCostMinor, units),
+        };
+      }
+      if (record.unitPrice && record.priceSnapshot) {
+        const reportingUnits = await minorUnitOf(record.priceSnapshot.reportingCurrency);
+        priceSnapshot = {
+          recordedOn: record.unitPrice.recordedOn,
+          rate: formatRate(record.priceSnapshot.rate),
+          rateDate: record.priceSnapshot.rateDate,
+          rateSource: record.priceSnapshot.rateSource,
+          reportingAmount: formatAmount(record.priceSnapshot.reportingMinor, reportingUnits),
+          reportingCurrency: record.priceSnapshot.reportingCurrency,
+          exchangeRateId: record.priceSnapshot.exchangeRateId,
+        };
+      }
+
+      views.push({
+        id: record.id,
+        planId: record.planId,
+        planName: record.planName,
+        ownerDepartmentId: record.ownerDepartmentId,
+        applicationId: record.applicationId,
+        applicationName: record.applicationName,
+        vendor: record.vendor,
+        kind: record.kind,
+        status: record.status,
+        missingFinancialData: record.status === 'DRAFT',
+        missing,
+        purchasedQuantity: record.purchasedQuantity,
+        unitPrice,
+        priceSnapshot,
+        billingCycle: record.billingCycle,
+        commitmentTermMonths: record.commitmentTermMonths,
+        startDate: record.startDate,
+        endDate: record.endDate,
+        renewalDate: record.renewalDate,
+        noticePeriodDays: record.noticePeriodDays,
+        autoRenew: record.autoRenew,
+        allowsMidTermReduction: record.allowsMidTermReduction,
+        responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
+        vendorMinimumSeats: record.vendorMinimumSeats,
+        isPrimaryForPlan: record.isPrimaryForPlan,
+        noticeDeadline: { value: notice.deadline, source: notice.source },
+        alerts: { baseDate: notice.baseDate, dates: alertDates(notice.baseDate, daysBefore) },
+        warnings: [...noticeWarnings(notice.source), ...poolWarnings(record), ...mergeWarnings(mergeCandidateIds)],
+        mergeCandidateIds,
+        taxProfile: { status: group ? 'DECLARED' : 'MISSING', group },
+        taxEstimate,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
+      });
+    }
+
+    return views;
+  }
+
+  /** Which of these subscriptions are live and which live subscriptions their plans have (only K2 and K4 plans, one read for all). */
+  private async liveOfPooledPlans(records: readonly SubscriptionRecord[]) {
+    const rows = await this.subscriptions.findLivenessOfPooledPlans([
+      ...new Set(records.map((record) => record.planId)),
+    ]);
+    const byPlan = liveIdsByPlan(rows, await this.organizationReads.businessToday());
+    const ids = new Set([...byPlan.values()].flat());
+
+    return { byPlan, has: (id: string) => ids.has(id) };
+  }
+
+  /** The days before the deadline an alert falls, as the parameter says now. */
+  private async alertDays(): Promise<number[]> {
+    const value = await this.parameters.getValue('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE');
+
+    return Array.isArray(value) ? value : [];
+  }
+}

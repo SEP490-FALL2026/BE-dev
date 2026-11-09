@@ -1,0 +1,134 @@
+import type { RouteErrorStatus } from './openapi-example-manifest';
+
+/**
+ * Part of ROUTE_ERROR_CODES (requests for a group and the spend step (G5)), traced on BE `0da8f56`
+ * (Prompt 02, 26/10/2026): see openapi-example-manifest.ts.
+ */
+export const ROUTE_ERROR_CODES_REQUESTS_SPEND: Readonly<
+  Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
+> = {
+  accessRequestLineCloseForDeparture: {
+    '404': ['ACCESS_REQUEST.NOT_FOUND'],
+    '409': [
+      'ACCESS_REQUEST.ALREADY_ENDED',
+      'ACCESS_REQUEST.BENEFICIARY_NOT_LEFT',
+      'ACCESS_REQUEST.BENEFICIARY_NOT_TRANSFERRED',
+      'ACCESS_REQUEST.WITHDRAWAL_PENDING',
+    ],
+    '422': ['ACCESS_REQUEST.EVIDENCE_REQUIRED'],
+  },
+  accessRequestLineList: {
+    '404': ['ACCESS_REQUEST.NOT_FOUND'],
+  },
+  accessRequestLineNeedDecide: {
+    '403': ['ACCESS_REQUEST.NOT_THE_ASSIGNEE', 'ACCESS_REQUEST.OWN_REQUEST'],
+    '404': ['ACCESS_REQUEST.NOT_FOUND'],
+    '409': ['ACCESS_REQUEST.STEP_NOT_PENDING', 'GROUP_REQUEST.LINE_HOLDS_ACCESS'],
+    '422': ['GROUP_REQUEST.LINES_MISMATCH'],
+  },
+  accessRequestLineWithdraw: {
+    '403': ['ACCESS_REQUEST.NOT_REQUESTER'],
+    '404': ['ACCESS_REQUEST.NOT_FOUND'],
+    '409': [
+      'ACCESS_REQUEST.ALREADY_ENDED',
+      'ACCESS_REQUEST.GRANT_COMPLETED',
+      'ACCESS_REQUEST.GRANT_RUNNING',
+      'ACCESS_REQUEST.WITHDRAWAL_PENDING',
+    ],
+    '422': ['ACCESS_REQUEST.REASON_REQUIRED'],
+  },
+  accessRequestSupplementAdd: {
+    '403': ['ACCESS_REQUEST.NOT_REQUESTER', 'SPEND.NOT_HEAD'],
+    '404': ['ACCESS_REQUEST.NOT_FOUND'],
+    '409': [
+      'ACCESS_REQUEST.NOT_PRICEABLE',
+      'SPEND.SUPPLEMENT_NOT_IN_QUEUE',
+      'SPEND.SUPPLEMENT_NOT_PRICED',
+      'SPEND.SUPPLEMENT_NO_CHANGE',
+      'SPEND.SUPPLEMENT_TERM_NOT_REDUCED',
+      'SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE',
+      'SUPPLEMENT.LINE_NOT_DROPPABLE',
+    ],
+    '422': ['SUPPLEMENT.CANNOT_DROP_LAST_LINE', 'SUPPLEMENT.DROP_NOT_FOR_GROUP'],
+  },
+  accessRequestSupplementList: {
+    '404': ['ACCESS_REQUEST.NOT_FOUND'],
+  },
+  budgetCheckGet: {
+    '404': ['SPEND.REVIEW_NOT_FOUND'],
+  },
+  budgetCheckYearList: {
+    '404': ['SPEND.REVIEW_NOT_FOUND'],
+  },
+  groupRequestCandidateList: {
+    '409': ['ACCESS_REQUEST.NO_DEPARTMENT'],
+    '422': ['REQUEST_PARTY.INELIGIBLE'],
+  },
+  groupRequestCheck: {
+    '404': ['ACCESS_REQUEST.PLAN_NOT_FOUND'],
+    '409': ['ACCESS_REQUEST.APPLICATION_RETIRED', 'ACCESS_REQUEST.NO_DEPARTMENT', 'FINANCE.SETUP_INCOMPLETE'],
+    '422': ['REQUEST_PARTY.INELIGIBLE'],
+  },
+  groupRequestSubmit: {
+    '403': ['ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST'],
+    '404': ['ACCESS_REQUEST.PLAN_NOT_FOUND'],
+    '409': ['ACCESS_REQUEST.APPLICATION_RETIRED', 'ACCESS_REQUEST.NO_DEPARTMENT', 'FINANCE.SETUP_INCOMPLETE'],
+    '422': [
+      'GROUP_REQUEST.DUPLICATE_LINE',
+      'GROUP_REQUEST.LINES_REFUSED',
+      'GROUP_REQUEST.PLAN_NOT_ELIGIBLE',
+      'GROUP_REQUEST.TERM_BEYOND_LIMIT',
+      'GROUP_REQUEST.TOO_FEW_LINES',
+      'GROUP_REQUEST.TOO_MANY_LINES',
+      'REQUEST_PARTY.INELIGIBLE',
+    ],
+  },
+  spendApprovalDecide: {
+    '403': ['SPEND.NOT_THE_ASSIGNEE', 'SPEND.OWN_REQUEST'],
+    '404': ['ACCESS_REQUEST.NOT_FOUND'],
+    '409': [
+      'ACCESS_REQUEST.GROUP_USES_LINES',
+      'SPEND.NOT_CHECKABLE',
+      'SPEND.NO_SPEND_STEP',
+      'SPEND.RECHECKED_RETURNED_TO_HEAD',
+      'SPEND.RECHECKED_RETURNED_TO_REQUESTER',
+    ],
+  },
+  spendApprovalGet: {
+    '404': ['SPEND.REVIEW_NOT_FOUND'],
+  },
+  spendApprovalLineDecide: {
+    '403': ['SPEND.NOT_THE_ASSIGNEE', 'SPEND.OWN_REQUEST'],
+    '404': ['ACCESS_REQUEST.NOT_FOUND'],
+    '409': [
+      'SPEND.NOT_CHECKABLE',
+      'SPEND.NO_SPEND_STEP',
+      'SPEND.RECHECKED_RETURNED_TO_HEAD',
+      'SPEND.RECHECKED_RETURNED_TO_REQUESTER',
+    ],
+    '422': ['GROUP_REQUEST.LINES_MISMATCH'],
+  },
+  spendBatchDecide: {
+    '404': ['SPEND.BATCH_NOT_FOUND'],
+  },
+  spendBatchGet: {
+    '404': ['SPEND.BATCH_NOT_FOUND'],
+  },
+  spendBatchItemList: {
+    '404': ['SPEND.BATCH_NOT_FOUND'],
+  },
+  spendBatchSubmit: {
+    '403': ['SPEND.NOT_HEAD'],
+    '404': ['ACCESS_REQUEST.NOT_FOUND'],
+    '409': ['FINANCE.SETUP_INCOMPLETE', 'SPEND.NOT_IN_QUEUE'],
+    '422': ['SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH'],
+  },
+  spendQueueList: {
+    '403': ['SPEND.NOT_HEAD'],
+  },
+  spendReserveConfirm: {
+    '403': ['SPEND.NOT_HEAD', 'SPEND.RESERVE_CONFIRMER_IS_BENEFICIARY'],
+    '404': ['ACCESS_REQUEST.NOT_FOUND'],
+    '409': ['SPEND.RESERVE_NOT_PENDING'],
+  },
+};

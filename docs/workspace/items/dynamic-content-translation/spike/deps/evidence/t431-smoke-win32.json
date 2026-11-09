@@ -1,0 +1,155 @@
+{
+  "label": "t431",
+  "node": "v24.0.1",
+  "platform": "win32-x64",
+  "user": "<user>",
+  "ok": true,
+  "install": {
+    "packages": [
+      "@huggingface+jinja@0.5.10",
+      "@huggingface+tokenizers@0.2.0",
+      "@huggingface+transformers@4.3.1",
+      "@img+colour@1.1.0",
+      "@img+sharp-win32-x64@0.35.5",
+      "onnxruntime-common@1.30.0",
+      "onnxruntime-common@1.31.0-dev.20260911-2a43ec07e",
+      "onnxruntime-node@1.30.0",
+      "onnxruntime-web@1.31.0-dev.20260914-8d85527a0",
+      "sharp@0.35.5"
+    ],
+    "onnxruntimeNodeBinaries": [
+      {
+        "file": "napi-v6/darwin/arm64/libonnxruntime.1.30.0.dylib",
+        "mb": 42.5
+      },
+      {
+        "file": "napi-v6/darwin/arm64/libonnxruntime.1.dylib",
+        "mb": 42.5
+      },
+      {
+        "file": "napi-v6/darwin/arm64/onnxruntime_binding.node",
+        "mb": 0.3
+      },
+      {
+        "file": "napi-v6/linux/arm64/libonnxruntime.so.1",
+        "mb": 24
+      },
+      {
+        "file": "napi-v6/linux/arm64/onnxruntime_binding.node",
+        "mb": 0.4
+      },
+      {
+        "file": "napi-v6/linux/x64/libonnxruntime.so.1",
+        "mb": 43.7
+      },
+      {
+        "file": "napi-v6/linux/x64/onnxruntime_binding.node",
+        "mb": 0.4
+      },
+      {
+        "file": "napi-v6/win32/arm64/DirectML.dll",
+        "mb": 17.6
+      },
+      {
+        "file": "napi-v6/win32/arm64/dxcompiler.dll",
+        "mb": 21.3
+      },
+      {
+        "file": "napi-v6/win32/arm64/dxil.dll",
+        "mb": 1.7
+      },
+      {
+        "file": "napi-v6/win32/arm64/onnxruntime.dll",
+        "mb": 28.4
+      },
+      {
+        "file": "napi-v6/win32/arm64/onnxruntime_binding.node",
+        "mb": 0.4
+      },
+      {
+        "file": "napi-v6/win32/x64/DirectML.dll",
+        "mb": 17.7
+      },
+      {
+        "file": "napi-v6/win32/x64/dxcompiler.dll",
+        "mb": 17.2
+      },
+      {
+        "file": "napi-v6/win32/x64/dxil.dll",
+        "mb": 1.4
+      },
+      {
+        "file": "napi-v6/win32/x64/onnxruntime.dll",
+        "mb": 27.4
+      },
+      {
+        "file": "napi-v6/win32/x64/onnxruntime_binding.node",
+        "mb": 0.3
+      }
+    ],
+    "sharpNative": [
+      {
+        "pkg": "@img+sharp-win32-x64@0.35.5",
+        "file": "node_modules/@img/sharp-win32-x64/lib/sharp-win32-x64-0.35.5.node",
+        "mb": 0.4
+      }
+    ]
+  },
+  "importMs": 392,
+  "exports": {
+    "pipeline": "function",
+    "env": "object"
+  },
+  "transformersVersion": "4.3.1",
+  "env4": {
+    "useWasmCache": false,
+    "hasEnvFetch": true
+  },
+  "models": {
+    "vi-en": {
+      "id": "Xenova/opus-mt-vi-en",
+      "loadMs": 2007,
+      "rssAfterLoadMb": 332.2,
+      "sentences": [
+        {
+          "input": "Giấy phép phần mềm sẽ hết hạn vào cuối tháng này.",
+          "output": "Software license expires by the end of the month.",
+          "firstMs": 662,
+          "secondMs": 671
+        },
+        {
+          "input": "Vui lòng liên hệ bộ phận hỗ trợ để gia hạn.",
+          "output": "Please contact the support unit for extension.",
+          "firstMs": 464,
+          "secondMs": 452
+        }
+      ]
+    },
+    "en-vi": {
+      "id": "Xenova/opus-mt-en-vi",
+      "loadMs": 1641,
+      "rssAfterLoadMb": 421.3,
+      "sentences": [
+        {
+          "input": ">>vie<< The license will expire at the end of this month.",
+          "output": "Giấy phép sẽ được đánh giá vào cuối tháng này.",
+          "firstMs": 711,
+          "secondMs": 556
+        },
+        {
+          "input": ">>vie<< Please contact support to renew your subscription.",
+          "output": "Vui lòng liên lạc với bạn để gửi kèm theo lời nhắn.",
+          "firstMs": 666,
+          "secondMs": 662
+        }
+      ]
+    }
+  },
+  "peakRssSampledMb": 572.5,
+  "maxRssResourceUsageMb": 572.8,
+  "fetchCalls": {
+    "count": 0,
+    "hosts": [],
+    "envFetchLocalCalls": 0
+  }
+}

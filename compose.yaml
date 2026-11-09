@@ -1,5 +1,10 @@
 name: software-license-management
 
+# Local development. "docker compose up -d --wait" starts PostgreSQL only: the API and the worker need nothing else
+# today, except the contract files, which the API keeps in object storage (ADR-0014): MinIO (profile "storage") serves
+# them locally. Redis (profile "queue") is optional standby infrastructure with no consumer yet, kept for a future slice
+# that mounts the queue (Owner decisions E2 = A and OD-R5):
+# "docker compose --profile queue --profile storage up -d --wait".
 services:
   postgres:
     image: postgres:17-alpine
@@ -8,7 +13,7 @@ services:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
     ports:
-      - '5432:5432'
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -18,9 +23,10 @@ services:
       retries: 10
 
   redis:
+    profiles: ['queue']
     image: redis:8-alpine
     ports:
-      - '6379:6379'
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
     command: ['redis-server', '--appendonly', 'yes']
     volumes:
       - redis-data:/data
@@ -31,14 +37,28 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
-    command: server /data --console-address ':9001'
+    profiles: ['storage']
+    build: ./infra/minio
+    image: slm-minio:2025-10-15
+    # The credentials come from your shell or .env and are the API's OBJECT_STORAGE_ACCESS_KEY_ID and
+    # OBJECT_STORAGE_SECRET_ACCESS_KEY: the API refuses MinIO's public default outside NODE_ENV=test (SEC-04), so MinIO
+    # refuses to start without credentials of your own, with the public default, or with a key equal to its secret
+    # (P28-08). Nothing here is required by the default profile (PostgreSQL only).
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        if [ -z "$$MINIO_ROOT_USER" ] || [ -z "$$MINIO_ROOT_PASSWORD" ] || [ "$$MINIO_ROOT_USER" = minioadmin ]
+        || [ "$$MINIO_ROOT_PASSWORD" = minioadmin ] || [ "$$MINIO_ROOT_USER" = "$$MINIO_ROOT_PASSWORD" ];
+        then echo 'Set MINIO_ROOT_USER and MINIO_ROOT_PASSWORD (not minioadmin, different from each other) and the same
+        values as OBJECT_STORAGE_ACCESS_KEY_ID and OBJECT_STORAGE_SECRET_ACCESS_KEY' >&2; exit 1; fi;
+        exec minio server /data --console-address :9001
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
     ports:
-      - '9000:9000'
-      - '9001:9001'
+      - '127.0.0.1:${MINIO_PORT:-9000}:9000'
+      - '127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001'
     volumes:
       - minio-data:/data
     healthcheck:
@@ -46,18 +66,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-
-  keycloak:
-    profiles: ['auth']
-    image: quay.io/keycloak/keycloak:26.7.0
-    command: ['start-dev', '--import-realm']
-    environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-    ports:
-      - '8080:8080'
-    volumes:
-      - ./infra/keycloak/import:/opt/keycloak/data/import:ro
 
 volumes:
   postgres-data:

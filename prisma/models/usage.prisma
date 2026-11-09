@@ -1,0 +1,412 @@
+// What the collectors on company machines send: the allowlist of tools they may report, the usage of an AI tool day by day, the
+// snapshot of its login and quota, and the reasons a request was refused. The device, the registration, the credential and the
+// application are values, not foreign keys: usage has a life and a retention of its own. Append-only triggers are SQL (ADR-0005).
+
+enum AiToolKey {
+  CLAUDE_CODE
+  CODEX
+  ANTIGRAVITY_CLI
+}
+
+enum UsageCoverage {
+  COVERED
+  PARTIAL
+  NOT_OBSERVABLE
+}
+
+enum CollectorAllowlistEntryKind {
+  AI_TOOL
+}
+
+enum ToolAuthStatus {
+  LOGGED_IN
+  LOGGED_OUT
+  UNKNOWN
+  NOT_SUPPORTED
+}
+
+enum ToolQuotaStatus {
+  OK
+  NOT_SUPPORTED
+  FAILED
+}
+
+enum ToolQuotaWindowCode {
+  PRIMARY
+  SECONDARY
+  SESSION
+  WEEKLY_ALL
+  WEEKLY_MODEL
+  FIVE_HOUR
+  DAILY
+  WEEKLY
+}
+
+enum IntakeEndpoint {
+  AI_USAGE_BATCH
+  AI_TOOL_STATUS_SNAPSHOT
+}
+
+enum IntakeRejectionReason {
+  NOT_ACKNOWLEDGED
+  COLLECTION_STOPPED
+  TOOL_STATUS_NOT_ACKNOWLEDGED
+  OUTSIDE_WINDOW
+  NOT_IN_ALLOWLIST
+  FUTURE_GENERATED_AT
+  FUTURE_OBSERVED_AT
+  INVALID_COVERAGE
+  INVALID_QUOTA
+}
+
+model CollectorAllowlistVersion {
+  id                   String   @id @default(uuid(7)) @db.Uuid
+  organizationId       String   @map("organization_id") @db.Uuid
+  versionNumber        Int      @map("version_number")
+  reason               String
+  publishedByAppUserId String   @map("published_by_app_user_id") @db.Uuid
+  publishedAt          DateTime @default(now()) @map("published_at") @db.Timestamptz(3)
+
+  entries CollectorAllowlistEntry[]
+
+  @@unique([organizationId, versionNumber])
+  @@map("collector_allowlist_versions")
+}
+
+model CollectorAllowlistEntry {
+  id            String                      @id @default(uuid(7)) @db.Uuid
+  versionId     String                      @map("version_id") @db.Uuid
+  kind          CollectorAllowlistEntryKind
+  key           String
+  applicationId String                      @map("application_id") @db.Uuid
+
+  version CollectorAllowlistVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+
+  @@unique([versionId, kind, key])
+  @@unique([versionId, applicationId])
+  @@map("collector_allowlist_entries")
+}
+
+// One row for each (registration, tool, day): the build made last wins, so several credentials of one registration merge.
+model AiUsageDay {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  deviceId       String        @map("device_id") @db.Uuid
+  registrationId String        @map("registration_id") @db.Uuid
+  credentialId   String        @map("credential_id") @db.Uuid
+  tool           AiToolKey
+  applicationId  String        @map("application_id") @db.Uuid
+  usageDate      DateTime      @map("usage_date") @db.Date
+  coverage       UsageCoverage
+  responses      Int
+  totalTokens    BigInt        @map("total_tokens")
+  generatedAt    DateTime      @map("generated_at") @db.Timestamptz(3)
+  contentHash    String        @map("content_hash")
+  receivedAt     DateTime      @default(now()) @map("received_at") @db.Timestamptz(3)
+
+  @@unique([registrationId, tool, usageDate])
+  @@index([deviceId, usageDate])
+  @@map("ai_usage_days")
+}
+
+model ToolStatusSnapshot {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  deviceId       String          @map("device_id") @db.Uuid
+  registrationId String          @map("registration_id") @db.Uuid
+  credentialId   String          @map("credential_id") @db.Uuid
+  tool           AiToolKey
+  observedAt     DateTime        @map("observed_at") @db.Timestamptz(3)
+  authStatus     ToolAuthStatus  @map("auth_status")
+  quotaStatus    ToolQuotaStatus @map("quota_status")
+  receivedAt     DateTime        @default(now()) @map("received_at") @db.Timestamptz(3)
+
+  windows ToolStatusWindow[]
+
+  @@unique([registrationId, tool, observedAt])
+  @@index([deviceId, tool, observedAt])
+  @@map("tool_status_snapshots")
+}
+
+model ToolStatusWindow {
+  snapshotId  String              @map("snapshot_id") @db.Uuid
+  code        ToolQuotaWindowCode
+  usedPercent Int                 @map("used_percent") @db.SmallInt
+  resetsAt    DateTime?           @map("resets_at") @db.Timestamptz(3)
+
+  snapshot ToolStatusSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@id([snapshotId, code])
+  @@map("tool_status_windows")
+}
+
+model IntakeRejection {
+  id             String                @id @default(uuid(7)) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  deviceId       String                @map("device_id") @db.Uuid
+  registrationId String?               @map("registration_id") @db.Uuid
+  credentialId   String                @map("credential_id") @db.Uuid
+  endpoint       IntakeEndpoint
+  usageDate      DateTime?             @map("usage_date") @db.Date
+  reasonCode     IntakeRejectionReason @map("reason_code")
+  rejectedAt     DateTime              @default(now()) @map("rejected_at") @db.Timestamptz(3)
+
+  @@index([deviceId, rejectedAt])
+  @@map("intake_rejections")
+}
+
+// The usage a software vendor reports (`SBF-04a`, `qd103-vendor-usage-import`): the source of an application the IT Admin declares, the
+// imports of its reports (preview, then confirmation), the days of activity they hold, who an identifier is, the identifiers nobody could
+// be told from, and the activity of a person who has no seat. The application and the people are values, not foreign keys: usage has a
+// life and a retention of its own. An identifier is tied to a person when it is read, never when it is written.
+
+enum UsageIdentifierType {
+  EMAIL
+  USERNAME
+  ACCOUNT_ID
+}
+
+enum UsageReportShape {
+  AGGREGATE
+  EVENT
+}
+
+enum UsageDefinitionStrictness {
+  STRICT
+  LOOSE
+}
+
+enum UsageEvidenceDirection {
+  POSITIVE_ONLY
+  POSITIVE_AND_NEGATIVE
+}
+
+enum UsageImportFormat {
+  JSON
+  CSV
+}
+
+enum UsageImportStatus {
+  PREVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum UsageCoverageBasis {
+  DECLARED
+  DERIVED
+}
+
+enum UsageNoticeMode {
+  CONFIRMED_DELIVERED
+  SYSTEM_SENT
+}
+
+enum UsageRowOutcome {
+  MATCHED
+  UNMATCHED
+  AMBIGUOUS
+  NOT_A_PERSON
+  INVALID
+}
+
+enum UsageEventClass {
+  VALUE
+  PASSIVE
+  AUTH_ONLY
+}
+
+enum UsageActivityBasis {
+  ACTIVE_DATE
+  LAST_ACTIVITY
+}
+
+enum UsageMatchMethod {
+  EXACT_EMAIL
+  ACCOUNT_IDENTIFIER
+  ALIAS_RULE
+  MANUAL
+}
+
+enum UsageMatchConfidence {
+  HIGH
+  MEDIUM
+}
+
+enum UsageUnmatchedReason {
+  NOT_FOUND
+  AMBIGUOUS
+}
+
+enum UsageUnmatchedStatus {
+  OPEN
+  DISMISSED
+  RESOLVED
+}
+
+enum UsageFindingStatus {
+  OPEN
+  CLOSED
+}
+
+// How the IT Admin reads one application vendor report: the identifier, the zone of the days, the shape, the columns, what counts as activity
+// (`INV-11`, required) and what the vendor can tell (`FR-4.4`). How fresh a report must be is a constant of the kind of source, not a column.
+model UsageSource {
+  id                   String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String                    @map("organization_id") @db.Uuid
+  applicationId        String                    @map("application_id") @db.Uuid
+  name                 String
+  identifierType       UsageIdentifierType       @map("identifier_type")
+  reportShape          UsageReportShape          @map("report_shape")
+  template             Json
+  timeZone             String                    @map("time_zone")
+  activityDefinition   String                    @map("activity_definition")
+  definitionStrictness UsageDefinitionStrictness @map("definition_strictness")
+  evidenceDirection    UsageEvidenceDirection    @map("evidence_direction")
+  capMemberList        Boolean                   @map("cap_member_list")
+  capLastActivity      Boolean                   @map("cap_last_activity")
+  capEventDetail       Boolean                   @map("cap_event_detail")
+  capMaxHistoryDays    Int?                      @map("cap_max_history_days")
+  retiredAt            DateTime?                 @map("retired_at") @db.Timestamptz(3)
+  createdByAppUserId   String                    @map("created_by_app_user_id") @db.Uuid
+  createdAt            DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                  @default(now()) @map("updated_at") @db.Timestamptz(3)
+
+  imports UsageImport[]
+
+  @@unique([organizationId, applicationId, name])
+  @@index([applicationId])
+  @@map("usage_sources")
+}
+
+model UsageImport {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String             @map("organization_id") @db.Uuid
+  sourceId             String             @map("source_id") @db.Uuid
+  format               UsageImportFormat
+  status               UsageImportStatus  @default(PREVIEW)
+  coverageFrom         DateTime           @map("coverage_from") @db.Date
+  coverageTo           DateTime           @map("coverage_to") @db.Date
+  coverageBasis        UsageCoverageBasis @map("coverage_basis")
+  contentHash          String             @map("content_hash")
+  previewVersion       Int                @default(1) @map("preview_version")
+  summary              Json
+  result               Json?
+  confirmKey           String?            @unique @map("confirm_key")
+  noticeMode           UsageNoticeMode?   @map("notice_mode")
+  noticeAt             DateTime?          @map("notice_at") @db.Timestamptz(3)
+  expiresAt            DateTime           @map("expires_at") @db.Timestamptz(3)
+  uploadedByAppUserId  String             @map("uploaded_by_app_user_id") @db.Uuid
+  confirmedByAppUserId String?            @map("confirmed_by_app_user_id") @db.Uuid
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  confirmedAt          DateTime?          @map("confirmed_at") @db.Timestamptz(3)
+  cancelledAt          DateTime?          @map("cancelled_at") @db.Timestamptz(3)
+
+  source UsageSource        @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  rows   UsageImportRow[]
+  days   UsageActivityDay[]
+
+  @@index([sourceId, status])
+  @@map("usage_imports")
+}
+
+model UsageImportRow {
+  importId             String            @map("import_id") @db.Uuid
+  lineNumber           Int               @map("line_number")
+  cells                Json
+  identifierRaw        String            @map("identifier_raw")
+  identifierNormalized String            @map("identifier_normalized")
+  outcome              UsageRowOutcome
+  // Only what the preview judged; the days are tied to a person when they are read.
+  employeeId           String?           @map("employee_id") @db.Uuid
+  matchMethod          UsageMatchMethod? @map("match_method")
+  errors               Json
+
+  import UsageImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@id([importId, lineNumber])
+  @@map("usage_import_rows")
+}
+
+// One day on which an identifier was active in a source, as an import said it. No employee: who it is, is read through the mapping in force.
+model UsageActivityDay {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String              @map("organization_id") @db.Uuid
+  sourceId             String              @map("source_id") @db.Uuid
+  importId             String              @map("import_id") @db.Uuid
+  applicationId        String              @map("application_id") @db.Uuid
+  identifierType       UsageIdentifierType @map("identifier_type")
+  normalizedIdentifier String              @map("normalized_identifier")
+  activityDate         DateTime            @map("activity_date") @db.Date
+  eventClass           UsageEventClass     @map("event_class")
+  basis                UsageActivityBasis
+  supersededByImportId String?             @map("superseded_by_import_id") @db.Uuid
+  createdAt            DateTime            @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(3)
+
+  import UsageImport @relation(fields: [importId], references: [id], onDelete: Restrict)
+
+  @@unique([importId, identifierType, normalizedIdentifier, activityDate, eventClass])
+  @@index([applicationId, identifierType, normalizedIdentifier, activityDate])
+  @@index([sourceId, activityDate])
+  @@map("usage_activity_days")
+}
+
+model UsageIdentityMapping {
+  id                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String               @map("organization_id") @db.Uuid
+  applicationId        String               @map("application_id") @db.Uuid
+  identifierType       UsageIdentifierType  @map("identifier_type")
+  normalizedIdentifier String               @map("normalized_identifier")
+  rawIdentifier        String               @map("raw_identifier")
+  employeeId           String               @map("employee_id") @db.Uuid
+  method               UsageMatchMethod
+  confidence           UsageMatchConfidence
+  confirmedByAppUserId String?              @map("confirmed_by_app_user_id") @db.Uuid
+  createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  endedAt              DateTime?            @map("ended_at") @db.Timestamptz(3)
+  endedByAppUserId     String?              @map("ended_by_app_user_id") @db.Uuid
+  endReason            String?              @map("end_reason")
+
+  @@index([applicationId, identifierType, normalizedIdentifier])
+  @@index([employeeId])
+  @@map("usage_identity_mappings")
+}
+
+model UsageUnmatchedIdentity {
+  id                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String               @map("organization_id") @db.Uuid
+  applicationId        String               @map("application_id") @db.Uuid
+  sourceId             String               @map("source_id") @db.Uuid
+  identifierType       UsageIdentifierType  @map("identifier_type")
+  normalizedIdentifier String               @map("normalized_identifier")
+  rawIdentifier        String               @map("raw_identifier")
+  reason               UsageUnmatchedReason
+  status               UsageUnmatchedStatus @default(OPEN)
+  candidateEmployeeIds String[]             @map("candidate_employee_ids") @db.Uuid
+  firstImportId        String               @map("first_import_id") @db.Uuid
+  lastImportId         String               @map("last_import_id") @db.Uuid
+  resolvedMappingId    String?              @map("resolved_mapping_id") @db.Uuid
+  handledByAppUserId   String?              @map("handled_by_app_user_id") @db.Uuid
+  handledAt            DateTime?            @map("handled_at") @db.Timestamptz(3)
+  note                 String?
+
+  @@index([applicationId, status])
+  @@map("usage_unmatched_identities")
+}
+
+// Activity of a person who holds no seat of the application (`FR-4.8`, Q-84): a finding to see, never a seat made.
+model UsageNoAssignmentFinding {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String             @map("organization_id") @db.Uuid
+  applicationId     String             @map("application_id") @db.Uuid
+  employeeId        String             @map("employee_id") @db.Uuid
+  firstActivityDate DateTime           @map("first_activity_date") @db.Date
+  lastActivityDate  DateTime           @map("last_activity_date") @db.Date
+  lastImportId      String             @map("last_import_id") @db.Uuid
+  status            UsageFindingStatus @default(OPEN)
+  closedAt          DateTime?          @map("closed_at") @db.Timestamptz(3)
+  closedReason      String?            @map("closed_reason")
+
+  @@index([applicationId, status])
+  @@map("usage_no_assignment_findings")
+}

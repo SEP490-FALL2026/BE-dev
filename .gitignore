@@ -12,6 +12,8 @@ pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+demo-dataset-reports/
+claude/worktrees/
 
 # OS
 .DS_Store
@@ -19,6 +21,10 @@ lerna-debug.log*
 # Tests
 /coverage
 /.nyc_output
+/reports
+
+# Public model weights; download separately, never commit them.
+/.models/
 
 # IDEs and editors
 /.idea
@@ -44,10 +50,10 @@ lerna-debug.log*
 .env.local
 .env.*
 !.env.example
+!.env.bootstrap.example
 
-# Local documentation workspace. Research notes, working plans and draft specs
-# may contain unfinished assumptions and are intentionally not versioned.
-/docs/workspace/
+# Shared planning is versioned; only personal scratch is ignored.
+/docs/workspace/local/
 
 # Durable documentation under /docs/architecture, /docs/decisions and
 # /docs/guides remains versioned as shared project context.
@@ -67,3 +73,8 @@ pids
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+
+!.env.seed.local.example
+
+!.env.seed.example
+seed-reports/

@@ -1,0 +1,218 @@
+import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
+import { normalizeEmail } from '../../../core/email';
+import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccessBlockService } from '../access-block/access-block.service';
+import { AccountRecordService } from '../accounts/account-record.service';
+import { ActionLinkService } from '../accounts/action-link.service';
+import { CredentialService } from '../credentials/credential.service';
+import { RoleGrantService } from '../accounts/role-grant.service';
+import {
+  AccessBlockCause,
+  AccessBlockRecord,
+  BootstrapSuperAdminInput,
+  EmployeeAccountInspection,
+  LeaverGrantRole,
+  PendingBlockOutcome,
+  SuperAdminHolder,
+} from './identity-access.types';
+import { employeeHasNotLeft, isActionLinkRedeemable } from '../accounts/account.policy';
+
+/** Public facade of the identity-access module. */
+@Injectable()
+export class IdentityAccessApi {
+  constructor(
+    private readonly accounts: AccountRecordService,
+    private readonly accessBlocks: AccessBlockService,
+    private readonly grants: RoleGrantService,
+    private readonly links: ActionLinkService,
+    private readonly credentials: CredentialService,
+    private readonly organizationReads: OrganizationReadApi,
+  ) {}
+
+  /**
+   * Checks the password policy and hashes the password. Call this BEFORE opening a transaction:
+   * hashing is the slow part and must not hold database locks (lock protocol rule 3).
+   */
+  prepareCredential(password: string, loginEmail: string): Promise<{ hash: string; hashPolicyVersion: number }> {
+    return this.credentials.prepareCredential(password, loginEmail);
+  }
+
+  /**
+   * Installation only (FR-9.8): an activated account for `employeeId` holding the one SUPER_ADMIN
+   * grant. The email counts as asserted by the person running the command, not as verified by
+   * an invitation, and is recorded that way.
+   */
+  async createBootstrapSuperAdmin(tx: DbTx, input: BootstrapSuperAdminInput): Promise<{ appUserId: string }> {
+    const user = await this.accounts.createAppUser(tx, {
+      organizationId: input.organizationId,
+      employeeId: input.employeeId,
+      loginEmail: input.loginEmail.trim(),
+      normalizedLoginEmail: normalizeEmail(input.loginEmail),
+      status: 'ACTIVE',
+      activationState: 'ACTIVATED',
+      emailVerificationSource: 'BOOTSTRAP_ASSERTED',
+      emailVerifiedAt: new Date(),
+    });
+    await this.credentials.createCredential(tx, user.id, input.passwordHash, input.hashPolicyVersion);
+    await this.grants.grantRole(tx, {
+      organizationId: input.organizationId,
+      appUserId: user.id,
+      role: 'SUPER_ADMIN',
+    });
+
+    return { appUserId: user.id };
+  }
+
+  /**
+   * Whether the link behind this token hash would still work, for an invitation or a password reset;
+   * the dispatcher asks this before sending.
+   */
+  async isActionLinkUsable(tokenHash: string): Promise<boolean> {
+    const link = await this.links.findActionLink(tokenHash);
+    if (link === null || !isActionLinkRedeemable(link, new Date())) return false;
+
+    // Redeeming refuses an employee who has left, so a link to one is dead and must not be mailed.
+    return employeeHasNotLeft(await this.organizationReads.getEmployee(link.appUser.employeeId));
+  }
+
+  /**
+   * The account of an employee as another module needs to judge it: does it exist, can it sign in, which roles it
+   * holds. Takes the account's row lock `FOR SHARE` first (lock protocol: the employee, then the account) and reads
+   * in a statement of its own, so a grant or a lock that commits after this cannot change what was judged before
+   * commit.
+   */
+  inspectEmployeeAccount(tx: DbTx, employeeId: string): Promise<EmployeeAccountInspection> {
+    return this.accounts.inspectEmployeeAccount(tx, employeeId);
+  }
+
+  /**
+   * The person behind the account of this employee left on `leftOn` (the record of a departure calls it once, in its transaction): the
+   * Super Admin then lists such accounts and locks them with a reason. The sign-in and the guard refuse the person from the status of
+   * the employee, not from this day. Nothing when the employee has no account.
+   */
+  markEmployeeLeft(tx: DbTx, employeeId: string, leftOn: BusinessDate): Promise<void> {
+    return this.accounts.markEmployeeLeft(tx, employeeId, leftOn);
+  }
+
+  /**
+   * The departure of this employee puts a block on their access from `blockedFrom` (QĐ-100q), in the transaction of the case:
+   * from that day the sign-in, the refresh and the guard refuse the account whatever the state of the case. One block for each employee.
+   */
+  setDepartureBlock(
+    tx: DbTx,
+    input: { employeeId: string; cause: AccessBlockCause; blockedFrom: BusinessDate; caseId: string },
+  ): Promise<void> {
+    return this.accessBlocks.set(tx, input);
+  }
+
+  /** The last working day moved: the block that follows it moves too; a block set to act now keeps its day (R-11). */
+  moveDepartureBlock(tx: DbTx, employeeId: string, blockedFrom: BusinessDate): Promise<void> {
+    return this.accessBlocks.move(tx, employeeId, blockedFrom);
+  }
+
+  /** The departure was cancelled: a block not yet in force is removed; one in force stays and can be lifted only by an unlock with a reason. */
+  clearPendingDepartureBlock(tx: DbTx, employeeId: string, today: BusinessDate): Promise<PendingBlockOutcome> {
+    return this.accessBlocks.clearPending(tx, employeeId, today);
+  }
+
+  /**
+   * Whether a block on the access of this employee is in force today (`blocked_from <= business today`, QĐ-100q): the device credential of a
+   * person who is blocked is refused from that day, as the sign-in is.
+   */
+  isAccessBlocked(employeeId: string, tx?: DbTx): Promise<boolean> {
+    return this.accessBlocks.isBlockedNow(employeeId, tx);
+  }
+
+  /** The block on the access of this employee, or null (an unlocked read; with `tx`, in the transaction of the act). */
+  findDepartureBlock(employeeId: string, tx?: DbTx): Promise<AccessBlockRecord | null> {
+    return this.accessBlocks.find(employeeId, tx);
+  }
+
+  /** The blocks on the access of these employees by employee id, one statement (an unlocked read, for lists). */
+  findDepartureBlocks(employeeIds: readonly string[]): Promise<Map<string, AccessBlockRecord>> {
+    return this.accessBlocks.findMany(employeeIds);
+  }
+
+  /** Among these employees, those who hold the IT Admin role on a usable account (an unlocked read, for lists). */
+  findUsableItAdminEmployeeIds(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.accounts.findUsableItAdminEmployeeIds(employeeIds, tx);
+  }
+
+  /** Every IT Admin whose account can act, by employee code: who is told what any IT Admin may handle. */
+  findAllUsableItAdminEmployeeIds(tx?: DbTx): Promise<string[]> {
+    return this.accounts.findAllUsableItAdminEmployeeIds(tx);
+  }
+
+  /** The usable IT Admin with the smallest employee code, or null: who a report is given to when nobody is in charge. */
+  findFirstUsableItAdminEmployeeId(tx?: DbTx): Promise<string | null> {
+    return this.accounts.findFirstUsableItAdminEmployeeId(tx);
+  }
+
+  /** The employee who holds the FINANCE role on an account that can act now, or null: who a review of Finance is given to. */
+  findUsableFinanceEmployeeId(tx?: DbTx): Promise<string | null> {
+    return this.accounts.findUsableFinanceEmployeeId(tx);
+  }
+
+  /** The employee who holds the SUPER_ADMIN role on an account that can act, or null: who is told to configure a role (an unlocked read). */
+  findUsableSuperAdminEmployeeId(tx?: DbTx): Promise<string | null> {
+    return this.accounts.findUsableSuperAdminEmployeeId(tx);
+  }
+
+  /**
+   * The account of this employee, or null when they have none: what a flow that carries out a decision a person took earlier needs, to
+   * act in their name (a transfer review that revokes a seat when the new Request ends, `STILL_NEEDED`) (an unlocked read).
+   */
+  findAccountIdOfEmployee(tx: DbTx, employeeId: string): Promise<string | null> {
+    return this.accounts.findAccountIdByEmployee(tx, employeeId);
+  }
+
+  /** The login email of the account of this employee, or null when they have none (an unlocked read): what a command compares a reference with. */
+  async findLoginEmailOfEmployee(tx: DbTx, employeeId: string): Promise<string | null> {
+    const appUserId = await this.accounts.findAccountIdByEmployee(tx, employeeId);
+
+    return appUserId === null ? null : this.accounts.findLoginEmail(appUserId);
+  }
+
+  /** The employee behind each of these accounts, by account id; for a consumer that reads who acted from an audit event (an unlocked read). */
+  employeeIdsOfAccounts(appUserIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    return this.accounts.employeeIdsOfAccounts(appUserIds, tx);
+  }
+
+  /** How many IT Admins other than this employee can act (an unlocked read, `QĐ-77m`); with `tx`, in the transaction of the act. */
+  countUsableItAdminsExcept(employeeId: string, tx?: DbTx): Promise<number> {
+    return this.accounts.countUsableItAdminsExcept(employeeId, tx);
+  }
+
+  /**
+   * The employee who holds the spending approver role now — the effective grant, whatever the state of the account or of the
+   * employee, who may have left: a consumer that needs somebody who works filters that itself. Null when nobody holds it. With
+   * `forShare`, in the transaction `tx`, the row of the grant is locked `FOR SHARE` until it ends, so a step opened on this answer
+   * and a revocation of the role take turns (`M6`).
+   */
+  getSpendingApproverEmployeeId(tx?: DbTx, options?: { forShare?: boolean }): Promise<string | null> {
+    return this.grants.spendingApproverEmployeeId(tx, options);
+  }
+
+  /**
+   * Which of these employees holds the spending approver role, or null: the accounts of all of them are locked `FOR SHARE` first, in the
+   * order of their ids, so a Request that is being created and a grant of the role that is being made meet on the same rows
+   * (`QĐ-93d`(3)). Call it in the transaction of the Request; the lock lasts to its end.
+   */
+  lockSpendingApproverAmong(tx: DbTx, employeeIds: readonly string[]): Promise<string | null> {
+    return this.accounts.lockSpendingApproverAmong(tx, employeeIds);
+  }
+
+  /** The one account that holds the Super Admin role and what decides whether it can act; null when nobody holds it (an unlocked read). */
+  getSuperAdminHolder(tx?: DbTx): Promise<SuperAdminHolder | null> {
+    return this.accounts.findSuperAdminHolder(tx);
+  }
+
+  /** Which of the Super Admin and Finance roles each of these employees holds, whatever the state of the account (one unlocked read). */
+  async listRoleHoldersAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, LeaverGrantRole[]>> {
+    const held = await this.grants.listHoldersAmong(employeeIds, ['SUPER_ADMIN', 'FINANCE'], tx);
+
+    return new Map([...held].map(([employeeId, roles]) => [employeeId, roles as LeaverGrantRole[]]));
+  }
+}

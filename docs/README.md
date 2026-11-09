@@ -1,100 +1,85 @@
-# Documentation convention
+# Tài liệu backend
 
-Current transition: [ADR-0010](decisions/0010-native-password-authentication.md) accepts the native-password direction. On 2026-10-04 the Owner accepted the [design v1.2](architecture/native-identity-workforce-design.md) for implementation, chose the four open points (Docs `QĐ-47`) and delegated the remaining technical choices; ADR-0009 is Accepted. The [delivery plan](architecture/native-delivery-plan.md) (package states `DESIGN_ACCEPTED`/`READY_TO_START`/`BLOCKED`/`IMPLEMENTED`/`VERIFIED`), the [Owner decision record](architecture/native-owner-decision-package.md), [verification](guides/native-identity-verification.md), [maintenance](guides/native-identity-maintenance.md), the [hand-off page](guides/native-handoff.md), [task prompts](guides/native-handoff-prompts.md) and the [bundle manifest](guides/native-handoff-manifest.json) are the hand-over set; the [import examples](examples/employee-import/README.md) follow the same contract. **This is an Owner decision, not a GVHD confirmation; nothing is implemented or verified.** Implementation follows the versioned delivery plan (the local work item 0008 only points to it); code is restored to HEAD `78cb675` and still contains OIDC until the replacement is built.
+Bắt đầu ở [README](../README.md), [CONTRIBUTING](../CONTRIBUTING.md)
+và [ARCHITECTURE](../ARCHITECTURE.md); dev mới đọc thêm
+[hướng dẫn dev mới](guides/huong-dan-dev-moi.md). Đây là foundation để triển khai US,
+không phải bộ chức năng đã hoàn thành.
 
-The `docs/` directory has two intentionally different lifecycles.
+| Thư mục    | Mục đích                                                                  |
+| ---------- | ------------------------------------------------------------------------- |
+| rules/     | Quy tắc ngắn phải tuân thủ theo phần code thay đổi                        |
+| guides/    | Cách thực hiện: hướng dẫn dev mới, dùng AI, chạy container, kho khóa      |
+| decisions/ | Vì sao chọn một hướng kỹ thuật; ghi rõ accepted khác implemented          |
+| examples/  | Dữ liệu mẫu/template tham khảo, không phải runtime hay acceptance đã pass |
+| reviews/   | Kết quả review và phạm vi đã kiểm chứng                                   |
+| workspace/ | Spec/plan chung trên Git; chỉ local/ là nháp cá nhân                      |
 
-## Reading the current design
+Kiến trúc hiện hành nằm ở ARCHITECTURE.md root. Không cần tạo một bản song song
+trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn khỏi baseline.
 
-| Question                                                       | Source and interpretation                                                                                                                                                                                                                                                |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| What currently runs?                                           | Source, `package.json`, migrations and exported OpenAPI at the checked-out commit. The restored foundation is not the previous S0 slice.                                                                                                                                 |
-| Which architecture is accepted?                                | See the [ADR index](#adr-index). In short: ADR-0001–0005, ADR-0007 and ADR-0008 are Accepted; ADR-0002/0004/0006 are Accepted but superseded in part by ADR-0010 (native passwords, which also retains the single-Super-Admin business invariant); ADR-0009 (single Super Admin, transfer, recovery) is Accepted (2026-10-04). |
-| What should the next identity/workforce implementation follow? | `architecture/native-identity-workforce-design.md` v1.2 (Accepted for implementation) and its verification/maintenance guides; start from `guides/native-handoff.md`.                                                                                                                                               |
-| How do the older S0 documents apply?                           | Native design supersedes their identity/workforce/auth-lock flows; license, money and other unaffected business design remain references with their own status. Do not combine two lock orders or resurrect removed seed scripts.                                        |
-| Where is the audit evidence?                                   | Local [2026-10-03 docs audit](workspace/research/2026-10-03-backend-docs-audit.md), when present. It is ignored session evidence, not a required file in a clean checkout.                                                                                               |
+## Hướng dẫn vận hành
 
-Durable specifications must explain their contracts and verification criteria without
-depending on an ignored plan being present. Links into `workspace/` are optional
-navigation for this checkout; implementation status must be checked against source.
+- [Bootstrap tổ chức và Super Admin trên VPS](guides/bootstrap-installation.md): nguồn hướng dẫn chính cho wrapper,
+  `.env.bootstrap`, copy file, cài đầu tiên, kiểm tra và các lần deploy sau.
+- [Seed demo](guides/seed.md): `pnpm ops:seed`, fixture v2, local/VPS wrappers and one-time rebuild runbook.
 
-## Versioned project knowledge
+- [Container, PostgreSQL roles và deploy](guides/containers.md): chuẩn bị hạ tầng, backup, migration và phục hồi release.
 
-These documents are reviewed with code and must remain in Git:
+## Quyết định còn áp dụng
 
-- `rules/`: contributor rules and task playbooks, entered through the root `AGENTS.md`; see [rules/README.md](rules/README.md). These are durable instructions, not ignored work plans.
+- [Modular monolith](decisions/0001-modular-monolith.md).
+- [Zod và auth mặc định chặn](decisions/0002-zod-http-contract-and-auth-defaults.md).
+- [Flat feature layout](decisions/0003-flat-feature-module-layout.md).
+- [Error contract và request ID](decisions/0004-error-contract-availability-and-request-id-trust.md).
+- [Constraint ngoài Prisma](decisions/0005-database-constraints-outside-prisma.md).
+- [Money](decisions/0007-money-representation.md): Accepted; implement ở `src/core/money` từ lát `g3-money-and-exchange-rates`
+  (PR #14) — annotation trạng thái 22/10/2026 trong ADR; chưa Owner review implementation.
 
-- `architecture/`: specifications that describe the current or intended system design.
-- `decisions/`: Architecture Decision Records (ADRs) — proposed, accepted, superseded or deprecated.
+## Quyết định đề xuất (chưa Accepted)
 
-**Status labels (Owner decision 2026-10-03).** A document in `architecture/` or `decisions/` may be committed while still **Proposed** so the team can review it, but its first lines must state the status (`Proposed`, `Accepted for implementation`/`Accepted`, `Superseded by …`, `Deprecated`) and the date. **Only `Accepted` documents are implementation decisions.** Code must not be merged on the basis of a Proposed document; a Proposed document must not be described as approved, implemented or verified. Accepting a document is not permission to commit or push — that remains a separate decision of the Owner.
+- [Xác thực nội bộ, phiên và quy ước persistence vùng danh tính](decisions/0011-internal-authentication-and-sessions.md) — Proposed; chờ dev review/Accepted.
+- [Gửi thư vòng đời tài khoản: outbox, thư viện SMTP, dispatcher](decisions/0012-account-email-delivery.md) — Proposed; chờ dev review/Accepted.
+- [Ba ngữ cảnh `catalog`, `finance`, `licensing` thay mẫu catalog cũ](decisions/0013-catalog-finance-licensing-contexts.md) — Proposed; chờ Owner review/Accepted.
+- [API mount lại kho đối tượng cho tệp của hợp đồng](decisions/0014-object-storage-mounted-for-contract-documents.md) — Proposed; chờ Owner review/Accepted.
+- [Ngữ cảnh `requests` (C4) cho Request, bước duyệt và định tuyến](decisions/0015-requests-context.md) — Proposed; chờ Owner review/Accepted.
+- [Ngữ cảnh `budgets` (C5) cho đề xuất và phiên bản ngân sách](decisions/0016-budgets-context.md) — Proposed; chờ Owner review/Accepted.
+- [Ngữ cảnh `personnel` (C2) cho vòng đời nhân sự](decisions/0017-personnel-context.md) — Proposed; chờ Owner review/Accepted.
+- [Các sweeper theo giờ vẫn chạy trong tiến trình API](decisions/0018-sweepers-stay-in-the-api-process.md) — Proposed; chờ Owner review/Accepted.
 
-- `guides/`: stable onboarding, operations and development guides.
+Trạng thái triển khai của các lát dùng hai ADR trên nằm ở [roadmap](roadmap.md). Số ADR bị khuyết không cần đánh lại.
+Định hướng tài khoản/mật khẩu + JWT hiện ghi ở ARCHITECTURE; spec/plan từng lát ở [workspace](workspace/README.md).
 
-Do not delete an old ADR when a decision changes. Add a new ADR that supersedes it so humans and AI agents retain the reasoning history.
+[Rules](rules/README.md) · [Tests](../test/README.md) · [Scripts](../scripts/README.md)
 
-### ADR index
+[Quy trình thiết kế](workspace/README.md) · [Roadmap](roadmap.md) · [Nguồn BRD/US](workspace/sources.md)
 
-Keep this table in the same change that adds or re-labels an ADR. Identify an ADR by repository and path: BE `ADR-0008` is neither Docs `ADR-08` nor work item `0008`. Note that `decisions/0005`–`0010` and the native documents may still be untracked in Git until the Owner decides to commit; the [bundle manifest](guides/native-handoff-manifest.json) lists exactly what a developer needs to receive.
+[Giao việc theo G và bộ prompt dùng lại](workspace/prompts/README.md): dùng cho dev tự làm hoặc dùng AI, gồm tin nhắn
+giao một phần G/một G/hai G và các bước thiết kế, audit, implement, validate, bàn giao.
 
-| ADR                                                                          | Topic                                                                                     | Status                                                                        |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [0001](decisions/0001-modular-monolith.md)                                   | Modular monolith                                                                          | Accepted                                                                      |
-| [0002](decisions/0002-zod-http-contract-and-auth-defaults.md)                | Zod HTTP contract, deny-by-default auth                                                   | Accepted; OIDC part superseded by 0010                                        |
-| [0003](decisions/0003-flat-feature-module-layout.md)                         | Flat feature modules                                                                      | Accepted                                                                      |
-| [0004](decisions/0004-error-contract-availability-and-request-id-trust.md)   | Error contract, request-id trust                                                          | Accepted; IdP-503 part superseded by 0010                                     |
-| [0005](decisions/0005-database-constraints-outside-prisma.md)                | Hand-written DB constraints, drift control                                                | Accepted                                                                      |
-| [0006](decisions/0006-principal-provisioning-and-authorization.md)           | Principal provisioning, DB authorization                                                  | Accepted; OIDC binding superseded by 0010; §2 amended by 0008                 |
-| [0007](decisions/0007-money-representation.md)                               | Money representation                                                                      | Accepted (not implemented)                                                    |
-| [0008](decisions/0008-effective-roles-super-admin-and-terminated-holders.md) | Effective roles, terminated holders                                                       | Accepted (not implemented); decision 4 count superseded by 0009 |
-| [0009](decisions/0009-single-super-admin-and-transfer.md)                    | Single Super Admin, transfer and offline recovery (rewritten for native 2026-10-04) | Accepted 2026-10-04 (not implemented)         |
-| [0010](decisions/0010-native-password-authentication.md)                     | Native password authentication                                                            | Accepted (direction 2026-10-03; details 2026-10-04; not implemented) |
+## Review G0/G1
 
-## Local working documents
+- [Review và remediation G0/1a/1b](reviews/g0-g1-remediation-2026-10-15/README.md): lịch sử finding, bản sửa remediation, kết quả kiểm chứng và phần còn mở; không phải phê duyệt của dev.
 
-`workspace/` is Git-ignored. It holds work in progress and the notes that support it.
+## Audit nền tảng
 
-```text
-docs/
-└── workspace/                  # ignored by Git
-    ├── PROGRESS.md             # session memory — read this first
-    ├── INDEX.md                # registry of every work item
-    ├── _template/              # copy this to start an item
-    ├── items/
-    │   └── NNNN-slug/          # one folder per unit of work
-    │       ├── spec.md         # what and why (omit for small work)
-    │       ├── plan.md         # how, task by task
-    │       └── todo.md         # checklist
-    └── research/               # links, experiments, investigation notes
-```
+- [Audit roadmap/API GAP và chia việc hai dev, 31/10/2026](reviews/roadmap-and-api-gaps-2026-10-31/README.md): đối chiếu
+  G0–G6 với source, API cần sớm cho FE và hai list G8/G9/Mobile-BE; Owner giữ G7/Tools, bên AI giữ AI G10;
+  không phải nghiệm thu.
+- [Audit BE nền tảng 18/10/2026](reviews/be-foundation-audit-2026-10-18/README.md): gate trên revision được audit, finding, quyết định kỹ thuật Q1–Q9 của Owner và giới hạn chưa kiểm chứng; không phải phê duyệt của dev.
+- [Audit kiến trúc toàn bộ `src` H4.0, 19/10/2026](reviews/be-full-src-architecture-audit-2026-10-19/README.md): inventory, finding `A4-01` → `A4-23`, backlog lát nhỏ và quyết định kỹ thuật E1–E9 của Owner; không phải phê duyệt của dev.
+- [Review checkpoint CP-0A, 19/10/2026](reviews/cp0-h1-h3c-checkpoint-review-2026-10-19/README.md): gate và review trước checkpoint `5aac33f`, manifest đường dẫn, finding `CP0-01` → `CP0-10`; không phải phê duyệt của dev.
+- [Kiểm kê chức năng BE và runbook kiểm thử API 20/10/2026](reviews/be-api-manual-verification-2026-10-20/README.md): trạng thái G/US, checklist 60 operation, seed account/role, lệnh vận hành và thứ tự test tay trên HEAD `9a7164a`; không phải nghiệm thu Story.
 
-### Why one folder per item
+## Review G2–G4
 
-An earlier layout kept `specs/` and `plans/` as flat directories. After a dozen documents you could not tell which files belonged together, which work was finished, or what order any of it happened in — the folder was a pile, not a record. Grouping by item means opening one directory shows you a whole piece of work, and the number gives it a stable name to refer to in commits and conversation.
+- [Hoàn tất G2–G4: kiểm kê, quyết định và kế hoạch, 21/10/2026](reviews/g2-g4-completion-2026-10-21/README.md): báo cáo
+  của tác giả PR #14 trên Docs `9416fe0`; claim, D1–D4 và Q1–Q8 được đối chiếu với baseline Docs `72e1480` ở
+  [business-baseline-impact-2026-10-22](workspace/items/business-baseline-impact-2026-10-22/spec.md#đối-chiếu-pr-14-và-trạng-thái-hiện-hành-theo-baseline-mới);
+  không phải nghiệm thu Story, D1–D4/Q1–Q8 không phải quyết định Owner.
+- [Review hậu merge G0→G4 và contract collection/detail, 22/10/2026](reviews/g0-g4-post-merge-review-2026-10-22/README.md):
+  disposition từng lát trên baseline Docs `72e1480`, gate trên cây cuối, ma trận 61 `GET`, finding bảo mật/migration/
+  transaction và gói remediation; không phải nghiệm thu Story.
 
-### Rules
+## Review dịch EN–VI
 
-- **`PROGRESS.md` is a navigation aid when present.** Read it to locate relevant work, then verify current behavior in the affected source/tests and accepted decisions. Historical results are not evidence for the current diff. If absent, continue with versioned docs and source; do not block on ignored memory. Update it when a session changes something.
-- **`INDEX.md` is updated in the same change that opens or closes an item.** An index that lags makes people trust a stale answer.
-- **The item number never changes.** The slug is a lowercase kebab-case noun phrase describing the outcome.
-- **File names inside an item are fixed:** `spec.md`, `plan.md`, `todo.md`. The folder already carries the identity.
-- **Every file carries frontmatter** with `item`, `title`, `kind`, `status`, `started` and `completed`. Status is one of `proposed`, `active`, `done`, `superseded`, `abandoned`.
-- **At most one item is `active`.**
-- **Closed items are never deleted.** What was tried and rejected is exactly what a future contributor would otherwise redo.
-- **Omit files you do not need.** A one-day fix needs no spec; creating an empty one to look complete helps nobody.
-- **An unticked box in a closed item must be explained** — put it under a "Not in scope (deliberate)" heading, or it reads as forgotten work.
-
-Do not place secrets, production data, access tokens or personal data in `workspace/` merely because Git ignores it.
-
-## Promotion workflow
-
-1. Explore under `docs/workspace/research/`.
-2. Open an item: copy `_template/` to `items/NNNN-slug/`, add its row to `INDEX.md`.
-3. Review the proposal with the team.
-4. Build it, ticking the todo only against verified results.
-5. Promote architecture to `docs/architecture/` and significant decisions to `docs/decisions/` — as `Proposed` for review or `Accepted` once approved (see _Status labels_).
-6. Close the item, update `INDEX.md` and `PROGRESS.md`.
-
-Keep implementation checklists local, but update durable documentation whenever the implemented system differs from it.
-
-Ignoring all of `docs/` is prohibited because it would remove architectural constraints and decision history from code review, CI and AI-agent context.
+- [Nghiên cứu và spike dịch nội dung động](reviews/dynamic-content-translation-2026-10-15/README.md): kết quả chất lượng âm tính, trạng thái pending và các finding còn lại; không phải phê duyệt của dev.

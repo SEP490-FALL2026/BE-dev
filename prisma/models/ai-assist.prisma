@@ -1,0 +1,63 @@
+enum AiFeature {
+  ACCESS_REQUEST_QUEUE_SUMMARY
+}
+
+// PENDING and RUNNING are live; COMPLETED, NO_VALID_OUTPUT, STALE and FAILED are final and carry `finished_at`.
+enum AiInvocationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  NO_VALID_OUTPUT
+  STALE
+  FAILED
+}
+
+// One call of an AI feature on behalf of one person (US-15-05): only what an audit or a support question needs, never what was
+// said to the model or what it answered (that is `ai_invocation_contents`, protected apart). The person and the organization are
+// values with no foreign key, as in `in_app_notifications`: the record of a call outlives the account. `source_revision` is the
+// queue revision the call was made for. At most one call per (organization, person, feature, source_revision) is live or kept as
+// the answer: the partial unique index `ai_invocations_active_per_revision` and the CHECK
+// `ai_invocations_final_state_finished_at_check` are SQL in the migration (ADR-0005), which Prisma cannot express.
+model AiInvocation {
+  id               String             @id @default(uuid()) @db.Uuid
+  organizationId   String             @map("organization_id") @db.Uuid
+  feature          AiFeature
+  actorAppUserId   String             @map("actor_app_user_id") @db.Uuid
+  actorEmployeeId  String             @map("actor_employee_id") @db.Uuid
+  status           AiInvocationStatus
+  sourceRevision   String             @map("source_revision")
+  configHash       String?            @map("config_hash")
+  modelId          String?            @map("model_id")
+  modelRevision    String?            @map("model_revision")
+  promptVersion    String?            @map("prompt_version")
+  schemaVersion    String?            @map("schema_version")
+  latencyMs        Int?               @map("latency_ms")
+  promptTokens     Int?               @map("prompt_tokens")
+  completionTokens Int?               @map("completion_tokens")
+  errorCode        String?            @map("error_code")
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  startedAt        DateTime?          @map("started_at") @db.Timestamptz(3)
+  finishedAt       DateTime?          @map("finished_at") @db.Timestamptz(3)
+
+  content AiInvocationContent?
+
+  @@map("ai_invocations")
+}
+
+// What went to the model and what came back, kept apart from the metadata so that only the Super Admin reads it (OQ-G-06) and a
+// purge can delete the content and keep the call. It is never logged.
+model AiInvocationContent {
+  invocationId String   @id @map("invocation_id") @db.Uuid
+  // The allow-listed context sent to the AI service, with opaque references (R001…) in place of ids.
+  context      Json
+  promptText   String?  @map("prompt_text")
+  rawResponse  String?  @map("raw_response")
+  // The output of the AI service as it parsed it, and the result after the checks of the backend.
+  parsed       Json?
+  result       Json?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  invocation AiInvocation @relation(fields: [invocationId], references: [id], onDelete: Restrict)
+
+  @@map("ai_invocation_contents")
+}

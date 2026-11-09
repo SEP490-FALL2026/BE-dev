@@ -1,0 +1,33 @@
+{
+  "scenario": "env",
+  "profile": "win32",
+  "node": "v24.0.1",
+  "platform": "win32-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 0,
+  "cgroupAfter": {
+    "memoryPeakMb": null,
+    "memoryCurrentMb": null,
+    "memoryMax": null,
+    "cpuMax": null,
+    "cpuStat": null
+  },
+  "result": {
+    "node": "v24.0.1",
+    "platform": "win32-x64",
+    "user": "Asus",
+    "cpusVisible": 16,
+    "availableParallelism": 16,
+    "totalMemMb": 16123,
+    "cgroup": {
+      "memoryPeakMb": null,
+      "memoryCurrentMb": null,
+      "memoryMax": null,
+      "cpuMax": null,
+      "cpuStat": null
+    },
+    "transformers": "4.3.1",
+    "pnpmPackages": ["onnxruntime-common@1.30.0", "onnxruntime-node@1.30.0", "sharp@0.35.5"],
+    "kernel": "10.0.26200"
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "scenario": "clock",
+  "profile": "linux",
+  "node": "v24.21.0",
+  "platform": "linux-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 41,
+  "cgroupAfter": {
+    "memoryPeakMb": 538.7,
+    "memoryCurrentMb": 23.7,
+    "memoryMax": "2147483648",
+    "cpuMax": "200000 100000",
+    "cpuStat": {
+      "nrPeriods": 416,
+      "nrThrottled": 31,
+      "throttledMs": 10865
+    }
+  },
+  "result": {
+    "coldTrials": [
+      {
+        "status": "OK",
+        "dispatchToLoadedMs": 4025.5,
+        "dispatchToRunSentMs": 4025.8,
+        "computeWindowMs": 800,
+        "runMs": 785,
+        "totalMs": 4836.8,
+        "killSent": 0,
+        "deadlineEvents": 0
+      },
+      {
+        "status": "TIMEOUT",
+        "reason": "deadline",
+        "dispatchToLoadedMs": 4524.8,
+        "dispatchToRunSentMs": 4525.2,
+        "computeWindowMs": 800,
+        "runMs": 827,
+        "totalMs": 5377.9,
+        "killSent": 0,
+        "deadlineEvents": 1
+      },
+      {
+        "status": "OK",
+        "dispatchToLoadedMs": 4464,
+        "dispatchToRunSentMs": 4464.2,
+        "computeWindowMs": 800,
+        "runMs": 609,
+        "totalMs": 5088.8,
+        "killSent": 0,
+        "deadlineEvents": 0
+      },
+      {
+        "status": "OK",
+        "dispatchToLoadedMs": 4369,
+        "dispatchToRunSentMs": 4369.3,
+        "computeWindowMs": 799,
+        "runMs": 744,
+        "totalMs": 5536.7,
+        "killSent": 0,
+        "deadlineEvents": 0
+      },
+      {
+        "status": "OK",
+        "dispatchToLoadedMs": 4077.5,
+        "dispatchToRunSentMs": 4077.8,
+        "computeWindowMs": 800,
+        "runMs": 676,
+        "totalMs": 4767.7,
+        "killSent": 0,
+        "deadlineEvents": 0
+      }
+    ],
+    "allColdOk": false,
+    "allKillFree": false,
+    "loadLongerThanComputeWindow": 5,
+    "responseDeadlineDuringLoad": {
+      "firstStatus": "TIMEOUT",
+      "firstReason": "timeout",
+      "firstMs": 718,
+      "laterStatus": "OK",
+      "runSentCount": 1,
+      "loadStartCount": 1,
+      "releaseBy": ["cancelled-before-run", "done"],
+      "spawnCount": 1
+    }
+  }
+}

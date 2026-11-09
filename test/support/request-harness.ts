@@ -1,0 +1,396 @@
+import type { AssessmentWire } from '../../src/modules/requests/assessment/assessment.dto';
+import type { PreviewWire } from '../../src/modules/requests/request-submission/request-preview.dto';
+import request from 'supertest';
+import { addDays } from '../../src/core/business-date';
+import { addMonths } from '../../src/core/fiscal-year';
+import { ApiAccount } from './api-accounts';
+import { clearSpendingApprover, insertEmployeeWithoutPlacement, setSpendingApprover } from './builders/account.builder';
+import { assignHead } from './builders/organization.builder';
+import { ProvisioningHarness } from './provisioning-harness';
+import { SeatHarness } from './seat-baseline-harness';
+
+export interface EmployeeRefWire {
+  employeeId: string;
+  employeeCode: string;
+  fullName: string;
+}
+
+export interface AccessRequestWire {
+  id: string;
+  routing: { mode: 'VIA_HEAD' | 'ONE_STEP'; oneStepReason: string | null };
+  spend: { stage: string; blockedReasons: string[]; overBy: { amount: string; currency: string } | null } | null;
+  type: string;
+  branch: 'INTERNAL_FREE' | 'PAID_IN_CATALOG' | 'NEW_SOFTWARE';
+  state:
+    | 'PENDING'
+    | 'WAITING_CONTROLLED'
+    | 'AWAITING_EXECUTION'
+    | 'AWAITING_IT_ASSESSMENT'
+    | 'AWAITING_SPEND_SUBMISSION'
+    | 'AWAITING_FINANCE_REVIEW'
+    | 'AWAITING_BUDGET'
+    | 'AWAITING_SPEND_DECISION'
+    | 'AWAITING_REQUESTER_REVISION'
+    | 'REJECTED'
+    | 'IT_REJECTED'
+    | 'EXECUTING'
+    | 'COMPLETED'
+    | 'FAILED';
+  plan: { planId: string; planName: string; applicationId: string; applicationName: string } | null;
+  proposal: {
+    softwareName: string;
+    homepageUrl: string;
+    purpose: string;
+    dataDescription: string;
+    expectedUsers: number;
+  } | null;
+  department: { id: string; code: string; name: string };
+  costCenter: { id: string; code: string };
+  requester: EmployeeRefWire;
+  beneficiary: EmployeeRefWire;
+  businessReason: string;
+  termMonths: number | null;
+  expectedEndDate: string | null;
+  budgetYear: number | null;
+  pricing: {
+    status: 'NOT_APPLICABLE' | 'PRICED' | 'MISSING';
+    missingReason: 'NO_PRICED_SUBSCRIPTION' | 'CYCLE_UNKNOWN' | 'AMOUNT_TOO_LARGE' | 'AWAITING_QUOTE' | null;
+    amount: { amount: string; currency: string } | null;
+    unitPrice: { amount: string; currency: string } | null;
+    billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null;
+    kind: 'RECURRING' | 'ONE_TIME' | null;
+    months: number | null;
+    monthlyPrice: { amount: string; currency: string } | null;
+    nextYearAmount: { amount: string; currency: string } | null;
+  };
+  policy: { version: number; hasSpendStep: boolean; slaWorkingDays: number };
+  submittedAt: string;
+  needDecision: {
+    decision: 'APPROVED' | 'REJECTED';
+    decidedBy: EmployeeRefWire;
+    deciderRole: string;
+    reason: string | null;
+    decidedAt: string;
+  } | null;
+  needStep: {
+    id: string;
+    state: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED' | 'CLOSED';
+    assignee: EmployeeRefWire | null;
+    routingRow: number;
+    waitingReason: string | null;
+    samePersonAsSpend?: boolean;
+    slaWorkingDays: number | null;
+    createdAt: string;
+    assignedAt: string | null;
+    decidedAt: string | null;
+  };
+}
+
+export interface Person {
+  employeeId: string;
+  account: ApiAccount;
+}
+
+/** A department of the organization with the people the routing table talks about, made through the real services. */
+export interface Department {
+  id: string;
+  code: string;
+  unitId: string;
+}
+
+/**
+ * The provisioning harness with what the requests of G5 need: departments with a head, people with an account, the
+ * approval roles, and the calls of the request routes. No assertion lives here: the specs make them.
+ */
+export class RequestHarness extends ProvisioningHarness {
+  private titleName: string | null = null;
+
+  /**
+   * Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. The suites of
+   * other rules send many requests for one person, often for the same plan while the first is still open, so the disposable database of the
+   * suite leaves every request and every line of a group out of GH-1 and GH-2 (BR-MF1-01e/f): a trigger of the test database only marks each
+   * new row with an exemption, the one value the count of the limits skips and nothing else reads. GH-2 (`REQUEST_OPEN_NEW_LIMIT`) is raised to
+   * its most as well. The suites of the limits call `enforceRequestLimits` to judge the limits as the product does.
+   */
+  override async start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
+    await SeatHarness.prototype.start.call(this, options);
+    await this.setParameter('REQUEST_OPEN_NEW_LIMIT', 20).expect(200);
+    await this.ctx.sql.query(`
+      CREATE OR REPLACE FUNCTION test_harness_exempt_from_request_limits() RETURNS trigger AS $$
+      BEGIN
+        IF NEW.limit_exemption IS NULL THEN NEW.limit_exemption := 'TRANSFER_OVERLAP'; END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql`);
+
+    // The function belongs to whoever owns the tables, as every object of the schema does: a reconcile of the database roles run by a
+    // suite on the same database (`_serial/database-runtime-role-*`) finds no object owned by the role of the test.
+    await this.ctx.sql.query(`DO $$
+      DECLARE owner text := (SELECT pg_get_userbyid(relowner) FROM pg_class WHERE oid = to_regclass('access_requests'));
+      BEGIN
+        IF owner IS NOT NULL AND owner <> current_user THEN
+          EXECUTE format('ALTER FUNCTION test_harness_exempt_from_request_limits() OWNER TO %I', owner);
+        END IF;
+      END $$`);
+    for (const table of ['access_requests', 'access_request_lines']) {
+      await this.ctx.sql.query(`CREATE TRIGGER test_harness_exempt_from_request_limits BEFORE INSERT ON ${table}
+        FOR EACH ROW EXECUTE FUNCTION test_harness_exempt_from_request_limits()`);
+    }
+  }
+
+  /** Judges GH-1, GH-2 and GH-3 as the product does: the exemption of `start` is no longer written on new rows. */
+  async enforceRequestLimits(): Promise<void> {
+    for (const table of ['access_requests', 'access_request_lines']) {
+      await this.ctx.sql.query(`DROP TRIGGER IF EXISTS test_harness_exempt_from_request_limits ON ${table}`);
+    }
+  }
+
+  /** One job title (free text) for everybody a spec makes. */
+  async title(): Promise<string> {
+    this.titleName ??= await this.jobTitle(this.unique('Title'));
+
+    return this.titleName;
+  }
+
+  /** A department with its own Unit Cost Center. The seats of a plan are one pool for every department (`BR-MF1-09`): it owns no subscription. */
+  async departmentWithUnit(code: string): Promise<Department> {
+    const created = await this.department(code);
+    // The Cost Center Finance created for the department, read through its own link (`QĐ-87d(1)`).
+    const { rows } = await this.ctx.sql.query<{ id: string }>(
+      `SELECT id FROM cost_centers WHERE department_id = $1 AND status = 'ACTIVE'`,
+      [created.id],
+    );
+
+    return { id: created.id, code: created.code, unitId: rows[0].id };
+  }
+
+  /** A person of the department with an activated account holding `roles`; a head or an approver is made one by the calls below. */
+  async staff(department: Department, code: string, role = 'EMPLOYEE'): Promise<Person> {
+    const employeeId = await this.member(department.code, code, await this.title());
+
+    return { employeeId, account: await this.account(code, employeeId, role) };
+  }
+
+  async unplacedStaff(code: string, role = 'EMPLOYEE'): Promise<Person> {
+    const employeeId = await insertEmployeeWithoutPlacement(this.ctx, this.seed, {
+      code,
+      email: `${code.toLowerCase()}@acme.vn`,
+    });
+
+    return { employeeId, account: await this.account(code, employeeId, role) };
+  }
+
+  /**
+   * Makes the person the head of the department from today (as the Super Admin does: the IT Admin has no right to, `QĐ-87`),
+   * through the service of the route (T2.2: no HTTP).
+   */
+  async makeHead(department: Department, person: Person): Promise<void> {
+    await assignHead(this.ctx, this.admin, department.id, {
+      employeeId: person.employeeId,
+      effectiveFrom: this.today(),
+    });
+  }
+
+  /** The Super Admin grants the role of the spending approver, through the service of the route (T2.2: no HTTP). */
+  async setRole(role: 'SPENDING_APPROVER', person: Person): Promise<void> {
+    if (role !== 'SPENDING_APPROVER')
+      throw new Error(`${String(role)} is not a role a test can set any more (QĐ-93c).`);
+    await setSpendingApprover(this.ctx, this.admin, person.employeeId);
+  }
+
+  /** Nobody holds the role of the spending approver any more: the Super Admin revokes it, through the service of the route. */
+  async clearRole(role: 'SPENDING_APPROVER'): Promise<void> {
+    if (role !== 'SPENDING_APPROVER')
+      throw new Error(`${String(role)} is not a role a test can clear any more (QĐ-93c).`);
+    await clearSpendingApprover(this.ctx, this.admin);
+  }
+
+  submit = (body: object, account: ApiAccount) =>
+    request(this.server()).post('/api/v1/access-requests').set(this.as(account)).send(this.endDated(body));
+
+  /** The decision of the need step: the head approves or refuses, and no line of the plan is chosen (`QĐ-101n`). */
+  decide = (id: string, body: object, account: ApiAccount) =>
+    request(this.server()).post(`/api/v1/access-requests/${id}/need-decision`).set(this.as(account)).send(body);
+  fetch = (id: string, account: ApiAccount) =>
+    request(this.server()).get(`/api/v1/access-requests/${id}`).set(this.as(account));
+
+  previewRequest = (body: object, account: ApiAccount) =>
+    request(this.server()).post('/api/v1/access-requests/preview').set(this.as(account)).send(this.endDated(body));
+
+  /** The preview of a request for the plan, failing on anything but 200. */
+  async previewed(person: Person, planId: string, extra: Record<string, unknown> = {}): Promise<PreviewWire> {
+    const response = await this.previewRequest({ planId, ...this.endDated(extra) }, person.account);
+    if (response.status !== 200) throw new Error(`preview: ${response.status} ${JSON.stringify(response.body)}`);
+
+    return this.dataOf<{ preview: PreviewWire }>(response).preview;
+  }
+
+  /** The software is not in the catalog: the proposal of a person, with what they declare and the term. */
+  proposeBody = (extra: Record<string, unknown> = {}) => ({
+    softwareName: 'Miro',
+    homepageUrl: 'https://miro.com',
+    purpose: 'Whiteboards for design reviews',
+    dataDescription: 'Product design boards',
+    expectedUsers: 5,
+    ...this.endDated(extra),
+  });
+  propose = (body: object, account: ApiAccount) =>
+    request(this.server()).post('/api/v1/access-requests/proposals').set(this.as(account)).send(this.endDated(body));
+
+  /** Sends the proposal and returns the request, failing on anything but 201. */
+  async proposed(person: Person, extra: Record<string, unknown> = {}): Promise<AccessRequestWire> {
+    const response = await this.propose(this.proposeBody(extra), person.account);
+    if (response.status !== 201) throw new Error(`propose: ${response.status} ${JSON.stringify(response.body)}`);
+
+    return this.dataOf<{ request: AccessRequestWire }>(response).request;
+  }
+
+  assessmentOf = (id: string, account: ApiAccount) =>
+    request(this.server()).get(`/api/v1/access-requests/${id}/assessment`).set(this.as(account));
+  saveAssessment = (id: string, body: object, account: ApiAccount) =>
+    request(this.server()).put(`/api/v1/access-requests/${id}/assessment`).set(this.as(account)).send(body);
+  completeAssessment = (id: string, account: ApiAccount) =>
+    request(this.server()).post(`/api/v1/access-requests/${id}/assessment/completion`).set(this.as(account));
+  rejectAssessment = (id: string, body: object, account: ApiAccount) =>
+    request(this.server()).post(`/api/v1/access-requests/${id}/assessment/rejection`).set(this.as(account)).send(body);
+  registerInternal = (id: string, body: object, account: ApiAccount) =>
+    request(this.server()).post(`/api/v1/access-requests/${id}/internal-registration`).set(this.as(account)).send(body);
+  linkPlan = (id: string, planId: string, account: ApiAccount) =>
+    request(this.server()).post(`/api/v1/access-requests/${id}/catalog-link`).set(this.as(account)).send({ planId });
+
+  async assessmentWire(id: string, account: ApiAccount): Promise<AssessmentWire> {
+    return this.dataOf<{ assessment: AssessmentWire }>(await this.assessmentOf(id, account).expect(200)).assessment;
+  }
+
+  /** The minimum of the assessment of paid software, with a quote, as the IT Admin gives it; `extra` overrides a field. */
+  assessmentBody = (extra: Record<string, unknown> = {}) => ({
+    classification: 'PAID_LICENSED',
+    vendorName: 'Miro Inc.',
+    plannedPlanName: 'Business',
+    provisioningType: 'K2',
+    adminConsole: true,
+    memberExport: true,
+    sso: false,
+    termsSummary: 'Annual terms, sharing not allowed',
+    memberUsageMethod: 'Export of members from the admin console',
+    grantRevokeMethod: 'Invite and remove by work email',
+    dataSensitivity: 'MEDIUM',
+    controlLevel: 'PARTIAL',
+    controlRiskNote: 'No export of usage',
+    quote: {
+      unitPrice: { amount: '8.00', currency: 'USD' },
+      billingCycle: 'MONTHLY',
+      validFrom: '2026-01-01',
+      validUntil: null,
+    },
+    ...extra,
+  });
+
+  /** The IT Admin in charge of the department, as the organization names them (`US-01-11`). */
+  async setItAdminInCharge(department: Department, person: Person): Promise<void> {
+    await this.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+      department.id,
+      person.employeeId,
+    ]);
+  }
+
+  /** The vendor of the application of a plan: whose tax profile estimates its price. */
+  async vendorOf(planId: string): Promise<{ id: string; name: string }> {
+    const { rows } = await this.ctx.sql.query<{ id: string; name: string }>(
+      `SELECT v.id, v.name FROM plans p JOIN applications a ON a.id = p.application_id JOIN vendors v ON v.id = a.vendor_id WHERE p.id = $1`,
+      [planId],
+    );
+
+    return rows[0];
+  }
+
+  /** Finance declares the tax profile of a vendor. */
+  declareTaxProfile = (vendorId: string, lines: Array<{ taxType: string; ratePercent: string; deductible: boolean }>) =>
+    request(this.server())
+      .put(`/api/v1/vendors/${vendorId}/tax-profile`)
+      .set(this.as(this.finance))
+      .send({ group: 'T2', lines });
+
+  /**
+   * A test that still says how long in months, said in the way the API takes it: the last day of the `termMonths`th month from the month
+   * of today (`QĐ-104a`; the month of today and the month of the end are counted whole, `BR-MF1-06`). No `termMonths` is no end date.
+   */
+  endDated = <T extends object>(extra: T): Record<string, unknown> => {
+    const { termMonths, ...rest } = extra as Record<string, unknown>;
+
+    return typeof termMonths === 'number'
+      ? { ...rest, expectedEndDate: addDays(addMonths(`${this.today().slice(0, 8)}01`, termMonths), -1) }
+      : rest;
+  };
+
+  /** The months of the amount of a request that runs `months` months from the month of today: the months left of the year at most (`BR-MF1-06`). */
+  monthsOf = (months: number): number => Math.min(months, 12 - Number(this.today().slice(5, 7)) + 1);
+
+  /** A form of `BM-01` for the plan, complete: a right with no end unless `extra` gives an end date or `termMonths`. */
+  form = (planId: string, extra: Record<string, unknown> = {}) => ({
+    planId,
+    businessReason: 'Design the new brand',
+    ...this.endDated(extra),
+  });
+
+  /** Sends the request and returns it, failing on anything but 201. */
+  async sent(person: Person, planId: string, extra: Record<string, unknown> = {}): Promise<AccessRequestWire> {
+    const response = await this.submit(this.form(planId, extra), person.account);
+    if (response.status !== 201) throw new Error(`submit: ${response.status} ${JSON.stringify(response.body)}`);
+
+    return this.dataOf<{ request: AccessRequestWire }>(response).request;
+  }
+
+  /** The plans' applications share one functional group, made now. */
+  async groupTogether(planIds: string[]): Promise<void> {
+    const made = this.dataOf<{ id?: string; group?: { id: string } }>(
+      await request(this.server())
+        .post('/api/v1/functional-groups')
+        .set(this.as(this.it1))
+        .send({ name: this.unique('Group') })
+        .expect(201),
+    );
+    const groupId = made.id ?? made.group?.id;
+    for (const planId of planIds) {
+      const { rows } = await this.ctx.sql.query<{ application_id: string }>(
+        `SELECT application_id FROM plans WHERE id = $1`,
+        [planId],
+      );
+      await request(this.server())
+        .patch(`/api/v1/applications/${rows[0].application_id}`)
+        .set(this.as(this.it1))
+        .send({ functionalGroupId: groupId })
+        .expect(200);
+    }
+  }
+
+  /** The plans' applications join the functional group the anchor plan's application is in. */
+  async joinGroupOf(anchorPlanId: string, planIds: string[]): Promise<void> {
+    const { rows } = await this.ctx.sql.query<{ functional_group_id: string }>(
+      `SELECT a.functional_group_id FROM plans p JOIN applications a ON a.id = p.application_id WHERE p.id = $1`,
+      [anchorPlanId],
+    );
+    for (const planId of planIds) {
+      const app = await this.ctx.sql.query<{ application_id: string }>(
+        `SELECT application_id FROM plans WHERE id = $1`,
+        [planId],
+      );
+      await request(this.server())
+        .patch(`/api/v1/applications/${app.rows[0].application_id}`)
+        .set(this.as(this.it1))
+        .send({ functionalGroupId: rows[0].functional_group_id })
+        .expect(200);
+    }
+  }
+
+  /** The person (by employee code) holds a seat of the internal plan, as a baseline records it. */
+  async hold(employeeCode: string, planId: string): Promise<void> {
+    await this.written({ planId }, [
+      { employee_code: employeeCode, account_identifier: `${employeeCode.toLowerCase()}@acme.vn` },
+    ]);
+  }
+
+  async requestRows(): Promise<number> {
+    return this.count('access_requests');
+  }
+}

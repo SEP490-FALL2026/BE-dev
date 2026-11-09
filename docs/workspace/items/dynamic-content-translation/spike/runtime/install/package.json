@@ -1,0 +1,9 @@
+{
+  "name": "spike-runtime-deps",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.1.3",
+  "dependencies": {
+    "@huggingface/transformers": "4.3.1"
+  }
+}

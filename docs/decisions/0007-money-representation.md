@@ -1,5 +1,12 @@
 # ADR-0007: Store money as integer minor units with a frozen reporting snapshot
 
+> Retained technical decision only. Old work-package IDs and implementation notes below
+> are historical; they do not require rebuilding the removed plans. No money schema or
+> implementation exists in the reset baseline. Start new work from the current US.
+>
+> _22/10/2026:_ the sentence above about no implementation is superseded — see the implementation annotation of
+> 22/10/2026 below. The decision text is unchanged.
+
 ## Status
 
 **Accepted** — 2026-10-03, by the project Owner (revision 2 decision text unchanged; only this _Status_ section was updated on acceptance). Closes `LR-11` of Docs `ERD/logical/LOGICAL-ERD-S0.md` (v0.4). **Accepted is not implemented:** no code or migration implements it yet (work package WP-05); the only money-related object in the database is `currencies.minor_unit`. The worked examples below were checked with an independent exact computation (Python `decimal`, 2026-10-03) — that is a check of the design examples, **not** of `core/money`, which does not exist yet.
@@ -14,6 +21,12 @@ This is a technical decision inside business rules already fixed by BRD `ADR-03`
 ## Date
 
 2026-10-03
+
+**Implementation annotation (20/10/2026, `g3-money-and-exchange-rates`):** `src/core/money` (parse/format, `ScaledRate`, `convertToReporting`, worked examples M1–M18 as unit tests), the tables `currencies` and `exchange_rates` (migration `20261020100000_finance_money_and_exchange_rates`) and the facade `FinanceService` (`parseMoney`, `snapshotMoney`) are implemented and `verified` locally. Money columns on subscriptions and the frozen snapshot stored with them are not yet: they arrive with `g3-subscription-purchase`. Accepted is still not Owner-reviewed implementation.
+
+**Implementation annotation (22/10/2026, independent post-merge review — [review](../reviews/g0-g4-post-merge-review-2026-10-22/README.md#7-nghiệp-vụ-hiện-hành-qđ-82--qđ-86-và-carry-over)):** at BE `69f4891` (PR #14 merged as `4e7097f`) the decision is implemented: `src/core/money` (`money.ts`, `convert.ts`, `rate.ts`, `tax-estimate.ts`), the tables `currencies` and `exchange_rates` (`20261020100000_finance_money_and_exchange_rates`, `20261020100500_exchange_rates_immutable`), the subscription price columns with their frozen conversion snapshot (`20261020150000_catalog_subscriptions`: `unit_price_minor BIGINT`, `price_rate NUMERIC(20,10)`, `price_reporting_minor BIGINT`, CHECKs) and the facade `FinanceService`. The worked examples have tests: M1, M3–M12, M14, M15, M18 in `convert/money/rate.spec.ts` (M7 unlabelled at `convert.spec.ts:22`), M2 and M16 in `finance-money-facade.integration-spec.ts`, M17 as `US-04-05` AC-7 in `subscription-http.integration-spec.ts`; they pass on the final tree (unit, integration). Two divergences from this text, not changed here: M13 (amount without currency) is refused as 422 `VALIDATION_ERROR` by the strict request schema and a CHECK, not with a distinct `MONEY_INCOMPLETE` code; `tax-estimate.ts:69` reads a tax percentage through `Number()` of bounded integer parts (no precision loss, but §3 forbids `Number()` on rates). The sentences _Accepted is not implemented_ in the Status section and _WP-02/WP-05 and `core/money` are future work_ below are historical. Implemented is still not Owner-reviewed or accepted.
+
+**Implementation annotation (23/10/2026, `finance-reporting-currency-integrity`, review findings `DB-01` and `DB-02`):** the lock on the reporting currency (`QĐ-42c`) is now safe under concurrency and the currency is one the system knows. A change of the reporting currency, a rate entered and a price converted into it each read or hold the organization row `FOR SHARE`/for update, so the later of two simultaneous writers waits, sees what the first committed and is refused (`23514`, or `55000` for the change); `FinanceService.snapshotMoney` takes the same share when it reads the reporting currency, so a conversion made while a change is in flight is made in the new currency. `organizations.reporting_currency` has a foreign key to `currencies(code)` (migration `20261022100000_reporting_currency_integrity`, which stops with instructions on an installation whose currency is not in the table); the installation command refuses such a code; the residual case answers `409 REPORTING_CURRENCY_NOT_SUPPORTED` instead of a 500. The decision text is unchanged.
 
 **Implementation annotation after restore:** the status description of `currencies.minor_unit` above refers to the pre-restore S0 database/schema, not the current checked-out foundation schema. No live database was inspected in this documentation audit. WP-02/WP-05 and `core/money` are future work; prior acceptance does not establish current implementation. Inspect migration history before applying any new schema to an existing environment.
 

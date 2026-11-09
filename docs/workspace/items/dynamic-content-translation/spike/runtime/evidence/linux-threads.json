@@ -1,0 +1,62 @@
+{
+  "scenario": "threads",
+  "profile": "linux",
+  "node": "v24.21.0",
+  "platform": "linux-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 49,
+  "cgroupAfter": {
+    "memoryPeakMb": 551.1,
+    "memoryCurrentMb": 24.9,
+    "memoryMax": "2147483648",
+    "cpuMax": "200000 100000",
+    "cpuStat": {
+      "nrPeriods": 490,
+      "nrThrottled": 236,
+      "throttledMs": 19198
+    }
+  },
+  "result": {
+    "runs": [
+      {
+        "intraOpNumThreads": 1,
+        "threadsIdleAfterLoad": 18,
+        "threadsMaxDuringRuns": 18,
+        "latency1000charsMs": {
+          "n": 4,
+          "min": 4445,
+          "p50": 4649,
+          "p95": 5262,
+          "p99": 5262,
+          "max": 5262,
+          "mean": 4890
+        },
+        "procStatus": {
+          "vmRssMb": 569.7,
+          "vmHwmMb": 569.7,
+          "threads": 18
+        }
+      },
+      {
+        "intraOpNumThreads": 2,
+        "threadsIdleAfterLoad": 20,
+        "threadsMaxDuringRuns": 20,
+        "latency1000charsMs": {
+          "n": 4,
+          "min": 5302,
+          "p50": 5568,
+          "p95": 5738,
+          "p99": 5738,
+          "max": 5738,
+          "mean": 5572
+        },
+        "procStatus": {
+          "vmRssMb": 565.3,
+          "vmHwmMb": 565.3,
+          "threads": 20
+        }
+      }
+    ],
+    "cpusVisible": 2
+  }
+}

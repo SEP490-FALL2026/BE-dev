@@ -1,0 +1,126 @@
+import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { z } from 'zod';
+import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { NOTICE_KINDS, SENDABLE_NOTICE_KINDS, VERIFICATION_METHODS } from '../personnel-notice.types';
+import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
+import { groundsBodySchema } from '../personnel-grounds.dto';
+
+const flag = z.enum(['true', 'false']).transform((value) => value === 'true');
+const kindSchema = z.enum(NOTICE_KINDS);
+const statusSchema = z.enum(['PENDING_VERIFICATION', 'RECORDED', 'REJECTED', 'WITHDRAWN']);
+
+const verificationBodySchema = z.strictObject({
+  method: z.enum(VERIFICATION_METHODS),
+  reference: z.string().max(300),
+});
+
+/** Strict: a field the route does not know, such as a reason for leaving, is refused and never kept. */
+const sendBodySchema = z.strictObject({
+  employeeId: z.uuid(),
+  /** A change of job title is not told any more: that kind is refused as a malformed body (`QĐ-87e`). */
+  kind: z.enum(SENDABLE_NOTICE_KINDS),
+  proposedOn: businessDay,
+  targetDepartmentId: z.uuid().optional(),
+  note: z.string().max(500).optional(),
+});
+
+const successorSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('EMPLOYEE'), employeeId: z.uuid() }),
+  z.strictObject({ kind: z.literal('NONE') }),
+]);
+
+/** The event the notice is recorded as; which fields it needs depends on the kind of the notice and is judged after. */
+const eventBodySchema = z.strictObject({
+  toDepartmentId: z.uuid().optional(),
+  effectiveOn: businessDay.optional(),
+  lastWorkingDay: businessDay.optional(),
+  accessBlockMode: z.enum(['WITH_LAST_DAY', 'BLOCK_NOW']).optional(),
+  successor: successorSchema.optional(),
+  cancelPendingTransfer: z.literal(true).optional(),
+  startedOn: businessDay.optional(),
+  approvedReturnOn: businessDay.optional(),
+});
+
+const rejectBodySchema = z.strictObject({ reason: z.string().min(1).max(1000) });
+const recordBodySchema = z.strictObject({
+  verification: verificationBodySchema,
+  grounds: groundsBodySchema,
+  event: eventBodySchema,
+});
+const linkBodySchema = z.strictObject({ eventId: z.uuid(), verification: verificationBodySchema });
+
+const listQuerySchema = z.strictObject({
+  status: statusSchema.optional(),
+  kind: kindSchema.optional(),
+  employeeId: z.uuid().optional(),
+  overdue: flag.optional(),
+  priority: flag.optional(),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+});
+
+const idParamSchema = z.strictObject({ id: z.uuid() });
+
+const pagination = z.strictObject({
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+});
+
+const employeeBrief = z.strictObject({ id: z.uuid(), employeeCode: z.string(), fullName: z.string() });
+
+/** The row of the list: the code, who it is about, the kind, the day proposed, where it stands, and whether it is late. */
+export const noticeSummarySchema = z.strictObject({
+  id: z.uuid(),
+  code: z.string(),
+  employee: employeeBrief,
+  kind: kindSchema,
+  proposedOn: z.string(),
+  status: statusSchema,
+  dueOn: z.string(),
+  overdue: z.boolean(),
+  priority: z.boolean(),
+});
+
+export const noticeDetailSchema = noticeSummarySchema.extend({
+  note: z.string().nullable(),
+  sender: employeeBrief,
+  targetDepartment: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
+  createdAt: z.iso.datetime(),
+  defaultItAdminEmployeeId: z.uuid().nullable(),
+  rejectReason: z.string().nullable(),
+  recordedEvent: z
+    .strictObject({
+      kind: z.enum(['DEPARTMENT_TRANSFER', 'LONG_LEAVE', 'OFFBOARDING_CASE']),
+      id: z.uuid(),
+    })
+    .nullable(),
+  handledAt: z.iso.datetime().nullable(),
+  overdueNoticedAt: z.iso.datetime().nullable(),
+  /** How the Super Admin checked the notice; only the Super Admin sees it, so an IT Admin and a head read null. */
+  verification: z
+    .strictObject({
+      method: z.enum(VERIFICATION_METHODS),
+      reference: z.string(),
+      /** The account that checked it; null when the controlled procedure recorded it (`verifiedByProcedure`). */
+      verifiedByAppUserId: z.uuid().nullable(),
+      verifiedByProcedure: z.boolean(),
+      verifiedAt: z.iso.datetime(),
+    })
+    .nullable(),
+});
+
+export type NoticeSummaryWire = z.infer<typeof noticeSummarySchema>;
+export type NoticeDetailWire = z.infer<typeof noticeDetailSchema>;
+
+export class SendNoticeBodyDto extends createZodDto(sendBodySchema) {}
+export class RejectNoticeBodyDto extends createZodDto(rejectBodySchema) {}
+export class RecordNoticeBodyDto extends createZodDto(recordBodySchema) {}
+export class LinkNoticeBodyDto extends createZodDto(linkBodySchema) {}
+export class ListNoticesQueryDto extends createZodDto(listQuerySchema) {}
+export class NoticeIdParamDto extends createZodDto(idParamSchema) {}
+export class NoticeDetailResponseDto extends createZodDto(successEnvelopeSchema(noticeDetailSchema)) {}
+export class NoticePageResponseDto extends createZodDto(
+  successEnvelopeSchema(z.strictObject({ items: z.array(noticeSummarySchema), pagination })),
+) {}

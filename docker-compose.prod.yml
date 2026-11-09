@@ -1,0 +1,156 @@
+name: slm-production
+
+# PostgreSQL identities (H7, docs/guides/containers.md#postgresql-roles-h7):
+# - `.env` beside this file feeds Compose interpolation only: POSTGRES_* (the cluster superuser of the image),
+#   DATABASE_DEPLOY_* (owns the schema: backup, preflight, migrate, reconcile) and DATABASE_RUNTIME_* (the API and the
+#   worker). A missing password stops every Compose command before anything runs.
+# - `.env.app` holds the application settings and never a database credential: it is the only file the API and the
+#   worker read, and their DATABASE_URL is the runtime role.
+# - migrate, backup (profile "deploy") and db-admin (profile "admin") run only through `docker compose run`.
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. DATABASE: PostgreSQL 17
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    container_name: slm-postgres
+    restart: unless-stopped
+    command:
+      - "postgres"
+      - "-c"
+      - "timezone=UTC"
+      - "-c"
+      - "shared_buffers=128MB"
+      - "-c"
+      - "work_mem=8MB"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-software_license_management}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-software_license_management}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - slm-network
+
+  # ----------------------------------------------------------------------------
+  # 2. BACKEND API: NestJS Core — runtime role only
+  # ----------------------------------------------------------------------------
+  api:
+    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    container_name: slm-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env.app
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-3000}
+      DATABASE_URL: postgresql://${DATABASE_RUNTIME_USER:-slm_runtime}:${DATABASE_RUNTIME_PASSWORD:?Set DATABASE_RUNTIME_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-software_license_management}
+    expose:
+      - "${PORT:-3000}"
+    networks:
+      - slm-network
+
+  # ----------------------------------------------------------------------------
+  # 3. BACKGROUND WORKER: gửi email outbox (thăm dò PostgreSQL, không dùng Redis/BullMQ — ADR-0012, E2 = A) — runtime role
+  # ----------------------------------------------------------------------------
+  worker:
+    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    container_name: slm-worker
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env.app
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DATABASE_RUNTIME_USER:-slm_runtime}:${DATABASE_RUNTIME_PASSWORD:?Set DATABASE_RUNTIME_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-software_license_management}
+    networks:
+      - slm-network
+
+  # ----------------------------------------------------------------------------
+  # 4. DEPLOY STEPS: preflight, prisma migrate deploy, ops:db-roles reconcile/verify, ops:inspect — deploy role
+  # ----------------------------------------------------------------------------
+  migrate:
+    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    profiles: ["deploy"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DATABASE_DEPLOY_USER:-slm_deploy}:${DATABASE_DEPLOY_PASSWORD:?Set DATABASE_DEPLOY_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-software_license_management}
+      DATABASE_RUNTIME_ROLE: ${DATABASE_RUNTIME_USER:-slm_runtime}
+    networks:
+      - slm-network
+
+  # ----------------------------------------------------------------------------
+  # 5. BACKUP BEFORE MIGRATIONS (DB-05): pg_dump of the server image over TCP and SCRAM — deploy role
+  # ----------------------------------------------------------------------------
+  backup:
+    image: postgres:17-alpine
+    profiles: ["deploy"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-software_license_management}
+      PGUSER: ${DATABASE_DEPLOY_USER:-slm_deploy}
+      PGPASSWORD: ${DATABASE_DEPLOY_PASSWORD:?Set DATABASE_DEPLOY_PASSWORD in .env}
+      PGCONNECT_TIMEOUT: "10"
+    networks:
+      - slm-network
+
+  # ----------------------------------------------------------------------------
+  # 6. ROLE PROVISIONING (once, after a restore, or to rotate a password): ops:db-roles provision — cluster superuser
+  # ----------------------------------------------------------------------------
+  db-admin:
+    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    profiles: ["admin"]
+    command: ["node", "dist/database-roles-cli.js", "provision"]
+    environment:
+      NODE_ENV: production
+      DATABASE_BOOTSTRAP_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-software_license_management}
+      DATABASE_DEPLOY_URL: postgresql://${DATABASE_DEPLOY_USER:-slm_deploy}:${DATABASE_DEPLOY_PASSWORD:?Set DATABASE_DEPLOY_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-software_license_management}
+      DATABASE_RUNTIME_URL: postgresql://${DATABASE_RUNTIME_USER:-slm_runtime}:${DATABASE_RUNTIME_PASSWORD:?Set DATABASE_RUNTIME_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-software_license_management}
+    networks:
+      - slm-network
+
+  # ----------------------------------------------------------------------------
+  # 7. REVERSE PROXY & AUTOMATIC HTTPS: Caddy Web Server
+  # ----------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: slm-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-:80}
+      PORT: ${PORT:-3000}
+    volumes:
+      # scripts/ops/deploy-release.sh names the file (H7-OPS-RV-01): the candidate's Caddyfile while a release is validated,
+      # the live one for the running container. By hand, without CADDYFILE_PATH, the Caddyfile beside the project.
+      - ${CADDYFILE_PATH:-./Caddyfile}:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+    networks:
+      - slm-network
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  slm-network:
+    driver: bridge

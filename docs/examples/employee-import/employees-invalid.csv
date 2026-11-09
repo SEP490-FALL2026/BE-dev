@@ -1,7 +1,9 @@
-﻿employeeCode,fullName,workEmail,employmentType,hireDate,costCenterCode,managerEmployeeCode,departmentLabel
-BAD001,Dữ liệu hợp lệ,fixture@example.test,STAFF,2025-01-01,COMPANY,,Kiểm thử
-BAD002,Thiếu Cost Center,missing@example.test,STAFF,2025-01-01,,,Kiểm thử
-BAD003,Quản lý không tồn tại,manager@example.test,STAFF,2025-01-01,COMPANY,UNKNOWN,Kiểm thử
-BAD004,Email trùng sau chuẩn hóa,fixture+alias@example.test,STAFF,2025-01-01,COMPANY,,Kiểm thử
-BAD005,Chu trình quản lý A,cycle.a@example.test,STAFF,2025-01-01,COMPANY,BAD006,Kiểm thử
-BAD006,Chu trình quản lý B,cycle.b@example.test,STAFF,2025-01-01,COMPANY,BAD005,Kiểm thử
+employee_code,full_name,work_email,employment_type,hire_date,department_code,job_title
+NV_BAD,Invalid Code,bad1@example.test,STAFF,2026-01-05,DS1-ENG,
+NV-002,Missing Department,bad2@example.test,STAFF,2026-01-05,DS1-NOPE,
+NV-003,,bad3@example.test,STAFF,2026-01-05,DS1-ENG,
+NV-004,Invalid Email,bad-email,STAFF,2026-01-05,DS1-ENG,
+NV-005,Invalid Date,bad5@example.test,STAFF,2026-02-30,DS1-ENG,
+NV-006,Invalid Type,bad6@example.test,BOSS,2026-01-05,DS1-ENG,
+NV-007,First Duplicate,bad7@example.test,STAFF,2026-01-05,DS1-ENG,
+NV-007,Second Duplicate,bad8@example.test,STAFF,2026-01-05,DS1-ENG,

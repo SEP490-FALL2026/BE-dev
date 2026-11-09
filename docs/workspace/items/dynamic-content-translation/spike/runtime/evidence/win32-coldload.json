@@ -1,0 +1,285 @@
+{
+  "scenario": "coldload",
+  "profile": "win32",
+  "node": "v24.0.1",
+  "platform": "win32-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 35,
+  "cgroupAfter": {
+    "memoryPeakMb": null,
+    "memoryCurrentMb": null,
+    "memoryMax": null,
+    "cpuMax": null,
+    "cpuStat": null
+  },
+  "result": {
+    "runs": [
+      {
+        "firstRequestViEnMs": 7726.7,
+        "firstRequestEnViMs": 2872.2,
+        "status": ["OK", "OK"],
+        "workerLoadMs": {
+          "vi-en": 6440,
+          "en-vi": 1594
+        },
+        "spawnToFirstLoadedMs": 6614.9,
+        "workerRssAfterViEnLoad": {
+          "procMb": null,
+          "ipcRssMb": 447.8
+        },
+        "workerRssAfterEnViLoad": {
+          "procMb": null,
+          "ipcRssMb": 806.4
+        },
+        "apiRssMb": {
+          "start": 56.3,
+          "afterBoth": 48.2
+        },
+        "health": {
+          "n": 172,
+          "min": 1,
+          "p50": 1.5,
+          "p95": 3.1,
+          "p99": 4.2,
+          "max": 37.5,
+          "mean": 1.9,
+          "errors": 0
+        },
+        "apiEld": {
+          "min": 9.67,
+          "mean": 15.5,
+          "p50": 15.42,
+          "p99": 17.1,
+          "p999": 21.58,
+          "max": 48.23,
+          "count": 684,
+          "resolutionMs": 10
+        },
+        "totalMs": 10913
+      },
+      {
+        "firstRequestViEnMs": 2447,
+        "firstRequestEnViMs": 2375.1,
+        "status": ["OK", "OK"],
+        "workerLoadMs": {
+          "vi-en": 1399,
+          "en-vi": 1365
+        },
+        "spawnToFirstLoadedMs": 1494.8,
+        "workerRssAfterViEnLoad": {
+          "procMb": null,
+          "ipcRssMb": 454.2
+        },
+        "workerRssAfterEnViLoad": {
+          "procMb": null,
+          "ipcRssMb": 812.6
+        },
+        "apiRssMb": {
+          "start": 56.9,
+          "afterBoth": 50.9
+        },
+        "health": {
+          "n": 78,
+          "min": 1,
+          "p50": 1.3,
+          "p95": 1.8,
+          "p99": 3.3,
+          "max": 3.3,
+          "mean": 1.4,
+          "errors": 0
+        },
+        "apiEld": {
+          "min": 12.71,
+          "mean": 15.49,
+          "p50": 15.43,
+          "p99": 16.66,
+          "p999": 19.45,
+          "max": 19.45,
+          "count": 309,
+          "resolutionMs": 10
+        },
+        "totalMs": 5131
+      },
+      {
+        "firstRequestViEnMs": 2375.2,
+        "firstRequestEnViMs": 2416.5,
+        "status": ["OK", "OK"],
+        "workerLoadMs": {
+          "vi-en": 1444,
+          "en-vi": 1178
+        },
+        "spawnToFirstLoadedMs": 1526.3,
+        "workerRssAfterViEnLoad": {
+          "procMb": null,
+          "ipcRssMb": 449.2
+        },
+        "workerRssAfterEnViLoad": {
+          "procMb": null,
+          "ipcRssMb": 813.5
+        },
+        "apiRssMb": {
+          "start": 58.8,
+          "afterBoth": 53.1
+        },
+        "health": {
+          "n": 77,
+          "min": 1,
+          "p50": 1.3,
+          "p95": 2,
+          "p99": 2.8,
+          "max": 2.8,
+          "mean": 1.4,
+          "errors": 0
+        },
+        "apiEld": {
+          "min": 9.78,
+          "mean": 15.52,
+          "p50": 15.53,
+          "p99": 16.74,
+          "p999": 21.71,
+          "max": 21.71,
+          "count": 307,
+          "resolutionMs": 10
+        },
+        "totalMs": 5100
+      },
+      {
+        "firstRequestViEnMs": 2251.2,
+        "firstRequestEnViMs": 2506.2,
+        "status": ["OK", "OK"],
+        "workerLoadMs": {
+          "vi-en": 1478,
+          "en-vi": 1125
+        },
+        "spawnToFirstLoadedMs": 1561.4,
+        "workerRssAfterViEnLoad": {
+          "procMb": null,
+          "ipcRssMb": 443.8
+        },
+        "workerRssAfterEnViLoad": {
+          "procMb": null,
+          "ipcRssMb": 809.9
+        },
+        "apiRssMb": {
+          "start": 57.8,
+          "afterBoth": 53.1
+        },
+        "health": {
+          "n": 77,
+          "min": 1,
+          "p50": 1.4,
+          "p95": 1.9,
+          "p99": 2.6,
+          "max": 2.6,
+          "mean": 1.4,
+          "errors": 0
+        },
+        "apiEld": {
+          "min": 11.62,
+          "mean": 15.48,
+          "p50": 15.47,
+          "p99": 16.52,
+          "p999": 17.2,
+          "max": 17.2,
+          "count": 306,
+          "resolutionMs": 10
+        },
+        "totalMs": 5068
+      },
+      {
+        "firstRequestViEnMs": 2338.7,
+        "firstRequestEnViMs": 2688.4,
+        "status": ["OK", "OK"],
+        "workerLoadMs": {
+          "vi-en": 1385,
+          "en-vi": 1307
+        },
+        "spawnToFirstLoadedMs": 1464.4,
+        "workerRssAfterViEnLoad": {
+          "procMb": null,
+          "ipcRssMb": 451.5
+        },
+        "workerRssAfterEnViLoad": {
+          "procMb": null,
+          "ipcRssMb": 809.3
+        },
+        "apiRssMb": {
+          "start": 58.4,
+          "afterBoth": 52.7
+        },
+        "health": {
+          "n": 81,
+          "min": 1,
+          "p50": 1.3,
+          "p95": 2,
+          "p99": 2.8,
+          "max": 2.8,
+          "mean": 1.4,
+          "errors": 0
+        },
+        "apiEld": {
+          "min": 9.83,
+          "mean": 15.51,
+          "p50": 15.48,
+          "p99": 16.69,
+          "p999": 18.81,
+          "max": 18.81,
+          "count": 323,
+          "resolutionMs": 10
+        },
+        "totalMs": 5333
+      }
+    ],
+    "summary": {
+      "spawnToFirstLoadedMs": {
+        "n": 5,
+        "min": 1464.4,
+        "p50": 1526.3,
+        "p95": 6614.9,
+        "p99": 6614.9,
+        "max": 6614.9,
+        "mean": 2532.4
+      },
+      "workerLoadViEnMs": {
+        "n": 5,
+        "min": 1385,
+        "p50": 1444,
+        "p95": 6440,
+        "p99": 6440,
+        "max": 6440,
+        "mean": 2429.2
+      },
+      "workerLoadEnViMs": {
+        "n": 5,
+        "min": 1125,
+        "p50": 1307,
+        "p95": 1594,
+        "p99": 1594,
+        "max": 1594,
+        "mean": 1313.8
+      },
+      "firstRequestViEnMs": {
+        "n": 5,
+        "min": 2251.2,
+        "p50": 2375.2,
+        "p95": 7726.7,
+        "p99": 7726.7,
+        "max": 7726.7,
+        "mean": 3427.8
+      },
+      "healthP50": {
+        "n": 5,
+        "min": 1.3,
+        "p50": 1.3,
+        "p95": 1.5,
+        "p99": 1.5,
+        "max": 1.5,
+        "mean": 1.4
+      },
+      "healthMaxOfMax": 37.5,
+      "healthP99MaxOfRuns": 4.2,
+      "apiEldMaxMs": 48.23,
+      "apiEldP99MaxMs": 17.1
+    }
+  }
+}

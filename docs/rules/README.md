@@ -1,18 +1,20 @@
-# Backend rules
+# Quy ước chuyên đề
 
-Entry: [AGENTS.md](../../AGENTS.md). Read [context.md](context.md) first. Paths in backticks are relative to the backend root. Select every row relevant to the task; a database-backed endpoint needs both API and database rules.
+Workflow chung ở [CONTRIBUTING](../../CONTRIBUTING.md), cấu trúc source ở
+[ARCHITECTURE](../../ARCHITECTURE.md). Đọc chuyên đề khi task chạm tới nó.
 
-| Task                                                 | Load                                                                                                  |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Research / design / plan / multi-step implementation | [skill workflow](../../../../Docs/rules/skill-workflow.md)                                            |
-| Implement / refactor                                 | [implementation](implementation.md), [architecture](architecture.md), [verification](verification.md) |
-| Debug / fix                                          | [debug](debug.md), [verification](verification.md), rules for the failing boundary                    |
-| Audit code or business behavior                      | [audit](audit.md), rules for the audited boundary                                                     |
-| HTTP / DTO / BE–FE handoff                           | [api-contract](api-contract.md)                                                                       |
-| Permissions / files / workers                        | [security-jobs](security-jobs.md)                                                                     |
-| Model / migration / transaction / lifecycle          | [database-business](database-business.md)                                                             |
-| Docs / plans / ADR                                   | [documentation](documentation.md)                                                                     |
+| Thay đổi                              | Quy ước                                         |
+| ------------------------------------- | ----------------------------------------------- |
+| Thêm/di chuyển file, capability, lỗi  | [Module structure](module-structure.md)         |
+| Controller, DTO, OpenAPI              | [API contract](api-contract.md)                 |
+| Query, schema, transaction, nghiệp vụ | [Database/business](database-business.md)       |
+| Auth, file, job                       | [Security/jobs](security-jobs.md)               |
+| Tài liệu, ADR                         | [Documentation](documentation.md)               |
+| Chia việc thành hạng mục, spec/plan   | [Work-item sizing](work-item-sizing.md)         |
+| Lệnh vận hành ngoài HTTP, seed local  | [Operational commands](operational-commands.md) |
 
-For business changes or audits also load the shared [domain guardrails](../../../../Docs/rules/domain-guardrails.md). For cross-repo changes load the shared [change workflow](../../../../Docs/rules/change-workflow.md). These are references, not copies of the BRD.
-
-The rules are versioned documentation, not work items. Keep them in `docs/rules/`; plans still use `docs/workspace/` as described in [documentation](documentation.md). Run `pnpm rules:check`, `pnpm rules:test` and `pnpm rules:format`; these also run in `pnpm check`. Backend CI triggers on rules/instruction changes. Use `pnpm rules:check:workspace` when BE, FE and Docs are checked out together. See the shared [gate guide](../../../../Docs/rules/automation.md) for scope and limits.
+Không cần thêm một `RULES.md` khác hoặc sao chép các quy ước này sang từng công cụ AI.
+[AGENTS](../../AGENTS.md) chỉ định tài liệu cần đọc theo tác vụ.
+`pnpm rules:check` kiểm tra link/import của bộ tài liệu đang dùng;
+`pnpm rules:format` kiểm tra format. Danh sách file nằm trong
+[rules-check.config.json](../../rules-check.config.json).

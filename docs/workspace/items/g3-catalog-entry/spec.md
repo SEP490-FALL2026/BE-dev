@@ -1,0 +1,167 @@
+# Spec: khai báo ứng dụng vào danh mục (`US-04-01` phần khai báo, `US-04-07` AC-6)
+
+- Phụ trách: AI theo giao việc Owner (triển khai 20/10/2026).
+- Thiết kế ban đầu bởi: AI theo giao việc Owner (20/10/2026; Owner giao tự thiết kế, tự làm, review cuối).
+- Thiết kế: `ready`. Owner review: chưa review.
+- Nguồn: Docs `9416fe0` (BRD v3.46 `FR-1.1`, `FR-1.7`, `FR-1.8`, `ADR-05`, `ADR-10`, `INV-06`, `QĐ-49a/b/h`, `QĐ-50a`, `BR-06.*`; `US-04-01` AC-1→AC-7, AC-10→AC-13 và `US-04-07` AC-6 trong `BE-UserStory/src/EP-04.md`; ERD logic `vendors`, `functional_groups`, `saas_products`), BE `57b1e1c`.
+- Nhóm roadmap: G3 — chỉ là planning container, không phải phạm vi của hạng mục này (xem `## Sizing decision`).
+- _Tác động 22/10/2026 (baseline Docs `72e1480`, `QĐ-82n` A):_ `US-04-01` AC-12 đã **bỏ** — không còn loại _phần mềm/SaaS
+  miễn phí bên ngoài_ để chọn hay để từ chối. Bảng Primary bỏ AC-12 (scope map G3); contract còn nhận `FREE_EXTERNAL` rồi
+  từ chối `APPLICATION.KIND_NOT_MANAGED` là sai baseline — sửa forward ở
+  [g3-catalog-kind-contract-cleanup](../g3-catalog-kind-contract-cleanup/spec.md). Phần còn lại của spec giữ nguồn đã pin.
+- _Tác động 24/10/2026 (Prompt 29A, `P29-N3`, hạng mục
+  [g0-g4-checkpoint-fix-forward](../g0-g4-checkpoint-fix-forward/spec.md)):_ khai ứng dụng từ dòng từ điển mà tên chuẩn hóa
+  của nhóm đã là tên một nhà cung cấp giữ **nhóm khác** ⟹ 422 `APPLICATION.DICTIONARY_LINE_MISMATCH`, không ghi ứng dụng/nhà cung
+  cấp/audit (trước đó 500). Kẻ thua đua nhóm từ điển (`DB-03`, khi tạo hay sửa) ⟹ 409 mã riêng
+  **`APPLICATION.DICTIONARY_GROUP_CHANGED`** — làm mới rồi gửi lại; mã 422 không dùng cho status thứ hai. Ngữ nghĩa 422 mismatch và
+  409 `APPLICATION.DICTIONARY_LINE_TAKEN` không đổi. FE/Mobile sinh lại client.
+- [Kế hoạch](plan.md).
+
+## Business outcome
+
+IT Admin khai báo ứng dụng thuộc ba loại đối tượng quản lý (SaaS có trả phí, phần mềm thương mại có bản quyền, phần mềm nội bộ) với
+một Business Owner đang làm việc, mức nhạy cảm dữ liệu, ba câu trả lời phân loại liên lạc, nhóm chức năng và dòng từ điển nhà cung
+cấp; phần mềm miễn phí bên ngoài bị từ chối; ứng dụng ngoài từ điển vẫn lưu được và sinh đề xuất bổ sung từ điển.
+
+## Sizing decision
+
+- Container: G3 (nhóm giao việc, không phải ranh giới hạng mục).
+- Mode: `split-story`.
+- Outcome and owner: danh mục ứng dụng của tổ chức do IT Admin khai báo và sửa; chủ là capability `catalog/catalog-entry`.
+- Boundaries: bảng `applications` (capability `catalog-entry/`), `vendors` (capability `vendor/`), `functional_groups` (capability `functional-group/`) của `catalog`; mở rộng bảng đề xuất từ điển (`source_application_id`, `proposed_domains`); route `/applications`, `/functional-groups`; kiểm Business Owner qua facade `OrganizationService`; dòng từ điển và đề xuất qua hai contract nội module của `vendor-dictionary/`.
+- Not larger: ngừng sử dụng (AC-8, AC-9, AC-14) cần Assignment và thuê bao — `g3-catalog-retire`; gói và thuê bao — `g3-plan-declaration`, `g3-subscription-purchase`.
+- Not smaller: khai báo, cờ liên lạc, nhóm chức năng, nhà cung cấp của tổ chức và liên kết dòng từ điển chung một bảng, một quyền IT Admin và một giao dịch ghi; thiếu một thứ thì AC-1, AC-5, AC-6 không kiểm chứng được.
+- Siblings: `g3-vendor-dictionary` (xong), `g3-catalog-retire`.
+- Scope map: [G3](../../../roadmap.md#work-item-decomposition-g3).
+
+## Primary Story/AC
+
+| Story    | AC                             | Coverage | Phần còn lại thuộc                     |
+| -------- | ------------------------------ | -------- | -------------------------------------- |
+| US-04-01 | AC-1→AC-7, AC-10, AC-11, AC-13 | partial  | AC-8, AC-9, AC-14: `g3-catalog-retire` |
+| US-04-07 | AC-6                           | partial  | AC-1→AC-5: `g3-vendor-dictionary`      |
+
+## Supporting references
+
+`FR-1.1`, `FR-1.7`, `FR-1.8`, `ADR-05`, `ADR-10` (ba câu hỏi liên lạc), `INV-06`, `QĐ-49a/b/h`, `QĐ-50a`, `BR-06.1`→`BR-06.3`, `BR-06.9`, `LR-06`, `LR-10`,
+[ADR-0013](../../../decisions/0013-catalog-finance-licensing-contexts.md).
+
+## Explicit out of scope
+
+- Ngừng sử dụng, xác nhận Business Owner khi ngừng, danh sách thứ đang chặn (AC-8, AC-9, AC-14) — `g3-catalog-retire`. Cột `catalog_status` có giá trị `RETIRED` ngay từ bảng, nhưng lát này chỉ ghi `APPROVED`.
+- Gói, thuê bao, hợp đồng; bước đánh giá và quyết định chi của phần mềm mới (`US-05-*`, `US-06-01`); đường yêu cầu không phí của phần mềm nội bộ (`US-05-20`).
+- Thu thập usage: cờ liên lạc chỉ ghi và lộ ra `usageCollectionDefault`; bộ thu thập ngoài MVP (`QĐ-62o`).
+- Hồ sơ thuế của nhà cung cấp (`g3-vendor-tax-profile`); import danh mục (sau S0, `QĐ-43e`); đổi Business Owner khi người cũ nghỉ (`g3-business-owner-replacement`).
+- Đổi loại đối tượng hoặc nhà cung cấp của ứng dụng đã khai: không có (sai thì ngừng và khai lại ở lát sau).
+
+## Dependencies and blockers
+
+`g3-catalog-foundation`, `g3-vendor-dictionary` (xong); facade `OrganizationService` (`lockEmployeeForShare`, `getEmployee`, `getEmployees`, `getOrganization`); `AuditService`. Không blocker.
+
+## Ownership: module, data, API
+
+- Module `catalog`: thêm capability `catalog-entry/` (controller, service, repo, DTO, lỗi, type, ánh xạ lỗi HTTP), `vendor/` (repo `vendors`; contract `VendorDirectoryService`), `functional-group/` (controller, service, repo, DTO, lỗi; contract `FunctionalGroupLookupService`), và hai contract của `vendor-dictionary/` (`VendorDictionaryLookupService`, `VendorProposalIntakeService`) cùng hàm thuần `vendor-matcher.ts`. Audit dùng chung nên ánh xạ audit chuyển lên `mappers/catalog-audit-event.ts` (từ hai capability trở lên mới dùng thư mục dùng chung).
+- Dữ liệu: `vendors`, `functional_groups`, `applications`; `vendor_dictionary_proposals` thêm `source_application_id` (khóa ngoại) và `proposed_domains`. `PRISMA_MODEL_OWNER`: `Vendor`, `FunctionalGroup`, `Application` → `catalog`. Khóa ngoại tới `employees` chỉ là ràng buộc CSDL; mã `catalog` đọc nhân viên qua `OrganizationService`.
+- API: `GET/POST /applications`, `GET/PATCH /applications/{id}`, `GET/POST /functional-groups`, `PATCH /functional-groups/{id}` — bảy operation; ghi chỉ `IT_ADMIN`, đọc `IT_ADMIN` và `FINANCE`.
+
+## Làm rõ yêu cầu
+
+| Câu hỏi / mâu thuẫn                   | Kết luận                                                                                                                                                                                                                                                                                                          | Nguồn / loại                           |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Loại `FREE_EXTERNAL` đi qua DTO       | DTO nhận bốn giá trị `SAAS`, `LICENSED`, `INTERNAL`, `FREE_EXTERNAL`; loại thứ tư bị từ chối bằng lỗi nghiệp vụ 422 `APPLICATION.KIND_NOT_MANAGED` trước mọi ghi (không tạo gì, kể cả nhà cung cấp)                                                                                                               | AC-12; `QĐ-49a`, `QĐ-49h`              |
+| Nhà cung cấp của tổ chức tạo thế nào  | Không có route riêng: khai báo ứng dụng mang `dictionaryServiceLineId` (nhà cung cấp suy ra từ nhóm của dòng) **hoặc** `vendorName` (nhập tay, ngoài từ điển); cả hai hoặc không có cái nào với loại có nhà cung cấp là lỗi. Nhà cung cấp được tìm theo tên chuẩn hóa hoặc tạo trong cùng giao dịch               | AC-5; ERD `vendors`; lựa chọn thiết kế |
+| Phần mềm nội bộ                       | Không nhận `vendorName` và `dictionaryServiceLineId` (422 `APPLICATION.INTERNAL_HAS_NO_VENDOR`); `vendor_id` rỗng do CHECK CSDL; không tạo nhà cung cấp, hợp đồng, thuê bao, hóa đơn; không có bước Người duyệt chi; không yêu cầu số seat                                                                        | AC-10; `QĐ-50a`                        |
+| Đề xuất khi ngoài từ điển             | Loại có nhà cung cấp, khai bằng `vendorName` (không có dòng từ điển) ⟹ cùng giao dịch tạo đề xuất `PENDING` tên = tên ứng dụng, tên miền = tên miền khai; đã có đề xuất chờ cùng tên ⟹ không tạo thêm. Đề xuất gắn `source_application_id`                                                                        | AC-5; ERD R25                          |
+| Business Owner                        | Bắt buộc, là `employeeId` của nhân viên **đang làm việc**; khóa `FOR SHARE` rồi kiểm trạng thái trong cùng giao dịch (người nghỉ đồng thời không lọt qua); thiếu ⟹ 422 `VALIDATION_ERROR`; không tồn tại hoặc đã nghỉ ⟹ 422 `APPLICATION.BUSINESS_OWNER_INVALID`                                                  | AC-4, AC-11; `INV-06`                  |
+| Cờ liên lạc                           | Ba câu trả lời boolean bắt buộc; `isCommunicationService` = hoặc của ba, do CHECK CSDL giữ; ghi chú tự do (`communicationNote`, ≤ 1000 ký tự) không ảnh hưởng cờ; `usageCollectionDefault` = `NOT_COLLECTED` khi có cờ, ngược lại `null`, suy ra khi đọc                                                          | AC-2, AC-3; `ADR-10`, `BR-06.2/.3`     |
+| Nhóm chức năng                        | Tùy chọn; chọn từ danh sách IT Admin duy trì (`/functional-groups`); nhóm `INACTIVE` hoặc không có ⟹ 422 `APPLICATION.FUNCTIONAL_GROUP_INVALID`. Công cụ tương tự = ứng dụng khác cùng nhóm, lộ ở chi tiết `similarApplications`                                                                                  | AC-7; `BR-06.9`                        |
+| Một dòng từ điển một ứng dụng         | Unique CSDL `(organization_id, dictionary_line_id)` ⟹ 409 `APPLICATION.DICTIONARY_LINE_TAKEN`; ứng dụng và nhà cung cấp cùng nhóm với dòng do trigger CSDL giữ (lỗi 23514 ⟹ 422 `APPLICATION.DICTIONARY_LINE_MISMATCH`). Gắn dòng cho ứng dụng sẵn có qua PATCH; nhà cung cấp chưa có nhóm thì nhận nhóm của dòng | AC-6; `LR-10`                          |
+| Tên ứng dụng trùng                    | Duy nhất theo tên chuẩn hóa trong cùng nhà cung cấp; ứng dụng nội bộ duy nhất trong các ứng dụng nội bộ ⟹ 409 `APPLICATION.NAME_TAKEN` (chỉ mục duy nhất một phần, không check-then-insert)                                                                                                                       | ERD `saas_products`                    |
+| Ai đọc danh mục                       | `IT_ADMIN` và `FINANCE` đọc (Finance cần danh mục để khai thuê bao); Manager/Employee chỉ chọn mục khi gửi yêu cầu (`US-05-*`, chưa có) nên chưa được đọc; mọi vai khác bị 403. Quyết định cho Owner xác nhận                                                                                                     | AC-6; lựa chọn thiết kế                |
+| Nhóm chức năng — ai sửa, có xóa không | Chỉ `IT_ADMIN` thêm, đổi tên, bật/tắt; không xóa. Tên duy nhất theo tên chuẩn hóa (409 `FUNCTIONAL_GROUP.NAME_TAKEN`)                                                                                                                                                                                             | `BR-06.9`, OI-14e                      |
+| Giới hạn                              | Tên 1–200 ký tự sau chuẩn hóa; tối đa 20 tên miền (host hợp lệ, bỏ trùng); ghi chú ≤ 1000                                                                                                                                                                                                                         | lựa chọn thiết kế                      |
+
+## Behavior and design
+
+### Quyết định kỹ thuật
+
+| Mã   | Quyết định                                                                                                                                                                                                                                                                                                                                                     |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T-A1 | Khóa so sánh tên = `searchKey(name)` (như từ điển); tên hiển thị `normalizeDisplayName`. Bảng `vendors` unique `(organization_id, normalized_name)` và `(organization_id, dictionary_group_id)`; `functional_groups` unique `(organization_id, normalized_name)`; `applications` có hai chỉ mục duy nhất một phần cho tên và một cho dòng từ điển              |
+| T-A2 | Mọi lệnh ghi mở một `TransactionRunner.run`: khóa nhân viên `FOR SHARE`, tìm hoặc tạo nhà cung cấp, ghi ứng dụng, tạo đề xuất khi cần và Audit Trail cùng giao dịch. Lỗi unique làm hỏng giao dịch nên được bắt ngoài `run`, ánh xạ theo tên chỉ mục                                                                                                           |
+| T-A3 | `VendorDirectoryService` (contract `vendor/`): `ensureForDictionaryGroup(tx, org, group)`, `ensureByName(tx, org, name)` — chèn `ON CONFLICT DO NOTHING` rồi đọc lại, nên hai khai báo đồng thời cùng nhà cung cấp mới đều dùng chung một dòng; trả `{ vendor, created }` để service ghi `VENDOR.CREATED`. `adoptDictionaryGroup` cho PATCH                    |
+| T-A4 | Trigger CSDL trên `applications`: `dictionary_line_id` khác rỗng thì dòng phải thuộc nhóm của nhà cung cấp (`vendors.dictionary_group_id`), nếu không `23514` constraint `applications_line_matches_vendor_group`. CHECK: `kind = INTERNAL ⇔ vendor_id IS NULL`; dòng từ điển không dùng cho nội bộ; `is_communication_service` = or ba cờ; tối đa 20 tên miền |
+| T-A5 | Danh sách đọc page/count cùng snapshot (`RepeatableRead`), thứ tự `normalized_name, id`; lọc `search` (tên ứng dụng hoặc nhà cung cấp chứa chuỗi chuẩn hóa), `kind`, `status`, `functionalGroupId`. Tên/mã Business Owner lấy qua `OrganizationService.getEmployees`                                                                                           |
+| T-A6 | Audit: `APPLICATION.CREATED/UPDATED`, `VENDOR.CREATED`, `FUNCTIONAL_GROUP.CREATED/UPDATED`; snapshot trường nghiệp vụ trước/sau, tác nhân `USER` kèm vai. Sửa không đổi gì (sau chuẩn hóa) ⟹ 200, không audit                                                                                                                                                  |
+
+### HTTP contract
+
+Lỗi chung: 401 `AUTHENTICATION_REQUIRED`/`INVALID_ACCESS_TOKEN`, 403 `AUTHORIZATION.FORBIDDEN`, 422 `VALIDATION_ERROR`, 503
+`SERVICE_UNAVAILABLE`/`TOKEN_VERIFICATION_UNAVAILABLE`. Trên dây: `Application = { id, name, kind, vendor: {id,name}|null, dictionaryServiceLineId|null,
+domains[], dataSensitivity, businessOwner: {employeeId, employeeCode, fullName, status}, communication: {personToPersonMessaging, callsOrMeetings, mailbox,
+isCommunicationService, note|null}, usageCollectionDefault: 'NOT_COLLECTED'|null, functionalGroup: {id,name}|null, status: 'APPROVED'|'RETIRED', createdAt, updatedAt }`;
+tạo thêm `proposedToDictionary: boolean`; chi tiết thêm `similarApplications: {id,name}[]`. `FunctionalGroup = { id, name, status: 'ACTIVE'|'INACTIVE', createdAt, updatedAt }`.
+
+| Operation (operationId)                                                                                                                                                                                            | Thành công                                           | Lỗi riêng                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /applications` (`applicationList`) — `search?`, `kind?`, `status?`, `functionalGroupId?`, `page`, `pageSize`                                                                                                  | 200 `APPLICATION.LISTED`                             | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `POST /applications` (`applicationCreate`) — `{ name, kind, vendorName?, dictionaryServiceLineId?, domains?, dataSensitivity, businessOwnerEmployeeId, communication{3 cờ + note?}, functionalGroupId? }`          | 201 `APPLICATION.CREATED` (+ `proposedToDictionary`) | 409 `APPLICATION.NAME_TAKEN`, `APPLICATION.DICTIONARY_LINE_TAKEN`, `APPLICATION.DICTIONARY_GROUP_CHANGED` (thua đua, Prompt 29A); 422 `APPLICATION.DICTIONARY_LINE_MISMATCH` (tên nhà cung cấp đã thuộc nhóm khác, Prompt 29A), `APPLICATION.KIND_NOT_MANAGED`, `APPLICATION.NAME_INVALID`, `APPLICATION.VENDOR_NAME_INVALID`, `APPLICATION.NOTE_INVALID`, `APPLICATION.DOMAIN_INVALID`, `APPLICATION.TOO_MANY_DOMAINS`, `APPLICATION.VENDOR_REQUIRED`, `APPLICATION.VENDOR_SOURCE_AMBIGUOUS`, `APPLICATION.INTERNAL_HAS_NO_VENDOR`, `APPLICATION.BUSINESS_OWNER_INVALID`, `APPLICATION.FUNCTIONAL_GROUP_INVALID`, `APPLICATION.DICTIONARY_LINE_NOT_FOUND` |
+| `GET /applications/{id}` (`applicationGet`)                                                                                                                                                                        | 200 `APPLICATION.FETCHED` (+ `similarApplications`)  | 404 `APPLICATION.NOT_FOUND`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `PATCH /applications/{id}` (`applicationUpdate`) — `{ name?, domains?, dataSensitivity?, businessOwnerEmployeeId?, communication?{3 cờ?, note?}, functionalGroupId?(null gỡ), dictionaryServiceLineId?(null gỡ) }` | 200 `APPLICATION.UPDATED`                            | 404; 409 như tạo; 422 như tạo và `APPLICATION.UPDATE_EMPTY`, `APPLICATION.DICTIONARY_LINE_MISMATCH`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `GET /functional-groups` (`functionalGroupList`) — `status?`, `page`, `pageSize`                                                                                                                                   | 200 `FUNCTIONAL_GROUP.LISTED`                        | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `POST /functional-groups` (`functionalGroupCreate`) — `{ name }`                                                                                                                                                   | 201 `FUNCTIONAL_GROUP.CREATED`                       | 409 `FUNCTIONAL_GROUP.NAME_TAKEN`; 422 `FUNCTIONAL_GROUP.NAME_INVALID`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `PATCH /functional-groups/{id}` (`functionalGroupUpdate`) — `{ name?, status? }`                                                                                                                                   | 200 `FUNCTIONAL_GROUP.UPDATED`                       | 404 `FUNCTIONAL_GROUP.NOT_FOUND`; 409, 422 như trên và `FUNCTIONAL_GROUP.UPDATE_EMPTY`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+
+Không có `DELETE` (router trả 404 `HTTP_NOT_FOUND`). Đổi `kind` hoặc `vendorName` qua PATCH bị DTO chặn (trường lạ ⟹ 422 `VALIDATION_ERROR`).
+
+### Dữ liệu và migration
+
+Migration `20261020120000_catalog_applications`: enum `ApplicationKind`, `DataSensitivity`, `FunctionalGroupStatus`, `CatalogStatus`; bảng `vendors`, `functional_groups`, `applications`
+(CHECK, unique, chỉ mục một phần, khóa ngoại tới `organizations`, `employees`, `vendor_groups`, `vendor_service_lines`), trigger T-A4; thêm hai cột cho `vendor_dictionary_proposals`.
+Không đụng bảng hiện có ngoài hai cột nullable/mặc định. Rollback: không code cũ nào dùng các bảng này; gỡ bằng migration mới.
+
+### Audit và bảo mật
+
+Chỉ IT Admin ghi; Finance đọc; Finance, Manager, Employee, Super Admin bị từ chối ghi (AC-6, `SoD-1`). Business Owner là thuộc tính, không cấp quyền (`SoD-5`).
+Danh mục không chứa dữ liệu cá nhân ngoài tham chiếu nhân viên (id; tên và mã nhân viên chỉ đọc qua facade khi trả về). Audit không ghi tên miền ngoài danh sách đã chuẩn hóa.
+
+## Test matrix
+
+| AC / rủi ro     | Tình huống (gồm từ chối, edge case)                                                                                                                                                                                             | Cấp test                  | Bằng chứng sau implement                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------ |
+| AC-1            | Figma (SaaS) qua dòng từ điển, Business Owner `B1`, nhạy cảm MEDIUM, ba "không" ⟹ 201, không cờ, nhà cung cấp Figma tạo cùng giao dịch, audit; đọc lại đúng                                                                     | integration HTTP          | `application-http` (Figma qua dòng từ điển)                                                |
+| AC-2            | Slack trả lời "có" câu nhắn tin ⟹ `isCommunicationService` đúng và `usageCollectionDefault = NOT_COLLECTED`; mỗi câu một mình cũng bật cờ                                                                                       | unit policy + integration | policy 5 + `application-http`                                                              |
+| AC-3            | Jira ghi chú "có bình luận trên ticket", ba "không" ⟹ không cờ, ghi chú giữ nguyên                                                                                                                                              | integration               | `application-http`                                                                         |
+| AC-4, AC-11     | Thiếu Business Owner ⟹ 422 `VALIDATION_ERROR`; nhân viên đã nghỉ, không tồn tại ⟹ 422 `APPLICATION.BUSINESS_OWNER_INVALID`, danh mục và nhà cung cấp không đổi; áp cho cả phần mềm nội bộ; PATCH đổi sang người đã nghỉ bị chặn | integration               | `application-http` (4 test, gồm khóa nhân viên; đột biến bỏ khóa làm đỏ)                   |
+| AC-5            | Ứng dụng `X` khai bằng `vendorName`, không dòng từ điển ⟹ lưu, `proposedToDictionary = true`, một đề xuất `PENDING` gắn ứng dụng, tên miền chép sang; khai thứ hai cùng tên chờ không sinh thêm đề xuất                         | integration               | `application-http` (đột biến bỏ đề xuất làm đỏ)                                            |
+| AC-6 (US-04-01) | Finance, Manager, Employee, Super Admin gọi POST/PATCH ⟹ 403 và danh mục không đổi; Finance đọc được; mọi route 401 khi thiếu token                                                                                             | e2e + integration         | e2e 6 vai × 4 route ghi + `application-http`                                               |
+| AC-7            | Nhóm _Thiết kế giao diện_: Figma và Sketch cùng nhóm ⟹ chi tiết Figma có Sketch ở `similarApplications` và ngược lại; nhóm không hoạt động hoặc không tồn tại ⟹ 422; lọc danh sách theo nhóm                                    | integration               | `application-http` (2 test)                                                                |
+| AC-10           | Cổng báo cáo nội bộ, không nhà cung cấp ⟹ 201, `vendor = null`, không đề xuất, không bản ghi `vendors`; gửi `vendorName` hay dòng từ điển với loại nội bộ ⟹ 422; hai ứng dụng nội bộ trùng tên ⟹ 409                            | integration + constraints | `application-http` + `application-constraints`                                             |
+| AC-12           | Loại `FREE_EXTERNAL` ⟹ 422 `APPLICATION.KIND_NOT_MANAGED`, không bản ghi nào (kể cả nhà cung cấp, đề xuất)                                                                                                                      | integration + e2e (DTO)   | policy + `application-http`                                                                |
+| AC-13           | Office 2021 (`LICENSED`) ⟹ lưu được, không yêu cầu thuê bao hay gói                                                                                                                                                             | integration               | `application-http`                                                                         |
+| US-04-07 AC-6   | Dòng L đã gắn ứng dụng A: khai B cùng L ⟹ 409 `APPLICATION.DICTIONARY_LINE_TAKEN`; PATCH gắn L cho B ⟹ 409; gỡ khỏi A rồi gắn B được; dòng của nhóm khác nhà cung cấp ⟹ 422 `APPLICATION.DICTIONARY_LINE_MISMATCH`              | integration + constraints | `application-http` (3 test) + `application-constraints` (đột biến bỏ ánh xạ unique làm đỏ) |
+| Ghi dữ liệu     | Tên ứng dụng trùng trong nhà cung cấp (hoa/thường/dấu) ⟹ 409; cùng tên khác nhà cung cấp được; nhà cung cấp tạo một lần dù khai hai ứng dụng; tên miền chuẩn hóa, bỏ trùng; PATCH không đổi gì ⟹ 200, không audit               | integration               | `application-http`, `application-constraints`                                              |
+| Giới hạn        | Tên rỗng/quá dài, tên miền sai, 21 tên miền ⟹ 422 mã riêng; trường lạ, `kind` trong PATCH ⟹ 422; ghi chú quá dài ⟹ 422                                                                                                          | e2e + integration         | policy 17 + e2e 33 + `application-http`                                                    |
+| Đồng thời       | Hai khai báo cùng tên ứng dụng đồng thời ⟹ một 201, một 409; hai khai báo cùng nhà cung cấp mới đồng thời ⟹ chỉ một dòng `vendors`; Business Owner bị cho nghỉ trong lúc khai ⟹ không lọt                                       | integration               | `application-http` (3 test)                                                                |
+| Nhóm chức năng  | Tạo, đổi tên, tắt; tên trùng ⟹ 409; 404; sửa rỗng ⟹ 422; không có DELETE                                                                                                                                                        | integration + e2e         | `functional-group-http` (8 test) + e2e                                                     |
+| Hợp đồng        | `api-inventory`: bảy operation mới có summary ngắn, 401/403/422/503, message riêng; manifest cập nhật                                                                                                                           | e2e                       | e2e `api-inventory` 79 operation                                                           |
+
+## Definition of Done
+
+- [x] Mọi primary AC `full` có test đỏ-trước/xanh-sau ở cấp phù hợp; AC `partial` ghi đúng vế đã làm (AC-1→AC-7, AC-10→AC-13; AC-6 của `US-04-07`).
+- [x] Gate theo [CONTRIBUTING](../../../../CONTRIBUTING.md) chạy xanh trên revision cuối; HTTP đổi nên e2e + `pnpm openapi:export`.
+- [x] Spec/plan/roadmap phản ánh implementation cuối; contract mới đã báo consumer FE.
+- [x] Không tăng legacy ledger kiến trúc; `PRISMA_MODEL_OWNER` thêm đúng ba model; contract nội module mới được đăng ký kèm lý do.
+- [x] ARCHITECTURE và AGENTS cập nhật; phần chưa kiểm chứng ghi rõ.
+
+## Changes and acceptance
+
+20/10/2026: thiết kế `ready`. Quyết định cần Owner xác nhận khi review: `IT_ADMIN` và `FINANCE` đọc danh mục (các vai khác chưa); nhà cung cấp của tổ chức tạo ngầm từ khai báo
+(không route riêng); đề xuất từ điển lấy tên **ứng dụng**; `usageCollectionDefault` chỉ suy ra khi đọc; chưa cho đổi `kind`/nhà cung cấp. Đã `verified` local (xem [plan](plan.md#verification-and-handoff)); chưa review, chưa nghiệm thu.
+
+26/10/2026 (Prompt 02, `MERGE-G56-SIZE`): sau merge G5/G6 (`0da8f56`), `catalog-entry/application.service.ts` 407 dòng vượt
+cap 400 (G5 thêm `declareRecord` ghi trong transaction của request, `US-05-20`). Tách collaborator đọc
+`ApplicationViewService` (`application-view.service.ts`): Business Owner của bản ghi kèm cờ cần thay (`INV-06`) và khuyến
+nghị K2 (`US-04-02` AC-9) — chỉ đọc, không ghi, không chặn. `ApplicationService` giữ mọi chữ ký public và ủy quyền; transaction,
+thứ tự khóa, payload audit, ánh xạ lỗi, ghi CSDL và wire không đổi (367 dòng, 9 dependency thay 10). Không nâng cap, không
+ledger.

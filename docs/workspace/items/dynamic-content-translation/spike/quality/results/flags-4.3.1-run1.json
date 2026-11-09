@@ -1,0 +1,140 @@
+{
+  "tag": "4.3.1",
+  "caveat": "Automatic keyword flags only: a flag means a mustContain / mustNotContain / protected-term check failed on a translated field; it may be a valid synonym (false alarm) or a real error. These flags are not adjudicated and have not been human reviewed. References are AI drafts.",
+  "total": 7,
+  "groups": [
+    {
+      "set": "heldout",
+      "direction": "en-vi",
+      "translatedFields": 32,
+      "flags": [
+        {
+          "id": "h-en-018",
+          "categories": ["approve", "code"],
+          "polarityCategory": "approve",
+          "source": "Finance has authorised the purchase order PO-2027-009.",
+          "output": "Tài chính đã cho phép mua hàng PO-2027-009.",
+          "reference": "Phòng Tài chính đã duyệt đơn mua PO-2027-009.",
+          "failed": {
+            "meaning": {
+              "failedContain": ["duyệt | chấp thuận | đồng ý | chấp nhận | tán thành | phê chuẩn | cấp"],
+              "failedNotContain": []
+            }
+          }
+        },
+        {
+          "id": "h-en-025",
+          "categories": ["reject", "negation", "glossary"],
+          "polarityCategory": "reject",
+          "source": "IT cannot approve the installation of unverified browser extensions.",
+          "output": "IT không thể chấp nhận việc cài đặt những phần mở rộng trình duyệt không được chứng nhận.",
+          "reference": "Phòng IT không thể duyệt việc cài các tiện ích trình duyệt chưa được kiểm định.",
+          "failed": {
+            "meaning": {
+              "failedContain": [
+                "phòng",
+                "từ chối | bác bỏ | không duyệt | không được duyệt | không thể duyệt | không chấp | không đồng ý | khước từ | không được trưởng phòng duyệt | không được chấp thuận | không được chấp nhận"
+              ],
+              "failedNotContain": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "set": "heldout",
+      "direction": "vi-en",
+      "translatedFields": 34,
+      "flags": [
+        {
+          "id": "h-vi-024",
+          "categories": ["reject", "name"],
+          "polarityCategory": "reject",
+          "source": "Rất tiếc, đơn xin cấp quyền quản trị của Lê Hoàng Nam bị bác.",
+          "output": "Sorry, the board application for the administrator's Lê Hoàng Nam was uncleed.",
+          "reference": "Unfortunately, the administrator-rights application of Lê Hoàng Nam was turned down.",
+          "failed": {
+            "meaning": {
+              "failedContain": [
+                "reject | declin | denied | deny | refus | turned down | not approv | not accept | not agree | disagree | cannot approve | cannot accept | unable to approve"
+              ],
+              "failedNotContain": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "set": "main",
+      "direction": "en-vi",
+      "translatedFields": 70,
+      "flags": [
+        {
+          "id": "en-015",
+          "categories": ["approve", "software", "glossary"],
+          "polarityCategory": "approve",
+          "source": "The department head approved the exception for Notion.",
+          "output": "trưởng phòng tán thành ngoại lệ Notion.",
+          "reference": "Trưởng phòng đã duyệt ngoại lệ cho Notion.",
+          "failed": {
+            "meaning": {
+              "failedContain": ["duyệt | chấp thuận | đồng ý | chấp nhận"],
+              "failedNotContain": []
+            }
+          }
+        },
+        {
+          "id": "en-040",
+          "categories": ["date", "software", "glossary"],
+          "polarityCategory": null,
+          "source": "Microsoft Office 365 must be renewed before December 15, 2026, otherwise the license will expire.",
+          "output": "Microsoft Office 365 phải là gia hạn trước December 15, 2026, nếu không thì bằng lái sẽ hết hạn.",
+          "reference": "Microsoft Office 365 cần được gia hạn trước ngày 15 tháng 12 năm 2026, nếu không giấy phép sẽ hết hạn.",
+          "failed": {
+            "meaning": {
+              "failedContain": ["15 tháng 12"],
+              "failedNotContain": []
+            }
+          },
+          "note": "verbatim-date policy: the keyword group expects a localised month name, dates are intentionally restored as written"
+        },
+        {
+          "id": "en-050",
+          "categories": ["date"],
+          "polarityCategory": null,
+          "source": "The budget review meeting is on November 3.",
+          "output": "Cuộc họp kiểm tra ngân sách đang trên November 3.",
+          "reference": "Cuộc họp xem xét ngân sách diễn ra vào ngày 3 tháng 11.",
+          "failed": {
+            "meaning": {
+              "failedContain": ["3 tháng 11"],
+              "failedNotContain": []
+            }
+          },
+          "note": "verbatim-date policy: the keyword group expects a localised month name, dates are intentionally restored as written"
+        }
+      ]
+    },
+    {
+      "set": "main",
+      "direction": "vi-en",
+      "translatedFields": 56,
+      "flags": [
+        {
+          "id": "vi-018",
+          "categories": ["approve", "name", "software"],
+          "polarityCategory": "approve",
+          "source": "Chúng tôi chấp thuận đề xuất của Phạm Quỳnh Anh về việc dùng Figma thay cho Adobe XD.",
+          "output": "We're accepting the proposition of Phạm Quỳnh Anh on using Figma instead of Adobe XD.",
+          "reference": "We approve Phạm Quỳnh Anh's proposal to use Figma instead of Adobe XD.",
+          "failed": {
+            "meaning": {
+              "failedContain": ["approv"],
+              "failedNotContain": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

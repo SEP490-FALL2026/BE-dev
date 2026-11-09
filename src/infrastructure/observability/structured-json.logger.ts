@@ -5,6 +5,24 @@ type LogLevel = 'debug' | 'error' | 'fatal' | 'info' | 'verbose' | 'warn';
 
 const MESSAGE_LIMIT = 2_000;
 const STACK_LIMIT = 8_000;
+const LEVEL_COLORS: Record<LogLevel, string> = {
+  info: '32',
+  warn: '33',
+  error: '31',
+  fatal: '1;31',
+  debug: '34',
+  verbose: '90',
+};
+
+interface LogEntry {
+  timestamp: string;
+  level: LogLevel;
+  service: string;
+  context: string;
+  message: string;
+  requestId?: string;
+  stack?: string;
+}
 
 export class StructuredJsonLogger implements LoggerService {
   constructor(
@@ -43,10 +61,22 @@ export class StructuredJsonLogger implements LoggerService {
   }
 
   private write(level: LogLevel, value: unknown, context?: string, trace?: string): void {
+    const entry = this.entryOf(level, value, context, trace);
+    const destination = level === 'error' || level === 'fatal' ? process.stderr : process.stdout;
+    if (destination.isTTY && process.env.NODE_ENV !== 'production') {
+      destination.write(this.terminalLine(entry));
+      return;
+    }
+    destination.write(`${JSON.stringify(entry)}\n`);
+  }
+
+  /** The JSON line: its fields in this order, the request id and the stack only when there is one. */
+  private entryOf(level: LogLevel, value: unknown, context?: string, trace?: string): LogEntry {
     const message = value instanceof Error ? value.message : String(value);
     const stack = trace ?? (value instanceof Error ? value.stack : undefined);
     const requestId = this.requestContext.getRequestId();
-    const entry = {
+
+    return {
       timestamp: new Date().toISOString(),
       level,
       service: this.service.replace(/[^\w.-]/g, '').slice(0, 120),
@@ -55,8 +85,21 @@ export class StructuredJsonLogger implements LoggerService {
       ...(requestId ? { requestId } : {}),
       ...(stack ? { stack: this.sanitize(stack, STACK_LIMIT) } : {}),
     };
-    const destination = level === 'error' || level === 'fatal' ? process.stderr : process.stdout;
-    destination.write(`${JSON.stringify(entry)}\n`);
+  }
+
+  /** The same entry for a person at a terminal (outside production), in color unless NO_COLOR or TERM=dumb. */
+  private terminalLine(entry: LogEntry): string {
+    const { level, requestId } = entry;
+    const useColor = process.env.NO_COLOR === undefined && process.env.TERM !== 'dumb';
+    const paint = (text: string, color: string): string => (useColor ? `\u001b[${color}m${text}\u001b[0m` : text);
+    const correlation = requestId ? ` ${paint(`requestId=${this.sanitize(requestId, 120)}`, '90')}` : '';
+    const details = entry.stack ? `\n  ${paint(entry.stack, '90')}` : '';
+
+    return (
+      `${paint(entry.timestamp, '90')} ${paint(level.toUpperCase().padEnd(7), LEVEL_COLORS[level])} ` +
+      `${paint(`[${entry.service}]`, '90')} ${paint(`[${entry.context}]`, '36')} ` +
+      `${paint(entry.message, LEVEL_COLORS[level])}${correlation}${details}\n`
+    );
   }
 
   private sanitize(value: string, limit: number): string {

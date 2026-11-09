@@ -1,0 +1,607 @@
+{
+  "referenceAuthor": "AI draft by Claude Sonnet — not reviewed by a human; Opus coordinator spot-check pending",
+  "direction": "en-vi",
+  "note": "SYNTHETIC data: invented people, companies, codes; *.example e-mail domains. References are AI drafts, not human gold.",
+  "items": [
+    {
+      "id": "h-en-001",
+      "source": "We have no spare licenses for the new interns.",
+      "reference": "Chúng tôi không còn giấy phép dự phòng nào cho các thực tập sinh mới.",
+      "categories": ["negation", "plain"],
+      "protected": [],
+      "mustContain": [["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-002",
+      "source": "Never reuse the same password for two tools.",
+      "reference": "Đừng bao giờ dùng lại cùng một mật khẩu cho hai công cụ.",
+      "categories": ["negation", "plain"],
+      "protected": [],
+      "mustContain": [["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-003",
+      "source": "The invoice has not been paid, and the vendor will not extend the deadline.",
+      "reference": "Hóa đơn chưa được thanh toán và nhà cung cấp sẽ không gia hạn thời hạn.",
+      "categories": ["negation", "plain"],
+      "protected": [],
+      "mustContain": [["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-004",
+      "source": "Nobody in procurement has seen this contract.",
+      "reference": "Không ai ở bộ phận mua sắm từng xem hợp đồng này.",
+      "categories": ["negation", "plain"],
+      "protected": [],
+      "mustContain": [["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-005",
+      "source": "The new hire doesn't have access to the billing portal yet.",
+      "reference": "Nhân viên mới chưa có quyền truy cập cổng thanh toán.",
+      "categories": ["negation", "plain"],
+      "protected": [],
+      "mustContain": [["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-006",
+      "source": "You cannot install plugins without administrator approval.",
+      "reference": "Bạn không thể cài plugin nếu không có sự phê duyệt của quản trị viên.",
+      "categories": ["negation", "approve"],
+      "protected": [],
+      "mustContain": [
+        ["không", "chưa", "chẳng", "đừng", "chớ"],
+        ["duyệt", "chấp thuận", "đồng ý", "chấp nhận", "tán thành", "phê chuẩn", "cấp"]
+      ],
+      "mustNotContain": ["từ chối", "bác bỏ"]
+    },
+    {
+      "id": "h-en-007",
+      "source": "This subscription does not renew automatically.",
+      "reference": "Gói đăng ký này không tự động gia hạn.",
+      "categories": ["negation", "glossary"],
+      "protected": [],
+      "mustContain": [["gia hạn"], ["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-008",
+      "source": "There is no seat left in the Marketing department plan.",
+      "reference": "Gói của phòng Marketing không còn seat nào.",
+      "categories": ["negation", "glossary"],
+      "protected": [],
+      "mustContain": [["seat"], ["phòng"], ["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-009",
+      "source": "The team never received the activation key.",
+      "reference": "Nhóm chưa bao giờ nhận được khóa kích hoạt.",
+      "categories": ["negation", "plain"],
+      "protected": [],
+      "mustContain": [["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-010",
+      "source": "Without a Cost Center, the purchase cannot proceed.",
+      "reference": "Nếu không có Cost Center, việc mua hàng không thể tiếp tục.",
+      "categories": ["negation", "glossary"],
+      "protected": ["Cost Center"],
+      "mustContain": [["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-011",
+      "source": "The budget committee endorsed the plan to consolidate three analytics tools.",
+      "reference": "Ủy ban ngân sách tán thành kế hoạch hợp nhất ba công cụ phân tích.",
+      "categories": ["approve", "plain"],
+      "protected": [],
+      "mustContain": [["duyệt", "chấp thuận", "đồng ý", "chấp nhận", "tán thành", "phê chuẩn", "cấp"]],
+      "mustNotContain": ["từ chối", "bác bỏ"]
+    },
+    {
+      "id": "h-en-012",
+      "source": "I am happy to approve the extra seats for the design team.",
+      "reference": "Tôi sẵn lòng duyệt thêm seat cho nhóm thiết kế.",
+      "categories": ["approve", "glossary"],
+      "protected": [],
+      "mustContain": [["seat"], ["duyệt", "chấp thuận", "đồng ý", "chấp nhận", "tán thành", "phê chuẩn", "cấp"]],
+      "mustNotContain": ["từ chối", "bác bỏ"]
+    },
+    {
+      "id": "h-en-013",
+      "source": "Your request to install Docker Desktop was approved yesterday.",
+      "reference": "Yêu cầu cài Docker Desktop của bạn đã được duyệt hôm qua.",
+      "categories": ["approve", "software"],
+      "protected": ["Docker Desktop"],
+      "mustContain": [["duyệt", "chấp thuận", "đồng ý", "chấp nhận", "tán thành", "phê chuẩn", "cấp"]],
+      "mustNotContain": ["từ chối", "bác bỏ"]
+    },
+    {
+      "id": "h-en-014",
+      "source": "The Spending Approver agreed to cover the cost of the Postman upgrade.",
+      "reference": "Người duyệt chi đồng ý chi trả khoản nâng cấp Postman.",
+      "categories": ["approve", "software", "glossary"],
+      "protected": ["Postman"],
+      "mustContain": [
+        ["người duyệt chi"],
+        ["duyệt", "chấp thuận", "đồng ý", "chấp nhận", "tán thành", "phê chuẩn", "cấp"]
+      ],
+      "mustNotContain": ["từ chối", "bác bỏ"]
+    },
+    {
+      "id": "h-en-015",
+      "source": "We accept the vendor offer of 14,000 USD for two years.",
+      "reference": "Chúng tôi chấp nhận đề nghị 14,000 USD trong hai năm của nhà cung cấp.",
+      "categories": ["approve", "number"],
+      "protected": ["14,000 USD"],
+      "mustContain": [["duyệt", "chấp thuận", "đồng ý", "chấp nhận", "tán thành", "phê chuẩn", "cấp"]],
+      "mustNotContain": ["từ chối", "bác bỏ"]
+    },
+    {
+      "id": "h-en-016",
+      "source": "The department head signed off on Tạ Minh Châu's laptop request.",
+      "reference": "Trưởng phòng đã ký duyệt yêu cầu laptop của Tạ Minh Châu.",
+      "categories": ["approve", "name", "glossary"],
+      "protected": ["Tạ Minh Châu"],
+      "mustContain": [
+        ["trưởng phòng"],
+        ["duyệt", "chấp thuận", "đồng ý", "chấp nhận", "tán thành", "phê chuẩn", "cấp"]
+      ],
+      "mustNotContain": ["từ chối", "bác bỏ"]
+    },
+    {
+      "id": "h-en-017",
+      "source": "Access to the analytics workspace is granted to all team leads.",
+      "reference": "Quyền truy cập không gian phân tích được cấp cho mọi trưởng nhóm.",
+      "categories": ["approve", "plain"],
+      "protected": [],
+      "mustContain": [["duyệt", "chấp thuận", "đồng ý", "chấp nhận", "tán thành", "phê chuẩn", "cấp"]],
+      "mustNotContain": ["từ chối", "bác bỏ"]
+    },
+    {
+      "id": "h-en-018",
+      "source": "Finance has authorised the purchase order PO-2027-009.",
+      "reference": "Phòng Tài chính đã duyệt đơn mua PO-2027-009.",
+      "categories": ["approve", "code"],
+      "protected": ["PO-2027-009"],
+      "mustContain": [["duyệt", "chấp thuận", "đồng ý", "chấp nhận", "tán thành", "phê chuẩn", "cấp"]],
+      "mustNotContain": ["từ chối", "bác bỏ"]
+    },
+    {
+      "id": "h-en-019",
+      "source": "Management declined to fund the extra Jira seats.",
+      "reference": "Ban quản lý từ chối tài trợ thêm seat Jira.",
+      "categories": ["reject", "software", "glossary"],
+      "protected": ["Jira"],
+      "mustContain": [
+        ["seat"],
+        [
+          "từ chối",
+          "bác bỏ",
+          "không duyệt",
+          "không được duyệt",
+          "không thể duyệt",
+          "không chấp",
+          "không đồng ý",
+          "khước từ",
+          "không được trưởng phòng duyệt",
+          "không được chấp thuận",
+          "không được chấp nhận"
+        ]
+      ],
+      "mustNotContain": ["đã được duyệt", "đã duyệt", "đã phê duyệt", "được phê duyệt"]
+    },
+    {
+      "id": "h-en-020",
+      "source": "The security team denied access to the production dashboard.",
+      "reference": "Nhóm bảo mật từ chối quyền truy cập bảng điều khiển sản xuất.",
+      "categories": ["reject", "plain"],
+      "protected": [],
+      "mustContain": [
+        [
+          "từ chối",
+          "bác bỏ",
+          "không duyệt",
+          "không được duyệt",
+          "không thể duyệt",
+          "không chấp",
+          "không đồng ý",
+          "khước từ",
+          "không được trưởng phòng duyệt",
+          "không được chấp thuận",
+          "không được chấp nhận"
+        ]
+      ],
+      "mustNotContain": ["đã được duyệt", "đã duyệt", "đã phê duyệt", "được phê duyệt"]
+    },
+    {
+      "id": "h-en-021",
+      "source": "Request REQ-2027-0044 was not approved by the department head.",
+      "reference": "Yêu cầu REQ-2027-0044 không được trưởng phòng duyệt.",
+      "categories": ["reject", "negation", "code", "glossary"],
+      "protected": ["REQ-2027-0044"],
+      "mustContain": [
+        ["trưởng phòng"],
+        [
+          "từ chối",
+          "bác bỏ",
+          "không duyệt",
+          "không được duyệt",
+          "không thể duyệt",
+          "không chấp",
+          "không đồng ý",
+          "khước từ",
+          "không được trưởng phòng duyệt",
+          "không được chấp thuận",
+          "không được chấp nhận"
+        ],
+        ["không", "chưa", "chẳng", "đừng", "chớ"]
+      ],
+      "mustNotContain": ["đã được duyệt", "đã duyệt", "đã phê duyệt", "được phê duyệt"]
+    },
+    {
+      "id": "h-en-022",
+      "source": "We rejected the offer because the renewal price rose by 22%.",
+      "reference": "Chúng tôi từ chối đề nghị vì giá gia hạn tăng 22%.",
+      "categories": ["reject", "number", "glossary"],
+      "protected": ["22%"],
+      "mustContain": [
+        ["gia hạn"],
+        [
+          "từ chối",
+          "bác bỏ",
+          "không duyệt",
+          "không được duyệt",
+          "không thể duyệt",
+          "không chấp",
+          "không đồng ý",
+          "khước từ",
+          "không được trưởng phòng duyệt",
+          "không được chấp thuận",
+          "không được chấp nhận"
+        ]
+      ],
+      "mustNotContain": ["đã được duyệt", "đã duyệt", "đã phê duyệt", "được phê duyệt"]
+    },
+    {
+      "id": "h-en-023",
+      "source": "Unfortunately the exception was turned down.",
+      "reference": "Rất tiếc, ngoại lệ đã bị bác bỏ.",
+      "categories": ["reject", "plain"],
+      "protected": [],
+      "mustContain": [
+        [
+          "từ chối",
+          "bác bỏ",
+          "không duyệt",
+          "không được duyệt",
+          "không thể duyệt",
+          "không chấp",
+          "không đồng ý",
+          "khước từ",
+          "không được trưởng phòng duyệt",
+          "không được chấp thuận",
+          "không được chấp nhận"
+        ]
+      ],
+      "mustNotContain": ["đã được duyệt", "đã duyệt", "đã phê duyệt", "được phê duyệt"]
+    },
+    {
+      "id": "h-en-024",
+      "source": "The Spending Approver refused the 7,800,000 VND expense.",
+      "reference": "Người duyệt chi từ chối khoản chi 7,800,000 VND.",
+      "categories": ["reject", "number", "glossary"],
+      "protected": ["7,800,000 VND"],
+      "mustContain": [
+        ["người duyệt chi"],
+        [
+          "từ chối",
+          "bác bỏ",
+          "không duyệt",
+          "không được duyệt",
+          "không thể duyệt",
+          "không chấp",
+          "không đồng ý",
+          "khước từ",
+          "không được trưởng phòng duyệt",
+          "không được chấp thuận",
+          "không được chấp nhận"
+        ]
+      ],
+      "mustNotContain": ["đã được duyệt", "đã duyệt", "đã phê duyệt", "được phê duyệt"]
+    },
+    {
+      "id": "h-en-025",
+      "source": "IT cannot approve the installation of unverified browser extensions.",
+      "reference": "Phòng IT không thể duyệt việc cài các tiện ích trình duyệt chưa được kiểm định.",
+      "categories": ["reject", "negation", "glossary"],
+      "protected": [],
+      "mustContain": [
+        ["phòng"],
+        [
+          "từ chối",
+          "bác bỏ",
+          "không duyệt",
+          "không được duyệt",
+          "không thể duyệt",
+          "không chấp",
+          "không đồng ý",
+          "khước từ",
+          "không được trưởng phòng duyệt",
+          "không được chấp thuận",
+          "không được chấp nhận"
+        ],
+        ["không", "chưa", "chẳng", "đừng", "chớ"]
+      ],
+      "mustNotContain": ["đã được duyệt", "đã duyệt", "đã phê duyệt", "được phê duyệt"]
+    },
+    {
+      "id": "h-en-026",
+      "source": "The proposal to share one Zoom account was disapproved.",
+      "reference": "Đề xuất dùng chung một tài khoản Zoom không được chấp thuận.",
+      "categories": ["reject", "software"],
+      "protected": ["Zoom"],
+      "mustContain": [
+        [
+          "từ chối",
+          "bác bỏ",
+          "không duyệt",
+          "không được duyệt",
+          "không thể duyệt",
+          "không chấp",
+          "không đồng ý",
+          "khước từ",
+          "không được trưởng phòng duyệt",
+          "không được chấp thuận",
+          "không được chấp nhận"
+        ]
+      ],
+      "mustNotContain": ["đã được duyệt", "đã duyệt", "đã phê duyệt", "được phê duyệt"]
+    },
+    {
+      "id": "h-en-027",
+      "source": "The administrator withdrew access for Phan Văn Tài after the audit.",
+      "reference": "Quản trị viên đã rút quyền truy cập của Phan Văn Tài sau đợt kiểm toán.",
+      "categories": ["revoke", "name"],
+      "protected": ["Phan Văn Tài"],
+      "mustContain": [["thu hồi", "rút quyền", "hủy quyền", "gỡ quyền", "tước quyền"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-028",
+      "source": "Licenses of inactive laptops will be revoked next week.",
+      "reference": "Giấy phép của các laptop không hoạt động sẽ bị thu hồi vào tuần sau.",
+      "categories": ["revoke", "glossary"],
+      "protected": [],
+      "mustContain": [["thu hồi"], ["thu hồi", "rút quyền", "hủy quyền", "gỡ quyền", "tước quyền"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-029",
+      "source": "We removed access to the shared drive for former contractors.",
+      "reference": "Chúng tôi đã gỡ quyền truy cập ổ đĩa chung của các nhà thầu cũ.",
+      "categories": ["revoke", "plain"],
+      "protected": [],
+      "mustContain": [["thu hồi", "rút quyền", "hủy quyền", "gỡ quyền", "tước quyền"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-030",
+      "source": "Revocation of the old API key is scheduled for 15/02/2027.",
+      "reference": "Việc thu hồi khóa API cũ được lên lịch vào 15/02/2027.",
+      "categories": ["revoke", "date", "glossary"],
+      "protected": ["15/02/2027"],
+      "mustContain": [["thu hồi"], ["thu hồi", "rút quyền", "hủy quyền", "gỡ quyền", "tước quyền"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-031",
+      "source": "Please do not revoke the badge until the handover meeting.",
+      "reference": "Vui lòng không thu hồi thẻ cho đến khi họp bàn giao.",
+      "categories": ["revoke", "negation", "glossary"],
+      "protected": [],
+      "mustContain": [
+        ["bàn giao"],
+        ["thu hồi", "rút quyền", "hủy quyền", "gỡ quyền", "tước quyền"],
+        ["không", "chưa", "chẳng", "đừng", "chớ"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-032",
+      "source": "The vendor will rescind the discount if we cancel early.",
+      "reference": "Nhà cung cấp sẽ thu hồi ưu đãi giảm giá nếu chúng tôi hủy sớm.",
+      "categories": ["revoke", "plain"],
+      "protected": [],
+      "mustContain": [["thu hồi", "rút quyền", "hủy quyền", "gỡ quyền", "tước quyền"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-033",
+      "source": "After the handover, the departing manager's seat is revoked at once.",
+      "reference": "Sau khi bàn giao, seat của quản lý nghỉ việc bị thu hồi ngay.",
+      "categories": ["revoke", "glossary"],
+      "protected": [],
+      "mustContain": [["seat"], ["bàn giao"], ["thu hồi", "rút quyền", "hủy quyền", "gỡ quyền", "tước quyền"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-034",
+      "source": "Remove access for the intern account today.",
+      "reference": "Hãy gỡ quyền truy cập của tài khoản thực tập sinh ngay hôm nay.",
+      "categories": ["revoke", "plain"],
+      "protected": [],
+      "mustContain": [["thu hồi", "rút quyền", "hủy quyền", "gỡ quyền", "tước quyền"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-035",
+      "source": "Acme Demo Co will pay 31,500,000 VND for the Atlassian bundle.",
+      "reference": "Acme Demo Co sẽ thanh toán 31,500,000 VND cho gói Atlassian.",
+      "categories": ["name", "number", "software"],
+      "protected": ["Acme Demo Co", "31,500,000 VND", "Atlassian"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-036",
+      "source": "Invoice INV-2027-0123 goes to accounting@acme-demo.example before December 8, 2026.",
+      "reference": "Hóa đơn INV-2027-0123 được gửi tới accounting@acme-demo.example trước December 8, 2026.",
+      "categories": ["code", "email", "date"],
+      "protected": ["INV-2027-0123", "accounting@acme-demo.example", "December 8, 2026"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-037",
+      "source": "The audit meeting is on 21/01/2027 in the meeting room on floor 4.",
+      "reference": "Cuộc họp kiểm toán diễn ra vào 21/01/2027 tại phòng họp tầng 4.",
+      "categories": ["date", "glossary"],
+      "protected": ["21/01/2027"],
+      "mustContain": [["phòng họp"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-038",
+      "source": "Tạ Minh Châu needs GitLab and SonarQube for the QA team.",
+      "reference": "Tạ Minh Châu cần GitLab và SonarQube cho nhóm QA.",
+      "categories": ["name", "software"],
+      "protected": ["Tạ Minh Châu", "GitLab", "SonarQube"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-039",
+      "source": "Contract HD-2027-08 costs 19,500 USD for 36 months.",
+      "reference": "Hợp đồng HD-2027-08 có giá 19,500 USD cho 36 tháng.",
+      "categories": ["code", "number"],
+      "protected": ["HD-2027-08", "19,500 USD"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-040",
+      "source": "Login details were emailed to hoa.ly@acme-demo.example this morning.",
+      "reference": "Thông tin đăng nhập đã được gửi tới hoa.ly@acme-demo.example sáng nay.",
+      "categories": ["email"],
+      "protected": ["hoa.ly@acme-demo.example"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-041",
+      "source": "The cancellation deadline for Dropbox is 15/01/2027, otherwise it renews for a year.",
+      "reference": "Hạn báo hủy Dropbox là 15/01/2027, nếu không sẽ gia hạn một năm.",
+      "categories": ["glossary", "date", "software"],
+      "protected": ["Dropbox", "15/01/2027"],
+      "mustContain": [["hạn báo hủy", "hạn báo huỷ"], ["gia hạn"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-042",
+      "source": "List price is $4,800 per year, with a 9% discount on three-year deals.",
+      "reference": "Giá niêm yết là $4,800 mỗi năm, giảm 9% cho hợp đồng ba năm.",
+      "categories": ["number"],
+      "protected": ["$4,800", "9%"],
+      "mustContain": [],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-043",
+      "source": "Could you approve the ticket please? Chị Mai đã check xong rồi.",
+      "reference": "Bạn duyệt giúp phiếu này nhé? Chị Mai đã check xong rồi.",
+      "categories": ["mixed", "approve"],
+      "protected": ["Chị Mai đã check xong rồi."],
+      "mustContain": [["duyệt", "chấp thuận", "đồng ý", "chấp nhận", "tán thành", "phê chuẩn", "cấp"]],
+      "mustNotContain": ["từ chối", "bác bỏ"]
+    },
+    {
+      "id": "h-en-044",
+      "source": "We do not need the premium tier, chỉ cần gói basic thôi.",
+      "reference": "Chúng tôi không cần gói premium, chỉ cần gói basic thôi.",
+      "categories": ["mixed", "negation"],
+      "protected": ["chỉ cần gói basic thôi"],
+      "mustContain": [["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-045",
+      "source": "The field <x0> in the report template is not a real code.",
+      "reference": "Trường <x0> trong mẫu báo cáo không phải là mã thật.",
+      "categories": ["collision", "negation"],
+      "protected": ["<x0>"],
+      "mustContain": [["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-046",
+      "source": "The template uses <x3> instead of the name Tạ Minh Châu and must not be removed.",
+      "reference": "Mẫu dùng <x3> thay cho tên Tạ Minh Châu và không được xóa.",
+      "categories": ["collision", "negation", "name"],
+      "protected": ["<x3>", "Tạ Minh Châu"],
+      "mustContain": [["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-047",
+      "source": "Project Orion needs a load-testing tool. Please grant 6 JMeter Cloud seats until 30/06/2027. The budget was approved last week.",
+      "reference": "Dự án Orion cần một công cụ kiểm thử tải. Đề nghị cấp 6 seat JMeter Cloud đến hết 30/06/2027. Ngân sách đã được duyệt tuần trước.",
+      "categories": ["approve", "software", "date", "glossary"],
+      "protected": ["Orion", "JMeter Cloud", "30/06/2027"],
+      "mustContain": [["seat"], ["duyệt", "chấp thuận", "đồng ý", "chấp nhận", "tán thành", "phê chuẩn", "cấp"]],
+      "mustNotContain": ["từ chối", "bác bỏ"]
+    },
+    {
+      "id": "h-en-048",
+      "source": "We will not renew Dropbox. The team will migrate the files to internal storage. The old accounts will be revoked after 30 days.",
+      "reference": "Chúng tôi sẽ không gia hạn Dropbox. Nhóm sẽ chuyển tệp sang kho lưu trữ nội bộ. Các tài khoản cũ sẽ bị thu hồi sau 30 ngày.",
+      "categories": ["negation", "revoke", "software", "glossary"],
+      "protected": ["Dropbox"],
+      "mustContain": [
+        ["gia hạn"],
+        ["không", "chưa", "chẳng", "đừng", "chớ"],
+        ["thu hồi", "rút quyền", "hủy quyền", "gỡ quyền", "tước quyền"]
+      ],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-049",
+      "source": "Never turn off two-factor authentication. The security policy does not allow exceptions. Contact it-helpdesk@acme-demo.example for support.",
+      "reference": "Đừng bao giờ tắt xác thực hai lớp. Chính sách bảo mật không cho phép ngoại lệ. Liên hệ it-helpdesk@acme-demo.example để được hỗ trợ.",
+      "categories": ["negation", "email"],
+      "protected": ["it-helpdesk@acme-demo.example"],
+      "mustContain": [["không", "chưa", "chẳng", "đừng", "chớ"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-L1",
+      "source": "We are writing this request to present a plan for sharing a performance-monitoring tool across three product teams, in which the payments team needs ten Datadog seats to track transaction latency, the search team needs five seats to compare figures before and after each system update, and the mobile team needs four more seats because the number of incidents this quarter has almost doubled, but the current budget covers only eight seats, so we ask the Finance department to consider advancing the expense for the missing part, so that all three teams can start at the beginning of next quarter.",
+      "reference": "Chúng tôi viết đề nghị này để trình bày kế hoạch dùng chung công cụ đo kiểm hiệu năng cho ba nhóm sản phẩm, trong đó nhóm thanh toán cần mười seat Datadog để theo dõi độ trễ giao dịch, nhóm tìm kiếm cần năm seat để so sánh số liệu trước và sau mỗi lần cập nhật hệ thống, và nhóm di động cần thêm bốn seat vì số sự cố trong quý này đã tăng gần gấp đôi, nhưng ngân sách hiện tại chỉ đủ cho tám seat, nên chúng tôi đề nghị phòng Tài chính xem xét tạm ứng khoản chi cho phần còn thiếu, để cả ba nhóm có thể bắt đầu từ đầu quý sau.",
+      "categories": ["long", "software", "glossary"],
+      "protected": ["Datadog"],
+      "mustContain": [["seat"], ["phòng"]],
+      "mustNotContain": []
+    },
+    {
+      "id": "h-en-L2",
+      "source": "The year-end license inventory shows that the Operations department still has twelve unused Confluence seats, the Engineering department is sharing one GitHub account among three people although the policy does not allow it, the design team bought two duplicate Figma plans because two team leads submitted the same request, while the testing team still has no test-case management tool other than a spreadsheet, so we propose to revoke the unused seats, merge the Figma plans, issue a separate account to each person and buy a test-case management tool next quarter, provided that the total cost does not exceed the limit approved for 2027.",
+      "reference": "Báo cáo kiểm kê giấy phép cuối năm cho thấy phòng Vận hành còn mười hai seat Confluence chưa dùng, phòng Kỹ thuật đang chia sẻ một tài khoản GitHub giữa ba người dù chính sách không cho phép, nhóm thiết kế đã mua trùng hai gói Figma do hai trưởng nhóm cùng gửi yêu cầu, trong khi nhóm kiểm thử vẫn chưa có công cụ quản lý ca kiểm thử nào ngoài bảng tính, vì vậy chúng tôi đề xuất thu hồi các seat chưa dùng, hợp nhất gói Figma, cấp riêng tài khoản cho từng người và mua một công cụ quản lý ca kiểm thử trong quý sau, miễn là tổng chi phí không vượt hạn mức đã được duyệt cho năm 2027.",
+      "categories": ["long", "negation", "revoke", "software", "glossary"],
+      "protected": ["Confluence", "GitHub", "Figma"],
+      "mustContain": [
+        ["seat"],
+        ["phòng"],
+        ["không", "chưa", "chẳng", "đừng", "chớ"],
+        ["thu hồi", "rút quyền", "hủy quyền", "gỡ quyền", "tước quyền"]
+      ],
+      "mustNotContain": []
+    }
+  ]
+}

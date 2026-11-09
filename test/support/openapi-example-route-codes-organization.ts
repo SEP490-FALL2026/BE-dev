@@ -1,0 +1,110 @@
+import type { RouteErrorStatus } from './openapi-example-manifest';
+
+/** Part of ROUTE_ERROR_CODES (organization), traced on BE `ea73c2f` (25/10/2026): see openapi-example-manifest.ts. */
+export const ROUTE_ERROR_CODES_ORGANIZATION: Readonly<
+  Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
+> = {
+  costCenterCreate: {
+    '409': ['COST_CENTER.CODE_TAKEN', 'COST_CENTER.DEPARTMENT_ALREADY_LINKED'],
+    '422': [
+      'COST_CENTER.DEPARTMENT_NOT_ACTIVE',
+      'COST_CENTER.KIND_NOT_SUPPORTED',
+      'COST_CENTER.NAME_INVALID',
+      'COST_CENTER.NAME_RESERVED',
+    ],
+  },
+  costCenterDeactivate: {
+    '404': ['COST_CENTER.NOT_FOUND'],
+    '409': ['COST_CENTER.IN_USE'],
+  },
+  costCenterEmployeeList: {
+    '404': ['COST_CENTER.NOT_FOUND'],
+  },
+  costCenterRename: {
+    '404': ['COST_CENTER.NOT_FOUND'],
+    '422': ['COST_CENTER.NAME_INVALID', 'COST_CENTER.NAME_RESERVED'],
+  },
+  departmentCreate: {
+    '409': ['DEPARTMENT.CODE_TAKEN', 'DEPARTMENT.OUTSIDE_BUDGET_PERIOD'],
+    '422': ['DEPARTMENT.IT_ADMIN_INVALID', 'DEPARTMENT.NAME_INVALID'],
+  },
+  departmentDeactivate: {
+    '404': ['DEPARTMENT.NOT_FOUND'],
+    '409': ['DEPARTMENT.IN_USE'],
+  },
+  departmentGet: {
+    '403': ['DEPARTMENT.OUT_OF_SCOPE'],
+    '404': ['DEPARTMENT.NOT_FOUND'],
+  },
+  departmentHeadAssign: {
+    '404': ['DEPARTMENT.NOT_FOUND'],
+    '409': ['DEPARTMENT.INACTIVE'],
+    '422': [
+      'DEPARTMENT.HEAD_DATE_IN_PAST',
+      'DEPARTMENT.HEAD_EMPLOYEE_NOT_ACTIVE',
+      'DEPARTMENT.HEAD_EMPLOYEE_NOT_FOUND',
+      'DEPARTMENT.HEAD_HEADS_ANOTHER_DEPARTMENT',
+      'DEPARTMENT.HEAD_NOT_A_MEMBER_ON_DATE',
+      'DEPARTMENT.HEAD_SUPER_ADMIN_CANNOT_HEAD',
+      'DEPARTMENT.HEAD_SPENDING_APPROVER_CANNOT_HEAD',
+      'DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED',
+      'DEPARTMENT.NOT_YET_EFFECTIVE',
+    ],
+  },
+  departmentHeadVacate: {
+    '404': ['DEPARTMENT.NOT_FOUND'],
+    '422': ['DEPARTMENT.HEAD_DATE_IN_PAST'],
+  },
+  departmentMemberList: {
+    '403': ['DEPARTMENT.OUT_OF_SCOPE'],
+    '404': ['DEPARTMENT.NOT_FOUND'],
+  },
+  departmentSuccessorClear: {
+    '404': ['DEPARTMENT.NOT_FOUND'],
+  },
+  departmentSuccessorDesignate: {
+    '404': ['DEPARTMENT.NOT_FOUND'],
+    '409': ['DEPARTMENT.HEAD_SUCCESSOR_ALREADY_NAMED', 'DEPARTMENT.INACTIVE'],
+    '422': [
+      'DEPARTMENT.HEAD_EMPLOYEE_NOT_ACTIVE',
+      'DEPARTMENT.HEAD_EMPLOYEE_NOT_FOUND',
+      'DEPARTMENT.HEAD_HEADS_ANOTHER_DEPARTMENT',
+      'DEPARTMENT.HEAD_NOT_A_MEMBER_ON_DATE',
+      'DEPARTMENT.HEAD_SUCCESSOR_DATE_NOT_FUTURE',
+      'DEPARTMENT.HEAD_SUCCESSOR_IS_THE_HEAD',
+      'DEPARTMENT.HEAD_SUCCESSOR_NEEDS_A_HEAD',
+      'DEPARTMENT.HEAD_SUPER_ADMIN_CANNOT_HEAD',
+      'DEPARTMENT.HEAD_SPENDING_APPROVER_CANNOT_HEAD',
+      'DEPARTMENT.HEAD_MANAGER_ROLE_REQUIRED',
+    ],
+  },
+  departmentTechnicalMemberList: {
+    '404': ['DEPARTMENT.NOT_FOUND'],
+  },
+  departmentUpdate: {
+    '404': ['DEPARTMENT.NOT_FOUND'],
+    '409': ['DEPARTMENT.INACTIVE'],
+    '422': ['DEPARTMENT.IT_ADMIN_INVALID', 'DEPARTMENT.NAME_INVALID', 'DEPARTMENT.UPDATE_EMPTY'],
+  },
+  employeeCreate: {
+    '422': ['EMPLOYEE.ROW_INVALID'],
+  },
+  employeeFirstPlacement: {
+    '404': ['DEPARTMENT.NOT_FOUND', 'EMPLOYEE.NOT_FOUND'],
+    '409': [
+      'DEPARTMENT.INACTIVE',
+      'EMPLOYEE.ALREADY_PLACED',
+      'EMPLOYEE.EMPLOYEE_INACTIVE',
+      'EMPLOYEE.EMPLOYEE_LEAVING',
+    ],
+    '422': ['DEPARTMENT.NOT_YET_EFFECTIVE', 'EMPLOYEE.DATE_INVALID'],
+  },
+  employeeGet: {
+    '404': ['EMPLOYEE.NOT_FOUND'],
+  },
+  employeeUpdateOfficialFields: {
+    '403': ['EMPLOYEE.SELF_CHANGE_FORBIDDEN'],
+    '404': ['EMPLOYEE.NOT_FOUND'],
+    '422': ['EMPLOYEE.ROW_INVALID', 'EMPLOYEE.UPDATE_EMPTY'],
+  },
+};

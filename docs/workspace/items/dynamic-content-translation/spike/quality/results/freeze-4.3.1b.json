@@ -1,0 +1,23 @@
+{
+  "frozenAt": "2026-10-14T18:44:32.566Z",
+  "note": "lib/*.mjs and the fixture files as they were BEFORE the 4.3.1 benchmark run. Guards must not be tuned after looking at the results.",
+  "lib": {
+    "lib/chrf.mjs": "dd34291ce919966fa2185524befcb009f82a2cf4277f377c999e7330383dabc4",
+    "lib/cli.mjs": "0b59ec3df543c5cd795a1708f671f4d18d0fab69554298af42ca35ef76fb24c0",
+    "lib/generate-adapter.mjs": "8949feb86b8dda5c1774c593a95247e3de699c96e832b543c62df22b2c8fc210",
+    "lib/glossary.mjs": "831f0e273b891d2bf3a5781a5b44e1d2f1a86c8882b037889318fc75a2bc321d",
+    "lib/metrics.mjs": "97672836ac8b2a9460c53d5f8ec8ecbf53faa754388ab88522fdd07d0a6848b6",
+    "lib/model.mjs": "cf552faa2e971152a6d36ce191370c472aee643b34c0724a0ec5d8a0d853dc3c",
+    "lib/pipeline.mjs": "36555bb1e906d478ac585a4d5e4a2c8cfa4ab8c54ed1476d2e01b121c541cd3a",
+    "lib/polarity.mjs": "0831f68e2c8d91e0f0502fc07a0b3076dd0a58caa968be09daaae6b4353c8c54",
+    "lib/protect.mjs": "d9342e20bbaee794d4e4bac8f49d66976066032bdc7249668e3dafcd221ea137",
+    "lib/report.mjs": "1d0eef46fa7ba4aa8058003d5a7f2ab1dc546b49d37eb91e247576093c71c5a1",
+    "lib/segmenter.mjs": "134fa1026ca6a25223f83a556a915186f6414fc281c0c1a58ffbf8321dccd59a"
+  },
+  "fixtures": {
+    "fixtures/vi-en.json": "acf33bd37b3e4c669a48c7ce3f1cff862e48fb78a07222f9c3a23703df164357",
+    "fixtures/en-vi.json": "98e7e716f920377ce2d7bbfeb1936cf9e4bcb241a389707f277746e889795f6d",
+    "fixtures/heldout-vi-en.json": "fe29b4685767d599b088651b490eb4648a6ff673ea95eaca234442970b5c376f",
+    "fixtures/heldout-en-vi.json": "a4148b46aae29beeb26e59798a63459fd2ac2ebdd58db536753a9e6b99480eb2"
+  }
+}

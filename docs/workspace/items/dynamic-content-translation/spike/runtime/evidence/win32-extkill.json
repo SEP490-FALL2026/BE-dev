@@ -1,0 +1,94 @@
+{
+  "scenario": "extkill",
+  "profile": "win32",
+  "node": "v24.0.1",
+  "platform": "win32-x64",
+  "transformersPath": "direct-generate",
+  "seconds": 30,
+  "cgroupAfter": {
+    "memoryPeakMb": null,
+    "memoryCurrentMb": null,
+    "memoryMax": null,
+    "cpuMax": null,
+    "cpuStat": null
+  },
+  "result": {
+    "phaseA_breaker": {
+      "trials": [
+        {
+          "settleAfterKillMs": 62,
+          "status": "UNAVAILABLE",
+          "reason": "crash",
+          "breaker": {
+            "state": "CLOSED",
+            "cooldownMs": 30000,
+            "opens": 0,
+            "recentFailures": 1
+          }
+        },
+        {
+          "settleAfterKillMs": 65,
+          "status": "UNAVAILABLE",
+          "reason": "crash",
+          "breaker": {
+            "state": "CLOSED",
+            "cooldownMs": 30000,
+            "opens": 0,
+            "recentFailures": 2
+          }
+        },
+        {
+          "settleAfterKillMs": 62,
+          "status": "UNAVAILABLE",
+          "reason": "crash",
+          "breaker": {
+            "state": "OPEN",
+            "cooldownMs": 30000,
+            "opens": 1,
+            "recentFailures": 0
+          }
+        }
+      ],
+      "afterOpen": {
+        "status": "UNAVAILABLE",
+        "reason": "breaker-open",
+        "ms": 1.4
+      }
+    },
+    "phaseB_settle": {
+      "trials": 10,
+      "settleAfterKillMs": {
+        "n": 10,
+        "min": 48,
+        "p50": 59,
+        "p95": 75,
+        "p99": 75,
+        "max": 75,
+        "mean": 60.1
+      },
+      "allUnavailableCrash": true,
+      "under100ms": 10
+    },
+    "respawnAfterExitMs": {
+      "n": 10,
+      "min": 15.1,
+      "p50": 19.6,
+      "p95": 21.5,
+      "p99": 21.5,
+      "max": 21.5,
+      "mean": 19.1
+    },
+    "eventAnalysis": {
+      "violations": [],
+      "maxLive": 1,
+      "maxConcurrentRuns": 1,
+      "dispatches": 12,
+      "kills": 0,
+      "releasesByExit": 10,
+      "events": 105
+    },
+    "failuresByKind": {
+      "crash": 10
+    }
+  }
+}

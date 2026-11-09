@@ -1,0 +1,1153 @@
+// The requests context (C4, ADR-0015): a request for access to software, the people it is for, and the steps that
+// decide it. Money, budgets and commitments are not here yet: the slices that need them add their own tables.
+
+enum RequestRoutingMode {
+  VIA_HEAD
+  ONE_STEP
+}
+
+enum AccessRequestType {
+  GRANT
+  // A service account asked for after the installation: a non-human subject owned by the department of the person who
+  // answers for it (US-05-21). It has one row of detail in `access_request_service_accounts`.
+  SERVICE_ACCOUNT
+  // The renewal of a right that ends on a day (US-05-14): a request like any other, whose approval does not wait for the IT
+  // Admin but writes a record that follows the old one. It has one row of detail in `access_request_renewals`.
+  RENEWAL
+  // One request for up to ten people of a department, or for as many as the head names (US-05-17): each person is a line of
+  // `access_request_lines` with a state, a decision and an outcome of their own. Always paid software already in the catalog.
+  GROUP_GRANT
+}
+
+// (a) internal software, no fee: Need then the IT Admin by hand. (b) paid or licensed software already in the catalog:
+// Need, then a spend decision, then the IT Admin. The branch of new software outside the catalog is added by the slice
+// that assesses it (`ALTER TYPE ... ADD VALUE`, no down migration — DB-05).
+enum AccessRequestBranch {
+  INTERNAL_FREE
+  PAID_IN_CATALOG
+  // (c) software that is not in the catalog yet: Need, then the IT Admin assesses it (BM-02), then a spend decision, then
+  // the IT Admin carries out the grant once the software is in the catalog.
+  NEW_SOFTWARE
+}
+
+enum AccessRequestState {
+  AWAITING_REQUESTER_REVISION
+  PENDING
+  // The need step is approved; the IT Admin carries the grant out by hand (branch INTERNAL_FREE).
+  AWAITING_EXECUTION
+  // The need step is approved; the IT Admin completes the assessment of the proposed software (branch NEW_SOFTWARE).
+  AWAITING_IT_ASSESSMENT
+  // The need step is approved; the head of the department sends it on to be decided as spend (branch PAID_IN_CATALOG).
+  AWAITING_SPEND_SUBMISSION
+  // The need step was refused: the request ends, with no spend step and no commitment.
+  REJECTED
+  // The IT Admin refused it at the gate of the assessment (cannot be controlled, or not eligible for the catalog): it
+  // ends, with no spend step, no snapshot and no commitment (US-05-18).
+  IT_REJECTED
+  // The grant is being carried out: an assignment and a task of the IT Admin exist for it (US-07-01).
+  EXECUTING
+  // The task of the grant was completed with evidence: the seat is real.
+  COMPLETED
+  // The IT Admin closed the grant as failed (FR-2.5, QĐ-62i).
+  FAILED
+  // The need step has nobody valid to hold it; nothing decides it and nothing refuses it until somebody valid exists.
+  WAITING_CONTROLLED
+  // The check of the budget found an exception or a high value: Finance reviews it before anyone decides it as spend
+  // (US-06-12, US-06-13). There is no spend step yet.
+  AWAITING_FINANCE_REVIEW
+  // Finance asked for the budget of the year to be made: it waits, under control, for a version to be approved (US-06-13 AC-11).
+  AWAITING_BUDGET
+  // The spend step is open: the spending approver decides it (US-06-01).
+  AWAITING_SPEND_DECISION
+  // The requester withdrew while the grant had failed: the IT Admin closes the task as cancelled, and only then does the request
+  // end (US-05-08 AC-9). Nothing else is decided on it meanwhile.
+  AWAITING_IT_CLOSE
+  // The requester (or, in the cases of FR-3.20, the head) withdrew it: it ends, neither refused nor failed (FR-2.5).
+  WITHDRAWN
+  // The IT Admin closed it because the person it was for left: it ends, neither refused, failed nor withdrawn (US-03-04 AC-25).
+  CANCELLED
+  // Written by the release after this one: a paid request being drafted. Never shown, never written by this release (spec L.1, L.10).
+  DRAFT
+}
+
+// Why the IT Admin cancelled a request. One cause today.
+enum AccessRequestCancelCause {
+  BENEFICIARY_LEFT
+  // The IT Admin closed what was left of it because the beneficiary was transferred (spec L.10). Read only here.
+  BENEFICIARY_TRANSFERRED
+  // The conversion command closed it because the spending approver is one of its parties (QĐ-93d(2), QĐ-93k(1)); nobody closed it:
+  // the one cause for which the column of who closed it may be empty (OD-6).
+  SPENDING_APPROVER_PARTY
+}
+
+// Pricing model of a plan: recurring (monthly/yearly), one-time (perpetual license).
+enum AccessRequestPriceKind {
+  RECURRING
+  ONE_TIME
+}
+
+// Whether the request has an amount: internal software has none; paid software is priced from its plan in the catalog, or
+// is missing its price and cannot be sent on to be decided as spend (FR-3.2, QĐ-82m C, QĐ-84e).
+enum AccessRequestPricingStatus {
+  NOT_APPLICABLE
+  PRICED
+  MISSING
+}
+
+enum AccessRequestStepKind {
+  NEED
+  IT_ASSESSMENT
+  FINANCE_REVIEW
+  SPEND_APPROVAL
+}
+
+enum AccessRequestStepState {
+  NOT_REQUIRED
+  PENDING
+  WAITING
+  APPROVED
+  REJECTED
+  // Done without a decision of approve or refuse: a review that reached an outcome.
+  COMPLETED
+  // Ended without a decision because the request moved on or out (withdrawn, checked again).
+  CLOSED
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+}
+
+// A question of the spending approver to Finance: open until Finance answers or the request goes away (US-06-02, US-06-03).
+enum BudgetInformationState {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+// What Finance says of the budget; an opinion, not a decision.
+enum BudgetInformationAnswer {
+  WITHIN_LIMIT
+  OVER_LIMIT
+  NO_BUDGET
+}
+
+enum BudgetInformationCloseReason {
+  REQUEST_WITHDRAWN
+  REQUEST_CANCELLED
+  STEP_CLOSED
+}
+
+// The role the person decided in, as it stood when they decided (it can change afterwards).
+enum ApprovalDeciderRole {
+  MANAGER
+  SPENDING_APPROVER
+  FALLBACK_APPROVER
+  // The substitute who decides in the place of the spending approver when they are a party (US-06-08).
+  CONFLICT_SUBSTITUTE
+}
+
+// One request to be given access to one plan. The branch, the chain of step kinds and the SLA of a step are fixed in
+// `policy` when the request is sent, so a parameter changed later reaches only what is sent after it (US-05-02 AC-3).
+// The department and its Unit Cost Center are those in force on the day it is sent (US-05-02 AC-7).
+model AccessRequest {
+  routingMode RequestRoutingMode @default(VIA_HEAD) @map("routing_mode")
+  oneStepReason String? @map("one_step_reason")
+  oneStepBlockedReason String? @map("one_step_blocked_reason")
+  // GH-3 (BR-MF1-01g): the beneficiary used this many paid applications when it was sent, and why they ask for one more.
+  manyPaidSoftware       Boolean @default(false) @map("many_paid_software")
+  manyPaidSoftwareCount  Int?    @map("many_paid_software_count") @db.SmallInt
+  manyPaidSoftwareReason String? @map("many_paid_software_reason")
+  // Why the request is left out of GH-1/GH-2 (TRANSFER_OVERLAP, ROLE_ENDED; QĐ-108c); null for every other.
+  limitExemption         String? @map("limit_exemption")
+  id                    String                     @id @default(uuid()) @db.Uuid
+  organizationId        String                     @map("organization_id") @db.Uuid
+  type                  AccessRequestType          @default(GRANT)
+  branch                AccessRequestBranch
+  state                 AccessRequestState
+  // Null only for a proposal of software that is not in the catalog yet; set when the IT Admin links the registered plan.
+  planId                String?                    @map("plan_id") @db.Uuid
+  // Who sent it. Who it is for are the beneficiaries; the two differ when a department head sends for someone else.
+  requesterEmployeeId   String                     @map("requester_employee_id") @db.Uuid
+  departmentId          String                     @map("department_id") @db.Uuid
+  // Null only while the request is a DRAFT (a paid request of a department that has no Cost Center yet; spec L.1).
+  costCenterId          String?                    @map("cost_center_id") @db.Uuid
+  businessReason        String                     @map("business_reason")
+  termMonths            Int?                       @map("term_months") // nullable: NULL = no time limit; NEW cols `amountMonths`, `priceKind` take over
+  amountMonths          Int?                       @map("amount_months") // months of the year for recurring pricing (0–12)
+  priceKind             AccessRequestPriceKind?   @map("price_kind") // RECURRING or ONE_TIME
+  grantedOn             DateTime?                  @map("granted_on") @db.Date // day task completed (BR-MF1-06a)
+  // What the first year of a request to go on using would cost, when it begins in the year after the day it is priced: shown, never held (QĐ-109b).
+  nextYearAmountMinor   BigInt?                    @map("next_year_amount_minor")
+  // Context only: it changes neither the Cost Center nor the chain (US-05-02 AC-7).
+  // Retired in QD-93h phase 1; dropped in phase 2.
+  pricingStatus         AccessRequestPricingStatus @default(NOT_APPLICABLE) @map("pricing_status")
+  // Why the price is missing (NO_PRICED_SUBSCRIPTION, CYCLE_UNKNOWN, AMOUNT_TOO_LARGE); null when it is not.
+  priceMissingReason    String?                    @map("price_missing_reason")
+  // The day the money is expected to go out and the fiscal year of that day: set for paid software, null for internal.
+  expectedSpendOn       DateTime?                  @map("expected_spend_on") @db.Date
+  budgetYear            Int?                       @map("budget_year")
+  // The whole amount of the term for the people it is for, in the currency of the unit price, and how it was made.
+  amountMinor           BigInt?                    @map("amount_minor")
+  amountCurrency        String?                    @map("amount_currency") @db.Char(3)
+  unitPriceMinor        BigInt?                    @map("unit_price_minor")
+  billingCycle          BillingCycle?              @map("billing_cycle")
+  // The payments, one for each billing period: [{ dueOn, amountMinor, budgetYear }]. Never shown as a list.
+  paymentSchedule       Json?                      @map("payment_schedule")
+  // The line of the plan of the budget it is for, as a value: the version it was read from and the position (US-05-04 AC-12).
+  planLineVersionId     String?                    @map("plan_line_version_id") @db.Uuid
+  planLinePosition      Int?                       @map("plan_line_position")
+  // The head confirmed it is still needed although the purchase window of the line has passed (US-05-04 AC-13).
+  planLineConfirmed     Boolean                    @default(false) @map("plan_line_confirmed")
+  // The head chose "outside the plan": a flag for Finance and the approver, never an exception (US-06-12 AC-10).
+  offPlan               Boolean                    @default(false) @map("off_plan")
+  // The requests a head sent for people of the department in one go share this (US-03-02 AC-1); null for any other.
+  delegatedBatchId      String?                    @map("delegated_batch_id") @db.Uuid
+  // When the person it is for is not staff, the day the access ends; the grant takes it as the end of the seat (US-03-02 AC-10).
+  expectedEndDate       DateTime?                  @map("expected_end_date") @db.Date
+  policy                Json
+  // Who asked for the withdrawal, when, and the reason they gave (US-05-08). The request ends at `withdrawnAt`: at once, or
+  // when the IT Admin has closed the task of a grant that had failed.
+  withdrawalRequestedAt DateTime?                  @map("withdrawal_requested_at") @db.Timestamptz(3)
+  withdrawnByEmployeeId String?                    @map("withdrawn_by_employee_id") @db.Uuid
+  withdrawalReason      String?                    @map("withdrawal_reason")
+  withdrawnAt           DateTime?                  @map("withdrawn_at") @db.Timestamptz(3)
+  // Who closed the request because its beneficiary left, when, why and the note they gave (US-03-04 AC-25).
+  cancelledAt           DateTime?                  @map("cancelled_at") @db.Timestamptz(3)
+  cancelledByEmployeeId String?                    @map("cancelled_by_employee_id") @db.Uuid
+  cancelCause           AccessRequestCancelCause?  @map("cancel_cause")
+  cancelNote            String?                    @map("cancel_note")
+  // When the task of the grant was completed: written by the grant gate in the transaction that moves the request to COMPLETED
+  // (US-05-15 AC-6, AC-11). Null for every request whose grant is not done, and for a renewal, which has no grant.
+  grantCompletedAt      DateTime?                  @map("grant_completed_at") @db.Timestamptz(3)
+  // When the request last entered the queue of the head for submission (US-05-09 AC-11): set by a trigger on entering the state,
+  // kept when it leaves, set again when it enters again. The clock of the reminder of a request that waits to be sent on.
+  spendQueuedAt         DateTime?                  @map("spend_queued_at") @db.Timestamptz(3)
+  // A value, not a foreign key: the history outlives the account (as the audit trail does).
+  createdByAppUserId    String                     @map("created_by_app_user_id") @db.Uuid
+  // Null only while the request is a DRAFT; the moment it is sent otherwise.
+  submittedAt           DateTime?                  @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  updatedAt             DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization         Organization                 @relation(fields: [organizationId], references: [id])
+  plan                 Plan?                        @relation(fields: [planId], references: [id], onDelete: Restrict)
+  requester            Employee                     @relation("AccessRequestRequester", fields: [requesterEmployeeId], references: [id], onDelete: Restrict)
+  withdrawnBy          Employee?                    @relation("AccessRequestWithdrawer", fields: [withdrawnByEmployeeId], references: [id], onDelete: Restrict)
+  cancelledBy          Employee?                    @relation("AccessRequestCanceller", fields: [cancelledByEmployeeId], references: [id], onDelete: Restrict)
+  department           Department                   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  costCenter           CostCenter?                  @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  amountCurrencyRecord Currency?                    @relation("AccessRequestAmountCurrency", fields: [amountCurrency], references: [code], onDelete: Restrict)
+  beneficiaries        AccessRequestBeneficiary[]
+  lines                AccessRequestLine[]
+  lineAmounts          AccessRequestLineAmount[]
+  steps                AccessRequestStep[]
+  approvalRecords      ApprovalRecord[]
+  proposal             AccessRequestProposal?
+  assessment           AccessRequestAssessment?
+  budgetChecks         RequestBudgetCheck[]
+  financeReviews       RequestFinanceReview[]
+  batchItems           SpendBatchItem[]
+  supplements          RequestSupplement[]
+  spendDecisions       SpendDecision[]
+  budgetCommitments    BudgetCommitment[]
+  budgetInformation    BudgetInformationRequest[]
+  reserveConfirmations RequestReserveConfirmation[]
+  controlledWaitAlerts ControlledWaitAlert[]
+  stepSlaReminders     StepSlaReminder[]
+  serviceAccount       AccessRequestServiceAccount?
+  renewal              AccessRequestRenewal?
+  returnsFromHere      ReturnRequest[]              @relation("ReturnRequestOrigin")
+
+  @@index([requesterEmployeeId, submittedAt])
+  @@index([state, submittedAt])
+  @@index([planId])
+  @@index([departmentId, routingMode, state], map: "access_requests_department_routing_state_idx")
+  // The history of a department and of the organization, newest sent first (qd103-request-history-by-role). The partial index of
+  // the free internal one-step requests the audit report reads is in the migration only.
+  @@index([departmentId, submittedAt(sort: Desc), id(sort: Desc)], map: "access_requests_department_submitted_idx")
+  @@index([submittedAt(sort: Desc), id(sort: Desc)], map: "access_requests_submitted_idx")
+  @@map("access_requests")
+}
+
+// A person the request is for. One row today; a request for a group has a row for each person.
+model AccessRequestBeneficiary {
+  requestId  String @map("request_id") @db.Uuid
+  employeeId String @map("employee_id") @db.Uuid
+  position   Int
+
+  request  AccessRequest      @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  employee Employee           @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  line     AccessRequestLine?
+
+  @@id([requestId, employeeId])
+  @@unique([requestId, position])
+  @@index([employeeId])
+  @@map("access_request_beneficiaries")
+}
+
+enum AccessRequestLineState {
+  // The need of this person waits for whoever holds the need step.
+  AWAITING_NEED
+  NEED_CONFIRMED
+  NEED_REJECTED
+  SPEND_REJECTED
+  // Approved as spend: the IT Admin grants it.
+  APPROVED
+  EXECUTING
+  // The requester withdrew while the grant of this person had failed: the IT Admin closes the task as cancelled.
+  AWAITING_IT_CLOSE
+  COMPLETED
+  FAILED
+  WITHDRAWN
+  // The head left this person out of the file they sent on, before the spend decision.
+  DROPPED
+  // The IT Admin closed the line of a person who left; the request goes on for the people who remain.
+  CANCELLED
+}
+
+enum LineDecisionStage {
+  NEED
+  SPEND
+}
+
+// One person of a request for a group (US-05-17): what became of them, apart from the others. A line exists only for a request
+// of the type GROUP_GRANT; the request itself is a summary of its lines. The people of a request stay in
+// `access_request_beneficiaries`, which this row joins.
+model AccessRequestLine {
+  requestId             String                    @map("request_id") @db.Uuid
+  employeeId            String                    @map("employee_id") @db.Uuid
+  state                 AccessRequestLineState
+  // The need step that holds this person: the one of the head for others, or the one that decides the head's own line.
+  needStepId            String                    @map("need_step_id") @db.Uuid
+  // When the person is not staff, the day their own access ends (US-05-17 AC-8).
+  expectedEndDate       DateTime?                 @map("expected_end_date") @db.Date
+  endedAt               DateTime?                 @map("ended_at") @db.Timestamptz(3)
+  endedByEmployeeId     String?                   @map("ended_by_employee_id") @db.Uuid
+  endReason             String?                   @map("end_reason")
+  // Why a cancelled line was closed: the cause of a cancelled request, which the line shares.
+  cancelCause           AccessRequestCancelCause? @map("cancel_cause")
+  withdrawalRequestedAt DateTime?                 @map("withdrawal_requested_at") @db.Timestamptz(3)
+  createdAt             DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  // GH-3 of this person (BR-MF1-01g), with the reason the sender gave for them; and why the line is left out of GH-1/GH-2.
+  manyPaidSoftware       Boolean @default(false) @map("many_paid_software")
+  manyPaidSoftwareCount  Int?    @map("many_paid_software_count") @db.SmallInt
+  manyPaidSoftwareReason String? @map("many_paid_software_reason")
+  limitExemption         String? @map("limit_exemption")
+
+  request     AccessRequest               @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  beneficiary AccessRequestBeneficiary    @relation(fields: [requestId, employeeId], references: [requestId, employeeId], onDelete: Restrict)
+  needStep    AccessRequestStep           @relation(fields: [needStepId], references: [id], onDelete: Restrict)
+  endedBy     Employee?                   @relation("AccessRequestLineEnder", fields: [endedByEmployeeId], references: [id], onDelete: Restrict)
+  decisions   AccessRequestLineDecision[]
+  amounts     AccessRequestLineAmount[]
+
+  @@id([requestId, employeeId])
+  @@index([requestId, state])
+  @@index([needStepId])
+  @@map("access_request_lines")
+}
+
+// What was decided for one person at one stage (US-05-17 AC-4, AC-9): who, in which role as it stood, what, why and when. Never
+// changed or deleted (INV-05); a mistake is put right by a new audit event.
+model AccessRequestLineDecision {
+  requestId           String              @map("request_id") @db.Uuid
+  employeeId          String              @map("employee_id") @db.Uuid
+  stage               LineDecisionStage
+  stepId              String              @map("step_id") @db.Uuid
+  decision            ApprovalDecision
+  reason              String?
+  decidedByEmployeeId String              @map("decided_by_employee_id") @db.Uuid
+  deciderRole         ApprovalDeciderRole @map("decider_role")
+  decidedAt           DateTime            @map("decided_at") @db.Timestamptz(3)
+
+  line      AccessRequestLine @relation(fields: [requestId, employeeId], references: [requestId, employeeId], onDelete: Restrict)
+  step      AccessRequestStep @relation(fields: [stepId], references: [id], onDelete: Restrict)
+  decidedBy Employee          @relation("LineDecisionDecider", fields: [decidedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@id([requestId, employeeId, stage])
+  @@index([stepId])
+  @@map("access_request_line_decisions")
+}
+
+// The part of the commitment of a year that is one person's (US-05-17 AC-9, AC-10): the commitment of the request is one for
+// each year, and these rows say how much of it each approved person stands for, so that withdrawing one person gives back
+// exactly their share. The amounts of a person are never changed; only `releasedAt` is set, once.
+model AccessRequestLineAmount {
+  requestId   String    @map("request_id") @db.Uuid
+  employeeId  String    @map("employee_id") @db.Uuid
+  budgetYear  Int       @map("budget_year")
+  amountMinor BigInt    @map("amount_minor")
+  currency    String    @db.Char(3)
+  releasedAt  DateTime? @map("released_at") @db.Timestamptz(3)
+
+  request        AccessRequest     @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  line           AccessRequestLine @relation(fields: [requestId, employeeId], references: [requestId, employeeId], onDelete: Restrict)
+  currencyRecord Currency          @relation("LineAmountCurrency", fields: [currency], references: [code], onDelete: Restrict)
+
+  @@id([requestId, employeeId, budgetYear])
+  @@map("access_request_line_amounts")
+}
+
+// One link of the chain of a request. A step holds at most one person (US-05-03 AC-10): `assigneeEmployeeId` is a single
+// column. `routingRow` is the row of the routing table of US-05-03 that decided it, and the audit trail keeps the rest.
+model AccessRequestStep {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  requestId           String                 @map("request_id") @db.Uuid
+  kind                AccessRequestStepKind
+  sequence            Int
+  state               AccessRequestStepState
+  assigneeEmployeeId  String?                @map("assignee_employee_id") @db.Uuid
+  routingRow          Int                    @map("routing_row")
+  // Why nobody holds a waiting step (NO_SPENDING_APPROVER, NO_DEPARTMENT_HEAD, SPENDING_APPROVER_IS_PARTY, NO_FINANCE_REVIEWER, NO_IT_ADMIN_IN_CHARGE); null when held.
+  waitingReason       String?                @map("waiting_reason")
+  // The same person holds this step and the spend step of the same request: both are flagged (US-05-03 AC-9).
+  samePersonAsSpend   Boolean                @default(false) @map("same_person_as_spend")
+  // The spend step of a request that Finance would have reviewed, had Finance not been the one it is for (US-06-13 AC-5).
+  noIndependentReview Boolean                @default(false) @map("no_independent_review")
+  // Working days the step may wait, as the parameter was when the request was sent; the clock starts at creation.
+  slaWorkingDays      Int                    @map("sla_working_days")
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  assignedAt          DateTime?              @map("assigned_at") @db.Timestamptz(3)
+  // When the step was decided; null while it is pending or waiting.
+  decidedAt           DateTime?              @map("decided_at") @db.Timestamptz(3)
+  // When the step began its present stretch of waiting (US-05-11); set and cleared by a trigger, so it is there exactly while
+  // the step is WAITING.
+  waitingSince        DateTime?              @map("waiting_since") @db.Timestamptz(3)
+
+  request              AccessRequest               @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  assignee             Employee?                   @relation("AccessRequestStepAssignee", fields: [assigneeEmployeeId], references: [id], onDelete: Restrict)
+  approvalRecord       ApprovalRecord?
+  lines                AccessRequestLine[]
+  lineDecisions        AccessRequestLineDecision[]
+  financeReview        RequestFinanceReview?
+  spendDecision        SpendDecision?
+  budgetInformation    BudgetInformationRequest[]
+  reserveConfirmation  RequestReserveConfirmation?
+  controlledWaitAlerts ControlledWaitAlert[]
+
+  @@unique([requestId, sequence])
+  @@index([assigneeEmployeeId, state])
+  @@map("access_request_steps")
+}
+
+// The electronic approval record of one decision (US-05-04 AC-9, US-01-12 AC-6): who decided, in which role as it stood
+// then, in which department, what, why and when. It is never changed or deleted: the database refuses (INV-05), and a
+// mistake is put right by a new audit event. One per step. There is no digital signature (QĐ-53a).
+model ApprovalRecord {
+  id                     String              @id @default(uuid()) @db.Uuid
+  organizationId         String              @map("organization_id") @db.Uuid
+  requestId              String              @map("request_id") @db.Uuid
+  stepId                 String              @unique @map("step_id") @db.Uuid
+  decision               ApprovalDecision
+  decidedByEmployeeId    String              @map("decided_by_employee_id") @db.Uuid
+  deciderRole            ApprovalDeciderRole @map("decider_role")
+  departmentId           String              @map("department_id") @db.Uuid
+  reason                 String?
+  // Why a term over twelve months was accepted (OI-07a); null when the term was not that long or the decision refused.
+  termConfirmationReason String?             @map("term_confirmation_reason")
+  decidedAt              DateTime            @map("decided_at") @db.Timestamptz(3)
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  request      AccessRequest     @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  step         AccessRequestStep @relation(fields: [stepId], references: [id], onDelete: Restrict)
+  decidedBy    Employee          @relation("ApprovalRecordDecider", fields: [decidedByEmployeeId], references: [id], onDelete: Restrict)
+  department   Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+
+  @@index([requestId])
+  @@map("approval_records")
+}
+
+enum AssessmentClassification {
+  INTERNAL
+  PAID_LICENSED
+}
+
+enum AssessmentStatus {
+  DRAFT
+  COMPLETED
+  REJECTED
+}
+
+// Why the IT Admin refused at the gate (US-05-18). There is no outcome for free software outside the catalog (QĐ-82n).
+enum ItRejectionKind {
+  UNCONTROLLABLE
+  NOT_ELIGIBLE
+}
+
+// How the quote is paid. UPFRONT_ONCE is the whole term in one payment (QĐ-84e).
+enum PaymentFrequency {
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+  UPFRONT_ONCE
+}
+
+enum OpinionStatus {
+  OBTAINED
+  NOT_AVAILABLE
+}
+
+// What the Employee declares when the software is not in the catalog (BM-02, the part the Employee fills; US-05-06 AC-1).
+model AccessRequestProposal {
+  requestId       String @id @map("request_id") @db.Uuid
+  softwareName    String @map("software_name")
+  homepageUrl     String @map("homepage_url")
+  purpose         String
+  // The kinds of company data the software will hold: required, so the IT Admin judges the risk (AC-1).
+  dataDescription String @map("data_description")
+  expectedUsers   Int    @map("expected_users")
+
+  request AccessRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+
+  @@map("access_request_proposals")
+}
+
+// The part of BM-02 the IT Admin completes (US-05-06, US-01-12 AC-2): the classification, the quote that gives the
+// request its amount, the minimum assessment and the control level. It is opened with the proposal and is not changed once
+// completed. Nothing here puts the software into the catalog: only the decision of the spending approver does (AC-4).
+model AccessRequestAssessment {
+  requestId                       String                    @id @map("request_id") @db.Uuid
+  status                          AssessmentStatus          @default(DRAFT)
+  classification                  AssessmentClassification?
+  vendorId                        String?                   @map("vendor_id") @db.Uuid
+  vendorName                      String?                   @map("vendor_name")
+  plannedPlanName                 String?                   @map("planned_plan_name")
+  provisioningType                ProvisioningType?         @map("provisioning_type")
+  adminConsole                    Boolean?                  @map("admin_console")
+  memberExport                    Boolean?                  @map("member_export")
+  sso                             Boolean?
+  termsSummary                    String?                   @map("terms_summary")
+  memberUsageMethod               String?                   @map("member_usage_method")
+  grantRevokeMethod               String?                   @map("grant_revoke_method")
+  dataSensitivity                 DataSensitivity?          @map("data_sensitivity")
+  opinionStatus                   OpinionStatus?            @map("opinion_status")
+  opinionNote                     String?                   @map("opinion_note")
+  // A tool that does the same work and is already in the catalog: a suggestion, never a gate (AC-5).
+  equivalentPlanId                String?                   @map("equivalent_plan_id") @db.Uuid
+  proposedBusinessOwnerEmployeeId String?                   @map("proposed_business_owner_employee_id") @db.Uuid
+  controlLevel                    ControlLevel?             @map("control_level")
+  controlRiskNote                 String?                   @map("control_risk_note")
+  quoteUnitPriceMinor             BigInt?                   @map("quote_unit_price_minor")
+  quoteCurrency                   String?                   @map("quote_currency") @db.Char(3)
+  quoteBillingCycle               BillingCycle?             @map("quote_billing_cycle")
+  quoteValidFrom                  DateTime?                 @map("quote_valid_from") @db.Date
+  quoteValidUntil                 DateTime?                 @map("quote_valid_until") @db.Date
+  // How long the contract binds and how it is paid; needed when the term spans more than one billing cycle (QĐ-84e).
+  commitmentMonths                Int?                      @map("commitment_months")
+  paymentFrequency                PaymentFrequency?         @map("payment_frequency")
+  firstPaymentOn                  DateTime?                 @map("first_payment_on") @db.Date
+  // The refusal at the gate: its kind, the reason that must go with it, and the alternative when there is one.
+  rejectionKind                   ItRejectionKind?          @map("rejection_kind")
+  rejectionReason                 String?                   @map("rejection_reason")
+  alternativePlanId               String?                   @map("alternative_plan_id") @db.Uuid
+  alternativeNote                 String?                   @map("alternative_note")
+  rejectedAt                      DateTime?                 @map("rejected_at") @db.Timestamptz(3)
+  rejectedByEmployeeId            String?                   @map("rejected_by_employee_id") @db.Uuid
+  savedByEmployeeId               String?                   @map("saved_by_employee_id") @db.Uuid
+  completedByEmployeeId           String?                   @map("completed_by_employee_id") @db.Uuid
+  completedAt                     DateTime?                 @map("completed_at") @db.Timestamptz(3)
+  updatedAt                       DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  request             AccessRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  vendor              Vendor?       @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  equivalent          Plan?         @relation("AssessmentEquivalentPlan", fields: [equivalentPlanId], references: [id], onDelete: Restrict)
+  proposedOwner       Employee?     @relation("AssessmentProposedOwner", fields: [proposedBusinessOwnerEmployeeId], references: [id], onDelete: Restrict)
+  alternativePlan     Plan?         @relation("AssessmentAlternativePlan", fields: [alternativePlanId], references: [id], onDelete: Restrict)
+  rejectedBy          Employee?     @relation("AssessmentRejectedBy", fields: [rejectedByEmployeeId], references: [id], onDelete: Restrict)
+  savedBy             Employee?     @relation("AssessmentSavedBy", fields: [savedByEmployeeId], references: [id], onDelete: Restrict)
+  completedBy         Employee?     @relation("AssessmentCompletedBy", fields: [completedByEmployeeId], references: [id], onDelete: Restrict)
+  quoteCurrencyRecord Currency?     @relation("AssessmentQuoteCurrency", fields: [quoteCurrency], references: [code], onDelete: Restrict)
+
+  @@map("access_request_assessments")
+}
+
+// What set a check of the budget going.
+enum BudgetCheckTrigger {
+  SUBMISSION
+  // Legacy, never written now (CHECK, 20261109141000): Finance moved the purchase window of the plan line (US-06-09 AC-17).
+  PLAN_LINE_MOVED
+  // A budget version was approved for the Cost Center and year the request waited on (US-06-13 AC-11).
+  BUDGET_VERSION_APPROVED
+  // The check made again when the spending approver decides, which is the snapshot the decision keeps (US-06-01 AC-2, AC-18).
+  SPEND_DECISION
+  // Finance gave an outcome while the request waited (spec L.10). Read only here.
+  FINANCE_OUTCOME_WHILE_WAITING
+  // The head confirmed that the request uses the reserve: the check is made again for the day of the confirmation (BR-MF1-06h).
+  RESERVE_CONFIRMATION
+}
+
+// What a check of the budget says of a request (BR-MF1-06g): it is within the base, it uses the reserve, or it is blocked.
+enum BudgetCheckOutcome {
+  WITHIN_BASE
+  USES_RESERVE
+  BLOCKED
+}
+
+// Where a check sends the request: nowhere (a problem with the data that only the head or the IT Admin can mend), to
+// Finance, or straight to the spending approver (US-06-12).
+enum BudgetCheckRoute {
+  BLOCKED
+  FINANCE_REVIEW
+  SPEND_APPROVAL
+}
+
+// How a Finance review ends (US-06-13): an opinion on the exception, the request given back to the head, a budget to be
+// made, or the plan line moved, which closes the review and starts a check of its own.
+enum FinanceReviewOutcome {
+  ASSESSED
+  RETURNED_TO_HEAD
+  BUDGET_REVISION_NEEDED
+  LINE_UPDATED
+}
+
+// What one year of a check says: the most serious of what applies to it (US-06-12).
+enum BudgetYearCode {
+  BUDGET_OK
+  HIGH_VALUE
+  INSUFFICIENT_BUDGET
+  NO_ACTIVE_BUDGET
+}
+
+// What Finance advises the spending approver; it decides nothing (SoD-3).
+enum FinanceDirection {
+  RECOMMEND_APPROVE
+  RECOMMEND_OVERRIDE
+  RECOMMEND_REJECT
+}
+
+// One run of the check of the budget of a request (US-06-12). Every run is a new row and none is changed: a check made again
+// after Finance moved a line or a budget was approved is a new check, and the ones before it stay as they were. The figures
+// of each year are frozen here, in the reporting currency, as the check read them.
+model RequestBudgetCheck {
+  id                String             @id @default(uuid()) @db.Uuid
+  organizationId    String             @map("organization_id") @db.Uuid
+  requestId         String             @map("request_id") @db.Uuid
+  number            Int
+  trigger           BudgetCheckTrigger
+  route             BudgetCheckRoute
+  // The two codes of the data and the code of the plan line: none of them is a year's own result.
+  staleCostEvidence Boolean            @map("stale_cost_evidence")
+  planLineOverdue   Boolean            @map("plan_line_overdue")
+  periodClosed      Boolean            @map("period_closed")
+  // Information only: the head chose "outside the plan" (US-06-12 AC-10).
+  offPlan           Boolean            @map("off_plan")
+  // What the check says (BR-MF1-06g); null only for a check made before (read from its code), never null for a new one (CHECK).
+  outcome           BudgetCheckOutcome?
+  // Why it is blocked: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED; every reason that applies (US-06-12 AC-9).
+  blockReasons      String[]           @default([]) @map("block_reasons")
+  // How much the cost is over what is left of the base (uses the reserve, or blocked for being over the reserve); how much over the reserve.
+  overBaseByMinor   BigInt?            @map("over_base_by_minor")
+  overByMinor       BigInt?            @map("over_by_minor")
+  // The Cost Center the check read: the current one of the department (M-12). Null for a check made before.
+  costCenterId      String?            @map("cost_center_id") @db.Uuid
+  currency          String             @db.Char(3)
+  // The payments that bind, as the request is held against budgets, in the reporting currency: never compared as a whole.
+  bindingTotalMinor BigInt             @map("binding_total_minor")
+  ranByEmployeeId   String?            @map("ran_by_employee_id") @db.Uuid
+  ranAt             DateTime           @default(now()) @map("ran_at") @db.Timestamptz(3)
+
+  organization   Organization             @relation(fields: [organizationId], references: [id])
+  request        AccessRequest            @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  currencyRecord Currency                 @relation("RequestBudgetCheckCurrency", fields: [currency], references: [code], onDelete: Restrict)
+  ranBy          Employee?                @relation("RequestBudgetCheckRanBy", fields: [ranByEmployeeId], references: [id], onDelete: Restrict)
+  financeReviews RequestFinanceReview[]
+  yearResults    RequestBudgetCheckYear[]
+  spendDecisions SpendDecision[]
+  commitments    BudgetCommitment[]
+  reserveConfirmation RequestReserveConfirmation?
+
+  @@unique([requestId, number])
+  @@map("request_budget_checks")
+}
+
+// What one year of the request said in a check: its slice of the cost, the code, and the figures of the budget as the check
+// read them, frozen in the reporting currency (US-06-12 AC-15). Never changed (INV-05). A year that has ended is not
+// judged: no code, no figures.
+model RequestBudgetCheckYear {
+  checkId          String          @map("check_id") @db.Uuid
+  year             Int
+  costMinor        BigInt          @map("cost_minor")
+  code             BudgetYearCode?
+  versionId        String?         @map("version_id") @db.Uuid
+  budgetMinor      BigInt?         @map("budget_minor")
+  heldMinor        BigInt?         @map("held_minor")
+  spentMinor       BigInt?         @map("spent_minor")
+  remainingMinor   BigInt?         @map("remaining_minor")
+  shareBasisPoints Int?            @map("share_basis_points")
+  // What the other requests of the Cost Center that wait to be decided cost in the year, as their own checks say (US-06-01 AC-9).
+  pendingMinor     BigInt?         @map("pending_minor")
+  // The base and the reserve of the approved version, and what is left at the two levels after what is spent, held and waiting (BR-MF1-06e).
+  baseMinor                 BigInt? @map("base_minor")
+  reserveMinor              BigInt? @map("reserve_minor")
+  remainingBaseMinor        BigInt? @map("remaining_base_minor")
+  remainingWithReserveMinor BigInt? @map("remaining_with_reserve_minor")
+
+  check RequestBudgetCheck @relation(fields: [checkId], references: [id], onDelete: Restrict)
+
+  @@id([checkId, year])
+  @@map("request_budget_check_years")
+}
+
+// How one Finance review step ended (US-06-13), never changed afterwards (INV-05). It is what the spending approver reads
+// next to the check: the outcome, the opinion, the direction, who and when (AC-8).
+model RequestFinanceReview {
+  stepId              String               @id @map("step_id") @db.Uuid
+  requestId           String               @map("request_id") @db.Uuid
+  checkId             String               @map("check_id") @db.Uuid
+  outcome             FinanceReviewOutcome
+  opinion             String?
+  direction           FinanceDirection?
+  reason              String?
+  decidedByEmployeeId String               @map("decided_by_employee_id") @db.Uuid
+  decidedAt           DateTime             @map("decided_at") @db.Timestamptz(3)
+
+  step      AccessRequestStep  @relation(fields: [stepId], references: [id], onDelete: Restrict)
+  request   AccessRequest      @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  check     RequestBudgetCheck @relation(fields: [checkId], references: [id], onDelete: Restrict)
+  decidedBy Employee           @relation("RequestFinanceReviewDecider", fields: [decidedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([requestId, decidedAt])
+  @@map("request_finance_reviews")
+}
+
+// How one request of a batch fared when the head sent it on (US-06-14).
+enum SpendBatchItemOutcome {
+  SENT_TO_APPROVER
+  // Legacy: Finance has no review any more (CHECK on the steps, 20261109141000).
+  SENT_TO_FINANCE
+  // It uses the reserve and the head has not confirmed it: it stays in their queue (BR-MF1-06h).
+  AWAITING_RESERVE_CONFIRMATION
+  // It stayed in the queue of the head, and the reason says why; nothing was made for Finance or the approver.
+  STOPPED
+}
+
+// Why a request is no longer in the batch it was sent in: Finance gave it back, or the approver was in conflict and the
+// substitute holds it (US-06-14 AC-7, AC-13).
+enum SpendBatchLeftReason {
+  RETURNED_BY_FINANCE
+  CONFLICT_OF_INTEREST
+  REQUEST_WITHDRAWN
+  REQUEST_CANCELLED
+}
+
+// The envelope of a submission (QĐ-82j): who sent which requests, and when. It has no state of decision and no commitment:
+// every request keeps its own steps, state and reason. Never changed or deleted; only what the items say of leaving it
+// is added.
+model SpendBatch {
+  id                    String   @id @default(uuid()) @db.Uuid
+  organizationId        String   @map("organization_id") @db.Uuid
+  departmentId          String   @map("department_id") @db.Uuid
+  submittedByEmployeeId String   @map("submitted_by_employee_id") @db.Uuid
+  submittedAt           DateTime @default(now()) @map("submitted_at") @db.Timestamptz(3)
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  department   Department       @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  submittedBy  Employee         @relation("SpendBatchSubmitter", fields: [submittedByEmployeeId], references: [id], onDelete: Restrict)
+  items        SpendBatchItem[]
+
+  @@index([submittedByEmployeeId, submittedAt])
+  @@map("spend_batches")
+}
+
+model SpendBatchItem {
+  batchId    String                @map("batch_id") @db.Uuid
+  requestId  String                @map("request_id") @db.Uuid
+  position   Int
+  outcome    SpendBatchItemOutcome
+  // Why it stayed: PLAN_LINE_REQUIRED, STALE_COST_EVIDENCE, CLOSED_OR_EXPIRED_BUDGET_PERIOD, PRICE_MISSING, RATE_MISSING.
+  stopReason String?               @map("stop_reason")
+  leftReason SpendBatchLeftReason? @map("left_reason")
+  leftAt     DateTime?             @map("left_at") @db.Timestamptz(3)
+
+  batch   SpendBatch    @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  request AccessRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+
+  @@id([batchId, requestId])
+  @@unique([batchId, position])
+  @@index([requestId])
+  @@map("spend_batch_items")
+}
+
+// The supplementary file of the head (QĐ-82n, US-06-14 AC-13, AC-15, US-05-04 AC-16): the day the money is expected to go
+// out changed after the request was sent, with the reason, and what it cost and which budget year it fell in before and
+// after. The request as it was first sent stays what it was in the history; none of this is ever changed.
+model RequestSupplement {
+  id                    String   @id @default(uuid()) @db.Uuid
+  organizationId        String   @map("organization_id") @db.Uuid
+  requestId             String   @map("request_id") @db.Uuid
+  number                Int
+  reason                String
+  changedByEmployeeId   String   @map("changed_by_employee_id") @db.Uuid
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  beforeExpectedSpendOn DateTime?  @map("before_expected_spend_on") @db.Date
+  afterExpectedSpendOn  DateTime?  @map("after_expected_spend_on") @db.Date
+  beforeBudgetYear      Int?       @map("before_budget_year")
+  afterBudgetYear       Int?       @map("after_budget_year")
+  beforeAmountMinor     BigInt?    @map("before_amount_minor")
+  afterAmountMinor      BigInt?    @map("after_amount_minor")
+  beforeExpectedEndDate DateTime?  @map("before_expected_end_date") @db.Date
+  afterExpectedEndDate  DateTime?  @map("after_expected_end_date") @db.Date
+  currency              String?    @db.Char(3)
+
+  organization   Organization            @relation(fields: [organizationId], references: [id])
+  request        AccessRequest           @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  changedBy      Employee                @relation("RequestSupplementAuthor", fields: [changedByEmployeeId], references: [id], onDelete: Restrict)
+  currencyRecord Currency?               @relation("RequestSupplementCurrency", fields: [currency], references: [code], onDelete: Restrict)
+  drops          RequestSupplementDrop[]
+
+  @@unique([requestId, number])
+  @@map("request_supplements")
+}
+
+// A person the head left out of a request for a group in a supplementary file (US-06-14 AC-13): which file, who. Never changed.
+model RequestSupplementDrop {
+  requestId  String @map("request_id") @db.Uuid
+  number     Int
+  employeeId String @map("employee_id") @db.Uuid
+
+  supplement RequestSupplement @relation(fields: [requestId, number], references: [requestId, number], onDelete: Restrict)
+  employee   Employee          @relation("SupplementDropEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@id([requestId, number, employeeId])
+  @@map("request_supplement_drops")
+}
+
+// What the spending approver decided on the spend step, beyond the electronic approval record (US-06-01 AC-2, AC-12, AC-16,
+// AC-21): the check made again at the moment of deciding, which is the snapshot the decision keeps and which no later change
+// of the budget alters, and the override with its reason and the years it names. Never changed (INV-05).
+model SpendDecision {
+  stepId              String           @id @map("step_id") @db.Uuid
+  requestId           String           @map("request_id") @db.Uuid
+  // The snapshot; a refusal that could not be checked has none.
+  checkId             String?          @map("check_id") @db.Uuid
+  decision            ApprovalDecision
+  overrideReason      String?          @map("override_reason")
+  // The years whose exception the approver accepted: a year with no budget or with less than the request costs.
+  overrideYears       Int[]            @default([]) @map("override_years")
+  decidedByEmployeeId String           @map("decided_by_employee_id") @db.Uuid
+  decidedAt           DateTime         @map("decided_at") @db.Timestamptz(3)
+
+  step      AccessRequestStep   @relation(fields: [stepId], references: [id], onDelete: Restrict)
+  request   AccessRequest       @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  check     RequestBudgetCheck? @relation(fields: [checkId], references: [id], onDelete: Restrict)
+  decidedBy Employee            @relation("SpendDecisionDecider", fields: [decidedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([requestId])
+  @@map("spend_decisions")
+}
+
+// The head's confirmation that a request uses the reserve, with one line of reason (BR-MF1-06h): for one check and the one spend step it
+// opens. It stays when the head changes. Never changed (INV-05).
+model RequestReserveConfirmation {
+  id                    String   @id @default(uuid(7)) @db.Uuid
+  organizationId        String   @map("organization_id") @db.Uuid
+  requestId             String   @map("request_id") @db.Uuid
+  checkId               String   @unique @map("check_id") @db.Uuid
+  spendStepId           String   @unique @map("spend_step_id") @db.Uuid
+  reason                String
+  confirmedByEmployeeId String   @map("confirmed_by_employee_id") @db.Uuid
+  confirmedAt           DateTime @default(now()) @map("confirmed_at") @db.Timestamptz(3)
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  request      AccessRequest     @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  check        RequestBudgetCheck @relation(fields: [checkId], references: [id], onDelete: Restrict)
+  spendStep    AccessRequestStep @relation(fields: [spendStepId], references: [id], onDelete: Restrict)
+  confirmedBy  Employee          @relation("ReserveConfirmationConfirmer", fields: [confirmedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([requestId])
+  @@map("request_reserve_confirmations")
+}
+
+/// What the spending approver asks Finance while the spend step is theirs, and what Finance answers (US-06-02, US-06-03). The
+/// question is advice for the approver and decides nothing: it does not stop the step, its SLA or the decision. It is kept for
+/// the step it was asked on, and once answered or closed it does not change.
+model BudgetInformationRequest {
+  id                   String                        @id @default(uuid(7)) @db.Uuid
+  requestId            String                        @map("request_id") @db.Uuid
+  stepId               String                        @map("step_id") @db.Uuid
+  askedByEmployeeId    String                        @map("asked_by_employee_id") @db.Uuid
+  question             String
+  askedAt              DateTime                      @map("asked_at") @db.Timestamptz(3)
+  state                BudgetInformationState        @default(OPEN)
+  answer               BudgetInformationAnswer?
+  answerNote           String?                       @map("answer_note")
+  answeredByEmployeeId String?                       @map("answered_by_employee_id") @db.Uuid
+  answeredAt           DateTime?                     @map("answered_at") @db.Timestamptz(3)
+  closedAt             DateTime?                     @map("closed_at") @db.Timestamptz(3)
+  closeReason          BudgetInformationCloseReason? @map("close_reason")
+
+  request    AccessRequest     @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  step       AccessRequestStep @relation(fields: [stepId], references: [id], onDelete: Restrict)
+  askedBy    Employee          @relation("BudgetInformationAsker", fields: [askedByEmployeeId], references: [id], onDelete: Restrict)
+  answeredBy Employee?         @relation("BudgetInformationAnswerer", fields: [answeredByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([requestId, askedAt])
+  @@index([state, askedAt])
+  @@map("budget_information_requests")
+}
+
+/// One alert for each stretch of controlled waiting (US-05-11): a step nobody valid can hold, raised once for the stretch that
+/// began at `waitingSince` however long it lasts. Append-only. The queue of waiting steps is the steps themselves; this keeps
+/// when the people who can put it right were told.
+model ControlledWaitAlert {
+  id             String                @id @default(uuid(7)) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  requestId      String                @map("request_id") @db.Uuid
+  stepId         String                @map("step_id") @db.Uuid
+  stepKind       AccessRequestStepKind @map("step_kind")
+  waitingReason  String                @map("waiting_reason")
+  // The key of the stretch of waiting: the step's `waiting_since` when the alert was raised.
+  waitingSince   DateTime              @map("waiting_since") @db.Timestamptz(3)
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  request      AccessRequest     @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  step         AccessRequestStep @relation(fields: [stepId], references: [id], onDelete: Restrict)
+
+  @@unique([stepId, waitingSince])
+  @@index([requestId])
+  @@map("controlled_wait_alerts")
+}
+
+// Whether the IT Admin accepted that a service account is a non-human subject (US-05-21 AC-3). Nothing is granted before
+// it is accepted.
+enum ServiceAccountBoundaryState {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+// What a request for a service account adds to the request: the purpose of the non-human subject, the identifier the sender
+// expects it to have at the vendor, the person who answers for it, and the verdict of the IT Admin on the boundary. Neither
+// a password nor a key is kept here. The verdict is written once and never changed or deleted: the database refuses (INV-05).
+model AccessRequestServiceAccount {
+  requestId                   String                      @id @map("request_id") @db.Uuid
+  purpose                     String
+  // The sender's guess, shown to the IT Admin; the identifier that counts is the one the IT Admin enters when granting.
+  expectedIdentifier          String                      @map("expected_identifier")
+  responsibleEmployeeId       String                      @map("responsible_employee_id") @db.Uuid
+  boundaryState               ServiceAccountBoundaryState @default(PENDING) @map("boundary_state")
+  boundaryReason              String?                     @map("boundary_reason")
+  boundaryDecidedByEmployeeId String?                     @map("boundary_decided_by_employee_id") @db.Uuid
+  boundaryDecidedAt           DateTime?                   @map("boundary_decided_at") @db.Timestamptz(3)
+  // The IT Admin who decided is also the person who answers for the account, and nobody else could (QĐ-77m).
+  boundarySelfExecuted        Boolean                     @default(false) @map("boundary_self_executed")
+
+  request           AccessRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  responsible       Employee      @relation("ServiceAccountResponsible", fields: [responsibleEmployeeId], references: [id], onDelete: Restrict)
+  boundaryDecidedBy Employee?     @relation("ServiceAccountBoundaryDecider", fields: [boundaryDecidedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([responsibleEmployeeId])
+  @@index([boundaryState])
+  @@map("access_request_service_accounts")
+}
+
+enum ReturnRequestState {
+  AWAITING_REVOCATION
+  COMPLETED
+  FAILED
+}
+
+// Who asked for the return of a seat: the holder, or the head of their department who confirms it is no longer needed.
+enum ReturnSource {
+  EMPLOYEE_RETURN
+  HEAD_CONFIRMATION
+}
+
+// The return of one seat (BM-03, US-05-13): a record of its own, not a request that goes through steps. It names exactly one
+// assignment and the revocation task licensing opened for it in the same transaction, snapshots what the plan said of the
+// handover when it was sent, and ends when that task is completed or closed as failed. Never deleted; what it said when it was
+// sent never changes (INV-05).
+model ReturnRequest {
+  id                            String             @id @default(uuid()) @db.Uuid
+  organizationId                String             @map("organization_id") @db.Uuid
+  assignmentId                  String             @map("assignment_id") @db.Uuid
+  // The plan of the seat, as a value kept for the lists: the plan of an assignment never changes.
+  planId                        String             @map("plan_id") @db.Uuid
+  revocationTaskId              String             @unique @map("revocation_task_id") @db.Uuid
+  requestedByEmployeeId         String             @map("requested_by_employee_id") @db.Uuid
+  holderEmployeeId              String             @map("holder_employee_id") @db.Uuid
+  // The department of the holder on the day it was sent: the head of that department reads and confirms it.
+  departmentId                  String             @map("department_id") @db.Uuid
+  source                        ReturnSource
+  reason                        String
+  requestedOn                   DateTime           @map("requested_on") @db.Date
+  // What the plan says to do before its right is taken away, as it was when the return was sent.
+  revocationNote                String?            @map("revocation_note")
+  // Only a plan whose removal loses data asks for a confirmation of the handover, due by `handoverDueOn`.
+  handoverRequired              Boolean            @map("handover_required")
+  handoverDueOn                 DateTime?          @map("handover_due_on") @db.Date
+  handoverConfirmedAt           DateTime?          @map("handover_confirmed_at") @db.Timestamptz(3)
+  handoverConfirmedByEmployeeId String?            @map("handover_confirmed_by_employee_id") @db.Uuid
+  // The revocation was completed after the deadline without the confirmation.
+  handoverFlagged               Boolean            @default(false) @map("handover_flagged")
+  // The request whose withdrawal was refused because its grant was done: the way back that this return follows (US-05-08).
+  originRequestId               String?            @map("origin_request_id") @db.Uuid
+  state                         ReturnRequestState @default(AWAITING_REVOCATION)
+  completedAt                   DateTime?          @map("completed_at") @db.Timestamptz(3)
+  failedAt                      DateTime?          @map("failed_at") @db.Timestamptz(3)
+  failureReason                 String?            @map("failure_reason")
+  // A value, not a foreign key: the history outlives the account (as the audit trail does).
+  createdByAppUserId            String             @map("created_by_app_user_id") @db.Uuid
+  createdAt                     DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization        Organization      @relation(fields: [organizationId], references: [id])
+  assignment          LicenseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  plan                Plan              @relation(fields: [planId], references: [id], onDelete: Restrict)
+  revocationTask      ProvisioningTask  @relation(fields: [revocationTaskId], references: [id], onDelete: Restrict)
+  requestedBy         Employee          @relation("ReturnRequestSender", fields: [requestedByEmployeeId], references: [id], onDelete: Restrict)
+  holder              Employee          @relation("ReturnRequestHolder", fields: [holderEmployeeId], references: [id], onDelete: Restrict)
+  department          Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  handoverConfirmedBy Employee?         @relation("ReturnRequestHandoverConfirmer", fields: [handoverConfirmedByEmployeeId], references: [id], onDelete: Restrict)
+  originRequest       AccessRequest?    @relation("ReturnRequestOrigin", fields: [originRequestId], references: [id], onDelete: Restrict)
+
+  // At most one return waits for the revocation of a seat is a partial unique index the model cannot say (SQL migration).
+  @@index([assignmentId])
+  @@index([planId])
+  @@index([holderEmployeeId])
+  @@index([requestedByEmployeeId])
+  @@index([departmentId])
+  @@index([originRequestId])
+  @@map("return_requests")
+}
+
+// What a request for the renewal of a right adds to the request: the right it renews, the end it had and the end it asks for,
+// the months the right would run on without a break, and, once approved, the record that follows the old one. The old record
+// keeps the end it had (US-05-14 AC-1). Written once and never changed or deleted: the database refuses (INV-05).
+model AccessRequestRenewal {
+  requestId               String    @id @map("request_id") @db.Uuid
+  assignmentId            String    @map("assignment_id") @db.Uuid
+  previousExpectedEndDate DateTime  @map("previous_expected_end_date") @db.Date
+  newExpectedEndDate      DateTime  @map("new_expected_end_date") @db.Date
+  // The months from the first of the chain of records that follow one another to the new end: more than twelve needs the
+  // confirmation of the head in so many words (OI-07a).
+  consecutiveMonths       Int       @map("consecutive_months")
+  successorAssignmentId   String?   @unique @map("successor_assignment_id") @db.Uuid
+  appliedAt               DateTime? @map("applied_at") @db.Timestamptz(3)
+
+  request    AccessRequest      @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  assignment LicenseAssignment  @relation("RenewalOf", fields: [assignmentId], references: [id], onDelete: Restrict)
+  successor  LicenseAssignment? @relation("RenewalSuccessor", fields: [successorAssignmentId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId])
+  @@map("access_request_renewals")
+}
+
+// Where the projection of the audit events into the inbox has got to (US-05-15): one row, the position of the last audit event
+// whose notices were written, so a pass starts after it and a second pass writes nothing again. Locked for the pass, so two
+// workers never project at once. The migration starts it at the day of the deployment: nothing that happened before is told.
+model RequestStatusCursor {
+  name           String   @id
+  lastOccurredAt DateTime @map("last_occurred_at") @db.Timestamptz(3)
+  lastEventId    String   @map("last_event_id") @db.Uuid
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("request_status_cursor")
+}
+
+enum SlaSubjectKind {
+  STEP
+  SPEND_QUEUE
+}
+
+enum SlaReminderRole {
+  HOLDER
+  SUPERIOR
+  // Legacy: the reminder to Finance of a question that is retired; read, never written (QĐ-97c).
+  FINANCE_QUESTION
+  SUPER_ADMIN
+  // The person who asked for the request, told with the holder of a need step that is late (QĐ-100j).
+  REQUESTER
+}
+
+/// One reminder of a step, or of a request in the queue of the head, that waited past its deadline (US-05-09): at most one for each
+/// subject on each working day, numbered in order. Append-only. It changes nothing of the step: the holder stays, the step stays,
+/// nobody decides in its place. `subjectId` is a value (the id of the step, or of the request for the queue), not a foreign key.
+model StepSlaReminder {
+  id                 String                 @id @default(uuid(7)) @db.Uuid
+  organizationId     String                 @map("organization_id") @db.Uuid
+  requestId          String                 @map("request_id") @db.Uuid
+  subjectKind        SlaSubjectKind         @map("subject_kind")
+  subjectId          String                 @map("subject_id") @db.Uuid
+  // Required for a step, empty for the queue (a check of the database).
+  stepKind           AccessRequestStepKind? @map("step_kind")
+  // The day of the organization the reminder was made for.
+  businessDate       DateTime               @map("business_date") @db.Date
+  sequence           Int
+  // Who held the subject when it was sent; null when nobody did.
+  holderEmployeeId   String?                @map("holder_employee_id") @db.Uuid
+  // The deadline that had passed, and how old and how late the subject was in working days.
+  dueAt              DateTime               @map("due_at") @db.Timestamptz(3)
+  ageWorkingDays     Int                    @map("age_working_days")
+  overdueWorkingDays Int                    @map("overdue_working_days")
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization               @relation(fields: [organizationId], references: [id])
+  request      AccessRequest              @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  holder       Employee?                  @relation("StepSlaReminderHolder", fields: [holderEmployeeId], references: [id], onDelete: Restrict)
+  recipients   StepSlaReminderRecipient[]
+
+  @@unique([subjectKind, subjectId, businessDate])
+  @@unique([subjectKind, subjectId, sequence])
+  @@index([requestId, createdAt])
+  @@index([holderEmployeeId, businessDate])
+  @@map("step_sla_reminders")
+}
+
+/// Who a reminder was sent to and in what part. Append-only, like the reminder.
+model StepSlaReminderRecipient {
+  reminderId String          @map("reminder_id") @db.Uuid
+  employeeId String          @map("employee_id") @db.Uuid
+  role       SlaReminderRole
+
+  reminder StepSlaReminder @relation(fields: [reminderId], references: [id], onDelete: Restrict)
+  employee Employee        @relation("StepSlaReminderRecipient", fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@id([reminderId, employeeId])
+  @@index([employeeId])
+  @@map("step_sla_reminder_recipients")
+}
+
+/// An incident the Super Admin recorded about the steps one holder keeps waiting (US-05-10 AC-4): the description and a snapshot of
+/// how many steps were open and how old the oldest was. It changes no step. Append-only. `recordedByAppUserId` is a value, as the
+/// audit trail keeps its actors.
+model CongestionIncident {
+  id                   String   @id @default(uuid(7)) @db.Uuid
+  organizationId       String   @map("organization_id") @db.Uuid
+  // Null for an incident about the steps nobody holds.
+  holderEmployeeId     String?  @map("holder_employee_id") @db.Uuid
+  description          String
+  openSteps            Int      @map("open_steps")
+  oldestAgeWorkingDays Int      @map("oldest_age_working_days")
+  recordedByAppUserId  String   @map("recorded_by_app_user_id") @db.Uuid
+  recordedAt           DateTime @default(now()) @map("recorded_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  holder       Employee?    @relation("CongestionIncidentHolder", fields: [holderEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([recordedAt(sort: Desc), id(sort: Desc)])
+  @@map("congestion_incidents")
+}
+
+// One pass of 01/01 for an organization and a year (`FR-5.8`(6), `QĐ-109a`): the mark that says the commitments of the new year were made, so that
+// a second pass the same year changes nothing. The row is made when a pass begins and completed when it has been through every request;
+// a pass that failed half way leaves it open and the next one goes on (a commitment is never made twice: the request and the year are unique).
+// The migration marks the year before the deployment as done for the organizations that exist, so the first pass is the one of the year
+// of the deployment. Each step of a pass takes the advisory lock of the organization and the year (`pg_try_advisory_xact_lock`).
+model YearStartCommitmentRun {
+  organizationId String    @map("organization_id") @db.Uuid
+  year           Int
+  startedAt      DateTime  @map("started_at") @db.Timestamptz(3)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(3)
+  // How many passes were made for the year (more than one after a failure), and what all of them made and left, batch by batch.
+  runCount       Int       @default(1) @map("run_count")
+  createdCount   Int       @default(0) @map("created_count")
+  skippedCount   Int       @default(0) @map("skipped_count")
+  // The last request (in order of id) a batch went through: a pass that failed half way goes on after it.
+  resumeAfterId  String?   @map("resume_after_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@id([organizationId, year])
+  @@map("year_start_commitment_runs")
+}
