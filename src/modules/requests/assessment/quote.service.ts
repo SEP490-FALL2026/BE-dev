@@ -63,7 +63,10 @@ export class QuoteService {
     return {
       status: 'PRICED',
       missingReason: null,
+      kind: null,
       expectedSpendOn: priced.firstPaymentOn,
+      expectedEndDate: null,
+      amountMonths: null,
       budgetYear: priced.budgetYear,
       amount: priced.amount,
       unitPrice: priced.unitPrice,

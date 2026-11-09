@@ -55,7 +55,7 @@ function fromNeedRow(row: NeedQueueRow): SourceRow {
     // The step of a head holds the people of the group still waiting on it, as the queue of the need steps counts them.
     groupSize: group ? row._count.lines : null,
     reason: request.businessReason,
-    termMonths: request.termMonths,
+    termMonths: request.termMonths ?? 0,
     price: null,
   };
 }
@@ -74,7 +74,7 @@ function fromSpendRow(row: SpendRow): SourceRow {
     beneficiaryId: group ? null : (request.beneficiaries[0]?.employeeId ?? null),
     groupSize: group ? request._count.beneficiaries : null,
     reason: request.businessReason,
-    termMonths: request.termMonths,
+    termMonths: request.termMonths ?? 0,
     price:
       request.amountMinor === null || request.amountCurrency === null
         ? null

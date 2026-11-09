@@ -55,7 +55,10 @@ export class RepricingService {
       return {
         status: 'MISSING',
         missingReason: 'AWAITING_QUOTE',
+        kind: null,
         expectedSpendOn,
+        expectedEndDate: null,
+        amountMonths: null,
         budgetYear: fiscalYearOf(expectedSpendOn),
         amount: null,
         unitPrice: null,

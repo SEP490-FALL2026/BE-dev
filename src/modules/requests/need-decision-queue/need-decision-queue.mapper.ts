@@ -69,7 +69,7 @@ export function needQueueItemOf(row: NeedQueueRow, lookups: NeedQueueLookups): N
     lineCount: isGroup ? row._count.lines : request._count.beneficiaries,
     department: { id: department.id, code: department.code, name: department.name },
     businessReasonExcerpt: reasonExcerptOf(request.businessReason),
-    termMonths: request.termMonths,
+    termMonths: request.termMonths ?? 0,
     pricing: pricingOf(request, lookups.units),
     samePersonAsSpend: row.samePersonAsSpend,
   };

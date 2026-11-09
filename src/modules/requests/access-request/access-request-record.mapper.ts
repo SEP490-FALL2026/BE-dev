@@ -154,7 +154,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     departmentId: row.departmentId,
     costCenterId: sent.costCenterId,
     businessReason: row.businessReason,
-    termMonths: row.termMonths,
+    termMonths: row.termMonths ?? 0,
     pricing: toPricing(row),
     planLine:
       row.planLineVersionId !== null && row.planLinePosition !== null

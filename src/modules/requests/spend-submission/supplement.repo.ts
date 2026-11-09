@@ -69,18 +69,26 @@ export class SupplementRepo {
     reason: string;
     changedByEmployeeId: string;
     createdAt: Date;
-    beforeExpectedSpendOn: Date;
-    afterExpectedSpendOn: Date;
+    beforeExpectedSpendOn: Date | null;
+    afterExpectedSpendOn: Date | null;
     beforeBudgetYear: number;
     afterBudgetYear: number;
     beforeAmountMinor: bigint;
     afterAmountMinor: bigint;
-    currency: string;
+    currency: string | null;
   }): SupplementRecord {
     return {
-      ...row,
-      beforeExpectedSpendOn: fromDateColumn(row.beforeExpectedSpendOn),
-      afterExpectedSpendOn: fromDateColumn(row.afterExpectedSpendOn),
+      number: row.number,
+      reason: row.reason,
+      changedByEmployeeId: row.changedByEmployeeId,
+      createdAt: row.createdAt,
+      beforeExpectedSpendOn: row.beforeExpectedSpendOn ? fromDateColumn(row.beforeExpectedSpendOn) : null,
+      afterExpectedSpendOn: row.afterExpectedSpendOn ? fromDateColumn(row.afterExpectedSpendOn) : null,
+      beforeBudgetYear: row.beforeBudgetYear,
+      afterBudgetYear: row.afterBudgetYear,
+      beforeAmountMinor: row.beforeAmountMinor,
+      afterAmountMinor: row.afterAmountMinor,
+      currency: row.currency ?? 'VND',
     };
   }
 }

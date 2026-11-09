@@ -49,7 +49,6 @@ export class AccessRequestRepo {
       costCenterId: input.costCenterId,
       businessReason: input.businessReason,
       termMonths: input.termMonths,
-      expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
       ...pricingColumns(input.pricing),
       policy: requestPolicyJson.encode(input.policy),
       createdByAppUserId: input.createdByAppUserId,

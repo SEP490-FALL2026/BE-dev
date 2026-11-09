@@ -632,15 +632,15 @@ describe('requests (integration, PostgreSQL constraints)', () => {
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             randomUUID(),
-            h.ctx.orgId,
+            h.seed.organizationId,
             'PAID_IN_CATALOG',
             'PENDING',
-            h.ctx.personId,
-            h.ctx.departmentId,
+            person.id,
+            department.id,
             'Test BR amount_months field',
             6,
             'RECURRING',
-            h.ctx.personId,
+            person.id,
           ]
         )
       ).toBeNull();
@@ -654,15 +654,15 @@ describe('requests (integration, PostgreSQL constraints)', () => {
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             randomUUID(),
-            h.ctx.orgId,
+            h.seed.organizationId,
             'PAID_IN_CATALOG',
             'PENDING',
-            h.ctx.personId,
-            h.ctx.departmentId,
+            person.id,
+            department.id,
             'Test',
             13,
             'RECURRING',
-            h.ctx.personId,
+            person.id,
           ]
         )
       ).toBe(CHECK);

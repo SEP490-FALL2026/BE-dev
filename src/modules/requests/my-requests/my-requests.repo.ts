@@ -45,7 +45,7 @@ function toRow(row: Row): MyRequestRow {
     // The filter of the page has no draft among its states.
     state: row.state as SentState,
     planId: row.planId,
-    termMonths: row.termMonths,
+    termMonths: row.termMonths ?? 0,
     submittedAt: row.submittedAt,
     updatedAt: row.updatedAt,
     hasSpendStep: hasSpendStep(requestPolicyJson.decode(row.policy)),

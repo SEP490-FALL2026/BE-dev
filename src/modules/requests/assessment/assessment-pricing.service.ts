@@ -8,7 +8,10 @@ import { QuoteService } from './quote.service';
 const NOT_APPLICABLE: PricingRecord = {
   status: 'NOT_APPLICABLE',
   missingReason: null,
+  kind: null,
   expectedSpendOn: null,
+  expectedEndDate: null,
+  amountMonths: null,
   budgetYear: null,
   amount: null,
   unitPrice: null,
