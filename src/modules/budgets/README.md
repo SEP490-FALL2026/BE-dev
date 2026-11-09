@@ -17,7 +17,10 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
   - `yearFacts` — ngân sách hiện hành của từng năm cho một Cost Center (năm chưa có ngân sách thì vắng mặt).
   - `planLine`, `currentLine`, `currentLines` — dòng kế hoạch mà request nêu, đọc từ version hiện hành.
   - `holdForRequest` — request giữ số tiền mỗi năm, trong transaction của quyết định duyệt (US-06-04).
-  - `releaseForRequest` — trả phần request còn giữ về ngân sách khi request kết thúc/rút bớt (US-06-06).
+  - `releaseForRequest` — trả phần request còn giữ về ngân sách khi request kết thúc/rút bớt (US-06-06); có `reference` thì mỗi khoản chỉ
+    trả một lần cho cùng lý do + tham chiếu (giải phóng theo ngày `REVOKED`/`LATE_GRANT`, ghi `reason_text`).
+  - `lockSeatCommitments` — khóa `FOR UPDATE` các khoản còn `HELD` của các request từ năm đang mở (theo thứ tự request, năm), trả
+    `origin`, `seat_monthly_minor`, phần còn giữ: `requests/grant/seat-release.service.ts` tính phần giải phóng theo ngày (RV-07, M-10).
   - `holdYearStart`, `listRequestsHoldingYear` — khoản cam kết ngày 01/01 (`FR-5.8`(6), `QĐ-109a`): job của `requests` giữ một khoản cho mỗi Request
     có quyền `K1`/`K2` đang chạy hoặc đã duyệt chi chưa cấp; chỉ Request mới có khoản, không có khoản theo Assignment.
   - `requestHoldsCommitment` — request có giữ commitment không, điều kiện để Finance đọc nó (US-06-09 AC-2).
@@ -30,7 +33,7 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
 
 - `budget_proposals`, `budget_proposal_lines`, `budget_versions`, `budget_version_lines`,
   `budget_version_line_changes` (còn trong DB, không còn code ghi), `budget_version_decisions`, `budget_version_history`, `budget_commitments`,
-  `budget_commitment_releases` (`budget_commitments.origin` = `APPROVAL` hoặc `YEAR_START`; `seat_monthly_minor` giá tháng một seat lúc ghi khoản 01/01), `invoices`, `budget_attachments` (`prisma/models/budgets.prisma`). Kiểm ngân sách của request
+  `budget_commitment_releases` (`budget_commitments.origin` = `APPROVAL` hoặc `YEAR_START`; `seat_monthly_minor` giá tháng một seat, quy tiền báo cáo, làm tròn lên, ghi lúc duyệt chi và lúc ghi khoản 01/01; null = khoản cũ, không giải phóng theo ngày), `invoices`, `budget_attachments` (`prisma/models/budgets.prisma`). Kiểm ngân sách của request
   (`request_budget_checks`…) thuộc `requests`.
 
 ## Extension point

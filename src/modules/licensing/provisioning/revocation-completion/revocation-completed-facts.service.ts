@@ -37,6 +37,7 @@ export class RevocationCompletedFactsReader {
   ): Promise<RevocationCompletedFacts> {
     return {
       grantRequestId: await this.chains.grantRequestOfChain(tx, task.assignmentId),
+      chainAssignmentIds: await this.chains.chainOf(tx, task.assignmentId),
       provisioningType: done.provisioningType,
       endedOn: done.endedOn,
       paidThroughOn: done.paidThroughOn,

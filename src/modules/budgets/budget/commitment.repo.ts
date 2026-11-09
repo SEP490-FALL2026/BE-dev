@@ -7,6 +7,7 @@ import type {
   CommitmentHoldInput,
   CommitmentReleaseReason,
   HeldCommitment,
+  SeatCommitment,
 } from '../public/budgets.types';
 import { BudgetCommitmentNotHoldableError } from './budget.errors';
 import { BudgetYearLockRepo } from './budget-year-lock.repo';
@@ -103,6 +104,7 @@ export class CommitmentRepo {
           attachedAt: current ? input.now : null,
           unattachedReason: current ? null : 'NO_BUDGET',
           snapshotCheckId: input.snapshotCheckId,
+          seatMonthlyMinor: input.seatMonthlyMinor ?? null,
         },
         select: { id: true },
       });
@@ -122,7 +124,7 @@ export class CommitmentRepo {
    * release queues behind an invoice that is being recorded on one of them and reads it as it stands then, and two releases of the
    * same request queue the same way. An invoice takes no other lock than its own commitment, so no circle is made with the year.
    */
-  async lockOfRequest(tx: DbTx, requestId: string): Promise<CommitmentOfRequest[]> {
+  async lockOfRequest(tx: DbTx, requestId: string): Promise<LockedCommitmentOfRequest[]> {
     await tx.$queryRaw`SELECT id FROM budget_commitments WHERE request_id = ${requestId}::uuid ORDER BY year FOR UPDATE`;
     const rows = await tx.budgetCommitment.findMany({ where: { requestId }, orderBy: { year: 'asc' } });
 
@@ -135,7 +137,46 @@ export class CommitmentRepo {
       state: row.state,
       organizationId: row.organizationId,
       costCenterId: row.costCenterId,
+      origin: row.origin,
+      seatMonthlyMinor: row.seatMonthlyMinor,
     }));
+  }
+
+  /**
+   * The commitments still held of these requests, for the years from `fromYear`, with their rows locked: the requests in order of id and the
+   * years of each earliest first, as `lockOfRequest` takes them, so two releases queue and never wait for each other in a circle.
+   */
+  async lockSeatCommitmentsOf(tx: DbTx, requestIds: readonly string[], fromYear: number): Promise<SeatCommitment[]> {
+    const found: SeatCommitment[] = [];
+    for (const requestId of [...new Set(requestIds)].sort()) {
+      for (const row of await this.lockOfRequest(tx, requestId)) {
+        if (row.state !== 'HELD' || row.year < fromYear) continue;
+        found.push({
+          requestId,
+          year: row.year,
+          origin: row.origin,
+          seatMonthlyMinor: row.seatMonthlyMinor,
+          heldMinor: row.amountMinor - row.releasedMinor - row.appliedMinor,
+        });
+      }
+    }
+
+    return found;
+  }
+
+  /** The commitments, among these, that already gave money back for this reason and reference. */
+  async releasedFor(
+    tx: DbTx,
+    commitmentIds: readonly string[],
+    by: { reason: CommitmentReleaseReason; reference: string },
+  ): Promise<Set<string>> {
+    if (commitmentIds.length === 0) return new Set();
+    const rows = await tx.budgetCommitmentRelease.findMany({
+      where: { commitmentId: { in: [...commitmentIds] }, reason: by.reason, reasonText: by.reference },
+      select: { commitmentId: true },
+    });
+
+    return new Set(rows.map((row) => row.commitmentId));
   }
 
   /** The requests, among these, that hold a commitment for the year already, whatever its state: one request holds one for a year (`INV-16`). */
@@ -437,6 +478,12 @@ export class CommitmentRepo {
 export interface CommitmentOfRequest extends CommitmentRow {
   organizationId: string;
   costCenterId: string;
+}
+
+/** A commitment of a request as `lockOfRequest` reads it: with where it came from and what one seat costs a month in it. */
+export interface LockedCommitmentOfRequest extends CommitmentOfRequest {
+  origin: 'APPROVAL' | 'YEAR_START';
+  seatMonthlyMinor: bigint | null;
 }
 
 /** What a commitment total says about the budget of a Cost Center and year. */

@@ -106020,7 +106020,9 @@
                         "REQUEST_WITHDRAWN",
                         "GRANT_FAILED",
                         "PARTICIPANT_WITHDRAWN",
-                        "REMAINDER"
+                        "REMAINDER",
+                        "REVOKED",
+                        "LATE_GRANT"
                       ]
                     },
                     "reasonText": { "type": "string", "nullable": true },

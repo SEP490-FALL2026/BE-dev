@@ -44,7 +44,9 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 - Mở: `RequestOutcomeListeners` (`requests.outcome`, Listeners) — personnel
   `transfer-review/transfer-review-outcome.listener.ts`; phát qua `outcome/request-outcome.service.ts`.
 - Đăng ký vào licensing: `licensing.grant-request-gate` ← `grant/access-request-grant.listener.ts`;
-  `licensing.revocation` ← `return-request/return-revocation.listener.ts`; `licensing.renewal-hold` ←
+  `licensing.revocation` ← `return-request/return-revocation.listener.ts` và `grant/seat-revocation.listener.ts` (G9-02: hoàn tất
+  thu hồi `K1`/`K2` ⟹ giải phóng theo ngày khoản của Request cấp và Request tiếp tục của chuỗi, `grant/seat-release.*`; cấp `K2` muộn
+  ⟹ giải phóng phần trước ngày cấp trong `grant/access-request-grant.listener.ts`); `licensing.renewal-hold` ←
   `renewal-request/renewal-hold.listener.ts`.
 - Đăng ký vào organization: `organization.department-use-readers`, `organization.cost-center-use-readers` ←
   `access-request/open-request/*-open-requests.listener.ts`; `organization.change-listeners` ←

@@ -8,6 +8,7 @@ import type {
   CommitmentReleaseInput,
   HeldCommitment,
   ReleasedCommitment,
+  SeatCommitment,
   YearBudgetFacts,
   YearStartHoldInput,
   YearStartHoldResult,
@@ -48,6 +49,15 @@ export class BudgetsApi {
    */
   releaseForRequest(tx: DbTx, input: CommitmentReleaseInput): Promise<ReleasedCommitment[]> {
     return this.commitments.release(tx, input);
+  }
+
+  /**
+   * The commitments still held of these requests for the years from `fromYear` (the years before are closed and left as they are), with their
+   * rows locked until the transaction ends: what the release by day of one seat is worked out on (`RV-07`, `M-06`, `M-10`) before the caller
+   * gives it back with `releaseForRequest` in the same transaction. Locks no request row and no year.
+   */
+  lockSeatCommitments(tx: DbTx, requestIds: readonly string[], fromYear: number): Promise<SeatCommitment[]> {
+    return this.commitments.lockSeatCommitments(tx, requestIds, fromYear);
   }
 
   /**
