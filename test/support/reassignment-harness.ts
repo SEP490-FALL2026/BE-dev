@@ -1,3 +1,4 @@
+import { OneStepConversionService } from '../../src/modules/requests/reassignment/one-step-conversion.service';
 import request from 'supertest';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
@@ -110,6 +111,7 @@ export class ReassignmentHarness extends SpendHarness {
     const app = this.ctx.app;
 
     return new StepRedeterminationSweepApi(
+      app.get(OneStepConversionService, { strict: false }),
       app.get(StepReassignmentService, { strict: false }),
       app.get(OrganizationReadApi, { strict: false }),
     );

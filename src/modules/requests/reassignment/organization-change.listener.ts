@@ -1,3 +1,4 @@
+import { OneStepConversionService } from './one-step-conversion.service';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -25,6 +26,7 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
   static readonly binds = [OrganizationChangeListeners] as const;
 
   constructor(
+    private readonly oneStep: OneStepConversionService,
     private readonly repo: StepReassignmentRepo,
     private readonly reassignment: StepReassignmentService,
     private readonly organizationReads: OrganizationReadApi,
@@ -43,6 +45,10 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
     if (concerned === null) return;
 
     const waiting = await this.repo.waitingRequestIds(tx);
+    const conversionIds = change.kind === 'HEAD_PERIOD_END' ? await this.repo.conversionIds(change.departmentId, tx) : [];
+    // Both operations below may take request locks. Take their union first, globally sorted, before either mutates a subset.
+    await this.repo.lockIds(tx, [...concerned.requestIds, ...waiting, ...conversionIds]);
+    if (change.kind === 'HEAD_PERIOD_END') await this.oneStep.markForDepartment(tx, change.departmentId, new Date());
     await this.reassignment.reconcileRequests(
       tx,
       [...concerned.requestIds, ...waiting],

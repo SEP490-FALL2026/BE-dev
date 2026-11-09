@@ -106,6 +106,10 @@ export class OrganizationReadApi {
    * calendar), oldest first, each with the code of its department and `CURRENT` or `UPCOMING`. Empty when there is none. `tx` reads
    * in the caller's transaction (the revoke of `MANAGER` and the grant of `SPENDING_APPROVER` give the periods in their refusal).
    */
+  nextHeadPeriodOf(departmentId: string, after: BusinessDate, tx?: DbTx) {
+    return this.departments.nextHeadPeriodOf(departmentId, after, tx);
+  }
+
   async headPeriodsFrom(employeeId: string, onDate?: BusinessDate, tx?: DbTx): Promise<EmployeeHeadPeriod[]> {
     const day = onDate ?? (await this.businessToday(new Date(), tx));
     const periods = await this.departments.headPeriodsOf(employeeId, day, tx);

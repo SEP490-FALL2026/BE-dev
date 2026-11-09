@@ -1,3 +1,4 @@
+import { OneStepConversionService } from '../reassignment/one-step-conversion.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { BusinessDate } from '../../../core/business-date';
@@ -8,6 +9,7 @@ import { StepReassignmentService, type SweepTrigger } from '../reassignment/step
 /** What one pass looked at and what it could not finish; a request that failed is tried again by the next pass. */
 export interface SweepResult {
   waitingRequests: number;
+  oneStepFinished: number;
   holderLeftRequests: number;
   /** Requests looked at by the pass of the day; zero on every other pass. */
   dailyPassRequests: number;
@@ -35,14 +37,23 @@ export class StepRedeterminationSweepApi {
   private dailyPassOn: BusinessDate | null = null;
 
   constructor(
+    private readonly oneStep: OneStepConversionService,
     private readonly reassignment: StepReassignmentService,
     private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   async sweep(now: Date = new Date()): Promise<SweepResult> {
     const correlationId = randomUUID();
-    const result: SweepResult = { waitingRequests: 0, holderLeftRequests: 0, dailyPassRequests: 0, failedRequests: 0 };
+    const result: SweepResult = { waitingRequests: 0, oneStepFinished: 0, holderLeftRequests: 0, dailyPassRequests: 0, failedRequests: 0 };
 
+    await this.oneStep.markMissingHeads(now);
+    for (const id of await this.oneStep.pendingIds()) {
+      try { if (await this.oneStep.finishPending(id, now)) result.oneStepFinished++; }
+      catch (error) {
+        result.failedRequests++;
+        this.logger.error(`One-step conversion failed (request ${id}): ${describeForOperator(error)}`, traceForOperator(error));
+      }
+    }
     const waiting = await this.reassignment.waitingRequestIds();
     result.waitingRequests = waiting.length;
     result.failedRequests += await this.each(waiting, 'WAITING_RETRY', correlationId, now);

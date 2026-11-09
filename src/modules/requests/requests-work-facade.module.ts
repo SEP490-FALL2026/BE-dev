@@ -1,3 +1,5 @@
+import { OneStepConversionService } from './reassignment/one-step-conversion.service';
+import { RequestsRoutingModule } from './requests-routing.module';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
@@ -7,7 +9,6 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
 import { OrganizationModule } from '../organization/organization.module';
 import { RequestDraftDepartureService } from './draft/request-draft-departure.service';
 import { RequestDraftRepo } from './request-draft/request-draft.repo';
-import { RoutingFactsService } from './access-request/routing-facts.service';
 import { ControlledWaitAlertService } from './reassignment/controlled-wait-alert.service';
 import { ControlledWaitQueryService } from './reassignment/controlled-wait-query.service';
 import { ControlledWaitRepo } from './reassignment/controlled-wait.repo';
@@ -17,7 +18,6 @@ import { RequestsSpendingApproverGrantCheck } from './reassignment/spending-appr
 import { SpendingApproverWorkRepo } from './reassignment/spending-approver-work.repo';
 import { StepReassignmentRepo } from './step-routing/step-reassignment.repo';
 import { StepReassignmentService } from './reassignment/step-reassignment.service';
-import { StepTargetService } from './step-routing/step-target.service';
 import { RequestStatusFactsService } from './status/request-status-facts.service';
 import { RequestStatusProjection } from './status/request-status-projector.service';
 import { RequestStatusRecipientsService } from './status/request-status-recipients.service';
@@ -49,6 +49,7 @@ import { StepSlaService } from './sla/step-sla.service';
  */
 @Module({
   imports: [
+    RequestsRoutingModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
@@ -57,13 +58,12 @@ import { StepSlaService } from './sla/step-sla.service';
     OperatingParametersModule,
   ],
   providers: [
-    RoutingFactsService,
+    OneStepConversionService,
     // The drafts of a person who leaves go with them, in the transaction of the change that says they left; the draft
     // operations of the API read and write them through the same repo, so it is declared once, here, for both graphs.
     RequestDraftRepo,
     RequestDraftDepartureService,
     StepReassignmentRepo,
-    StepTargetService,
     ControlledWaitRepo,
     ControlledWaitAlertService,
     ControlledWaitQueryService,
@@ -90,13 +90,12 @@ import { StepSlaService } from './sla/step-sla.service';
     StepSlaSweepApi,
   ],
   exports: [
+    RequestsRoutingModule,
     StepRedeterminationSweepApi,
     RequestStatusProjectorApi,
     StepSlaSweepApi,
     SlaQueueAgeService,
     CongestionRepo,
-    StepTargetService,
-    RoutingFactsService,
     ControlledWaitQueryService,
     RequestDraftRepo,
   ],
