@@ -4,10 +4,9 @@ import request from 'supertest';
 import { addDays } from '../../src/core/business-date';
 import { addMonths } from '../../src/core/fiscal-year';
 import { ApiAccount } from './api-accounts';
-import { declareSubscription } from './builders/catalog.builder';
+import { OwnedSubscriptions } from './owned-subscriptions';
 import { clearSpendingApprover, insertEmployeeWithoutPlacement, setSpendingApprover } from './builders/account.builder';
 import { assignHead } from './builders/organization.builder';
-import { OwnedSubscriptions } from './owned-subscriptions';
 import { ProvisioningHarness } from './provisioning-harness';
 import { SeatHarness } from './seat-baseline-harness';
 
@@ -104,26 +103,8 @@ export interface Department {
 export class RequestHarness extends ProvisioningHarness {
   private titleName: string | null = null;
 
-  /** A request is priced, and a seat taken, by the subscription of its own department (F38, F20): see owned-subscriptions.ts. */
-  readonly owned = new OwnedSubscriptions((body) => declareSubscription(this.ctx, this.it1.accessToken, body));
-
-  constructor() {
-    super();
-    // A grant of a request made through the harness is made on the subscription its department owns.
-    const grantOnSeeded = this.grant;
-    this.grant = (body: object, account?: ApiAccount) => grantOnSeeded(this.owned.grantBody(body), account);
-  }
-
-  override async subscription(
-    quantity: number | null = 100,
-    type: 'K1' | 'K2' | 'K4' = 'K2',
-    ownerDepartmentId: string = this.seed.departmentId,
-  ): Promise<string> {
-    const id = await super.subscription(quantity, type, ownerDepartmentId);
-    if (ownerDepartmentId === this.seed.departmentId) await this.owned.recordSeed(id, await this.planOf(id), quantity);
-
-    return id;
-  }
+  /** The pool of seats is one for every department (`BR-MF1-09`): see owned-subscriptions.ts. */
+  readonly owned = new OwnedSubscriptions();
 
   /** Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. */
   override start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
@@ -137,10 +118,9 @@ export class RequestHarness extends ProvisioningHarness {
     return this.titleName;
   }
 
-  /** A department with its own Unit Cost Center, and a subscription of every plan the seeded department holds. */
+  /** A department with its own Unit Cost Center. The seats of a plan are one pool for every department (`BR-MF1-09`): it owns no subscription. */
   async departmentWithUnit(code: string): Promise<Department> {
     const created = await this.department(code);
-    await this.owned.give(created.id);
     // The Cost Center Finance created for the department, read through its own link (`QĐ-87d(1)`).
     const { rows } = await this.ctx.sql.query<{ id: string }>(
       `SELECT id FROM cost_centers WHERE department_id = $1 AND status = 'ACTIVE'`,
@@ -193,12 +173,6 @@ export class RequestHarness extends ProvisioningHarness {
 
   submit = (body: object, account: ApiAccount) =>
     request(this.server()).post('/api/v1/access-requests').set(this.as(account)).send(this.endDated(body));
-  /** Notes the department of a request made through `sent` and `proposed`, so that the seat it takes is on the subscription the department owns (F20). */
-  private remember(wire: AccessRequestWire): AccessRequestWire {
-    this.owned.noteRequest(wire.id, wire.department.id);
-
-    return wire;
-  }
 
   /** The decision of the need step: the head approves or refuses, and no line of the plan is chosen (`QĐ-101n`). */
   decide = (id: string, body: object, account: ApiAccount) =>
@@ -234,7 +208,7 @@ export class RequestHarness extends ProvisioningHarness {
     const response = await this.propose(this.proposeBody(extra), person.account);
     if (response.status !== 201) throw new Error(`propose: ${response.status} ${JSON.stringify(response.body)}`);
 
-    return this.remember(this.dataOf<{ request: AccessRequestWire }>(response).request);
+    return this.dataOf<{ request: AccessRequestWire }>(response).request;
   }
 
   assessmentOf = (id: string, account: ApiAccount) =>
@@ -330,7 +304,7 @@ export class RequestHarness extends ProvisioningHarness {
     const response = await this.submit(this.form(planId, extra), person.account);
     if (response.status !== 201) throw new Error(`submit: ${response.status} ${JSON.stringify(response.body)}`);
 
-    return this.remember(this.dataOf<{ request: AccessRequestWire }>(response).request);
+    return this.dataOf<{ request: AccessRequestWire }>(response).request;
   }
 
   /** The plans' applications share one functional group, made now. */

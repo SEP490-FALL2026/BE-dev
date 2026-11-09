@@ -10,8 +10,14 @@ import {
   assertDeclarableCycle,
   assertPoolTerms,
   assertResponsibleNamed,
+  isLiveSubscription,
+  isPooledPlan,
+  liveIdsByPlan,
+  liveSiblingsOf,
+  orderBySourcePreference,
   pickPriceSource,
   poolWarnings,
+  type LivenessFacts,
   type PriceSource,
 } from './subscription-pool.policy';
 
@@ -139,5 +145,67 @@ describe('BR-MF1-07: the subscription that gives a plan its price (Q-04 C)', () 
         ?.id,
     ).toBe('m');
     expect(pickPriceSource([])).toBeNull();
+  });
+});
+
+describe('the subscription that still holds the pool of its plan (R-E02, QĐ-104k(3))', () => {
+  const row = (extra: Partial<LivenessFacts> = {}): LivenessFacts => ({
+    id: 's1',
+    planId: 'p1',
+    status: 'ACTIVE',
+    kind: 'TERM',
+    endDate: null,
+    renewed: false,
+    ...extra,
+  });
+  const TODAY = '2026-11-09';
+
+  it('is live as a draft, active with no end, active ending today or later, and perpetual whatever its end', () => {
+    expect(isLiveSubscription(row({ status: 'DRAFT', endDate: '2020-01-01' }), TODAY)).toBe(true);
+    expect(isLiveSubscription(row(), TODAY)).toBe(true);
+    expect(isLiveSubscription(row({ endDate: TODAY }), TODAY)).toBe(true);
+    expect(isLiveSubscription(row({ kind: 'PERPETUAL', endDate: '2020-01-01' }), TODAY)).toBe(true);
+  });
+
+  it('is not live once its period ended, or when a later period continues it', () => {
+    expect(isLiveSubscription(row({ endDate: '2026-11-08' }), TODAY)).toBe(false);
+    expect(isLiveSubscription(row({ renewed: true }), TODAY)).toBe(false);
+  });
+
+  it('lists the live ones by plan and leaves out the subscription being written, a renewal included', () => {
+    const live = liveIdsByPlan(
+      [row({ id: 'a' }), row({ id: 'b', status: 'DRAFT' }), row({ id: 'c', endDate: '2025-01-01' }), row({ id: 'd', planId: 'p2' })],
+      TODAY,
+    );
+
+    expect(liveSiblingsOf(live, 'p1', null)).toEqual(['a', 'b']);
+    expect(liveSiblingsOf(live, 'p1', 'b')).toEqual(['a']);
+    expect(liveSiblingsOf(live, 'p3', null)).toEqual([]);
+  });
+
+  it('knows that only the K2 and K4 plans have the pool', () => {
+    expect(['K1', 'K2', 'K3', 'K4', 'K5'].filter((type) => isPooledPlan(type as 'K1'))).toEqual(['K2', 'K4']);
+  });
+});
+
+describe('the order a grant that names no subscription takes them (P0-05)', () => {
+  const src = (id: string, extra: Partial<PriceSource> = {}): PriceSource => ({
+    id,
+    isPrimaryForPlan: false,
+    unitPriceMinor: 100n,
+    billingCycle: 'MONTHLY',
+    startDate: null,
+    ...extra,
+  });
+
+  it('puts the primary first, then the dearest a month, and the subscription with no price last', () => {
+    const ordered = orderBySourcePreference([
+      src('cheap', { unitPriceMinor: 50n }),
+      src('free-of-price', { unitPriceMinor: 0n, billingCycle: 'OTHER' }),
+      src('primary', { isPrimaryForPlan: true, unitPriceMinor: 10n }),
+      src('dear', { unitPriceMinor: 900n }),
+    ]);
+
+    expect(ordered.map((source) => source.id)).toEqual(['primary', 'dear', 'cheap', 'free-of-price']);
   });
 });

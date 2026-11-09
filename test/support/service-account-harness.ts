@@ -48,9 +48,6 @@ export class ServiceAccountHarness extends SpendHarness {
     if (response.status !== 201) throw new Error(`submit: ${response.status} ${JSON.stringify(response.body)}`);
 
     const sent = this.dataOf<{ request: ServiceRequestWire }>(response).request;
-    // A grant of this request is made on the subscription its department owns (F20, F38): see owned-subscriptions.ts.
-    this.owned.noteRequest(sent.id, sent.department.id);
-
     return sent;
   }
 

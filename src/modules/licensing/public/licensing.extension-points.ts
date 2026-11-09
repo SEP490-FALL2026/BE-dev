@@ -14,6 +14,7 @@ import type {
   GrantRequestAnswer,
   RevocationContext,
   RevocationReasonFacts,
+  GrantOutcomeFacts,
   RevocationTaskFacts,
 } from './licensing.types';
 
@@ -32,8 +33,17 @@ export interface GrantRequestGate {
    * the state of a request being carried out (what lets it be granted once). Any answer but `GRANTABLE` leaves it as it was.
    */
   claimForGrant(tx: DbTx, requestId: string, employeeId?: string): Promise<GrantRequestAnswer>;
-  /** Inside the transaction that completes or closes as failed the task of a grant: says how the request ended. */
-  reportOutcome(tx: DbTx, requestId: string, outcome: GrantOutcome, employeeId?: string): Promise<void>;
+  /**
+   * Inside the transaction that completes or closes as failed the task of a grant: says how the request ended. A completed grant also says
+   * what was granted (`facts`): from the pool or not, the kind, the day, the assignment.
+   */
+  reportOutcome(
+    tx: DbTx,
+    requestId: string,
+    outcome: GrantOutcome,
+    employeeId?: string,
+    facts?: GrantOutcomeFacts,
+  ): Promise<void>;
   /** Whether the request waits for the IT Admin to close the task of its grant as cancelled: nothing else is decided on it. */
   isWithdrawing(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean>;
   /**
@@ -150,25 +160,6 @@ export interface SeatBaselineClosedEvent {
 export class SeatBaselineClosedListeners extends Listeners<SeatBaselineClosedEvent, DbTx> {
   constructor() {
     super('licensing.seat-baseline-closed');
-  }
-}
-
-/**
- * **Gói 9 (MF1-F):** Kiểm tra trạng thái đóng baseline cho các hạn chế (ví dụ chặn trùng `QĐ-104k`).
- * Bind trong licensing.seat-baseline module; nếu không bind ⟹ coi như đã đóng (chặn tạo mới).
- */
-export interface SeatBaselinePhase {
-  /**
-   * Coi baseline của org đã đóng hay chưa. Nếu hook không bind ⟹ true (chặn).
-   */
-  isClosed(tx: DbTx, organizationId: string): Promise<boolean>;
-}
-
-/** Hook cho SeatBaselinePhase (bind từ licensing.seat-baseline). */
-@Injectable()
-export class SeatBaselinePhaseHook extends Hook<SeatBaselinePhase> {
-  constructor() {
-    super('licensing.seat-baseline-phase');
   }
 }
 

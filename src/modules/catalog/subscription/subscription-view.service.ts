@@ -4,8 +4,10 @@ import { formatRate } from '../../../core/money/rate';
 import { FinanceApi } from '../../finance/public/finance.api';
 import type { TaxEstimateResult } from '../../finance/public/finance.types';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
-import { poolWarnings } from './pool/subscription-pool.policy';
+import { liveIdsByPlan, liveSiblingsOf, poolWarnings } from './pool/subscription-pool.policy';
+import { SubscriptionRepo } from './subscription.repo';
 import type { SubscriptionRecord, SubscriptionView, TaxEstimateSummary } from './subscription.types';
 
 /**
@@ -18,6 +20,8 @@ export class SubscriptionViewService {
   constructor(
     private readonly finance: FinanceApi,
     private readonly parameters: OperatingParametersApi,
+    private readonly subscriptions: SubscriptionRepo,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. */
@@ -54,8 +58,11 @@ export class SubscriptionViewService {
       ).map((estimate, index) => [priced[index].id, estimate]),
     );
 
+    const live = await this.liveOfPooledPlans(records);
     const views: SubscriptionView[] = [];
     for (const record of records) {
+      // The rule against a second live subscription of a K2 or K4 plan: answered at every phase of the baseline, so the IT Admin sees what to fold (`QĐ-104k`(3)).
+      const mergeCandidateIds = live.has(record.id) ? liveSiblingsOf(live.byPlan, record.planId, record.id) : [];
       const notice = deriveNotice(noticeInputOf(record));
       const missing = missingData({
         kind: record.kind,
@@ -126,7 +133,12 @@ export class SubscriptionViewService {
         isPrimaryForPlan: record.isPrimaryForPlan,
         noticeDeadline: { value: notice.deadline, source: notice.source },
         alerts: { baseDate: notice.baseDate, dates: alertDates(notice.baseDate, daysBefore) },
-        warnings: [...noticeWarnings(notice.source), ...poolWarnings(record)],
+        warnings: [
+          ...noticeWarnings(notice.source),
+          ...poolWarnings(record),
+          ...(mergeCandidateIds.length > 0 ? (['SHOULD_MERGE'] as const) : []),
+        ],
+        mergeCandidateIds,
         taxProfile: { status: group ? 'DECLARED' : 'MISSING', group },
         taxEstimate,
         createdAt: record.createdAt,
@@ -135,6 +147,17 @@ export class SubscriptionViewService {
     }
 
     return views;
+  }
+
+  /** Which of these subscriptions are live and which live subscriptions their plans have (only K2 and K4 plans, one read for all). */
+  private async liveOfPooledPlans(records: readonly SubscriptionRecord[]) {
+    const rows = await this.subscriptions.findLivenessOfPooledPlans([
+      ...new Set(records.map((record) => record.planId)),
+    ]);
+    const byPlan = liveIdsByPlan(rows, await this.organizationReads.businessToday());
+    const ids = new Set([...byPlan.values()].flat());
+
+    return { byPlan, has: (id: string) => ids.has(id) };
   }
 
   /** The days before the deadline an alert falls, as the parameter says now. */

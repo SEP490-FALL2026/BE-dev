@@ -150,9 +150,12 @@ export class SubscriptionService {
     ctx: { money: { amountMinor: bigint; currency: string } | null; organizationId: string },
   ): Promise<SubscriptionRecord> {
     const { money, organizationId } = ctx;
-    const plan = await this.plans.lockShared(tx, input.planId);
+    // The plan is locked `FOR UPDATE` before anything else: no row of this subscription exists yet to lock, so the plan is what two
+    // declarations of the same K2 or K4 plan take turns on (R-E02); every other writer locks a subscription first, then its plan.
+    const plan = await this.plans.lockExclusive(tx, input.planId);
     if (!plan) throw new SubscriptionPlanNotFoundError();
     if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError();
+    await this.poolRules.assertNoLiveDuplicate(tx, plan, null, organizationId);
     // Held FOR SHARE until commit, so the department cannot be stopped between this check and the row (QĐ-89a).
     const owner = await this.organizationReads.lockDepartmentShared(tx, input.ownerDepartmentId);
     if (!owner?.active) throw new SubscriptionOwnerDepartmentInactiveError();
@@ -199,7 +202,8 @@ export class SubscriptionService {
       const current = await this.subscriptions.lock(tx, id);
       if (!current) throw new SubscriptionNotFoundError();
       if (current.status === 'ACTIVE') return current;
-      const plan = await this.plans.lockShared(tx, current.planId);
+      // The subscription is locked, then its plan `FOR UPDATE`: a draft that becomes live takes its turn against the other writes of the plan.
+      const plan = await this.plans.lockExclusive(tx, current.planId);
       if (!plan) throw new SubscriptionPlanNotFoundError();
 
       const priceSnapshot =
@@ -210,8 +214,15 @@ export class SubscriptionService {
       const missing = this.missingOf(plan, current.kind, state);
       if (missing.length > 0) throw new SubscriptionStillDraftError(missing);
       await this.poolRules.assertActivation(tx, plan, current.kind, state);
+      await this.poolRules.assertNoLiveDuplicate(tx, plan, id, organizationId);
 
-      const completed = await this.subscriptions.update(tx, id, { ...state, status: 'ACTIVE' });
+      // A draft renewal period takes the flag that prices the plan from the period it continues, now that it is active (F-012).
+      const takesPrimary = await this.poolRules.takePrimaryFromPrevious(tx, actor, organizationId, current);
+      const completed = await this.subscriptions.update(tx, id, {
+        ...state,
+        status: 'ACTIVE',
+        isPrimaryForPlan: takesPrimary || state.isPrimaryForPlan,
+      });
       await this.audit.record(
         tx,
         catalogAuditEvent(

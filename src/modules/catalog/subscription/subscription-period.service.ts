@@ -137,7 +137,6 @@ export class SubscriptionPeriodService {
       commitmentTermMonths: previous.commitmentTermMonths,
       responsibleItAdminEmployeeId: previous.responsibleItAdminEmployeeId,
       vendorMinimumSeats: previous.vendorMinimumSeats,
-      isPrimaryForPlan: previous.isPrimaryForPlan,
     };
     this.assertNextPeriod(plan, state, input.billingCycle, previous);
     const money = await this.pricing.read(input.unitPrice);
@@ -145,7 +144,11 @@ export class SubscriptionPeriodService {
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A renewal was recorded before installation');
 
-    if (previous.isPrimaryForPlan) await this.pool.releasePrimary(tx, actor, organization.id, previous.id);
+    // The flag that prices the plan moves to the new period only when it is written active; a draft period leaves it on the one it continues
+    // and `subscriptionComplete` hands it over (F-012).
+    const status = subscriptionStatusOf(plan, 'TERM', { ...state, ...priced });
+    const takesPrimary = status === 'ACTIVE' && previous.isPrimaryForPlan;
+    if (takesPrimary) await this.pool.releasePrimary(tx, actor, organization.id, previous.id);
     const created = await this.subscriptions.insert(tx, {
       organizationId: organization.id,
       planId: previous.planId,
@@ -154,7 +157,8 @@ export class SubscriptionPeriodService {
       renewedFromId: previous.id,
       ...state,
       ...priced,
-      status: subscriptionStatusOf(plan, 'TERM', { ...state, ...priced }),
+      isPrimaryForPlan: takesPrimary,
+      status,
     });
     await this.audit.record(
       tx,

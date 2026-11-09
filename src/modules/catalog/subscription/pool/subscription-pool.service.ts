@@ -6,8 +6,21 @@ import { IdentityAccessApi } from '../../../identity-access/public/identity-acce
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../../catalog-audit-event.mapper';
 import type { LockedPlan } from '../../plan/plan-facts.service';
-import { SubscriptionPrimaryNotEligibleError, SubscriptionResponsibleNotItAdminError } from '../subscription.errors';
-import { assertPoolTerms, assertResponsibleNamed } from './subscription-pool.policy';
+import { PoolSeatNotAddableError } from '../../public/catalog.errors';
+import { SeatBaselinePhaseHook } from '../../public/catalog.extension-points';
+import {
+  SubscriptionDuplicatePlanError,
+  SubscriptionPrimaryNotEligibleError,
+  SubscriptionResponsibleNotItAdminError,
+} from '../subscription.errors';
+import {
+  assertPoolTerms,
+  assertResponsibleNamed,
+  isPooledPlan,
+  liveIdsByPlan,
+  liveSiblingsOf,
+} from './subscription-pool.policy';
+import { stateOf } from '../subscription.mapper';
 import { SubscriptionRepo } from '../subscription.repo';
 import type {
   BillingCycle,
@@ -47,6 +60,7 @@ export class SubscriptionPoolService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly subscriptions: SubscriptionRepo,
     private readonly audit: AuditApi,
+    private readonly baselinePhase: SeatBaselinePhaseHook,
   ) {}
 
   /**
@@ -106,6 +120,77 @@ export class SubscriptionPoolService {
     if (activating) await this.assertActivation(tx, plan, current.kind, state);
     else if (touches) this.assert(plan, current.kind, state, false);
     if (input.isPrimaryForPlan) await this.makePrimary(tx, change);
+  }
+
+  /**
+   * A second live subscription of a K2 or K4 plan (`QĐ-104k`(3), R-E02): while the seat baseline is open it is let through (the read answers
+   * `SHOULD_MERGE`), once closed it is refused. The caller holds the plan `FOR UPDATE`, so two writes of the plan take turns. A renewal is
+   * never a duplicate: the period it continues is no longer live. `selfId` is the subscription being completed, none for a new one. Throws
+   * SubscriptionDuplicatePlanError.
+   */
+  async assertNoLiveDuplicate(
+    tx: DbTx,
+    plan: LockedPlan,
+    selfId: string | null,
+    organizationId: string,
+  ): Promise<void> {
+    if (!isPooledPlan(plan.provisioningType)) return;
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+    const rows = await this.subscriptions.findLivenessOfPooledPlans([plan.id], tx);
+    const siblings = liveSiblingsOf(liveIdsByPlan(rows, today), plan.id, selfId);
+    if (siblings.length === 0) return;
+    // Nobody to say the baseline is still open: take it as closed, so nothing is let through by accident.
+    const closed = !this.baselinePhase.isBound() || (await this.baselinePhase.get().isClosed(tx, organizationId));
+    if (closed) throw new SubscriptionDuplicatePlanError(siblings);
+  }
+
+  /**
+   * Whether the period that is being completed continues one that priced its plan: the flag moves to it from the previous period in this
+   * transaction (F-012), the previous one being the one a draft renewal had to leave it on. True when the flag moved.
+   */
+  async takePrimaryFromPrevious(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    organizationId: string,
+    current: SubscriptionRecord,
+  ): Promise<boolean> {
+    if (current.renewedFromId === null) return false;
+    const previous = await this.subscriptions.find(current.renewedFromId, tx);
+    if (!previous?.isPrimaryForPlan) return false;
+    await this.releasePrimary(tx, actor, organizationId, previous.id);
+
+    return true;
+  }
+
+  /**
+   * Buys one more seat on the subscription, in the transaction of the caller, which holds the subscription `FOR UPDATE` (a grant that finds
+   * the pool empty, or a K1 grant that buys its own seat): `purchased_quantity` rises by one, on a term bought by the year too, with an
+   * audit event. No gate of a Cost Center is asked: the request that takes the seat is charged to the department of its beneficiary
+   * (`QĐ-103d`(2)). Throws PoolSeatNotAddableError.
+   */
+  async addSeat(tx: DbTx, actor: AuthenticatedPrincipal, subscriptionId: string): Promise<number> {
+    const current = await this.subscriptions.find(subscriptionId, tx);
+    if (!current) throw new PoolSeatNotAddableError('NOT_FOUND');
+    if (current.status !== 'ACTIVE') throw new PoolSeatNotAddableError('NOT_ACTIVE');
+    const organization = await this.organizationReads.getOrganization(tx);
+    if (!organization) throw new Error('A seat was bought before installation');
+
+    const next = (current.purchasedQuantity ?? 0) + 1;
+    await this.subscriptions.update(tx, current.id, { ...stateOf(current), purchasedQuantity: next });
+    await this.audit.record(
+      tx,
+      catalogAuditEvent(
+        actor,
+        organization.id,
+        'SUBSCRIPTION.UPDATED',
+        'Subscription',
+        current.id,
+        { purchasedQuantity: current.purchasedQuantity },
+        { purchasedQuantity: next, cause: 'SEAT_BOUGHT_WITH_GRANT' },
+      ),
+    );
+
+    return next;
   }
 
   /** Only an active subscription that no later period continues prices its plan; the flag of the others of the plan is taken off first. */

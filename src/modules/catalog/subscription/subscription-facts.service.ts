@@ -48,6 +48,11 @@ export class SubscriptionFactsService {
     return this.subscriptions.findGrantableOfPlan(planId, today, tx);
   }
 
+  /** The subscriptions a seat can be taken from today for many plans, in one read, by plan, each in the order a grant takes them. */
+  grantableOfPlans(planIds: readonly string[], today: BusinessDate, tx?: DbTx) {
+    return this.subscriptions.findGrantableOfPlans(planIds, today, tx);
+  }
+
   /** What this one subscription is bought at; null when it does not exist or has no price yet. */
   async priceOfSubscription(
     subscriptionId: string,

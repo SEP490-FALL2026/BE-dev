@@ -7,7 +7,7 @@ import { IdentityAccessFacadeModule } from '../identity-access/identity-access-f
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { CatalogApi } from './public/catalog.api';
-import { SeatOccupancyHook } from './public/catalog.extension-points';
+import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
 import { ApplicationFactsService } from './catalog-entry/application-facts.service';
 import { ApplicationOwnerService } from './catalog-entry/application-owner.service';
 import { ApplicationRetirementController } from './application-retirement/application-retirement.controller';
@@ -150,6 +150,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     SeatTargetService,
     OnboardingFactsService,
     SeatOccupancyHook,
+    SeatBaselinePhaseHook,
     ContractRepo,
     ContractService,
     DocumentRepo,
@@ -168,6 +169,6 @@ import { VendorRepo } from './vendor/vendor.repo';
   ],
   // The facade licensing reads the seat targets through (ADR-0013), and the hook licensing binds its reader of occupied seats to
   // (`public/catalog.extension-points.ts`); the capability services and repos stay private.
-  exports: [CatalogApi, SubscriptionPeriodApi, SeatOccupancyHook],
+  exports: [CatalogApi, SubscriptionPeriodApi, SeatOccupancyHook, SeatBaselinePhaseHook],
 })
 export class CatalogModule {}

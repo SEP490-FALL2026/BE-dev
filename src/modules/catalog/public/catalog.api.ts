@@ -25,6 +25,7 @@ import { DocumentAttachRefusedError } from './catalog.errors';
 import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { SubscriptionFactsService } from '../subscription/subscription-facts.service';
+import { SubscriptionPoolService } from '../subscription/pool/subscription-pool.service';
 import { SeatTargetService } from '../subscription/seat-target.service';
 import { VendorFactsService } from '../vendor/vendor-facts.service';
 import {
@@ -47,6 +48,7 @@ export class CatalogApi {
     private readonly internalRegistration: InternalSoftwareRegistrationService,
     private readonly applicationLookup: ApplicationFactsService,
     private readonly documents: DocumentService,
+    private readonly pool: SubscriptionPoolService,
   ) {}
 
   /**
@@ -110,6 +112,24 @@ export class CatalogApi {
   /** The subscriptions of the plan a seat can be taken from today: the shared pool of the plan (`QĐ-103d`). */
   getGrantableSubscriptions(planId: string, today: BusinessDate, tx?: DbTx): Promise<PoolSubscription[]> {
     return this.subscriptions.grantableOfPlan(planId, today, tx);
+  }
+
+  /** The same for many plans in one read, by plan (a plan with none is absent): what the stock of a queue of grants is counted from. */
+  getGrantableSubscriptionsOfPlans(
+    planIds: readonly string[],
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, PoolSubscription[]>> {
+    return this.subscriptions.grantableOfPlans(planIds, today, tx);
+  }
+
+  /**
+   * Buys one more seat on the subscription, in the transaction of the caller, which holds it locked through `lockSeatTarget`: `purchased_quantity`
+   * rises by one (a K2 or K4 pool topped up with a grant, or the seat a K1 grant buys for its holder). It asks no Cost Center of the department
+   * that owns the subscription, if any. Throws PoolSeatNotAddableError for a subscription that is absent or a draft.
+   */
+  addPoolSeat(tx: DbTx, actor: AuthenticatedPrincipal, subscriptionId: string): Promise<number> {
+    return this.pool.addSeat(tx, actor, subscriptionId);
   }
 
   /** What one subscription is bought at (unit price and billing cycle); null when it has no price. */

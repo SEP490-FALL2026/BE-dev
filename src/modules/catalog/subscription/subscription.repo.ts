@@ -5,7 +5,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { BaselineSubscription } from '../public/catalog.types';
-import { pickPriceSource } from './pool/subscription-pool.policy';
+import { orderBySourcePreference, pickPriceSource, type LivenessFacts } from './pool/subscription-pool.policy';
 import type {
   BillingCycle,
   NewSubscription,
@@ -258,26 +258,79 @@ export class SubscriptionRepo {
   }
 
   /**
-   * The subscriptions of a plan a seat can be taken from on `today`: active, not continued by a later period and not ended. A draft
-   * is left out (its seats cannot be granted), and so is a subscription whose period already ended.
+   * The subscriptions of these plans, as far as they are K2 or K4 plans, that a later period does not continue: the candidates of the rule
+   * against a second live subscription (`isLiveSubscription` decides on the end date, the repository has no calendar). A draft is one.
    */
-  async findGrantableOfPlan(
-    planId: string,
+  async findLivenessOfPooledPlans(planIds: readonly string[], tx?: DbTx): Promise<LivenessFacts[]> {
+    if (planIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: { planId: { in: [...planIds] }, plan: { provisioningType: { in: ['K2', 'K4'] } }, renewedBy: null },
+      select: { id: true, planId: true, status: true, kind: true, endDate: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      planId: row.planId,
+      status: row.status,
+      kind: row.kind,
+      endDate: date(row.endDate),
+      renewed: false,
+    }));
+  }
+
+  /** The subscriptions of one plan a seat can be taken from on `today`, in the order a grant takes them (see `findGrantableOfPlans`). */
+  async findGrantableOfPlan(planId: string, today: BusinessDate, tx?: DbTx) {
+    return (await this.findGrantableOfPlans([planId], today, tx)).get(planId) ?? [];
+  }
+
+  /**
+   * The same for many plans in one read, by plan (a plan with none is absent). A draft is left out (its seats cannot be granted), and so is
+   * a subscription that a later period continues or whose period already ended. Per plan the primary subscription comes first, then the
+   * one that would price the plan: the order a grant with no subscription named takes them.
+   */
+  async findGrantableOfPlans(
+    planIds: readonly string[],
     today: BusinessDate,
     tx?: DbTx,
-  ): Promise<{ subscriptionId: string; purchasedQuantity: number | null }[]> {
+  ): Promise<Map<string, { subscriptionId: string; purchasedQuantity: number | null; isPrimaryForPlan: boolean }[]>> {
+    const grantable = new Map<
+      string,
+      { subscriptionId: string; purchasedQuantity: number | null; isPrimaryForPlan: boolean }[]
+    >();
+    if (planIds.length === 0) return grantable;
     const rows = await (tx ?? this.prisma).subscription.findMany({
       where: {
-        planId,
+        planId: { in: [...planIds] },
         status: 'ACTIVE',
         renewedBy: null,
         OR: [{ endDate: null }, { endDate: { gte: toDateColumn(today) } }],
       },
-      select: { id: true, purchasedQuantity: true },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        planId: true,
+        purchasedQuantity: true,
+        startDate: true,
+        isPrimaryForPlan: true,
+        unitPriceMinor: true,
+        billingCycle: true,
+      },
     });
+    type Source = ReturnType<typeof withPriceSource<(typeof rows)[number]>>;
+    const byPlan = new Map<string, Source[]>();
+    for (const row of rows) byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), withPriceSource(row)]);
+    for (const [planId, sources] of byPlan) {
+      grantable.set(
+        planId,
+        orderBySourcePreference(sources).map((row) => ({
+          subscriptionId: row.id,
+          purchasedQuantity: row.purchasedQuantity,
+          isPrimaryForPlan: row.isPrimaryForPlan,
+        })),
+      );
+    }
 
-    return rows.map((row) => ({ subscriptionId: row.id, purchasedQuantity: row.purchasedQuantity }));
+    return grantable;
   }
 
   /**

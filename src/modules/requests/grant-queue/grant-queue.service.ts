@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import { LicensingPoolStockApi } from '../../licensing/public/licensing-pool-stock.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { GrantQueueItemWire } from './grant-queue.dto';
 import { GrantQueueRepo } from './grant-queue.repo';
@@ -16,6 +17,7 @@ export class GrantQueueService {
     private readonly queue: GrantQueueRepo,
     private readonly catalog: CatalogApi,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly poolStock: LicensingPoolStockApi,
   ) {}
 
   async page(query: {
@@ -28,7 +30,9 @@ export class GrantQueueService {
       (query.page - 1) * query.pageSize,
       query.pageSize,
     );
-    const [plans, people] = await Promise.all([
+    const planIds = [...new Set(rows.map((row) => row.planId))];
+    // One read of the stock for every plan on the page: no query per item.
+    const [plans, people, stocks] = await Promise.all([
       rows.length === 0
         ? Promise.resolve([])
         : this.catalog.getPlanSummaries([...new Set(rows.map((row) => row.planId))]),
@@ -37,6 +41,7 @@ export class GrantQueueService {
         : this.organizationReads.getEmployees([
             ...new Set(rows.flatMap((row) => [row.requesterEmployeeId, row.beneficiaryEmployeeId])),
           ]),
+      rows.length === 0 ? Promise.resolve(new Map()) : this.poolStock.getStockOfPlans(planIds),
     ]);
     const ref = (id: string) => {
       const found = people.find((employee) => employee.id === id);
@@ -59,6 +64,7 @@ export class GrantQueueService {
           requester: ref(row.requesterEmployeeId),
           expectedEndDate: row.expectedEndDate,
           submittedAt: row.submittedAt.toISOString(),
+          stock: stocks.get(row.planId) ?? { kind: 'NONE' as const, free: 0, inRevocation: 0 },
         },
       ];
     });

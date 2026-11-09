@@ -3,6 +3,7 @@ import type { BusinessDate } from '../../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import { AssignmentChainRepo } from '../../assignment/assignment-chain.repo';
 import { AssignmentEndService } from '../../assignment/assignment-end.service';
 import {
   AssignmentNotOpenError,
@@ -15,6 +16,7 @@ import { assertRevocationTask, planAccessCut, planCompletion, type CompletionInp
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskViewService, type TaskView } from '../provisioning-task-view.service';
+import { ProvisioningTaskReasonRepo } from '../provisioning-task-reason.repo';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import { RevocationLeaverAlert } from './revocation-leaver-alert.service';
 
@@ -37,6 +39,8 @@ export class RevocationCompletionService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly revocation: RevocationListeners,
     private readonly leaverAlert: RevocationLeaverAlert,
+    private readonly chains: AssignmentChainRepo,
+    private readonly reasons: ProvisioningTaskReasonRepo,
   ) {}
 
   /**
@@ -62,7 +66,20 @@ export class RevocationCompletionService {
 
         await this.tasks.markRevocationCompleted(tx, locked.id, actor.appUserId, done, now);
         await this.ending.end(tx, actor, { organizationId, assignment, until: done.endOn, taskId: locked.id });
-        await this.revocation.emit(tx, { moment: 'AFTER_WORK', task: { ...facts, status: 'COMPLETED' }, now, actor });
+        // The listeners of the end of the work are told what the right held and when it ends, so the money held for it can be given back.
+        const completed = {
+          grantRequestId: await this.chains.grantRequestOfChain(tx, locked.assignmentId),
+          provisioningType: plan.provisioningType,
+          endedOn: done.endOn,
+          paidThroughOn: done.paidThroughOn,
+          sources: (await this.reasons.listOf([locked.id], tx)).map((reason) => reason.source),
+        };
+        await this.revocation.emit(tx, {
+          moment: 'AFTER_WORK',
+          task: { ...facts, status: 'COMPLETED', completed },
+          now,
+          actor,
+        });
         await this.leaverAlert.tell(tx, {
           organizationId,
           task: locked,

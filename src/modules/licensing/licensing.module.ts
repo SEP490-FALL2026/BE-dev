@@ -19,6 +19,7 @@ import { ServiceAccountDutyService } from './assignment/service-account-duty/ser
 import { ServiceAccountDutySweeper } from './assignment/service-account-duty/service-account-duty.job';
 import { ServiceAccountSpendingApproverGrantCheck } from './assignment/service-account-duty/spending-approver-grant.listener';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
+import { AssignmentChainRepo } from './assignment/assignment-chain.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
 import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
 import { AssignmentServiceAccountReader } from './assignment/assignment-service-account.listener';
@@ -66,12 +67,12 @@ import {
   ResponsibleDeadlineHook,
   RevocationListeners,
   SeatBaselineClosedListeners,
-  SeatBaselinePhaseHook,
 } from './public/licensing.extension-points';
 import { LicensingApi } from './public/licensing.api';
 import { LicensingDashboardApi } from './public/licensing-dashboard.api';
 import { LicensingHandoverApi } from './public/licensing-handover.api';
 import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
+import { LicensingPoolStockApi } from './public/licensing-pool-stock.api';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
 import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
 import { LicensingServiceAccountApi } from './public/licensing-service-account.api';
@@ -81,6 +82,7 @@ import { ProvisioningFailureService } from './provisioning/provisioning-failure.
 import { ProvisioningHolderService } from './provisioning/tasks/provisioning-holder.service';
 import { ProvisioningGrantPlanner } from './provisioning/tasks/provisioning-grant-planner.service';
 import { ProvisioningGrantService } from './provisioning/tasks/provisioning-grant.service';
+import { ProvisioningPurchaseRefusal } from './provisioning/tasks/provisioning-purchase-refusal.service';
 import { ProvisioningGrantWriter } from './provisioning/tasks/provisioning-grant-writer.service';
 import { ProvisioningService } from './provisioning/tasks/provisioning.service';
 import { ProvisioningTaskFrame } from './provisioning/provisioning-task-frame.service';
@@ -168,6 +170,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
   providers: [
     LicensingAlerts,
     AssignmentRepo,
+    AssignmentChainRepo,
     AssignmentDepartmentRepo,
     AssignmentSeatOccupancy,
     AssignmentServiceAccountReader,
@@ -199,6 +202,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     ProvisioningTaskViewService,
     ProvisioningGrantPlanner,
     ProvisioningGrantWriter,
+    ProvisioningPurchaseRefusal,
     ProvisioningGrantService,
     ProvisioningService,
     ProvisioningDecisionService,
@@ -281,11 +285,11 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     },
     // The extension points licensing opens (public/licensing.extension-points.ts): requests binds the gate.
     GrantRequestGateHook,
-    SeatBaselinePhaseHook,
     LicensingApi,
     LicensingDashboardApi,
     LicensingHandoverApi,
     LicensingOpenGrantsApi,
+    LicensingPoolStockApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
     LicensingServiceAccountApi,
@@ -296,6 +300,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingDashboardApi,
     LicensingHandoverApi,
     LicensingOpenGrantsApi,
+    LicensingPoolStockApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
     LicensingServiceAccountApi,

@@ -10,6 +10,8 @@ export interface PoolStock {
   inRevocation: number;
   /** The subscriptions that still have a free seat, for the answer that refuses a purchase. */
   freeSubscriptionIds: readonly string[];
+  /** The free seats of each subscription a grant can take a seat from, in the order a grant that names none takes them. */
+  freeBySubscription: ReadonlyMap<string, number>;
 }
 
 export type PurchaseDecision =
@@ -28,7 +30,7 @@ export function judgePurchase(input: {
 }): PurchaseDecision {
   if (!input.purchase) return { purchased: false };
   if (input.provisioningType !== 'K2' && input.provisioningType !== 'K4') throw new PurchaseNotApplicableError();
-  const stock = input.stock ?? { free: 0, inRevocation: 0, freeSubscriptionIds: [] };
+  const stock = input.stock ?? { free: 0, inRevocation: 0, freeSubscriptionIds: [], freeBySubscription: new Map() };
   if (stock.free > 0) throw new PurchaseNotAllowedError(stock.free, stock.freeSubscriptionIds);
 
   const reason = input.purchase.reason?.trim() || null;

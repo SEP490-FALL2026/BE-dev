@@ -30,7 +30,8 @@ describe('judgeSeatRows: one valid personal row', () => {
       accountIdentifier: 'E1@Congty.vn',
       reason: null,
       costCenterId: null,
-      owningDepartmentId: null,
+      // The department of the person (E1 is in design), not of the subscription: the pool is every department's (QĐ-103d).
+      owningDepartmentId: 'd-des',
       effectiveFrom: TODAY,
       effectiveFromBasis: 'RECORDED',
       expectedEndDate: null,
@@ -141,28 +142,29 @@ describe('judgeSeatRows: a service account (AC-7)', () => {
     expect(codesOf(judgeOne({ ...bot, cost_center_code: 'CC-A' }))).toEqual(['COST_CENTER_NOT_OWNING_UNIT']);
   });
 
-  it('refuses a service account on the subscription of another department, and only that one (F20, QĐ-89a)', () => {
+  // Rewritten for BR-MF1-09 / L3-06: the pool of seats is every department's, so a service account of another department than the owner of the
+  // subscription is a valid row (it was SUBSCRIPTION_DEPARTMENT_MISMATCH); the case of the internal plan is kept.
+  it('accepts a service account on the subscription of another department (L3-06, QĐ-103d)', () => {
     const owned = (ownerDepartmentId: string | null) => ({
       target: { kind: 'SUBSCRIPTION' as const, purchasedQuantity: 100, ownerDepartmentId },
     });
 
-    expect(codesOf(judgeOne(bot, owned('d-fin')))).toEqual(['SUBSCRIPTION_DEPARTMENT_MISMATCH']);
-    expect(judgeOne(bot, owned('d-fin')).outcome).toBe('ERROR');
+    expect(judgeOne(bot, owned('d-fin')).outcome).toBe('VALID');
     expect(judgeOne(bot, owned('d-des')).outcome).toBe('VALID');
     // An internal plan has no subscription and no owner: nothing is compared.
     expect(judgeOne(bot, owned(null)).outcome).toBe('VALID');
   });
 
-  it('writes a personal seat with the department that owns the subscription, whatever department the person is in (F21, QĐ-89e)', () => {
+  it('writes a personal seat with the department of the person, whoever owns the subscription (L3-06, QĐ-103d)', () => {
     const owned = (ownerDepartmentId: string | null) => ({
       target: { kind: 'SUBSCRIPTION' as const, purchasedQuantity: 100, ownerDepartmentId },
     });
     const own = { employee_code: 'E1', account_identifier: 'e1@congty.vn' };
 
-    // E1 is a person of the design department: on the subscription of finance the seat is finance's, and the row is valid.
-    expect(judgeOne(own, owned('d-fin'))).toMatchObject({ outcome: 'VALID', parsed: { owningDepartmentId: 'd-fin' } });
+    // E1 is a person of the design department: on the subscription of finance the seat is still design's, and the row is valid.
+    expect(judgeOne(own, owned('d-fin'))).toMatchObject({ outcome: 'VALID', parsed: { owningDepartmentId: 'd-des' } });
     expect(judgeOne(own, owned('d-des')).parsed).toMatchObject({ owningDepartmentId: 'd-des' });
-    expect(judgeOne(own, owned(null)).parsed).toMatchObject({ owningDepartmentId: null });
+    expect(judgeOne(own, owned(null)).parsed).toMatchObject({ owningDepartmentId: 'd-des' });
   });
 
   it('refuses a service account whose owning Unit is not in use, and one whose person is in no department', () => {

@@ -107,8 +107,13 @@ export class SubscriptionChangeService {
     };
     await this.guard.judgePool(tx, { plan, current, state, input, actor, organizationId });
     if (sameState(state, stateOf(current))) return current;
-    // What is owed cannot be created, raised or extended for a department with no Cost Center in use.
-    await this.obligation.assertChargeable(tx, current.ownerDepartmentId, stateOf(current), state);
+    // What is owed cannot be created, raised or extended for a K1 or K5 subscription of a department with no Cost Center in use (a K2 or K4 pool has no such gate).
+    await this.obligation.assertChargeable(
+      tx,
+      { ownerDepartmentId: current.ownerDepartmentId, provisioningType: plan.provisioningType },
+      stateOf(current),
+      state,
+    );
 
     const updated = await this.subscriptions.update(tx, id, state);
     await this.auditChange(tx, actor, { current, updated, organizationId });

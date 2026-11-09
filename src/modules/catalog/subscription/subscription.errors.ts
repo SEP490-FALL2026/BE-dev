@@ -154,3 +154,14 @@ export class SubscriptionPrimaryConflictError extends Error {
     this.name = 'SubscriptionPrimaryConflictError';
   }
 }
+
+/**
+ * Another live subscription of the same K2 or K4 plan exists after the seat baseline is closed (`QĐ-104k`(3), R-E02): the seats of a plan
+ * are one pool, so the pool is topped up, not declared twice.
+ */
+export class SubscriptionDuplicatePlanError extends Error {
+  constructor(readonly subscriptionIds: readonly string[]) {
+    super('The plan already has a live subscription: add seats to it or renew it instead of declaring another.');
+    this.name = 'SubscriptionDuplicatePlanError';
+  }
+}

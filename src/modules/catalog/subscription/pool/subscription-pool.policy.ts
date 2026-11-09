@@ -103,6 +103,14 @@ export function pickPriceSource<T extends PriceSource>(sources: readonly T[]): T
   return [...sources].sort(compareSources)[0] ?? null;
 }
 
+/**
+ * The subscriptions of a plan in the order a grant that names none takes them: the one flagged primary first, then the rest as `pickPriceSource`
+ * would rank them (the highest price a month, the older start, the smaller id). A subscription with no price comes after those with one.
+ */
+export function orderBySourcePreference<T extends PriceSource>(sources: readonly T[]): T[] {
+  return [...sources].sort((a, b) => Number(b.isPrimaryForPlan) - Number(a.isPrimaryForPlan) || compareSources(a, b));
+}
+
 /** Highest price a month first, then the older start date (none last), then the smaller id. */
 function compareSources(a: PriceSource, b: PriceSource): number {
   return comparePrice(a, b) || compareStart(a.startDate, b.startDate) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
@@ -125,4 +133,46 @@ function compareStart(a: string | null, b: string | null): number {
   if (b === null) return -1;
 
   return a < b ? -1 : 1;
+}
+
+/** What decides whether a subscription is still alive for the rule against duplicates: its state, its end and whether a later period continues it. */
+export interface LivenessFacts {
+  id: string;
+  planId: string;
+  status: 'DRAFT' | 'ACTIVE';
+  kind: SubscriptionKind;
+  endDate: string | null;
+  /** A later period continues it (it was renewed): the period that continues it is the live one. */
+  renewed: boolean;
+}
+
+/**
+ * Whether the subscription still holds the pool of its plan on `today` (`QĐ-104k`(3), R-E02): a draft does (it is about to be active); an active
+ * one does until a later period continues it, or its end date has passed. A perpetual purchase has no end.
+ */
+export function isLiveSubscription(row: LivenessFacts, today: string): boolean {
+  if (row.status === 'DRAFT') return true;
+  if (row.renewed) return false;
+
+  return row.kind === 'PERPETUAL' || row.endDate === null || row.endDate >= today;
+}
+
+/** The live subscriptions by plan, each list in the order given. */
+export function liveIdsByPlan(rows: readonly LivenessFacts[], today: string): Map<string, string[]> {
+  const live = new Map<string, string[]>();
+  for (const row of rows) {
+    if (isLiveSubscription(row, today)) live.set(row.planId, [...(live.get(row.planId) ?? []), row.id]);
+  }
+
+  return live;
+}
+
+/** The other live subscriptions of the plan than `selfId` (a subscription being written has none yet: pass null). */
+export function liveSiblingsOf(live: ReadonlyMap<string, readonly string[]>, planId: string, selfId: string | null) {
+  return (live.get(planId) ?? []).filter((id) => id !== selfId);
+}
+
+/** Only the plans whose seats are one pool (K2 workspaces and K4 keys) have the rule against a second subscription. */
+export function isPooledPlan(type: ProvisioningType): boolean {
+  return type === 'K2' || type === 'K4';
 }

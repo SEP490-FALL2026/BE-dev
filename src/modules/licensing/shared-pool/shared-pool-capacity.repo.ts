@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
+import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 
 /** The seats a subscription holds today, and how many of them are held by a right whose revocation is still open. */
@@ -11,18 +12,36 @@ export interface SubscriptionOccupancy {
 /** Reads the assignments and tasks of licensing to tell how much of the pool of a plan is taken. */
 @Injectable()
 export class SharedPoolCapacityRepo {
+  constructor(private readonly prisma: PrismaService) {}
+
   /**
    * For each subscription, the assignments in force on `today` (the reading the seats of a subscription are counted by: it has
    * started and has not ended) and, of those, the ones with a revocation task not yet completed, closed or cancelled.
    */
-  async occupancyOf(
+  occupancyOf(
     tx: DbTx,
+    subscriptionIds: readonly string[],
+    today: BusinessDate,
+  ): Promise<Map<string, SubscriptionOccupancy>> {
+    return this.read(tx, subscriptionIds, today);
+  }
+
+  /** The same without a transaction, for a read of many subscriptions at once (the queue of grants): one statement whatever their number. */
+  occupancyOfMany(
+    subscriptionIds: readonly string[],
+    today: BusinessDate,
+  ): Promise<Map<string, SubscriptionOccupancy>> {
+    return this.read(this.prisma, subscriptionIds, today);
+  }
+
+  private async read(
+    client: DbTx | PrismaService,
     subscriptionIds: readonly string[],
     today: BusinessDate,
   ): Promise<Map<string, SubscriptionOccupancy>> {
     const result = new Map<string, SubscriptionOccupancy>();
     if (subscriptionIds.length === 0) return result;
-    const rows = await tx.$queryRaw<{ subscription_id: string; occupied: bigint; in_revocation: bigint }[]>`
+    const rows = await client.$queryRaw<{ subscription_id: string; occupied: bigint; in_revocation: bigint }[]>`
       SELECT a."subscription_id" AS subscription_id,
              count(*) AS occupied,
              count(*) FILTER (WHERE EXISTS (

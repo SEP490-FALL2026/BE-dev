@@ -1,7 +1,7 @@
 import { avoidedCostOf, judgePurchase, type PoolStock } from './shared-pool.policy';
 import { PurchaseNotAllowedError, PurchaseNotApplicableError, PurchaseReasonRequiredError } from './shared-pool.errors';
 
-const EMPTY: PoolStock = { free: 0, inRevocation: 0, freeSubscriptionIds: [] };
+const EMPTY: PoolStock = { free: 0, inRevocation: 0, freeSubscriptionIds: [], freeBySubscription: new Map() };
 
 describe('judgePurchase', () => {
   it('BR-MF1-09a: a grant with no purchase is not judged', () => {
@@ -9,7 +9,12 @@ describe('judgePurchase', () => {
   });
 
   it('BR-MF1-09a: refuses a purchase while the pool still has a free seat of the plan', () => {
-    const stock: PoolStock = { free: 2, inRevocation: 0, freeSubscriptionIds: ['s1'] };
+    const stock: PoolStock = {
+      free: 2,
+      inRevocation: 0,
+      freeSubscriptionIds: ['s1'],
+      freeBySubscription: new Map([['s1', 2]]),
+    };
     const call = () => judgePurchase({ provisioningType: 'K2', purchase: {}, stock });
 
     expect(call).toThrow(PurchaseNotAllowedError);

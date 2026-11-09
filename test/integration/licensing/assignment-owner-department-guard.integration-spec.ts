@@ -4,16 +4,16 @@ import type { Unit } from '../../support/spend-harness';
 
 const h = new ServiceAccountHarness();
 const M = 1_000_000;
-const MISMATCH = 'LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH';
 
 /**
- * `g0-g6-final-business-baseline-remediation`, Tasks 3.2a and 3.2 (F20, `QĐ-89a`, spec K and L.10): a seat sits on a subscription of its
- * own department. The service refuses another department's subscription with 422 `LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH`
- * before it writes, a row of a seat baseline file that would break it is an `ERROR` of the same code, and the trigger
- * `license_assignments_owner_department_guard` of the final schema, when it answers first, is told in the same 422 and never as a 500
- * (the Prisma driver adapter hands over the code and the message of a trigger's refusal, and the message begins with the constraint).
+ * `g0-g6-final-business-baseline-remediation` Tasks 3.2a and 3.2 (F20, `QĐ-89a`, spec K and L.10) as `BR-MF1-09` / `QĐ-103d` changed them
+ * (rewritten, the cases are kept with their new expectation): the seats of a subscription are one pool for every department, so a seat does
+ * not have to sit on a subscription of its own department. Before, the service refused another department's subscription with 422
+ * `LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH` before it wrote, a baseline file row that broke it was an `ERROR` of the same code, and
+ * the trigger `license_assignments_owner_department_guard` answered the same in 422. Now the grant of another department's subscription is
+ * 201, the file row is valid, and the trigger no longer exists (migration `shared_pool_grant`).
  */
-describe('a seat of a department sits on a subscription of that department (integration, real PostgreSQL)', () => {
+describe('a seat sits on a subscription of any department (integration, real PostgreSQL)', () => {
   let counter = 0;
   /** A paid subscription of a new plan owned by `departmentId`, with the tax profile its requests need. */
   const subscriptionOf = async (departmentId: string) => {
@@ -41,8 +41,7 @@ describe('a seat of a department sits on a subscription of that department (inte
     return id;
   };
   /**
-   * The grant as the route takes it. The harness grant swaps in the subscription the department of the request owns
-   * (`owned-subscriptions.ts`); this suite sends another department's subscription on purpose, so it must reach the service as sent.
+   * The grant as the route takes it: the subscription goes to the service as it is sent, whichever department owns it.
    */
   const grant = (body: object) => request(h.server()).post('/api/v1/provisioning-tasks').set(h.as(h.it1)).send(body);
   const rows = async () => ({
@@ -72,7 +71,7 @@ describe('a seat of a department sits on a subscription of that department (inte
     await h.withApprover();
     foreign = await subscriptionOf(h.seed.departmentId);
     // The file of a seat baseline, judged while the baseline is open: a service account of another department than the owner of
-    // the subscription, and a personal seat of a person of another department, which is written with the department of the owner.
+    // the subscription, and a personal seat of a person of another department, which is written with the department of the person.
     const u = await unit();
     const preview = await h.preview({ subscriptionId: foreign.id }, [
       {
@@ -96,18 +95,17 @@ describe('a seat of a department sits on a subscription of that department (inte
   });
 
   describe('the grant of a service account (provisioningTaskGrant)', () => {
-    it('refuses the subscription of another department with 422, before anything is written, and the request still waits', async () => {
+    it('grants the subscription of another department with 201 (it was 422 SUBSCRIPTION_DEPARTMENT_MISMATCH): the seat carries the department of the account', async () => {
       const u = await unit();
       const id = await waiting(u, foreign.plan);
       const before = await rows();
 
-      const refused = await grant({ requestId: id, subscriptionId: foreign.id, accountIdentifier: 'ci-bot' }).expect(
-        422,
-      );
+      await grant({ requestId: id, subscriptionId: foreign.id, accountIdentifier: 'ci-bot' }).expect(201);
 
-      expect(h.codeOf(refused)).toBe(MISMATCH);
-      expect(await rows()).toEqual(before);
-      expect(await h.state(id)).toBe('AWAITING_EXECUTION');
+      const after = await rows();
+      expect(after).toEqual({ assignments: before.assignments + 1, tasks: before.tasks + 1 });
+      // The subscription is the seeded department's; the account is the unit's: the seat is the account's department's.
+      expect(await seatOf(id)).toEqual({ owning_department_id: u.department.id, subscription_id: foreign.id });
     });
 
     it('grants the subscription of the department of the account, and the seat carries that department', async () => {
@@ -120,55 +118,18 @@ describe('a seat of a department sits on a subscription of that department (inte
       expect(await seatOf(id)).toEqual({ owning_department_id: u.department.id, subscription_id: own.id });
     });
 
-    // The Prisma driver adapter hands the application the message and the code of a trigger's refusal, not its CONSTRAINT field: the
-    // trigger of the final schema therefore names its constraint at the start of its message, and the mapper reads it there.
-    // Gói 9: guard function removed — test no longer applicable
-    // it('answers 422, never 500, when only the trigger of the final schema refuses it (the guard of the service turned off)', async () => {
-    //   const u = await unit();
-    //   const guarded = await subscriptionOf(h.seed.departmentId);
-    //   const id = await waiting(u, guarded.plan);
-    //   const before = await rows();
-    //   jest.spyOn(policy, 'assertSubscriptionDepartment').mockImplementation(() => undefined);
-    //
-    //   const refused = await grant({ requestId: id, subscriptionId: guarded.id, accountIdentifier: 'ci-bot' }).expect(
-    //     422,
-    //   );
-    //
-    //   expect(h.codeOf(refused)).toBe(MISMATCH);
-    //   expect(await rows()).toEqual(before);
-    //   expect(await h.state(id)).toBe('AWAITING_EXECUTION');
-    // });
+    it('has no trigger of the owner department any more: the database does not refuse the seat of another department', async () => {
+      const { rows: triggers } = await h.ctx.sql.query<{ tgname: string }>(
+        `SELECT tgname FROM pg_trigger WHERE tgname = 'license_assignments_owner_department_guard'`,
+      );
 
-    it('is also refused by the database itself: the trigger names its constraint and the seat of another department is not stored', async () => {
-      const u = await unit();
-      const guarded = await subscriptionOf(h.seed.departmentId);
-      const before = await rows();
-
-      await expect(
-        h.ctx.sql.query(
-          `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
-             normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from, valid_from_basis, created_by_app_user_id)
-           SELECT gen_random_uuid(), s.organization_id, 'SERVICE', 'BASELINE', s.plan_id, s.id, e.id, 'direct-sql', 'direct-sql', 'x',
-                  (SELECT id FROM cost_centers WHERE department_id = $2 AND status = 'ACTIVE'), $2, '2026-01-05', 'RECORDED', gen_random_uuid()
-             FROM subscriptions s, employees e WHERE s.id = $1 AND e.id = $3`,
-          [guarded.id, u.department.id, u.member.employeeId],
-        ),
-      ).rejects.toMatchObject({
-        code: '23514',
-        message: expect.stringContaining('license_assignments_owner_department_guard') as unknown,
-      });
-      expect(await rows()).toEqual(before);
+      expect(triggers).toEqual([]);
     });
   });
 
   describe('the file of a seat baseline', () => {
-    it('makes the service row of another department an ERROR of the same code and leaves the personal row valid; nothing is written', () => {
-      expect(imported.preview.summary).toMatchObject({
-        totalRows: 2,
-        valid: 1,
-        errors: 1,
-        byCode: { SUBSCRIPTION_DEPARTMENT_MISMATCH: 1 },
-      });
+    it('accepts the service row of another department and the personal row of a person of another department (they were an ERROR); nothing is written by a preview', () => {
+      expect(imported.preview.summary).toMatchObject({ totalRows: 2, valid: 2, errors: 0 });
       expect(imported.assignmentsAfter).toBe(0);
     });
   });

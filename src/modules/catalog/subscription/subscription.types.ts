@@ -10,7 +10,7 @@ export type NoticeSource = 'DECLARED' | 'INFERRED_UNCONFIRMED' | 'BY_END_DATE' |
 /** The months a purchase commits to (`QĐ-103e`): a month or a year. */
 export type CommitmentTermMonths = 1 | 12;
 export type MissingItem = 'QUANTITY' | 'START_DATE' | 'BILLING_CYCLE' | 'UNIT_PRICE' | 'EXCHANGE_RATE';
-export type SubscriptionWarning = 'NO_ALERT_ANCHOR' | 'RESPONSIBLE_MISSING' | 'BILLING_CYCLE_LEGACY';
+export type SubscriptionWarning = 'NO_ALERT_ANCHOR' | 'RESPONSIBLE_MISSING' | 'BILLING_CYCLE_LEGACY' | 'SHOULD_MERGE';
 export type PlanPricingModel = 'PER_SEAT' | 'FLAT_RATE' | 'CONCURRENT' | 'CONSUMPTION' | 'PER_HOST';
 export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
 export type ProvisioningType = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
@@ -159,6 +159,8 @@ export interface SubscriptionView {
   noticeDeadline: { value: BusinessDate | null; source: NoticeSource };
   alerts: { baseDate: BusinessDate | null; dates: BusinessDate[] };
   warnings: SubscriptionWarning[];
+  /** The other live subscriptions of the same K2 or K4 plan: set with the warning `SHOULD_MERGE`, empty otherwise (`QĐ-104k`(3)). */
+  mergeCandidateIds: string[];
   taxProfile: { status: 'DECLARED' | 'MISSING'; group: 'T1' | 'T2' | 'T3' | null };
   taxEstimate: TaxEstimateSummary | null;
   createdAt: Date;

@@ -23,6 +23,7 @@ import {
   SubscriptionResponsibleNotItAdminError,
   SubscriptionResponsibleRequiredError,
   SubscriptionDatesInvalidError,
+  SubscriptionDuplicatePlanError,
   SubscriptionNotFoundError,
   SubscriptionOwnerDepartmentInactiveError,
   SubscriptionPerpetualHasNoTermError,
@@ -84,6 +85,12 @@ export function toSubscriptionApiException(error: unknown): unknown {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.STILL_DRAFT', error.message, { missing: error.missing });
   }
 
+  // The pool of a K2 or K4 plan is one: a second live subscription is refused once the seat baseline is closed (`QĐ-104k`(3)).
+  if (error instanceof SubscriptionDuplicatePlanError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.DUPLICATE_PLAN', error.message, {
+      subscriptionIds: [...error.subscriptionIds],
+    });
+  }
   if (error instanceof SubscriptionCommitmentTermRequiredError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.COMMITMENT_TERM_REQUIRED', error.message);
   }
@@ -148,6 +155,7 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   RESPONSIBLE_NOT_IT_ADMIN: example(new SubscriptionResponsibleNotItAdminError()),
   PRIMARY_NOT_ELIGIBLE: example(new SubscriptionPrimaryNotEligibleError('NOT_ACTIVE')),
   PRIMARY_CONFLICT: example(new SubscriptionPrimaryConflictError()),
+  DUPLICATE_PLAN: example(new SubscriptionDuplicatePlanError(['<subscription-id>'])),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
   CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
