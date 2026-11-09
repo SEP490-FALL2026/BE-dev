@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `9c7f386`, BE `5fd5f594` (sau commit `qd103-purchase-invoice-sbf19` Phase 3; W2, W3 PASS).
 - Phụ trách: chat code `SEP-Start 75: coder mainflow`. Thiết kế ban đầu bởi: AI chat review (W4, 08/11/2026).
 - Owner review: chưa review. Peer review: chat review (R2).
-- Triển khai: `in-progress` (gói 4, 09/11/2026, nhánh `feat/qd103-108-mf145`; chưa review, chưa merge `dev`). PR: chưa có.
+- Triển khai: `verified` (gói 4, 09/11/2026, nhánh `feat/qd103-108-mf145`; chưa review, chưa merge `dev`). PR: chưa có.
 - Giao code: **hai lượt** — Phase 1 budgets (Task 1–3, Checkpoint A), Phase 2 nguồn + job (Task 4–6, Checkpoint B). Ước ~40 file.
 
 ## Delta gói 4 (MF1-C, 09/11/2026) — thắng mọi chỗ khác của spec/plan này
