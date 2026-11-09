@@ -57,7 +57,6 @@ import { VersionLineRepo } from './budget/version-line.repo';
 import { VersionDecisionJudge } from './version/version-decision-judge.service';
 import { VersionDecisionWriter } from './version/version-decision-writer.service';
 import { VersionDecisionService } from './version/version-decision.service';
-import { VersionLineMovedNotifier } from './version/version-line-moved.service';
 import { VersionLineService } from './version/version-line.service';
 import { VersionRepo } from './budget/version.repo';
 import { VersionBaselineCreationService } from './version/version-baseline-creation.service';
@@ -137,7 +136,6 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     VersionCreationService,
     VersionBaselineCreationService,
     VersionService,
-    VersionLineMovedNotifier,
     VersionLineService,
     VersionDecisionJudge,
     VersionDecisionWriter,

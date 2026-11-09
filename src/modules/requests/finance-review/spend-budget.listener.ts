@@ -8,7 +8,6 @@ import {
   type BudgetChangeListener,
   type BudgetRefusalEvent,
   type BudgetVersionEvent,
-  type PlanLineMovedEvent,
 } from '../../budgets/public/budgets.extension-points';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -59,17 +58,6 @@ export class SpendBudgetListener implements BudgetChangeListener, OnModuleInit {
   async lockWaiting(tx: DbTx, scope: { costCenterId: string; year: number }): Promise<void> {
     const waiting = await this.waitingFor(tx, scope.costCenterId, scope.year);
     await this.lockRequestsAndYears(tx, scope.costCenterId, waiting.ids, [scope.year, ...waiting.years]);
-  }
-
-  async planLineMoved(tx: DbTx, actor: AuthenticatedPrincipal, event: PlanLineMovedEvent): Promise<void> {
-    // Every request is locked, by id, and every year they bind, before the first one is checked again: checking one takes the budget
-    // year lock and keeps it, and a request or an earlier year locked after that would be waited for while a holder of it waits for
-    // the year.
-    const ids = [...(await this.found.awaitingReviewOnLine(tx, event.versionIds, event.position))].sort();
-    const latest = await this.checks.latestOf(ids, tx);
-    const years = ids.flatMap((id) => latest.get(id)?.years.map((entry) => entry.year) ?? []);
-    const locked = await this.lockRequestsAndYears(tx, event.costCenterId, ids, years);
-    for (const request of locked) await this.reviews.endBecauseLineMoved(tx, actor, request, event.reason);
   }
 
   private async lockRequestsAndYears(

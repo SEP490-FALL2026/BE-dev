@@ -77,11 +77,18 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
       expect(told(done.department.unitId)).toHaveLength(0);
       expect(told(headless.unitId)).toHaveLength(0);
       const noHead = await noticesOf('BUDGET_NO_HEAD_AT_DEADLINE');
-      expect(noHead.map((notice) => notice.recipient_employee_id).sort()).toEqual(
-        [h.finance.employeeId, await superAdminId()].sort(),
+      // C4-03: Each headless department gets 1 notice to Finance and 1 to Super Admin (2 per department)
+      const financeNotices = toDepartment(noHead, headless.id).filter(
+        (notice) => notice.recipient_employee_id === h.finance.employeeId
       );
-      // C4-03: Each notice carries the headless department's id, not a count
-      expect(toDepartment(noHead, headless.id).map((notice) => notice.params.departmentId)).toContain(headless.id);
+      const superAdminId_val = await superAdminId();
+      const superAdminNotices = toDepartment(noHead, headless.id).filter(
+        (notice) => notice.recipient_employee_id === superAdminId_val
+      );
+      expect(financeNotices).toHaveLength(1);
+      expect(superAdminNotices).toHaveLength(1);
+      expect(financeNotices[0].params.departmentId).toBe(headless.id);
+      expect(superAdminNotices[0].params.departmentId).toBe(headless.id);
       const passed = await noticesOf('BUDGET_SUBMISSION_DEADLINE_PASSED');
       expect(passed.map((notice) => notice.recipient_employee_id)).toEqual([h.finance.employeeId]);
     });
@@ -108,7 +115,8 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
       const firstDay = lateDay();
       await setDeadlines(firstDay, addDays(h.today(), 20));
       await service().run();
-      const before = noHeadOn(firstDay);
+      const before = await noHeadOn(firstDay);
+      expect(before).toHaveLength(2);  // C4-03: 1 to Finance, 1 to Super Admin
       await h.ctx.sql.query(
         `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
          VALUES (gen_random_uuid(), $1, $2, $3, $4::date)`,
@@ -119,10 +127,23 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
 
       await service().run();
 
-      expect(await before).toHaveLength(1);
       expect(await noHeadOn(secondDay)).toHaveLength(0);
       const reminders = await noticesOf('BUDGET_PROPOSAL_DEADLINE_REMINDER');
       expect(reminders.filter((notice) => notice.params.costCenterId === department.unitId)).toHaveLength(0);
+    });
+
+    it.skip('BR-MF4-09: does not tell Finance/Super Admin when the headless department already has a baseline version (C4-09)', async () => {
+      const department = await bare();
+      await setDeadlines(lateDay(), addDays(h.today(), 20));
+
+      // TODO: Integration test — create version, verify noHead logic
+      // (Code C4-09 implement verified in unit test; integration test setup complexity deferred)
+
+      await service().run();
+
+      const noHead = await noticesOf('BUDGET_NO_HEAD_AT_DEADLINE');
+      const headlessDepartmentNotices = noHead.filter((n) => n.params.departmentId === department.id);
+      expect(headlessDepartmentNotices).toHaveLength(0);
     });
   });
 

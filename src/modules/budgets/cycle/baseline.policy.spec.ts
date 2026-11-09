@@ -88,6 +88,15 @@ describe('the baseline of the budget (R-I03)', () => {
       expect(shouldSuggestRenewal(2027, today, later, false)).toBe(true);
       expect(shouldSuggestRenewal(2027, today, { ...later, endDate: '2028-01-01' }, false)).toBe(false);
     });
+
+    it('BR-MF4-04: does not renew when the end date is before today (C4-04: willRenew hết hôm nay)', () => {
+      const endedYesterday = { startDate: '2026-01-01', endDate: '2026-11-08', renewalDate: null, hasSuccessor: false };
+      expect(willRenew(today, endedYesterday, false)).toBe(false);
+      // shouldSuggestRenewal checks if it ends within the year — 11-08 is in 2026
+      expect(shouldSuggestRenewal(2026, today, endedYesterday, false)).toBe(true);
+      // But year 2025 would not suggest it
+      expect(shouldSuggestRenewal(2025, today, endedYesterday, false)).toBe(false);
+    });
   });
 });
 
@@ -127,6 +136,28 @@ describe('the cost of one subscription over a year (R-I03)', () => {
 
   it('has no estimate when the price is not known', () => {
     expect(subscriptionCost(2027, '2026-11-09', 6, { ...annual, unitPriceReportingMinor: null }).costMinor).toBeNull();
+  });
+
+  it('BR-MF4-04: estimates cost with 3 cases (C4-04)', () => {
+    // Case 1: renewed 12 months
+    expect(subscriptionCost(2027, '2026-11-09', 1, annual)).toEqual({
+      monthlyMinor: 100n,
+      months: 12,
+      costMinor: 1200n,
+    });
+    // Case 2: ordered to end (months remaining)
+    expect(subscriptionCost(2027, '2026-11-09', 2, annual, true)).toEqual({
+      monthlyMinor: 100n,
+      months: 6,  // From Nov 2026 to June 2027 (where annual ends)
+      costMinor: 1200n,
+    });
+    // Case 3: ends today (willRenew = false, 6 months June to Nov)
+    const endsToday = { ...annual, endDate: '2026-11-09', startDate: '2026-06-01', billingCycle: 'ANNUAL', hasSuccessor: false };
+    expect(subscriptionCost(2026, '2026-11-09', 3, endsToday, true)).toEqual({
+      monthlyMinor: 100n,
+      months: 6,  // June to Nov (6 months)
+      costMinor: 1800n,  // 3 seats × 100 × 6 months
+    });
   });
 });
 
