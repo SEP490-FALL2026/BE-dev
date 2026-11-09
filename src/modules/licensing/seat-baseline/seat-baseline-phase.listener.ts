@@ -10,15 +10,17 @@ import { SeatBaselineRepo } from './seat-baseline.repo';
  */
 @Injectable()
 export class SeatBaselinePhaseListener implements OnModuleInit {
+  private impl: { isClosed(tx: DbTx, organizationId: string): Promise<boolean> } = {
+    isClosed: (tx, organizationId) => this.isClosed(tx, organizationId),
+  };
+
   constructor(
     private readonly repo: SeatBaselineRepo,
     private readonly hook: SeatBaselinePhaseHook,
   ) {}
 
   onModuleInit(): void {
-    this.hook.bind({
-      isClosed: (tx, organizationId) => this.isClosed(tx, organizationId),
-    });
+    this.hook.bind(this.impl);
   }
 
   /**
