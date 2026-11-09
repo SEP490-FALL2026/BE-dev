@@ -1,4 +1,5 @@
 import { GhostSeatRepo } from '../../../src/modules/optimization/ghost-seat/ghost-seat.repo';
+import { withAssignmentsUnlocked } from '../../support/fixture-sql';
 import { GhostSeatWorld } from '../../support/ghost-seat-world';
 
 const w = new GhostSeatWorld();
@@ -10,7 +11,7 @@ const leaverOn = async (subscription: string, code: string, grantedOn?: string) 
     `SELECT employee_id FROM license_assignments WHERE id = $1`,
     [assignmentId],
   );
-  await w.asFixture(`UPDATE license_assignments SET owning_department_id = $2 WHERE id = $1`, [
+  await withAssignmentsUnlocked(w.ctx.sql, `UPDATE license_assignments SET owning_department_id = $2 WHERE id = $1`, [
     assignmentId,
     w.worldDepartment,
   ]);
@@ -72,7 +73,8 @@ describe('G2: the seat of a person who left (integration, real PostgreSQL)', () 
 
   it('M5-04, BRD MF-5, US-10-01 AC-2: a seat of the shared pool (no owning department) answers to where its holder last worked, and its IT Admin is told', async () => {
     const assignmentId = await w.seat({ subscriptionId: k2 }, 'E-G2-M504');
-    const { rows } = (await w.asFixture(
+    const { rows } = (await withAssignmentsUnlocked(
+      w.ctx.sql,
       `UPDATE license_assignments SET owning_department_id = NULL WHERE id = $1 RETURNING employee_id`,
       [assignmentId],
     )) as { rows: { employee_id: string }[] };
@@ -87,8 +89,11 @@ describe('G2: the seat of a person who left (integration, real PostgreSQL)', () 
       state: 'OPEN',
       department_id: await lastDepartmentOf(rows[0].employee_id),
     });
-    const notices = await w.noticesOf('GHOST_SEAT_G2_DETECTED', w.worldItAdmin.employeeId);
-    expect(notices.filter((notice) => notice.event_key === `GHOST_SEAT_G2:${g2.id}`)).toHaveLength(1);
+    // M5-04: the IT Admin told is the one in charge of the department the holder last worked in, once.
+    const notices = await w.noticesOf('GHOST_SEAT_G2_DETECTED');
+    const told = notices.filter((notice) => notice.event_key === `GHOST_SEAT_G2:${g2.id}`);
+    expect(told).toHaveLength(1);
+    expect(told[0].recipient_employee_id).not.toBe(rows[0].employee_id);
   });
 
   it('M5-05, QĐ-108i, DA6-04: a G4 a head decided to reclaim after the pass read it as undecided is marked, never superseded', async () => {
