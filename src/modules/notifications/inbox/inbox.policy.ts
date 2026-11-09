@@ -149,6 +149,9 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   SUBSCRIPTION_RENEWAL_LATE: ['renewalId', 'subscriptionId', 'baseDate'],
   SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate'],
   SUBSCRIPTION_EXPIRY_MARKED: ['subscriptionId', 'baseDate', 'endDate'],
+  // What the person is told before the usage of an application they hold is written (`US-08-05` AC-2): the application by id (the interface turns it into a name), what counts as activity,
+  // the kinds of data, why, how long the usage is kept, and where to read it. Words and one number; never a name or a figure of money.
+  USAGE_TRACKING_NOTICE: ['applicationId', 'activityDefinition', 'dataKinds', 'purpose', 'retentionMonths', 'viewPath'],
 };
 
 /** Whether the code is one of the closed table. */

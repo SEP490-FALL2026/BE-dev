@@ -67,7 +67,11 @@ export class VendorImportPreviewService {
   }
 
   /** The judgement of rows already kept, made now: what the confirmation compares with what the preview said. */
-  async rejudge(source: SourceRecord, stored: readonly StoredRow[], tx?: DbTx): Promise<StoredRow[]> {
+  async rejudge(
+    source: SourceRecord,
+    stored: readonly StoredRow[],
+    tx?: DbTx,
+  ): Promise<Array<StoredRow & { candidates: string[] }>> {
     const judgements = await this.matches.judge(
       { applicationId: source.applicationId, identifierType: source.identifierType },
       stored.map((row) => ({
@@ -83,6 +87,7 @@ export class VendorImportPreviewService {
       outcome: judgements[index].outcome,
       employeeId: judgements[index].employeeId,
       matchMethod: judgements[index].method,
+      candidates: judgements[index].candidates,
     }));
   }
 

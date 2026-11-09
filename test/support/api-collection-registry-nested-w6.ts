@@ -94,4 +94,17 @@ export const NESTED_ARRAYS_W6: readonly NestedArrayEntry[] = [
     rationale: 'The faults of one row of the report.',
     removeWhen: 'Review when MAX_ROW_ERRORS changes.',
   },
+  {
+    key: 'usageUnmatchedIdentityList#candidates',
+    classification: 'bounded',
+    findings: [],
+    owner: 'qd103-vendor-usage-import',
+    businessMaximum: {
+      maxItems: 10,
+      source:
+        'MAX_CANDIDATES in identity.types.ts, the maxItems of candidates in identity.dto.ts: an identifier that fits several people keeps at most ten of them',
+    },
+    rationale: 'The people an identifier of a vendor may be, by code and work email only.',
+    removeWhen: 'Review when MAX_CANDIDATES changes.',
+  },
 ];

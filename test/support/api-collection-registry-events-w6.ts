@@ -81,4 +81,15 @@ export const W6_REGISTRY_EVENTS: readonly RegistryEvent[] = [
     date: '2026-11-09',
     reason: 'The faults of one row of the report. At most MAX_ROW_ERRORS.',
   },
+  {
+    registry: 'nested',
+    key: 'usageUnmatchedIdentityList#candidates',
+    change: 'added',
+    to: 'bounded',
+    bound: 'MAX_CANDIDATES',
+    finding: 'LD-14',
+    item: 'qd103-vendor-usage-import',
+    date: '2026-11-09',
+    reason: 'The people an identifier of a vendor may be, by code and work email only. At most MAX_CANDIDATES.',
+  },
 ];

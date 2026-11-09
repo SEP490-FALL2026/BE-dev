@@ -21,7 +21,8 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
     - Phòng ban: `getDepartmentBrief(s)`, `getActiveDepartmentIds`, `lockDepartmentShared`, `lockDepartmentForEntry`, `getDepartmentMemberIds`,
       `getDepartmentHeads`, `getHeadedDepartment`, `isDepartmentHead`, `departmentsWithoutHead`; IT Admin phụ trách:
       `getItAdminInCharge`, `getItAdminInChargeOfDepartment`, `getItAdminScope`, `getDepartmentIdsInChargeOf`.
-    - Nhân viên: `getEmployee`, `getEmployeeByCode`, `getEmployeesByCodes`, `getEmployees`, `getEmployeePlacement`,
+    - Nhân viên: `getEmployee`, `getEmployeeByCode`, `getEmployeesByCodes`, `getEmployeesByWorkEmails` (theo email công việc đã chuẩn hóa, gồm
+      người đã nghỉ; chỉ mã NV + email, không họ tên — usage nhà cung cấp khớp danh tính), `getEmployees`, `getEmployeePlacement`,
       `getEmployeeProfile`, `searchActiveEmployees`, `lockEmployeeForShare`, `isWorkEmailTaken`, `lookupForEmployeeImport`,
       `lockForEmployeeImport` (`FOR SHARE` trên phòng ban), `getProfileNotices`, `getOnboardingFacts`.
     - Cost Center: `getCostCentersByCodes`, `costCentersByIds`, `lockCostCentersShared`, `getOwningUnits`,

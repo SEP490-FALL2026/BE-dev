@@ -77154,6 +77154,333 @@
         "tags": ["usage-imports"]
       }
     },
+    "/api/v1/usage-imports/{id}/confirm": {
+      "post": {
+        "operationId": "usageImportConfirm",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A key the caller makes once for this confirmation (16 to 128 letters, digits, - or _); sending it again answers what was written, another key is refused.",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfirmUsageImportBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The holders of the application were told, then the days of the preview that is still current were written, once. The same key again answers the same result with replayed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UsageImportConfirmationResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_IMPORT.CONFIRMED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin imports the usage of a vendor: a head of department never reads the raw usage.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The import does not exist (USAGE_IMPORT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_IMPORT.NOT_FOUND": {
+                    "summary": "Usage import not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.NOT_FOUND",
+                        "message": "Usage import not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The preview is not the current one or no longer holds (USAGE_IMPORT.PREVIEW_STALE), the import was cancelled or expired (NOT_OPEN), or it was already confirmed under another key (ALREADY_CONFIRMED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_IMPORT.PREVIEW_STALE": {
+                    "summary": "The preview that was confirmed is no longer the current one.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.PREVIEW_STALE",
+                        "message": "The preview that was confirmed is no longer the current one.",
+                        "details": { "currentVersion": 1, "changedLines": [3, 4] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.NOT_OPEN": {
+                    "summary": "The usage import cannot be used: NOT_OPEN.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.NOT_OPEN",
+                        "message": "The usage import cannot be used: NOT_OPEN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.ALREADY_CONFIRMED": {
+                    "summary": "The usage import was already confirmed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.ALREADY_CONFIRMED",
+                        "message": "The usage import was already confirmed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request or the Idempotency-Key is invalid (VALIDATION_ERROR), the report has types of event nobody sorted (USAGE_IMPORT.EVENT_TYPE_UNMAPPED), the holders of the first report were not told (TRACKING_NOTICE_REQUIRED), or the application became a communication service (USAGE_SOURCE.COMMUNICATION_APP).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.EVENT_TYPE_UNMAPPED": {
+                    "summary": "The report has types of event the source does not classify.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.EVENT_TYPE_UNMAPPED",
+                        "message": "The report has types of event the source does not classify.",
+                        "details": { "eventTypes": ["export"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.TRACKING_NOTICE_REQUIRED": {
+                    "summary": "The holders of this application must be told its usage is tracked before the first report is written.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.TRACKING_NOTICE_REQUIRED",
+                        "message": "The holders of this application must be told its usage is tracked before the first report is written.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.COMMUNICATION_APP": {
+                    "summary": "The usage source cannot be used: COMMUNICATION_APP.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.COMMUNICATION_APP",
+                        "message": "The usage source cannot be used: COMMUNICATION_APP.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Confirm a usage import preview",
+        "tags": ["usage-imports"]
+      }
+    },
     "/api/v1/usage-imports/{id}/cancel": {
       "post": {
         "operationId": "usageImportCancel",
@@ -77348,6 +77675,1349 @@
         "security": [{ "bearer": [] }],
         "summary": "Throw a usage import preview away",
         "tags": ["usage-imports"]
+      }
+    },
+    "/api/v1/usage-unmatched-identities": {
+      "get": {
+        "operationId": "usageUnmatchedIdentityList",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["OPEN", "DISMISSED", "RESOLVED"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 9007199254740991, "default": 1, "type": "integer" }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 100, "default": 20, "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The queue: the open identifiers and the dismissed ones (dismissing keeps them here); each with the people it may be, by code and work email only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UnmatchedPageResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_IDENTITY.UNMATCHED_LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin reads or changes who a vendor identifier is.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the vendor identifiers nobody could be tied to",
+        "tags": ["usage-identities"]
+      }
+    },
+    "/api/v1/usage-unmatched-identities/{id}/resolve": {
+      "post": {
+        "operationId": "usageUnmatchedIdentityResolve",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResolveBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "A mapping made by hand ties the identifier, as the vendor wrote it, to the person; the days of that identifier are read as theirs from now on.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UnmatchedResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_IDENTITY.RESOLVED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin reads or changes who a vendor identifier is.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The identifier is not in the queue (USAGE_IDENTITY.UNMATCHED_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_IDENTITY.UNMATCHED_NOT_FOUND": {
+                    "summary": "The usage identity cannot be changed: UNMATCHED_NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IDENTITY.UNMATCHED_NOT_FOUND",
+                        "message": "The usage identity cannot be changed: UNMATCHED_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The identifier is already tied to someone (USAGE_IDENTITY.ALREADY_MAPPED) or was resolved already (ALREADY_HANDLED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_IDENTITY.ALREADY_MAPPED": {
+                    "summary": "The usage identity cannot be changed: ALREADY_MAPPED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IDENTITY.ALREADY_MAPPED",
+                        "message": "The usage identity cannot be changed: ALREADY_MAPPED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IDENTITY.ALREADY_HANDLED": {
+                    "summary": "The usage identity cannot be changed: ALREADY_HANDLED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IDENTITY.ALREADY_HANDLED",
+                        "message": "The usage identity cannot be changed: ALREADY_HANDLED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or the person does not exist (USAGE_IDENTITY.EMPLOYEE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IDENTITY.EMPLOYEE_NOT_FOUND": {
+                    "summary": "The usage identity cannot be changed: EMPLOYEE_NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IDENTITY.EMPLOYEE_NOT_FOUND",
+                        "message": "The usage identity cannot be changed: EMPLOYEE_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Say who a vendor identifier is",
+        "tags": ["usage-identities"]
+      }
+    },
+    "/api/v1/usage-unmatched-identities/{id}/dismiss": {
+      "post": {
+        "operationId": "usageUnmatchedIdentityDismiss",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DismissBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The identifier stays in the queue as dismissed, with the note; its days still conclude nothing about anyone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UnmatchedResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_IDENTITY.DISMISSED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin reads or changes who a vendor identifier is.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The identifier is not in the queue (USAGE_IDENTITY.UNMATCHED_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_IDENTITY.UNMATCHED_NOT_FOUND": {
+                    "summary": "The usage identity cannot be changed: UNMATCHED_NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IDENTITY.UNMATCHED_NOT_FOUND",
+                        "message": "The usage identity cannot be changed: UNMATCHED_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The identifier was resolved already (USAGE_IDENTITY.ALREADY_HANDLED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_IDENTITY.ALREADY_HANDLED": {
+                    "summary": "The usage identity cannot be changed: ALREADY_HANDLED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IDENTITY.ALREADY_HANDLED",
+                        "message": "The usage identity cannot be changed: ALREADY_HANDLED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Dismiss a vendor identifier that nobody could be tied to",
+        "tags": ["usage-identities"]
+      }
+    },
+    "/api/v1/usage-identity-mappings": {
+      "get": {
+        "operationId": "usageIdentityMappingList",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          { "name": "employeeId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "inForceOnly",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "true", "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 9007199254740991, "default": 1, "type": "integer" }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 100, "default": 20, "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The mappings in force (or all, with inForceOnly=false), each with how it was made.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/MappingPageResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_IDENTITY.MAPPINGS_LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin reads or changes who a vendor identifier is.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the mappings of vendor identifiers to people",
+        "tags": ["usage-identities"]
+      }
+    },
+    "/api/v1/usage-identity-mappings/{id}/end": {
+      "post": {
+        "operationId": "usageIdentityMappingEnd",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MappingEndBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The mapping ends with its reason; its identifier goes back to the queue as open, and its days are tied to nobody until it is resolved again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/MappingResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_IDENTITY.MAPPING_ENDED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin reads or changes who a vendor identifier is.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The mapping does not exist (USAGE_IDENTITY.MAPPING_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_IDENTITY.MAPPING_NOT_FOUND": {
+                    "summary": "The usage identity cannot be changed: MAPPING_NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IDENTITY.MAPPING_NOT_FOUND",
+                        "message": "The usage identity cannot be changed: MAPPING_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The mapping has ended already (USAGE_IDENTITY.MAPPING_ENDED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_IDENTITY.MAPPING_ENDED": {
+                    "summary": "The usage identity cannot be changed: MAPPING_ENDED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IDENTITY.MAPPING_ENDED",
+                        "message": "The usage identity cannot be changed: MAPPING_ENDED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Take a wrong mapping of a vendor identifier back",
+        "tags": ["usage-identities"]
+      }
+    },
+    "/api/v1/usage-no-assignment-findings": {
+      "get": {
+        "operationId": "usageNoAssignmentFindingList",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "OPEN", "type": "string", "enum": ["OPEN", "CLOSED"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 9007199254740991, "default": 1, "type": "integer" }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 100, "default": 20, "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The findings (open by default), each with the first and the last day of activity no seat covers; no seat is made from them.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/FindingPageResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_IDENTITY.FINDINGS_LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin reads or changes who a vendor identifier is.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the people active in a vendor with no seat to cover the day",
+        "tags": ["usage-identities"]
       }
     },
     "/api/v1/notifications": {
@@ -84703,7 +86373,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "The sections of the overview of the IT Admin on the business day (asOf), in their scope: the departments that name them in charge (every active one while nobody usable is named), and the tasks and SaaS reports they are in charge of by default. The open grant and revocation tasks, the open SaaS reports, the departures still handing over and the keys in the vault are counted; the subscriptions near their cancellation deadline and the plan terms to review name the operation that lists them; the discrepancies between sources and the machines without a confirmation say they are not available yet and are never shown as zero.",
+            "description": "The sections of the overview of the IT Admin on the business day (asOf), in their scope: the departments that name them in charge (every active one while nobody usable is named), and the tasks and SaaS reports they are in charge of by default. The open grant and revocation tasks, the open SaaS reports, the departures still handing over and the keys in the vault are counted; the subscriptions near their cancellation deadline and the plan terms to review name the operation that lists them; the discrepancies count the open findings of people active in a vendor with no seat to cover the day, and the machines without a confirmation say they are not available yet and are never shown as zero.",
             "content": {
               "application/json": {
                 "schema": {
@@ -108681,6 +110351,488 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "ConfirmUsageImportBodyDto": {
+        "type": "object",
+        "properties": {
+          "previewVersion": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+          "notice": { "type": "string", "enum": ["CONFIRMED_DELIVERED", "SYSTEM_SENT"] }
+        },
+        "required": ["previewVersion"],
+        "additionalProperties": false
+      },
+      "UsageImportConfirmationResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "import": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "sourceId": { "type": "string", "format": "uuid" },
+                  "format": { "type": "string", "enum": ["JSON", "CSV"] },
+                  "status": { "type": "string", "enum": ["PREVIEW", "COMPLETED", "CANCELLED"] },
+                  "previewVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "summary": {
+                    "type": "object",
+                    "properties": {
+                      "window": {
+                        "type": "object",
+                        "properties": {
+                          "from": { "type": "string" },
+                          "to": { "type": "string" },
+                          "basis": { "type": "string", "enum": ["DECLARED", "DERIVED"] }
+                        },
+                        "required": ["from", "to", "basis"],
+                        "additionalProperties": false
+                      },
+                      "totalRows": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "matched": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "unmatched": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "ambiguous": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "notAPerson": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "invalid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "byCode": {
+                        "type": "object",
+                        "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                      },
+                      "distinctIdentifiers": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "affectedSeats": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "detectableGroups": {
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": { "type": "string", "enum": ["G1", "G2", "G3", "G4"] }
+                      },
+                      "activityDefinition": { "type": "string" },
+                      "warnings": { "maxItems": 10, "type": "array", "items": { "type": "string" } },
+                      "unmappedEventTypes": { "maxItems": 200, "type": "array", "items": { "type": "string" } },
+                      "trackingNoticeRequired": { "type": "boolean" },
+                      "recordedOn": { "type": "string" }
+                    },
+                    "required": [
+                      "window",
+                      "totalRows",
+                      "matched",
+                      "unmatched",
+                      "ambiguous",
+                      "notAPerson",
+                      "invalid",
+                      "byCode",
+                      "distinctIdentifiers",
+                      "affectedSeats",
+                      "detectableGroups",
+                      "activityDefinition",
+                      "warnings",
+                      "unmappedEventTypes",
+                      "trackingNoticeRequired",
+                      "recordedOn"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "result": {
+                    "type": "object",
+                    "properties": {
+                      "daysWritten": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "matched": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "unmatched": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "ambiguous": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "notAPerson": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "invalid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "mappingsCreated": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "daysSuperseded": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "findingsOpened": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "findingsClosed": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "noticesSent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    },
+                    "required": [
+                      "daysWritten",
+                      "matched",
+                      "unmatched",
+                      "ambiguous",
+                      "notAPerson",
+                      "invalid",
+                      "mappingsCreated",
+                      "daysSuperseded",
+                      "findingsOpened",
+                      "findingsClosed",
+                      "noticesSent"
+                    ],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "noticeMode": {
+                    "type": "string",
+                    "enum": ["CONFIRMED_DELIVERED", "SYSTEM_SENT", null],
+                    "nullable": true
+                  },
+                  "createdAt": { "type": "string", "format": "date-time" },
+                  "expiresAt": { "type": "string", "format": "date-time" },
+                  "confirmedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "cancelledAt": { "type": "string", "format": "date-time", "nullable": true }
+                },
+                "required": [
+                  "id",
+                  "sourceId",
+                  "format",
+                  "status",
+                  "previewVersion",
+                  "summary",
+                  "result",
+                  "noticeMode",
+                  "createdAt",
+                  "expiresAt",
+                  "confirmedAt",
+                  "cancelledAt"
+                ],
+                "additionalProperties": false
+              },
+              "replayed": { "type": "boolean" }
+            },
+            "required": ["import", "replayed"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "UnmatchedPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "applicationId": { "type": "string", "format": "uuid" },
+                    "sourceId": { "type": "string", "format": "uuid" },
+                    "identifierType": { "type": "string", "enum": ["EMAIL", "USERNAME", "ACCOUNT_ID"] },
+                    "identifier": { "type": "string" },
+                    "reason": { "type": "string", "enum": ["NOT_FOUND", "AMBIGUOUS"] },
+                    "status": { "type": "string", "enum": ["OPEN", "DISMISSED", "RESOLVED"] },
+                    "candidates": {
+                      "maxItems": 10,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "employeeId": { "type": "string", "format": "uuid" },
+                          "employeeCode": { "type": "string" },
+                          "workEmail": { "type": "string", "nullable": true }
+                        },
+                        "required": ["employeeId", "employeeCode", "workEmail"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "firstImportId": { "type": "string", "format": "uuid" },
+                    "lastImportId": { "type": "string", "format": "uuid" },
+                    "resolvedMappingId": { "type": "string", "format": "uuid", "nullable": true },
+                    "note": { "type": "string", "nullable": true },
+                    "handledAt": { "type": "string", "format": "date-time", "nullable": true }
+                  },
+                  "required": [
+                    "id",
+                    "applicationId",
+                    "sourceId",
+                    "identifierType",
+                    "identifier",
+                    "reason",
+                    "status",
+                    "candidates",
+                    "firstImportId",
+                    "lastImportId",
+                    "resolvedMappingId",
+                    "note",
+                    "handledAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ResolveBodyDto": {
+        "type": "object",
+        "properties": { "employeeId": { "type": "string", "format": "uuid" } },
+        "required": ["employeeId"],
+        "additionalProperties": false
+      },
+      "UnmatchedResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "applicationId": { "type": "string", "format": "uuid" },
+              "sourceId": { "type": "string", "format": "uuid" },
+              "identifierType": { "type": "string", "enum": ["EMAIL", "USERNAME", "ACCOUNT_ID"] },
+              "identifier": { "type": "string" },
+              "reason": { "type": "string", "enum": ["NOT_FOUND", "AMBIGUOUS"] },
+              "status": { "type": "string", "enum": ["OPEN", "DISMISSED", "RESOLVED"] },
+              "candidates": {
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "employeeId": { "type": "string", "format": "uuid" },
+                    "employeeCode": { "type": "string" },
+                    "workEmail": { "type": "string", "nullable": true }
+                  },
+                  "required": ["employeeId", "employeeCode", "workEmail"],
+                  "additionalProperties": false
+                }
+              },
+              "firstImportId": { "type": "string", "format": "uuid" },
+              "lastImportId": { "type": "string", "format": "uuid" },
+              "resolvedMappingId": { "type": "string", "format": "uuid", "nullable": true },
+              "note": { "type": "string", "nullable": true },
+              "handledAt": { "type": "string", "format": "date-time", "nullable": true }
+            },
+            "required": [
+              "id",
+              "applicationId",
+              "sourceId",
+              "identifierType",
+              "identifier",
+              "reason",
+              "status",
+              "candidates",
+              "firstImportId",
+              "lastImportId",
+              "resolvedMappingId",
+              "note",
+              "handledAt"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "DismissBodyDto": {
+        "type": "object",
+        "properties": { "note": { "type": "string", "minLength": 1, "maxLength": 500 } },
+        "required": ["note"],
+        "additionalProperties": false
+      },
+      "MappingPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "applicationId": { "type": "string", "format": "uuid" },
+                    "identifierType": { "type": "string", "enum": ["EMAIL", "USERNAME", "ACCOUNT_ID"] },
+                    "identifier": { "type": "string" },
+                    "employeeId": { "type": "string", "format": "uuid" },
+                    "employeeCode": { "type": "string", "nullable": true },
+                    "method": {
+                      "type": "string",
+                      "enum": ["EXACT_EMAIL", "ACCOUNT_IDENTIFIER", "ALIAS_RULE", "MANUAL"]
+                    },
+                    "confidence": { "type": "string", "enum": ["HIGH", "MEDIUM"] },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "endedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "endReason": { "type": "string", "nullable": true }
+                  },
+                  "required": [
+                    "id",
+                    "applicationId",
+                    "identifierType",
+                    "identifier",
+                    "employeeId",
+                    "employeeCode",
+                    "method",
+                    "confidence",
+                    "createdAt",
+                    "endedAt",
+                    "endReason"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "MappingEndBodyDto": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500 } },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
+      "MappingResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "applicationId": { "type": "string", "format": "uuid" },
+              "identifierType": { "type": "string", "enum": ["EMAIL", "USERNAME", "ACCOUNT_ID"] },
+              "identifier": { "type": "string" },
+              "employeeId": { "type": "string", "format": "uuid" },
+              "employeeCode": { "type": "string", "nullable": true },
+              "method": { "type": "string", "enum": ["EXACT_EMAIL", "ACCOUNT_IDENTIFIER", "ALIAS_RULE", "MANUAL"] },
+              "confidence": { "type": "string", "enum": ["HIGH", "MEDIUM"] },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "endedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "endReason": { "type": "string", "nullable": true }
+            },
+            "required": [
+              "id",
+              "applicationId",
+              "identifierType",
+              "identifier",
+              "employeeId",
+              "employeeCode",
+              "method",
+              "confidence",
+              "createdAt",
+              "endedAt",
+              "endReason"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "FindingPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "applicationId": { "type": "string", "format": "uuid" },
+                    "employeeId": { "type": "string", "format": "uuid" },
+                    "employeeCode": { "type": "string", "nullable": true },
+                    "firstActivityDate": { "type": "string" },
+                    "lastActivityDate": { "type": "string" },
+                    "status": { "type": "string", "enum": ["OPEN", "CLOSED"] },
+                    "closedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "closedReason": { "type": "string", "nullable": true }
+                  },
+                  "required": [
+                    "id",
+                    "applicationId",
+                    "employeeId",
+                    "employeeCode",
+                    "firstActivityDate",
+                    "lastActivityDate",
+                    "status",
+                    "closedAt",
+                    "closedReason"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "NotificationListResponseDto": {
         "type": "object",
         "properties": {
@@ -111342,7 +113494,7 @@
                     },
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
-                    "description": "The discrepancies between data sources; they need usage data, which is not delivered yet."
+                    "description": "The people active in a vendor with no seat to cover the day (`FR-4.8`): the open findings of the vendor usage import."
                   },
                   "cancellationDeadlines": {
                     "type": "object",

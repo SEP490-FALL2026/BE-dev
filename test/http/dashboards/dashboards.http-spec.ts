@@ -73,7 +73,7 @@ const ROUTES: Route[] = [
       sections: {
         grantTasks: COUNTED,
         revocationTasks: COUNTED,
-        discrepancies: MISSING,
+        discrepancies: COUNTED,
         cancellationDeadlines: AT_SOURCE,
         licenseKeys: COUNTED,
         termsToReview: AT_SOURCE,

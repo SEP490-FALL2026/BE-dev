@@ -5,6 +5,7 @@ import { OrganizationModule } from '../organization/organization.module';
 import { OptimizationModule } from '../optimization/optimization.module';
 import { PersonnelModule } from '../personnel/personnel.module';
 import { RequestsModule } from '../requests/requests.module';
+import { UsageModule } from '../usage/usage.module';
 import { EmployeeDashboardController } from './employee/employee-dashboard.controller';
 import { EmployeeDashboardService } from './employee/employee-dashboard.service';
 import { ItAdminDashboardController } from './it-admin/it-admin-dashboard.controller';
@@ -27,6 +28,7 @@ import { SuperAdminDashboardService } from './super-admin/super-admin-dashboard.
     OptimizationModule,
     PersonnelModule,
     RequestsModule,
+    UsageModule,
   ],
   controllers: [
     EmployeeDashboardController,

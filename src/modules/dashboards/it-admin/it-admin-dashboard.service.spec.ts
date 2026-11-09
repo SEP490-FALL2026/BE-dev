@@ -4,6 +4,7 @@ import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboar
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { OptimizationApi } from '../../optimization/public/optimization.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
+import type { UsageEvidenceApi } from '../../usage/public/usage-evidence.api';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
 import { ItAdminDashboardService } from './it-admin-dashboard.service';
 
@@ -28,19 +29,21 @@ function serviceWith(scope: string[]) {
     .mockResolvedValue({ openGrantTasks: 3, openRevocationTasks: 1, openSaasIssues: 2, keysInStore: 40 });
   const handingOverCases = jest.fn().mockResolvedValue(5);
   const getSummary = jest.fn().mockResolvedValue({ counted: 3, groups: [], limitation: '' });
+  const openFindingCount = jest.fn().mockResolvedValue(2);
   const service = new ItAdminDashboardService(
     { businessToday: () => Promise.resolve('2026-10-23'), getItAdminScope } as unknown as OrganizationReadApi,
     { findUsableItAdminEmployeeIds } as unknown as IdentityAccessApi,
     { itAdminFacts } as unknown as LicensingDashboardApi,
     { handingOverCases } as unknown as PersonnelDashboardApi,
     { getSummary } as unknown as OptimizationApi,
+    { openFindingCount } as unknown as UsageEvidenceApi,
   );
 
   return { service, getItAdminScope, findUsableItAdminEmployeeIds, itAdminFacts, handingOverCases, getSummary };
 }
 
 describe('ItAdminDashboardService', () => {
-  // US-12-15 AC-4: the work of the departments in the IT Admin's charge; devices and discrepancies have no source yet.
+  // US-12-15 AC-4: the work of the departments in the IT Admin's charge; devices have no source yet; the discrepancies are the open findings of the vendor usage import.
   it('counts the work in the charge of the IT Admin and the departures of the departments in scope', async () => {
     const { service, getItAdminScope, findUsableItAdminEmployeeIds, itAdminFacts, handingOverCases } = serviceWith([
       'd-des',
@@ -64,7 +67,8 @@ describe('ItAdminDashboardService', () => {
       offboardingHandovers: { state: 'COUNTED', count: 5, sourceOperationId: 'offboardingCaseList' },
       cancellationDeadlines: { state: 'AT_SOURCE', count: null, sourceOperationId: 'subscriptionList' },
       termsToReview: { state: 'AT_SOURCE', count: null, sourceOperationId: 'planWarningList' },
-      discrepancies: { state: 'NOT_AVAILABLE', count: null, reason: 'USAGE_DATA_NOT_DELIVERED' },
+      // The open findings of people active in a vendor with no seat (Q-84).
+      discrepancies: { state: 'COUNTED', count: 2, sourceOperationId: 'usageNoAssignmentFindingList' },
       unconfirmedDevices: { state: 'NOT_AVAILABLE', count: null, reason: 'DEVICE_REGISTRY_NOT_DELIVERED' },
     });
   });

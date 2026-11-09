@@ -172,6 +172,17 @@ describe('the alerts of the rights (a03-license-inbox-alerts, FR-5.14 lines 3, 1
         params: { recommendationId: ID, employeeId: ID, applicationId: ID, exemptUntil: '2026-12-31' },
       }),
       notice({
+        code: 'USAGE_TRACKING_NOTICE',
+        params: {
+          applicationId: ID,
+          activityDefinition: 'mở hoặc chỉnh sửa một tệp',
+          dataKinds: 'ngày hoạt động theo tài khoản',
+          purpose: 'đối chiếu quyền đang giữ với việc sử dụng',
+          retentionMonths: 6,
+          viewPath: '/applications/x/usage-tracking',
+        },
+      }),
+      notice({
         code: 'REVOCATION_UPCOMING',
         params: { taskId: ID, planId: ID, applicationId: ID, source: 'GHOST_SEAT', notBefore: '2026-11-08' },
       }),

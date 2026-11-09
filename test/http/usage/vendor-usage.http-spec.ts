@@ -18,6 +18,13 @@ const OPERATIONS = [
   'usageImportGet',
   'usageImportRowList',
   'usageImportCancel',
+  'usageImportConfirm',
+  'usageUnmatchedIdentityList',
+  'usageUnmatchedIdentityResolve',
+  'usageUnmatchedIdentityDismiss',
+  'usageIdentityMappingList',
+  'usageIdentityMappingEnd',
+  'usageNoAssignmentFindingList',
 ];
 
 describe('vendor usage routes (http contract, no database)', () => {
@@ -54,6 +61,13 @@ describe('vendor usage routes (http contract, no database)', () => {
     ['get', `/api/v1/usage-imports/${ID}`],
     ['get', `/api/v1/usage-imports/${ID}/rows`],
     ['post', `/api/v1/usage-imports/${ID}/cancel`],
+    ['post', `/api/v1/usage-imports/${ID}/confirm`],
+    ['get', '/api/v1/usage-unmatched-identities'],
+    ['post', `/api/v1/usage-unmatched-identities/${ID}/resolve`],
+    ['post', `/api/v1/usage-unmatched-identities/${ID}/dismiss`],
+    ['get', '/api/v1/usage-identity-mappings'],
+    ['post', `/api/v1/usage-identity-mappings/${ID}/end`],
+    ['get', '/api/v1/usage-no-assignment-findings'],
   ] as const)('answers 401 to %s %s without a token', async (method, path) => {
     const response = await request(app.getHttpServer())[method](path).expect(401);
 
@@ -76,6 +90,11 @@ describe('vendor usage routes (http contract, no database)', () => {
       await as(request(server).get(`/api/v1/usage-imports/${ID}`)),
       await as(request(server).get(`/api/v1/usage-imports/${ID}/rows`)),
       await as(request(server).post(`/api/v1/usage-imports/${ID}/cancel`)),
+      await as(request(server).post(`/api/v1/usage-imports/${ID}/confirm`).send({ previewVersion: 1 })),
+      await as(request(server).get('/api/v1/usage-unmatched-identities')),
+      await as(request(server).post(`/api/v1/usage-unmatched-identities/${ID}/resolve`).send({ employeeId: ID })),
+      await as(request(server).get('/api/v1/usage-identity-mappings')),
+      await as(request(server).get('/api/v1/usage-no-assignment-findings')),
     ]) {
       expect(response.status).toBe(403);
     }
@@ -114,5 +133,10 @@ describe('vendor usage routes (http contract, no database)', () => {
     await asAdmin(request(server).get('/api/v1/usage-imports/not-a-uuid')).expect(422);
     await asAdmin(request(server).get(`/api/v1/usage-imports/${ID}/rows`).query({ pageSize: 101 })).expect(422);
     await asAdmin(request(server).get('/api/v1/usage-sources').query({ page: 0 })).expect(422);
+    await asAdmin(request(server).post(`/api/v1/usage-imports/${ID}/confirm`).send({ previewVersion: 0 })).expect(422);
+    await asAdmin(request(server).post(`/api/v1/usage-unmatched-identities/${ID}/dismiss`).send({ note: '' })).expect(
+      422,
+    );
+    await asAdmin(request(server).post(`/api/v1/usage-identity-mappings/${ID}/end`).send({ reason: 'x' })).expect(422);
   });
 });

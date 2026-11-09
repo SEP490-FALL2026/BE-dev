@@ -5,9 +5,12 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { UsageIdentifierType } from '../vendor-source/vendor-source.types';
 import {
   MAX_CANDIDATES,
+  type MappingConfidence,
+  type MappingMethod,
   type MappingRecord,
   type NewMapping,
   type NewUnmatched,
+  type UnmatchedReason,
   type UnmatchedRecord,
   type UnmatchedStatus,
 } from './identity.types';
@@ -49,6 +52,35 @@ export class IdentityRepo {
       RETURNING id`;
 
     return rows[0]?.id ?? null;
+  }
+
+  /**
+   * Writes many mappings in one statement, those a match of a report makes; an identifier that has a mapping in force already is left as it
+   * is. Returns the id of each one written, by normalized identifier.
+   */
+  async insertMappingsIfAbsent(
+    tx: DbTx,
+    input: Array<
+      Omit<NewMapping, 'method' | 'confidence' | 'confirmedByAppUserId'> & {
+        method: MappingMethod;
+        confidence: MappingConfidence;
+      }
+    >,
+  ): Promise<Map<string, string>> {
+    if (input.length === 0) return new Map();
+    const first = input[0];
+    const rows = await tx.$queryRaw<{ id: string; normalized_identifier: string }[]>`
+      INSERT INTO usage_identity_mappings (organization_id, application_id, identifier_type, normalized_identifier, raw_identifier,
+        employee_id, method, confidence)
+      SELECT ${first.organizationId}::uuid, ${first.applicationId}::uuid, ${first.identifierType}::"UsageIdentifierType", t.normalized,
+             t.raw, t.employee::uuid, t.method::"UsageMatchMethod", t.confidence::"UsageMatchConfidence"
+        FROM unnest(${input.map((item) => item.normalizedIdentifier)}::text[], ${input.map((item) => item.rawIdentifier)}::text[],
+                    ${input.map((item) => item.employeeId)}::text[], ${input.map((item) => item.method)}::text[],
+                    ${input.map((item) => item.confidence)}::text[]) AS t(normalized, raw, employee, method, confidence)
+      ON CONFLICT (organization_id, application_id, identifier_type, normalized_identifier) WHERE ended_at IS NULL DO NOTHING
+      RETURNING id, normalized_identifier`;
+
+    return new Map(rows.map((row) => [row.normalized_identifier, row.id]));
   }
 
   async findMapping(id: string, tx?: DbTx): Promise<MappingRecord | null> {
@@ -115,6 +147,58 @@ export class IdentityRepo {
       ON CONFLICT (organization_id, application_id, identifier_type, normalized_identifier) WHERE status <> 'RESOLVED'
       DO UPDATE SET last_import_id = EXCLUDED.last_import_id, reason = EXCLUDED.reason,
         candidate_employee_ids = EXCLUDED.candidate_employee_ids, source_id = EXCLUDED.source_id`;
+  }
+
+  /** Opens or refreshes many identifiers of one application and source in the queue, in one statement (see `upsertUnmatched`). */
+  async upsertUnmatchedMany(
+    tx: DbTx,
+    input: {
+      organizationId: string;
+      applicationId: string;
+      sourceId: string;
+      identifierType: UsageIdentifierType;
+      importId: string;
+    },
+    items: ReadonlyArray<{
+      normalizedIdentifier: string;
+      rawIdentifier: string;
+      reason: UnmatchedReason;
+      candidateEmployeeIds: string[];
+    }>,
+  ): Promise<void> {
+    if (items.length === 0) return;
+    await tx.$executeRaw`
+      INSERT INTO usage_unmatched_identities (organization_id, application_id, source_id, identifier_type, normalized_identifier,
+        raw_identifier, reason, status, candidate_employee_ids, first_import_id, last_import_id)
+      SELECT ${input.organizationId}::uuid, ${input.applicationId}::uuid, ${input.sourceId}::uuid,
+             ${input.identifierType}::"UsageIdentifierType", t.normalized, t.raw, t.reason::"UsageUnmatchedReason", 'OPEN',
+             CASE WHEN t.candidates = '' THEN '{}'::uuid[] ELSE string_to_array(t.candidates, ',')::uuid[] END,
+             ${input.importId}::uuid, ${input.importId}::uuid
+        FROM unnest(${items.map((item) => item.normalizedIdentifier)}::text[], ${items.map((item) => item.rawIdentifier)}::text[],
+                    ${items.map((item) => item.reason)}::text[],
+                    ${items.map((item) => item.candidateEmployeeIds.slice(0, MAX_CANDIDATES).join(','))}::text[])
+             AS t(normalized, raw, reason, candidates)
+      ON CONFLICT (organization_id, application_id, identifier_type, normalized_identifier) WHERE status <> 'RESOLVED'
+      DO UPDATE SET last_import_id = EXCLUDED.last_import_id, reason = EXCLUDED.reason,
+        candidate_employee_ids = EXCLUDED.candidate_employee_ids, source_id = EXCLUDED.source_id`;
+  }
+
+  /** The identifiers now matched by a mapping leave the queue as resolved, in one statement. */
+  async resolveByMappings(
+    tx: DbTx,
+    input: { applicationId: string; identifierType: UsageIdentifierType; byAppUserId: string; at: Date },
+    mappings: ReadonlyMap<string, string>,
+  ): Promise<number> {
+    if (mappings.size === 0) return 0;
+    const entries = [...mappings.entries()];
+
+    return tx.$executeRaw`
+      UPDATE usage_unmatched_identities u
+         SET status = 'RESOLVED', resolved_mapping_id = t.mapping::uuid, handled_by_app_user_id = ${input.byAppUserId}::uuid,
+             handled_at = ${input.at}
+        FROM unnest(${entries.map(([identifier]) => identifier)}::text[], ${entries.map(([, id]) => id)}::text[]) AS t(normalized, mapping)
+       WHERE u.application_id = ${input.applicationId}::uuid AND u.identifier_type = ${input.identifierType}::"UsageIdentifierType"
+         AND u.normalized_identifier = t.normalized AND u.status <> 'RESOLVED'`;
   }
 
   /** Marks the identifiers resolved by a mapping: they are matched now, so they leave the queue. */

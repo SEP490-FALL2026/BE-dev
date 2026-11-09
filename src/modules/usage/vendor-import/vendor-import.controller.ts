@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -11,7 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
   fallbackExample,
@@ -20,20 +21,26 @@ import {
   UNAUTHENTICATED_RESPONSE,
   VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import { VALIDATION_ERROR_BODY } from '../../../infrastructure/http/pipes/zod-validation.pipe';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { USAGE_SOURCE_ERROR_EXAMPLES } from '../vendor-source/vendor-source.http-errors';
 import {
+  ConfirmUsageImportBodyDto,
+  idempotencyKeySchema,
   ListUsageImportRowsQueryDto,
   UploadUsageImportBodyDto,
+  UsageImportConfirmationResponseDto,
   UsageImportIdParamDto,
   UsageImportResponseDto,
   UsageImportRowsResponseDto,
 } from './vendor-import.dto';
 import { UsageImportFileError } from './vendor-import.errors';
 import { toUsageImportApiException, USAGE_IMPORT_ERROR_EXAMPLES as EXAMPLES } from './vendor-import.http-errors';
+import { VendorImportConfirmationService } from './confirmation/vendor-import-confirmation.service';
 import { VendorImportQueryService } from './vendor-import-query.service';
 import { VendorImportService } from './vendor-import.service';
 import { MAX_REPORT_BYTES, type ImportView, type StoredRow } from './vendor-import.types';
@@ -112,6 +119,26 @@ const UPLOAD_ERRORS = [
   },
 ] as const;
 
+const CONFIRM_ERRORS = [
+  {
+    status: HttpStatus.CONFLICT,
+    description:
+      'The preview is not the current one or no longer holds (USAGE_IMPORT.PREVIEW_STALE), the import was cancelled or expired (NOT_OPEN), or it was already confirmed under another key (ALREADY_CONFIRMED).',
+    examples: [EXAMPLES.PREVIEW_STALE, EXAMPLES.NOT_OPEN, EXAMPLES.ALREADY_CONFIRMED],
+  },
+  {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'The request or the Idempotency-Key is invalid (VALIDATION_ERROR), the report has types of event nobody sorted (USAGE_IMPORT.EVENT_TYPE_UNMAPPED), the holders of the first report were not told (TRACKING_NOTICE_REQUIRED), or the application became a communication service (USAGE_SOURCE.COMMUNICATION_APP).',
+    examples: [
+      VALIDATION_EXAMPLE,
+      EXAMPLES.EVENT_TYPE_UNMAPPED,
+      EXAMPLES.TRACKING_NOTICE_REQUIRED,
+      USAGE_SOURCE_ERROR_EXAMPLES.COMMUNICATION_APP,
+    ],
+  },
+] as const;
+
 export function importToWire(view: ImportView) {
   return {
     id: view.id,
@@ -149,6 +176,7 @@ export class VendorImportController {
   constructor(
     private readonly imports: VendorImportService,
     private readonly queries: VendorImportQueryService,
+    private readonly confirmations: VendorImportConfirmationService,
   ) {}
 
   @Post()
@@ -223,6 +251,47 @@ export class VendorImportController {
       const page = await this.queries.rows(params.id, query);
 
       return { items: page.items.map(rowToWire), pagination: page.pagination };
+    } catch (error) {
+      throw toUsageImportApiException(error);
+    }
+  }
+
+  @Post(':id/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'A key the caller makes once for this confirmation (16 to 128 letters, digits, - or _); sending it again answers what was written, another key is refused.',
+  })
+  @ApiOperation({ operationId: 'usageImportConfirm', summary: 'Confirm a usage import preview' })
+  @ApiSuccessResponse(UsageImportConfirmationResponseDto, {
+    message: 'USAGE_IMPORT.CONFIRMED',
+    description:
+      'The holders of the application were told, then the days of the preview that is still current were written, once. The same key again answers the same result with replayed.',
+  })
+  @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, ...CONFIRM_ERRORS)
+  async confirm(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: UsageImportIdParamDto,
+    @Body() body: ConfirmUsageImportBodyDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ) {
+    const key = idempotencyKeySchema.safeParse(idempotencyKey);
+    if (!key.success) {
+      throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+        ...VALIDATION_ERROR_BODY,
+        details: { issues: [{ code: 'invalid_format', path: 'Idempotency-Key' }] },
+      });
+    }
+    try {
+      const { import: view, replayed } = await this.confirmations.confirm(actor, params.id, {
+        previewVersion: body.previewVersion,
+        idempotencyKey: key.data,
+        ...(body.notice ? { notice: body.notice } : {}),
+      });
+
+      return { import: importToWire(view), replayed };
     } catch (error) {
       throw toUsageImportApiException(error);
     }

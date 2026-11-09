@@ -24,11 +24,12 @@ describe('the usage sources over HTTP (integration, real PostgreSQL)', () => {
         canConcludeAbsence: false,
       });
       expect(created.limitation).toContain('không được hiểu là không dùng');
-      const { activityDefinition: _omitted, ...withoutDefinition } = h.sourceBody(applicationId);
+      const withoutDefinition: Record<string, unknown> = { ...h.sourceBody(applicationId) };
+      delete withoutDefinition.activityDefinition;
 
-      expect((await h.createSource(withoutDefinition).expect(422)).body.error.code).toBe('VALIDATION_ERROR');
+      expect(h.codeOf(await h.createSource(withoutDefinition).expect(422))).toBe('VALIDATION_ERROR');
       expect(
-        (await h.createSource(h.sourceBody(applicationId, { activityDefinition: 'ab' })).expect(422)).body.error.code,
+        h.codeOf(await h.createSource(h.sourceBody(applicationId, { activityDefinition: 'ab' })).expect(422)),
       ).toBe('VALIDATION_ERROR');
       expect(await h.auditOf('UsageSource', created.id)).toHaveLength(1);
     });

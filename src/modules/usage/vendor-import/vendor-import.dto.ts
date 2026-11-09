@@ -17,6 +17,7 @@ export const confirmUsageImportBodySchema = z.strictObject({
   previewVersion: z.number().int().positive(),
   notice: z.enum(['CONFIRMED_DELIVERED', 'SYSTEM_SENT']).optional(),
 });
+export const idempotencyKeySchema = z.string().regex(/^[A-Za-z0-9_-]{16,128}$/);
 export const usageImportIdParamSchema = z.strictObject({ id: z.uuid() });
 export const listUsageImportRowsQuerySchema = z.strictObject({
   outcome: z.enum(['MATCHED', 'UNMATCHED', 'AMBIGUOUS', 'NOT_A_PERSON', 'INVALID']).optional(),

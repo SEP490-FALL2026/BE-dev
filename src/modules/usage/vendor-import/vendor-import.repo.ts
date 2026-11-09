@@ -101,23 +101,24 @@ export class VendorImportRepo {
       },
       select: { id: true },
     });
-    for (let start = 0; start < input.rows.length; start += 2000) {
-      await tx.usageImportRow.createMany({
-        data: input.rows.slice(start, start + 2000).map((row) => ({
-          importId: created.id,
-          lineNumber: row.lineNumber,
-          cells: usageImportRowCellsJson.encode(row.cells),
-          identifierRaw: row.identifierRaw,
-          identifierNormalized: row.identifierNormalized,
-          outcome: row.outcome,
-          employeeId: row.employeeId,
-          matchMethod: row.matchMethod,
-          errors: usageImportRowErrorsJson.encode(row.errors),
-        })),
-      });
+    for (let start = 0; start < input.rows.length; start += CHUNK_SIZE) {
+      await this.insertRows(tx, created.id, input.rows.slice(start, start + CHUNK_SIZE));
     }
 
     return created.id;
+  }
+
+  /** Writes a chunk of rows in one statement; the JSON columns go through their codecs and arrive as text. */
+  private async insertRows(tx: DbTx, importId: string, rows: readonly StoredRow[]): Promise<void> {
+    await tx.$executeRaw`
+      INSERT INTO usage_import_rows (import_id, line_number, cells, identifier_raw, identifier_normalized, outcome, employee_id, match_method, errors)
+      SELECT ${importId}::uuid, t.line, t.cells::jsonb, t.raw, t.normalized, t.outcome::"UsageRowOutcome", NULLIF(t.employee, '')::uuid,
+             NULLIF(t.method, '')::"UsageMatchMethod", t.errors::jsonb
+        FROM unnest(${rows.map((row) => row.lineNumber)}::int[], ${rows.map((row) => JSON.stringify(usageImportRowCellsJson.encode(row.cells)))}::text[],
+                    ${rows.map((row) => row.identifierRaw)}::text[], ${rows.map((row) => row.identifierNormalized)}::text[],
+                    ${rows.map((row) => row.outcome)}::text[], ${rows.map((row) => row.employeeId ?? '')}::text[],
+                    ${rows.map((row) => row.matchMethod ?? '')}::text[], ${rows.map((row) => JSON.stringify(usageImportRowErrorsJson.encode(row.errors)))}::text[])
+             AS t(line, cells, raw, normalized, outcome, employee, method, errors)`;
   }
 
   async find(id: string, tx?: DbTx): Promise<ImportRecord | null> {
@@ -234,21 +235,14 @@ export class VendorImportRepo {
     let written = 0;
     for (let start = 0; start < input.days.length; start += CHUNK_SIZE) {
       const chunk = input.days.slice(start, start + CHUNK_SIZE);
-      const result = await tx.usageActivityDay.createMany({
-        data: chunk.map((day) => ({
-          organizationId: input.organizationId,
-          sourceId: input.sourceId,
-          importId: input.importId,
-          applicationId: input.applicationId,
-          identifierType: input.identifierType,
-          normalizedIdentifier: day.identifierNormalized,
-          activityDate: toDateColumn(day.date),
-          eventClass: day.eventClass,
-          basis: day.basis,
-        })),
-        skipDuplicates: true,
-      });
-      written += result.count;
+      written += await tx.$executeRaw`
+        INSERT INTO usage_activity_days (organization_id, source_id, import_id, application_id, identifier_type, normalized_identifier,
+          activity_date, event_class, basis)
+        SELECT ${input.organizationId}::uuid, ${input.sourceId}::uuid, ${input.importId}::uuid, ${input.applicationId}::uuid,
+               ${input.identifierType}::"UsageIdentifierType", t.normalized, t.day::date, t.class::"UsageEventClass", t.basis::"UsageActivityBasis"
+          FROM unnest(${chunk.map((day) => day.identifierNormalized)}::text[], ${chunk.map((day) => day.date)}::text[],
+                      ${chunk.map((day) => day.eventClass)}::text[], ${chunk.map((day) => day.basis)}::text[]) AS t(normalized, day, class, basis)
+        ON CONFLICT (import_id, identifier_type, normalized_identifier, activity_date, event_class) DO NOTHING`;
     }
 
     return written;

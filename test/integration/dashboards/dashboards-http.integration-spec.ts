@@ -248,7 +248,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
   });
 
   describe('the IT Admin overview', () => {
-    // US-12-15 AC-4: the work in the IT Admin's charge and the departments in their scope; devices and discrepancies have no source.
+    // US-12-15 AC-4: the work in the IT Admin's charge and the departments in their scope; devices have no source; the discrepancies are the open findings of the vendor usage import.
     it('counts the work of IT1 as the queues show it to IT1', async () => {
       const overview = await overviewOf(OVERVIEW_PATHS.itAdmin, it1);
       const sections = overview.sections;
@@ -270,7 +270,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       expect(sections.offboardingHandovers.count).toBe(1);
       expect(sections.licenseKeys).toEqual(countedAs(2, 'licenseKeyList'));
       expect(sections.unconfirmedDevices).toEqual(missing('DEVICE_REGISTRY_NOT_DELIVERED'));
-      expect(sections.discrepancies).toEqual(missing('USAGE_DATA_NOT_DELIVERED'));
+      expect(sections.discrepancies).toEqual(countedAs(0, 'usageNoAssignmentFindingList'));
       expect(sections.cancellationDeadlines).toMatchObject({
         state: 'AT_SOURCE',
         sourceOperationId: 'subscriptionList',

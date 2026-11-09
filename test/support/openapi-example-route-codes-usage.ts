@@ -44,5 +44,27 @@ export const ROUTE_ERROR_CODES_USAGE: Readonly<Record<string, Partial<Record<Rou
   },
   usageImportGet: { '404': ['USAGE_IMPORT.NOT_FOUND'] },
   usageImportRowList: { '404': ['USAGE_IMPORT.NOT_FOUND'] },
+  usageImportConfirm: {
+    '404': ['USAGE_IMPORT.NOT_FOUND'],
+    '409': ['USAGE_IMPORT.ALREADY_CONFIRMED', 'USAGE_IMPORT.NOT_OPEN', 'USAGE_IMPORT.PREVIEW_STALE'],
+    '422': [
+      'USAGE_IMPORT.EVENT_TYPE_UNMAPPED',
+      'USAGE_IMPORT.TRACKING_NOTICE_REQUIRED',
+      'USAGE_SOURCE.COMMUNICATION_APP',
+    ],
+  },
+  usageUnmatchedIdentityResolve: {
+    '404': ['USAGE_IDENTITY.UNMATCHED_NOT_FOUND'],
+    '409': ['USAGE_IDENTITY.ALREADY_HANDLED', 'USAGE_IDENTITY.ALREADY_MAPPED'],
+    '422': ['USAGE_IDENTITY.EMPLOYEE_NOT_FOUND'],
+  },
+  usageUnmatchedIdentityDismiss: {
+    '404': ['USAGE_IDENTITY.UNMATCHED_NOT_FOUND'],
+    '409': ['USAGE_IDENTITY.ALREADY_HANDLED'],
+  },
+  usageIdentityMappingEnd: {
+    '404': ['USAGE_IDENTITY.MAPPING_NOT_FOUND'],
+    '409': ['USAGE_IDENTITY.MAPPING_ENDED'],
+  },
   usageImportCancel: { '404': ['USAGE_IMPORT.NOT_FOUND'], '409': ['USAGE_IMPORT.NOT_PREVIEW'] },
 };

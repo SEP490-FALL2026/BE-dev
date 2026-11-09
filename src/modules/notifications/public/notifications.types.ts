@@ -142,6 +142,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'SUBSCRIPTION_RENEWAL_LATE',
   'SUBSCRIPTION_AUTO_RENEWAL_INCIDENT',
   'SUBSCRIPTION_EXPIRY_MARKED',
+  // The usage of an application is tracked from a vendor report (`qd103-vendor-usage-import`, `US-08-05` AC-2): told to each person who holds it.
+  'USAGE_TRACKING_NOTICE',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { ApiAccount } from './api-accounts';
+import { pretendBusinessToday } from './pretend-today';
 import { declareApplication, declarePlan, declareSubscription } from './builders/catalog.builder';
 import { SeatHarness } from './seat-baseline-harness';
 
@@ -69,6 +71,8 @@ export const EVENT_SOURCE = {
 
 /** The seat harness with the sources and the reports of vendor usage (`SBF-04a`) a suite needs. */
 export class UsageHarness extends SeatHarness {
+  private machines = 0;
+
   /** An application of the catalog with a plan and a subscription of 100 seats; `communication` makes it a messaging service. */
   async usageApp(options: { communication?: boolean; kind?: 'SAAS' | 'INTERNAL' } = {}) {
     const kind = options.kind ?? 'SAAS';
@@ -173,6 +177,94 @@ export class UsageHarness extends SeatHarness {
         ...(person.grantedOn ? { granted_on: person.grantedOn } : {}),
       })),
     );
+  }
+
+  /** A machine held by the person: its registration, as the IT Admin registers it. */
+  async registrationOf(
+    employeeId: string,
+    today = '2026-09-02',
+  ): Promise<{ deviceId: string; registrationId: string }> {
+    this.machines += 1;
+    // The machine was already in the hands of its holder before the days a test sends: it is registered on an earlier day.
+    const spy = pretendBusinessToday(this.ctx.app, '2026-01-05');
+    const response = await request(this.server())
+      .post('/api/v1/devices')
+      .set(this.as(this.it1))
+      .send({
+        assetCode: `UE-${this.machines}-${randomUUID().slice(0, 6)}`,
+        hostname: `UE-${this.machines}`,
+        os: 'Windows 11',
+        holderEmployeeId: employeeId,
+      })
+      .expect(201);
+    spy.mockResolvedValue(today);
+    const device = this.dataOf<{ id: string; registrationId: string }>(response);
+
+    return { deviceId: device.id, registrationId: device.registrationId };
+  }
+
+  /** Days a collector sent of an AI tool on a machine (`ai_usage_days`), the way the intake writes them. */
+  async collectorUsage(
+    machine: { deviceId: string; registrationId: string },
+    applicationId: string,
+    days: Array<{ date: string; responses: number; coverage?: 'COVERED' | 'PARTIAL' | 'NOT_OBSERVABLE' }>,
+  ): Promise<void> {
+    for (const day of days) {
+      await this.ctx.sql.query(
+        `INSERT INTO ai_usage_days (id, organization_id, device_id, registration_id, credential_id, tool, application_id, usage_date, coverage,
+           responses, total_tokens, generated_at, content_hash)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, 'CODEX', $5, $6::date, $7::"UsageCoverage", $8, $9, now(), 'h')`,
+        [
+          this.seed.organizationId,
+          machine.deviceId,
+          machine.registrationId,
+          randomUUID(),
+          applicationId,
+          day.date,
+          day.coverage ?? 'PARTIAL',
+          day.coverage === 'NOT_OBSERVABLE' ? 0 : day.responses,
+          day.coverage === 'NOT_OBSERVABLE' ? 0 : 900,
+        ],
+      );
+    }
+  }
+
+  /** The confirmation of a preview, with the `Idempotency-Key` the route asks for. */
+  confirmReport(
+    importId: string,
+    previewVersion: number,
+    options: { key?: string; notice?: 'CONFIRMED_DELIVERED' | 'SYSTEM_SENT' } = {},
+    account: ApiAccount = this.it1,
+  ) {
+    return request(this.server())
+      .post(`/api/v1/usage-imports/${importId}/confirm`)
+      .set(this.as(account))
+      .set('Idempotency-Key', options.key ?? randomUUID())
+      .send({ previewVersion, ...(options.notice ? { notice: options.notice } : {}) });
+  }
+
+  /** Previews a report and confirms it (the first report of an application is told to its holders by the system). */
+  async confirmed(
+    sourceId: string,
+    bytes: Buffer,
+    fields: { coverageFrom?: string; coverageTo?: string } = {},
+  ): Promise<{ preview: UsageImportWire; import: UsageImportWire }> {
+    const preview = await this.previewReport(sourceId, bytes, fields);
+    const response = await this.confirmReport(preview.id, preview.previewVersion, { notice: 'SYSTEM_SENT' }).expect(
+      200,
+    );
+
+    return { preview, import: this.dataOf<{ import: UsageImportWire }>(response).import };
+  }
+
+  /** The notices of the usage tracking a person has. */
+  async trackingNoticesOf(employeeId: string): Promise<Array<{ params: Record<string, unknown>; created_at: Date }>> {
+    return (
+      await this.ctx.sql.query<{ params: Record<string, unknown>; created_at: Date }>(
+        `SELECT params, created_at FROM in_app_notifications WHERE recipient_employee_id = $1 AND code = 'USAGE_TRACKING_NOTICE'`,
+        [employeeId],
+      )
+    ).rows;
   }
 
   async days(
