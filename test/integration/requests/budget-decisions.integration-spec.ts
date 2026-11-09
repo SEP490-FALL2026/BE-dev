@@ -411,8 +411,13 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
       for (const id of [first, second, third]) {
         expect(await attachedTo(id)).toEqual({ attached_version_id: null, unattached_reason: 'NO_BUDGET' });
       }
-      for (const unit of [waiting, sentBack, refused])
-        expect(await rowOf(unit.department.unitId, h.next)).toBeUndefined();
+      // MF4-C: the table lists a Cost Center that holds commitments even with no approved version; such a row has no version and no base.
+      for (const unit of [waiting, sentBack, refused]) {
+        const row = (await rowOf(unit.department.unitId, h.next)) as { number?: unknown; base?: unknown } | undefined;
+        expect(row === undefined ? null : { number: row.number, base: row.base }).toEqual(
+          row === undefined ? null : { number: null, base: null },
+        );
+      }
     });
 
     it('make no budget of their own: nothing of limit zero is created for them', async () => {

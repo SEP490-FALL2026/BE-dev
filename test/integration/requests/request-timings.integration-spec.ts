@@ -213,13 +213,11 @@ describe('the time a request took over PostgreSQL (US-05-15 AC-1, AC-6, AC-11)',
       const stranger = await h.staff(await h.departmentWithUnit(`P-TS${counter}`), `TS-X${counter}`);
       const id = await h.waitingForApprover(u, plan, { amount: 5 * M });
 
-      for (const account of [u.member.account, h.it1, u.head.account]) {
+      // P1-10: the spending approver reads a request once its spend step is opened (it waits for them here).
+      for (const account of [u.member.account, h.it1, u.head.account, h.boss.account]) {
         expect((await timingsOf(id, account)).requestId).toBe(id);
       }
-      for (const refused of [
-        await h.timings(id, stranger.account).expect(404),
-        await h.timings(id, h.boss.account).expect(404),
-      ]) {
+      for (const refused of [await h.timings(id, stranger.account).expect(404)]) {
         expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.NOT_FOUND');
       }
       const asSuperAdmin = await request(h.server())

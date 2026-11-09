@@ -73,6 +73,15 @@ describe('the commitment of 01/01 of a right a renewal extended over PostgreSQL 
       businessReason: 'The work goes on',
     });
     await approvePaid(request.id, unit);
+    // BR-MF1-08d: the record that follows is written when the IT Admin completes the task EXTEND the approval opened.
+    const [extension] = (
+      await h.ctx.sql.query<{ id: string }>(
+        `SELECT id FROM provisioning_tasks WHERE request_id = $1 AND kind = 'EXTEND'`,
+        [request.id],
+      )
+    ).rows;
+    await h.claim(extension.id).expect(200);
+    await h.complete(extension.id, { evidence: 'Extended with the vendor' }).expect(200);
     const renewal = await h.renewalOf(request.id);
     expect(renewal.successor_assignment_id).not.toBeNull();
 

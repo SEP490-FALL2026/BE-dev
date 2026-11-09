@@ -265,18 +265,21 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
     it('asks for no confirmation however many months the records run on without a break: the stay is counted and shown, never confirmed in words (QĐ-98)', async () => {
       const since = '2026-10-05';
       const { unit, assignmentId, end } = await holder({ planId: internalPlan }, 5, since);
-      const firstEnd = endAfter(end, 6);
-      const first = await h.renewed(unit.member.account, body(assignmentId, 6));
+      // BR-MF1-08a: the record that follows is renewed only within its window, so the first renewal is short (one month) and the window
+      // is at its most (90 days); the second asks for the twelve months a renewal may add.
+      await h.setParameter('RENEWAL_WINDOW_DAYS', 90).expect(200);
+      const firstEnd = endAfter(end, 1);
+      const first = await h.renewed(unit.member.account, body(assignmentId, 1));
       await approve(first.request.id, unit).expect(200);
       await extend(first.request.id);
       const [current] = await h.successorsOf(assignmentId);
       expect(first.request.renewal?.consecutiveMonths).toBe(monthsBetween(since, firstEnd));
 
-      // Six months more is a term of six, but the right would have run more than a year without a break.
-      const secondEnd = endAfter(firstEnd, 6);
-      const second = await h.renewed(unit.member.account, body(current.id, 6));
+      // Twelve months more is a term of twelve, but the right would have run more than a year without a break.
+      const secondEnd = endAfter(firstEnd, 12);
+      const second = await h.renewed(unit.member.account, body(current.id, 12));
       expect(second.request).toMatchObject({
-        termMonths: 6,
+        termMonths: 12,
         renewal: { consecutiveMonths: monthsBetween(since, secondEnd) },
       });
       expect(second.request.renewal?.consecutiveMonths).toBeGreaterThan(12);

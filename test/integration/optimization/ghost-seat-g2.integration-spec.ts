@@ -19,6 +19,15 @@ const leaverOn = async (subscription: string, code: string, grantedOn?: string) 
   return { employeeId: rows[0].employee_id, assignmentId };
 };
 
+/** M5-04: a G2 answers to the department its holder last worked in (the owning department only when the holder has no placement). */
+const lastDepartmentOf = async (employeeId: string): Promise<string> =>
+  (
+    await w.ctx.sql.query<{ department_id: string }>(
+      `SELECT department_id FROM employee_placements WHERE employee_id = $1 ORDER BY valid_from DESC LIMIT 1`,
+      [employeeId],
+    )
+  ).rows[0].department_id;
+
 describe('G2: the seat of a person who left (integration, real PostgreSQL)', () => {
   let k2: string;
 
@@ -49,7 +58,7 @@ describe('G2: the seat of a person who left (integration, real PostgreSQL)', () 
       tier: 'ACTION',
       assignment_id: assignmentId,
       seat_chain_id: assignmentId,
-      department_id: w.worldDepartment,
+      department_id: await lastDepartmentOf(employeeId),
       revocation_task_id: null,
       evidence: { group: 'G2', employeeId, provisioningType: 'K2' },
     });
@@ -73,7 +82,11 @@ describe('G2: the seat of a person who left (integration, real PostgreSQL)', () 
 
     expect(run).toMatchObject({ status: 'COMPLETED', failedCount: 0 });
     const [g2] = await w.g2Of(rows[0].employee_id);
-    expect(g2).toMatchObject({ group: 'G2', state: 'OPEN', department_id: w.worldDepartment });
+    expect(g2).toMatchObject({
+      group: 'G2',
+      state: 'OPEN',
+      department_id: await lastDepartmentOf(rows[0].employee_id),
+    });
     const notices = await w.noticesOf('GHOST_SEAT_G2_DETECTED', w.worldItAdmin.employeeId);
     expect(notices.filter((notice) => notice.event_key === `GHOST_SEAT_G2:${g2.id}`)).toHaveLength(1);
   });

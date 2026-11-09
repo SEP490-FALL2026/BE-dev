@@ -115,9 +115,9 @@ describe('the list of batches Finance reads over PostgreSQL (US-06-14)', () => {
     expect(first.pagination.totalItems).toBe((await list()).items.length);
   });
 
-  it('turns every other role away from the list', async () => {
+  it('turns every other role away from the list; the spending approver reads it (FIX-BUDGET 6a)', async () => {
     await h.batchList(design.head.account).expect(403);
-    await h.batchList(h.boss.account).expect(403);
+    await h.batchList(h.boss.account).expect(200);
     await h.batchList(design.member.account).expect(403);
   });
 

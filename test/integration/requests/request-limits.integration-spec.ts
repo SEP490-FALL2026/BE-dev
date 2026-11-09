@@ -130,8 +130,17 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
 
     beforeAll(async () => {
       e7 = await person('GH-E7');
-      await h.hold('GH-E7', plans[0]);
-      await h.hold('GH-E7', plans[1]);
+      // Two paid seats the person holds today, on the subscriptions of two paid applications.
+      for (const planId of [plans[0], plans[1]]) {
+        await h.ctx.sql.query(
+          `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
+             normalized_account_identifier, valid_from, valid_from_basis, owning_department_id, created_by_app_user_id)
+           SELECT gen_random_uuid(), s.organization_id, 'PERSONAL', 'REQUEST', s.plan_id, s.id, e.id, e.work_email, e.work_email,
+                  '2026-01-05', 'RECORDED', s.owner_department_id, gen_random_uuid()
+             FROM subscriptions s JOIN employees e ON e.id = $2 WHERE s.plan_id = $1 LIMIT 1`,
+          [planId, e7.employeeId],
+        );
+      }
       await h.setParameter('PAID_SOFTWARE_FLAG_THRESHOLD', 2).expect(200);
       fresh = await h.planOf(await h.subscription(20));
     });

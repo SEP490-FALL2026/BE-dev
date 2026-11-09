@@ -81,7 +81,9 @@ describe('self-service belongs to every account, with one role per account', () 
     for (const person of people) {
       const sent = await h.sent(person, internal);
       if (person === unit.head) {
-        expect(sent.needStep.assignee?.employeeId).toBe(h.boss.employeeId);
+        // MF1-D (BR-MF1-02): the own request of a head goes one step; nobody holds its need step.
+        expect(sent.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' });
+        expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
       }
       expect(sent.needStep.assignee?.employeeId).not.toBe(person.employeeId);
       await h.withdrawRequest(sent.id, { reason: 'The work is cancelled' }, person.account).expect(200);

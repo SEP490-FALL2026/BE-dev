@@ -167,7 +167,8 @@ describe('withdrawing one person of a request for a group, or what is left of it
       expect(h.codeOf(real)).toBe('ACCESS_REQUEST.GRANT_COMPLETED');
       expect((real.body as Refused).error.details?.assignmentId).toEqual(expect.any(String));
       expect(await h.lineStates(id)).toEqual(['EXECUTING', 'COMPLETED', 'APPROVED']);
-      expect(await releases(id)).toEqual([]);
+      // The refusals give nothing back; the K2 seat that was granted gave back its days before the grant (M-10, LATE_GRANT).
+      expect((await releases(id)).filter((row) => row.reason !== 'LATE_GRANT')).toEqual([]);
     });
 
     it('lets the line wait for the IT Admin when the grant had failed, and ends it, giving back the share, when the task is cancelled', async () => {
@@ -224,7 +225,8 @@ describe('withdrawing one person of a request for a group, or what is left of it
 
       expect(await h.lineStates(id)).toEqual(['COMPLETED', 'WITHDRAWN', 'WITHDRAWN']);
       expect(await h.state(id)).toBe('COMPLETED');
-      const given = await releases(id);
+      // M-10: the seat granted first gave back its days before the grant (LATE_GRANT); the withdrawal gives back the others' shares.
+      const given = (await releases(id)).filter((row) => row.reason !== 'LATE_GRANT');
       expect(given.every((row) => row.reason === 'REQUEST_WITHDRAWN')).toBe(true);
       expect(sum(given)).toBe(sum(others));
       expect((await taskStatuses(id)).map((task) => task.status).sort()).toEqual(['CANCELLED', 'COMPLETED']);

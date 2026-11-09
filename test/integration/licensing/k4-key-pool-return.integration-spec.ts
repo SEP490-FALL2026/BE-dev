@@ -9,6 +9,25 @@ const h = new RevocationHarness();
  * like any seat and its key goes back to the store, or back and withdrawn from it at once; the IT Admin withdraws a free key from the store
  * with a reason; a withdrawn key is never counted, given out or revealed again, and the database keeps the withdrawal fixed.
  */
+/**
+ * A K4 seat recorded before the key pool, with no key: the seat baseline no longer takes a K4 seat (a K4 grant names a key), so the fixture
+ * writes the record the way an older release left it.
+ */
+const legacySeat = async (subscriptionId: string, code: string): Promise<string> => {
+  const employeeId = await h.person(code);
+  const { rows } = await h.ctx.sql.query<{ id: string }>(
+    `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
+       normalized_account_identifier, valid_from, valid_from_basis, owning_department_id, created_by_app_user_id)
+     SELECT gen_random_uuid(), s.organization_id, 'PERSONAL', 'REQUEST', s.plan_id, s.id, e.id, e.work_email, e.work_email,
+            '2026-01-05', 'RECORDED', s.owner_department_id, gen_random_uuid()
+       FROM subscriptions s JOIN employees e ON e.id = $2 WHERE s.id = $1
+     RETURNING id`,
+    [subscriptionId, employeeId],
+  );
+
+  return rows[0].id;
+};
+
 describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integration, real PostgreSQL)', () => {
   let counter = 0;
   let batch = 0;
@@ -165,7 +184,7 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
 
   it('BR-MF1-09: a K4 seat granted before the key pool holds no key: the revocation ends it and moves no key', async () => {
     const subscriptionId = await h.subscription(3, 'K4');
-    const assignmentId = await h.seat({ subscriptionId }, `E-K4R-OLD-${(counter += 1)}`);
+    const assignmentId = await legacySeat(subscriptionId, `E-K4R-OLD-${(counter += 1)}`);
     const { taskId } = await h.open(assignmentId, 'RETURN');
     await h.claim(taskId).expect(200);
 
@@ -243,7 +262,7 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
     expect(
       await sqlState(`UPDATE license_keys SET withdrawn_at = NULL, withdrawal_reason = NULL WHERE id = $1`, [out.id]),
     ).toBe('55000');
-    const another = await h.seat({ subscriptionId: seat.subscriptionId }, `E-K4R-DB-${(counter += 1)}`);
+    const another = await legacySeat(seat.subscriptionId, `E-K4R-DB-${(counter += 1)}`);
     expect(await sqlState(`UPDATE license_keys SET assignment_id = $2 WHERE id = $1`, [seat.keyId, another])).toBe(
       '55000',
     );

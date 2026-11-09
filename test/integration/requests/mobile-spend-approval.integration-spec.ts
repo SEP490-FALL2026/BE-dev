@@ -103,7 +103,9 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
         await get(`/access-requests/${r1}/budget-check`, h.boss.account).expect(200),
       ).budgetCheck;
 
-      expect(item).toMatchObject({ primaryCode: 'BUDGET_OK', samePersonAsSpend: false });
+      // The flag of one person on both steps is no longer on the wire (gói 7, MF1-D).
+      expect(item).toMatchObject({ primaryCode: 'BUDGET_OK' });
+      expect(item).not.toHaveProperty('samePersonAsSpend');
       expect(detail).toMatchObject({
         step: { state: 'PENDING', assignee: { employeeId: h.boss.employeeId } },
         need: { decidedBy: { employeeId: u.head.employeeId } },
@@ -218,36 +220,23 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
       expect(await records(r1)).toHaveLength(1);
     });
 
-    it('decides the need step of the request a head sent for themselves, then its spend step: two records, flagged as one person (AC-4)', async () => {
+    it('MF1-D: the request a head sent for themselves goes one step: the approver decides its spend step only, one record (AC-4, BR-MF1-02)', async () => {
       const u = await example();
       const r9 = await h.sent(u.head, plan, { termMonths: 1 });
-      expect(r9.needStep).toMatchObject({ routingRow: 2, assignee: { employeeId: h.boss.employeeId } });
-      // The list of the phone has spend steps only: the need step the approver holds is not in it (B-02).
-      expect((await queue()).map((row) => row.requestId)).not.toContain(r9.id);
+      expect(r9.needStep).toMatchObject({ routingRow: 2, state: 'NOT_REQUIRED', assignee: null });
+      expect(r9.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' });
 
-      const unexplained = await post(`/access-requests/${r9.id}/need-decision`, h.boss.account, { decision: 'REJECT' });
-      expect(unexplained.status).toBe(422);
-      const need = await post(`/access-requests/${r9.id}/need-decision`, h.boss.account, {
-        decision: 'APPROVE',
-      }).expect(200);
-      expect(h.dataOf<{ request: AccessRequestWire }>(need).request).toMatchObject({
-        state: 'AWAITING_SPEND_DECISION',
-        needDecision: { deciderRole: 'SPENDING_APPROVER', decidedBy: { employeeId: h.boss.employeeId } },
-      });
-      expect((await queue()).find((row) => row.requestId === r9.id)).toMatchObject({ samePersonAsSpend: true });
-
+      // Nobody holds a need step: the approver has no need decision to make on it.
+      const need = await post(`/access-requests/${r9.id}/need-decision`, h.boss.account, { decision: 'APPROVE' });
+      expect([404, 409]).toContain(need.status);
+      const sent = h.dataOf<{ request: AccessRequestWire }>(
+        await get(`/access-requests/${r9.id}`, u.head.account).expect(200),
+      );
+      expect(sent.request.state).toBe('AWAITING_SPEND_DECISION');
       await spend(r9.id, { decision: 'APPROVE' }).expect(200);
-
       expect(await records(r9.id)).toEqual([
-        expect.objectContaining({
-          kind: 'NEED',
-          decider_role: 'SPENDING_APPROVER',
-          decided_by_employee_id: h.boss.employeeId,
-        }),
         expect.objectContaining({ kind: 'SPEND_APPROVAL', decider_role: 'SPENDING_APPROVER' }),
       ]);
-      expect((await h.steps(r9.id, 'NEED'))[0].same_person_as_spend).toBe(true);
-      expect((await h.steps(r9.id, 'SPEND_APPROVAL'))[0].same_person_as_spend).toBe(true);
       expect(await commitments(r9.id)).toEqual([{ state: 'HELD' }]);
     });
 

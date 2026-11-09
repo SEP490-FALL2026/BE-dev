@@ -44,7 +44,12 @@ describe('the cost avoided by a grant from the pool, and the grant that names no
 
   it('R-E06 K2: a grant completed on 14/07 at a monthly price of 15 records 6 months and 90; the commitments are not touched', async () => {
     const subscriptionId = await h.subscription(3, 'K2');
-    await h.ctx.sql.query(`UPDATE subscriptions SET unit_price_minor = 1500 WHERE id = $1`, [subscriptionId]);
+    // The price in VND and its reporting snapshot (VND as well) move together: the cost avoided reads the reporting price.
+    await h.ctx.sql.query(
+      `UPDATE subscriptions SET unit_price_minor = 1500,
+         price_reporting_minor = CASE WHEN price_reporting_minor IS NULL THEN NULL ELSE 1500 END WHERE id = $1`,
+      [subscriptionId],
+    );
     const planId = await h.planOf(subscriptionId);
     const task = await h.granted(await person(), planId, { subscriptionId });
     const commitmentsBefore = await h.count('budget_commitments');

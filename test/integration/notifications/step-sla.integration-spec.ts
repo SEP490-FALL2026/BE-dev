@@ -254,20 +254,19 @@ describe('the reminders of a step that is late, over PostgreSQL (US-05-09, US-05
       expect(await h.stepCount(id)).toBe(stepsBefore);
     });
 
-    it('reminds the Super Admin, every working day, of a need step that waits for a head, and leaves the step waiting (AC-9, QĐ-93c)', async () => {
+    it('MF1-D: a request from a department with no head has no need step to wait, so nobody is reminded of one (AC-9, QĐ-93c, BR-MF1-02)', async () => {
       const headless = await h.departmentWithUnit(`P-NH${(counter += 1)}`);
       const requester = await h.staff(headless, `NH-E${counter}`);
       const sent = await h.sent(requester, internal);
       const step = await h.stepOf(sent.id, 'NEED');
-      expect(step).toMatchObject({ state: 'WAITING', assignee_employee_id: null });
+      // One-step routing: the need step of a department with no head is not required, and nobody holds it.
+      expect(step).toMatchObject({ state: 'NOT_REQUIRED', assignee_employee_id: null });
       await h.beganAt(sent.id, 'NEED', FRIDAY_16);
 
       await h.sweepAt(at(5, '10:00'));
 
-      const [reminder] = await h.remindersOf(step.id);
-      expect(reminder.holder_employee_id).toBeNull();
-      expect(roles(reminder.recipients)).toEqual([`${superAdmin}:SUPER_ADMIN`]);
-      expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({ assignee_employee_id: null, state: 'WAITING' });
+      expect(await h.remindersOf(step.id)).toEqual([]);
+      expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({ assignee_employee_id: null, state: 'NOT_REQUIRED' });
     });
   });
 

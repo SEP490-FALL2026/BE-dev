@@ -11,12 +11,15 @@ const SUMMARY_KEYS = [
   'availableDecisions',
   'beneficiary',
   'channel',
+  // US-10-07 AC-18 (MF-5): whether the task may be taken today, its due day and its day not before.
+  'claimableNow',
   'claimedAt',
   'claimedBy',
   'closedAt',
   'completedAt',
   'createdAt',
   'defaultResponsibleEmployeeId',
+  'dueOn',
   'elapsedSeconds',
   'failedAt',
   'failureKind',
@@ -25,6 +28,7 @@ const SUMMARY_KEYS = [
   'kind',
   'maxAttempts',
   'nextRetryAt',
+  'notBefore',
   'plan',
   // BR-MF1-09: what was bought with the grant (null for a task with no purchase).
   'purchase',

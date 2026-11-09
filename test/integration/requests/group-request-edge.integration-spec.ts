@@ -7,10 +7,6 @@ const M = 1_000_000;
 /** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
 const monthsLeft = h.monthsOf(12);
 
-interface Refused {
-  error: { code: string; details?: { missing?: string[]; extra?: string[] } };
-}
-
 describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-8, AC-9, AC-16, US-06-08 AC-10)', () => {
   let counter = 0;
 
@@ -68,20 +64,18 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     });
   });
 
-  it('closes the step of the head when every person of it was withdrawn, and keeps the request for the line that is left (FR-3.16, US-05-17)', async () => {
+  it('MF1-D: a group that names its head is refused before any step is made (FR-3.16, US-05-17, BR-MF1-02)', async () => {
     const u = await unit();
     const plan = await h.planOf(await h.subscription(10));
     const [e1, e2] = await h.colleagues(u, 2);
-    const id = h.dataOf<{ request: { id: string } }>(
-      await h.submitGroup(h.groupBody(plan, [e1, e2, u.head]), e1.account).expect(201),
-    ).request.id;
+    const rows = await h.requestRows();
 
-    await h.withdrawLine(id, e1.employeeId, {}, e1.account).expect(200);
-    await h.withdrawLine(id, e2.employeeId, {}, e1.account).expect(200);
+    // MF1-D (BR-MF1-02): a head is no line of a group any more; the group is refused for that line and nothing is written.
+    const refused = await h.submitGroup(h.groupBody(plan, [e1, e2, u.head]), e1.account).expect(422);
 
-    expect((await h.needSteps(id)).map((step) => step.state)).toEqual(['CLOSED', 'PENDING']);
-    expect(await h.lineStates(id)).toEqual(['WITHDRAWN', 'WITHDRAWN', 'AWAITING_NEED']);
-    expect(await h.state(id)).toBe('PENDING');
+    expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+    expect(h.detailsOf(refused)).toEqual({ lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] });
+    expect(await h.requestRows()).toBe(rows);
   });
 
   it('reads the seats of one person of a group for the head who holds their step, and for nobody else (US-05-04 AC-3)', async () => {
@@ -89,7 +83,8 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     const plan = await h.planOf(await h.subscription(10));
     const [e1, e2] = await h.colleagues(u, 2);
     const id = h.dataOf<{ request: { id: string } }>(
-      await h.submitGroup(h.groupBody(plan, [e1, e2, u.head]), e1.account).expect(201),
+      // MF1-D: the head is no line of a group; asking the seats of the head is asking for a person who is not in it.
+      await h.submitGroup(h.groupBody(plan, [e1, e2]), e1.account).expect(201),
     ).request.id;
     const outsider = await h.colleague(await unit());
 
@@ -180,27 +175,18 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     });
   });
 
-  it('refuses the head who declares their own line in the step of the others: it is not a line of that step (AC-16)', async () => {
+  it('MF1-D: refuses the head as a line of the group, so no head declares their own line in a step (AC-16, BR-MF1-02)', async () => {
     const u = await unit();
     const plan = await h.planOf(await h.subscription(10));
     const [e1, e2] = await h.colleagues(u, 2);
-    const id = h.dataOf<{ request: { id: string } }>(
-      await h.submitGroup(h.groupBody(plan, [e1, e2, u.head]), e1.account).expect(201),
-    ).request.id;
+    const rows = await h.requestRows();
 
-    const attempt = await h
-      .decideLines(
-        id,
-        { lines: [approve(e1.employeeId), approve(e2.employeeId), approve(u.head.employeeId)] },
-        u.head.account,
-      )
-      .expect(422);
+    // MF1-D (BR-MF1-02): a head is no line of a group any more; the group is refused for that line and nothing is written.
+    const refused = await h.submitGroup(h.groupBody(plan, [e1, e2, u.head]), e1.account).expect(422);
 
-    expect((attempt.body as Refused).error).toMatchObject({
-      code: 'GROUP_REQUEST.LINES_MISMATCH',
-      details: { extra: [u.head.employeeId] },
-    });
-    expect(await h.lineStates(id)).toEqual(['AWAITING_NEED', 'AWAITING_NEED', 'AWAITING_NEED']);
+    expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+    expect(h.detailsOf(refused)).toEqual({ lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] });
+    expect(await h.requestRows()).toBe(rows);
   });
 
   it('BR-MF1-07c: checks the people approved again when the approver decides: a request that is blocked now goes back to its head, and nobody is decided (AC-9)', async () => {

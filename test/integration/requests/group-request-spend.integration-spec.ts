@@ -326,25 +326,18 @@ describe('the spend of the people of a request for a group, decided one by one o
   });
 
   describe('the same person on two steps of one request (US-06-14 AC-6)', () => {
-    it('flags the need step of the line of the head as held by the person who also holds the spend step, and not the head’s own step', async () => {
+    it('MF1-D: no line of the head, so nobody holds both a need step of a line and the spend step (US-06-14 AC-6, BR-MF1-02)', async () => {
       const u = await unit();
       await h.budgetFor(u, { total: 100_000 * M });
-      await h.budgetFor(u, { total: 100_000 * M, year: h.next });
       const [e1, e2] = await h.colleagues(u, 2);
-      const sent = h.dataOf<{ request: { id: string } }>(
-        await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), u.head.account).expect(201),
-      ).request;
-      await h.decideLines(sent.id, { lines: [approve(u.head.employeeId)] }, h.boss.account).expect(200);
-      await h.sendOn([sent.id], u.head.account).expect(201);
+      const rows = await h.requestRows();
 
-      const steps = await h.needSteps(sent.id);
-      const spend = await h.steps(sent.id, 'SPEND_APPROVAL');
+      // MF1-D (BR-MF1-02): a head is no line of a group any more; the group is refused for that line and nothing is written.
+      const refused = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), u.head.account).expect(422);
 
-      expect(steps.map((step) => [step.assignee_employee_id, step.same_person_as_spend])).toEqual([
-        [u.head.employeeId, false],
-        [h.boss.employeeId, true],
-      ]);
-      expect(spend[0]).toMatchObject({ assignee_employee_id: h.boss.employeeId, same_person_as_spend: true });
+      expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+      expect(h.detailsOf(refused)).toEqual({ lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] });
+      expect(await h.requestRows()).toBe(rows);
     });
   });
 });

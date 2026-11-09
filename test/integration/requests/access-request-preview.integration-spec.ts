@@ -110,6 +110,8 @@ describe('requests over HTTP: the preview before sending (integration, real Post
           'spendSubmission',
           'chain',
           'totalExpectedWorkingDays',
+          // GH-1/2/3 (BR-MF1-01): how many requests are open, how many paid applications, whether a reason is needed.
+          'limits',
         ].sort(),
       );
     });
@@ -178,36 +180,30 @@ describe('requests over HTTP: the preview before sending (integration, real Post
   });
 
   describe('the routing table (AC-5)', () => {
-    it('a head asking for themselves: the spending approver', async () => {
+    it('MF1-D: a head asking for themselves goes one step, straight to the spending approver', async () => {
       const preview = await h.previewed(head, paidPlan);
       const sent = await h.sent(head, paidPlan);
 
-      expect(preview.chain[0]).toMatchObject({
-        kind: 'NEED',
-        assignee: { employeeId: boss.employeeId },
-        explanation: 'HEAD_ASKS_FOR_SELF',
-      });
-      expect(sent.needStep.assignee?.employeeId).toBe(boss.employeeId);
+      // One-step routing (BR-MF1-02): no need step; the first step of the chain is the spend step of the approver.
+      expect(preview.chain[0]).toMatchObject({ kind: 'SPEND_APPROVAL', assignee: { employeeId: boss.employeeId } });
+      expect(sent.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' });
+      expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
     });
 
-    it('a member of a department with no head: waits for the head, naming nobody and saying why', async () => {
+    it('MF1-D: a member of a department with no head goes one step: nobody takes the need step in place of a head', async () => {
       const preview = await h.previewed(newcomer, paidPlan);
       const sent = await h.sent(newcomer, paidPlan);
 
+      // One-step routing (BR-MF1-02): the chain begins with the spend step of the approver; no need step waits for a head.
       expect(preview.chain[0]).toMatchObject({
-        kind: 'NEED',
-        role: 'MANAGER',
-        assignee: null,
-        explanation: 'WAITS_FOR_DEPARTMENT_HEAD',
-        waitingReason: 'NO_DEPARTMENT_HEAD',
+        kind: 'SPEND_APPROVAL',
+        role: 'SPENDING_APPROVER',
+        assignee: { employeeId: boss.employeeId },
+        waitingReason: null,
       });
-      // The chain shown is the chain made (AC-11): nobody takes the step in place of a head.
-      expect(sent.needStep).toMatchObject({
-        state: 'WAITING',
-        assignee: null,
-        routingRow: 4,
-        waitingReason: 'NO_DEPARTMENT_HEAD',
-      });
+      // The chain shown is the chain made (AC-11).
+      expect(sent.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' });
+      expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null, routingRow: 4 });
       expect(JSON.stringify(preview)).not.toMatch(/FALLBACK|DEPARTMENT_HAS_NO_HEAD|HEAD_IS_THE_APPROVER/);
     });
   });

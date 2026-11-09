@@ -322,6 +322,8 @@ describe('the reads and the hook of a revocation (integration, real PostgreSQL)'
     it('tells the handover confirmation before the return of a seat, so the first to refuse is the handover (the order the modules start in)', () => {
       expect(h.ctx.app.get(RevocationListeners).names()).toEqual([
         'licensing.handover-confirmation',
+        // G9-02 (RV-07): the money held for the seat goes back by the day when the revocation is completed.
+        'requests.seat-release',
         'requests.return-request',
         'optimization.ghost-seat',
       ]);

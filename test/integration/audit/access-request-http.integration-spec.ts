@@ -162,8 +162,10 @@ describe('requests over HTTP: sending and routing the need step (integration, re
       const paid = await h.sent(head, paidPlan);
       const internal = await h.sent(head, internalPlan);
 
-      expect(paid.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null, samePersonAsSpend: false });
-      expect(internal.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null, samePersonAsSpend: false });
+      expect(paid.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
+      expect(internal.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
+      // The flag of one person on both steps is no longer on the wire (gói 7): nobody holds a need step that is not required.
+      expect(paid.needStep).not.toHaveProperty('samePersonAsSpend');
     });
 
     it('keeps the SLA of a request sent before the parameter changed, and gives a later request the new one (AC-3)', async () => {

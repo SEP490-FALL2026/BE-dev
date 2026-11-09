@@ -1,3 +1,4 @@
+import request from 'supertest';
 import { IdentityAccessApi } from '../../../src/modules/identity-access/public/identity-access.api';
 import { ProvisioningDecisionService } from '../../../src/modules/licensing/provisioning/tasks/provisioning-decision.service';
 import { ProvisioningGrantService } from '../../../src/modules/licensing/provisioning/tasks/provisioning-grant.service';
@@ -139,8 +140,20 @@ describe('the grant of a seat and the work on a task: the department of the seat
       (await h.ctx.sql.query<{ status: string }>(`SELECT status FROM provisioning_tasks WHERE id = $1`, [id])).rows[0]
         .status;
     /** A grant task of a K4 purchase, which the queue does not grant yet (the key vault and the devices come later): written as the database allows. */
+    /** BR-MF1-09: a K4 grant names a free key of the store of its subscription; the key `keyTask` imported for its task. */
+    let k4Key = '';
     const keyTask = async (): Promise<string> => {
       const subscriptionId = await h.subscription(5, 'K4');
+      await request(h.server())
+        .post('/api/v1/license-keys/imports')
+        .set(h.as(h.it1))
+        .send({ subscriptionId, keys: [`EV-K4-${subscriptionId.slice(0, 8)}-ABCDE-12345`] })
+        .expect(201);
+      k4Key = (
+        await h.ctx.sql.query<{ id: string }>(`SELECT id FROM license_keys WHERE subscription_id = $1`, [
+          subscriptionId,
+        ])
+      ).rows[0].id;
       const employeeId = await h.person(`E-K4-${subscriptionId.slice(0, 6)}`);
       const assignmentId = (
         await h.ctx.sql.query<{ id: string }>(
@@ -181,7 +194,9 @@ describe('the grant of a seat and the work on a task: the department of the seat
         }
         expect(await taskStatus(id)).toBe('IN_PROGRESS');
 
-        await h.complete(id, { evidence: `đã làm ${kind}` }).expect(200);
+        await h
+          .complete(id, { evidence: `đã làm ${kind}`, ...(kind === 'K4' ? { licenseKeyId: k4Key } : {}) })
+          .expect(200);
         expect(await taskStatus(id)).toBe('COMPLETED');
       },
     );
