@@ -1,5 +1,4 @@
 import type { NestedClassification, RegistryEvent } from './api-collection-registry';
-import { G9_REGISTRY_EVENTS } from './api-collection-registry-events-g9';
 import { W2_REGISTRY_EVENTS } from './api-collection-registry-events-w2';
 import { W3_REGISTRY_EVENTS } from './api-collection-registry-events-w3';
 
@@ -92,7 +91,6 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     date: '2026-11-02',
     reason: 'The granted roles of the caller as one array, at most one effective grant per role (QĐ-93a, D-S19).',
   },
-  ...G9_REGISTRY_EVENTS,
   removedOperation('exceptions', 'standardToolsetList#detail-reuse', 'F04', 'standardToolsetList is removed (QĐ-87h).'),
   removedOperation(
     'exceptions',
