@@ -82,8 +82,8 @@ const subscriptionSchema = z.strictObject({
   id: z.uuid(),
   planId: z.uuid(),
   planName: z.string(),
-  // The department that owns the purchase: always present (`QĐ-89a`).
-  ownerDepartmentId: z.uuid(),
+  // The department that owns the purchase (`QĐ-89a`); null on a subscription of the shared pool that no department owns.
+  ownerDepartmentId: z.uuid().nullable(),
   applicationId: z.uuid(),
   applicationName: z.string(),
   vendor: z.strictObject({ id: z.uuid(), name: z.string() }),
@@ -120,7 +120,9 @@ const subscriptionSchema = z.strictObject({
     source: z.enum(['DECLARED', 'INFERRED_UNCONFIRMED', 'BY_END_DATE', 'MISSING', 'NOT_APPLICABLE']),
   }),
   alerts: z.strictObject({ baseDate: z.string().nullable(), dates: z.array(z.string()) }),
-  warnings: z.array(z.enum(['NO_ALERT_ANCHOR', 'RESPONSIBLE_MISSING', 'BILLING_CYCLE_LEGACY'])),
+  warnings: z.array(z.enum(['NO_ALERT_ANCHOR', 'RESPONSIBLE_MISSING', 'BILLING_CYCLE_LEGACY', 'SHOULD_MERGE'])),
+  /** The other live subscriptions of the same K2 or K4 plan when `warnings` has SHOULD_MERGE: the ones to fold into one. */
+  mergeCandidateIds: z.array(z.uuid()),
   taxProfile: z.strictObject({ status: z.enum(['DECLARED', 'MISSING']), group: z.enum(['T1', 'T2', 'T3']).nullable() }),
   taxEstimate: taxEstimate.nullable(),
   createdAt: z.iso.datetime(),

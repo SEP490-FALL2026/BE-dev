@@ -104,19 +104,13 @@ describe('the final release over a database the compatibility release ran on (in
       expect(audit.rows[0].correlation_id).toContain('subscription_owner_required');
     });
 
-    it('makes the department required and unchangeable', async () => {
+    // Rewritten for QĐ-103d: `shared_pool_grant` (the migration after this one) makes the column nullable, so a subscription no department owns is
+    // stored (the insert with no department was 23502); the department a subscription has stays unchangeable. W5 drops the column.
+    it('leaves the department nullable (shared pool) and unchangeable once set', async () => {
       const column = await sql.query<{ is_nullable: string }>(
         `SELECT is_nullable FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'owner_department_id'`,
       );
-      expect(column.rows).toEqual([{ is_nullable: 'NO' }]);
-      expect(
-        await sqlState(
-          sql,
-          `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, auto_renew, allows_mid_term_reduction)
-           VALUES (gen_random_uuid(), $1, $2, 'TERM', 'DRAFT', false, false)`,
-          [world.organizationId, world.planId],
-        ),
-      ).toBe('23502');
+      expect(column.rows).toEqual([{ is_nullable: 'YES' }]);
       expect(
         await sqlState(sql, `UPDATE subscriptions SET owner_department_id = $2 WHERE id = $1`, [
           ids.assigned,

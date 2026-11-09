@@ -83,8 +83,9 @@ describe('the kinds that can be granted now (US-07-01 AC-10 deferred, RB-4)', ()
 });
 
 describe('the subscription of a grant (US-07-01 AC-1, AC-11)', () => {
-  it.each(['K1', 'K2'] as const)('is required for %s', (type) => {
-    expect(() => assertSubscriptionChoice(type, undefined)).toThrow(new ProvisioningSubscriptionError('REQUIRED'));
+  // Rewritten for BR-MF1-09 / P0-05: the subscription is optional, the pool of the plan gives one when the IT Admin names none.
+  it.each(['K1', 'K2'] as const)('is optional for %s: the pool of the plan gives one when none is named', (type) => {
+    expect(() => assertSubscriptionChoice(type, undefined)).not.toThrow();
     expect(() => assertSubscriptionChoice(type, 'sub-1')).not.toThrow();
   });
 

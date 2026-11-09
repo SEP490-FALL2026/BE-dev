@@ -222,6 +222,7 @@ model Plan {
   termOpinions           PlanTermOpinion[]
   seatBaselineImports    SeatBaselineImport[]
   licenseAssignments     LicenseAssignment[]
+  poolGrantAvoidedCosts  PoolGrantAvoidedCost[]
   accessRequests         AccessRequest[]
   returnRequests         ReturnRequest[]
   assessmentsEquivalent  AccessRequestAssessment[] @relation("AssessmentEquivalentPlan")

@@ -44,6 +44,8 @@ export interface SeatTarget {
 export interface PoolSubscription {
   subscriptionId: string;
   purchasedQuantity: number | null;
+  /** The subscription that prices the plan (`Q-04`): the one a grant that names no subscription takes first. */
+  isPrimaryForPlan: boolean;
 }
 
 /** What one subscription is bought at: the price a seat granted from it would have cost (`QĐ-106e`). */

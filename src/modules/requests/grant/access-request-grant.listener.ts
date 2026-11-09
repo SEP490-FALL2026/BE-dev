@@ -3,7 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { GrantRequestGateHook, type GrantRequestGate } from '../../licensing/public/licensing.extension-points';
-import type { GrantOutcome, GrantRequestAnswer } from '../../licensing/public/licensing.types';
+import type { GrantOutcome, GrantOutcomeFacts, GrantRequestAnswer } from '../../licensing/public/licensing.types';
 import { GroupGrantService } from '../group-request/group-grant.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { grantAnswerFor } from './grant.policy';
@@ -63,7 +63,13 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
     return answer;
   }
 
-  async reportOutcome(tx: DbTx, requestId: string, outcome: GrantOutcome, employeeId?: string): Promise<void> {
+  async reportOutcome(
+    tx: DbTx,
+    requestId: string,
+    outcome: GrantOutcome,
+    employeeId?: string,
+    facts?: GrantOutcomeFacts,
+  ): Promise<void> {
     const request = await this.repo.lockById(tx, requestId);
     if (request?.type === 'GROUP_GRANT') {
       if (employeeId !== undefined) await this.group.report(tx, request, outcome, employeeId);
@@ -80,7 +86,13 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
       request.organizationId,
       outcome === 'COMPLETED' ? 'ACCESS_REQUEST.GRANT_COMPLETED' : 'ACCESS_REQUEST.GRANT_FAILED',
       request.id,
-      { requestId: request.id, from: 'EXECUTING', to: outcome },
+      {
+        requestId: request.id,
+        from: 'EXECUTING',
+        to: outcome,
+        // Whether the seat came from the stock of the pool: what the cost avoided is read by (`BR-MF1-09c`).
+        ...(facts ? { fromPool: facts.fromPool } : {}),
+      },
     );
     // A grant the IT Admin closed as failed spends nothing: what was held goes back to the budget in the same transaction
     // (US-06-06 AC-3). A grant that is only retrying is not reported here, so its commitment stays held (AC-7).
@@ -128,7 +140,7 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
     organizationId: string,
     action: string,
     requestId: string,
-    after: { [key: string]: string | null },
+    after: { [key: string]: string | boolean | null },
   ): Promise<void> {
     return this.audit.record(tx, {
       organizationId,

@@ -73,6 +73,7 @@ model Organization {
   subscriptionRenewals               SubscriptionRenewal[]
   subscriptionDeadlineEvents         SubscriptionDeadlineEvent[]
   provisioningTasks                  ProvisioningTask[]
+  poolGrantAvoidedCosts              PoolGrantAvoidedCost[]
   returnRequests                     ReturnRequest[]
   handoverDuties                     HandoverDuty[]
   accessRequests                     AccessRequest[]

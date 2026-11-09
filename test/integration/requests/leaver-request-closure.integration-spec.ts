@@ -259,7 +259,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
       const id = await approvedFor(u, u.leaver, 15 * M);
       const task = await granted(id);
       // The seat is on the subscription the department of the request owns (QĐ-89a), not on the one of the seeded department.
-      const ownSubscription = h.owned.subscriptionFor(plans[0].subscriptionId, u.department.id);
+      const ownSubscription = plans[0].subscriptionId;
       const free = await h.freeSeats(ownSubscription);
       expect(await commitmentOf(id)).toMatchObject({ state: 'HELD', released_minor: '0' });
       const wired = await left(u.leaver);

@@ -106,14 +106,12 @@ export function assertGrantableType(type: ProvisioningKind): void {
   if (type === 'K3' || type === 'K4') throw new ProvisioningTypeNotSupportedError(type);
 }
 
-/** K1 and K2 take a seat on a subscription the IT Admin picks; K5 holds no seat and takes none (`US-07-01` AC-11). */
+/**
+ * K1 and K2 take a seat on a subscription: the one the IT Admin names, or, when none is named, the one the shared pool of the plan gives
+ * (`P0-05`: the primary subscription of the plan, the one that has a free seat first). K5 holds no seat and takes none (`US-07-01` AC-11).
+ */
 export function assertSubscriptionChoice(type: ProvisioningKind, subscriptionId: string | undefined): void {
-  if (type === 'K5') {
-    if (subscriptionId !== undefined) throw new ProvisioningSubscriptionError('NOT_ALLOWED');
-
-    return;
-  }
-  if (subscriptionId === undefined) throw new ProvisioningSubscriptionError('REQUIRED');
+  if (type === 'K5' && subscriptionId !== undefined) throw new ProvisioningSubscriptionError('NOT_ALLOWED');
 }
 
 /**

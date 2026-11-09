@@ -168,12 +168,10 @@ export class AssignmentService {
 
   /**
    * Writes the seat a request is granted, in the caller transaction (which holds the lock of the seat target), with its
-   * audit event: a personal seat, or a service account with its reason, owning department and Cost Center (`US-05-21`). A seat
-   * on a subscription belongs to the department that owns it, and the request may be granted only on a subscription of its own
-   * department (`departmentId`): there is no pool of seats between departments (`QĐ-89a`). Throws AssignmentConflictError
-   * when the subscription is another department's (before anything is written), or when the database refuses the seat: an
-   * overlap, the seats all taken, the identifier in use, no expected end date for time-limited staff, or a rule of the baseline or
-   * of the owning department.
+   * audit event: a personal seat, or a service account with its reason, owning department and Cost Center (`US-05-21`). The seats
+   * of a subscription are one pool for every department (`QĐ-103d`): the seat is held by the department of the request
+   * (`departmentId`), the department of the person it is for. Throws AssignmentConflictError when the database refuses the seat:
+   * an overlap, the seats all taken, the identifier in use, no expected end date for time-limited staff, or a rule of the baseline.
    */
   async createFromRequest(
     tx: DbTx,
@@ -181,7 +179,7 @@ export class AssignmentService {
     input: {
       organizationId: string;
       requestId: string;
-      /** The department of the request. */
+      /** The department of the request: the department of the person the seat is for. */
       departmentId: string;
       target: SeatTarget;
       holder: AssignmentHolder;
@@ -190,9 +188,9 @@ export class AssignmentService {
     },
   ): Promise<AssignmentRecord> {
     const { holder } = input;
-    // Gói 9: bỏ guard phòng — cấp từ kho được phép cấp qua phòng (subscription.ownerDepartmentId nullable).
-    // A personal seat on a subscription carries the department that owns it, as a service account carries the one that owns it.
-    const owningDepartmentId = holder.kind === 'SERVICE' ? holder.owningDepartmentId : input.target.ownerDepartmentId;
+    // The pool of seats is shared by every department (`QĐ-103d`): a personal seat carries the department of the person it is for on the
+    // day of the grant, whoever owns the subscription; a service account carries the department that owns the account.
+    const owningDepartmentId = holder.kind === 'SERVICE' ? holder.owningDepartmentId : input.departmentId;
     let record: AssignmentRecord;
     try {
       record = await this.repo.insert(tx, {

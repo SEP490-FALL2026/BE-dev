@@ -24,6 +24,15 @@ const grantQueueItemSchema = z.strictObject({
   requester: employeeRef,
   /** The day the access of a person who is not staff ends; null for staff. */
   expectedEndDate: z.string().nullable(),
+  /**
+   * What the shared pool of the plan holds today (`BR-MF1-09`): `SEATS` for a K2 plan, `KEYS` for a K4 plan, `NONE` for any other kind (nothing
+   * counted). `free` is what a grant can take without buying; `inRevocation` is held by a right whose revocation is still open.
+   */
+  stock: z.strictObject({
+    kind: z.enum(['SEATS', 'KEYS', 'NONE']),
+    free: z.number().int().nonnegative(),
+    inRevocation: z.number().int().nonnegative(),
+  }),
   submittedAt: z.iso.datetime(),
 });
 

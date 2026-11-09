@@ -6,6 +6,7 @@ import { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../../catalog/public/catalog.types';
 import { AssignmentService } from '../../assignment/assignment.service';
 import {
+  AssignmentConflictError,
   GrantRequestRefusedError,
   ProvisioningSubscriptionError,
   SeatQuantityUnknownError,
@@ -22,6 +23,7 @@ import { effectiveEndOf } from '../../../../core/term-limit';
 import type { GrantRequestAnswer } from '../../public/licensing.types';
 import { ProvisioningHolderService } from './provisioning-holder.service';
 import { SharedPoolService } from '../../shared-pool/shared-pool.service';
+import type { PoolStock } from '../../shared-pool/shared-pool.policy';
 
 type Planned = Awaited<ReturnType<ProvisioningGrantPlanner['plan']>>;
 
@@ -55,14 +57,16 @@ export class ProvisioningGrantWriter {
     const claimed = await this.gate.get().claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);
     if (claimed.status !== 'GRANTABLE') throw new GrantRequestRefusedError(claimed.status);
     if (!claimMatchesAnswer(claimed, answer)) throw new GrantRequestRefusedError('NOT_APPROVED');
-    const target = await this.lockTarget(tx, plan, input.subscriptionId);
+    const subscriptionId = await this.subscriptionOf(tx, plan, input.subscriptionId, today);
+    const target = await this.lockTarget(tx, plan, subscriptionId);
     // Judged under the locks of the grant, so the count of the free seats cannot change before the seat is written (`BR-MF1-09a`).
-    const purchase = await this.sharedPool.judgePurchase(tx, {
+    const { decision: purchase, stock } = await this.sharedPool.judgePurchase(tx, {
       planId: plan.planId,
       provisioningType: plan.provisioningType,
       today,
       purchase: input.purchase,
     });
+    await this.takeSeat(tx, actor, { plan, target, purchased: purchase.purchased, stock });
     const holder = await this.holderOf(tx, actor, { input, answer, claimed, serviceIdentifier, today });
     const assignment = await this.assignments.createFromRequest(tx, actor, {
       organizationId: organization.id,
@@ -102,6 +106,52 @@ export class ProvisioningGrantWriter {
     if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
 
     return task;
+  }
+
+  /**
+   * The subscription the seat is taken from: the one the IT Admin names, else the one the shared pool of the plan gives (the primary
+   * subscription, the one with a free seat first). Read before the subscription is locked; the lock that follows holds it for the grant.
+   * Throws SeatTargetNotFoundError when the plan has no subscription a seat can be taken from today.
+   */
+  private async subscriptionOf(
+    tx: DbTx,
+    plan: SeatTarget,
+    named: string | undefined,
+    today: string,
+  ): Promise<string | undefined> {
+    if (named !== undefined || plan.provisioningType === 'K5') return named;
+    const chosen = await this.sharedPool.chooseSubscription(tx, {
+      planId: plan.planId,
+      provisioningType: plan.provisioningType,
+      today,
+    });
+    if (chosen === null) throw new SeatTargetNotFoundError('SUBSCRIPTION');
+
+    return chosen;
+  }
+
+  /**
+   * Makes room for the seat of this grant on the locked subscription. A K1 grant buys its own seat: the quantity rises by one, with no gate
+   * on the department that owns the subscription (`S1-04`). A K2 or K4 grant with a purchase tops the pool up by one seat, since a grant is
+   * for one person. A K2 or K4 grant with none must find a free seat in its subscription, else the answer says how many are free in the
+   * plan's other subscriptions. Throws AssignmentConflictError.
+   */
+  private async takeSeat(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: { plan: SeatTarget; target: SeatTarget; purchased: boolean; stock: PoolStock | null },
+  ): Promise<void> {
+    const { plan, target, purchased, stock } = facts;
+    if (target.subscriptionId === null) return;
+    if (plan.provisioningType === 'K1' || purchased) {
+      await this.catalog.addPoolSeat(tx, actor, target.subscriptionId);
+
+      return;
+    }
+    // Read under the lock of the subscription, so the count is the one the database trigger will see: refusing here keeps the transaction usable.
+    if (stock !== null && stock.freeBySubscription.get(target.subscriptionId) === 0) {
+      throw new AssignmentConflictError('SEAT_CAPACITY', 0, stock.free);
+    }
   }
 
   /** The person or the service account the seat is for: a service account has the identifier and the responsible person the IT Admin gave. */

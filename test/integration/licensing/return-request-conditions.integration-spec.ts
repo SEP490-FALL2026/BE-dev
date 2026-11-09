@@ -33,8 +33,7 @@ describe('which seat may be returned, and what the return leaves behind over Pos
   const written = async (person: Person, unit: Unit, shape: 'K4' | 'SERVICE') => {
     const id = randomUUID();
     // A service seat sits on the subscription its own department owns (QĐ-89a).
-    const target =
-      shape === 'K4' ? await h.subscription(5, 'K4') : h.owned.subscriptionFor(subscriptionId, unit.department.id);
+    const target = shape === 'K4' ? await h.subscription(5, 'K4') : subscriptionId;
     const planId = await h.planOf(target);
     await h.ctx.sql.query(
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,

@@ -1,20 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogApi } from '../../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { AssignmentEndService } from '../../assignment/assignment-end.service';
-import {
-  AssignmentNotOpenError,
-  ProvisioningTaskStateError,
-  SeatTargetNotFoundError,
-} from '../../public/licensing.errors';
+import { AssignmentNotOpenError, ProvisioningTaskStateError } from '../../public/licensing.errors';
 import { nextStatus } from '../provisioning.policy';
 import { RevocationListeners } from '../../public/licensing.extension-points';
 import { assertRevocationTask, planAccessCut, planCompletion, type CompletionInput } from '../revocation.policy';
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskViewService, type TaskView } from '../provisioning-task-view.service';
+import { RevocationCompletedFactsReader } from './revocation-completed-facts.service';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import { RevocationLeaverAlert } from './revocation-leaver-alert.service';
 
@@ -33,10 +29,10 @@ export class RevocationCompletionService {
     private readonly frame: ProvisioningTaskFrame,
     private readonly views: ProvisioningTaskViewService,
     private readonly ending: AssignmentEndService,
-    private readonly catalog: CatalogApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly revocation: RevocationListeners,
     private readonly leaverAlert: RevocationLeaverAlert,
+    private readonly completedFacts: RevocationCompletedFactsReader,
   ) {}
 
   /**
@@ -54,15 +50,25 @@ export class RevocationCompletionService {
       write: async ({ tx, task: locked, organizationId, now }) => {
         const facts = toRevocationFacts(locked);
         await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: facts, now });
-        const [plan] = await this.catalog.getPlanRevocationInfo([locked.assignment.planId], tx);
-        if (!plan) throw new SeatTargetNotFoundError('PLAN');
+        const plan = await this.completedFacts.planOf(tx, locked.assignment.planId);
         const assignment = await this.ending.lock(tx, locked.assignmentId);
         const today = await this.organizationReads.businessToday(now, tx);
         const done = planCompletion(input, { type: plan.provisioningType, startsOn: assignment.effectiveFrom, today });
 
         await this.tasks.markRevocationCompleted(tx, locked.id, actor.appUserId, done, now);
         await this.ending.end(tx, actor, { organizationId, assignment, until: done.endOn, taskId: locked.id });
-        await this.revocation.emit(tx, { moment: 'AFTER_WORK', task: { ...facts, status: 'COMPLETED' }, now, actor });
+        // The listeners of the end of the work are told what the right held and when it ends, so the money held for it can be given back.
+        const completed = await this.completedFacts.completedOf(tx, locked, {
+          provisioningType: plan.provisioningType,
+          endedOn: done.endOn,
+          paidThroughOn: done.paidThroughOn,
+        });
+        await this.revocation.emit(tx, {
+          moment: 'AFTER_WORK',
+          task: { ...facts, status: 'COMPLETED', completed },
+          now,
+          actor,
+        });
         await this.leaverAlert.tell(tx, {
           organizationId,
           task: locked,

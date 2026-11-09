@@ -214,16 +214,11 @@ function namedCostCenterErrors(costCenterCode: string, unit: OwningUnit | null, 
   return unit && named.id !== unit.costCenter?.id ? ['COST_CENTER_NOT_OWNING_UNIT'] : [];
 }
 
-function owningUnitErrors(unit: OwningUnit, facts: SeatFacts): SeatRowErrorCode[] {
-  const errors: SeatRowErrorCode[] = [];
+function owningUnitErrors(unit: OwningUnit): SeatRowErrorCode[] {
   // A department that has no Cost Center in use yet (`QĐ-87d(1)`) has nothing to charge the account to: the same refusal
-  // as a Unit that was retired.
-  if (!unit.costCenter || unit.costCenter.status !== 'ACTIVE') errors.push('COST_CENTER_INACTIVE');
-  // A service account of one department does not sit on the subscription of another (`QĐ-89a`).
-  const owner = facts.target.ownerDepartmentId ?? null;
-  if (owner !== null && owner !== unit.departmentId) errors.push('SUBSCRIPTION_DEPARTMENT_MISMATCH');
-
-  return errors;
+  // as a Unit that was retired. The seats of a subscription are one pool for every department (`QĐ-103d`): the department that owns
+  // the subscription, if any, is not compared with the one of the account.
+  return !unit.costCenter || unit.costCenter.status !== 'ACTIVE' ? ['COST_CENTER_INACTIVE'] : [];
 }
 
 /**
@@ -242,20 +237,20 @@ function judgeServiceCharge(
   if (employee && !unit) errors.push('OWNING_DEPARTMENT_NOT_FOUND');
   errors.push(...namedCostCenterErrors(costCenterCode, unit, facts));
   if (!unit) return { errors, costCenterId: null, owningDepartmentId: null };
-  errors.push(...owningUnitErrors(unit, facts));
+  errors.push(...owningUnitErrors(unit));
 
   return { errors, costCenterId: unit.costCenter?.id ?? null, owningDepartmentId: unit.departmentId };
 }
 
 /**
- * A personal seat names no Cost Center. It is written on the subscription of its owner department whatever department
- * the person is in; when they are in another one, closing the baseline opens the review of their own head (`QĐ-89e`).
+ * A personal seat names no Cost Center. It is held by the department the person is in (`QĐ-103d`), whoever owns the subscription: the pool of
+ * seats is every department's, so a person of another department than the owner's is a valid row and nobody reviews it afterwards.
  */
-function judgePersonalCharge(costCenterCode: string, facts: SeatFacts): SeatCharge {
+function judgePersonalCharge(costCenterCode: string, employee: SeatEmployee | undefined): SeatCharge {
   return {
     errors: costCenterCode !== '' ? ['COST_CENTER_NOT_ALLOWED'] : [],
     costCenterId: null,
-    owningDepartmentId: facts.target.ownerDepartmentId ?? null,
+    owningDepartmentId: employee?.owningUnit?.departmentId ?? null,
   };
 }
 
@@ -267,7 +262,7 @@ function judgeCharge(
 ): SeatCharge {
   const costCenterCode = cell(cells, 'cost_center_code');
   if (kind === 'SERVICE') return judgeServiceCharge(employee, cell(cells, 'reason'), costCenterCode, facts);
-  if (kind === 'PERSONAL') return judgePersonalCharge(costCenterCode, facts);
+  if (kind === 'PERSONAL') return judgePersonalCharge(costCenterCode, employee);
 
   return { errors: [], costCenterId: null, owningDepartmentId: null };
 }

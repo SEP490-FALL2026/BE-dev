@@ -296,6 +296,34 @@ export interface OpenedRevocation {
   status: ProvisioningTaskStatus;
 }
 
+/**
+ * What a listener needs to tell the money the right still holds, known only when the revocation has been completed (`AFTER_WORK` with the status
+ * `COMPLETED`): the request that made the right, the day it ends and what is paid for it.
+ */
+export interface RevocationCompletedFacts {
+  /** The request whose grant made the right, found through the chain of assignments (a renewal, a handover); null when no request made it. */
+  grantRequestId: string | null;
+  provisioningType: ProvisioningKind;
+  /** The day the right ends: it holds the seat on every day before it (`valid_until`). */
+  endedOn: BusinessDate | null;
+  /** K1 only: the last day the provider was paid for; the access may run to it. */
+  paidThroughOn: BusinessDate | null;
+  /** Every source that asked for the revocation. */
+  sources: RevocationSource[];
+}
+
+/**
+ * What the request is told of the grant that completed for it, beyond the outcome (`BR-MF1-09c`, `M-10`): whether the seat was taken from the
+ * stock of the pool of its plan with nothing bought, the kind of right, the day the grant was completed (the day the right begins to be
+ * used) and the assignment it made.
+ */
+export interface GrantOutcomeFacts {
+  fromPool: boolean;
+  provisioningType: ProvisioningKind;
+  grantedOn: BusinessDate;
+  assignmentId: string;
+}
+
 /** The facts of a revocation task its listeners are told. */
 export interface RevocationTaskFacts {
   id: string;
@@ -303,6 +331,8 @@ export interface RevocationTaskFacts {
   employeeId: string;
   planId: string;
   status: ProvisioningTaskStatus;
+  /** Set only when the revocation has been completed. */
+  completed?: RevocationCompletedFacts;
 }
 
 /** A reason that asked for the revocation, as its listeners are told it. */

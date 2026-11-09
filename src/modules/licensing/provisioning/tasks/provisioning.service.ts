@@ -120,19 +120,30 @@ export class ProvisioningService {
         const completedOn = await this.organizationReads.businessToday(now, tx);
         await this.assignments.recordGranted(tx, locked.assignmentId, completedOn);
         if (locked.requestId !== null) {
-          await this.gate.get().reportOutcome(tx, locked.requestId, 'COMPLETED', locked.assignment.employeeId);
-          await this.sharedPool.recordAvoided(tx, {
-            organizationId,
-            completedOn,
-            task: {
-              id: locked.id,
-              assignmentId: locked.assignmentId,
-              requestId: locked.requestId,
-              planId: locked.assignment.planId,
-              subscriptionId: locked.assignment.subscriptionId,
-              purchased: locked.purchase !== null,
-            },
+          const provisioningType = await this.sharedPool.provisioningTypeOf(tx, locked.assignment.planId);
+          const pooled = provisioningType === 'K2' || provisioningType === 'K4';
+          // From the pool means taken from a free seat or key: a K2 or K4 grant with nothing bought for it (`BR-MF1-09c`).
+          const fromPool = pooled && locked.purchase === null;
+          await this.gate.get().reportOutcome(tx, locked.requestId, 'COMPLETED', locked.assignment.employeeId, {
+            fromPool,
+            provisioningType,
+            grantedOn: completedOn,
+            assignmentId: locked.assignmentId,
           });
+          if (fromPool) {
+            await this.sharedPool.recordAvoided(tx, {
+              organizationId,
+              completedOn,
+              task: {
+                id: locked.id,
+                assignmentId: locked.assignmentId,
+                requestId: locked.requestId,
+                planId: locked.assignment.planId,
+                subscriptionId: locked.assignment.subscriptionId,
+                provisioningType,
+              },
+            });
+          }
         }
 
         return { action: 'COMPLETED', after: { status: 'COMPLETED', completedBy: actor.appUserId } };

@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { SeatBaselinePhaseHook } from '../public/licensing.extension-points';
+import { SeatBaselinePhaseHook } from '../../catalog/public/catalog.extension-points';
 import { SeatBaselineRepo } from './seat-baseline.repo';
 
 /**

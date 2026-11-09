@@ -112,6 +112,24 @@ export class CatalogApi {
     return this.subscriptions.grantableOfPlan(planId, today, tx);
   }
 
+  /** The same for many plans in one read, by plan (a plan with none is absent): what the stock of a queue of grants is counted from. */
+  getGrantableSubscriptionsOfPlans(
+    planIds: readonly string[],
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, PoolSubscription[]>> {
+    return this.subscriptions.grantableOfPlans(planIds, today, tx);
+  }
+
+  /**
+   * Buys one more seat on the subscription, in the transaction of the caller, which holds it locked through `lockSeatTarget`: `purchased_quantity`
+   * rises by one (a K2 or K4 pool topped up with a grant, or the seat a K1 grant buys for its holder). It asks no Cost Center of the department
+   * that owns the subscription, if any. Throws PoolSeatNotAddableError for a subscription that is absent or a draft.
+   */
+  addPoolSeat(tx: DbTx, actor: AuthenticatedPrincipal, subscriptionId: string): Promise<number> {
+    return this.subscriptions.addSeat(tx, actor, subscriptionId);
+  }
+
   /** What one subscription is bought at (unit price and billing cycle); null when it has no price. */
   getSubscriptionPrice(subscriptionId: string, tx?: DbTx): Promise<SubscriptionPrice | null> {
     return this.subscriptions.priceOfSubscription(subscriptionId, tx);

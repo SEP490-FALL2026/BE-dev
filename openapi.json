@@ -22837,11 +22837,23 @@
             }
           },
           "409": {
-            "description": "A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.",
+            "description": "The plan is a K2 or K4 plan, another subscription of it is live (a draft, or active and not continued by a later period, not ended) and the seat baseline is closed: add seats to that one or renew it instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). While the baseline is open the write is accepted and the answer says SHOULD_MERGE in warnings. A price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency): a fault of the configuration, not of the request.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "SUBSCRIPTION.DUPLICATE_PLAN": {
+                    "summary": "The plan already has a live subscription: add seats to it or renew it instead of declaring another.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.DUPLICATE_PLAN",
+                        "message": "The plan already has a live subscription: add seats to it or renew it instead of declaring another.",
+                        "details": { "subscriptionIds": ["<subscription-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "REPORTING_CURRENCY_NOT_SUPPORTED": {
                     "summary": "The reporting currency XYZ is not in the currency table.",
                     "value": {
@@ -23911,11 +23923,23 @@
             }
           },
           "409": {
-            "description": "A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.",
+            "description": "The plan is a K2 or K4 plan, another subscription of it is live (a draft, or active and not continued by a later period, not ended) and the seat baseline is closed: add seats to that one or renew it instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). While the baseline is open the write is accepted and the answer says SHOULD_MERGE in warnings. A price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency): a fault of the configuration, not of the request.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "SUBSCRIPTION.DUPLICATE_PLAN": {
+                    "summary": "The plan already has a live subscription: add seats to it or renew it instead of declaring another.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.DUPLICATE_PLAN",
+                        "message": "The plan already has a live subscription: add seats to it or renew it instead of declaring another.",
+                        "details": { "subscriptionIds": ["<subscription-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "REPORTING_CURRENCY_NOT_SUPPORTED": {
                     "summary": "The reporting currency XYZ is not in the currency table.",
                     "value": {
@@ -30019,7 +30043,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3, K4), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY.",
+            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3, K4), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -30133,6 +30157,19 @@
                       "error": {
                         "code": "LICENSE_ASSIGNMENT.SEAT_CAPACITY",
                         "message": "An assignment conflicts with the data as it is now: SEAT_CAPACITY.",
+                        "details": { "freeSeatsInPool": 2 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING.PURCHASE_NOT_ALLOWED": {
+                    "summary": "The pool still has 2 free seat(s) of this plan: grant one of them instead of buying.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING.PURCHASE_NOT_ALLOWED",
+                        "message": "The pool still has 2 free seat(s) of this plan: grant one of them instead of buying.",
+                        "details": { "freeSeats": 2, "subscriptionIds": ["<subscription-id>"] },
                         "requestId": "req_example"
                       }
                     }
@@ -30184,7 +30221,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, ACCOUNT_IDENTIFIER_REQUIRED (a service account without the identifier the IT Admin enters), RESPONSIBLE_INVALID (the person named is not active in the owning department, or the request is not for a service account), REQUEST_PARTY.INELIGIBLE (the person named is the spending approver, who answers for no account of a request), SUBSCRIPTION_REQUIRED, SUBSCRIPTION_NOT_ALLOWED, SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_QUANTITY_UNKNOWN, PURCHASE_NOT_APPLICABLE (a `purchase` for a plan that is not K2 or K4), PURCHASE_REASON_REQUIRED (the pool is empty but a seat is still being taken back: say why buying cannot wait), SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP or IDENTIFIER_IN_USE. The IT Admin gives no end day: a body with `expectedEndDate` is a VALIDATION_ERROR, and the seat ends on the day of the request or, when it names none, when its term ends.",
+            "description": "The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, ACCOUNT_IDENTIFIER_REQUIRED (a service account without the identifier the IT Admin enters), RESPONSIBLE_INVALID (the person named is not active in the owning department, or the request is not for a service account), REQUEST_PARTY.INELIGIBLE (the person named is the spending approver, who answers for no account of a request), SUBSCRIPTION_NOT_ALLOWED (a K5 plan names none), SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_QUANTITY_UNKNOWN, PURCHASE_NOT_APPLICABLE (a `purchase` for a plan that is not K2 or K4), PURCHASE_REASON_REQUIRED (the pool is empty but a seat is still being taken back: say why buying cannot wait), SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP or IDENTIFIER_IN_USE. The IT Admin gives no end day: a body with `expectedEndDate` is a VALIDATION_ERROR, and the seat ends on the day of the request or, when it names none, when its term ends.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -30258,17 +30295,6 @@
                           "party": "BENEFICIARY",
                           "employeeIds": ["<employee-id>"]
                         },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PROVISIONING.SUBSCRIPTION_REQUIRED": {
-                    "summary": "The subscription of the grant is not right: REQUIRED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PROVISIONING.SUBSCRIPTION_REQUIRED",
-                        "message": "The subscription of the grant is not right: REQUIRED.",
                         "requestId": "req_example"
                       }
                     }
@@ -30351,13 +30377,24 @@
                       }
                     }
                   },
-                  "LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH": {
-                    "summary": "An assignment conflicts with the data as it is now: SUBSCRIPTION_DEPARTMENT_MISMATCH.",
+                  "PROVISIONING.PURCHASE_NOT_APPLICABLE": {
+                    "summary": "Only a plan of the K2 or K4 kind has a pool a purchase can be recorded against.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH",
-                        "message": "An assignment conflicts with the data as it is now: SUBSCRIPTION_DEPARTMENT_MISMATCH.",
+                        "code": "PROVISIONING.PURCHASE_NOT_APPLICABLE",
+                        "message": "Only a plan of the K2 or K4 kind has a pool a purchase can be recorded against.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING.PURCHASE_REASON_REQUIRED": {
+                    "summary": "The pool has only seats that are being taken back: a reason for buying is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING.PURCHASE_REASON_REQUIRED",
+                        "message": "The pool has only seats that are being taken back: a reason for buying is required.",
                         "requestId": "req_example"
                       }
                     }
@@ -85006,7 +85043,7 @@
                     "id": { "type": "string", "format": "uuid" },
                     "planId": { "type": "string", "format": "uuid" },
                     "planName": { "type": "string" },
-                    "ownerDepartmentId": { "type": "string", "format": "uuid" },
+                    "ownerDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
                     "applicationId": { "type": "string", "format": "uuid" },
                     "applicationName": { "type": "string" },
                     "vendor": {
@@ -85117,9 +85154,10 @@
                       "type": "array",
                       "items": {
                         "type": "string",
-                        "enum": ["NO_ALERT_ANCHOR", "RESPONSIBLE_MISSING", "BILLING_CYCLE_LEGACY"]
+                        "enum": ["NO_ALERT_ANCHOR", "RESPONSIBLE_MISSING", "BILLING_CYCLE_LEGACY", "SHOULD_MERGE"]
                       }
                     },
+                    "mergeCandidateIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
                     "taxProfile": {
                       "type": "object",
                       "properties": {
@@ -85184,6 +85222,7 @@
                     "noticeDeadline",
                     "alerts",
                     "warnings",
+                    "mergeCandidateIds",
                     "taxProfile",
                     "taxEstimate",
                     "createdAt",
@@ -85298,7 +85337,7 @@
               "id": { "type": "string", "format": "uuid" },
               "planId": { "type": "string", "format": "uuid" },
               "planName": { "type": "string" },
-              "ownerDepartmentId": { "type": "string", "format": "uuid" },
+              "ownerDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
               "applicationId": { "type": "string", "format": "uuid" },
               "applicationName": { "type": "string" },
               "vendor": {
@@ -85409,9 +85448,10 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "enum": ["NO_ALERT_ANCHOR", "RESPONSIBLE_MISSING", "BILLING_CYCLE_LEGACY"]
+                  "enum": ["NO_ALERT_ANCHOR", "RESPONSIBLE_MISSING", "BILLING_CYCLE_LEGACY", "SHOULD_MERGE"]
                 }
               },
+              "mergeCandidateIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
               "taxProfile": {
                 "type": "object",
                 "properties": {
@@ -85476,6 +85516,7 @@
               "noticeDeadline",
               "alerts",
               "warnings",
+              "mergeCandidateIds",
               "taxProfile",
               "taxEstimate",
               "createdAt",
@@ -94213,6 +94254,16 @@
                       "additionalProperties": false
                     },
                     "expectedEndDate": { "type": "string", "nullable": true },
+                    "stock": {
+                      "type": "object",
+                      "properties": {
+                        "kind": { "type": "string", "enum": ["SEATS", "KEYS", "NONE"] },
+                        "free": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "inRevocation": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                      },
+                      "required": ["kind", "free", "inRevocation"],
+                      "additionalProperties": false
+                    },
                     "submittedAt": { "type": "string", "format": "date-time" }
                   },
                   "required": [
@@ -94224,6 +94275,7 @@
                     "beneficiary",
                     "requester",
                     "expectedEndDate",
+                    "stock",
                     "submittedAt"
                   ],
                   "additionalProperties": false

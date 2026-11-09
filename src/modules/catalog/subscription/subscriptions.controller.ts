@@ -90,12 +90,12 @@ const INVALID_UPDATE = {
     SUBSCRIPTION_ERROR_EXAMPLES.CURRENCY_NOT_SUPPORTED,
   ],
 } as const;
-/** Only where a unit price is converted (`FinanceApi.snapshotMoney`); the database key of `DB-02` normally rules it out. */
-const REPORTING_CURRENCY_CONFLICT = {
+/** Declaring or completing a subscription of a K2 or K4 plan that already has a live one, once the seat baseline is closed (R-E02, `QĐ-104k`(3)). */
+const DUPLICATE_PLAN_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
-    'A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.',
-  examples: [SUBSCRIPTION_ERROR_EXAMPLES.REPORTING_CURRENCY_NOT_SUPPORTED],
+    'The plan is a K2 or K4 plan, another subscription of it is live (a draft, or active and not continued by a later period, not ended) and the seat baseline is closed: add seats to that one or renew it instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). While the baseline is open the write is accepted and the answer says SHOULD_MERGE in warnings. A price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency): a fault of the configuration, not of the request.',
+  examples: [SUBSCRIPTION_ERROR_EXAMPLES.DUPLICATE_PLAN, SUBSCRIPTION_ERROR_EXAMPLES.REPORTING_CURRENCY_NOT_SUPPORTED],
 } as const;
 
 /** The update is the one route whose conflict is not only the configuration: a change that owes more needs a Cost Center. */
@@ -163,7 +163,7 @@ export class SubscriptionsController {
     description:
       'The subscription is stored: a draft while its data is incomplete, with what is missing; the unit price keeps the conversion at the rate of the day it was recorded.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, REPORTING_CURRENCY_CONFLICT)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, DUPLICATE_PLAN_CONFLICT)
   async declare(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DeclareSubscriptionBodyDto) {
     try {
       return toWire(await this.subscriptions.declare(actor, body));
@@ -222,7 +222,7 @@ export class SubscriptionsController {
     description:
       'The draft becomes active once its data is whole; a price with no rate for its day is converted at the rate entered for that day. An active subscription is answered unchanged.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, REPORTING_CURRENCY_CONFLICT, {
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, DUPLICATE_PLAN_CONFLICT, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or the rate of its price day (SUBSCRIPTION.STILL_DRAFT, details.missing), or the shared-pool rules refuse it: COMMITMENT_TERM_REQUIRED, K1_MONTHLY_ONLY, RESPONSIBLE_REQUIRED, RESPONSIBLE_NOT_IT_ADMIN.',

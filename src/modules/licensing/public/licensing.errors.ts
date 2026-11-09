@@ -48,6 +48,8 @@ export class AssignmentConflictError extends Error {
   constructor(
     readonly conflict: AssignmentConflict,
     readonly index: number,
+    /** For `SEAT_CAPACITY` of a K2 or K4 grant: the seats still free in the other subscriptions of the plan, so the IT Admin grants from there (`BR-MF1-09a`). */
+    readonly freeSeatsInPool?: number,
   ) {
     super(`An assignment conflicts with the data as it is now: ${conflict}.`);
     this.name = 'AssignmentConflictError';

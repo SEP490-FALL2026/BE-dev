@@ -222,19 +222,23 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(h.codeOf(named)).toBe('PROVISIONING.SUBSCRIPTION_NOT_ALLOWED');
   });
 
-  it('refuses a K1 or K2 grant with no subscription, with one of another plan, or with none that exists', async () => {
-    const { planId } = await k2();
+  // Rewritten for P0-05: the subscription is optional (it was 422 SUBSCRIPTION_REQUIRED); the cases of another plan and of none that exists stay.
+  it('takes the subscription of the plan when a K1 or K2 grant names none; refuses one of another plan, or none that exists, or a plan with nothing to take a seat from', async () => {
+    const { subscriptionId: own, planId } = await k2();
     const other = await h.subscription(5, 'K2');
 
-    const none = await h.grant({ requestId: h.gate.grantable(e5, planId) }).expect(422);
-    const mismatch = await h.grant({ requestId: h.gate.grantable(e5, planId), subscriptionId: other }).expect(422);
+    const none = await h.grant({ requestId: h.gate.grantable(e5, planId) }).expect(201);
+    const mismatch = await h.grant({ requestId: h.gate.grantable(e6, planId), subscriptionId: other }).expect(422);
     const missing = await h
-      .grant({ requestId: h.gate.grantable(e5, planId), subscriptionId: randomUUID() })
+      .grant({ requestId: h.gate.grantable(e6, planId), subscriptionId: randomUUID() })
       .expect(404);
+    const draftPlan = await h.planOf(await h.draftSubscription('K2'));
+    const nothing = await h.grant({ requestId: h.gate.grantable(e6, draftPlan) }).expect(404);
 
-    expect(h.codeOf(none)).toBe('PROVISIONING.SUBSCRIPTION_REQUIRED');
+    expect(h.dataOf<{ task: { subscriptionId: string } }>(none).task.subscriptionId).toBe(own);
     expect(h.codeOf(mismatch)).toBe('PROVISIONING.SUBSCRIPTION_PLAN_MISMATCH');
     expect(h.codeOf(missing)).toBe('SUBSCRIPTION.NOT_FOUND');
+    expect(h.codeOf(nothing)).toBe('SUBSCRIPTION.NOT_FOUND');
     expect(await tasksOf(other)).toBe(0);
   });
 

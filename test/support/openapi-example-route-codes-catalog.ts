@@ -176,7 +176,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
     },
     subscriptionComplete: {
       '404': ['SUBSCRIPTION.NOT_FOUND'],
-      '409': ['REPORTING_CURRENCY_NOT_SUPPORTED'],
+      '409': ['REPORTING_CURRENCY_NOT_SUPPORTED', 'SUBSCRIPTION.DUPLICATE_PLAN'],
       '422': [
         'MONEY_OUT_OF_RANGE',
         'SUBSCRIPTION.COMMITMENT_TERM_REQUIRED',
@@ -187,7 +187,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
       ],
     },
     subscriptionCreate: {
-      '409': ['REPORTING_CURRENCY_NOT_SUPPORTED'],
+      '409': ['REPORTING_CURRENCY_NOT_SUPPORTED', 'SUBSCRIPTION.DUPLICATE_PLAN'],
       '422': [
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',

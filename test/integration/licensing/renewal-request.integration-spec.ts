@@ -385,7 +385,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
           h.seed.organizationId,
           paid.planId,
           // The seat sits on the subscription its own department owns (QĐ-89a).
-          h.owned.subscriptionFor(paid.subscriptionId, service.department.id),
+          paid.subscriptionId,
           service.member.employeeId,
           service.department.unitId,
           service.department.id,
