@@ -21,6 +21,7 @@ const SECTION_KEYS = {
   itAdmin: [
     'cancellationDeadlines',
     'discrepancies',
+    'ghostSeats',
     'grantTasks',
     'licenseKeys',
     'offboardingHandovers',
@@ -216,7 +217,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       );
       expect(overview.sections.transferReviews.count).toBe(1);
       expect(overview.sections.spending).toEqual(missing('FINANCE_FIGURES_NOT_DELIVERED'));
-      expect(overview.sections.ghostSeats).toEqual(missing('USAGE_DATA_NOT_DELIVERED'));
+      expect(overview.sections.ghostSeats).toEqual(countedAs(0, 'ghostSeatQueueList'));
       expect(overview.sections.needApprovals).toEqual(
         countedAs(await h.totalOf('/api/v1/need-decisions', des.head.account), 'needDecisionList'),
       );

@@ -323,6 +323,7 @@ describe('the reads and the hook of a revocation (integration, real PostgreSQL)'
       expect(h.ctx.app.get(RevocationListeners).names()).toEqual([
         'licensing.handover-confirmation',
         'requests.return-request',
+        'optimization.ghost-seat',
       ]);
     });
 
