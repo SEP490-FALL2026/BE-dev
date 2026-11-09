@@ -3,8 +3,26 @@
 - [Spec](spec.md); revision đầu vào: Docs `9c7f386`, BE `5fd5f594` (sau commit `qd103-purchase-invoice-sbf19` Phase 3; W2, W3 PASS).
 - Phụ trách: chat code `SEP-Start 75: coder mainflow`. Thiết kế ban đầu bởi: AI chat review (W4, 08/11/2026).
 - Owner review: chưa review. Peer review: chat review (R2).
-- Triển khai: `not-started`. PR: chưa có.
+- Triển khai: `in-progress` (gói 4, 09/11/2026, nhánh `feat/qd103-108-mf145`; chưa review, chưa merge `dev`). PR: chưa có.
 - Giao code: **hai lượt** — Phase 1 budgets (Task 1–3, Checkpoint A), Phase 2 nguồn + job (Task 4–6, Checkpoint B). Ước ~40 file.
+
+## Delta gói 4 (MF1-C, 09/11/2026) — thắng mọi chỗ khác của spec/plan này
+
+Nguồn: [SPEC](../../../reviews/mf1-mf4-reaudit-2026-11-09/SPEC.md) §4 MF1-C, §4b RV-01/RV-03/RV-19/RV-22, `QĐ-109a`. Đã làm ở BE (commit gói 4):
+
+- **Chỉ Request có khoản.** Bỏ: khoản theo Assignment không Request (Q-01 B), `request_id` nullable, `assignment_id`, CHECK/UNIQUE theo Assignment, đổi
+  `budgetCommitmentList`/`budgetCommitmentRelease`, mở rộng listener thu hồi cho khoản theo Assignment (**Task 1–3 cũ chỉ còn phần migration/`holdYearStart`
+  rút gọn**), `assignment-chain.repo.ts`, `lockOpenSeats`, `getPlanPrice(…, on)` (giá của gói nay không theo phòng và không theo ngày: giá thuê bao chính
+  hiện tại — lượt trễ vẫn cùng giá vì chạy trong ngày), `createdAt` của tổ chức (Q-48 thay bằng _chưa từng có dấu chạy năm nào_ ⟹ chỉ đánh dấu năm đầu).
+- **Nguồn** = Request `GRANT`/`SERVICE_ACCOUNT`/`GROUP_GRANT` trả phí (`PAID_IN_CATALOG`/`NEW_SOFTWARE`) ở trạng thái `AWAITING_EXECUTION`/`EXECUTING`/`COMPLETED`
+  (đọc lúc chạy, dưới khóa hàng), gói `K1`/`K2`; seat = người chưa cấp (Request một người đang chờ IT, dòng nhóm `APPROVED`) + grant còn giữ ngày 01/01
+  (`LicensingOpenGrantsApi.listHeldSeatsOfRequests`: không `failed`/`cancelled`, `valid_until` null hoặc sau 01/01, `expected_end_date` null hoặc từ 01/01).
+  `ROLE_BASED`/`K4` đọc mặc định: không có cột nên không có seat theo vai; `K4` bị loại theo loại gói. **RV-03** (Request tiếp tục đã duyệt chưa kéo dài) để gói 11.
+- **Số tiền** = `requestAmountOf` với `checkDate = 01/01/Y` cho từng nhóm seat cùng ngày kết thúc (tháng kết thúc tính đủ), cộng lại; `seat_monthly_minor` = giá tháng
+  làm tròn lên (cột mới, gói 9 dùng lại). Không giá / giá một lần ⟹ bỏ mục, audit `YEAR_START_SKIPPED` `NO_PRICE`; phòng không Cost Center ⟹ `NO_COST_CENTER`.
+- **Thứ tự khóa** (xem comment `year-start-commitments-batch.service.ts`): hàng Request (`FOR UPDATE` theo id, lô ≤ 100) → đọc grant không khóa → khóa năm (Cost Center theo id)
+  trong `BudgetsApi.holdYearStart`. Không leader: hai instance chạy cùng lúc an toàn nhờ UNIQUE (Request, năm) + kiểm dưới khóa hàng; lượt hoàn tất dấu chạy báo audit một lần.
+- **Dấu chạy** `year_start_commitment_runs` (khóa `(organization_id, year)`): migration đánh dấu năm triển khai đã xong cho tổ chức đang có.
 
 ## Before coding
 

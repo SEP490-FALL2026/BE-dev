@@ -494,7 +494,9 @@ assign or link cannot be placed between two migrations of one deploy: it is plac
    `CHANGE_ANNOUNCEMENTS_MISSING` when a placement or head period that had already taken effect, by the calendar of its own
    organization, when the seeding migration ran has no announcement mark (the migration
    `…_change_announcements_zone_and_yearly_counters` writes the missing marks, so the finding is gone after the final deploy). The closure of an ended fiscal year (`BudgetYearEndSweeper`) runs in the API process every
-   hour and may run on several instances: the second run finds nothing left to do (ADR-0018).
+   hour and may run on several instances: the second run finds nothing left to do (ADR-0018). The commitments of 01/01 (`YearStartCommitmentsSweeper`) are made by the first pass after midnight of
+   the organization on 01/01 and marked in `year_start_commitment_runs`; the migration of the deployment marks its own year done, so nothing is made backwards. After 01/01/2027 check that table has the year 2027 with `completed_at`
+   and that `budget_commitments` has rows with `origin = 'YEAR_START'`.
 
 ### Task 1.2b action 9 on a real server (two paths)
 
