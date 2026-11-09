@@ -116,6 +116,57 @@ export function canViewRequest(actor: ViewingActor, request: ViewFacts): boolean
   );
 }
 
+/**
+ * What else decides who reads a request, beyond the people who have a part in it: the department it was sent from, the department
+ * the caller heads today, and how far it went on its way to the money. Loaded once for one read.
+ */
+export interface ReadFacts extends ViewFacts {
+  isGroup: boolean;
+  departmentId: string;
+  /** The department the caller heads today; null when they head none. */
+  actorHeadsDepartmentId: string | null;
+  /** A spend step was opened on the request, whatever became of it since. */
+  spendStepOpened: boolean;
+  /** The spend was approved, so a commitment was made for the request (released since or not). */
+  spendApproved: boolean;
+}
+
+/** Whether the caller reads the request, and, when they read it only as one person of a request for a group, whose line. */
+export type ReadAccess = { read: false } | { read: true; onlyLineOf: string | null };
+
+/**
+ * Who reads a request and its history: the sender, whoever holds or held a need step, an IT Admin, the head today of the department
+ * it was sent from, a spending approver once a spend step was opened on it, Finance once its spend was approved. A person it is for
+ * reads it too, but of a request for a group only their own line. There is no branch for the Super Admin, who files and decides no
+ * business record (`SoD-1`): they read none. Reading gives no right to act; every action keeps its own policy.
+ */
+export function canReadRequest(actor: ViewingActor, facts: ReadFacts): ReadAccess {
+  if (decidesOrSent(actor, facts) || oversees(actor, facts)) return { read: true, onlyLineOf: null };
+  if (facts.beneficiaryEmployeeIds.includes(actor.employeeId)) {
+    return { read: true, onlyLineOf: facts.isGroup ? actor.employeeId : null };
+  }
+
+  return { read: false };
+}
+
+/** The sender and whoever holds or held a need step of the request. */
+const decidesOrSent = (actor: ViewingActor, facts: ReadFacts): boolean =>
+  actor.employeeId === facts.requesterEmployeeId ||
+  actor.employeeId === facts.needStepAssigneeEmployeeId ||
+  (facts.needStepAssigneeEmployeeIds ?? []).includes(actor.employeeId);
+
+/** The roles that oversee requests, each as far as it reaches: the IT Admin, the head today, the spending approver, Finance. */
+function oversees(actor: ViewingActor, facts: ReadFacts): boolean {
+  const { roles } = actor;
+
+  return (
+    roles.includes('IT_ADMIN') ||
+    (facts.actorHeadsDepartmentId !== null && facts.actorHeadsDepartmentId === facts.departmentId) ||
+    (roles.includes('SPENDING_APPROVER') && facts.spendStepOpened) ||
+    (roles.includes('FINANCE') && facts.spendApproved)
+  );
+}
+
 /** What decides who may see a request. */
 export interface ViewFacts {
   requesterEmployeeId: string;

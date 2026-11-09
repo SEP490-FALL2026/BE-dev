@@ -49,3 +49,9 @@ export interface SeatRootsOfRequests {
   grantRequestIds: readonly string[];
   namedRoots: readonly { requestId: string; assignmentId: string }[];
 }
+
+/** Who completed the grant task of a request and when: the account of the IT Admin, a value that outlives the account. */
+export interface GrantCompletion {
+  completedByAppUserId: string | null;
+  completedAt: Date;
+}

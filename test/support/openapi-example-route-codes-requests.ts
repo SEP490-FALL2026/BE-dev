@@ -175,6 +175,13 @@ export const ROUTE_ERROR_CODES_REQUESTS: Readonly<
   accessRequestTimingsGet: {
     '404': ['ACCESS_REQUEST.NOT_FOUND'],
   },
+  accessRequestEventList: {
+    '404': ['ACCESS_REQUEST.NOT_FOUND'],
+  },
+  departmentAccessRequestList: {
+    '403': ['ACCESS_REQUEST_HISTORY.OUT_OF_SCOPE'],
+    '404': ['ACCESS_REQUEST_HISTORY.DEPARTMENT_NOT_FOUND'],
+  },
   accessRequestWithdraw: {
     '403': ['ACCESS_REQUEST.NOT_REQUESTER'],
     '404': ['ACCESS_REQUEST.NOT_FOUND'],

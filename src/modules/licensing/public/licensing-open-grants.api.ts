@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OpenGrantTaskService } from '../provisioning/open-grants/open-grant-task.service';
 import type { BusinessDate } from '../../../core/business-date';
-import type { GrantedSeatOfRequest, OpenGrantTask, SeatRootsOfRequests } from './licensing-open-grants.types';
+import type {
+  GrantCompletion,
+  GrantedSeatOfRequest,
+  OpenGrantTask,
+  SeatRootsOfRequests,
+} from './licensing-open-grants.types';
 
 /**
  * The licensing facade for the grant tasks of a person that are not finished (`US-03-04` AC-24).
@@ -36,5 +41,13 @@ export class LicensingOpenGrantsApi {
     tx?: DbTx,
   ): Promise<GrantedSeatOfRequest[]> {
     return this.openGrants.heldSeatsOfRequests(roots, onDate, tx);
+  }
+
+  /**
+   * Who completed the grant of each of these requests and when, the last completion of a request when it has more than one: the
+   * account of the IT Admin, never the evidence. A request whose grant is not completed is absent. One statement.
+   */
+  listGrantCompletionsOfRequests(requestIds: readonly string[], tx?: DbTx): Promise<Map<string, GrantCompletion>> {
+    return this.openGrants.grantCompletionsOf(requestIds, tx);
   }
 }

@@ -3,6 +3,7 @@ import type { DbTx } from '../../../../infrastructure/database/transaction-runne
 import { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { BusinessDate } from '../../../../core/business-date';
 import type {
+  GrantCompletion,
   GrantedSeatOfRequest,
   OpenGrantTask,
   SeatRootsOfRequests,
@@ -63,5 +64,9 @@ export class OpenGrantTaskService {
   /** The seats of these requests still held on `onDate`, along their chains (`BR-MF1-09e`): what the commitment of 01/01 counts. */
   heldSeatsOfRequests(roots: SeatRootsOfRequests, onDate: BusinessDate, tx?: DbTx): Promise<GrantedSeatOfRequest[]> {
     return this.repo.heldSeatsOfRequests(roots, onDate, tx);
+  }
+
+  grantCompletionsOf(requestIds: readonly string[], tx?: DbTx): Promise<Map<string, GrantCompletion>> {
+    return this.repo.grantCompletionsOf(requestIds, tx);
   }
 }

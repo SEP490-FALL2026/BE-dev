@@ -4,6 +4,7 @@ import type { DbTx } from '../../../../infrastructure/database/transaction-runne
 import { fromDateColumn, type BusinessDate } from '../../../../core/business-date';
 import {
   OPEN_GRANT_TASK_STATUSES,
+  type GrantCompletion,
   type GrantedSeatOfRequest,
   type SeatRootsOfRequests,
 } from '../../public/licensing-open-grants.types';
@@ -42,6 +43,30 @@ export class OpenGrantTaskRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   /** The open grant tasks of the person, oldest first, and how many there are in all. */
+  /** The last completed grant task of each request: who completed it and when. */
+  async grantCompletionsOf(requestIds: readonly string[], tx?: DbTx): Promise<Map<string, GrantCompletion>> {
+    if (requestIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).provisioningTask.findMany({
+      where: {
+        kind: 'GRANT',
+        status: 'COMPLETED',
+        requestId: { in: [...new Set(requestIds)] },
+        completedAt: { not: null },
+      },
+      select: { requestId: true, completedByAppUserId: true, completedAt: true },
+      orderBy: [{ requestId: 'asc' }, { completedAt: 'desc' }, { id: 'desc' }],
+      distinct: ['requestId'],
+    });
+
+    return new Map(
+      rows.flatMap((row) =>
+        row.requestId === null || row.completedAt === null
+          ? []
+          : [[row.requestId, { completedByAppUserId: row.completedByAppUserId, completedAt: row.completedAt }]],
+      ),
+    );
+  }
+
   async pageOf(
     employeeId: string,
     page: { skip: number; take: number },

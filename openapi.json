@@ -40472,6 +40472,230 @@
         "security": [{ "bearer": [] }],
         "summary": "Send a request for access to software",
         "tags": ["access-requests"]
+      },
+      "get": {
+        "operationId": "accessRequestList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "description": "open: the requests that are not over, one that waits for the IT Admin to close the task of a withdrawal included. ended: the requests nothing is left to do in (completed, refused, failed, withdrawn, cancelled). Left out: both.",
+            "schema": { "type": "string", "enum": ["open", "ended"] }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "description": "One or more states of a request, comma-separated and none twice (for example PENDING,AWAITING_SPEND_DECISION); a draft is not a state of a request. Narrows within view when both are given.",
+            "schema": { "maxLength": 400, "type": "string" }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "The first moment the request was sent that is read (included). Must be earlier than to when both are given.",
+            "schema": { "format": "date-time", "type": "string" }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "The moment after the last one the request was sent that is read (excluded).",
+            "schema": { "format": "date-time", "type": "string" }
+          },
+          {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "description": "Only the requests sent from this department.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "employeeId",
+            "required": false,
+            "in": "query",
+            "description": "Only the requests this person sent or is one of the people for.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "flag",
+            "required": false,
+            "in": "query",
+            "description": "One or both of ONE_STEP (sent through the one-step route) and RESERVE_USED (the head confirmed the use of the reserve of the budget), comma-separated and none twice; a request has every flag named.",
+            "schema": { "maxLength": 40, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of the requests the role of the caller oversees, in every state, the newest sent first and then by id: pageSize 1 to 100, 20 when left out. An IT Admin reads every request sent in the organization; a spending approver the requests a spend step was opened on (one-step requests included), decided or not; Finance the requests whose spend was approved, so a commitment was made, released since or not. A caller with more than one of these roles reads all they reach. A draft is never listed. Narrowed by view (open or ended), by one or more states, by type, by the moment it was sent, by department, by a person who sent it or is one of the people for it, and by the flags ONE_STEP and RESERVE_USED. Each row names the plan or the proposed software, who sent it and who it is for, the department it was sent from, its state, its one-step or via-head routing, who it waits for at the need step, where a request that costs money stands on its way to the spending approver, the reason when it was refused, when it was withdrawn, and whether the head confirmed the use of the reserve. No price, amount, figure of a budget, result of a check, commitment or reason Finance wrote is answered; the detail, the time, the people and the history of a request are read by its id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/AccessRequestHistoryPageResponseDto" },
+                    { "properties": { "message": { "example": "ACCESS_REQUEST_HISTORY.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin, a spending approver or Finance reads the requests of the organization (AUTHORIZATION.FORBIDDEN): a department head reads those of their department, a person their own, and the Super Admin reads no request.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The page, its size, the view, the states, the type, the department, the person, the flags or the window of the moment sent is invalid, or a parameter that is not listed is given (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the requests my role oversees",
+        "tags": ["access-requests"]
       }
     },
     "/api/v1/access-requests/preview": {
@@ -40952,7 +41176,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The request with the person who holds its need step, the row of the routing table that named them (or why nobody holds it) and its fixed one-step or via-head routing. Only the sender, the person it is for, the person who holds the step and an IT Admin read it. The person who saved a draft reads it here too, as `draft` instead of `request`: a draft is not a request yet, so it has no price, step or Cost Center, and nobody else reads it (the id of a draft that is owned by somebody else answers as one that does not exist).",
+            "description": "The request with the person who holds its need step, the row of the routing table that named them (or why nobody holds it) and its fixed one-step or via-head routing. It is read by the people who read it in their history: the sender, the person it is for, whoever holds or held a need step, the head today of the department it was sent from, an IT Admin, a spending approver once a spend step was opened on it and Finance once its spend was approved; nobody else, the Super Admin included, learns that it exists. The person who saved a draft reads it here too, as `draft` instead of `request`: a draft is not a request yet, so it has no price, step or Cost Center, and nobody else reads it (the id of a draft that is owned by somebody else answers as one that does not exist).",
             "content": {
               "application/json": {
                 "schema": {
@@ -51464,7 +51688,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The people of a request for a group in the order they were named, each with the state of their own, the step that holds them, what each costs, what was decided for them at the need and the spend, the share of the commitment they stand for once approved, and how and why they ended. The sender, whoever holds a step and an IT Admin see every person; a person the request is for sees only their own line.",
+            "description": "The people of a request for a group in the order they were named, each with the state of their own, the step that holds them, what each costs, what was decided for them at the need and the spend, the share of the commitment they stand for once approved, and how and why they ended. The sender, whoever holds a step, the head today of its department, an IT Admin, a spending approver once a spend step was opened on it and Finance once its spend was approved see every person; a person the request is for sees only their own line, and the Super Admin none.",
             "content": {
               "application/json": {
                 "schema": {
@@ -52902,11 +53126,18 @@
             "in": "query",
             "description": "The moment after the last one the request was sent that is read (excluded).",
             "schema": { "format": "date-time", "type": "string" }
+          },
+          {
+            "name": "involvement",
+            "required": false,
+            "in": "query",
+            "description": "SENT (the default): the requests the caller sent. FOR_ME: the requests the caller is one of the people for, a request for a group somebody else sent included. ALL: both.",
+            "schema": { "type": "string", "enum": ["SENT", "FOR_ME", "ALL"] }
           }
         ],
         "responses": {
           "200": {
-            "description": "One page of the requests the signed-in person sent and nobody else’s, the newest sent first and then by id: pageSize 1 to 100, 20 when left out. A request that somebody else sent for them, a request they only decide or read as the head, the IT Admin or Finance, and a draft are not listed (a draft is listed by the drafts route). Narrowed by view (open or ended), by one or more states, by type and by the moment it was sent. Each row names the plan or the proposed software, who it is for, its state, who it waits for at the need step, where a request that costs money stands on its way to the spending approver, the reason when it was refused, when it was withdrawn and whether the sender may withdraw it now (a hint: the withdrawal judges again). No budget figure, what is left, result of a check, price or cost of another person is answered; the detail of a request is read by its id.",
+            "description": "One page of the requests of the signed-in person and nobody else’s, the newest sent first and then by id: pageSize 1 to 100, 20 when left out. involvement chooses which: SENT (the default) the requests they sent, FOR_ME the requests somebody else or they themselves sent for them (one person of a request for a group included), ALL both. A request they only decide or read as the head, the IT Admin, the spending approver or Finance is read through the history of that role, and a draft by the drafts route. Narrowed by view (open or ended), by one or more states, by type and by the moment it was sent. Each row names the plan or the proposed software, who it is for, its state, who it waits for at the need step, where a request that costs money stands on its way to the spending approver, the reason when it was refused, when it was withdrawn, whether the sender may withdraw it now (a hint: the withdrawal judges again; never for a request somebody else sent), whether the caller sent it, and, for a request for a group somebody else sent for them, their own line and only that. No budget figure, what is left, result of a check, price or cost of another person is answered; the detail of a request is read by its id.",
             "content": {
               "application/json": {
                 "schema": {
@@ -52951,7 +53182,7 @@
             }
           },
           "422": {
-            "description": "The page, its size, the view, the states, the type or the window of the moment sent is invalid, or a parameter that names a person is given (VALIDATION_ERROR).",
+            "description": "The page, its size, the view, the states, the type, the involvement or the window of the moment sent is invalid, or a parameter that names a person is given (VALIDATION_ERROR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -53027,8 +53258,617 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "List the requests I sent",
+        "summary": "List the requests I sent or that were sent for me",
         "tags": ["me"]
+      }
+    },
+    "/api/v1/departments/{id}/access-requests": {
+      "get": {
+        "operationId": "departmentAccessRequestList",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "description": "open: the requests that are not over, one that waits for the IT Admin to close the task of a withdrawal included. ended: the requests nothing is left to do in (completed, refused, failed, withdrawn, cancelled). Left out: both.",
+            "schema": { "type": "string", "enum": ["open", "ended"] }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "description": "One or more states of a request, comma-separated and none twice (for example PENDING,AWAITING_SPEND_DECISION); a draft is not a state of a request. Narrows within view when both are given.",
+            "schema": { "maxLength": 400, "type": "string" }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "The first moment the request was sent that is read (included). Must be earlier than to when both are given.",
+            "schema": { "format": "date-time", "type": "string" }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "The moment after the last one the request was sent that is read (excluded).",
+            "schema": { "format": "date-time", "type": "string" }
+          },
+          {
+            "name": "employeeId",
+            "required": false,
+            "in": "query",
+            "description": "Only the requests this person sent or is one of the people for, within the department.",
+            "schema": { "format": "uuid", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of every request sent from the department the caller heads today, in every state (decided, completed, refused, withdrawn and cancelled included), the newest sent first and then by id: pageSize 1 to 100, 20 when left out. The department of a request is the one it was sent from: a request of a person who left or moved away stays, a request a person who moved in sent from their former department is not here, and a one-step request of the head is here. Narrowed by view (open or ended), by one or more states, by type, by the moment it was sent and by a person who sent it or is one of the people for it. awaitingMe says that it waits for the head now. Each row names the plan or the proposed software, who sent it and who it is for, the department it was sent from, its state, its one-step or via-head routing, who it waits for at the need step, where a request that costs money stands on its way to the spending approver, the reason when it was refused, when it was withdrawn, and whether the head confirmed the use of the reserve. No price, amount, figure of a budget, result of a check, commitment or reason Finance wrote is answered; the detail, the time, the people and the history of a request are read by its id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DepartmentAccessRequestPageResponseDto" },
+                    { "properties": { "message": { "example": "ACCESS_REQUEST_HISTORY.DEPARTMENT_LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only a department head reads the requests of a department, and only of the department they head today (AUTHORIZATION.FORBIDDEN for any other role, ACCESS_REQUEST_HISTORY.OUT_OF_SCOPE for the head of another department).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST_HISTORY.OUT_OF_SCOPE": {
+                    "summary": "Only the head of the department today reads the requests of that department.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST_HISTORY.OUT_OF_SCOPE",
+                        "message": "Only the head of the department today reads the requests of that department.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The department does not exist (ACCESS_REQUEST_HISTORY.DEPARTMENT_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "ACCESS_REQUEST_HISTORY.DEPARTMENT_NOT_FOUND": {
+                    "summary": "The department does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST_HISTORY.DEPARTMENT_NOT_FOUND",
+                        "message": "The department does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id, the page, its size, the view, the states, the type, the person or the window of the moment sent is invalid, or a parameter that is not listed is given (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the requests of the department I head",
+        "tags": ["access-requests"]
+      }
+    },
+    "/api/v1/access-requests/{id}/events": {
+      "get": {
+        "operationId": "accessRequestEventList",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of what happened to the request, oldest first and then by id: sent, sent again, the need approved or refused (for each person of a request for a group), the reserve confirmed, the spend approved, refused or returned, the assessment of the IT Admin, the grant started, completed or failed, the withdrawal and the closing; pageSize 1 to 100, 20 when left out. Each entry says who acted (or that the system did), the role a decider acted in, the person of a request for a group it is about, and the reason a person wrote when they refused, withdrew, closed, returned or used the reserve. Nothing else of the record of the event is answered: no figure of a budget, amount or check. The people who read the request read its history: the sender, whoever holds or held a need step, the head today of its department, an IT Admin, a spending approver once a spend step was opened on it, Finance once its spend was approved; a person a request for a group is for reads the entries about the whole request and about themselves only. This is not the Audit Trail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/RequestEventPageResponseDto" },
+                    { "properties": { "message": { "example": "ACCESS_REQUEST_HISTORY.EVENTS_LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The request does not exist, or the caller may not read it (ACCESS_REQUEST.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "ACCESS_REQUEST.NOT_FOUND": {
+                    "summary": "The request does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.NOT_FOUND",
+                        "message": "The request does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id, the page or its size is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List what happened to a request",
+        "tags": ["access-requests"]
+      }
+    },
+    "/api/v1/access-request-audit-flags": {
+      "get": {
+        "operationId": "accessRequestAuditFlagList",
+        "parameters": [
+          {
+            "name": "flag",
+            "required": false,
+            "in": "query",
+            "description": "NO_NEED_APPROVER (the default): free internal software sent through the one-step route, so no head approved the need.",
+            "schema": { "default": "NO_NEED_APPROVER", "type": "string", "enum": ["NO_NEED_APPROVER"] }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "The first moment the request was sent that is read (included). Must be earlier than to.",
+            "schema": { "format": "date-time", "type": "string" }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "The moment after the last one the request was sent that is read (excluded).",
+            "schema": { "format": "date-time", "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of the requests that carry the flag, the newest sent first and then by id: pageSize 1 to 100, 20 when left out, narrowed by the moment sent. NO_NEED_APPROVER: free internal software sent through the one-step route, so no head approved the need, because the requester heads the department, the department has no head or its head left. A paid request is never flagged: it still has a spend step. Each row names who sent it, the department, the software and plan, why it went the one-step route, and who completed the grant and when (null until it is completed). No price, amount, budget, commitment, evidence or reason the requester wrote is answered, and the flag is only read: nothing is approved, refused or cleared here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/RequestAuditFlagPageResponseDto" },
+                    { "properties": { "message": { "example": "ACCESS_REQUEST_HISTORY.AUDIT_FLAGS_LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin reads the flags of the audit report (AUTHORIZATION.FORBIDDEN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The flag, the page, its size or the window of the moment sent is invalid, or a parameter that is not listed is given (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the requests flagged for the audit report",
+        "tags": ["access-requests"]
       }
     },
     "/api/v1/budget-proposals": {
@@ -103931,7 +104771,34 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
-                    "canWithdraw": { "type": "boolean" }
+                    "canWithdraw": { "type": "boolean" },
+                    "involvement": { "type": "string", "enum": ["SENT", "FOR_ME"] },
+                    "myLine": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "AWAITING_NEED",
+                            "NEED_CONFIRMED",
+                            "NEED_REJECTED",
+                            "SPEND_REJECTED",
+                            "APPROVED",
+                            "EXECUTING",
+                            "AWAITING_IT_CLOSE",
+                            "COMPLETED",
+                            "FAILED",
+                            "WITHDRAWN",
+                            "DROPPED",
+                            "CANCELLED"
+                          ]
+                        },
+                        "outcomeReason": { "type": "string", "nullable": true }
+                      },
+                      "required": ["state", "outcomeReason"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    }
                   },
                   "required": [
                     "id",
@@ -103951,7 +104818,681 @@
                     "spend",
                     "outcome",
                     "withdrawal",
-                    "canWithdraw"
+                    "canWithdraw",
+                    "involvement",
+                    "myLine"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "DepartmentAccessRequestPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                    "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG", "NEW_SOFTWARE"] },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "PENDING",
+                        "WAITING_CONTROLLED",
+                        "AWAITING_EXECUTION",
+                        "AWAITING_IT_ASSESSMENT",
+                        "AWAITING_SPEND_SUBMISSION",
+                        "AWAITING_SPEND_DECISION",
+                        "AWAITING_REQUESTER_REVISION",
+                        "REJECTED",
+                        "IT_REJECTED",
+                        "EXECUTING",
+                        "COMPLETED",
+                        "FAILED",
+                        "AWAITING_IT_CLOSE",
+                        "WITHDRAWN",
+                        "CANCELLED"
+                      ]
+                    },
+                    "routing": {
+                      "type": "object",
+                      "properties": {
+                        "mode": { "type": "string", "enum": ["VIA_HEAD", "ONE_STEP"] },
+                        "oneStepReason": {
+                          "type": "string",
+                          "enum": ["REQUESTER_IS_HEAD", "NO_DEPARTMENT_HEAD", "HEAD_LEFT", null],
+                          "nullable": true
+                        }
+                      },
+                      "required": ["mode", "oneStepReason"],
+                      "additionalProperties": false
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": {
+                        "planId": { "type": "string", "format": "uuid" },
+                        "planName": { "type": "string" },
+                        "applicationId": { "type": "string", "format": "uuid" },
+                        "applicationName": { "type": "string" }
+                      },
+                      "required": ["planId", "planName", "applicationId", "applicationName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "softwareName": { "type": "string", "nullable": true },
+                    "beneficiary": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "lineCount": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0
+                    },
+                    "termMonths": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "nullable": true,
+                      "minimum": 0
+                    },
+                    "expectedEndDate": { "type": "string", "nullable": true },
+                    "submittedAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" },
+                    "needStep": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED", "NOT_REQUIRED"]
+                        },
+                        "assignee": {
+                          "type": "object",
+                          "properties": {
+                            "employeeId": { "type": "string", "format": "uuid" },
+                            "employeeCode": { "type": "string" },
+                            "fullName": { "type": "string" }
+                          },
+                          "required": ["employeeId", "employeeCode", "fullName"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "waitingReason": {
+                          "type": "string",
+                          "enum": ["NO_SPENDING_APPROVER", "NO_DEPARTMENT_HEAD", null],
+                          "nullable": true
+                        }
+                      },
+                      "required": ["state", "assignee", "waitingReason"],
+                      "additionalProperties": false
+                    },
+                    "spend": {
+                      "type": "object",
+                      "properties": {
+                        "stage": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_SUBMITTED",
+                            "RETURNED_TO_REQUESTER",
+                            "RESERVE_CONFIRMATION",
+                            "BLOCKED",
+                            "WAITING_SPEND_DECISION",
+                            "REFUSED"
+                          ]
+                        }
+                      },
+                      "required": ["stage"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "outcome": {
+                      "type": "object",
+                      "properties": { "reason": { "type": "string", "nullable": true } },
+                      "required": ["reason"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "withdrawal": {
+                      "type": "object",
+                      "properties": { "withdrawnAt": { "type": "string", "format": "date-time", "nullable": true } },
+                      "required": ["withdrawnAt"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "requester": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false
+                    },
+                    "department": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false
+                    },
+                    "reserveUsed": { "type": "boolean" },
+                    "awaitingMe": { "type": "boolean" }
+                  },
+                  "required": [
+                    "id",
+                    "type",
+                    "branch",
+                    "state",
+                    "routing",
+                    "plan",
+                    "softwareName",
+                    "beneficiary",
+                    "lineCount",
+                    "termMonths",
+                    "expectedEndDate",
+                    "submittedAt",
+                    "updatedAt",
+                    "needStep",
+                    "spend",
+                    "outcome",
+                    "withdrawal",
+                    "requester",
+                    "department",
+                    "reserveUsed",
+                    "awaitingMe"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "AccessRequestHistoryPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                    "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG", "NEW_SOFTWARE"] },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "PENDING",
+                        "WAITING_CONTROLLED",
+                        "AWAITING_EXECUTION",
+                        "AWAITING_IT_ASSESSMENT",
+                        "AWAITING_SPEND_SUBMISSION",
+                        "AWAITING_SPEND_DECISION",
+                        "AWAITING_REQUESTER_REVISION",
+                        "REJECTED",
+                        "IT_REJECTED",
+                        "EXECUTING",
+                        "COMPLETED",
+                        "FAILED",
+                        "AWAITING_IT_CLOSE",
+                        "WITHDRAWN",
+                        "CANCELLED"
+                      ]
+                    },
+                    "routing": {
+                      "type": "object",
+                      "properties": {
+                        "mode": { "type": "string", "enum": ["VIA_HEAD", "ONE_STEP"] },
+                        "oneStepReason": {
+                          "type": "string",
+                          "enum": ["REQUESTER_IS_HEAD", "NO_DEPARTMENT_HEAD", "HEAD_LEFT", null],
+                          "nullable": true
+                        }
+                      },
+                      "required": ["mode", "oneStepReason"],
+                      "additionalProperties": false
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": {
+                        "planId": { "type": "string", "format": "uuid" },
+                        "planName": { "type": "string" },
+                        "applicationId": { "type": "string", "format": "uuid" },
+                        "applicationName": { "type": "string" }
+                      },
+                      "required": ["planId", "planName", "applicationId", "applicationName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "softwareName": { "type": "string", "nullable": true },
+                    "beneficiary": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "lineCount": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0
+                    },
+                    "termMonths": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "nullable": true,
+                      "minimum": 0
+                    },
+                    "expectedEndDate": { "type": "string", "nullable": true },
+                    "submittedAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" },
+                    "needStep": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED", "NOT_REQUIRED"]
+                        },
+                        "assignee": {
+                          "type": "object",
+                          "properties": {
+                            "employeeId": { "type": "string", "format": "uuid" },
+                            "employeeCode": { "type": "string" },
+                            "fullName": { "type": "string" }
+                          },
+                          "required": ["employeeId", "employeeCode", "fullName"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "waitingReason": {
+                          "type": "string",
+                          "enum": ["NO_SPENDING_APPROVER", "NO_DEPARTMENT_HEAD", null],
+                          "nullable": true
+                        }
+                      },
+                      "required": ["state", "assignee", "waitingReason"],
+                      "additionalProperties": false
+                    },
+                    "spend": {
+                      "type": "object",
+                      "properties": {
+                        "stage": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_SUBMITTED",
+                            "RETURNED_TO_REQUESTER",
+                            "RESERVE_CONFIRMATION",
+                            "BLOCKED",
+                            "WAITING_SPEND_DECISION",
+                            "REFUSED"
+                          ]
+                        }
+                      },
+                      "required": ["stage"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "outcome": {
+                      "type": "object",
+                      "properties": { "reason": { "type": "string", "nullable": true } },
+                      "required": ["reason"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "withdrawal": {
+                      "type": "object",
+                      "properties": { "withdrawnAt": { "type": "string", "format": "date-time", "nullable": true } },
+                      "required": ["withdrawnAt"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "requester": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false
+                    },
+                    "department": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false
+                    },
+                    "reserveUsed": { "type": "boolean" }
+                  },
+                  "required": [
+                    "id",
+                    "type",
+                    "branch",
+                    "state",
+                    "routing",
+                    "plan",
+                    "softwareName",
+                    "beneficiary",
+                    "lineCount",
+                    "termMonths",
+                    "expectedEndDate",
+                    "submittedAt",
+                    "updatedAt",
+                    "needStep",
+                    "spend",
+                    "outcome",
+                    "withdrawal",
+                    "requester",
+                    "department",
+                    "reserveUsed"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "RequestEventPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "occurredAt": { "type": "string", "format": "date-time" },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "SUBMITTED",
+                        "RESUBMITTED",
+                        "NEED_APPROVED",
+                        "NEED_REJECTED",
+                        "LINE_NEED_DECIDED",
+                        "RESERVE_CONFIRMED",
+                        "SPEND_APPROVED",
+                        "SPEND_REJECTED",
+                        "LINE_SPEND_DECIDED",
+                        "RETURNED_TO_REQUESTER",
+                        "ASSESSMENT_COMPLETED",
+                        "ASSESSMENT_REJECTED",
+                        "GRANT_STARTED",
+                        "GRANT_COMPLETED",
+                        "GRANT_FAILED",
+                        "WITHDRAWAL_REQUESTED",
+                        "WITHDRAWN",
+                        "CANCELLED",
+                        "RENEWAL_APPLIED"
+                      ]
+                    },
+                    "actor": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "actorKind": { "type": "string", "enum": ["USER", "SYSTEM"] },
+                    "actorRole": { "type": "string", "nullable": true },
+                    "line": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "reason": { "type": "string", "nullable": true }
+                  },
+                  "required": ["id", "occurredAt", "kind", "actor", "actorKind", "actorRole", "line", "reason"],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "RequestAuditFlagPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": { "type": "string", "format": "uuid" },
+                    "flag": { "type": "string", "enum": ["NO_NEED_APPROVER"] },
+                    "submittedAt": { "type": "string", "format": "date-time" },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "PENDING",
+                        "WAITING_CONTROLLED",
+                        "AWAITING_EXECUTION",
+                        "AWAITING_IT_ASSESSMENT",
+                        "AWAITING_SPEND_SUBMISSION",
+                        "AWAITING_SPEND_DECISION",
+                        "AWAITING_REQUESTER_REVISION",
+                        "REJECTED",
+                        "IT_REJECTED",
+                        "EXECUTING",
+                        "COMPLETED",
+                        "FAILED",
+                        "AWAITING_IT_CLOSE",
+                        "WITHDRAWN",
+                        "CANCELLED"
+                      ]
+                    },
+                    "requester": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false
+                    },
+                    "department": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false
+                    },
+                    "application": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "routingReason": {
+                      "type": "string",
+                      "enum": ["REQUESTER_IS_HEAD", "NO_DEPARTMENT_HEAD", "HEAD_LEFT", null],
+                      "nullable": true
+                    },
+                    "grant": {
+                      "type": "object",
+                      "properties": {
+                        "itAdmin": {
+                          "type": "object",
+                          "properties": {
+                            "employeeId": { "type": "string", "format": "uuid" },
+                            "employeeCode": { "type": "string" },
+                            "fullName": { "type": "string" }
+                          },
+                          "required": ["employeeId", "employeeCode", "fullName"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "completedAt": { "type": "string", "format": "date-time" }
+                      },
+                      "required": ["itAdmin", "completedAt"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "requestId",
+                    "flag",
+                    "submittedAt",
+                    "state",
+                    "requester",
+                    "department",
+                    "application",
+                    "plan",
+                    "routingReason",
+                    "grant"
                   ],
                   "additionalProperties": false
                 }

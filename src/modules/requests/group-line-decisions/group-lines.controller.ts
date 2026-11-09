@@ -61,7 +61,7 @@ export class GroupLinesController {
   @ApiSuccessResponse(LinesResponseDto, {
     message: 'GROUP_REQUEST.LINES_LISTED',
     description:
-      'The people of a request for a group in the order they were named, each with the state of their own, the step that holds them, what each costs, what was decided for them at the need and the spend, the share of the commitment they stand for once approved, and how and why they ended. The sender, whoever holds a step and an IT Admin see every person; a person the request is for sees only their own line.',
+      'The people of a request for a group in the order they were named, each with the state of their own, the step that holds them, what each costs, what was decided for them at the need and the spend, the share of the commitment they stand for once approved, and how and why they ended. The sender, whoever holds a step, the head today of its department, an IT Admin, a spending approver once a spend step was opened on it and Finance once its spend was approved see every person; a person the request is for sees only their own line, and the Super Admin none.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

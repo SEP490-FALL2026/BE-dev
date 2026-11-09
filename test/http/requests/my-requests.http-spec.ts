@@ -34,6 +34,8 @@ const ROW = {
   outcome: null,
   withdrawal: null,
   canWithdraw: true,
+  involvement: 'SENT',
+  myLine: null,
 };
 const PAGE = { items: [ROW], pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 } };
 
@@ -107,6 +109,29 @@ describe('my requests route (e2e, no database)', () => {
     });
   });
 
+  it.each(['SENT', 'FOR_ME', 'ALL'])('gives the involvement %s to the service as it is', async (involvement) => {
+    await get(`${PATH}?involvement=${involvement}`).expect(200);
+
+    expect(list).toHaveBeenCalledWith(expect.anything(), { page: 1, pageSize: 20, involvement });
+  });
+
+  it('answers the line of the caller in a request for a group somebody else sent for them', async () => {
+    const item = {
+      ...ROW,
+      type: 'GROUP_GRANT',
+      beneficiary: null,
+      lineCount: 3,
+      canWithdraw: false,
+      involvement: 'FOR_ME',
+      myLine: { state: 'NEED_REJECTED', outcomeReason: 'Not this quarter' },
+    };
+    list.mockResolvedValue({ ...PAGE, items: [item] });
+
+    const response = await get(`${PATH}?involvement=FOR_ME`).expect(200);
+
+    expect((bodyOf(response).data as unknown as { items: unknown[] }).items).toEqual([item]);
+  });
+
   it.each([
     ['an Employee', ['EMPLOYEE'], []],
     ['a department head who holds no Employee role of their own', [], ['MANAGER']],
@@ -131,6 +156,8 @@ describe('my requests route (e2e, no database)', () => {
     ['a type that does not exist', `${PATH}?type=RETURN`],
     ['a moment that is not one', `${PATH}?from=yesterday`],
     ['a window that ends before it begins', `${PATH}?from=2026-11-01T00:00:00Z&to=2026-10-01T00:00:00Z`],
+    ['an involvement that does not exist', `${PATH}?involvement=OTHERS`],
+    ['a person named beside the involvement', `${PATH}?involvement=FOR_ME&employeeId=${ID}`],
   ])('turns away %s, 422', async (_name, path) => {
     const response = await get(path).expect(422);
 
@@ -178,6 +205,6 @@ describe('my requests route and the Super Admin (e2e, no database)', () => {
       .set('Authorization', bearer(principal(['SUPER_ADMIN'])))
       .expect(200);
     expect(bodyOf(response).data).toMatchObject({ items: [], pagination: { totalItems: 0 } });
-    expect(pageOf).toHaveBeenCalledWith(expect.objectContaining({ requesterEmployeeId: 'e1' }));
+    expect(pageOf).toHaveBeenCalledWith(expect.objectContaining({ scope: { kind: 'SENT_BY', employeeId: 'e1' } }));
   });
 });
