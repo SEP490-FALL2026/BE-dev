@@ -162,7 +162,8 @@ describe('the preview of a vendor usage report over HTTP (integration, real Post
       await h.crowd('M', 187);
       await h.person('SAM1');
       await h.person('SAM2');
-      // Two people whose work emails differ only by the domain of the company: an old address of the vendor account fits both.
+      // Two people whose work emails differ only by the domain of the company: an alias on a domain of the company fits both. An address on a
+      // domain outside the company is never tied by its local part (M5-06, FR-4.5, TC-2).
       await h.ctx.sql.query(
         `UPDATE employees SET work_email = 'sam1@other.vn', normalized_work_email = 'sam1@other.vn' WHERE employee_code = 'SAM2'`,
       );
@@ -170,7 +171,7 @@ describe('the preview of a vendor usage report over HTTP (integration, real Post
       const lines = [
         ...Array.from({ length: 187 }, (_, index) => [`m${index}@acme.vn`, '2026-08-01']),
         ...Array.from({ length: 12 }, (_, index) => [`stranger${index}@vendor.example`, '2026-08-02']),
-        ['sam1@old.example', '2026-08-03'],
+        ['sam1+old@acme.vn', '2026-08-03'],
       ];
 
       const preview = await h.previewReport(source.id, aggregate(lines), {

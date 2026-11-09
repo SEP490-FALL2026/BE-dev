@@ -594,8 +594,11 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
     });
     const watch = await seedOn(w.people[0], 'G4');
     // The watch was made from the last day the report shows (41 days ago): no later day of activity denies it (NEGATED), whatever today is.
+    // The denial reads the column `last_active_date`, the evidence only shows it: both are written.
     await h.ctx.sql.query(
-      `UPDATE ghost_seat_recommendations SET evidence = jsonb_set(evidence, '{lastActiveDate}', to_jsonb($2::text)) WHERE id = $1`,
+      `UPDATE ghost_seat_recommendations
+          SET evidence = jsonb_set(evidence, '{lastActiveDate}', to_jsonb($2::text)), last_active_date = $2::date
+        WHERE id = $1`,
       [watch, addDays(today, -41)],
     );
 

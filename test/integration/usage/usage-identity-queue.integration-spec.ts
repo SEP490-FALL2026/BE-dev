@@ -69,14 +69,15 @@ describe('the queue of vendor identifiers nobody could be tied to (integration, 
         aggregate([
           ['que1@acme.vn', '2026-08-01'],
           ['stranger@vendor.example', '2026-08-02'],
-          ['sam1@old.example', '2026-08-03'],
+          // An alias on a domain of the company fits both SAM1 and SAM2; the same local part outside the company is nobody (M5-06, FR-4.5).
+          ['sam1+old@acme.vn', '2026-08-03'],
         ]),
         WINDOW,
       );
 
       const items = await queueOf(applicationId);
       expect(items.map((item) => [item.identifier, item.reason, item.status]).sort()).toEqual([
-        ['sam1@old.example', 'AMBIGUOUS', 'OPEN'],
+        ['sam1+old@acme.vn', 'AMBIGUOUS', 'OPEN'],
         ['stranger@vendor.example', 'NOT_FOUND', 'OPEN'],
       ]);
       const ambiguous = items.find((item) => item.reason === 'AMBIGUOUS');
