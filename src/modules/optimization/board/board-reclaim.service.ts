@@ -1,13 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { LicensingGhostSeatApi } from '../../licensing/public/licensing-ghost-seat.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { GhostSeatDecisionRepo } from '../ghost-seat/ghost-seat-decision.repo';
 import { GhostSeatRepo } from '../ghost-seat/ghost-seat.repo';
 import { GhostSeatService } from '../ghost-seat/ghost-seat.service';
+import type { GhostSeatRecord } from '../ghost-seat/ghost-seat.types';
 import { isReclaimable } from '../ghost-seat/ghost-seat-state.policy';
 import { GhostSeatNotFoundError, GhostSeatNotReclaimableError } from './board.errors';
 import { BoardQueryService } from './board-query.service';
+
+/** A `G3`/`G4` the head decided to reclaim: the IT Admin may open it again once its task ended without the seat being given back. */
+const isReopenableDecided = (record: GhostSeatRecord): boolean =>
+  (record.group === 'G3' || record.group === 'G4') && record.state === 'RECLAIM_DECIDED';
+/** The states of a task that was given up (closed as failed or cancelled): nothing is under way for the seat. */
+const GIVEN_UP: readonly string[] = ['CLOSED_FAILED', 'CANCELLED'];
 
 /** The role the IT Admin decides a reclaim of a `G2` in, kept on the reason of the task (`US-10-05` AC-5). */
 export const RECLAIM_DECIDED_ROLE = 'IT_ADMIN_G2';
@@ -31,6 +40,8 @@ export class BoardReclaimService {
     private readonly licensing: LicensingApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly queries: BoardQueryService,
+    private readonly decisions: GhostSeatDecisionRepo,
+    private readonly taskStandings: LicensingGhostSeatApi,
   ) {}
 
   async reclaim(actor: AuthenticatedPrincipal, id: string) {
@@ -38,6 +49,7 @@ export class BoardReclaimService {
       const record = await this.repo.lock(tx, id);
       const organization = await this.organizationReads.getOrganization(tx);
       if (!record || record.organizationId !== organization?.id) throw new GhostSeatNotFoundError();
+      if (isReopenableDecided(record)) return this.reopen(tx, actor, record);
       if (!isReclaimable(record) || record.assignmentId === null) throw new GhostSeatNotReclaimableError();
       const opened = await this.licensing.openRevocation(tx, actor, {
         assignmentId: record.assignmentId,
@@ -66,5 +78,35 @@ export class BoardReclaimService {
     if (!updated) throw new GhostSeatNotFoundError();
 
     return { recommendation: await this.queries.detailOf(updated), taskId: done.taskId };
+  }
+
+  /**
+   * A reclaim the head decided on a `G3`/`G4` was closed as failed and no task is alive: the IT Admin opens it again (`Q-95`, `QĐ-62i`,
+   * `DA6-25`) with the decision of the head as it was (the head who decided, the same reference), the same first day of the grace, and no
+   * notice: the duty of the handover stays with the head who decided (`QĐ-64a`), whoever is the head now.
+   */
+  private async reopen(tx: DbTx, actor: AuthenticatedPrincipal, record: GhostSeatRecord) {
+    const standing = record.revocationTaskId
+      ? (await this.taskStandings.getRevocationTaskStatuses([record.revocationTaskId], tx)).get(record.revocationTaskId)
+      : undefined;
+    const decided = await this.decisions.latestReclaimOf(record.id, tx);
+    if (!decided || record.assignmentId === null || (standing && !GIVEN_UP.includes(standing.status))) {
+      throw new GhostSeatNotReclaimableError();
+    }
+    const opened = await this.licensing.openRevocation(tx, actor, {
+      assignmentId: record.assignmentId,
+      source: 'GHOST_SEAT',
+      decision: {
+        decidedByEmployeeId: decided.decidedByEmployeeId,
+        decidedRole: 'DEPARTMENT_HEAD',
+        referenceKind: RECLAIM_REFERENCE_KIND,
+        referenceId: record.id,
+        note: decided.reason,
+      },
+      ...(record.revocationNotBefore ? { timing: { notBefore: record.revocationNotBefore } } : {}),
+    });
+    await this.ghostSeats.relinkTask(tx, record, opened.taskId, { kind: 'USER', principal: actor });
+
+    return { id: record.id, taskId: opened.taskId };
   }
 }

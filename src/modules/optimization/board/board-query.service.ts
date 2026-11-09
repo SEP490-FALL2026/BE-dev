@@ -7,7 +7,7 @@ import type { GhostSeatRecord } from '../ghost-seat/ghost-seat.types';
 import { RuleRunQueryService } from '../rule-run/rule-run-query.service';
 import { toDetailWire, toSummaryWire, type RowNames } from './board.mapper';
 import { departmentsOfScope, type DepartmentScope } from './board.policy';
-import { GhostSeatNotFoundError } from './board.errors';
+import { GhostSeatNotDeciderError, GhostSeatNotFoundError } from './board.errors';
 
 export interface RecommendationQuery {
   group?: GhostSeatRecord['group'];
@@ -63,11 +63,21 @@ export class BoardQueryService {
     };
   }
 
-  /** Throws GhostSeatNotFoundError. */
-  async get(id: string) {
+  /**
+   * Throws GhostSeatNotFoundError, and GhostSeatNotDeciderError for a head who is not the head of the department that was asked
+   * (`US-10-06` AC-8): an IT Admin reads any recommendation, a head only the ones about a seat of the department they head today.
+   */
+  async get(actor: AuthenticatedPrincipal, id: string) {
     const record = await this.repo.find(id);
     const organization = await this.organizationReads.getOrganization();
     if (!record || record.organizationId !== organization?.id) throw new GhostSeatNotFoundError();
+    if (!actor.roles.includes('IT_ADMIN')) {
+      const headed = await this.organizationReads.getHeadedDepartment(
+        actor.employeeId,
+        await this.organizationReads.businessToday(),
+      );
+      if (!headed || record.deciderDepartmentId !== headed.departmentId) throw new GhostSeatNotDeciderError();
+    }
 
     return this.detailOf(record);
   }

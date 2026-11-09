@@ -9,6 +9,7 @@ import {
   SeatTargetNotFoundError,
 } from '../../licensing/public/licensing.errors';
 import {
+  GhostSeatNotDeciderError,
   GhostSeatNotFoundError,
   GhostSeatNotReclaimableError,
   GhostSeatPeriodInvalidError,
@@ -26,6 +27,9 @@ export function toGhostSeatApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
   if (error instanceof GhostSeatNotFoundError)
     return refuse(HttpStatus.NOT_FOUND, 'GHOST_SEAT.NOT_FOUND', error.message);
+  if (error instanceof GhostSeatNotDeciderError) {
+    return refuse(HttpStatus.FORBIDDEN, 'GHOST_SEAT.NOT_DECIDER', error.message);
+  }
   if (error instanceof GhostSeatNotReclaimableError) {
     return refuse(HttpStatus.CONFLICT, 'GHOST_SEAT.NOT_RECLAIMABLE', error.message);
   }
@@ -58,6 +62,7 @@ const example = (error: Error) => errorExampleOf(toGhostSeatApiException(error))
 export const GHOST_SEAT_ERROR_EXAMPLES = {
   NOT_FOUND: example(new GhostSeatNotFoundError()),
   NOT_RECLAIMABLE: example(new GhostSeatNotReclaimableError()),
+  NOT_DECIDER: example(new GhostSeatNotDeciderError()),
   SEAT_NOT_REVOCABLE: example(new GhostSeatSeatNotRevocableError('ASSIGNMENT_IS_SERVICE_ACCOUNT')),
   PERIOD_INVALID: example(new GhostSeatPeriodInvalidError()),
 } as const;

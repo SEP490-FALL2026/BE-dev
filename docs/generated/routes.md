@@ -357,9 +357,14 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/ghost-seat-rule-runs` | [optimization/board/board.controller.ts](../../src/modules/optimization/board/board.controller.ts) → `runs` | [BoardQueryService](../../src/modules/optimization/board/board-query.service.ts) |
 | GET | `/ghost-seat-rule-runs/{id}/skips` | [optimization/board/board.controller.ts](../../src/modules/optimization/board/board.controller.ts) → `skips` | [BoardQueryService](../../src/modules/optimization/board/board-query.service.ts) |
 | GET | `/ghost-seat-kpi5` | [optimization/board/board.controller.ts](../../src/modules/optimization/board/board.controller.ts) → `kpi5` | [BoardKpiService](../../src/modules/optimization/board/board-kpi.service.ts) |
+| GET | `/ghost-seat-queue` | [optimization/decision/decision.controller.ts](../../src/modules/optimization/decision/decision.controller.ts) → `list` | [DecisionQueueService](../../src/modules/optimization/decision/decision-queue.service.ts) |
+| GET | `/ghost-seat-decisions` | [optimization/decision/decision.controller.ts](../../src/modules/optimization/decision/decision.controller.ts) → `listDecisions` | [DecisionQueueService](../../src/modules/optimization/decision/decision-queue.service.ts) |
+| POST | `/ghost-seat-decisions` | [optimization/decision/decision.controller.ts](../../src/modules/optimization/decision/decision.controller.ts) → `decide` | [DecisionService](../../src/modules/optimization/decision/decision.service.ts) |
+| GET | `/ghost-seat-exemptions` | [optimization/decision/decision.controller.ts](../../src/modules/optimization/decision/decision.controller.ts) → `listExemptions` | [DecisionQueueService](../../src/modules/optimization/decision/decision-queue.service.ts) |
+| POST | `/ghost-seat-recommendations/{id}/return` | [optimization/decision/decision.controller.ts](../../src/modules/optimization/decision/decision.controller.ts) → `returnToHead` | [DecisionReturnService](../../src/modules/optimization/decision/decision-return.service.ts) |
 | GET | `/dashboards/employee` | [dashboards/employee/employee-dashboard.controller.ts](../../src/modules/dashboards/employee/employee-dashboard.controller.ts) → `get` | [EmployeeDashboardService](../../src/modules/dashboards/employee/employee-dashboard.service.ts) |
 | GET | `/dashboards/manager` | [dashboards/manager/manager-dashboard.controller.ts](../../src/modules/dashboards/manager/manager-dashboard.controller.ts) → `get` | [ManagerDashboardService](../../src/modules/dashboards/manager/manager-dashboard.service.ts) |
 | GET | `/dashboards/it-admin` | [dashboards/it-admin/it-admin-dashboard.controller.ts](../../src/modules/dashboards/it-admin/it-admin-dashboard.controller.ts) → `get` | [ItAdminDashboardService](../../src/modules/dashboards/it-admin/it-admin-dashboard.service.ts) |
 | GET | `/dashboards/super-admin` | [dashboards/super-admin/super-admin-dashboard.controller.ts](../../src/modules/dashboards/super-admin/super-admin-dashboard.controller.ts) → `get` | [SuperAdminDashboardService](../../src/modules/dashboards/super-admin/super-admin-dashboard.service.ts) |
 
-356 operations.
+361 operations.

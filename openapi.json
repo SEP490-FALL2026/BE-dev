@@ -80166,7 +80166,18 @@
             "name": "state",
             "required": false,
             "in": "query",
-            "schema": { "type": "string", "enum": ["OPEN", "PAUSED", "RECLAIM_DECIDED", "CLOSED"] }
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "PAUSED",
+                "RECLAIM_DECIDED",
+                "CLOSED",
+                "AWAITING_DECISION",
+                "WAITING_FOR_HEAD",
+                "RETURNED_TO_HEAD"
+              ]
+            }
           },
           {
             "name": "applicationId",
@@ -80485,7 +80496,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The recommendation with the evidence it was made from.",
+            "description": "The recommendation with the evidence it was made from; a head reads only the ones about their department.",
             "content": {
               "application/json": {
                 "schema": {
@@ -80530,7 +80541,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin may do this.",
+            "description": "Only an IT Admin, or the head of the department that was asked, may read it (GHOST_SEAT.NOT_DECIDER for another head).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -80542,6 +80553,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.NOT_DECIDER": {
+                    "summary": "Only the head of the department that was asked can read this recommendation.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.NOT_DECIDER",
+                        "message": "Only the head of the department that was asked can read this recommendation.",
                         "requestId": "req_example"
                       }
                     }
@@ -81399,6 +81421,1085 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Read KPI-5 over a period",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-queue": {
+      "get": {
+        "operationId": "ghostSeatQueueList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of what waits for the head of the department or was returned to them, a person’s rows together, with the fields the head decides on.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/QueuePageResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_QUEUE.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only a head of a department may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body, the query or the id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the recommendations about the seats of my department that wait for my decision",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-decisions": {
+      "get": {
+        "operationId": "ghostSeatDecisionList",
+        "parameters": [
+          {
+            "name": "selfDecided",
+            "required": false,
+            "in": "query",
+            "description": "true: only what a head decided on their own seat (the report of `US-10-03` AC-13).",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of decisions, newest first; `selfDecided=true` is the report of the heads who decided on their own seats.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DecisionPageResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_DECISIONS.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body, the query or the id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List what heads decided about wasted seats, or only what they decided on their own seats",
+        "tags": ["ghost-seats"]
+      },
+      "post": {
+        "operationId": "ghostSeatDecisionCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DecisionBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The choice was saved for every recommendation of the batch: kept or exempted ones are closed, a reclaim opens the revocation with its grace (or is left to expire when the right ends within a month).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DecisionCreatedResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_DECISION.CREATED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the head of the department that was asked may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A recommendation does not exist (GHOST_SEAT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "GHOST_SEAT.NOT_FOUND": {
+                    "summary": "The recommendation does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.NOT_FOUND",
+                        "message": "The recommendation does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (NOT_DECIDABLE) or its seat cannot be revoked (SEAT_NOT_REVOCABLE); `details.items` names each; nothing was saved.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "GHOST_SEAT.PAUSED": {
+                    "summary": "The recommendation is paused while its holder is in a transfer.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.PAUSED",
+                        "message": "The recommendation is paused while its holder is in a transfer.",
+                        "details": { "items": [{ "recommendationId": "recommendation-id", "code": "PAUSED" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is invalid (VALIDATION_ERROR) or an exemption has no end day (EXEMPTION_REQUIRED) or lasts beyond 12 months or into the past (EXEMPTION_TOO_LONG).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.EXEMPTION_TOO_LONG": {
+                    "summary": "An exemption lasts after today and at most 12 months.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.EXEMPTION_TOO_LONG",
+                        "message": "An exemption lasts after today and at most 12 months.",
+                        "details": {
+                          "items": [{ "recommendationId": "recommendation-id", "code": "EXEMPTION_TOO_LONG" }]
+                        },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Keep, reclaim or exempt the seats recommended to me, with a reason",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-exemptions": {
+      "get": {
+        "operationId": "ghostSeatExemptionList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of exemptions, newest first; the IT Admin cannot set, change or cancel one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ExemptionPageResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_EXEMPTIONS.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only a head of a department or an IT Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body, the query or the id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the exemptions of the seats of my department (an IT Admin reads all of them)",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-recommendations/{id}/return": {
+      "post": {
+        "operationId": "ghostSeatRecommendationReturn",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReturnBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The reason of the head was taken back from the task (cancelled when none stands) and the recommendation is with the head again, due in the working days of the parameter from today.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ReturnedResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_RECOMMENDATION.RETURNED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The recommendation does not exist (GHOST_SEAT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "GHOST_SEAT.NOT_FOUND": {
+                    "summary": "The recommendation does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.NOT_FOUND",
+                        "message": "The recommendation does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a reclaim of unused or idle seats the head decided (GHOST_SEAT.NOT_RETURNABLE), returned once already (ALREADY_RETURNED) or another IT Admin works the task (TASK_IN_PROGRESS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "GHOST_SEAT.NOT_RETURNABLE": {
+                    "summary": "Only a reclaim the head decided on a recommendation of unused or idle seats can be returned.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.NOT_RETURNABLE",
+                        "message": "Only a reclaim the head decided on a recommendation of unused or idle seats can be returned.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.ALREADY_RETURNED": {
+                    "summary": "The recommendation was returned to the head once already.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.ALREADY_RETURNED",
+                        "message": "The recommendation was returned to the head once already.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.TASK_IN_PROGRESS": {
+                    "summary": "Another IT Admin is working the revocation task; close it first.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.TASK_IN_PROGRESS",
+                        "message": "Another IT Admin is working the revocation task; close it first.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body, the query or the id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Give back to the head a reclaim they decided, with a reason (once)",
         "tags": ["ghost-seats"]
       }
     },
@@ -90093,8 +91194,7 @@
                   "handedOffAt",
                   "handOffEvidence",
                   "closedBy",
-                  "closeReason",
-                  "poolGrantAvoidedCosts"
+                  "closeReason"
                 ],
                 "additionalProperties": false
               },
@@ -90609,8 +91709,7 @@
                   "handedOffAt",
                   "handOffEvidence",
                   "closedBy",
-                  "closeReason",
-                  "poolGrantAvoidedCosts"
+                  "closeReason"
                 ],
                 "additionalProperties": false
               }
@@ -97180,11 +98279,14 @@
       "ReturnBodyDto": {
         "type": "object",
         "properties": {
-          "assignmentId": { "type": "string", "format": "uuid" },
-          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "fromRequestId": { "type": "string", "format": "uuid" }
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Why: 3 to 1000 characters, for every choice (`US-10-06` AC-5)."
+          }
         },
-        "required": ["assignmentId", "reason"],
+        "required": ["reason"],
         "additionalProperties": false
       },
       "ReturnResponseDto": {
@@ -100289,11 +101391,32 @@
       "DecisionBodyDto": {
         "type": "object",
         "properties": {
-          "decision": { "type": "string", "enum": ["APPROVE", "REJECT", "REQUEST_CHANGES"] },
-          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          "items": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": { "recommendationId": { "type": "string", "format": "uuid" } },
+              "required": ["recommendationId"],
+              "additionalProperties": false
+            },
+            "description": "The recommendations the one choice and reason apply to (1 to 50), all or none."
+          },
+          "choice": { "type": "string", "enum": ["KEEP", "RECLAIM", "EXEMPT"] },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Why: 3 to 1000 characters, for every choice (`US-10-06` AC-5)."
+          },
+          "exemptUntil": {
+            "description": "Only for EXEMPT: the last day, after today and at most 12 months from today.",
+            "type": "string",
+            "format": "date"
+          }
         },
-        "required": ["decision"],
-        "description": "A refusal (REJECT) or a request to look again (REQUEST_CHANGES) gives its reason; an approval (APPROVE) gives none.",
+        "required": ["items", "choice", "reason"],
         "additionalProperties": false
       },
       "VersionLinePageResponseDto": {
@@ -105958,7 +107081,18 @@
                   "properties": {
                     "id": { "type": "string", "format": "uuid" },
                     "group": { "type": "string", "enum": ["G1", "G2", "G3", "G4"] },
-                    "state": { "type": "string", "enum": ["OPEN", "PAUSED", "RECLAIM_DECIDED", "CLOSED"] },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "OPEN",
+                        "PAUSED",
+                        "RECLAIM_DECIDED",
+                        "CLOSED",
+                        "AWAITING_DECISION",
+                        "WAITING_FOR_HEAD",
+                        "RETURNED_TO_HEAD"
+                      ]
+                    },
                     "closeReason": {
                       "type": "string",
                       "enum": [
@@ -105970,6 +107104,8 @@
                         "KEPT",
                         "NEGATED",
                         "TRANSFER_SEAT_REVOKED",
+                        "EXEMPTED",
+                        "LEFT_TO_EXPIRE",
                         null
                       ],
                       "nullable": true
@@ -106168,7 +107304,18 @@
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
                   "group": { "type": "string", "enum": ["G1", "G2", "G3", "G4"] },
-                  "state": { "type": "string", "enum": ["OPEN", "PAUSED", "RECLAIM_DECIDED", "CLOSED"] },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "OPEN",
+                      "PAUSED",
+                      "RECLAIM_DECIDED",
+                      "CLOSED",
+                      "AWAITING_DECISION",
+                      "WAITING_FOR_HEAD",
+                      "RETURNED_TO_HEAD"
+                    ]
+                  },
                   "closeReason": {
                     "type": "string",
                     "enum": [
@@ -106180,6 +107327,8 @@
                       "KEPT",
                       "NEGATED",
                       "TRANSFER_SEAT_REVOKED",
+                      "EXEMPTED",
+                      "LEFT_TO_EXPIRE",
                       null
                     ],
                     "nullable": true
@@ -106315,7 +107464,18 @@
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
                   "group": { "type": "string", "enum": ["G1", "G2", "G3", "G4"] },
-                  "state": { "type": "string", "enum": ["OPEN", "PAUSED", "RECLAIM_DECIDED", "CLOSED"] },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "OPEN",
+                      "PAUSED",
+                      "RECLAIM_DECIDED",
+                      "CLOSED",
+                      "AWAITING_DECISION",
+                      "WAITING_FOR_HEAD",
+                      "RETURNED_TO_HEAD"
+                    ]
+                  },
                   "closeReason": {
                     "type": "string",
                     "enum": [
@@ -106327,6 +107487,8 @@
                       "KEPT",
                       "NEGATED",
                       "TRANSFER_SEAT_REVOKED",
+                      "EXEMPTED",
+                      "LEFT_TO_EXPIRE",
                       null
                     ],
                     "nullable": true
@@ -106644,6 +107806,401 @@
               }
             },
             "required": ["denominator", "numerator", "ratePercent", "from", "to", "byGroup"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "QueuePageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "group": { "type": "string", "enum": ["G1", "G2", "G3", "G4"] },
+                    "tier": { "type": "string", "enum": ["MONITOR", "REVIEW", "ACTION", null], "nullable": true },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "OPEN",
+                        "PAUSED",
+                        "RECLAIM_DECIDED",
+                        "CLOSED",
+                        "AWAITING_DECISION",
+                        "WAITING_FOR_HEAD",
+                        "RETURNED_TO_HEAD"
+                      ]
+                    },
+                    "holder": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false
+                    },
+                    "selfSeat": {
+                      "type": "boolean",
+                      "description": "The seat is the head’s own: the reason is mandatory and the act is marked."
+                    },
+                    "application": {
+                      "type": "object",
+                      "properties": {
+                        "applicationId": { "type": "string", "format": "uuid" },
+                        "applicationName": { "type": "string" }
+                      },
+                      "required": ["applicationId", "applicationName"],
+                      "additionalProperties": false
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": {
+                        "planId": { "type": "string", "format": "uuid" },
+                        "planName": { "type": "string" }
+                      },
+                      "required": ["planId", "planName"],
+                      "additionalProperties": false
+                    },
+                    "decisionDueOn": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD.",
+                      "nullable": true
+                    },
+                    "overdue": {
+                      "type": "boolean",
+                      "description": "Past the due day: only a reminder, nothing is decided for the head."
+                    },
+                    "returnReason": {
+                      "description": "Why the IT Admin returned a reclaim to the head.",
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "previousDecision": {
+                      "type": "object",
+                      "properties": {
+                        "choice": { "type": "string", "enum": ["KEEP", "RECLAIM", "EXEMPT"] },
+                        "reason": { "type": "string" },
+                        "decidedOn": {
+                          "type": "string",
+                          "format": "date",
+                          "description": "A calendar date as YYYY-MM-DD."
+                        }
+                      },
+                      "required": ["choice", "reason", "decidedOn"],
+                      "additionalProperties": false,
+                      "description": "What the head chose before the IT Admin returned it.",
+                      "nullable": true
+                    },
+                    "evidence": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "What the recommendation was made from (no usage volume)."
+                    },
+                    "createdAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": [
+                    "id",
+                    "group",
+                    "tier",
+                    "state",
+                    "holder",
+                    "selfSeat",
+                    "application",
+                    "plan",
+                    "decisionDueOn",
+                    "overdue",
+                    "returnReason",
+                    "previousDecision",
+                    "evidence",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "description": "Sorted by holder, so the rows of one person sit together."
+              },
+              "holderCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "How many people the items of this page are about."
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "holderCount", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "DecisionPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "recommendationId": { "type": "string", "format": "uuid" },
+                    "choice": { "type": "string", "enum": ["KEEP", "RECLAIM", "EXEMPT"] },
+                    "reason": { "type": "string" },
+                    "exemptUntil": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD.",
+                      "nullable": true
+                    },
+                    "decidedOn": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD."
+                    },
+                    "decidedAt": { "type": "string", "format": "date-time" },
+                    "decidedBy": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false
+                    },
+                    "deciderDepartmentId": { "type": "string", "format": "uuid" },
+                    "selfDecided": { "type": "boolean" }
+                  },
+                  "required": [
+                    "id",
+                    "recommendationId",
+                    "choice",
+                    "reason",
+                    "exemptUntil",
+                    "decidedOn",
+                    "decidedAt",
+                    "decidedBy",
+                    "deciderDepartmentId",
+                    "selfDecided"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ExemptionPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "recommendationId": { "type": "string", "format": "uuid" },
+                    "holder": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "application": {
+                      "type": "object",
+                      "properties": {
+                        "applicationId": { "type": "string", "format": "uuid" },
+                        "applicationName": { "type": "string" }
+                      },
+                      "required": ["applicationId", "applicationName"],
+                      "additionalProperties": false
+                    },
+                    "exemptUntil": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD."
+                    },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "remindedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "endedAt": { "type": "string", "format": "date-time", "nullable": true }
+                  },
+                  "required": [
+                    "id",
+                    "recommendationId",
+                    "holder",
+                    "application",
+                    "exemptUntil",
+                    "createdAt",
+                    "remindedAt",
+                    "endedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "DecisionCreatedResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "recommendationId": { "type": "string", "format": "uuid" },
+                    "choice": { "type": "string", "enum": ["KEEP", "RECLAIM", "EXEMPT"] },
+                    "outcome": { "type": "string", "enum": ["KEPT", "EXEMPTED", "RECLAIM_DECIDED", "LEFT_TO_EXPIRE"] },
+                    "revocationTaskId": { "type": "string", "format": "uuid", "nullable": true },
+                    "notBefore": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD.",
+                      "nullable": true
+                    },
+                    "selfDecided": { "type": "boolean" }
+                  },
+                  "required": ["recommendationId", "choice", "outcome", "revocationTaskId", "notBefore", "selfDecided"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ReturnedResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "recommendation": {
+                "type": "object",
+                "properties": {
+                  "recommendationId": { "type": "string", "format": "uuid" },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "OPEN",
+                      "PAUSED",
+                      "RECLAIM_DECIDED",
+                      "CLOSED",
+                      "AWAITING_DECISION",
+                      "WAITING_FOR_HEAD",
+                      "RETURNED_TO_HEAD"
+                    ]
+                  },
+                  "returnCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "decisionDueOn": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  }
+                },
+                "required": ["recommendationId", "state", "returnCount", "decisionDueOn"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["recommendation"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -106992,7 +108549,7 @@
                     },
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
-                    "description": "The ghost seats waiting for a decision; they need usage data, which is not delivered yet."
+                    "description": "The recommendations about the seats of the department that wait for the head to decide, or were returned to them."
                   },
                   "spending": {
                     "type": "object",

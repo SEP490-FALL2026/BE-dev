@@ -1,16 +1,29 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
+import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { LicensingModule } from '../licensing/licensing.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { PersonnelModule } from '../personnel/personnel.module';
 import { BoardController } from './board/board.controller';
 import { BoardKpiService } from './board/board-kpi.service';
 import { BoardQueryService } from './board/board-query.service';
 import { BoardReclaimService } from './board/board-reclaim.service';
 import { BoardSummaryService } from './board/board-summary.service';
+import { DecisionController } from './decision/decision.controller';
+import { DecisionQueueService } from './decision/decision-queue.service';
+import { DecisionReminderService } from './decision/decision-reminder.service';
+import { DecisionReclaimService } from './decision/decision-reclaim.service';
+import { DecisionReturnService } from './decision/decision-return.service';
+import { DecisionService } from './decision/decision.service';
+import { DecisionFollowUpService } from './decision/decision-follow-up.service';
+import { DecisionFollowUpSweeper } from './decision/decision-follow-up.job';
+import { DecisionRoutingService } from './decision/decision-routing.service';
+import { DecisionTransferService } from './decision/decision-transfer.service';
+import { GhostSeatDecisionRepo } from './ghost-seat/ghost-seat-decision.repo';
 import { GhostSeatRepo } from './ghost-seat/ghost-seat.repo';
 import { GhostSeatRevocationListener } from './ghost-seat/ghost-seat-revocation.listener';
 import { GhostSeatService } from './ghost-seat/ghost-seat.service';
@@ -37,8 +50,10 @@ import { RuleRunService } from './rule-run/rule-run.service';
     CatalogModule,
     LicensingModule,
     NotificationsModule,
+    IdentityAccessFacadeModule,
+    PersonnelModule,
   ],
-  controllers: [BoardController],
+  controllers: [BoardController, DecisionController],
   providers: [
     BoardQueryService,
     BoardSummaryService,
@@ -55,6 +70,16 @@ import { RuleRunService } from './rule-run/rule-run.service';
     InternalRulesG2Service,
     InternalRulesService,
     InternalRulesSweeper,
+    DecisionRoutingService,
+    DecisionTransferService,
+    DecisionFollowUpService,
+    DecisionFollowUpSweeper,
+    DecisionQueueService,
+    DecisionReclaimService,
+    DecisionService,
+    DecisionReturnService,
+    DecisionReminderService,
+    GhostSeatDecisionRepo,
   ],
   exports: [OptimizationApi],
 })

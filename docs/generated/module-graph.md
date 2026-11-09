@@ -59,7 +59,7 @@ flowchart BT
   catalog -->|29| organization
   dashboards -->|3| identity_access
   dashboards -->|4| licensing
-  dashboards -->|2| optimization
+  dashboards -->|3| optimization
   dashboards -->|5| organization
   dashboards -->|4| personnel
   dashboards -->|3| requests
@@ -97,11 +97,13 @@ flowchart BT
   operating_parameters -->|2| finance
   operating_parameters -->|7| organization
   optimization -->|4| audit
-  optimization -->|2| catalog
-  optimization -->|9| licensing
-  optimization -->|2| notifications
-  optimization -->|2| operating_parameters
-  optimization -->|8| organization
+  optimization -->|3| catalog
+  optimization -->|2| identity_access
+  optimization -->|17| licensing
+  optimization -->|6| notifications
+  optimization -->|4| operating_parameters
+  optimization -->|15| organization
+  optimization -->|3| personnel
   organization -->|10| audit
   organization -->|5| notifications
   personnel -->|24| audit
@@ -128,4 +130,4 @@ flowchart BT
   usage -->|3| organization
 ```
 
-86 module edges.
+88 module edges.

@@ -98,16 +98,27 @@ export class BoardController {
   }
 
   @Get('ghost-seat-recommendations/:id')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('IT_ADMIN', 'MANAGER')
   @ApiOperation({ operationId: 'ghostSeatRecommendationGet', summary: 'Read one recommendation of wasted seats' })
   @ApiSuccessResponse(RecommendationResponseDto, {
     message: 'GHOST_SEAT_RECOMMENDATION.READ',
-    description: 'The recommendation with the evidence it was made from.',
+    description:
+      'The recommendation with the evidence it was made from; a head reads only the ones about their department.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, forbidden('an IT Admin'), NOT_FOUND, QUERY_INVALID)
-  async get(@Param() params: RecommendationIdParamDto) {
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an IT Admin, or the head of the department that was asked, may read it (GHOST_SEAT.NOT_DECIDER for another head).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_DECIDER],
+    },
+    NOT_FOUND,
+    QUERY_INVALID,
+  )
+  async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RecommendationIdParamDto) {
     try {
-      return { recommendation: await this.queries.get(params.id) };
+      return { recommendation: await this.queries.get(actor, params.id) };
     } catch (error) {
       throw toGhostSeatApiException(error);
     }

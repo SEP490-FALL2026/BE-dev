@@ -29,3 +29,11 @@ export class GhostSeatPeriodInvalidError extends Error {
     this.name = 'GhostSeatPeriodInvalidError';
   }
 }
+
+/** A head reads only a recommendation about a seat of the department they head today: another head, or a person with no department, is refused. */
+export class GhostSeatNotDeciderError extends Error {
+  constructor() {
+    super('Only the head of the department that was asked can read this recommendation.');
+    this.name = 'GhostSeatNotDeciderError';
+  }
+}

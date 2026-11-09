@@ -143,7 +143,10 @@ describe('ghost seat board routes (no database)', () => {
     });
 
     it('US-10-05 AC-7: is refused to every other role (403) and to a call with no token (401)', async () => {
-      for (const role of ROLES.filter((candidate) => candidate !== 'IT_ADMIN')) {
+      // The head of a department may read the one recommendation about their own department (the service says which, `GHOST_SEAT.NOT_DECIDER`).
+      const allowed = (role: string) =>
+        role === 'IT_ADMIN' || (route.name === 'one recommendation' && role === 'MANAGER');
+      for (const role of ROLES.filter((candidate) => !allowed(candidate))) {
         const response = await request(app.getHttpServer())[route.method](route.path).set(as(role)).expect(403);
         expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
       }
@@ -151,6 +154,12 @@ describe('ghost seat board routes (no database)', () => {
       expect(queries.list).not.toHaveBeenCalled();
       expect(reclaims.reclaim).not.toHaveBeenCalled();
     });
+  });
+
+  it('US-10-06 AC-8: a head reads one recommendation through the same route, and the service is told who asks', async () => {
+    await request(app.getHttpServer()).get(`/api/v1/ghost-seat-recommendations/${ID}`).set(as('MANAGER')).expect(200);
+
+    expect(queries.get).toHaveBeenCalledWith(expect.objectContaining({ roles: ['MANAGER'] }), ID);
   });
 
   it('answers the table with no level and no percentage, G1 and G2 labelled as internal data', async () => {
