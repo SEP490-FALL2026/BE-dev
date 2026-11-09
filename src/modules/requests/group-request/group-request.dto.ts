@@ -27,7 +27,13 @@ const reason = z.string().trim().min(1).max(REASON_MAX_LENGTH);
 export const groupBodySchema = z.strictObject({
   planId: z.uuid(),
   lines: z
-    .array(z.strictObject({ employeeId: z.uuid() }))
+    .array(
+      z.strictObject({
+        employeeId: z.uuid(),
+        /** GH-3 (`BR-MF1-01g`): why this person asks for one more paid application; required only at the threshold. */
+        manyPaidSoftwareReason: reason.optional(),
+      }),
+    )
     .min(1)
     .max(GROUP_BODY_LINES_MAX),
   businessReason: reason,
@@ -44,6 +50,8 @@ const LINE_REASONS = [
   'HAS_ACCESS',
   'HAS_OPEN_REQUEST',
   'TERM_REQUIRED',
+  'OPEN_LIMIT_REACHED',
+  'MANY_PAID_SOFTWARE_REASON_REQUIRED',
 ] as const;
 
 /** What the check of a group says: every reason of every person at once, and what it would cost; nothing is written. */
@@ -64,6 +72,10 @@ const checkSchema = z.strictObject({
       employeeId: z.uuid(),
       ok: z.boolean(),
       reason: z.enum([...LINE_REASONS, 'DUPLICATE_LINE']).nullable(),
+      /** GH-3 of the person: how many paid applications they use and the threshold; null when the line is not flagged. */
+      manyPaidSoftware: z
+        .strictObject({ count: z.number().int().nonnegative(), threshold: z.number().int() })
+        .nullable(),
     }),
   ),
   lineCount: z.number().int().nonnegative(),

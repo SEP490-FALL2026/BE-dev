@@ -63,13 +63,15 @@ export class ProvisioningTaskRepo {
       maxAttempts: number;
       /** What was bought with the grant (a K1 seat, or a pool that had nothing free); absent when the seat comes from the pool. */
       purchase?: { kind: 'POOL_TOP_UP' | 'KEY_PURCHASE' | 'K1_SUBSCRIPTION'; reason: string | null; purchasedAt: Date };
+      /** A grant unless said: the extension of a right whose renewal was approved answers for its request the same way. */
+      kind?: 'GRANT' | 'EXTEND';
     },
   ): Promise<ProvisioningTaskRecord> {
-    const { purchase, ...task } = input;
+    const { purchase, kind, ...task } = input;
     const row = await tx.provisioningTask.create({
       data: {
         ...task,
-        kind: 'GRANT',
+        kind: kind ?? 'GRANT',
         ...(purchase && {
           purchaseKind: purchase.kind,
           purchaseReason: purchase.reason,

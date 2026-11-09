@@ -50,6 +50,30 @@ export function expiryReminderAlert(input: {
   };
 }
 
+/** The window of the renewal of a right opened (`BR-MF1-08a`): told once for the right and its end to each person. */
+export function renewalWindowOpenedAlert(input: {
+  assignmentId: string;
+  holderEmployeeId: string;
+  planId: string;
+  expectedEndDate: BusinessDate;
+  opensOn: BusinessDate;
+  audience: 'EMPLOYEE' | 'HEAD';
+}): LicensingAlert {
+  return {
+    code: 'RENEWAL_WINDOW_OPENED',
+    subject: { type: 'LicenseAssignment', id: input.assignmentId },
+    params: {
+      assignmentId: input.assignmentId,
+      holderEmployeeId: input.holderEmployeeId,
+      planId: input.planId,
+      expectedEndDate: input.expectedEndDate,
+      opensOn: input.opensOn,
+      audience: input.audience,
+    },
+    eventKey: `RENEWAL_WINDOW_OPENED:${input.assignmentId}:${input.expectedEndDate}:${input.audience}`,
+  };
+}
+
 export type HandoverStage = 'DUE' | 'OVERDUE';
 
 /**

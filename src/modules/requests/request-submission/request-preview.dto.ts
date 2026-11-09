@@ -68,6 +68,20 @@ const previewSchema = z.strictObject({
       employeeIds: z.array(z.uuid()),
     })
     .nullable(),
+  /**
+   * GH-1/GH-2/GH-3 of the person on the day (`BR-MF1-01`): the requests for new access they have open and the most they may, the paid
+   * applications they use and the threshold, whether a reason is required, and why sending would be refused (`openRequestId` is the
+   * request of the same plan already open). Read without a lock: sending judges again.
+   */
+  limits: z.strictObject({
+    openNewCount: z.number().int().nonnegative(),
+    openNewMax: z.number().int().positive(),
+    paidSoftwareCount: z.number().int().nonnegative(),
+    paidSoftwareThreshold: z.number().int().positive(),
+    reasonRequired: z.boolean(),
+    refusal: z.enum(['HAS_OPEN_REQUEST', 'OPEN_LIMIT_REACHED']).nullable(),
+    openRequestId: z.uuid().nullable(),
+  }),
   canSubmit: z.boolean(),
   budgetYear: z.number().int().nullable(),
   pricing: pricingSchema,

@@ -13,6 +13,7 @@ import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { RequestDraftRepo } from '../request-draft/request-draft.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
 import { RequestFactsService, type RequestSettings } from '../access-request/request-facts.service';
+import { RequestLimitsService, type LimitSettings } from '../request-limits/request-limits.service';
 import {
   GroupRequestDuplicateLineError,
   GroupRequestLinesRefusedError,
@@ -45,7 +46,12 @@ export interface GroupCheck {
   tooFewLines: { min: number } | null;
   maxEndDate: string;
   endDateOutOfRange: boolean;
-  lines: { employeeId: string; ok: boolean; reason: LineReason | 'DUPLICATE_LINE' | null }[];
+  lines: {
+    employeeId: string;
+    ok: boolean;
+    reason: LineReason | 'DUPLICATE_LINE' | null;
+    manyPaidSoftware: { count: number; threshold: number } | null;
+  }[];
   pricing: PricingRecord;
   lineCount: number;
 }
@@ -67,16 +73,18 @@ export class GroupRequestService {
     private readonly requests: AccessRequestRepo,
     private readonly drafts: RequestDraftRepo,
     private readonly writer: GroupRequestWriter,
+    private readonly limits: RequestLimitsService,
   ) {}
 
   /** Every reason the request cannot be sent, and what it would cost, without writing anything. */
   async check(actor: AuthenticatedPrincipal, body: GroupBody): Promise<GroupCheck> {
     const settings = await this.assessment.settings();
+    const limitSettings = await this.limits.settings();
 
     return this.runner.run(async (tx) => {
       await this.requireSender(tx, actor);
       await this.facts.requireEligibleSender(tx, actor.employeeId, { lock: false });
-      const judged = await this.facts.judge(tx, this.input(actor, body, settings, false));
+      const judged = await this.facts.judge(tx, this.input(actor, body, { settings, limitSettings }, false));
       const refused = new Map(judged.refused.map((line) => [line.employeeId, line.reason]));
 
       return {
@@ -89,7 +97,12 @@ export class GroupRequestService {
           const duplicate = judged.count.duplicates.includes(line.employeeId);
           const reason = duplicate ? ('DUPLICATE_LINE' as const) : (refused.get(line.employeeId) ?? null);
 
-          return { employeeId: line.employeeId, ok: reason === null, reason };
+          return {
+            employeeId: line.employeeId,
+            ok: reason === null,
+            reason,
+            manyPaidSoftware: judged.limits.get(line.employeeId)?.manyPaidSoftware ?? null,
+          };
         }),
         pricing: judged.pricing,
         lineCount: judged.lines.length,
@@ -111,6 +124,7 @@ export class GroupRequestService {
   ): Promise<AccessRequestRecord> {
     if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const settings = await this.assessment.settings();
+    const limitSettings = await this.limits.settings();
 
     return this.runner.run(async (tx) => {
       if (options.draftId) {
@@ -120,7 +134,12 @@ export class GroupRequestService {
       }
       const organizationId = await this.requireSender(tx, actor);
       await this.facts.requireEligibleSender(tx, actor.employeeId, { lock: true });
-      const judged = await this.facts.judge(tx, this.input(actor, body, settings, true));
+      // The limits of every person named are judged one sending after the other (QĐ-106g): locked before any department is.
+      await this.limits.lock(
+        tx,
+        body.lines.map((line) => line.employeeId),
+      );
+      const judged = await this.facts.judge(tx, this.input(actor, body, { settings, limitSettings }, true));
       this.refuse(judged);
 
       const planned = planNeedSteps({
@@ -146,8 +165,14 @@ export class GroupRequestService {
     });
   }
 
-  private input(actor: AuthenticatedPrincipal, body: GroupBody, settings: RequestSettings, lockPeople: boolean) {
+  private input(
+    actor: AuthenticatedPrincipal,
+    body: GroupBody,
+    { settings, limitSettings }: { settings: RequestSettings; limitSettings: LimitSettings },
+    lockPeople: boolean,
+  ) {
     return {
+      limitSettings,
       senderEmployeeId: actor.employeeId,
       planId: body.planId,
       expectedEndDate: body.expectedEndDate ?? null,

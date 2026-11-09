@@ -173,8 +173,9 @@ export class YearStartCommitmentsRepo {
   /**
    * The seats of the candidates that nobody has been given yet: the one person of a request that waits for the IT Admin, and the people of a
    * group whose line is approved as spend and not yet carried out. Each is a seat the company will pay for once granted, so it counts on 01/01
-   * as one that runs (`BR-MF1-09e`). A request that is being carried out or is done has its seats in the grants, not here. A renewal has none:
-   * its seat is the record that follows the renewed one, and one approved that no record follows yet waits for it.
+   * as one that runs (`BR-MF1-09e`). A request that is being carried out or is done has its seats in the grants, not here. A renewal approved
+   * whose extension the IT Admin has not completed yet (`AWAITING_EXECUTION`, no record follows the renewed one) is approved and not granted
+   * the same way, to its new end (RV-03, `BR-MF1-08d`); once extended, its seat is the record that follows (`renewalSuccessors`).
    */
   async unclaimedSeats(
     tx: DbTx,
@@ -185,7 +186,7 @@ export class YearStartCommitmentsRepo {
       seats.set(requestId, [...(seats.get(requestId) ?? []), { expectedEndDate }]);
     };
     for (const candidate of candidates) {
-      const single = candidate.type === 'GRANT' || candidate.type === 'SERVICE_ACCOUNT';
+      const single = candidate.type === 'GRANT' || candidate.type === 'SERVICE_ACCOUNT' || candidate.type === 'RENEWAL';
       if (single && candidate.state === 'AWAITING_EXECUTION') {
         add(candidate.id, candidate.expectedEndDate);
       }

@@ -6,6 +6,7 @@ import { AssignmentService } from '../../assignment/assignment.service';
 import { LicenseKeyAssignmentService } from '../../license-key/license-key-assignment.service';
 import { GrantRequestGateHook } from '../../public/licensing.extension-points';
 import { SharedPoolService } from '../../shared-pool/shared-pool.service';
+import { ProvisioningKeyError } from '../provisioning.errors';
 import { assertKeyFits } from '../provisioning.policy';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
@@ -15,7 +16,8 @@ import type { ProvisioningTaskRecord } from '../provisioning-task.types';
  * completed, a K4 seat is given the free key of the store the IT Admin names (the subscription, then the key, locked in that order), the day
  * the right begins is recorded (`BR-MF1-06a`), the request is told the outcome with whether the seat came from the pool, and a grant taken
  * from the pool with nothing bought records the cost it avoided once (`BR-MF1-09c`). Throws ProvisioningKeyError, LicenseKeyNotFoundError,
- * LicenseKeyStateError and whatever the request gate throws.
+ * LicenseKeyStateError and whatever the request gate throws. The task of an extension (`EXTEND`, `BR-MF1-08d`) only completes and tells
+ * the request, which writes the record that follows the renewed one.
  */
 @Injectable()
 export class ProvisioningGrantCompletion {
@@ -35,6 +37,14 @@ export class ProvisioningGrantCompletion {
     input: { evidence: string; licenseKeyId?: string | undefined },
   ): Promise<void> {
     const { task, now, organizationId } = context;
+    // An extension grants nothing and names no key: the renewal it answers for is applied by the module of requests (`BR-MF1-08d`).
+    if (task.kind === 'EXTEND' && task.requestId !== null) {
+      if (input.licenseKeyId !== undefined) throw new ProvisioningKeyError('KEY_NOT_APPLICABLE');
+      await this.repo.markCompleted(tx, task.id, actor.appUserId, input.evidence, now);
+      await this.gate.get().reportExtended(tx, actor, task.requestId, now);
+
+      return;
+    }
     const provisioningType = await this.sharedPool.provisioningTypeOf(tx, task.assignment.planId);
     assertKeyFits(provisioningType, input.licenseKeyId);
     await this.repo.markCompleted(tx, task.id, actor.appUserId, input.evidence, now);

@@ -154,6 +154,12 @@ model AccessRequest {
   routingMode RequestRoutingMode @default(VIA_HEAD) @map("routing_mode")
   oneStepReason String? @map("one_step_reason")
   oneStepBlockedReason String? @map("one_step_blocked_reason")
+  // GH-3 (BR-MF1-01g): the beneficiary used this many paid applications when it was sent, and why they ask for one more.
+  manyPaidSoftware       Boolean @default(false) @map("many_paid_software")
+  manyPaidSoftwareCount  Int?    @map("many_paid_software_count") @db.SmallInt
+  manyPaidSoftwareReason String? @map("many_paid_software_reason")
+  // Why the request is left out of GH-1/GH-2 (TRANSFER_OVERLAP, ROLE_ENDED; QĐ-108c); null for every other.
+  limitExemption         String? @map("limit_exemption")
   id                    String                     @id @default(uuid()) @db.Uuid
   organizationId        String                     @map("organization_id") @db.Uuid
   type                  AccessRequestType          @default(GRANT)
@@ -322,6 +328,11 @@ model AccessRequestLine {
   cancelCause           AccessRequestCancelCause? @map("cancel_cause")
   withdrawalRequestedAt DateTime?                 @map("withdrawal_requested_at") @db.Timestamptz(3)
   createdAt             DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  // GH-3 of this person (BR-MF1-01g), with the reason the sender gave for them; and why the line is left out of GH-1/GH-2.
+  manyPaidSoftware       Boolean @default(false) @map("many_paid_software")
+  manyPaidSoftwareCount  Int?    @map("many_paid_software_count") @db.SmallInt
+  manyPaidSoftwareReason String? @map("many_paid_software_reason")
+  limitExemption         String? @map("limit_exemption")
 
   request     AccessRequest               @relation(fields: [requestId], references: [id], onDelete: Restrict)
   beneficiary AccessRequestBeneficiary    @relation(fields: [requestId, employeeId], references: [requestId, employeeId], onDelete: Restrict)

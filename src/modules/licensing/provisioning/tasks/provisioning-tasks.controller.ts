@@ -197,7 +197,7 @@ export class ProvisioningTasksController {
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.COMPLETED',
     description:
-      'The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key. A K4 grant names the free key of the store its seat is given (licenseKeyId; a key bought with the grant is imported into the store first): the key becomes ASSIGNED to the seat in the same transaction (LICENSE_KEY.ASSIGNED in the audit trail). A K2 or K4 grant taken from the pool with nothing bought records the cost it avoided; the request of a K4 grant taken from the pool gives back all of its commitment (GRANTED_FROM_POOL).',
+      'The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key. A K4 grant names the free key of the store its seat is given (licenseKeyId; a key bought with the grant is imported into the store first): the key becomes ASSIGNED to the seat in the same transaction (LICENSE_KEY.ASSIGNED in the audit trail). A K2 or K4 grant taken from the pool with nothing bought records the cost it avoided; the request of a K4 grant taken from the pool gives back all of its commitment (GRANTED_FROM_POOL). A task of the kind EXTEND (the extension of a right whose renewal was approved, BR-MF1-08d) grants nothing: completing it writes the record that follows the renewed one and completes the renewal.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

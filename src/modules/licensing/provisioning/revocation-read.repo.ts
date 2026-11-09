@@ -154,6 +154,38 @@ export class RevocationReadRepo {
   }
 
   /**
+   * The paid applications each of these people uses on `day` or will (GH-3, `BR-MF1-01g`): their personal seats not failed, not
+   * cancelled and not ended, of an application that is not internal and of a plan that is not `K5`. Two plans of one application are
+   * one application. One statement; the people with none are absent.
+   */
+  async paidApplicationsOf(
+    employeeIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, Set<string>>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).licenseAssignment.findMany({
+      where: {
+        employeeId: { in: [...employeeIds] },
+        kind: 'PERSONAL',
+        failedAt: null,
+        cancelledAt: null,
+        OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
+        plan: { provisioningType: { not: 'K5' }, application: { kind: { not: 'INTERNAL' } } },
+      },
+      select: { employeeId: true, plan: { select: { applicationId: true } } },
+    });
+    const found = new Map<string, Set<string>>();
+    for (const row of rows) {
+      const applications = found.get(row.employeeId) ?? new Set<string>();
+      applications.add(row.plan.applicationId);
+      found.set(row.employeeId, applications);
+    }
+
+    return found;
+  }
+
+  /**
    * Which of these seats have a revocation under way or done (a task of the kind that is not cancelled and not closed as failed)
    * that was asked for with one of these sources and this reference, whatever else asked for it too. One statement.
    */

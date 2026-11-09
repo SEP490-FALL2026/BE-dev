@@ -8,6 +8,9 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { PricingRecord } from '../access-request/access-request.types';
 import { RequestFactsService, type Assessment, type RequestSettings } from '../access-request/request-facts.service';
+import type { ManyPaidSoftwareFlag } from '../access-request/access-request.types';
+import { manyPaidSoftwareReasonOf, type LimitVerdict } from '../request-limits/request-limits.policy';
+import { RequestLimitsService, type LimitSettings } from '../request-limits/request-limits.service';
 import {
   checkGroupPlan,
   checkLineCount,
@@ -20,6 +23,8 @@ import {
 
 export interface GroupLineInput {
   employeeId: string;
+  /** GH-3 (`BR-MF1-01g`): why this person asks for one more paid application, as the sender gave it. */
+  manyPaidSoftwareReason?: string;
   /** The day the access of this person ends: the one the group names, for every person of it (`US-05-17` AC-8). */
   expectedEndDate?: BusinessDate | null;
 }
@@ -32,6 +37,8 @@ export interface GroupSubmissionInput {
   lines: readonly GroupLineInput[];
   now: Date;
   settings: RequestSettings;
+  /** GH-2 and GH-3 as read before the transaction opened. */
+  limitSettings: LimitSettings;
   /** Sending locks the department of the sender and the people named against change until commit; checking locks nothing. */
   lockPeople: boolean;
 }
@@ -51,6 +58,10 @@ export interface GroupJudgement {
   lines: GroupLineInput[];
   /** What the request costs for the people named. */
   pricing: PricingRecord;
+  /** GH-1/GH-2/GH-3 of each person named (`BR-MF1-01`, `QĐ-106g`). */
+  limits: Map<string, LimitVerdict>;
+  /** The lines flagged by GH-3 that carry a reason: what the sending writes on them. */
+  manyPaidSoftware: Map<string, ManyPaidSoftwareFlag>;
 }
 
 /**
@@ -67,6 +78,7 @@ export class GroupSubmissionFactsService {
     private readonly assessment: RequestFactsService,
     private readonly requests: AccessRequestRepo,
     private readonly requestParties: RequestPartyEligibilityApi,
+    private readonly limits: RequestLimitsService,
   ) {}
 
   /**
@@ -103,7 +115,11 @@ export class GroupSubmissionFactsService {
     const count = checkLineCount({ senderIsHead, requested });
     const lines = input.lines
       .filter((line, index) => requested.indexOf(line.employeeId) === index)
-      .map((line) => ({ employeeId: line.employeeId, expectedEndDate: input.expectedEndDate }));
+      .map((line) => ({
+        employeeId: line.employeeId,
+        expectedEndDate: input.expectedEndDate,
+        manyPaidSoftwareReason: line.manyPaidSoftwareReason,
+      }));
     const ids = lines.map((line) => line.employeeId);
 
     const people = await this.organizationReads.getEmployees(ids, tx);
@@ -117,8 +133,21 @@ export class GroupSubmissionFactsService {
       }
     }
     const party = await this.requestParties.ineligibleAmong(ids, tx, { lockForShare: input.lockPeople });
+    const limits = await this.limits.judge(tx, {
+      employeeIds: ids,
+      planId: input.planId,
+      applicationId: target.applicationId,
+      today,
+      settings: input.limitSettings,
+    });
+    const manyPaidSoftware = new Map<string, ManyPaidSoftwareFlag>();
     const facts: LineFacts[] = [];
     for (const line of lines) {
+      const verdict = limits.get(line.employeeId);
+      const given = verdict ? manyPaidSoftwareReasonOf(verdict, line.manyPaidSoftwareReason) : null;
+      if (verdict?.manyPaidSoftware && given?.reason) {
+        manyPaidSoftware.set(line.employeeId, { count: verdict.manyPaidSoftware.count, reason: given.reason });
+      }
       const person = known.get(line.employeeId);
       const own = units.get(line.employeeId);
       facts.push({
@@ -129,7 +158,9 @@ export class GroupSubmissionFactsService {
         employmentType: person?.employmentType ?? 'STAFF',
         hireDate: person?.hireDate ?? today,
         holdsAccess: person ? await this.holds(line.employeeId, input.planId) : false,
-        hasOpenRequest: open.has(line.employeeId),
+        hasOpenRequest: open.has(line.employeeId) || verdict?.refusal === 'HAS_OPEN_REQUEST',
+        openLimitReached: verdict?.refusal === 'OPEN_LIMIT_REACHED',
+        manyPaidSoftwareReasonMissing: given?.missing ?? false,
         isDepartmentHead: headEmployeeId !== null && line.employeeId === headEmployeeId,
         termRequired: input.expectedEndDate === null && (person?.employmentType ?? 'STAFF') !== 'STAFF',
         spendingApprover: party.get(line.employeeId) === 'SPENDING_APPROVER',
@@ -158,6 +189,8 @@ export class GroupSubmissionFactsService {
       refused: checkLines(unit.departmentId, facts),
       lines,
       pricing,
+      limits,
+      manyPaidSoftware,
     };
   }
 

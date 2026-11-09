@@ -102,7 +102,7 @@ function toFacts(row: {
   validFrom: Date;
   validUntil: Date | null;
   expectedEndDate: Date | null;
-  provisioningTasks: { kind: 'GRANT' | 'REVOKE'; status: string }[];
+  provisioningTasks: { kind: 'GRANT' | 'REVOKE' | 'EXTEND'; status: string }[];
   successors: { id: string }[];
 }): RightFacts {
   const tasks = row.provisioningTasks;

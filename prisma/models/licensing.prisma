@@ -68,6 +68,7 @@ model LicenseAssignment {
   handoverDuties      HandoverDuty[]
   dutyNotices         ServiceAccountDutyNotice[]
   expiryReminders     AssignmentExpiryReminder[]
+  renewalWindows      AssignmentRenewalWindow[]
   renewalReleases     SubscriptionRenewalReleasedSeat[]
   saasIssues          SaasIssue[]
   licenseKey          LicenseKey?
@@ -99,6 +100,8 @@ model SeatBaselineState {
 enum ProvisioningTaskKind {
   GRANT
   REVOKE
+  // The IT Admin extends a right whose renewal was approved (BR-MF1-08d): completed, it writes the record that follows the old one.
+  EXTEND
 }
 
 enum ProvisioningChannel {
@@ -415,6 +418,23 @@ model AssignmentExpiryReminder {
   @@index([recipientEmployeeId, createdAt(sort: Desc), id])
   @@index([createdAt(sort: Desc), id])
   @@map("assignment_expiry_reminders")
+}
+
+// The window in which the holder may send the renewal of a right that ends on a day (BR-MF1-08a, QĐ-108b): recorded once when it
+// opens, with the number of days in force then, so a later change of the parameter reaches only the windows not yet open. A fact:
+// never changed or deleted (trigger). The organization is a value, as on the reminders.
+model AssignmentRenewalWindow {
+  assignmentId    String   @map("assignment_id") @db.Uuid
+  expectedEndDate DateTime @map("expected_end_date") @db.Date
+  organizationId  String   @map("organization_id") @db.Uuid
+  windowDays      Int      @map("window_days") @db.SmallInt
+  opensOn         DateTime @map("opens_on") @db.Date
+  openedAt        DateTime @default(now()) @map("opened_at") @db.Timestamptz(3)
+
+  assignment LicenseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+
+  @@id([assignmentId, expectedEndDate])
+  @@map("assignment_renewal_windows")
 }
 
 enum SaasIssueState {

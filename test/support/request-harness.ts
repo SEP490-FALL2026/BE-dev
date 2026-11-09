@@ -105,9 +105,14 @@ export interface Department {
 export class RequestHarness extends ProvisioningHarness {
   private titleName: string | null = null;
 
-  /** Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. */
-  override start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
-    return SeatHarness.prototype.start.call(this, options);
+  /**
+   * Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. The suites of
+   * other rules send many requests for one person, so GH-2 (`REQUEST_OPEN_NEW_LIMIT`, BR-MF1-01f) is raised to its most here; the suite of
+   * the limits (`request-limits.integration-spec.ts`) sets it back to the default.
+   */
+  override async start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
+    await SeatHarness.prototype.start.call(this, options);
+    await this.setParameter('REQUEST_OPEN_NEW_LIMIT', 20).expect(200);
   }
 
   /** One job title (free text) for everybody a spec makes. */

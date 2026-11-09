@@ -83,9 +83,9 @@ export class SpendDecisionRecorder {
     // A refusal ends the request for the person it was for, without a grant.
     if (decided.decision === 'REJECTED') await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
 
-    // A renewal needs nobody to carry it out: approved in full, it is applied here, in the transaction of the decision.
+    // A renewal approved in full is extended by the IT Admin (`BR-MF1-08d`): its task is opened here, in the transaction of the decision.
     if (decided.decision === 'APPROVED' && request.type === 'RENEWAL') {
-      await this.renewals.apply(tx, actor, request, now);
+      await this.renewals.requestExtension(tx, actor, request, now);
 
       return { status: 'DECIDED', decision: decided.decision, requestState: await this.stateOf(tx, request.id) };
     }
