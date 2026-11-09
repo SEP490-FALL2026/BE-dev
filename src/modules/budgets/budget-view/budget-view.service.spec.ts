@@ -1,8 +1,8 @@
 import type { BudgetFactsService } from '../budget/budget-facts.service';
-import type { CommitmentRepo } from '../budget/commitment.repo';
-import type { InvoiceRepo } from '../budget/invoice.repo';
-import type { ReferenceFigures, VersionRepo } from '../budget/version.repo';
-import { BudgetViewService } from './budget-view.service';
+import type { ReferenceFigures } from '../budget/version.repo';
+import { BudgetTableViewService } from './budget-table-view.service';
+import type { BudgetViewRepo } from './budget-view.repo';
+import type { BudgetViewNumbersService } from './budget-view-numbers.service';
 
 const CC_A = 'cc-a';
 const CC_B = 'cc-b';
@@ -22,21 +22,37 @@ function serviceOver(
   held: Map<string, { held: bigint; spent: bigint }>,
   lastInvoice: Date | null = null,
 ) {
-  return new BudgetViewService(
-    { referenceFiguresOfYear: jest.fn().mockResolvedValue(versions) } as unknown as VersionRepo,
-    {} as never,
-    {} as never,
-    { totals: jest.fn().mockResolvedValue(held) } as unknown as CommitmentRepo,
-    {} as never,
-    {} as never,
+  return new BudgetTableViewService(
+    {
+      rows: jest.fn().mockResolvedValue(versions.map((row) => ({ ...row, versionId: 'version', number: 1 }))),
+    } as unknown as BudgetViewRepo,
+    {
+      totals: jest.fn().mockResolvedValue(
+        new Map(
+          versions.map((row) => {
+            const key = `${row.costCenterId}:${row.year}`;
+            return [
+              key,
+              {
+                committed: held.get(key)?.held ?? 0n,
+                spent: held.get(key)?.spent ?? 0n,
+                pendingSpend: 0n,
+                priorPeriodAdjustment: 0n,
+              },
+            ];
+          }),
+        ),
+      ),
+      cycle: jest.fn().mockResolvedValue(null),
+      lastInvoice: jest.fn().mockResolvedValue(lastInvoice?.toISOString() ?? null),
+    } as unknown as BudgetViewNumbersService,
     {
       formatter: (currency: string) => Promise.resolve((minor: bigint) => ({ amount: minor.toString(), currency })),
     } as unknown as BudgetFactsService,
-    { lastRecordedAt: jest.fn().mockResolvedValue(lastInvoice) } as unknown as InvoiceRepo,
   );
 }
 
-describe('BudgetViewService.summary', () => {
+describe('BR-MF4-05 BudgetTableViewService.summary', () => {
   it('adds the Cost Centers of one currency and counts the ones over budget', async () => {
     const service = serviceOver(
       [figures(CC_A, 'VND', 900n, 100n), figures(CC_B, 'VND', 450n, 50n)],
@@ -59,6 +75,9 @@ describe('BudgetViewService.summary', () => {
       committed: { amount: '700', currency: 'VND' },
       spent: { amount: '350', currency: 'VND' },
       remaining: { amount: '450', currency: 'VND' },
+      pendingSpend: { amount: '0', currency: 'VND' },
+      remainingBase: { amount: '300', currency: 'VND' },
+      remainingWithReserve: { amount: '450', currency: 'VND' },
       costCenterCount: 2,
       // A: 1000 - 300 - 200 = 500; B: 500 - 400 - 150 = -50.
       overBudgetCount: 1,

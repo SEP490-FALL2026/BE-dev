@@ -54,8 +54,8 @@ Dashboard Finance riêng (W5); khoản cam kết 01/01 (W4) — view đọc từ
 
 ## Ownership: module, data, API
 
-- `budgets/public/budgets.extension-points.ts`: `PendingSpendContributions` (`Contributions<PendingSpendReader>`), reader
-  `(tx, pairs: { costCenterId; year }[]) => Promise<Map<key, bigint>>`; `requests` đăng ký trong
+- `budgets/public/budgets.extension-points.ts`: `PendingSpendContributions` (`Contributions<PendingSpendContribution>`), reader
+  `pendingMany(pairs: { costCenterId; year }[], tx?) => Promise<Map<key, bigint>>`; `requests` đăng ký trong
   `requests/spend/pending-spend.listener.ts` bằng hàm lô mới của `budget-check.repo.ts` (cùng định nghĩa với `pendingFor`).
   Không có đóng góp (graph không có `requests`) ⟹ 0.
 - `budgetMine` (trưởng phòng của Cost Center cho năm): giữ `status` (`ACTIVE` | `NO_ACTIVE_BUDGET` — không thêm `noBudget`),

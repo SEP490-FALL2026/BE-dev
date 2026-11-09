@@ -146,6 +146,9 @@ const baselineDepartmentView = z.strictObject({
 });
 /** What runs today, department by department, and what it is estimated to cost over the year (`FR-5.15`, `R-I03`). */
 export const baselineSchema = z.strictObject({
+  basis: z
+    .literal('OWNER_DEPARTMENT')
+    .meta({ description: 'Costs follow subscription ownership until seat-month allocation is available.' }),
   year: z.number().int(),
   currency: z.string(),
   computedAt: z.iso.datetime(),

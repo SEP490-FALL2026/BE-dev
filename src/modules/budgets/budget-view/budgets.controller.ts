@@ -45,11 +45,7 @@ const HEADS_ONLY = {
   examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_YOUR_COST_CENTER],
 } as const;
 
-/**
- * Reading the budgets (`US-06-09` AC-5, `US-06-10` AC-7). A head of department reads the budget of their own department:
- * the proposal, the total and the lines of the current version, never what is left, the checks of requests, other
- * departments or the company. Finance reads the table of all the current versions.
- */
+/** Department heads read their department; Finance and the spending approver read company figures. */
 @ApiTags('budgets')
 @Controller({ path: 'budgets', version: '1' })
 export class BudgetsController {
@@ -61,7 +57,7 @@ export class BudgetsController {
   @ApiSuccessResponse(MineResponseDto, {
     message: 'BUDGET.FETCHED',
     description:
-      'The Cost Center of the department the caller heads, the year, whether it has a current budget (ACTIVE) or not (NO_ACTIVE_BUDGET), the total, and the proposal behind it. No part of this says what is left.',
+      'The Cost Center of the department the caller heads, the year, whether it has a current budget (ACTIVE) or not (NO_ACTIVE_BUDGET), its base, reserve, commitments, spend, pending spend, both remaining amounts, the published department ceiling and cycle deadlines, and the proposal behind it.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, MINE_INVALID)
   async mine(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineQueryDto) {
@@ -106,18 +102,18 @@ export class BudgetsController {
   }
 
   @Get('summary')
-  @RequireRoles('FINANCE')
+  @RequireRoles('FINANCE', 'SPENDING_APPROVER')
   @ApiOperation({ operationId: 'budgetSummary', summary: 'Get the company-wide budget figures of a year' })
   @ApiSuccessResponse(BudgetSummaryResponseDto, {
     message: 'BUDGET.SUMMARY_FETCHED',
     description:
-      'The base, reserve, total, held, spent and remaining of all the current budgets of the year, added up for each currency (keyed by currency code), with the number of Cost Centers and how many are over budget, and when the last invoice was recorded. Only Finance reads it.',
+      'The base, reserve, total, held, spent, pending spend and both remaining levels of the year, added per currency. Includes commitment-only Cost Centers, the annual ceiling and shared-pool reserve, and when the last invoice was recorded. Finance and the spending approver read it.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'Only Finance reads the budgets of the company.',
+      description: 'Finance and the spending approver read the budgets of the company.',
       examples: [FORBIDDEN_EXAMPLE],
     },
     INVALID,
@@ -131,18 +127,18 @@ export class BudgetsController {
   }
 
   @Get()
-  @RequireRoles('FINANCE')
+  @RequireRoles('FINANCE', 'SPENDING_APPROVER')
   @ApiOperation({ operationId: 'budgetTable', summary: 'List the current budgets of all Cost Centers' })
   @ApiSuccessResponse(BudgetTablePageResponseDto, {
     message: 'BUDGET.LISTED',
     description:
-      'One row for each Cost Center and year that has a current version. Only Finance reads the company-wide table.',
+      'One row per Cost Center and year with a reference budget or commitments, including NO_BUDGET rows. Finance and the spending approver read the table.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'Only Finance reads the budgets of the company.',
+      description: 'Finance and the spending approver read the budgets of the company.',
       examples: [FORBIDDEN_EXAMPLE],
     },
     INVALID,

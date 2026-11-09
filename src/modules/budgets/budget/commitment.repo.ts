@@ -319,6 +319,7 @@ export class CommitmentRepo {
   async totals(
     pairs: readonly { costCenterId: string; year: number }[],
     tx?: DbTx,
+    includeUnattached = false,
   ): Promise<Map<string, CommitmentTotals>> {
     const totals = new Map<string, CommitmentTotals>();
     if (pairs.length === 0) return totals;
@@ -332,7 +333,7 @@ export class CommitmentRepo {
       by: ['costCenterId', 'year'],
       where: {
         state: 'HELD',
-        attachedVersionId: { not: null },
+        ...(includeUnattached ? {} : { attachedVersionId: { not: null } }),
         OR: pairs.map((pair) => ({ costCenterId: pair.costCenterId, year: pair.year })),
       },
       _sum: { amountMinor: true, releasedMinor: true, appliedMinor: true },

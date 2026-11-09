@@ -20,6 +20,9 @@ import { BudgetFactsService } from './budget/budget-facts.service';
 import { BudgetYearLockRepo } from './budget/budget-year-lock.repo';
 import { BudgetVersionLinesController } from './version/budget-version-lines.controller';
 import { BudgetVersionsController } from './version/budget-versions.controller';
+import { BudgetViewRepo } from './budget-view/budget-view.repo';
+import { BudgetViewNumbersService } from './budget-view/budget-view-numbers.service';
+import { BudgetTableViewService } from './budget-view/budget-table-view.service';
 import { BudgetViewService } from './budget-view/budget-view.service';
 import { BudgetsController } from './budget-view/budgets.controller';
 import { BudgetsApi } from './public/budgets.api';
@@ -154,6 +157,9 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetAttachmentLinkService,
     BudgetAttachmentExpiryService,
     BudgetAttachmentExpirySweeper,
+    BudgetViewRepo,
+    BudgetViewNumbersService,
+    BudgetTableViewService,
     BudgetViewService,
     BudgetFactsRepo,
     CycleRepo,

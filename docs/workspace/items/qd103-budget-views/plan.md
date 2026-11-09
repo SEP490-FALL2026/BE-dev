@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `9c7f386`, BE `d9c46552`.
 - Phụ trách: chat code `SEP-Start 75: coder mainflow`. Thiết kế ban đầu bởi: AI chat review (W2, 08/11/2026).
 - Owner review: chưa review. Peer review: chat review (R2).
-- Triển khai: `not-started`. PR: chưa có.
+- Triển khai: `in-progress` (gói 6 MF4-C, 09/11/2026). PR: chưa có.
 
 ## Before coding
 
@@ -60,3 +60,16 @@ Kiểm tra nhanh tracker §4.5; `openapi:export` drift đúng 3 operation. Tự 
 - [ ] AC trong scope có bằng chứng.
 - [ ] Spec/plan phản ánh implementation cuối.
 - [ ] `pnpm check` và full suite CHƯA chạy (ghi rõ).
+
+## Delta áp dụng cho gói 6 (09/11/2026)
+
+- SPEC review §4b RV-10 thắng thiết kế cũ: giữ định nghĩa pending trong `requests/spend`, bổ sung batch vào
+  `PendingSpendContributions`; `pendingFor` và batch dùng cùng câu SQL, không sao chép predicate.
+- RV-21: giữ nguyên `countedInYear` (M-19); `headStatus`/`baselineAllowed`/`baselineRefusal` đã có từ gói 5, giữ nguyên và kiểm hồi quy.
+- C4-05: response số liệu nền thêm `basis: OWNER_DEPARTMENT`; chưa tính chi phí seat-tháng/dòng kho (ngoài phạm vi).
+- Task 2/3 dùng `BudgetViewNumbersService` cho mọi số; held chưa attached được tính riêng cho view, không đổi mặc định
+  `CommitmentRepo.totals` mà kiểm ngân sách dùng. `BudgetViewRepo` phân trang cả reference và commitment-only trong cùng snapshot.
+- TẠM CHỌN: summary cộng khoản của dòng `NO_BUDGET` vào held/spent/pending và đếm Cost Center; ngân sách của dòng đó không
+  được cộng (chưa có), không đếm là `overBudget` khi chưa có tổng ngân sách. Bảng và mine giữ số ngân sách/còn lại là null.
+- Task 1–3: đã viết code và unit/http/integration; giai đoạn 1 chỉ typecheck/lint, chưa chạy Jest. Bằng chứng giai đoạn 2 sẽ ghi bên dưới.
+- Không migration; `pnpm check` và test toàn bộ CHƯA chạy — Owner chạy khi audit.

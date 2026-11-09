@@ -30,7 +30,7 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
 
 ## Extension point
 
-- Mở `PendingSpendContributions` (`budgets.pending-spend`, Contributions): số tiền các Request đang chờ duyệt chi của một (Cost Center, năm) — requests `spend/pending-spend.listener.ts` cấp (định nghĩa ở `requests/spend`, không ở `BudgetsApi`). `BudgetChangeListeners` đã gỡ (không còn Request chờ phiên bản ngân sách).
+- Mở `PendingSpendContributions` (`budgets.pending-spend`, Contributions): số tiền các Request đang chờ duyệt chi theo lô (Cost Center, năm) — requests `spend/pending-spend.listener.ts` cấp (định nghĩa ở `requests/spend`, không ở `BudgetsApi`). `BudgetChangeListeners` đã gỡ (không còn Request chờ phiên bản ngân sách).
 - Mở `CommitmentReleaseGuardHook` (`budgets.commitment-release-guard`, Hook) — requests
   `spend/commitment-release.listener.ts`. Chưa bind thì nhả phần dư thất bại thay vì cho qua.
 - Mở `CommitmentRequestFactsHook` (`budgets.commitment-request-facts`, Hook) — requests `spend/commitment-request-facts.listener.ts`:

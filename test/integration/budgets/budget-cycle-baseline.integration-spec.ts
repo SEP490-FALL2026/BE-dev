@@ -27,6 +27,7 @@ interface BaselineDepartment {
   software: Software[];
 }
 interface BaselineWire {
+  basis: string;
   year: number;
   kpi3: number | null;
   departmentsTotal: number;
@@ -148,6 +149,7 @@ describe('the baseline and the package of a budget cycle (integration, real Post
 
     const wire = h.dataOf<BaselineWire>(await baseline().expect(200));
 
+    expect(wire.basis).toBe('OWNER_DEPARTMENT');
     const entry = entryOf(wire, unit.department.id, unit.subscription);
     // 10 seats bought, 6 held (five people, one of them starting later, and a service account), 1,000,000 a month, running since
     // January and not ordered to end: it is renewed, 6 × 1,000,000 × 12 (F-096, Q-162).

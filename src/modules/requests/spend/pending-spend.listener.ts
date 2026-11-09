@@ -29,4 +29,8 @@ export class PendingSpendListener implements PendingSpendContribution, OnModuleI
   pendingOf(costCenterId: string, year: number, exceptRequestId: string | null, tx?: DbTx): Promise<bigint> {
     return this.checks.pendingFor(costCenterId, year, exceptRequestId, tx);
   }
+
+  pendingMany(pairs: readonly { costCenterId: string; year: number }[], tx?: DbTx): Promise<Map<string, bigint>> {
+    return this.checks.pendingMany(pairs, tx);
+  }
 }
