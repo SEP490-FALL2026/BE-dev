@@ -67,15 +67,12 @@ export class SpendDecisionRepo {
   }
 
   /** What the approver decided, the newest if the request was decided more than once. */
-  async latest(
-    requestId: string,
-    tx?: DbTx,
-  ): Promise<(SpendDecisionRecord & { reason: string | null; bySubstitute: boolean }) | null> {
+  async latest(requestId: string, tx?: DbTx): Promise<(SpendDecisionRecord & { reason: string | null }) | null> {
     const db = tx ?? this.prisma;
     const row = await db.spendDecision.findFirst({
       where: { requestId },
       orderBy: { decidedAt: 'desc' },
-      include: { step: { select: { approvalRecord: { select: { reason: true, deciderRole: true } } } } },
+      include: { step: { select: { approvalRecord: { select: { reason: true } } } } },
     });
     if (!row) return null;
     const { step, ...decision } = row;
@@ -83,7 +80,6 @@ export class SpendDecisionRepo {
     return {
       ...decision,
       reason: step.approvalRecord?.reason ?? null,
-      bySubstitute: step.approvalRecord?.deciderRole === 'CONFLICT_SUBSTITUTE',
     };
   }
 }

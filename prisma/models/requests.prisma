@@ -1,6 +1,11 @@
 // The requests context (C4, ADR-0015): a request for access to software, the people it is for, and the steps that
 // decide it. Money, budgets and commitments are not here yet: the slices that need them add their own tables.
 
+enum RequestRoutingMode {
+  VIA_HEAD
+  ONE_STEP
+}
+
 enum AccessRequestType {
   GRANT
   // A service account asked for after the installation: a non-human subject owned by the department of the person who
@@ -26,6 +31,7 @@ enum AccessRequestBranch {
 }
 
 enum AccessRequestState {
+  AWAITING_REQUESTER_REVISION
   PENDING
   // The need step is approved; the IT Admin carries the grant out by hand (branch INTERNAL_FREE).
   AWAITING_EXECUTION
@@ -96,6 +102,7 @@ enum AccessRequestStepKind {
 }
 
 enum AccessRequestStepState {
+  NOT_REQUIRED
   PENDING
   WAITING
   APPROVED
@@ -144,6 +151,9 @@ enum ApprovalDeciderRole {
 // `policy` when the request is sent, so a parameter changed later reaches only what is sent after it (US-05-02 AC-3).
 // The department and its Unit Cost Center are those in force on the day it is sent (US-05-02 AC-7).
 model AccessRequest {
+  routingMode RequestRoutingMode @default(VIA_HEAD) @map("routing_mode")
+  oneStepReason String? @map("one_step_reason")
+  oneStepBlockedReason String? @map("one_step_blocked_reason")
   id                    String                     @id @default(uuid()) @db.Uuid
   organizationId        String                     @map("organization_id") @db.Uuid
   type                  AccessRequestType          @default(GRANT)
@@ -245,6 +255,7 @@ model AccessRequest {
   @@index([requesterEmployeeId, submittedAt])
   @@index([state, submittedAt])
   @@index([planId])
+  @@index([departmentId, routingMode, state], map: "access_requests_department_routing_state_idx")
   @@map("access_requests")
 }
 

@@ -73,6 +73,5 @@ export function needQueueItemOf(row: NeedQueueRow, lookups: NeedQueueLookups): N
     termMonths: request.termMonths,
     expectedEndDate: request.expectedEndDate ? fromDateColumn(request.expectedEndDate) : null,
     pricing: pricingOf(request, lookups.units),
-    samePersonAsSpend: row.samePersonAsSpend,
   };
 }

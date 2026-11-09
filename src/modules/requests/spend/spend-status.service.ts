@@ -13,7 +13,7 @@ const LEGACY_REASONS = (check: Pick<CheckRecord, 'staleCostEvidence'>): BlockRea
 export interface SpendStatusView {
   stage: SpendStage;
   /** Why the request is blocked, every reason that applies; empty unless the stage is `BLOCKED`. */
-  blockedReasons: BlockReason[];
+  blockedReasons: (BlockReason | 'PRICE_MISSING' | 'RATE_MISSING')[];
   /**
    * How much the request is over what it may use, in the reporting currency: over the base when it waits for the head to confirm the
    * reserve (`RESERVE_CONFIRMATION`), over the reserve when it is blocked for being over it. Null otherwise. Never what is left.
@@ -65,10 +65,22 @@ export class SpendStatusService {
     private readonly decisions: SpendDecisionRepo,
   ) {}
 
+  private async returnedToRequester(request: AccessRequestRecord): Promise<SpendStatusView> {
+    if (request.oneStepBlockedReason)
+      return status('RETURNED_TO_REQUESTER', { blockedReasons: [request.oneStepBlockedReason] });
+    const check = await this.checks.latest(request.id);
+    return status('RETURNED_TO_REQUESTER', {
+      blockedReasons: check?.blockReasons ?? [],
+      overBy: check?.overByMinor == null ? null : { minor: check.overByMinor, currency: check.currency },
+    });
+  }
+
   async of(request: AccessRequestRecord): Promise<SpendStatusView | null> {
     if (!hasSpendStep(request.policy)) return null;
 
     switch (request.state) {
+      case 'AWAITING_REQUESTER_REVISION':
+        return this.returnedToRequester(request);
       case 'AWAITING_SPEND_SUBMISSION':
         return queuedStatus(await this.checks.latest(request.id));
       case 'AWAITING_SPEND_DECISION':

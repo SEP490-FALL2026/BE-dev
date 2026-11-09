@@ -86,13 +86,12 @@ describe('BR-MF1-07c: what the check made now allows of an approval', () => {
 });
 
 describe('what the decision of the spend step is recorded as (US-06-01 AC-2, AC-4, AC-5)', () => {
-  const step = { id: 'step-1', samePersonAsSpend: false };
   const request = { id: 'req-1' };
 
   it('records an approval in the role the person decided in, sends the request to be carried out, and says whether it used the reserve', () => {
     expect(
       spendDecisionRecordOf(
-        { request, step },
+        { request },
         {
           decision: 'APPROVED',
           checkId: 'check-1',
@@ -107,12 +106,12 @@ describe('what the decision of the spend step is recorded as (US-06-01 AC-2, AC-
       action: 'ACCESS_REQUEST.SPEND_APPROVED',
       detail: {
         requestId: 'req-1',
+        oneStep: false,
         checkId: 'check-1',
         decision: 'APPROVED',
         deciderRole: 'SPENDING_APPROVER',
         usesReserve: true,
         reserveReason: 'Cần gấp cho dự án',
-        samePersonAsSpend: false,
         requestState: 'AWAITING_EXECUTION',
       },
     });
@@ -120,7 +119,7 @@ describe('what the decision of the spend step is recorded as (US-06-01 AC-2, AC-
 
   it('records a refusal as REJECTED, in the role of the spending approver and no other', () => {
     const recorded = spendDecisionRecordOf(
-      { request, step },
+      { request },
       { decision: 'REJECTED', checkId: null, reason: 'Không cần nữa', usesReserve: false, reserveReason: null },
     );
 
@@ -135,7 +134,7 @@ describe('what the decision of the spend step is recorded as (US-06-01 AC-2, AC-
   it('never writes a substitute for a conflict of interest as the role of the decision', () => {
     for (const decision of ['APPROVED', 'REJECTED'] as const) {
       const recorded = spendDecisionRecordOf(
-        { request, step },
+        { request },
         { decision, checkId: null, reason: null, usesReserve: false, reserveReason: null },
       );
 

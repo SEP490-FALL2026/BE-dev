@@ -1,3 +1,4 @@
+import { SPEND_ERROR_EXAMPLES } from '../spend/spend.http-errors';
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
@@ -145,11 +146,12 @@ export class GroupLinesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again on the people approved and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED).',
+        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again on the people approved and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD or SPEND.RECHECKED_RETURNED_TO_REQUESTER for a one-step request, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED).',
       examples: [
         GROUP_REQUEST_ERROR_EXAMPLES.NO_SPEND_STEP,
         GROUP_REQUEST_ERROR_EXAMPLES.NOT_CHECKABLE,
         GROUP_REQUEST_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_HEAD,
+        SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_REQUESTER,
       ],
     },
     {
@@ -166,7 +168,7 @@ export class GroupLinesController {
   ) {
     try {
       const result = await this.spends.decide(actor, params.id, body);
-      if (result.status === 'BOUNCED') throw toRecheckedApiException(result.reasons);
+      if (result.status === 'BOUNCED') throw toRecheckedApiException(result.reasons, result.to, result.overBy);
 
       return { spendApproval: await this.approvals.detail(actor, params.id) };
     } catch (error) {

@@ -35,6 +35,7 @@ export function toSummary(
     type: row.type,
     branch: row.branch,
     state: row.state,
+    routing: row.routing ?? { mode: 'VIA_HEAD', oneStepReason: null },
     plan: planId === null ? null : (lookups.plans.get(planId) ?? failMissing('plan', planId, row.id)),
     softwareName: lookups.softwareNames.get(row.id) ?? null,
     beneficiary: person(row.beneficiaryEmployeeId),

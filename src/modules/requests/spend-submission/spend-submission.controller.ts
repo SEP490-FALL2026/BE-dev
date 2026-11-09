@@ -1,3 +1,4 @@
+import { ACCESS_REQUEST_ERROR_EXAMPLES } from '../access-request/access-request.http-errors';
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
@@ -230,7 +231,7 @@ export class SpendSubmissionController {
   }
 
   @Post('access-requests/:id/supplements')
-  @RequireRoles('MANAGER')
+  @AuthenticatedOnly()
   @ApiOperation({
     operationId: 'accessRequestSupplementAdd',
     summary: 'Shorten the term or leave people out in a supplementary file',
@@ -239,11 +240,16 @@ export class SpendSubmissionController {
     status: HttpStatus.CREATED,
     message: 'ACCESS_REQUEST.SUPPLEMENT_ADDED',
     description:
-      'The head gives an earlier end date to a request back in their queue (a request with no end may be given one), or, for a request for a group, leaves people out of it, or both, with the reason. The request is priced again for the day of the file and the people who remain (the months left of the year up to the new end date), and its budget year follows; the file keeps the end date, the year and the amount before and after, how many people were left out, who and when.',
+      'The head, or the requester of a one-step request awaiting revision, gives an earlier end date to a request back in their queue (a request with no end may be given one), or, for a request for a group, leaves people out of it, or both, with the reason. The request is priced again for the day of the file and the people who remain (the months left of the year up to the new end date), and its budget year follows; the file keeps the end date, the year and the amount before and after, how many people were left out, who and when.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    NOT_HEAD,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only the current head supplements a via-head request; only the requester supplements a one-step request (SPEND.NOT_HEAD, ACCESS_REQUEST.NOT_REQUESTER).',
+      examples: [SPEND_ERROR_EXAMPLES.NOT_HEAD, ACCESS_REQUEST_ERROR_EXAMPLES.NOT_REQUESTER],
+    },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,

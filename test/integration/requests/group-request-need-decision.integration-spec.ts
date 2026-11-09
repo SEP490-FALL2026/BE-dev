@@ -227,53 +227,29 @@ describe('the need of the people of a request for a group, decided one by one ov
     });
   });
 
-  describe('the line of the head is decided by somebody else (US-05-03 AC-8, US-05-17 AC-3, AC-4, AC-16)', () => {
-    it('keeps the whole group waiting for the line of the head, and the head decides none of it', async () => {
+  describe('BR-MF1-02 the head cannot be a beneficiary of a new group', () => {
+    it('BR-MF1-02 refuses the head sender before any need decision is written', async () => {
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
-      const request = h.dataOf<{ request: RequestWire }>(
-        await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), u.head.account).expect(201),
-      ).request;
-
-      expect(await h.state(request.id)).toBe('PENDING');
-      expect(
-        h.codeOf(await h.decideLines(request.id, { lines: [approve(u.head.employeeId)] }, u.head.account).expect(403)),
-      ).toBe('ACCESS_REQUEST.OWN_REQUEST');
-
-      await h
-        .decideLines(request.id, { lines: [refuse(u.head.employeeId, 'The head has it already')] }, h.boss.account)
-        .expect(200);
-
-      expect(await h.state(request.id)).toBe('AWAITING_SPEND_SUBMISSION');
-      expect(await h.lineStates(request.id)).toEqual(['NEED_CONFIRMED', 'NEED_CONFIRMED', 'NEED_REJECTED']);
-      const mine = await lineList(request.id, u.head.account);
-      expect(mine[2]).toMatchObject({
-        state: 'NEED_REJECTED',
-        endReason: 'The head has it already',
-        needDecision: { deciderRole: 'SPENDING_APPROVER' },
+      const before = await h.requestRows();
+      const refused = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), u.head.account).expect(422);
+      expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+      expect(h.detailsOf(refused)).toMatchObject({
+        lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }],
       });
-      const request2 = h.dataOf<{ request: RequestWire }>(
-        await h.fetch(request.id, u.head.account).expect(200),
-      ).request;
-      expect(request2.pricing.amount?.amount).toBe(String(2 * M * monthsLeft));
+      expect(await h.requestRows()).toBe(before);
     });
 
-    it('sends the group on once both steps are decided, when an Employee sent it with the head among the people', async () => {
+    it('BR-MF1-02 refuses the head in an employee-sent group instead of opening a second need step', async () => {
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
-      const request = h.dataOf<{ request: RequestWire }>(
-        await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), e1.account).expect(201),
-      ).request;
-
-      await h
-        .decideLines(request.id, { lines: [approve(e1.employeeId), approve(e2.employeeId)] }, u.head.account)
-        .expect(200);
-      expect(await h.state(request.id)).toBe('PENDING');
-      await h.decideLines(request.id, { lines: [approve(u.head.employeeId)] }, h.boss.account).expect(200);
-
-      expect(await h.state(request.id)).toBe('AWAITING_SPEND_SUBMISSION');
-      expect(await h.lineStates(request.id)).toEqual(['NEED_CONFIRMED', 'NEED_CONFIRMED', 'NEED_CONFIRMED']);
-      expect((await h.needSteps(request.id)).map((row) => row.state)).toEqual(['APPROVED', 'APPROVED']);
+      const before = await h.requestRows();
+      const refused = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), e1.account).expect(422);
+      expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+      expect(h.detailsOf(refused)).toMatchObject({
+        lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }],
+      });
+      expect(await h.requestRows()).toBe(before);
     });
   });
 
@@ -290,7 +266,11 @@ describe('the need of the people of a request for a group, decided one by one ov
       await h.sweep();
 
       const [step] = await h.needSteps(request.id);
-      expect(step).toMatchObject({ state: 'PENDING', assignee_employee_id: h.boss.employeeId });
+      expect(step).toMatchObject({
+        state: 'WAITING',
+        assignee_employee_id: null,
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
+      });
       const own = await h
         .decideLines(request.id, { lines: [approve(e1.employeeId), approve(e2.employeeId)] }, e2.account)
         .expect(403);

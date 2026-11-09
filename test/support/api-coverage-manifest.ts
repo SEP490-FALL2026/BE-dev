@@ -27,6 +27,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/applications/{id}/retirement',
   'POST /api/v1/applications/{id}/retire',
   'POST /api/v1/access-requests',
+  'POST /api/v1/access-requests/{id}/resubmission',
   'POST /api/v1/access-requests/drafts',
   'GET /api/v1/access-requests/drafts',
   'POST /api/v1/access-requests/drafts/{id}/submission',

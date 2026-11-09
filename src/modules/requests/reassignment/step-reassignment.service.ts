@@ -160,7 +160,6 @@ export class StepReassignmentService {
     const { gone, operator } = context;
     const steps = request.steps.map((step) => ({ ...step }));
     let state = request.state;
-    let holdersChanged = false;
 
     for (const step of steps) {
       if (!OPEN.has(step.state)) continue;
@@ -274,10 +273,7 @@ export class StepReassignmentService {
         result.madeToWait += 1;
         result.alerted += await this.alert(tx, request, step, correlationId);
       }
-      if (step.kind === 'NEED' || step.kind === 'SPEND_APPROVAL') holdersChanged = true;
     }
-
-    if (holdersChanged) await this.flagSamePerson(tx, request, steps, facts);
   }
 
   /** The request follows the step: waiting under control while a step waits, the state of the step once it is held. */
@@ -321,34 +317,5 @@ export class StepReassignmentService {
     );
 
     return raised ? 1 : 0;
-  }
-
-  /**
-   * One person holding the need step and the spend step is flagged on both (`US-05-03` AC-9). Once a spend step is open the
-   * flag follows whether the two holders are the same; before it, the need step is flagged when its holder is the spending
-   * approver of a chain that has a spend step.
-   */
-  private async flagSamePerson(
-    tx: DbTx,
-    request: ReassignableRequest,
-    steps: readonly ReassignableStep[],
-    facts: TodayFacts,
-  ): Promise<void> {
-    const need = steps.find((step) => step.kind === 'NEED');
-    const spend = steps.find((step) => step.kind === 'SPEND_APPROVAL' && OPEN.has(step.state));
-    if (!need) return;
-
-    const same = spend
-      ? need.assigneeEmployeeId !== null && need.assigneeEmployeeId === spend.assigneeEmployeeId
-      : request.chainHasSpendStep &&
-        need.assigneeEmployeeId !== null &&
-        need.assigneeEmployeeId === facts.spendingApproverEmployeeId;
-    const changing = [need, ...(spend ? [spend] : [])].filter((step) => step.samePersonAsSpend !== same);
-    await this.repo.flagSamePerson(
-      tx,
-      changing.map((step) => step.id),
-      same,
-    );
-    for (const step of changing) step.samePersonAsSpend = same;
   }
 }

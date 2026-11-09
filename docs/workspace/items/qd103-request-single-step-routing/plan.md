@@ -164,3 +164,41 @@ Kiểm tra nhanh tracker §4.5; `openapi:export` (trường đổi); README `req
 - [ ] AC trong scope có bằng chứng; danh sách khẳng định flow/e2e đổi theo luật.
 - [ ] Spec/plan phản ánh implementation cuối.
 - [ ] `pnpm check` và full suite CHƯA chạy (ghi rõ).
+
+## Triển khai gói 7 — 09/11/2026
+
+Áp SPEC reaudit §4b: RV-15 giữ cột/enum lịch sử, ngừng ghi cũ bằng trigger từ chối INSERT/UPDATE bật lại giá trị cũ; RV-23 bỏ xét kế nhiệm
+khi gửi Request mới (M-15), còn Request cũ đang chờ giữ chờ kế nhiệm đã ghi; RV-26 chỉ gỡ hai đầu vào Business Owner ở SBF-15.
+Bốn phase code đã triển khai; unit/integration/http/flow/e2e được viết/cập nhật trước lượt Jest đầu theo yêu cầu Owner.
+
+TẠM CHỌN: catalog còn bắt cột Business Owner nên adapter đăng ký nội bộ suy legacy owner từ requester để tương thích lưu trữ,
+không cần cho IT nhập/chọn; phạm vi dọn Business Owner toàn catalog thuộc hạng mục riêng. `one_step_blocked_reason` lưu lý do thiếu
+số liệu (PRICE_MISSING/RATE_MISSING), không tạo snapshot kiểm ngân sách giả. Need `NOT_REQUIRED` giữ scalar SLA lịch sử trong DB,
+response trả SLA null và sweeper không đọc bước này. Request một bước không phát thông báo `REQUEST_SUBMITTED` (spec không yêu cầu).
+
+Hàm kiểm của gói 3 (`SpendRoutingService.route`) được dùng trực tiếp cho gửi/gửi lại/duyệt/hoàn tất chuyển. Graph dùng chung cung cấp
+cổng check/routing cho API và worker. Listener tổ chức chỉ đánh dấu sau khóa phòng và khóa union Request theo id; sweep hoàn tất từng
+Request một transaction. Kiểm lại dưới khóa Request để không chuyển nhầm khi bước chi đã được mở đồng thời.
+
+Đã viết thêm coverage khi rõ trong giai đoạn 2: dữ liệu migration paid/group/nhu cầu đã duyệt, gửi lần đầu dùng dự phòng,
+bổ sung thực qua API, RATE_MISSING, và retry độc lập khi một Request chuyển bước gặp lỗi.
+
+Các khẳng định hồi quy đã đổi: trưởng phòng tự gửi chỉ có quyết định chi (bước nhu cầu `NOT_REQUIRED`, `routingRow` 2); nhóm chứa trưởng phòng
+bị từ chối `HEAD_IN_GROUP`; Request mới trong khoảng trống kế nhiệm đi một bước; K5 đã chờ trước lúc mất trưởng phòng vẫn chờ (giữ
+`routing_row` đã định tuyến); Request trả phí đã gửi trước lúc mất trưởng phòng được chuyển thành một bước; Request cũ có kế nhiệm tương lai
+được giao kế nhiệm khi hiệu lực. Giữ nguyên các khẳng định MF-2/MF-3 và luồng nhân viên trong phòng có trưởng phòng.
+
+### Bằng chứng (nhánh `feat/mf1-g7`, worktree `be-mf1-g7`, 09/11/2026)
+
+| Lệnh | Kết quả thật |
+| ---- | ------------ |
+| `pnpm typecheck`, `arch:check`, `rules:check`, `format:check`, `arch:docs:check`, `prisma:validate` | exit 0 |
+| `pnpm lint` | 0 lỗi (đã sửa 1 lỗi `no-unsafe-member-access` ở `one-step-routing-migration.integration-spec.ts`) |
+| `pnpm test` (unit) | 389 suite, 4 993 test, 0 lỗi |
+| `pnpm test:gates` | 16 suite, 330 test, 0 lỗi |
+| `pnpm test:http` | 78 suite: 77 xanh; 1 suite đỏ do `openapi-presentation` (mô tả `PackageResponseDto` của gói 5 chứa mã `QĐ-100h`/`QĐ-109c`) — không thuộc gói 7, sửa ở nhánh gom |
+| `pnpm test:integration` — 16 file của gói 7 (định tuyến một bước, migration, chuyển khi mất trưởng phòng, bổ sung/tỷ giá, nhóm, hàng đợi nhu cầu, chờ có kiểm soát, thông báo, rút lại, điều chuyển) | 16/16 suite xanh sau khi cập nhật test cũ theo luật một bước |
+| `pnpm test:integration` — 13 file còn lại của plan (seed, seed-rerun, gia hạn, đóng do nghỉ việc/điều chuyển, dashboards, nội bộ, dịch vụ, bổ sung chi, constraints) | 13/13 suite, 247 test xanh |
+
+`pnpm check`, `test:e2e`, `test:flows`, `test:scripts`, `test:integration:serial` và toàn bộ integration CHƯA chạy ở nhánh này — chạy ở nhánh gom.
+Chưa xác nhận review/accepted.

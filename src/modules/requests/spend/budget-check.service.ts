@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { BudgetsApi } from '../../budgets/public/budgets.api';
+import { BudgetsReadApi } from '../../budgets/public/budgets-read.api';
 import { AuditApi } from '../../audit/public/audit.api';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -67,7 +67,7 @@ interface CostCenterRead {
 export class BudgetCheckService {
   constructor(
     private readonly checks: BudgetCheckRepo,
-    private readonly budgets: BudgetsApi,
+    private readonly budgets: BudgetsReadApi,
     private readonly finance: FinanceApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly assessments: AssessmentReadRepo,

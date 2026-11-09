@@ -167,6 +167,32 @@ describe('the requests and grants of a person who left (integration, real Postgr
     );
 
   describe('what is open is listed and nothing changes by itself (AC-24)', () => {
+    it('BR-MF1-02/07: lists a request awaiting requester revision and allows its closure after the beneficiary leaves', async () => {
+      const u = await example();
+      const id = (await h.sent(u.leaver, plan, { termMonths: 1 })).id;
+      await h.ctx.sql.query(
+        `UPDATE access_request_steps SET state = 'NOT_REQUIRED', assignee_employee_id = NULL, assigned_at = NULL,
+           waiting_reason = NULL, waiting_since = NULL WHERE request_id = $1 AND kind = 'NEED'`,
+        [id],
+      );
+      await h.ctx.sql.query(
+        `UPDATE access_requests SET state = 'AWAITING_REQUESTER_REVISION', routing_mode = 'ONE_STEP', one_step_reason = 'HEAD_LEFT' WHERE id = $1`,
+        [id],
+      );
+      const departure = await h.recordedCase(u.leaver);
+
+      expect((await openRequests(departure.id)).items).toContainEqual(
+        expect.objectContaining({ requestId: id, state: 'AWAITING_REQUESTER_REVISION', cancellable: false }),
+      );
+      await h.leaveOnLastDay(departure.id).expect(200);
+      expect((await openRequests(departure.id)).items).toContainEqual(
+        expect.objectContaining({ requestId: id, state: 'AWAITING_REQUESTER_REVISION', cancellable: true }),
+      );
+      expect(wire(await h.cancelForDeparture(id).expect(200)).state).toBe('CANCELLED');
+      expect((await openRequests(departure.id)).items.map((item) => item.requestId)).not.toContain(id);
+      expect(await commitmentOf(id)).toBeUndefined();
+    });
+
     it('lists the request that waits for the need step and the grant being worked beside the record of the departure', async () => {
       const u = await example();
       const waiting = (await h.sent(u.leaver, plan, { termMonths: 1 })).id;

@@ -20,7 +20,13 @@ const DRAFT = {
 describe('AccessRequestsController.get', () => {
   const queries = { get: jest.fn() };
   const drafts = { readOwn: jest.fn() };
-  const controller = new AccessRequestsController({} as never, {} as never, queries as never, drafts as never);
+  const controller = new AccessRequestsController(
+    {} as never,
+    {} as never,
+    {} as never,
+    queries as never,
+    drafts as never,
+  );
 
   beforeEach(() => jest.resetAllMocks());
 

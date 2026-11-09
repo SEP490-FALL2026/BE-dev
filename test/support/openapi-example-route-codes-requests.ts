@@ -7,6 +7,11 @@ import type { RouteErrorStatus } from './openapi-example-manifest';
 export const ROUTE_ERROR_CODES_REQUESTS: Readonly<
   Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
 > = {
+  accessRequestResubmit: {
+    403: ['ACCESS_REQUEST.NOT_REQUESTER'],
+    404: ['ACCESS_REQUEST.NOT_FOUND'],
+    409: ['ACCESS_REQUEST.NOT_AWAITING_REVISION'],
+  },
   accessRequestAssessmentComplete: {
     '403': ['ACCESS_REQUEST.OWN_REQUEST'],
     '404': ['ACCESS_REQUEST.NOT_FOUND'],

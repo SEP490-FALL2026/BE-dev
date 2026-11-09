@@ -1,4 +1,3 @@
-import { isSingleStep } from '../spend/spend-submission.policy';
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -105,6 +104,17 @@ export class SpendDecisionService {
     return step;
   }
 
+  private async returnMissing(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    of: { request: AccessRequestRecord; step: SpendStepRecord; now: Date },
+    reason: 'PRICE_MISSING' | 'RATE_MISSING',
+  ): Promise<SpendDecisionResult> {
+    if (of.request.routing?.mode !== 'ONE_STEP') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
+    await this.effects.sendBack(tx, actor, of.request, of.step, { now: of.now, reasons: [reason], check: null });
+    return { status: 'BOUNCED', to: 'REQUESTER', reasons: [reason], overBy: null };
+  }
+
   /** An approval is made on what the check says: it is recorded, or the request goes back to its head. */
   private async approve(
     tx: DbTx,
@@ -113,14 +123,19 @@ export class SpendDecisionService {
     outcome: CheckOutcome,
   ): Promise<SpendDecisionResult> {
     const { request, step, now } = of;
-    if (outcome.status === 'NOT_CHECKABLE') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
+    if (outcome.status === 'NOT_CHECKABLE') return this.returnMissing(tx, actor, of, outcome.reason);
 
     const confirmation = await this.confirmations.ofStep(step.id, tx);
-    const verdict = judgeApproval(outcome.check, confirmation !== null || isSingleStep(request));
+    const verdict = judgeApproval(outcome.check, request.routing?.mode === 'ONE_STEP' || confirmation !== null);
     if (verdict.kind === 'RETURNED') {
       await this.effects.sendBack(tx, actor, request, step, { now, reasons: verdict.reasons, check: outcome.check });
 
-      return { status: 'BOUNCED', to: 'HEAD', reasons: verdict.reasons };
+      return {
+        status: 'BOUNCED',
+        to: request.routing?.mode === 'ONE_STEP' ? 'REQUESTER' : 'HEAD',
+        reasons: verdict.reasons,
+        overBy: outcome.check.overByMinor?.toString() ?? null,
+      };
     }
 
     return this.recorder.record(tx, actor, of, {

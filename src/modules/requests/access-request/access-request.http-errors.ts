@@ -23,6 +23,8 @@ import {
   AccessRequestWithdrawalRefusedError,
   AccessRequestNoDepartmentError,
   AccessRequestNotFoundError,
+  AccessRequestNotRequesterError,
+  AccessRequestNotAwaitingRevisionError,
   AccessRequestNotPriceableError,
   AccessRequestPlanNotFoundError,
 } from './access-request.errors';
@@ -33,6 +35,10 @@ const refuse = (status: HttpStatus, code: string, message: string): ApiException
 /** Maps the errors of the request routes to their HTTP answers; a database that cannot answer is a 503. */
 export function toAccessRequestApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  if (error instanceof AccessRequestNotRequesterError)
+    return refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.NOT_REQUESTER', error.message);
+  if (error instanceof AccessRequestNotAwaitingRevisionError)
+    return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_AWAITING_REVISION', error.message);
 
   if (error instanceof AccessRequestNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'ACCESS_REQUEST.NOT_FOUND', error.message);
@@ -147,6 +153,7 @@ const cancellation = (reason: ConstructorParameters<typeof AccessRequestCancella
 
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
 export const ACCESS_REQUEST_ERROR_EXAMPLES = {
+  NOT_AWAITING_REVISION: example(new AccessRequestNotAwaitingRevisionError()),
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),

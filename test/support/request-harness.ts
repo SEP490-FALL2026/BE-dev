@@ -17,6 +17,8 @@ export interface EmployeeRefWire {
 
 export interface AccessRequestWire {
   id: string;
+  routing: { mode: 'VIA_HEAD' | 'ONE_STEP'; oneStepReason: string | null };
+  spend: { stage: string; blockedReasons: string[]; overBy: { amount: string; currency: string } | null } | null;
   type: string;
   branch: 'INTERNAL_FREE' | 'PAID_IN_CATALOG' | 'NEW_SOFTWARE';
   state:
@@ -28,6 +30,7 @@ export interface AccessRequestWire {
     | 'AWAITING_FINANCE_REVIEW'
     | 'AWAITING_BUDGET'
     | 'AWAITING_SPEND_DECISION'
+    | 'AWAITING_REQUESTER_REVISION'
     | 'REJECTED'
     | 'IT_REJECTED'
     | 'EXECUTING'
@@ -71,12 +74,12 @@ export interface AccessRequestWire {
   } | null;
   needStep: {
     id: string;
-    state: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED';
+    state: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED' | 'CLOSED';
     assignee: EmployeeRefWire | null;
     routingRow: number;
     waitingReason: string | null;
-    samePersonAsSpend: boolean;
-    slaWorkingDays: number;
+    samePersonAsSpend?: boolean;
+    slaWorkingDays: number | null;
     createdAt: string;
     assignedAt: string | null;
     decidedAt: string | null;

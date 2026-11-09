@@ -115,6 +115,10 @@ export class DepartmentRecordService {
     return this.heads.currentHeads(departmentIds, onDate, tx);
   }
 
+  nextHeadPeriodOf(departmentId: string, after: BusinessDate, tx?: DbTx) {
+    return this.heads.nextPeriod(departmentId, after, tx);
+  }
+
   headHistory(client: DbTx | undefined, departmentId: string, limit: number): Promise<HeadPeriodRecord[]> {
     return this.heads.headPeriods(client, departmentId, limit);
   }

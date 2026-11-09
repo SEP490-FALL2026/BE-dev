@@ -57,6 +57,7 @@ export const myRequestSummarySchema = z.strictObject({
   type: requestSchema.shape.type,
   branch: requestSchema.shape.branch,
   state: requestStateSchema,
+  routing: requestSchema.shape.routing,
   /** The plan asked for; null for software that is not in the catalog until the IT Admin registers and links it. */
   plan: requestSchema.shape.plan,
   /** What the sender called software that is not in the catalog; null for any other request. */

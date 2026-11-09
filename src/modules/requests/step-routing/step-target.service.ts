@@ -31,6 +31,11 @@ export class StepTargetService {
     private readonly routing: RoutingFactsService,
   ) {}
 
+  async assessmentTarget(tx: DbTx, requesterEmployeeId: string, now: Date): Promise<string | null> {
+    const today = await this.organizationReads.businessToday(now, tx);
+    return (await this.organizationReads.getItAdminInCharge(requesterEmployeeId, today, tx))?.itAdminEmployeeId ?? null;
+  }
+
   /**
    * The spending approver now, leaving out one who has left the company. With `forShare` the row of the grant is locked until the
    * transaction ends, which a step that is being opened asks for (`M6`).
@@ -79,7 +84,10 @@ export class StepTargetService {
 
         return decision.outcome === 'ASSIGNED'
           ? { assigneeEmployeeId: decision.assigneeEmployeeId, routingRow: decision.row }
-          : { assigneeEmployeeId: null, reason: decision.reason };
+          : {
+              assigneeEmployeeId: null,
+              reason: decision.outcome === 'NOT_REQUIRED' ? 'NO_DEPARTMENT_HEAD' : decision.reason,
+            };
       }
       case 'SPEND_APPROVAL': {
         const assignment = routeSpendStep(people, facts.spendingApproverEmployeeId);

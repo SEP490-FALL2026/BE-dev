@@ -62,7 +62,7 @@ export class GroupSpendReport {
         decided.outcome === 'APPROVED' ? 'ACCESS_REQUEST.SPEND_APPROVED' : 'ACCESS_REQUEST.SPEND_REJECTED',
         'ACCESS_REQUEST_STEP',
         step.id,
-        groupSpendDecidedDetail(request, step, {
+        groupSpendDecidedDetail(request, {
           verdicts,
           checkId: decided.checkId,
           usesReserve: decided.usesReserve,

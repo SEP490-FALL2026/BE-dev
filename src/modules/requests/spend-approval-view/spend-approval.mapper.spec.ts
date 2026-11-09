@@ -31,6 +31,8 @@ const row = (request: Record<string, unknown> = {}): Row =>
       amountMinor: 123456n,
       amountCurrency: 'VND',
       offPlan: false,
+      routingMode: 'VIA_HEAD',
+      oneStepReason: null,
       ...request,
     },
   }) as unknown as Row;
@@ -65,7 +67,17 @@ describe('a row of the queue of the spending approver (US-06-01 AC-1)', () => {
       primaryCode: null,
       outcome: null,
       batchId: 'batch-1',
+      routing: { mode: 'VIA_HEAD', oneStepReason: null },
     });
+  });
+
+  it('BR-MF1-02 shows one-step routing without the retired same-person flag', () => {
+    const wire = approvalSummaryOf(
+      row({ routingMode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' }),
+      lookups({ batches: new Map() }),
+    );
+    expect(wire).toMatchObject({ routing: { mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' }, batchId: null });
+    expect(wire).not.toHaveProperty('samePersonAsSpend');
   });
 
   it('has no one person it is for when it is a group, no amount when it is not priced yet, and no plan for a proposal', () => {
@@ -150,6 +162,22 @@ describe('the spend step of one request and what surrounds it (US-06-01 AC-3, AC
     });
     expect(wire.need).toEqual({ decidedBy: person('emp-4'), decidedAt: '2026-10-02T00:00:00.000Z', reason: null });
     expect([wire.assessment, wire.decision]).toEqual([null, null]);
+  });
+
+  it('BR-MF1-02 one-step detail has no need decision and no retired flags', () => {
+    const original = facts();
+    const wire = approvalDetailOf({
+      ...original,
+      request: {
+        ...original.request,
+        routing: { mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' },
+        needDecision: null,
+      },
+    });
+    expect(wire.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' });
+    expect(wire.need).toBeNull();
+    expect(wire.step).not.toHaveProperty('samePersonAsSpend');
+    expect(wire.step).not.toHaveProperty('noIndependentReview');
   });
 
   it('shows the assessment with the equivalent tool, and what was decided with who decided it', () => {

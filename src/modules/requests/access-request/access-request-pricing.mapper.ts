@@ -1,7 +1,7 @@
 import type { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, toDateColumn } from '../../../core/business-date';
 import type { PricingRecord } from './access-request.types';
-import type { MissingPriceReason } from './pricing.policy';
+import type { MissingPriceReason } from './access-request.types';
 
 /** The columns of a request that carry its price, as the database returns them. */
 type PricingRow = Pick<

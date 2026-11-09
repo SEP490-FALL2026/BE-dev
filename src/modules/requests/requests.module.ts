@@ -1,4 +1,8 @@
+import { RequestFactsService } from './access-request/request-facts.service';
+import { PendingSpendListener } from './spend/pending-spend.listener';
+import { RequestsRoutingFacadeModule } from './requests-routing-facade.module';
 import { RequestsDashboardApi } from './public/requests-dashboard.api';
+import { RequestResubmissionService } from './request-intake/request-resubmission.service';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
@@ -23,7 +27,6 @@ import { RequestDraftSubmitService } from './draft/request-draft-submit.service'
 import { RequestDraftsController } from './draft/request-drafts.controller';
 import { RequestOutcomeListeners } from './public/requests.extension-points';
 import { RequestOutcomeService } from './outcome/request-outcome.service';
-import { AssessmentReadRepo } from './access-request/assessment-read.repo';
 import { AssessmentRepo } from './assessment/assessment.repo';
 import { AssessmentCompletionService } from './assessment/assessment-completion.service';
 import { AssessmentGate } from './assessment/assessment-gate.service';
@@ -40,7 +43,6 @@ import { InternalRegistrationService } from './assessment/internal-registration.
 import { ProposalService } from './assessment/proposal.service';
 import { ProposalsController } from './proposal-review/proposals.controller';
 import { AccessRequestQueryService } from './request-view/access-request-query.service';
-import { AccessRequestRepo } from './access-request/access-request.repo';
 import { AccessRequestService } from './request-intake/access-request.service';
 import { RequestSenderService } from './request-intake/request-sender.service';
 import { AccessRequestsController } from './request-submission/access-requests.controller';
@@ -66,7 +68,6 @@ import { RequestEndService } from './request-end/request-end.service';
 import { RequestsApi } from './public/requests.api';
 import { RequestsAiSourceApi } from './public/requests-ai-source.api';
 import { PricingViewService } from './request-view/pricing-view.service';
-import { RequestFactsService } from './access-request/request-facts.service';
 import { RequestPreviewService } from './request-submission/request-preview.service';
 import { SimilarSeatsService } from './need-decision/similar-seats.service';
 import { GroupCandidateService } from './group-request-submission/group-candidate.service';
@@ -105,14 +106,11 @@ import { YearStartCommitmentsBatchService } from './year-start-commitments/year-
 import { YearStartCommitmentsSweeper } from './year-start-commitments/year-start-commitments.job';
 import { YearStartCommitmentsRepo } from './year-start-commitments/year-start-commitments.repo';
 import { YearStartCommitmentsService } from './year-start-commitments/year-start-commitments.service';
-import { BudgetCheckRepo } from './spend/budget-check.repo';
-import { BudgetCheckService } from './spend/budget-check.service';
 import { BudgetCheckController } from './budget-check/budget-check.controller';
 import { BudgetCheckViewService } from './budget-check/budget-check-view.service';
 import { BudgetCheckYearsViewService } from './budget-check/budget-check-years-view.service';
 import { ReserveConfirmationRepo } from './reserve-confirmation/reserve-confirmation.repo';
 import { ReserveConfirmationService } from './reserve-confirmation/reserve-confirmation.service';
-import { PendingSpendListener } from './spend/pending-spend.listener';
 import { SpendApprovalQueueService } from './spend-approval-view/spend-approval-queue.service';
 import { SpendApprovalSourcesService } from './spend-approval-view/spend-approval-sources.service';
 import { SpendApprovalViewService } from './spend-approval-view/spend-approval-view.service';
@@ -127,7 +125,6 @@ import { SpendBatchService } from './spend-submission/spend-batch.service';
 import { SpendBatchListService } from './spend-submission/spend-batch-list.service';
 import { SpendBatchViewService } from './spend-submission/spend-batch-view.service';
 import { SpendEffectsService } from './spend-effects/spend-effects.service';
-import { SpendEntryService } from './spend/spend-entry.service';
 import { SpendHeadService } from './spend-submission/spend-head.service';
 import { SpendQueueService } from './spend-submission/spend-queue.service';
 import { SpendQueueOutcomeService } from './spend-submission/spend-queue-outcome.service';
@@ -139,11 +136,8 @@ import { SupplementPricing } from './spend-submission/supplement-pricing.service
 import { SupplementQueryService } from './spend-submission/supplement-query.service';
 import { SupplementRecorder } from './spend-submission/supplement-recorder.service';
 import { SupplementService } from './spend-submission/supplement.service';
-import { RepricingService } from './repricing/repricing.service';
 import { SpendRequestRepo } from './spend/spend-request.repo';
-import { SpendRoutingService } from './spend/spend-routing.service';
 import { SpendStatusService } from './spend/spend-status.service';
-import { SpendStepRepo } from './spend/spend-step.repo';
 import { RenewalApplyService } from './renewal-apply/renewal-apply.service';
 import { RenewalHoldReader } from './renewal-request/renewal-hold.listener';
 import { RenewalRequestRepo } from './renewal-apply/renewal-request.repo';
@@ -183,6 +177,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
  */
 @Module({
   imports: [
+    RequestsRoutingFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
@@ -221,14 +216,14 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     MyRequestsController,
   ],
   providers: [
-    AccessRequestRepo,
+    RequestFactsService,
+    PendingSpendListener,
     AssessmentRepo,
-    AssessmentReadRepo,
     AssessmentStepRepo,
     PricingViewService,
-    RequestFactsService,
     RequestPreviewService,
     AccessRequestService,
+    RequestResubmissionService,
     RequestSenderService,
     RequestDraftService,
     RequestDraftSubmitService,
@@ -266,21 +261,14 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     AccessRequestGrantGate,
     RequestCommitmentReleaseGuard,
     RequestCommitmentFacts,
-    SpendStepRepo,
-    BudgetCheckRepo,
     SpendRequestRepo,
-    BudgetCheckService,
-    SpendRoutingService,
     SpendStatusService,
     BudgetCheckViewService,
     BudgetCheckYearsViewService,
-    PendingSpendListener,
     ReserveConfirmationRepo,
     ReserveConfirmationService,
-    RepricingService,
     SpendWireViewService,
     SpendHeadService,
-    SpendEntryService,
     SpendBatchRepo,
     SpendBatchService,
     SpendBatchViewService,

@@ -173,26 +173,22 @@ describe('what the audit says of a spend decision taken on the people of a group
 
   it('says of the whole decision what was checked, whether it used the reserve and why, who was approved and who refused', () => {
     expect(
-      groupSpendDecidedDetail(
-        request,
-        { id: 'step-1', samePersonAsSpend: false },
-        {
-          verdicts,
-          checkId: 'check-1',
-          usesReserve: true,
-          reserveReason: 'Cần gấp',
-          decision: 'APPROVED',
-          deciderRole: 'SPENDING_APPROVER',
-        },
-      ),
+      groupSpendDecidedDetail(request, {
+        verdicts,
+        checkId: 'check-1',
+        usesReserve: true,
+        reserveReason: 'Cần gấp',
+        decision: 'APPROVED',
+        deciderRole: 'SPENDING_APPROVER',
+      }),
     ).toEqual({
       requestId: 'req-1',
+      oneStep: false,
       checkId: 'check-1',
       decision: 'APPROVED',
       deciderRole: 'SPENDING_APPROVER',
       usesReserve: true,
       reserveReason: 'Cần gấp',
-      samePersonAsSpend: false,
       requestState: 'AWAITING_EXECUTION',
       lineCount: 2,
       approvedEmployeeIds: ['p1'],
@@ -202,18 +198,14 @@ describe('what the audit says of a spend decision taken on the people of a group
 
   it('goes to REJECTED when nobody is approved, with no reserve used', () => {
     expect(
-      groupSpendDecidedDetail(
-        request,
-        { id: 'step-1', samePersonAsSpend: true },
-        {
-          verdicts: [verdicts[1]],
-          checkId: null,
-          usesReserve: false,
-          reserveReason: null,
-          decision: 'REJECTED',
-          deciderRole: 'SPENDING_APPROVER',
-        },
-      ),
+      groupSpendDecidedDetail(request, {
+        verdicts: [verdicts[1]],
+        checkId: null,
+        usesReserve: false,
+        reserveReason: null,
+        decision: 'REJECTED',
+        deciderRole: 'SPENDING_APPROVER',
+      }),
     ).toMatchObject({ requestState: 'REJECTED', usesReserve: false, reserveReason: null, checkId: null });
   });
 });

@@ -33,7 +33,7 @@ export function checkSpendDecider(facts: {
 }
 
 /** Why an approval is not saved and the request goes back to its head: the check made again blocks it, or the reserve it uses is not confirmed. */
-export type ReturnReason = BlockReason | 'RESERVE_UNCONFIRMED';
+export type ReturnReason = BlockReason | 'RESERVE_UNCONFIRMED' | 'PRICE_MISSING' | 'RATE_MISSING';
 
 export type ApprovalVerdict =
   /** The approval may be saved; `usesReserve` is whether the check made now needs the reserve (and the head confirmed it). */
@@ -65,8 +65,7 @@ export function judgeApproval(
  */
 export function spendDecisionRecordOf(
   of: {
-    request: { id: string };
-    step: { id: string; samePersonAsSpend: boolean };
+    request: { id: string; routing?: { mode: string } };
   },
   decided: {
     decision: 'APPROVED' | 'REJECTED';
@@ -93,11 +92,11 @@ export function spendDecisionRecordOf(
     detail: {
       requestId: of.request.id,
       checkId: decided.checkId,
+      oneStep: of.request.routing?.mode === 'ONE_STEP',
       decision: decided.decision,
       deciderRole,
       usesReserve: decided.usesReserve,
       reserveReason: decided.reserveReason,
-      samePersonAsSpend: of.step.samePersonAsSpend,
       requestState,
     },
   };

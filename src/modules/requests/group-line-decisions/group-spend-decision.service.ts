@@ -1,4 +1,3 @@
-import { isSingleStep } from '../spend/spend-submission.policy';
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -23,7 +22,7 @@ export interface LineSpendDecisionInput {
 export type LineSpendDecisionResult =
   | { status: 'DECIDED'; requestState: string }
   /** The request was checked again as the approver decided and it is not for them now: it went back to its head, nothing was decided (`US-06-01` AC-18). */
-  | { status: 'BOUNCED'; to: 'HEAD'; reasons: ReturnReason[] };
+  | { status: 'BOUNCED'; to: 'HEAD' | 'REQUESTER'; reasons: ReturnReason[]; overBy?: string | null };
 
 /**
  * The spending approver decides the people of a request for a group (`US-05-17` AC-9, `US-06-01` AC-15, `US-06-08` AC-10). The step
@@ -96,14 +95,23 @@ export class GroupSpendDecisionService {
           })),
         };
       }
-      if (outcome.status === 'NOT_CHECKABLE') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
+      if (outcome.status === 'NOT_CHECKABLE') {
+        if (request.routing?.mode !== 'ONE_STEP') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
+        await this.effects.sendBack(tx, actor, request, step, { now, reasons: [outcome.reason], check: null });
+        return { status: 'BOUNCED', to: 'REQUESTER', reasons: [outcome.reason], overBy: null };
+      }
 
       const confirmation = await this.confirmations.ofStep(step.id, tx);
-      const verdict = judgeApproval(outcome.check, confirmation !== null || isSingleStep(request));
+      const verdict = judgeApproval(outcome.check, request.routing?.mode === 'ONE_STEP' || confirmation !== null);
       if (verdict.kind === 'RETURNED') {
         await this.effects.sendBack(tx, actor, request, step, { now, reasons: verdict.reasons, check: outcome.check });
 
-        return { status: 'BOUNCED', to: 'HEAD', reasons: verdict.reasons };
+        return {
+          status: 'BOUNCED',
+          to: request.routing?.mode === 'ONE_STEP' ? 'REQUESTER' : 'HEAD',
+          reasons: verdict.reasons,
+          overBy: outcome.check.overByMinor?.toString() ?? null,
+        };
       }
 
       return {

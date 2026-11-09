@@ -50,12 +50,11 @@ export const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: 
 /** The need step. A step holds one person or none (`US-05-03` AC-10); later steps are a paged subresource, not an array here. */
 const needStepSchema = z.strictObject({
   id: z.uuid(),
-  state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED']),
+  state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED', 'NOT_REQUIRED']),
   assignee: employeeRef.nullable(),
   routingRow: z.number().int().min(1).max(9),
   waitingReason: z.enum(['NO_SPENDING_APPROVER', 'NO_DEPARTMENT_HEAD']).nullable(),
-  samePersonAsSpend: z.boolean(),
-  slaWorkingDays: z.number().int().positive(),
+  slaWorkingDays: z.number().int().positive().nullable(),
   createdAt: z.iso.datetime(),
   assignedAt: z.iso.datetime().nullable(),
   decidedAt: z.iso.datetime().nullable(),
@@ -65,7 +64,7 @@ const needStepSchema = z.strictObject({
 const needDecisionSchema = z.strictObject({
   decision: z.enum(['APPROVED', 'REJECTED']),
   decidedBy: employeeRef,
-  deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER', 'FALLBACK_APPROVER']),
+  deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER']),
   reason: z.string().nullable(),
   decidedAt: z.iso.datetime(),
 });
@@ -104,6 +103,7 @@ export const requestStateSchema = z.enum([
   'AWAITING_IT_ASSESSMENT',
   'AWAITING_SPEND_SUBMISSION',
   'AWAITING_SPEND_DECISION',
+  'AWAITING_REQUESTER_REVISION',
   'REJECTED',
   'IT_REJECTED',
   'EXECUTING',
@@ -119,6 +119,10 @@ export const requestSchema = z.strictObject({
   type: z.enum(['GRANT', 'SERVICE_ACCOUNT', 'RENEWAL', 'GROUP_GRANT']),
   branch: z.enum(['INTERNAL_FREE', 'PAID_IN_CATALOG', 'NEW_SOFTWARE']),
   state: requestStateSchema,
+  routing: z.strictObject({
+    mode: z.enum(['VIA_HEAD', 'ONE_STEP']),
+    oneStepReason: z.enum(['REQUESTER_IS_HEAD', 'NO_DEPARTMENT_HEAD', 'HEAD_LEFT']).nullable(),
+  }),
   /** The plan asked for; null for software that is not in the catalog until the IT Admin registers and links it. */
   plan: z
     .strictObject({
@@ -190,9 +194,18 @@ export const requestSchema = z.strictObject({
    */
   spend: z
     .strictObject({
-      stage: z.enum(['NOT_SUBMITTED', 'RESERVE_CONFIRMATION', 'BLOCKED', 'WAITING_SPEND_DECISION', 'REFUSED']),
+      stage: z.enum([
+        'NOT_SUBMITTED',
+        'RETURNED_TO_REQUESTER',
+        'RESERVE_CONFIRMATION',
+        'BLOCKED',
+        'WAITING_SPEND_DECISION',
+        'REFUSED',
+      ]),
       /** Why the request is blocked, every reason that applies; empty unless the stage is `BLOCKED`. */
-      blockedReasons: z.array(z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE'])).max(3),
+      blockedReasons: z
+        .array(z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING', 'RATE_MISSING']))
+        .max(3),
       /** How far over the base (it waits for the reserve to be confirmed) or over the reserve (blocked for that); null otherwise. */
       overBy: moneySchema.nullable(),
       /** What the spending approver wrote when they refused the request. */

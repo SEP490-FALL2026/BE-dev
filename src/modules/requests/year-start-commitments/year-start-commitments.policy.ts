@@ -1,6 +1,7 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
-import { monthlyPriceOf, requestAmountOf, type BillingCycleCode } from '../access-request/pricing.policy';
+import type { BillingCycleCode } from '../access-request/access-request.types';
+import { monthlyPriceOf, requestAmountOf } from '../access-request/pricing.policy';
 
 /**
  * What the commitment made on 01/01 holds (`FR-5.8`(6), `BR-MF1-09`, `QĐ-109a`), as pure decisions. A request whose right goes on into the

@@ -1,3 +1,4 @@
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -31,6 +32,7 @@ export interface GroupWritten {
 @Injectable()
 export class GroupRequestWriter {
   constructor(
+    private readonly spendRouting: SpendRoutingService,
     private readonly requests: AccessRequestRepo,
     private readonly lines: RequestLineRepo,
     private readonly decisions: LineDecisionRepo,
@@ -95,6 +97,7 @@ export class GroupRequestWriter {
       await this.audit.record(tx, event);
     }
 
+    await this.spendRouting.start(tx, actor, created.id, now);
     const request = await this.requests.findById(created.id, tx);
     if (!request) throw new Error(`The request ${created.id} was not found after it was written.`);
 

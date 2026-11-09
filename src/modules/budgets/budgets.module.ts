@@ -1,3 +1,4 @@
+import { BudgetsReadFacadeModule } from './budgets-read-facade.module';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { ObjectStorageModule } from '../../infrastructure/object-storage/object-storage.module';
@@ -13,11 +14,9 @@ import { BudgetCostCenterUseReader } from './commitment/budget-cost-center-use.l
 import { BudgetHeadChangeListener } from './proposal/budget-head-change.listener';
 import { BudgetSpendingApproverGrantCheck } from './proposal/spending-approver-grant.listener';
 import { SpendingApproverWaitListener } from './budget/spending-approver-wait.listener';
-import { BudgetFactsRepo } from './budget/budget-facts.repo';
 import { BudgetNotifierService } from './budget/budget-notifier.service';
 import { BudgetProposalsController } from './proposal/budget-proposals.controller';
 import { BudgetFactsService } from './budget/budget-facts.service';
-import { BudgetYearLockRepo } from './budget/budget-year-lock.repo';
 import { BudgetVersionLinesController } from './version/budget-version-lines.controller';
 import { BudgetVersionsController } from './version/budget-versions.controller';
 import { BudgetViewRepo } from './budget-view/budget-view.repo';
@@ -32,9 +31,7 @@ import {
   PendingSpendContributions,
 } from './public/budgets.extension-points';
 import { BudgetCommitmentsController } from './commitment/budget-commitments.controller';
-import { CommitmentRepo } from './budget/commitment.repo';
 import { CommitmentService } from './commitment/commitment.service';
-import { InvoiceRepo } from './budget/invoice.repo';
 import { BudgetInvoicesController } from './invoice/budget-invoices.controller';
 import { BudgetCyclesController } from './cycle/budget-cycles.controller';
 import { BaselineService } from './cycle/baseline.service';
@@ -94,6 +91,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
  */
 @Module({
   imports: [
+    BudgetsReadFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
@@ -122,9 +120,6 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     VersionLineRepo,
     VersionHistoryRepo,
     DecisionRepo,
-    CommitmentRepo,
-    InvoiceRepo,
-    BudgetYearLockRepo,
     BudgetFactsService,
     BudgetNotifierService,
     ProposalViewService,
@@ -161,7 +156,6 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetViewNumbersService,
     BudgetTableViewService,
     BudgetViewService,
-    BudgetFactsRepo,
     CycleRepo,
     CycleService,
     BaselineService,

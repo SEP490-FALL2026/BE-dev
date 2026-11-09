@@ -3,7 +3,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { maxEndDateOf } from '../access-request/pricing.policy';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
+import { AccessRequestNotFoundError, AccessRequestNotRequesterError } from '../access-request/access-request.errors';
 import { hasSpendStep } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { GroupSupplementService } from '../group-request/group-supplement.service';
@@ -39,12 +39,15 @@ export class SupplementService {
    * Throws SpendNotHeadError, AccessRequestNotFoundError, SpendSupplementRefusedError and AccessRequestNotPriceableError.
    */
   async add(actor: AuthenticatedPrincipal, requestId: string, body: SupplementBodyDto): Promise<SupplementWire> {
-    const departmentId = await this.head.departmentOf(actor);
     const record = await this.runner.run(async (tx) => {
       const request = await this.requests.lockById(tx, requestId);
-      if (!request || request.departmentId !== departmentId || !hasSpendStep(request.policy)) {
+      if (!request || !hasSpendStep(request.policy)) {
         throw new AccessRequestNotFoundError();
       }
+      if (request.routing?.mode === 'ONE_STEP') {
+        if (request.requesterEmployeeId !== actor.employeeId) throw new AccessRequestNotRequesterError();
+        if (request.state !== 'AWAITING_REQUESTER_REVISION') throw new SpendSupplementRefusedError('NOT_IN_QUEUE');
+      } else if (request.departmentId !== (await this.head.departmentOf(actor))) throw new AccessRequestNotFoundError();
       const { pricing } = request;
       // The people of a group the head leaves out are judged first: a request for one person has none to leave out.
       const dropped = this.groups.check(request, body.dropEmployeeIds ?? []);

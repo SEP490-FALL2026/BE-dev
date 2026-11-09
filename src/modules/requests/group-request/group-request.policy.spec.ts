@@ -17,7 +17,7 @@ const person = (over: Partial<LineFacts> = {}): LineFacts => ({
   hireDate: '2026-01-05',
   holdsAccess: false,
   hasOpenRequest: false,
-  isHeadOwnLine: false,
+  isDepartmentHead: false,
   termRequired: false,
   spendingApprover: false,
   ...over,
@@ -138,10 +138,10 @@ describe('what each person named must have (US-05-17 AC-2, AC-8, AC-12, AC-15)',
     ]);
   });
 
-  it("asks no email and no end day of the head in their own line, as it does of a head's own request", () => {
-    const own = person({ isHeadOwnLine: true, workEmail: null, employmentType: 'INTERN' });
+  it('BR-MF1-02: rejects the current head in a group before contact checks', () => {
+    const own = person({ isDepartmentHead: true, workEmail: null, employmentType: 'INTERN' });
 
-    expect(check([own])).toEqual([]);
-    expect(check([{ ...own, active: false }])).toEqual([{ employeeId: 'e1', reason: 'NOT_ACTIVE' }]);
+    expect(check([own])).toEqual([{ employeeId: 'e1', reason: 'HEAD_IN_GROUP' }]);
+    expect(check([{ ...own, active: false }])).toEqual([{ employeeId: 'e1', reason: 'HEAD_IN_GROUP' }]);
   });
 });

@@ -26,14 +26,18 @@ export interface NeedDecisionView extends Omit<ApprovalRecordRecord, 'decidedByE
   decidedBy: EmployeeRefView;
 }
 
-export interface NeedStepView extends Omit<NeedStepRecord, 'assigneeEmployeeId'> {
+export interface NeedStepView extends Omit<
+  NeedStepRecord,
+  'assigneeEmployeeId' | 'samePersonAsSpend' | 'slaWorkingDays'
+> {
   assignee: EmployeeRefView | null;
+  slaWorkingDays: number | null;
 }
 
 /** Where the request stands on its way to the spending approver, as the wire writes it (`BR-MF1-06g`). */
 export interface SpendView {
   stage: SpendStage;
-  blockedReasons: BlockReason[];
+  blockedReasons: (BlockReason | 'PRICE_MISSING' | 'RATE_MISSING')[];
   /** How far over the base (waiting for the reserve to be confirmed) or over the reserve (blocked for that); null otherwise. */
   overBy: MoneyView | null;
   refusalReason: string | null;
@@ -43,6 +47,7 @@ export interface SpendView {
 export interface AccessRequestView extends Omit<
   AccessRequestRecord,
   | 'organizationId'
+  | 'oneStepBlockedReason'
   | 'planId'
   | 'departmentId'
   | 'costCenterId'
@@ -196,7 +201,9 @@ export class AccessRequestQueryService {
       throw new Error(`The request ${record.id} points at a missing record.`);
     }
 
-    const { assigneeEmployeeId, ...step } = needStep;
+    const { assigneeEmployeeId, ...legacyStep } = needStep;
+    const step = { ...legacyStep };
+    Reflect.deleteProperty(step, 'samePersonAsSpend');
     const decision = record.needDecision;
 
     return {
@@ -204,6 +211,7 @@ export class AccessRequestQueryService {
       type: record.type,
       branch: record.branch,
       state: record.state,
+      routing: record.routing ?? { mode: 'VIA_HEAD', oneStepReason: null },
       plan: plan && {
         planId: plan.planId,
         planName: plan.planName,
@@ -251,7 +259,11 @@ export class AccessRequestQueryService {
             },
       serviceAccount: this.serviceAccountOf(record.serviceAccount, person),
       renewal: this.renewalOf(record.renewal),
-      needStep: { ...step, assignee: assigneeEmployeeId === null ? null : person(assigneeEmployeeId) },
+      needStep: {
+        ...step,
+        slaWorkingDays: step.state === 'NOT_REQUIRED' ? null : step.slaWorkingDays,
+        assignee: assigneeEmployeeId === null ? null : person(assigneeEmployeeId),
+      },
       needDecision:
         decision === null
           ? null

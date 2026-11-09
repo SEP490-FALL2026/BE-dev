@@ -1,3 +1,4 @@
+import { CatalogPricingFacadeModule } from './catalog-pricing-facade.module';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { ObjectStorageModule } from '../../infrastructure/object-storage/object-storage.module';
@@ -53,7 +54,6 @@ import { SubscriptionPeriodService } from './subscription/subscription-period.se
 import { SubscriptionPeriodApi } from './public/subscription-period.api';
 import { SubscriptionObligationService } from './subscription/subscription-obligation.service';
 import { SubscriptionGrantingRepo } from './subscription/subscription-granting.repo';
-import { SubscriptionRepo } from './subscription/subscription.repo';
 import { SubscriptionChangeGuard } from './subscription/subscription-change-guard.service';
 import { SubscriptionChangeService } from './subscription/subscription-change.service';
 import { SubscriptionService } from './subscription/subscription.service';
@@ -85,6 +85,7 @@ import { VendorRepo } from './vendor/vendor.repo';
  */
 @Module({
   imports: [
+    CatalogPricingFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
@@ -144,7 +145,6 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionPricingService,
     SubscriptionObligationService,
     SubscriptionDepartmentUseReader,
-    SubscriptionRepo,
     SubscriptionGrantingRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,

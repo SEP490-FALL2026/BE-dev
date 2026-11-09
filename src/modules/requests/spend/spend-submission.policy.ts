@@ -1,5 +1,3 @@
-import type { DeciderRole as ReadDeciderRole } from '../access-request/access-request.types';
-
 /**
  * The rules of sending a request that costs money on to be decided as spend (`US-06-14`, `US-05-04` AC-12 to AC-16), as pure
  * decisions: which line of the plan a request is attached to, who sends it on, what stops it, and when its day may change.
@@ -20,25 +18,6 @@ export type StopReason =
   | 'OVER_RESERVE'
   | 'STALE_COST_EVIDENCE'
   | 'CLOSED_OR_EXPIRED_BUDGET_PERIOD';
-
-/**
- * Where a request goes once its need is approved and it costs money: the queue of the head, who sends it on, or straight to
- * the check when nobody can send it (`US-06-14` AC-8). Nobody can when the need was decided by the spending approver, in the place
- * of the head who sent the request (row 2): they would send it to themselves. A department with no head never gets here, since its
- * need step waits (`QĐ-93c`); a request whose need the head decided stays in the queue of the department, even if the head leaves
- * meanwhile (`US-06-14` AC-8).
- */
-export function entryFor(input: { deciderRole: ReadDeciderRole }): 'HEAD_QUEUE' | 'DIRECT' {
-  return input.deciderRole === 'MANAGER' ? 'HEAD_QUEUE' : 'DIRECT';
-}
-
-/**
- * Whether the request goes in one step (`BR-MF1-02`, `QĐ-103b`): its need was not decided by a head, so no head sends it on in a batch or
- * confirms the reserve — the spending approver decides need and spend at once, the reserve included (`BR-MF1-06`, `BR-MF1-07c`).
- */
-export function isSingleStep(request: { needDecision: { deciderRole: ReadDeciderRole } | null }): boolean {
-  return request.needDecision !== null && entryFor({ deciderRole: request.needDecision.deciderRole }) === 'DIRECT';
-}
 
 export type SupplementRefusal =
   /** The request is not in the queue of the head: it is being decided, or has been. */
@@ -63,7 +42,8 @@ export function checkSupplement(facts: {
   /** The end date the file asks for, when it asks for one, with the end date and the limits the request has. */
   term?: { requested: string; current: string | null; today: string; maxEndDate: string };
 }): SupplementRefusal | null {
-  if (facts.state !== 'AWAITING_SPEND_SUBMISSION') return 'NOT_IN_QUEUE';
+  if (facts.state !== 'AWAITING_SPEND_SUBMISSION' && facts.state !== 'AWAITING_REQUESTER_REVISION')
+    return 'NOT_IN_QUEUE';
   if (!facts.priced) return 'NOT_PRICED';
   if (facts.term) {
     const { requested, current, today, maxEndDate } = facts.term;

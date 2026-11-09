@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpStatus, Param, Post } from '@nestjs/common';
+import { RequestResubmissionService } from '../request-intake/request-resubmission.service';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -46,6 +47,7 @@ const NOT_FOUND = {
 export class AccessRequestsController {
   constructor(
     private readonly requests: AccessRequestService,
+    private readonly resubmissions: RequestResubmissionService,
     private readonly previews: RequestPreviewService,
     private readonly queries: AccessRequestQueryService,
     private readonly drafts: RequestDraftService,
@@ -58,7 +60,7 @@ export class AccessRequestsController {
     status: HttpStatus.CREATED,
     message: 'ACCESS_REQUEST.SUBMITTED',
     description:
-      'The request is fixed to its branch and chain of steps, charged to the Unit Cost Center of the department of the sender on the day, and its need step is given to the one person the routing table names. With nobody valid to hold it the request waits under control (state WAITING_CONTROLLED) and decides or refuses nothing.',
+      'The request is fixed to its branch and chain of steps, charged to the Unit Cost Center of the department of the sender on the day, and its need step is given to the one person the routing table names. A requester who is the current head, or whose department has no effective head, skips the need step; paid requests are checked immediately and a blocked request stays saved for revision.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -128,13 +130,48 @@ export class AccessRequestsController {
     }
   }
 
+  @Post(':id/resubmission')
+  @HttpCode(HttpStatus.OK)
+  @AuthenticatedOnly()
+  @ApiOperation({ operationId: 'accessRequestResubmit', summary: 'Send a revised one-step request again' })
+  @ApiSuccessResponse(AccessRequestResponseDto, {
+    message: 'ACCESS_REQUEST.RESUBMITTED',
+    description: 'The request is checked again and either waits for its requester or goes to the spending approver.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    NOT_FOUND,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only the requester sends the request again (ACCESS_REQUEST.NOT_REQUESTER).',
+      examples: [EXAMPLES.NOT_REQUESTER],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'The request is not waiting for revision (ACCESS_REQUEST.NOT_AWAITING_REVISION).',
+      examples: [EXAMPLES.NOT_AWAITING_REVISION],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
+  )
+  async resubmit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RequestIdParamDto) {
+    try {
+      return { request: toWire(await this.queries.view(await this.resubmissions.resubmit(actor, params.id))) };
+    } catch (error) {
+      throw toAccessRequestApiException(error);
+    }
+  }
+
   @Get(':id')
   @AuthenticatedOnly()
   @ApiOperation({ operationId: 'accessRequestGet', summary: 'Get a request for access to software' })
   @ApiSuccessResponse(AccessRequestOrDraftResponseDto, {
     message: 'ACCESS_REQUEST.FETCHED',
     description:
-      'The request with the person who holds its need step, the row of the routing table that named them (or why nobody holds it) and whether the same person also holds the spend step. Only the sender, the person it is for, the person who holds the step and an IT Admin read it. The person who saved a draft reads it here too, as `draft` instead of `request`: a draft is not a request yet, so it has no price, step or Cost Center, and nobody else reads it (the id of a draft that is owned by somebody else answers as one that does not exist).',
+      'The request with the person who holds its need step, the row of the routing table that named them (or why nobody holds it) and its fixed one-step or via-head routing. Only the sender, the person it is for, the person who holds the step and an IT Admin read it. The person who saved a draft reads it here too, as `draft` instead of `request`: a draft is not a request yet, so it has no price, step or Cost Center, and nobody else reads it (the id of a draft that is owned by somebody else answers as one that does not exist).',
   })
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

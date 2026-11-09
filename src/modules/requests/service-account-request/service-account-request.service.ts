@@ -106,11 +106,10 @@ export class ServiceAccountRequestService {
         createdByAppUserId: actor.appUserId,
         now,
         needStep: {
-          state: assigned ? 'PENDING' : 'WAITING',
+          state: decision.outcome === 'NOT_REQUIRED' ? 'NOT_REQUIRED' : assigned ? 'PENDING' : 'WAITING',
           assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
           routingRow: decision.row,
           waitingReason: assigned ? null : decision.reason,
-          samePersonAsSpend: assigned && decision.samePersonAsSpend,
           slaWorkingDays: policy.slaWorkingDays,
         },
         draftId: options.draftId ?? null,
@@ -166,7 +165,6 @@ export class ServiceAccountRequestService {
             assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
             role: assigned ? decision.role : null,
             waitingReason: assigned ? null : decision.reason,
-            samePersonAsSpend: assigned && decision.samePersonAsSpend,
             requesterEmployeeId: actor.employeeId,
             departmentId: unit.departmentId,
             departmentHeadEmployeeId,
@@ -174,6 +172,7 @@ export class ServiceAccountRequestService {
         ),
       );
 
+      await this.sender.startOneStep(tx, actor, created.id, now);
       const record = await this.requests.findById(created.id, tx);
       if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
 

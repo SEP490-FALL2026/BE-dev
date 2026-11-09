@@ -1,3 +1,4 @@
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -26,6 +27,7 @@ import { AssessmentPricingService } from './assessment-pricing.service';
 @Injectable()
 export class InternalRegistrationService {
   constructor(
+    private readonly spending: SpendRoutingService,
     private readonly runner: TransactionRunner,
     private readonly requests: AccessRequestRepo,
     private readonly assessments: AssessmentRepo,
@@ -59,7 +61,8 @@ export class InternalRegistrationService {
       });
       const registered = await this.catalog.registerInternalSoftware(tx, actor, {
         name: body.softwareName ?? proposal.softwareName,
-        businessOwnerEmployeeId: body.businessOwnerEmployeeId,
+        // The legacy catalog column stays until its own removal; it is no longer a field the assessor chooses.
+        businessOwnerEmployeeId: request.requesterEmployeeId,
         dataSensitivity: basis.dataSensitivity,
       });
       if (registered.status === 'REFUSED') throw new InternalRegistrationRefusedError(registered.reason);
@@ -75,7 +78,6 @@ export class InternalRegistrationService {
         requestId,
         {
           dataSensitivity: basis.dataSensitivity,
-          proposedBusinessOwnerEmployeeId: body.businessOwnerEmployeeId,
           ...(quote ? { quote } : {}),
         },
         actor.employeeId,
@@ -83,12 +85,28 @@ export class InternalRegistrationService {
       const standsIn = await this.gate.finishStep(tx, requestId, actor, { now });
       await this.assessments.complete(tx, requestId, actor.employeeId, now);
       await this.auditRegistered(tx, actor, request, { registered, body, withSpend, standsIn });
+      await this.startOneStep(tx, actor, requestId, request.routing?.mode === 'ONE_STEP', withSpend, now);
 
       const record = await this.requests.findById(requestId, tx);
       if (!record) throw new Error(`The request ${requestId} was not found after its software was registered.`);
 
       return record;
     });
+  }
+
+  private async startOneStep(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    id: string,
+    oneStep: boolean,
+    withSpend: boolean,
+    now: Date,
+  ): Promise<void> {
+    if (!oneStep) return;
+    const request = await this.requests.findById(id, tx);
+    if (!request) return;
+    if (withSpend) await this.spending.route(tx, actor, request, 'SUBMISSION', now);
+    else await this.spending.start(tx, actor, id, now);
   }
 
   private async auditRegistered(
@@ -114,7 +132,6 @@ export class InternalRegistrationService {
           requestId: request.id,
           applicationId: done.registered.applicationId,
           planId: done.registered.planId,
-          businessOwnerEmployeeId: done.body.businessOwnerEmployeeId,
           withSpend: done.withSpend,
           actingForAssignee: done.standsIn,
         },

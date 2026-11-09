@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import request from 'supertest';
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
@@ -127,5 +128,52 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
 
     expect(total).toBe(4);
     expect(items.map((item) => item.id)).toEqual([...open].sort().slice(0, 2));
+  });
+
+  it('BR-MF1-02/07: requester revision keeps both the department and its Cost Center in use', async () => {
+    const department = await h.department('P-REVISION');
+    const employeeId = await h.member(department.code, 'E-REVISION', 'Specialist');
+    const account = await h.account('E-REVISION', employeeId);
+    // No head and no approved budget: the paid request is retained for its requester to revise.
+    const sent = await request(h.server())
+      .post('/api/v1/access-requests')
+      .set(h.as(account))
+      .send({ planId: ownerPlan, businessReason: 'Work in the new department' })
+      .expect(201);
+    const revision = h.dataOf<{ request: { id: string; state: string } }>(sent).request;
+    expect(revision.state).toBe('AWAITING_REQUESTER_REVISION');
+    const stored = await h.ctx.sql.query<{ cost_center_id: string }>(
+      `SELECT cost_center_id FROM access_requests WHERE id = $1`,
+      [revision.id],
+    );
+    const costCenterId = stored.rows[0].cost_center_id;
+    const api = h.ctx.app.get(OrganizationApi, { strict: false });
+
+    expect((await api.getDepartmentUse(department.id, today, 50)).openWork.items).toContainEqual({
+      kind: 'ACCESS_REQUEST',
+      id: revision.id,
+      label: null,
+    });
+    expect((await api.getCostCenterUse(costCenterId, 50)).requests).toEqual({
+      total: 1,
+      items: [{ kind: 'ACCESS_REQUEST', id: revision.id, label: null }],
+    });
+    const retireDepartment = await request(h.server())
+      .post(`/api/v1/departments/${department.id}/deactivate`)
+      .set({ Authorization: `Bearer ${h.admin}` })
+      .send({})
+      .expect(409);
+    expect(h.codeOf(retireDepartment)).toBe('DEPARTMENT.IN_USE');
+    expect(h.detailsOf(retireDepartment).openWork).toContainEqual({
+      kind: 'ACCESS_REQUEST',
+      id: revision.id,
+      label: null,
+    });
+    const retireCostCenter = await request(h.server())
+      .post(`/api/v1/cost-centers/${costCenterId}/deactivate`)
+      .set(h.as(h.finance))
+      .expect(409);
+    expect(h.codeOf(retireCostCenter)).toBe('COST_CENTER.IN_USE');
+    expect(h.detailsOf(retireCostCenter).requests).toEqual([{ kind: 'ACCESS_REQUEST', id: revision.id, label: null }]);
   });
 });

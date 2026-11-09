@@ -78,6 +78,10 @@ export function approvalSummaryOf(row: OpenSpendRow, lookups: QueueLookups): App
 
   return {
     requestId: row.requestId,
+    routing: {
+      mode: request.routingMode ?? 'VIA_HEAD',
+      oneStepReason: (request.oneStepReason ?? null) as import('../access-request/routing.policy').OneStepReason | null,
+    },
     stepId: row.id,
     stepKind: 'SPEND_APPROVAL',
     openedAt: row.createdAt.toISOString(),
@@ -92,7 +96,6 @@ export function approvalSummaryOf(row: OpenSpendRow, lookups: QueueLookups): App
     amount: amountOf(request, lookups.units),
     primaryCode: check ? (codesOf(check)[0] ?? null) : null,
     outcome: check?.outcome === 'WITHIN_BASE' || check?.outcome === 'USES_RESERVE' ? check.outcome : null,
-    samePersonAsSpend: row.samePersonAsSpend,
     batchId: lookups.batches.get(row.requestId) ?? null,
   };
 }
@@ -199,7 +202,6 @@ function stepView(step: DetailStep, person: Person): ApprovalDetailWire['step'] 
     openedAt: step.createdAt.toISOString(),
     decidedAt: step.decidedAt?.toISOString() ?? null,
     slaWorkingDays: step.slaWorkingDays,
-    samePersonAsSpend: step.samePersonAsSpend,
   };
 }
 
@@ -241,6 +243,7 @@ export function approvalDetailOf(facts: DetailFacts): ApprovalDetailWire {
 
   return {
     requestId: facts.requestId,
+    routing: request.routing ?? { mode: 'VIA_HEAD', oneStepReason: null },
     step: stepView(facts.step, person),
     request: requestView(facts),
     need: request.needDecision

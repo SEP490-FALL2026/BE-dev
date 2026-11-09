@@ -1,4 +1,4 @@
-import { maxEndDateOf, monthsBetween, requestAmountOf, type PricingInput } from './pricing.policy';
+import { maxEndDateOf, monthsBetween, pricingRecordFor, requestAmountOf, type PricingInput } from './pricing.policy';
 
 const SEAT = { amountMinor: 2000n, currency: 'USD' }; // 20.00 per seat per month
 
@@ -10,6 +10,52 @@ const input = (patch: Partial<PricingInput> = {}): PricingInput => ({
   checkDate: '2026-11-10',
   endDate: null,
   ...patch,
+});
+
+describe('BR-MF1-06 shared intake and worker pricing record', () => {
+  const request = { planId: 'plan', free: false, beneficiaries: 2, checkDate: '2026-11-10', endDate: null };
+
+  it('keeps the same current-year amount and metadata for both callers', () => {
+    expect(pricingRecordFor(request, { kind: 'RECURRING', unitPrice: SEAT, billingCycle: 'MONTHLY' })).toMatchObject({
+      status: 'PRICED',
+      amount: { amountMinor: 8000n, currency: 'USD' },
+      amountMonths: 2,
+      budgetYear: 2026,
+      expectedEndDate: null,
+      nextYearAmount: null,
+    });
+  });
+
+  it('preserves missing-price and internal-free records without guessing an amount', () => {
+    expect(pricingRecordFor(request, null)).toMatchObject({
+      status: 'MISSING',
+      missingReason: 'NO_PRICED_SUBSCRIPTION',
+      amount: null,
+    });
+    expect(pricingRecordFor({ ...request, free: true }, null)).toMatchObject({
+      status: 'NOT_APPLICABLE',
+      budgetYear: null,
+      amount: null,
+    });
+  });
+
+  it('keeps a full next-year renewal at zero this year and shows next year to the approver', () => {
+    expect(
+      pricingRecordFor(
+        { ...request, from: '2027-01-01', endDate: '2027-12-31' },
+        {
+          kind: 'RECURRING',
+          unitPrice: SEAT,
+          billingCycle: 'MONTHLY',
+        },
+      ),
+    ).toMatchObject({
+      status: 'PRICED',
+      amount: { amountMinor: 0n },
+      budgetYear: 2026,
+      nextYearAmount: { amountMinor: 48000n },
+    });
+  });
 });
 
 describe('BR-MF1-06: the amount of a request is the price of the months left of the year', () => {

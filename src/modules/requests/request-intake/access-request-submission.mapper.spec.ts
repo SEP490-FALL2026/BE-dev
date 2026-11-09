@@ -28,7 +28,6 @@ const assigned = {
   row: 1,
   role: 'MANAGER',
   assigneeEmployeeId: 'head-1',
-  samePersonAsSpend: false,
 };
 const waiting = { outcome: 'WAITING', row: 8, reason: 'NO_VALID_APPROVER' };
 
@@ -105,7 +104,6 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
       assigneeEmployeeId: 'head-1',
       role: 'MANAGER',
       waitingReason: null,
-      samePersonAsSpend: false,
       requesterEmployeeId: 'emp-1',
       departmentId: 'dep-1',
       departmentHeadEmployeeId: 'head-1',
@@ -115,7 +113,6 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
       assigneeEmployeeId: null,
       role: null,
       waitingReason: 'NO_VALID_APPROVER',
-      samePersonAsSpend: false,
     });
   });
 });

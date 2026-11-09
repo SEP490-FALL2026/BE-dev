@@ -1,7 +1,8 @@
 import type { Money } from '../../../core/money/money';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
-import type { BillingCycleCode, MissingPriceReason } from './pricing.policy';
+export type BillingCycleCode = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+export type MissingPriceReason = 'NO_PRICED_SUBSCRIPTION' | 'CYCLE_UNKNOWN' | 'AMOUNT_TOO_LARGE' | 'AWAITING_QUOTE';
 import type { WaitingReason } from './routing.policy';
 
 export type ReadableNeedWaitingReason = WaitingReason;
@@ -22,6 +23,7 @@ export type AccessRequestState =
   | 'AWAITING_IT_ASSESSMENT'
   | 'AWAITING_SPEND_SUBMISSION'
   | 'AWAITING_SPEND_DECISION'
+  | 'AWAITING_REQUESTER_REVISION'
   | 'REJECTED'
   | 'IT_REJECTED'
   | 'EXECUTING'
@@ -31,8 +33,8 @@ export type AccessRequestState =
   | 'WITHDRAWN'
   | 'CANCELLED';
 /** A need step is held or waiting, then decided, or closed because the request ended without a decision (`US-05-08`). */
-export type NeedStepState = 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
-export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER' | 'FALLBACK_APPROVER' | 'CONFLICT_SUBSTITUTE';
+export type NeedStepState = 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED' | 'NOT_REQUIRED';
+export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER';
 
 /** What the request costs: nothing for internal software, one amount for the year it is counted in (`QĐ-109`), or a missing price. */
 export interface PricingRecord {
@@ -117,7 +119,6 @@ export interface NewNeedStep {
   assigneeEmployeeId: string | null;
   routingRow: number;
   waitingReason: WaitingReason | null;
-  samePersonAsSpend: boolean;
   slaWorkingDays: number;
 }
 
@@ -177,6 +178,8 @@ export interface CancellationRecord {
 }
 
 export interface AccessRequestRecord {
+  routing?: import('./routing.policy').RequestRouting;
+  oneStepBlockedReason?: 'PRICE_MISSING' | 'RATE_MISSING' | null;
   id: string;
   organizationId: string;
   type: AccessRequestKind;
@@ -268,6 +271,7 @@ export const NOT_OPEN_FOR_LEAVER: readonly AccessRequestState[] = [...ENDED_STAT
  */
 export type SpendStage =
   | 'NOT_SUBMITTED'
+  | 'RETURNED_TO_REQUESTER'
   /** Its check says it uses the reserve and the head has not confirmed it with a line of reason (`BR-MF1-06h`). */
   | 'RESERVE_CONFIRMATION'
   | 'BLOCKED'

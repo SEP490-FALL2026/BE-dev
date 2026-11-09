@@ -8,6 +8,9 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
 
 ## Public API (`public/`)
 
+- `CatalogPricingApi` (`public/catalog-pricing.api.ts`) — `getPlanPrice` chỉ đọc, cùng nguồn giá với `CatalogApi`.
+  `CatalogPricingFacadeModule` dùng chung với worker: không controller, storage hay listener vòng đời.
+
 - `CatalogApi` ([public/catalog.api.ts](public/catalog.api.ts)) — facade cho module khác:
   - `findSeatTarget`, `findPlanSeatTargets`, `lockSeatTarget` — đích ghế (một subscription hoặc một plan nội bộ).
   - `getPlanSummaries`, `getPlanRevocationInfo`, `getSimilarPlanIds`, `getPlanVendorId`, `getPlanVendorIds` (nhiều plan trong một lần đọc), `getPlanBusinessOwnerId` — đọc

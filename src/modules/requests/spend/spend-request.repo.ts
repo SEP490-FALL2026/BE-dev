@@ -18,6 +18,7 @@ export class SpendRequestRepo {
     const where = {
       departmentId,
       state: 'AWAITING_SPEND_SUBMISSION' as const,
+      routingMode: 'VIA_HEAD' as const,
       policy: { path: ['chain'], array_contains: 'SPEND_APPROVAL' },
     };
     const rows = await db.accessRequest.findMany({

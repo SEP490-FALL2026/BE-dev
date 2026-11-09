@@ -3,7 +3,7 @@ import type { ApiAccount } from '../../support/api-accounts';
 import { PgRelay } from '../../support/pg-relay';
 import { QueryCounter, dataStatements, tablesOf } from '../../support/query-count';
 import { ReassignmentHarness, type WaitWire } from '../../support/reassignment-harness';
-import type { Person } from '../../support/request-harness';
+import type { Department, Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new ReassignmentHarness();
@@ -51,6 +51,14 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
     await h.budgetFor(unit, { total: 100 * M, ...extra });
 
     return unit;
+  };
+  /** New headless requests are one-step; this fixture is an internal request sent before its head leaves. */
+  const waitingInternal = async (department: Department, person: Person) => {
+    const head = await h.staff(department, `WAIT-H${++n}`);
+    await h.makeHead(department, head);
+    const sent = await h.sent(person, internal);
+    await h.vacateHead(department.id).expect(200);
+    return sent;
   };
   const alertsOf = async (stepId: string) =>
     Number(
@@ -200,14 +208,15 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
     });
   });
 
-  describe('the need step of a head who sends for themselves (AC-8, US-05-03 AC-13)', () => {
-    it('waits for the spending approver and is not given to anybody else, then goes to the approver when one is configured', async () => {
-      const unit = await h.departmentWithHead(`P-H${(n += 1)}`);
+  describe('the one-step request a head sends for themselves (BR-MF1-02)', () => {
+    it('waits only at the spend step when the approver is missing, then goes to the configured approver', async () => {
+      const unit = await unitWithBudget();
 
       await sentWhileEmpty('SPENDING_APPROVER', async () => {
-        const sent = await h.sent(unit.head, internal);
+        const sent = await h.sent(unit.head, paid);
 
-        const step = await h.stepOf(sent.id, 'NEED');
+        expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({ state: 'NOT_REQUIRED', assignee_employee_id: null });
+        const step = await h.stepOf(sent.id, 'SPEND_APPROVAL');
         expect(step).toMatchObject({
           state: 'WAITING',
           assignee_employee_id: null,
@@ -219,7 +228,7 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
           configurationHint: 'CONFIGURE_SPENDING_APPROVER',
           notify: 'SUPER_ADMIN',
         });
-        expect(await waitsFor(step.id)).toMatchObject({ stepKind: 'NEED' });
+        expect(await waitsFor(step.id)).toMatchObject({ stepKind: 'SPEND_APPROVAL' });
         // Nobody can decide it: not the head who sent it, not a person who holds no role.
         await h.decide(sent.id, APPROVE, bystander.account).expect(404);
       });
@@ -228,14 +237,28 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
         `SELECT id FROM access_requests WHERE requester_employee_id = $1`,
         [unit.head.employeeId],
       );
-      const step = await h.stepOf(sentRows.rows[0].id, 'NEED');
-      expect(step).toMatchObject({ state: 'PENDING', assignee_employee_id: h.boss.employeeId, routing_row: 2 });
-      expect(await h.state(sentRows.rows[0].id)).toBe('PENDING');
+      const step = await h.stepOf(sentRows.rows[0].id, 'SPEND_APPROVAL');
+      expect(step).toMatchObject({ state: 'PENDING', assignee_employee_id: h.boss.employeeId });
+      expect(await h.state(sentRows.rows[0].id)).toBe('AWAITING_SPEND_DECISION');
+    });
+
+    it('BR-MF1-02 internal head-own requests reach IT directly even without a spending approver', async () => {
+      const unit = await h.departmentWithHead(`P-H${++n}`);
+      await sentWhileEmpty('SPENDING_APPROVER', async () => {
+        const sent = await h.sent(unit.head, internal);
+        const need = await h.stepOf(sent.id, 'NEED');
+        expect(need).toMatchObject({ state: 'NOT_REQUIRED', assignee_employee_id: null, waiting_reason: null });
+        expect(await h.state(sent.id)).toBe('AWAITING_EXECUTION');
+        expect(await h.stepOf(sent.id, 'SPEND_APPROVAL')).toBeUndefined();
+        await h.sweep();
+        expect(await alertsOf(need.id)).toBe(0);
+        expect(await waitsFor(need.id)).toBeUndefined();
+      });
     });
   });
 
   describe('a department with no head (AC-6, AC-7, D-S20)', () => {
-    it('alerts the Super Admin once when a need step waits with NO_DEPARTMENT_HEAD, shows the row to the IT Admin in charge and to nobody else, and loses it when the requester withdraws', async () => {
+    it('BR-MF1-02 keeps an existing internal request waiting after its head leaves, with one alert and scoped queue access', async () => {
       n += 1;
       const headless = await h.departmentWithUnit(`P-HL${n}`);
       const e4 = await h.staff(headless, `HL-E${n}`);
@@ -245,13 +268,13 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
       const itElsewhere = await h.staff(otherDepartment, `IT-OT${n}`, 'IT_ADMIN');
       await h.setItAdminInCharge(otherDepartment, itElsewhere);
 
-      const sent = await h.sent(e4, internal);
+      const sent = await waitingInternal(headless, e4);
       const step = await h.stepOf(sent.id, 'NEED');
-      // Nobody takes the step in place of a head: it waits on row 4, with the request under control.
+      // Nobody takes the step in place of a head: it waits, on the row it was routed on, with the request under control.
       expect(step).toMatchObject({
         state: 'WAITING',
         assignee_employee_id: null,
-        routing_row: 4,
+        routing_row: 1,
         waiting_reason: 'NO_DEPARTMENT_HEAD',
       });
       expect(await h.state(sent.id)).toBe('WAITING_CONTROLLED');
@@ -339,7 +362,8 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
     it('lists the steps that wait, the longest first, with a stable order, in pages that add up, and shows no amount', async () => {
       n += 1;
       const headless = await h.departmentWithUnit(`P-Q${n}`);
-      for (let index = 0; index < 4; index += 1) await h.sent(await h.staff(headless, `Q-E${n}-${index}`), internal);
+      for (let index = 0; index < 4; index += 1)
+        await waitingInternal(headless, await h.staff(headless, `Q-E${n}-${index}`));
       const all = await listed(h.admin, { pageSize: 100 });
       const expected = (
         await h.ctx.sql.query<{ id: string }>(
@@ -373,9 +397,10 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
       n += 1;
       const headless = await h.departmentWithUnit(`P-N${n}`);
       const read = () => counter.run(() => listed(h.admin, { pageSize: 100 }));
-      await h.sent(await h.staff(headless, `N-E${n}-0`), internal);
+      await waitingInternal(headless, await h.staff(headless, `N-E${n}-0`));
       const few = await read();
-      for (let index = 1; index < 6; index += 1) await h.sent(await h.staff(headless, `N-E${n}-${index}`), internal);
+      for (let index = 1; index < 6; index += 1)
+        await waitingInternal(headless, await h.staff(headless, `N-E${n}-${index}`));
       const many = await read();
 
       expect(many.result.items.length).toBeGreaterThan(few.result.items.length);

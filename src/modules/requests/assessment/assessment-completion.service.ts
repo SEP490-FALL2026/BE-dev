@@ -6,7 +6,7 @@ import { accessRequestAuditEvent } from '../access-request/access-request-audit-
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
 import type { AssessmentRecord, Quote } from '../access-request/assessment-record.types';
-import { SpendEntryService } from '../spend/spend-entry.service';
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import {
   AssessmentIncompleteError,
   AssessmentInternalByRegistrationError,
@@ -30,7 +30,7 @@ export class AssessmentCompletionService {
     private readonly requests: AccessRequestRepo,
     private readonly assessments: AssessmentRepo,
     private readonly audit: AuditApi,
-    private readonly entry: SpendEntryService,
+    private readonly entry: SpendRoutingService,
     private readonly pricing: AssessmentPricingService,
   ) {}
 
@@ -80,7 +80,7 @@ export class AssessmentCompletionService {
   private async enterSpend(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string): Promise<AccessRequestRecord> {
     const priced = await this.requests.findById(requestId, tx);
     if (!priced) throw new Error(`The request ${requestId} was not found after its assessment was completed.`);
-    await this.entry.enter(tx, actor, priced);
+    if (priced.routing?.mode === 'ONE_STEP') await this.entry.route(tx, actor, priced, 'SUBMISSION', new Date());
     const record = await this.requests.findById(requestId, tx);
     if (!record) throw new Error(`The request ${requestId} was not found after its assessment was completed.`);
 

@@ -86,7 +86,15 @@ export class SpendEffectsService {
     by: { now: Date; reasons: readonly ReturnReason[]; check: CheckRecord | null },
   ): Promise<void> {
     await this.steps.end(tx, step, 'CLOSED', null, by.now);
-    await this.requests.setState(tx, request.id, 'AWAITING_SPEND_SUBMISSION');
+    if (request.routing?.mode === 'ONE_STEP') {
+      const missing = by.reasons.find((reason) => reason === 'PRICE_MISSING' || reason === 'RATE_MISSING');
+      await this.requests.setOneStepBlockedReason(tx, request.id, missing ?? null);
+    }
+    await this.requests.setState(
+      tx,
+      request.id,
+      request.routing?.mode === 'ONE_STEP' ? 'AWAITING_REQUESTER_REVISION' : 'AWAITING_SPEND_SUBMISSION',
+    );
     await this.audit.record(
       tx,
       accessRequestAuditEvent(

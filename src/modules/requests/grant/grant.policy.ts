@@ -80,6 +80,7 @@ export function grantAnswerFor(
     case 'PENDING':
     case 'WAITING_CONTROLLED':
     case 'AWAITING_IT_ASSESSMENT':
+    case 'AWAITING_REQUESTER_REVISION':
     case 'AWAITING_SPEND_SUBMISSION':
     case 'AWAITING_SPEND_DECISION':
       return { status: 'NOT_APPROVED' };

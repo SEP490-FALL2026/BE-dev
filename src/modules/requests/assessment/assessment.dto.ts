@@ -66,7 +66,6 @@ export const assessmentPatchSchema = z
       .strictObject({ status: z.enum(['OBTAINED', 'NOT_AVAILABLE']), note: text(REASON_MAX_LENGTH).optional() })
       .nullable(),
     equivalentPlanId: z.uuid().nullable(),
-    proposedBusinessOwnerEmployeeId: z.uuid().nullable(),
     controlLevel: z.enum(['FULL', 'PARTIAL', 'UNCONTROLLABLE']),
     controlRiskNote: text(REASON_MAX_LENGTH).nullable(),
     quote: quoteInput.nullable(),
@@ -86,19 +85,29 @@ export const catalogLinkBodySchema = z.strictObject({ planId: z.uuid() });
  * software that is not eligible for the catalog (there is no outcome for free software, `QĐ-82n`), the reason that must
  * go with it, and the alternative when the IT Admin has one: a plan of the catalog, a note, or neither.
  */
-export const assessmentRejectionBodySchema = z.strictObject({
-  kind: z.enum(['UNCONTROLLABLE', 'NOT_ELIGIBLE']),
-  reason: text(REASON_MAX_LENGTH),
-  alternativePlanId: z.uuid().optional(),
-  alternativeNote: text(REASON_MAX_LENGTH).optional(),
-});
+export const assessmentRejectionBodySchema = z
+  .strictObject({
+    kind: z.enum(['UNCONTROLLABLE', 'NOT_ELIGIBLE']),
+    reason: text(REASON_MAX_LENGTH),
+    alternativePlanId: z.uuid().optional(),
+    alternativeNote: text(REASON_MAX_LENGTH).optional(),
+  })
+  .superRefine((body, context) => {
+    if (body.kind === 'UNCONTROLLABLE' && body.alternativePlanId === undefined && body.alternativeNote === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['alternativeNote'],
+        message: 'Give an alternative plan or note for software that cannot be controlled.',
+      });
+    }
+  })
+  .meta({ description: 'UNCONTROLLABLE requires alternativePlanId or alternativeNote.' });
 
 /**
  * Registering software the company built itself (`US-05-20`): its Business Owner, who must still work, and the name when it
  * is not the one proposed. A payment that the grant needs (`US-05-20` AC-10) comes with the quote that prices it.
  */
 export const internalRegistrationBodySchema = z.strictObject({
-  businessOwnerEmployeeId: z.uuid(),
   softwareName: text(200).optional(),
   dataSensitivity: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
   spend: z.strictObject({ quote: quoteInput }).optional(),
@@ -124,7 +133,7 @@ const assessmentSchema = z.strictObject({
   /** The step of the IT Admin: who holds it, how long it may wait, and when it was done. */
   step: z
     .strictObject({
-      state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED']),
+      state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED', 'NOT_REQUIRED']),
       assignee: employeeRef.nullable(),
       waitingReason: z.string().nullable(),
       slaWorkingDays: z.number().int().positive(),

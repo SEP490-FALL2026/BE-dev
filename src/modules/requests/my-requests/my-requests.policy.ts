@@ -18,6 +18,7 @@ export const SENT_STATES: readonly SentState[] = [
   'AWAITING_IT_ASSESSMENT',
   'AWAITING_SPEND_SUBMISSION',
   'AWAITING_SPEND_DECISION',
+  'AWAITING_REQUESTER_REVISION',
   'REJECTED',
   'IT_REJECTED',
   'EXECUTING',
@@ -85,6 +86,8 @@ export function spendStageOf(
   if (!row.hasSpendStep) return null;
   const { id } = row;
   switch (row.state) {
+    case 'AWAITING_REQUESTER_REVISION':
+      return 'RETURNED_TO_REQUESTER';
     case 'AWAITING_SPEND_SUBMISSION':
       return queuedStageOf(id, facts);
     case 'AWAITING_SPEND_DECISION':

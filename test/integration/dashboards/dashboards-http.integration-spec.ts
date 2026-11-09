@@ -145,6 +145,23 @@ describe('role overviews (integration, real PostgreSQL)', () => {
   });
 
   describe('the Employee overview', () => {
+    it('BR-MF1-02/07: counts a request awaiting requester revision as open and removes it only when withdrawn', async () => {
+      const person = await h.employeeIn(des.department, 'D-REVISION');
+      const sent = await h.sent(person, await h.plan('K5'));
+      await h.ctx.sql.query(`UPDATE access_requests SET state = 'AWAITING_REQUESTER_REVISION' WHERE id = $1`, [
+        sent.id,
+      ]);
+
+      expect((await overviewOf(OVERVIEW_PATHS.employee, person.account)).sections.requests).toEqual(
+        countedAs(1, 'meAccessRequestList'),
+      );
+      expect(await h.totalOf('/api/v1/me/access-requests', person.account, { view: 'open' })).toBe(1);
+      await h.withdrawRequest(sent.id, { reason: 'No longer needed' }, person.account).expect(200);
+      expect((await overviewOf(OVERVIEW_PATHS.employee, person.account)).sections.requests).toEqual(
+        countedAs(0, 'meAccessRequestList'),
+      );
+    });
+
     // US-12-15 AC-2: the software held (K1 to K5), the right about to end, the reports and the open requests.
     it('counts the rights and reports of the caller as their own lists show them', async () => {
       const overview = await overviewOf(OVERVIEW_PATHS.employee, e1.account);

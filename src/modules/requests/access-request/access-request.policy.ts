@@ -1,3 +1,4 @@
+import type { RequestRouting } from './routing.policy';
 /**
  * The branch and the chain of step kinds of a request, and the SLA of its steps, fixed when it is sent (`US-05-02`
  * AC-3, AC-9). Paid or licensed software that is already in the catalog always has a spend step, whatever the seats left
@@ -29,7 +30,7 @@ export function currentStateOf<S extends string>(
 export type ChainStep = (typeof CHAIN_STEPS)[number];
 
 /** The version of the rules of this policy; a request keeps the version it was sent under. */
-export const CURRENT_POLICY_VERSION = 1;
+export const CURRENT_POLICY_VERSION = 2;
 
 export interface RequestPolicy {
   version: number;
@@ -40,13 +41,21 @@ export interface RequestPolicy {
 }
 
 /** The policy of a request for a plan of an application of this kind, with the SLA in force now. A fresh value each time. */
-export function policyFor(kind: ApplicationKind, slaWorkingDays: number): RequestPolicy {
+export function policyFor(kind: ApplicationKind, slaWorkingDays: number, routing?: RequestRouting): RequestPolicy {
   return kind === 'INTERNAL'
-    ? { version: CURRENT_POLICY_VERSION, branch: 'INTERNAL_FREE', chain: ['NEED', 'IT_EXECUTION'], slaWorkingDays }
+    ? {
+        version: CURRENT_POLICY_VERSION,
+        branch: 'INTERNAL_FREE',
+        chain: routing?.mode === 'ONE_STEP' ? ['IT_EXECUTION'] : ['NEED', 'IT_EXECUTION'],
+        slaWorkingDays,
+      }
     : {
         version: CURRENT_POLICY_VERSION,
         branch: 'PAID_IN_CATALOG',
-        chain: ['NEED', 'SPEND_APPROVAL', 'IT_EXECUTION'],
+        chain:
+          routing?.mode === 'ONE_STEP'
+            ? ['SPEND_APPROVAL', 'IT_EXECUTION']
+            : ['NEED', 'SPEND_APPROVAL', 'IT_EXECUTION'],
         slaWorkingDays,
       };
 }
@@ -56,11 +65,14 @@ export function policyFor(kind: ApplicationKind, slaWorkingDays: number): Reques
  * Admin, the spend decision, then the grant. It has a spend step always: the only way out of it that skips the spend is
  * the rejection of the assessment or the registration of internal software, which end or change the request.
  */
-export function proposalPolicy(slaWorkingDays: number): RequestPolicy {
+export function proposalPolicy(slaWorkingDays: number, routing?: RequestRouting): RequestPolicy {
   return {
     version: CURRENT_POLICY_VERSION,
     branch: 'NEW_SOFTWARE',
-    chain: ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'],
+    chain:
+      routing?.mode === 'ONE_STEP'
+        ? ['IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION']
+        : ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'],
     slaWorkingDays,
   };
 }
