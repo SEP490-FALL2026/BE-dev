@@ -70,7 +70,14 @@ export const releaseListQuerySchema = z.strictObject({
 const releaseSchema = z.strictObject({
   id: z.uuid(),
   amount: moneyView,
-  reason: z.enum(['REQUEST_CANCELLED', 'REQUEST_WITHDRAWN', 'GRANT_FAILED', 'PARTICIPANT_WITHDRAWN', 'REMAINDER']),
+  reason: z.enum([
+    'REQUEST_CANCELLED',
+    'REQUEST_WITHDRAWN',
+    'GRANT_FAILED',
+    'PARTICIPANT_WITHDRAWN',
+    'REMAINDER',
+    'GRANTED_FROM_POOL',
+  ]),
   /** Why Finance let the remainder go; the other reasons are the event itself. */
   reasonText: z.string().nullable(),
   releasedBy: z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() }).nullable(),

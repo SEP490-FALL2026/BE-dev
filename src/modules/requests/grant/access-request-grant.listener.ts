@@ -7,6 +7,7 @@ import type { GrantOutcome, GrantOutcomeFacts, GrantRequestAnswer } from '../../
 import { GroupGrantService } from '../group-request/group-grant.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { grantAnswerFor } from './grant.policy';
+import { releasesAllOnPoolGrant } from './pool-grant-release.policy';
 import { RequestOutcomeService } from '../outcome/request-outcome.service';
 
 /**
@@ -98,6 +99,10 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
     // (US-06-06 AC-3). A grant that is only retrying is not reported here, so its commitment stays held (AC-7).
     if (outcome === 'FAILED') {
       await this.budgets.releaseForRequest(tx, { requestId: request.id, reason: 'GRANT_FAILED', now });
+    }
+    // A K4 key taken from the pool spends nothing: all that was held for its price goes back (`QĐ-106d`).
+    if (releasesAllOnPoolGrant(outcome, facts)) {
+      await this.budgets.releaseForRequest(tx, { requestId: request.id, reason: 'GRANTED_FROM_POOL', now });
     }
     // The seat is real, or the request ended without one: the contexts that follow what became of it hear it here.
     if (outcome === 'COMPLETED') await this.outcomes.granted(tx, request, request.beneficiaryEmployeeIds, now);

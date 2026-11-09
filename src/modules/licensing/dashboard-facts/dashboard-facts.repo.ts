@@ -89,7 +89,7 @@ export class DashboardFactsRepo {
         const openSaasIssues = await tx.saasIssue.count({
           where: { assignedItAdminEmployeeId: employeeId, state: { in: [...UNRESOLVED_SAAS_ISSUE] } },
         });
-        const keysInStore = await tx.licenseKey.count({ where: { status: 'IN_STORE' } });
+        const keysInStore = await tx.licenseKey.count({ where: { status: 'IN_STORE', withdrawnAt: null } });
 
         return { openGrantTasks, openRevocationTasks, openSaasIssues, keysInStore };
       },

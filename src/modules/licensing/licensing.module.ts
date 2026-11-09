@@ -58,6 +58,7 @@ import { HandoverService } from './handover/handover.service';
 import { LicensingAlerts } from './licensing-alerts.service';
 import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-key-cipher.service';
 import { LicenseKeyRepo } from './license-key/license-key.repo';
+import { LicenseKeyAssignmentService } from './license-key/license-key-assignment.service';
 import { LicenseKeyRevealQuotaRepo } from './license-key/license-key-reveal-quota.repo';
 import { LicenseKeyService } from './license-key/license-key.service';
 import { LicenseKeysController } from './license-key/license-keys.controller';
@@ -92,6 +93,7 @@ import { ProvisioningGrantService } from './provisioning/tasks/provisioning-gran
 import { ProvisioningPurchaseRefusal } from './provisioning/tasks/provisioning-purchase-refusal.service';
 import { ProvisioningGrantWriter } from './provisioning/tasks/provisioning-grant-writer.service';
 import { ProvisioningService } from './provisioning/tasks/provisioning.service';
+import { ProvisioningGrantCompletion } from './provisioning/tasks/provisioning-grant-completion.service';
 import { ProvisioningTaskFrame } from './provisioning/provisioning-task-frame.service';
 import { ProvisioningTaskViewService } from './provisioning/provisioning-task-view.service';
 import { ProvisioningTaskRepo } from './provisioning/provisioning-task.repo';
@@ -101,6 +103,7 @@ import { DepartmentOpenWorkReader } from './provisioning/department-use/departme
 import { ProvisioningDepartmentUseRepo } from './provisioning/department-use/provisioning-department-use.repo';
 import { RevocationCompletionService } from './provisioning/revocation-completion/revocation-completion.service';
 import { RevocationLeaverAlert } from './provisioning/revocation-completion/revocation-leaver-alert.service';
+import { RevocationAftermath } from './provisioning/revocation-completion/revocation-aftermath.service';
 import { OpenGrantTaskRepo } from './provisioning/open-grants/open-grant-task.repo';
 import { OpenGrantTaskService } from './provisioning/open-grants/open-grant-task.service';
 import { RevocationReadRepo } from './provisioning/revocation-read.repo';
@@ -214,6 +217,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     ProvisioningPurchaseRefusal,
     ProvisioningGrantService,
     ProvisioningService,
+    ProvisioningGrantCompletion,
     ProvisioningDecisionService,
     ProvisioningCancellationService,
     ProvisioningFailureService,
@@ -225,6 +229,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     RevocationWithdrawalService,
     RevocationCompletionService,
     RevocationLeaverAlert,
+    RevocationAftermath,
     RevocationReadRepo,
     RevocationViewService,
     OpenGrantTaskRepo,
@@ -277,6 +282,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicenseKeyRepo,
     LicenseKeyRevealQuotaRepo,
     LicenseKeyService,
+    LicenseKeyAssignmentService,
     {
       provide: LicenseKeyCipher,
       inject: [ConfigService],

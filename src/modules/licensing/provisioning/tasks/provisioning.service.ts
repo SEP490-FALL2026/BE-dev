@@ -3,7 +3,7 @@ import { Page, pageOf } from '../../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { ProvisioningBeneficiaryDepartedError, ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
-import { GrantRequestGateHook, RevocationListeners } from '../../public/licensing.extension-points';
+import { RevocationListeners } from '../../public/licensing.extension-points';
 import type { ProvisioningChannel, ProvisioningTaskStatus } from '../../public/licensing.types';
 import { cleanEvidence, cleanFailureReason, nextStatus } from '../provisioning.policy';
 import { assertNotBefore, assertNotRevocationTask } from '../revocation.policy';
@@ -11,8 +11,7 @@ import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import { ProvisioningTaskViewService, type TaskSummaryView, type TaskView } from '../provisioning-task-view.service';
-import { SharedPoolService } from '../../shared-pool/shared-pool.service';
-import { AssignmentService } from '../../assignment/assignment.service';
+import { ProvisioningGrantCompletion } from './provisioning-grant-completion.service';
 
 export type TaskScope = 'ALL' | 'MINE' | 'GENERAL';
 
@@ -28,10 +27,8 @@ export class ProvisioningService {
     private readonly frame: ProvisioningTaskFrame,
     private readonly views: ProvisioningTaskViewService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly gate: GrantRequestGateHook,
     private readonly revocation: RevocationListeners,
-    private readonly sharedPool: SharedPoolService,
-    private readonly assignments: AssignmentService,
+    private readonly completion: ProvisioningGrantCompletion,
   ) {}
 
   /** The queue, the oldest first: `MINE` the tasks this IT Admin is in charge of, `GENERAL` those nobody works by default. */
@@ -108,13 +105,17 @@ export class ProvisioningService {
   }
 
   /**
-   * Completes the task of a grant with the note of what was done; a revocation has its own completion. Throws
-   * ProvisioningEvidenceRequiredError, the errors of `claim` except the departed beneficiary, and ProvisioningTaskStateError
-   * (`IS_REVOCATION` for a revocation).
-   * A grant taken from the pool, with nothing bought for it, records the cost it avoided once (`BR-MF1-09c`). The day it is completed is
-   * the day the right begins (`BR-MF1-06a`).
+   * Completes the task of a grant with the note of what was done; a revocation has its own completion. A K4 grant names the free key of
+   * the store its seat is given (`licenseKeyId`, `QĐ-103d`). Throws ProvisioningEvidenceRequiredError, the errors of `claim` except the
+   * departed beneficiary, ProvisioningTaskStateError (`IS_REVOCATION` for a revocation), ProvisioningKeyError, LicenseKeyNotFoundError and
+   * LicenseKeyStateError. A grant taken from the pool, with nothing bought for it, records the cost it avoided once (`BR-MF1-09c`). The day
+   * it is completed is the day the right begins (`BR-MF1-06a`).
    */
-  async complete(actor: AuthenticatedPrincipal, id: string, input: { evidence: string }): Promise<TaskView> {
+  async complete(
+    actor: AuthenticatedPrincipal,
+    id: string,
+    input: { evidence: string; licenseKeyId?: string | undefined },
+  ): Promise<TaskView> {
     const evidence = cleanEvidence(input.evidence);
     const task = await this.frame.work(actor, id, {
       check: (locked) => {
@@ -122,37 +123,19 @@ export class ProvisioningService {
         nextStatus(locked.status, 'COMPLETE', locked.channel);
       },
       write: async ({ tx, task: locked, now, organizationId }) => {
-        await this.repo.markCompleted(tx, locked.id, actor.appUserId, evidence, now);
-        const completedOn = await this.organizationReads.businessToday(now, tx);
-        await this.assignments.recordGranted(tx, locked.assignmentId, completedOn);
-        if (locked.requestId !== null) {
-          const provisioningType = await this.sharedPool.provisioningTypeOf(tx, locked.assignment.planId);
-          const pooled = provisioningType === 'K2' || provisioningType === 'K4';
-          // From the pool means taken from a free seat or key: a K2 or K4 grant with nothing bought for it (`BR-MF1-09c`).
-          const fromPool = pooled && locked.purchase === null;
-          await this.gate.get().reportOutcome(tx, locked.requestId, 'COMPLETED', locked.assignment.employeeId, {
-            fromPool,
-            provisioningType,
-            grantedOn: completedOn,
-            assignmentId: locked.assignmentId,
-          });
-          if (fromPool) {
-            await this.sharedPool.recordAvoided(tx, {
-              organizationId,
-              completedOn,
-              task: {
-                id: locked.id,
-                assignmentId: locked.assignmentId,
-                requestId: locked.requestId,
-                planId: locked.assignment.planId,
-                subscriptionId: locked.assignment.subscriptionId,
-                provisioningType,
-              },
-            });
-          }
-        }
+        await this.completion.write(
+          tx,
+          actor,
+          { task: locked, now, organizationId },
+          { evidence, licenseKeyId: input.licenseKeyId },
+        );
+        const after = {
+          status: 'COMPLETED',
+          completedBy: actor.appUserId,
+          ...(input.licenseKeyId === undefined ? {} : { licenseKeyId: input.licenseKeyId }),
+        };
 
-        return { action: 'COMPLETED', after: { status: 'COMPLETED', completedBy: actor.appUserId } };
+        return { action: 'COMPLETED', after };
       },
     });
 

@@ -33,6 +33,7 @@ import {
   SeatQuantityUnknownError,
   SeatSubscriptionDraftError,
   SeatTargetNotFoundError,
+  LicenseKeyNotFoundError,
 } from '../public/licensing.errors';
 import { toLicensingApiException } from '../licensing.http-errors';
 import {
@@ -40,7 +41,8 @@ import {
   PurchaseNotApplicableError,
   PurchaseReasonRequiredError,
 } from '../shared-pool/shared-pool.errors';
-import { ProvisioningItAdminRequiredError } from './provisioning.errors';
+import { LicenseKeyStateError } from '../license-key/license-key.errors';
+import { ProvisioningItAdminRequiredError, ProvisioningKeyError } from './provisioning.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });
@@ -160,6 +162,11 @@ export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof PurchaseReasonRequiredError) {
     return refuse(UNPROCESSABLE, 'PROVISIONING.PURCHASE_REASON_REQUIRED', error.message);
   }
+  if (error instanceof ProvisioningKeyError)
+    return refuse(UNPROCESSABLE, `PROVISIONING.${error.problem}`, error.message);
+  if (error instanceof LicenseKeyNotFoundError)
+    return refuse(HttpStatus.NOT_FOUND, 'LICENSE_KEY.NOT_FOUND', error.message);
+  if (error instanceof LicenseKeyStateError) return refuse(CONFLICT, `LICENSE_KEY.${error.problem}`, error.message);
   // The same answer as the role guard of the route: the policy of the work refuses what the guard would have refused.
   if (error instanceof ProvisioningItAdminRequiredError) return new ApiException(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR);
 
@@ -195,6 +202,13 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   PAID_THROUGH_REQUIRED: example(new RevocationCompletionError('PAID_THROUGH_REQUIRED')),
   ACCESS_STATE_REQUIRED: example(new RevocationCompletionError('ACCESS_STATE_REQUIRED')),
   ACCESS_STATE_INVALID: example(new RevocationCompletionError('ACCESS_STATE_INVALID')),
+  WITHDRAWAL_REASON_REQUIRED: example(new RevocationCompletionError('WITHDRAWAL_REASON_REQUIRED')),
+  KEY_REQUIRED: example(new ProvisioningKeyError('KEY_REQUIRED')),
+  KEY_NOT_APPLICABLE: example(new ProvisioningKeyError('KEY_NOT_APPLICABLE')),
+  KEY_NOT_FOUND: example(new LicenseKeyNotFoundError()),
+  KEY_NOT_IN_STORE: example(new LicenseKeyStateError('NOT_IN_STORE')),
+  KEY_WITHDRAWN: example(new LicenseKeyStateError('WITHDRAWN')),
+  KEY_SUBSCRIPTION_MISMATCH: example(new LicenseKeyStateError('SUBSCRIPTION_MISMATCH')),
 } as const;
 
 /** The refusals of the grant of a seat, by status, after the request gate of G5 (`US-07-01`). */
@@ -206,7 +220,7 @@ export const PROVISIONING_GRANT_EXAMPLES = {
     example(new GrantRequestRefusedError('NOT_IN_CATALOG')),
     example(new GrantRequestRefusedError('BOUNDARY_NOT_CHECKED')),
     example(new ProvisioningResponsibleNotInDepartmentError()),
-    example(new ProvisioningTypeNotSupportedError('K4')),
+    example(new ProvisioningTypeNotSupportedError('K3')),
     PROVISIONING_ERROR_EXAMPLES.BENEFICIARY_DEPARTED,
     example(new ProvisioningBeneficiaryNotStartedError('<request-id>', '2026-01-01')),
     example(new SeatApplicationRetiredError()),

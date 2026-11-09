@@ -66,9 +66,12 @@ export interface HeldCommitment {
   attachedVersionId: string | null;
 }
 
-/** Why money held for a request goes back to the budget (`US-06-06`). Finance letting a remainder go has its own route. */
+/**
+ * Why money held for a request goes back to the budget (`US-06-06`); `GRANTED_FROM_POOL`: a K4 key was given from the pool, so the price
+ * held is not spent (`QĐ-106d`). Finance letting a remainder go has its own route.
+ */
 export type CommitmentReleaseReason =
-  'REQUEST_CANCELLED' | 'REQUEST_WITHDRAWN' | 'GRANT_FAILED' | 'PARTICIPANT_WITHDRAWN';
+  'REQUEST_CANCELLED' | 'REQUEST_WITHDRAWN' | 'GRANT_FAILED' | 'PARTICIPANT_WITHDRAWN' | 'GRANTED_FROM_POOL';
 
 /** What goes back to the budget when a request ends or a share of it is withdrawn. */
 export interface CommitmentReleaseInput {

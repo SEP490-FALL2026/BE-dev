@@ -92,7 +92,7 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3, K4), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).',
+        'PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).',
       examples: PROVISIONING_GRANT_EXAMPLES.CONFLICT,
     },
     {
@@ -197,23 +197,39 @@ export class ProvisioningTasksController {
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.COMPLETED',
     description:
-      'The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key.',
+      'The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key. A K4 grant names the free key of the store its seat is given (licenseKeyId; a key bought with the grant is imported into the store first): the key becomes ASSIGNED to the seat in the same transaction (LICENSE_KEY.ASSIGNED in the audit trail). A K2 or K4 grant taken from the pool with nothing bought records the cost it avoided; the request of a K4 grant taken from the pool gives back all of its commitment (GRANTED_FROM_POOL).',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     TASK_WORKER_FORBIDDEN,
-    NOT_FOUND,
+    {
+      status: HttpStatus.NOT_FOUND,
+      description:
+        'The task does not exist (PROVISIONING_TASK.NOT_FOUND) or the key named does not (LICENSE_KEY.NOT_FOUND).',
+      examples: [PROVISIONING_ERROR_EXAMPLES.TASK_NOT_FOUND, PROVISIONING_ERROR_EXAMPLES.KEY_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
-        'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, or IS_REVOCATION (a revocation is completed by its own route).',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS, PROVISIONING_ERROR_EXAMPLES.IS_REVOCATION],
+        'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, or IS_REVOCATION (a revocation is completed by its own route); the key named is not free in the store (LICENSE_KEY.NOT_IN_STORE: another grant took it), was withdrawn from it (LICENSE_KEY.WITHDRAWN) or belongs to another purchase than the seat (LICENSE_KEY.SUBSCRIPTION_MISMATCH). Nothing is written.',
+      examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS,
+        PROVISIONING_ERROR_EXAMPLES.IS_REVOCATION,
+        PROVISIONING_ERROR_EXAMPLES.KEY_NOT_IN_STORE,
+        PROVISIONING_ERROR_EXAMPLES.KEY_WITHDRAWN,
+        PROVISIONING_ERROR_EXAMPLES.KEY_SUBSCRIPTION_MISMATCH,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR) or has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED): the task is unchanged.',
-      examples: [VALIDATION_EXAMPLE, PROVISIONING_ERROR_EXAMPLES.EVIDENCE_REQUIRED],
+        'The request is invalid (VALIDATION_ERROR), has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), a K4 grant names no key (PROVISIONING.KEY_REQUIRED) or a grant of another kind names one (PROVISIONING.KEY_NOT_APPLICABLE): the task is unchanged.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        PROVISIONING_ERROR_EXAMPLES.EVIDENCE_REQUIRED,
+        PROVISIONING_ERROR_EXAMPLES.KEY_REQUIRED,
+        PROVISIONING_ERROR_EXAMPLES.KEY_NOT_APPLICABLE,
+      ],
     },
   )
   async complete(

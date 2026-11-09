@@ -280,6 +280,7 @@ enum CommitmentReleaseReason {
   GRANT_FAILED
   PARTICIPANT_WITHDRAWN
   REMAINDER
+  GRANTED_FROM_POOL
 }
 
 // The electronic record of the decision of the spending approver on a version (US-06-11 AC-1): who, in which role, what,

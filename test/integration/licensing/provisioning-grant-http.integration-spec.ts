@@ -242,14 +242,16 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(await tasksOf(other)).toBe(0);
   });
 
-  it('refuses K4, which needs the key store and a company device, and keeps no assignment or task', async () => {
+  // Rewritten for BR-MF1-09 / QĐ-103d: K4 is granted from the key pool (k4-key-pool-grant.integration-spec.ts); K3 stays refused.
+  it('refuses K3, which is only specified, and keeps no assignment or task', async () => {
     const subscriptionId = await h.subscription(5, 'K4');
     const planId = await h.planOf(subscriptionId);
+    await h.ctx.sql.query(`UPDATE plans SET provisioning_type = 'K3', pricing_model = NULL WHERE id = $1`, [planId]);
 
     const refused = await h.grant({ requestId: h.gate.grantable(e5, planId), subscriptionId }).expect(409);
 
     expect(h.codeOf(refused)).toBe('PROVISIONING.TYPE_NOT_SUPPORTED');
-    expect(h.detailsOf(refused)).toMatchObject({ provisioningType: 'K4' });
+    expect(h.detailsOf(refused)).toMatchObject({ provisioningType: 'K3' });
     expect(await tasksOf(subscriptionId)).toBe(0);
   });
 

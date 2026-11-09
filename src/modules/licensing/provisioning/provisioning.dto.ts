@@ -4,6 +4,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { REVOCATION_SOURCES } from '../public/licensing.types';
 import { EVIDENCE_MAX_LENGTH, FAILURE_REASON_MAX_LENGTH } from './provisioning.policy';
 import { REVOCATION_NOTE_MAX_LENGTH } from './revocation.policy';
+import { WITHDRAWAL_REASON_MAX_LENGTH } from '../license-key/license-key.policy';
 import { businessDate, responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /**
@@ -27,24 +28,39 @@ export const grantBodySchema = z.strictObject({
   /** Record a purchase with the grant when the pool has nothing free; the kind of purchase follows from the plan (`BR-MF1-09b`). */
   purchase: purchaseBodySchema.optional(),
 });
-export const completeBodySchema = z.strictObject({ evidence: z.string().max(EVIDENCE_MAX_LENGTH).default('') });
+export const completeBodySchema = z.strictObject({
+  evidence: z.string().max(EVIDENCE_MAX_LENGTH).default(''),
+  /** K4 only, and then required: the free key of the store the seat is given (`QĐ-103d`); a purchased key is imported first. */
+  licenseKeyId: z.uuid().optional(),
+});
 export const failureBodySchema = z.strictObject({ reason: z.string().max(FAILURE_REASON_MAX_LENGTH).default('') });
 /** A hand-off carries nothing: it changes only the channel, and the evidence is asked when the manual work completes (`QĐ-90a`). */
 export const handOffBodySchema = z.strictObject({});
 export const closeFailedBodySchema = failureBodySchema;
+const COMPLETIONS = [
+  'ACCOUNT_REMOVED',
+  'ALREADY_GONE',
+  'RENEWAL_CANCELLED',
+  'OFF_SYSTEM_REVOKED',
+  'KEY_DEACTIVATED',
+] as const;
+
 /**
  * How a revocation was completed. Which way fits which kind of provisioning, which of the fields it needs (a K1 completion
  * needs the day the paid period ends and what is known of the access) and whether the evidence is enough are judged by the
  * policy and answer with their own codes; a note of evidence is never a password or a key.
  */
 export const revocationCompletionBodySchema = z.strictObject({
-  completion: z.enum(['ACCOUNT_REMOVED', 'ALREADY_GONE', 'RENEWAL_CANCELLED', 'OFF_SYSTEM_REVOKED']),
+  completion: z.enum(COMPLETIONS),
   evidence: z.string().max(EVIDENCE_MAX_LENGTH).default(''),
   note: z.string().max(REVOCATION_NOTE_MAX_LENGTH).optional(),
   paidThroughOn: businessDate.optional(),
   accessState: z.enum(['CUT', 'UNTIL_PAID_END']).optional(),
   accessCutOn: businessDate.optional(),
   accessEvidence: z.string().max(EVIDENCE_MAX_LENGTH).optional(),
+  /** K4 only: the key goes back to the store (the default), or back and withdrawn from it at once (`WITHDRAW`, with a reason). */
+  keyDisposition: z.enum(['RETURN_TO_STORE', 'WITHDRAW']).optional(),
+  withdrawalReason: z.string().max(WITHDRAWAL_REASON_MAX_LENGTH).optional(),
 });
 export const accessCutBodySchema = z.strictObject({
   accessCutOn: businessDate,
@@ -89,6 +105,7 @@ const stepSchema = z.strictObject({
     'RECORD_ACCESS_STATE',
     'REMOVE_FROM_WORKSPACE',
     'REVOKE_IN_INTERNAL_SOFTWARE',
+    'DEACTIVATE_KEY_ON_DEVICE',
     'CONFIRM_WITH_EVIDENCE',
   ]),
   accountIdentifier: z.string().optional(),
@@ -98,7 +115,7 @@ const stepSchema = z.strictObject({
 const revocationSummarySchema = z.strictObject({
   source: z.enum(REVOCATION_SOURCES),
   reasonCount: z.number().int().nonnegative(),
-  completion: z.enum(['ACCOUNT_REMOVED', 'ALREADY_GONE', 'RENEWAL_CANCELLED', 'OFF_SYSTEM_REVOKED']).nullable(),
+  completion: z.enum(COMPLETIONS).nullable(),
   accessState: z.enum(['CUT', 'UNTIL_PAID_END']).nullable(),
   paidThroughOn: responseBusinessDate.nullable(),
   terminating: z.boolean(),

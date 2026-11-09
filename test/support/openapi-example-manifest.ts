@@ -218,6 +218,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   licenseKeyImport: 'LICENSE_KEY.IMPORTED',
   licenseKeyList: 'LICENSE_KEY.LISTED',
   licenseKeyReveal: 'LICENSE_KEY.REVEALED',
+  licenseKeyWithdraw: 'LICENSE_KEY.WITHDRAWN',
   longLeaveChangeList: 'LONG_LEAVE.CHANGES_LISTED',
   longLeaveChangeReturnDate: 'LONG_LEAVE.RETURN_DATE_CHANGED',
   longLeaveConfirmReturn: 'LONG_LEAVE.RETURNED',
