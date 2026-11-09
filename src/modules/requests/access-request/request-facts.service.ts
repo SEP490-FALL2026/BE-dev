@@ -257,8 +257,11 @@ export class RequestFactsService {
       return {
         status: 'MISSING',
         missingReason: priced.reason,
+        kind: price?.kind ?? null,
         expectedSpendOn,
         budgetYear: priced.budgetYear,
+        expectedEndDate: input.expectedEndDate ?? null,
+        amountMonths: null,
         amount: null,
         unitPrice: null,
         billingCycle: null,
@@ -269,8 +272,11 @@ export class RequestFactsService {
     return {
       status: 'PRICED',
       missingReason: null,
+      kind: price?.kind ?? 'RECURRING',
       expectedSpendOn,
       budgetYear: priced.budgetYear,
+      expectedEndDate: input.expectedEndDate ?? null,
+      amountMonths: input.termMonths,
       amount: priced.amount,
       unitPrice: priced.unitPrice,
       billingCycle: priced.billingCycle,

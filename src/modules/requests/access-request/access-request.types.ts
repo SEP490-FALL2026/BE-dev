@@ -40,8 +40,11 @@ export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER' | 'FALLBACK_APPROVER' 
 export interface PricingRecord {
   status: 'NOT_APPLICABLE' | 'PRICED' | 'MISSING';
   missingReason: MissingPriceReason | null;
+  kind: 'RECURRING' | 'ONE_TIME' | null; // Pricing model: BR-MF1-07
   expectedSpendOn: BusinessDate | null;
   budgetYear: number | null;
+  expectedEndDate: BusinessDate | null; // Date the right ends; BR-MF1-06a
+  amountMonths: number | null; // Months of term for calculation; BR-MF1-06
   amount: Money | null;
   unitPrice: Money | null;
   billingCycle: BillingCycleCode | null;
