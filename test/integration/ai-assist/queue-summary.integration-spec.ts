@@ -179,9 +179,11 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
         'invocationId',
         'lines',
         'omittedCount',
+        'simulated',
         'sourceStale',
         'status',
       ]);
+      expect(view.simulated).toBe(false);
     });
 
     it('asking again for the same revision gives back the same call: no second call to the AI service, one row', async () => {
@@ -233,6 +235,7 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
         ['AI_INVOCATION.CONTENT_READ', h.seed.superAdmin.appUserId],
       ]);
       expect(events[2].after).toEqual({ invocationId: view.invocationId });
+      expect(events.slice(0, 2).map((event) => event.after.providerMode)).toEqual(['MODEL', 'MODEL']);
       for (const event of events) {
         expect(Object.keys(event.after).filter((key) => SECRET_LIKE.test(key))).toEqual([]);
         expect(JSON.stringify(event.after)).not.toContain(REASONS[0]);

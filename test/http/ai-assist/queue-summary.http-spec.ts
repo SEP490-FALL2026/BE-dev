@@ -24,6 +24,7 @@ const VIEW = {
   status: 'COMPLETED',
   createdAt: '2026-11-04T03:00:00.000Z',
   sourceStale: false,
+  simulated: false,
   omittedCount: 1,
   items: [
     { requestId: REQUEST_ID, stepId: STEP_ID, stepKind: 'NEED_APPROVAL', summary: 'An cần Figma trong 3 tháng.' },
@@ -213,6 +214,17 @@ describe('the AI summary of the approval queue (e2e, no database)', () => {
       // The service says `items`; on the wire the lines are `lines` (a GET with `items` is a collection to the contract gate).
       expect(bodyOf(response)).toEqual({ success: true, message: 'AI.SUMMARY_READ', data: { ...rest, lines: items } });
       expect(get).toHaveBeenCalledWith(expect.objectContaining({ appUserId: 'caller-account' }), INVOCATION_ID);
+    });
+
+    it('carries simulated true for a summary composed by the simulation, so the label "not AI" is always shown', async () => {
+      get.mockResolvedValueOnce({ ...VIEW, simulated: true });
+
+      const response = await request(server())
+        .get(`${BASE}/${INVOCATION_ID}`)
+        .set('Authorization', as('MANAGER'))
+        .expect(200);
+
+      expect(bodyOf(response).data).toMatchObject({ simulated: true, status: 'COMPLETED' });
     });
 
     it.each([

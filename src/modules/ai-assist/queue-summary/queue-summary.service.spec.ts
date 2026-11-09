@@ -227,6 +227,7 @@ describe('QueueSummaryService.get', () => {
       status: 'COMPLETED',
       createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T.*Z$/) as unknown,
       sourceStale: false,
+      simulated: false,
       omittedCount: 0,
       errorCode: null,
       items: [

@@ -344,6 +344,22 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
       'Cho phép người được giao bước duyệt bấm "Tóm tắt bằng AI" trên hàng chờ của mình; chỉ có hiệu lực khi công tắc tổng của AI đang bật.',
     source: 'OQ-G-08, US-15-05',
   },
+  {
+    key: 'AI_PROVIDER_MODE',
+    label: 'Nguồn trả lời của AI',
+    group: 'AI',
+    shape: {
+      kind: 'enum',
+      options: ['SIMULATED', 'MODEL'],
+      optionLabels: { SIMULATED: 'Giả lập (không gọi model)', MODEL: 'Model AI' },
+    },
+    default: 'SIMULATED',
+    unit: 'mode',
+    unitLabel: 'chế độ',
+    description:
+      'Giả lập: hệ thống tự dựng câu mẫu từ dữ liệu nguồn, không gọi model, kết quả mang nhãn "giả lập — không phải AI". Model AI: gọi dịch vụ AI của nhóm. Chỉ có hiệu lực khi công tắc AI đang bật.',
+    source: 'QĐ-102f, US-15-05 AC-16',
+  },
 ];
 
 const BY_KEY = new Map(PARAMETER_DEFINITIONS.map((definition) => [definition.key, definition]));

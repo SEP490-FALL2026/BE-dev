@@ -19,6 +19,7 @@ export function summaryView(record: InvocationRecord, now: SourceNow | null): Qu
     status: record.status,
     createdAt: record.createdAt.toISOString(),
     sourceStale: false,
+    simulated: record.providerMode === 'SIMULATED',
     omittedCount: 0,
     items: [],
     errorCode: record.errorCode,

@@ -73764,7 +73764,7 @@
         },
         "responses": {
           "202": {
-            "description": "The call is recorded and runs in the background; read it with GET until it is no longer PENDING or RUNNING. Asking again for the same revision gives the call already kept for it. When the steps of the caller cannot be read the answer is still 202, with status FAILED: nothing was sent to the model and the queue read by hand is unchanged. The model is never called when no step waits for the caller. With no AI service configured the answer is 503 AI.PROVIDER_UNAVAILABLE and nothing is written.",
+            "description": "The call is recorded and runs in the background; read it with GET until it is no longer PENDING or RUNNING. Asking again for the same revision gives the call already kept for it. When the steps of the caller cannot be read the answer is still 202, with status FAILED: nothing was sent to the model and the queue read by hand is unchanged. The model is never called when no step waits for the caller. In the MODEL mode with no AI service configured the answer is 503 AI.PROVIDER_UNAVAILABLE and nothing is written; the SIMULATED mode needs no AI service.",
             "content": {
               "application/json": {
                 "schema": {
@@ -100944,6 +100944,10 @@
                 "type": "boolean",
                 "description": "True when the queue of the person changed since the summary was composed."
               },
+              "simulated": {
+                "type": "boolean",
+                "description": "True khi bản tóm tắt do chế độ giả lập dựng, không phải model AI; FE luôn hiển thị nhãn 'Giả lập — không phải AI'."
+              },
               "omittedCount": {
                 "type": "integer",
                 "minimum": 0,
@@ -100975,7 +100979,16 @@
                 "nullable": true
               }
             },
-            "required": ["invocationId", "status", "createdAt", "sourceStale", "omittedCount", "lines", "errorCode"],
+            "required": [
+              "invocationId",
+              "status",
+              "createdAt",
+              "sourceStale",
+              "simulated",
+              "omittedCount",
+              "lines",
+              "errorCode"
+            ],
             "additionalProperties": false,
             "nullable": true
           }
@@ -100992,6 +101005,11 @@
             "type": "object",
             "properties": {
               "invocationId": { "type": "string", "format": "uuid" },
+              "providerMode": {
+                "type": "string",
+                "enum": ["MODEL", "SIMULATED"],
+                "description": "Where the answer came from: MODEL, the AI service; SIMULATED, the simulation that calls no model (show the label 'Giả lập — không phải AI')."
+              },
               "context": {
                 "type": "object",
                 "additionalProperties": {},
@@ -101020,7 +101038,7 @@
                 "nullable": true
               }
             },
-            "required": ["invocationId", "context", "promptText", "rawResponse", "parsed", "result"],
+            "required": ["invocationId", "providerMode", "context", "promptText", "rawResponse", "parsed", "result"],
             "additionalProperties": false,
             "nullable": true
           }

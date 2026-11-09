@@ -200,6 +200,54 @@ describe('QueueSummaryRunService', () => {
     expect(lines.join('\n')).not.toMatch(/PROMPT|RAW|Figma|Nguyễn|duyệt|boom/);
   });
 
+  it.each([
+    [
+      'refused the token (401)',
+      new AiServiceUnavailableError(401, 'UNAUTHORIZED'),
+      'httpStatus=401 serviceCode=UNAUTHORIZED',
+    ],
+    [
+      'failed in the model (500)',
+      new AiServiceUnavailableError(500, 'MODEL_ERROR'),
+      'httpStatus=500 serviceCode=MODEL_ERROR',
+    ],
+    ['could not be reached', new AiServiceUnavailableError(null, null), 'httpStatus=none serviceCode=none'],
+    ['ran out of time', new AiServiceTimeoutError(), 'httpStatus=none serviceCode=none'],
+  ])(
+    'logs the HTTP status and the code of the AI service when it %s, never its content or a token',
+    async (_label, failure, said) => {
+      const lines: string[] = [];
+      for (const level of ['log', 'warn', 'error'] as const) {
+        jest.spyOn(Logger.prototype, level).mockImplementation((...args: unknown[]) => {
+          lines.push(args.map(String).join(' '));
+        });
+      }
+
+      const { row } = await ran(() => failure);
+
+      const ended = lines.filter((line) => line.includes(row.id) && line.includes('status=FAILED'));
+      expect(ended).toHaveLength(1);
+      expect(ended[0]).toContain(said);
+      expect(ended[0]).toContain(`errorCode=${row.errorCode}`);
+      expect(lines.join('\n')).not.toMatch(/PROMPT|RAW|Figma|Nguyễn|duyệt/);
+      expect(lines.join('\n')).not.toMatch(/bearer|token/i);
+    },
+  );
+
+  it('logs no HTTP status or code of the AI service for a call that ended with an answer', async () => {
+    const lines: string[] = [];
+    jest.spyOn(Logger.prototype, 'log').mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(' '));
+    });
+
+    const { row } = await ran(GOOD);
+
+    expect(lines.filter((line) => line.includes(row.id))).toEqual([
+      expect.stringContaining('status=COMPLETED') as unknown,
+    ]);
+    expect(lines.join('\n')).not.toMatch(/httpStatus|serviceCode/);
+  });
+
   it('writes nothing over a call that was marked FAILED while it ran', async () => {
     const { row, finished } = await ran(
       (request) => {

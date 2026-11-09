@@ -12,12 +12,21 @@ enum AiInvocationStatus {
   FAILED
 }
 
+// Where the answers of a call come from, fixed when the call is made from the operating parameter `AI_PROVIDER_MODE` (QĐ-102f):
+// the AI service (MODEL) or the simulation that calls no model (SIMULATED). A call never changes source, not even when it fails.
+enum AiProviderMode {
+  MODEL
+  SIMULATED
+}
+
 // One call of an AI feature on behalf of one person (US-15-05): only what an audit or a support question needs, never what was
 // said to the model or what it answered (that is `ai_invocation_contents`, protected apart). The person and the organization are
 // values with no foreign key, as in `in_app_notifications`: the record of a call outlives the account. `source_revision` is the
-// queue revision the call was made for. At most one call per (organization, person, feature, source_revision) is live or kept as
-// the answer: the partial unique index `ai_invocations_active_per_revision` and the CHECK
-// `ai_invocations_final_state_finished_at_check` are SQL in the migration (ADR-0005), which Prisma cannot express.
+// queue revision the call was made for, `provider_mode` the source of its answers (no default: a call that does not say it is
+// refused). At most one call per (organization, person, feature, source_revision, provider_mode) is live or kept as the answer, so
+// asking again in the other mode makes a new call instead of giving back the answer of the other source: the partial unique index
+// `ai_invocations_active_per_revision` and the CHECK `ai_invocations_final_state_finished_at_check` are SQL in the migrations
+// (ADR-0005), which Prisma cannot express.
 model AiInvocation {
   id               String             @id @default(uuid()) @db.Uuid
   organizationId   String             @map("organization_id") @db.Uuid
@@ -25,6 +34,7 @@ model AiInvocation {
   actorAppUserId   String             @map("actor_app_user_id") @db.Uuid
   actorEmployeeId  String             @map("actor_employee_id") @db.Uuid
   status           AiInvocationStatus
+  providerMode     AiProviderMode     @map("provider_mode")
   sourceRevision   String             @map("source_revision")
   configHash       String?            @map("config_hash")
   modelId          String?            @map("model_id")

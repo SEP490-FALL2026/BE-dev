@@ -47,6 +47,8 @@ export interface QueueSummaryView {
   status: QueueSummaryStatus;
   createdAt: string;
   sourceStale: boolean;
+  /** True for a call the simulation answered (`provider_mode` SIMULATED), whatever its state: the label "not AI" is always shown. */
+  simulated: boolean;
   omittedCount: number;
   items: QueueSummaryItem[];
   errorCode: string | null;

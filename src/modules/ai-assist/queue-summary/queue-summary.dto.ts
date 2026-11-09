@@ -52,6 +52,10 @@ const summarySchema = z.strictObject({
   sourceStale: z
     .boolean()
     .meta({ description: 'True when the queue of the person changed since the summary was composed.' }),
+  simulated: z.boolean().meta({
+    description:
+      "True khi bản tóm tắt do chế độ giả lập dựng, không phải model AI; FE luôn hiển thị nhãn 'Giả lập — không phải AI'.",
+  }),
   omittedCount: z.number().int().nonnegative().meta({
     description:
       'How many steps still given to the person the summary leaves out: past the first 20, or whose line did not pass the checks.',

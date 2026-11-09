@@ -4,6 +4,8 @@ import type { DbTx, TransactionRunner } from '../../src/infrastructure/database/
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../src/modules/audit/public/audit.api';
 import type { AuditEventInput } from '../../src/modules/audit/public/audit.types';
+import { AiServiceClients } from '../../src/modules/ai-assist/ai-service/ai-service-clients.service';
+import { SimulatedAiServiceClient } from '../../src/modules/ai-assist/ai-service/ai-service-simulated-client.service';
 import { AiServiceClient } from '../../src/modules/ai-assist/ai-service/ai-service.types';
 import type {
   QueueSummaryServiceRequest,
@@ -13,9 +15,11 @@ import type { AiInvocationRepo } from '../../src/modules/ai-assist/invocation/in
 import type {
   InvocationKey,
   InvocationOutcome,
+  InvocationOwner,
   InvocationRecord,
   LiveInvocation,
   NewInvocation,
+  StuckInvocation,
 } from '../../src/modules/ai-assist/invocation/invocation.types';
 import { QueueSummaryRunService } from '../../src/modules/ai-assist/queue-summary/queue-summary-run.service';
 import { QueueSummaryService } from '../../src/modules/ai-assist/queue-summary/queue-summary.service';
@@ -42,11 +46,13 @@ export interface FakeInvocationRow extends InvocationRecord {
 
 const KEPT = new Set(['PENDING', 'RUNNING', 'COMPLETED']);
 const LIVE = new Set(['PENDING', 'RUNNING']);
+const ownedBy = (row: FakeInvocationRow, owner: InvocationOwner) =>
+  row.organizationId === owner.organizationId &&
+  row.actorAppUserId === owner.actorAppUserId &&
+  row.feature === owner.feature;
+/** The columns of the partial unique index, the mode included. */
 const sameKey = (row: FakeInvocationRow, key: InvocationKey & { sourceRevision: string }) =>
-  row.organizationId === key.organizationId &&
-  row.actorAppUserId === key.actorAppUserId &&
-  row.feature === key.feature &&
-  row.sourceRevision === key.sourceRevision;
+  ownedBy(row, key) && row.providerMode === key.providerMode && row.sourceRevision === key.sourceRevision;
 const stuck = (row: FakeInvocationRow, startedBefore: Date) =>
   LIVE.has(row.status) && (row.startedAt ?? row.createdAt).getTime() < startedBefore.getTime();
 
@@ -71,6 +77,7 @@ export class FakeInvocationRepo implements Pick<AiInvocationRepo, keyof AiInvoca
       actorAppUserId: input.actorAppUserId,
       actorEmployeeId: input.actorEmployeeId,
       status: input.status,
+      providerMode: input.providerMode,
       sourceRevision: input.sourceRevision,
       errorCode: input.errorCode,
       createdAt: input.at,
@@ -90,12 +97,13 @@ export class FakeInvocationRepo implements Pick<AiInvocationRepo, keyof AiInvoca
     return Promise.resolve(row ? { id: row.id, status: row.status as LiveInvocation['status'] } : null);
   }
 
-  stuckOf(_tx: DbTx, key: InvocationKey, startedBefore: Date): Promise<string[]> {
-    const ids = [...this.rows.values()]
-      .filter((row) => sameKey(row, { ...key, sourceRevision: row.sourceRevision }) && stuck(row, startedBefore))
-      .map((row) => row.id);
+  /** In every mode, as the repository: a run stuck is stuck whatever its source. */
+  stuckOf(_tx: DbTx, owner: InvocationOwner, startedBefore: Date): Promise<StuckInvocation[]> {
+    const found = [...this.rows.values()]
+      .filter((row) => ownedBy(row, owner) && stuck(row, startedBefore))
+      .map((row) => ({ id: row.id, providerMode: row.providerMode }));
 
-    return Promise.resolve(ids);
+    return Promise.resolve(found);
   }
 
   expire(_tx: DbTx, id: string, startedBefore: Date, at: Date): Promise<boolean> {
@@ -141,6 +149,7 @@ export class FakeInvocationRepo implements Pick<AiInvocationRepo, keyof AiInvoca
       id,
       organizationId: ORGANIZATION_ID,
       feature: 'ACCESS_REQUEST_QUEUE_SUMMARY',
+      providerMode: 'MODEL',
       actorEmployeeId: randomUUID(),
       sourceRevision: 'r'.repeat(64),
       errorCode: null,
@@ -250,15 +259,22 @@ export function sourceStep(index: number, overrides: Partial<AiSourceStep> = {})
   };
 }
 
-/** The service of the summary on the fakes above, with both switches ON unless told otherwise. */
+/**
+ * The service of the summary on the fakes above, with both switches ON and `AI_PROVIDER_MODE` = MODEL unless told otherwise
+ * (`switches` holds the three parameters). MODEL is answered by `ai`; SIMULATED by the real simulation (`simulated`), without its
+ * wait.
+ */
 export function queueSummaryWorld() {
   const repo = new FakeInvocationRepo();
   const source = new FakeStepSource();
   const ai = new FakeAiService();
+  const simulated = new SimulatedAiServiceClient({ sleep: () => Promise.resolve() });
+  const clients = new AiServiceClients(ai, simulated);
   const events: AuditEventInput[] = [];
   const switches = new Map<string, string>([
     ['AI_ENABLED', 'ON'],
     ['AI_ACCESS_REQUEST_SUMMARY_ENABLED', 'ON'],
+    ['AI_PROVIDER_MODE', 'MODEL'],
   ]);
   const runner = { run: <T>(work: (tx: DbTx) => Promise<T>) => work(TX) } as unknown as TransactionRunner;
   const audit = {
@@ -276,8 +292,8 @@ export function queueSummaryWorld() {
   } as unknown as OrganizationReadApi;
   const facade = source as unknown as RequestsAiSourceApi;
   const fakeRepo = repo as unknown as AiInvocationRepo;
-  const runs = new QueueSummaryRunService(runner, fakeRepo, facade, audit, ai);
-  const service = new QueueSummaryService(runner, fakeRepo, facade, parameters, organizations, audit, ai, runs);
+  const runs = new QueueSummaryRunService(runner, fakeRepo, facade, audit, clients);
+  const service = new QueueSummaryService(runner, fakeRepo, facade, parameters, organizations, audit, clients, runs);
 
-  return { service, runs, repo, source, ai, events, switches };
+  return { service, runs, repo, source, ai, simulated, events, switches };
 }

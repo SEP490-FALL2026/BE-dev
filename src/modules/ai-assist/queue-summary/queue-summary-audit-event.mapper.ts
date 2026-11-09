@@ -1,4 +1,5 @@
 import type { AuditEventInput } from '../../audit/public/audit.types';
+import type { AiProviderMode } from '../ai-service/ai-service.types';
 import type { InvocationMetadata } from '../invocation/invocation.types';
 import { QUEUE_SUMMARY_FEATURE } from './queue-summary.types';
 
@@ -9,9 +10,10 @@ export interface SummaryActor {
   sessionId: string;
 }
 
-/** How a call ended, as the audit trail tells it. */
+/** How a call ended, as the audit trail tells it, with the mode it was made in. */
 export interface SummaryEnding {
   status: 'COMPLETED' | 'NO_VALID_OUTPUT' | 'FAILED';
+  providerMode: AiProviderMode;
   errorCode: string | null;
   metadata: InvocationMetadata | null;
   acceptedCount: number;
@@ -19,9 +21,10 @@ export interface SummaryEnding {
 }
 
 /*
- * The audit events of a call of the AI: metadata and the reference to the record of its content, never the context, the
- * prompt or the answer. No key may read as a secret to the audit trail (`AuditApi` refuses pass, hash, token…): the configuration is a
- * `configFingerprint`, and the counts of the model are `promptSize` and `completionSize`.
+ * The audit events of a call of the AI: metadata, the mode of the call (`providerMode`: a simulated call is never taken for one of
+ * the model) and the reference to the record of its content, never the context, the prompt or the answer. No key may read as a
+ * secret to the audit trail (`AuditApi` refuses pass, hash, token…): the configuration is a `configFingerprint`, and the counts of
+ * the model are `promptSize` and `completionSize`.
  */
 
 const NO_MODEL = {
@@ -63,12 +66,14 @@ function event(
   };
 }
 
-/** `AI_INVOCATION.REQUESTED`: a call was recorded for the queue revision, with how many steps it sends and leaves out. */
+/**
+ * `AI_INVOCATION.REQUESTED`: a call was recorded for the queue revision in a mode, with how many steps it sends and leaves out.
+ */
 export function summaryRequestedEvent(
   actor: SummaryActor,
   organizationId: string,
   invocationId: string,
-  facts: { queueRevision: string; stepCount: number; omittedCount: number },
+  facts: { queueRevision: string; providerMode: AiProviderMode; stepCount: number; omittedCount: number },
 ): AuditEventInput {
   return event(actor, organizationId, invocationId, 'AI_INVOCATION.REQUESTED', { status: 'PENDING', ...facts });
 }
@@ -87,6 +92,7 @@ export function summaryEndedEvent(
     ending.status === 'FAILED' ? 'AI_INVOCATION.FAILED' : 'AI_INVOCATION.COMPLETED',
     {
       status: ending.status,
+      providerMode: ending.providerMode,
       errorCode: ending.errorCode,
       acceptedCount: ending.acceptedCount,
       rejectedCount: ending.rejectedCount,
@@ -100,11 +106,11 @@ export function summaryFailedEvent(
   actor: SummaryActor,
   organizationId: string,
   invocationId: string,
-  errorCode: string,
+  failure: { errorCode: string; providerMode: AiProviderMode },
 ): AuditEventInput {
   return summaryEndedEvent(actor, organizationId, invocationId, {
     status: 'FAILED',
-    errorCode,
+    ...failure,
     metadata: null,
     acceptedCount: 0,
     rejectedCount: 0,

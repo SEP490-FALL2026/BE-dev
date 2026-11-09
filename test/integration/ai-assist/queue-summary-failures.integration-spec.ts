@@ -14,7 +14,8 @@ const M = 1_000_000;
  * HTTP: with the AI switched off nothing is sent and the routes answer 403; with the service down, slow, busy or answering
  * something that is not the contract, the call ends FAILED (or NO_VALID_OUTPUT) with a stable code, read with 200, never a 500. In
  * every case no step changes — state, holder, the time it was given, its SLA — and the head and the spending approver decide by
- * hand as before.
+ * hand as before. The harness sets `AI_PROVIDER_MODE` = MODEL: a model that fails is never replaced by the simulation (AC-17), and a
+ * call keeps the mode it was made in when the Super Admin changes it.
  */
 describe('the AI summary when the AI is off or failing (integration, real HTTP to a stand-in AI service, real PostgreSQL)', () => {
   let internal: string;
@@ -134,6 +135,14 @@ describe('the AI summary when the AI is off or failing (integration, real HTTP t
         errorCode: 'AI.PROVIDER_TIMEOUT',
         calls: 1,
       },
+      // AC-17: the model failing twice is a failed call, never simulated lines in its place.
+      {
+        name: 'failing (500 MODEL_ERROR, then again)',
+        reply: { kind: 'status', status: 500, code: 'MODEL_ERROR' },
+        status: 'FAILED',
+        errorCode: 'AI.PROVIDER_UNAVAILABLE',
+        calls: 2,
+      },
       {
         name: 'refusing the token of the backend (401 UNAUTHORIZED)',
         reply: { kind: 'status', status: 401, code: 'UNAUTHORIZED' },
@@ -176,10 +185,10 @@ describe('the AI summary when the AI is off or failing (integration, real HTTP t
         omittedCount: 0,
       });
       expect(h.ai.calls.filter((call) => call.authorized)).toHaveLength(scenario.calls);
-      expect(await h.invocationRow(view.invocationId)).toMatchObject({
-        status: scenario.status,
-        error_code: scenario.errorCode,
-      });
+      const row = await h.invocationRow(view.invocationId);
+      expect(row).toMatchObject({ status: scenario.status, error_code: scenario.errorCode, provider_mode: 'MODEL' });
+      expect(row?.model_id).not.toBe('saas-sentry-simulated');
+      expect(String((await h.contentRow(view.invocationId))?.prompt_text)).not.toContain('[SIMULATED]');
       await expectQueuesUnchanged();
       // What is recorded of the failure names no token and no address of the AI service.
       const recorded = JSON.stringify(await h.aiEvents(view.invocationId)) + JSON.stringify(view);
@@ -226,7 +235,7 @@ describe('the AI summary when the AI is off or failing (integration, real HTTP t
       h.ai.release();
       await h.settled();
 
-      expect(read).toMatchObject({ status: 'FAILED', errorCode: 'AI.PROVIDER_TIMEOUT' });
+      expect(read).toMatchObject({ status: 'FAILED', errorCode: 'AI.PROVIDER_TIMEOUT', simulated: false });
       expect(h.ai.accepted()).toHaveLength(2);
       expect(await h.invocationRow(invocationId)).toMatchObject({
         status: 'FAILED',
@@ -234,9 +243,9 @@ describe('the AI summary when the AI is off or failing (integration, real HTTP t
         model_id: null,
       });
       expect(await h.contentRow(invocationId)).toMatchObject({ prompt_text: null, raw_response: null, result: null });
-      expect((await h.aiEvents(invocationId)).map((event) => event.action)).toEqual([
-        'AI_INVOCATION.REQUESTED',
-        'AI_INVOCATION.FAILED',
+      expect((await h.aiEvents(invocationId)).map((event) => [event.action, event.after.providerMode])).toEqual([
+        ['AI_INVOCATION.REQUESTED', 'MODEL'],
+        ['AI_INVOCATION.FAILED', 'MODEL'],
       ]);
     });
 
@@ -291,14 +300,66 @@ describe('the AI summary when the AI is off or failing (integration, real HTTP t
       expect(fresh.invocationId).not.toBe(stuck.invocationId);
       expect(fresh.status).toBe('PENDING');
       expect(stuckRow).toMatchObject({ status: 'FAILED', error_code: 'AI.PROVIDER_TIMEOUT' });
-      expect((await h.aiEvents(stuck.invocationId)).map((event) => event.action)).toEqual([
-        'AI_INVOCATION.REQUESTED',
-        'AI_INVOCATION.FAILED',
+      expect((await h.aiEvents(stuck.invocationId)).map((event) => [event.action, event.after.providerMode])).toEqual([
+        ['AI_INVOCATION.REQUESTED', 'MODEL'],
+        ['AI_INVOCATION.FAILED', 'MODEL'],
       ]);
       expect(await h.invocationRow(stuck.invocationId)).toMatchObject({ status: 'FAILED' });
       const view = h.dataOf<SummaryWire>(await h.read(design.head.account, fresh.invocationId).expect(200));
       expect(view).toMatchObject({ status: 'COMPLETED' });
       expect(view.lines.map((line) => line.requestId)).toEqual([r1.id, r2.id]);
+      await expectQueuesUnchanged();
+    });
+  });
+
+  describe('the mode changed by the Super Admin while a call runs', () => {
+    afterAll(async () => {
+      await h.setMode('MODEL').expect(200);
+    });
+
+    it('the MODEL call stays MODEL and ends with the answer of the model; the same revision asked in SIMULATED is a call of its own', async () => {
+      await h.switchAll('ON');
+      // The summary kept from the tests above goes stale as the purge makes it, so the revision is free in both modes.
+      await h.ctx.sql.query(`UPDATE ai_invocations SET status = 'STALE' WHERE status = 'COMPLETED'`);
+      h.ai.reply(() => ({ kind: 'hang' }));
+      const revision = await h.revisionOf(design.head.account);
+      const received = h.ai.nextCall();
+      const model = h.dataOf<{ invocationId: string }>(await h.ask(design.head.account, revision).expect(202));
+      await received;
+
+      await h.setMode('SIMULATED').expect(200);
+      const simulated = h.dataOf<{ invocationId: string; status: string }>(
+        await h.ask(design.head.account, revision).expect(202),
+      );
+      // The model comes back: the dropped call is tried again and answered.
+      h.ai.reply((call) => faithfulAnswer(call));
+      h.ai.release();
+      await h.settled();
+
+      expect(simulated.invocationId).not.toBe(model.invocationId);
+      expect(h.ai.accepted()).toHaveLength(2);
+      const modelRow = await h.invocationRow(model.invocationId);
+      expect(modelRow).toMatchObject({ provider_mode: 'MODEL', status: 'COMPLETED', error_code: null });
+      expect(modelRow?.model_id).not.toBe('saas-sentry-simulated');
+      expect(await h.invocationRow(simulated.invocationId)).toMatchObject({
+        provider_mode: 'SIMULATED',
+        status: 'COMPLETED',
+        model_id: 'saas-sentry-simulated',
+      });
+      for (const invocationId of [model.invocationId, simulated.invocationId]) {
+        const view = h.dataOf<SummaryWire>(await h.read(design.head.account, invocationId).expect(200));
+        expect(view.lines.map((line) => line.requestId)).toEqual([r1.id, r2.id]);
+      }
+      // Asked again in each mode, the same revision gives back the call kept in that mode.
+      expect(h.dataOf<{ invocationId: string }>(await h.ask(design.head.account, revision).expect(202))).toEqual({
+        invocationId: simulated.invocationId,
+        status: 'COMPLETED',
+      });
+      await h.setMode('MODEL').expect(200);
+      expect(h.dataOf<{ invocationId: string }>(await h.ask(design.head.account, revision).expect(202))).toEqual({
+        invocationId: model.invocationId,
+        status: 'COMPLETED',
+      });
       await expectQueuesUnchanged();
     });
   });
