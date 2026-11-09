@@ -12,4 +12,8 @@ export const SUCCESS_MESSAGES_OPTIMIZATION: Readonly<Record<string, string>> = {
   ghostSeatRecommendationReturn: 'GHOST_SEAT_RECOMMENDATION.RETURNED',
   ghostSeatRuleRunList: 'GHOST_SEAT_RULE_RUNS.LISTED',
   ghostSeatRuleSkipList: 'GHOST_SEAT_RULE_SKIPS.LISTED',
+  ghostSeatSeatStateList: 'GHOST_SEAT_SEAT_STATES.LISTED',
+  ghostSeatThresholdDelete: 'GHOST_SEAT_THRESHOLD.DELETED',
+  ghostSeatThresholdList: 'GHOST_SEAT_THRESHOLDS.LISTED',
+  ghostSeatThresholdSet: 'GHOST_SEAT_THRESHOLD.SET',
 };

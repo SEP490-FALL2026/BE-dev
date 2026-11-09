@@ -1,12 +1,12 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import type { EvidenceSource, UnmatchedEvidence } from '../../usage/public/usage-evidence.types';
+import type { SeatStatus } from '../ghost-seat/ghost-seat-seat-state.repo';
 import type { RuleSkipDetail } from '../rule-run/rule-run-skip-detail.json';
 import type { SkipGate } from '../rule-run/rule-run.repo';
 import { oneMonthAfter } from './usage-assessment.policy';
 
-/** The one state a seat has after the weekly pass (`FR-5.10`): no data and an unmatched identity are never read as inactive. */
-export type SeatStatus =
-  'ACTIVE' | 'INACTIVE' | 'NO_DATA' | 'UNMATCHED_IDENTITY' | 'INSUFFICIENT_EVIDENCE' | 'EXCLUDED';
+// The one state a seat has after the weekly pass (`FR-5.10`): no data and an unmatched identity are never read as inactive.
+export type { SeatStatus };
 
 export interface GateSkip {
   gate: SkipGate;

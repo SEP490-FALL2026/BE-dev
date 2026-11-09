@@ -107,4 +107,54 @@ export const NESTED_ARRAYS_W6: readonly NestedArrayEntry[] = [
     rationale: 'The people an identifier of a vendor may be, by code and work email only.',
     removeWhen: 'Review when MAX_CANDIDATES changes.',
   },
+  {
+    key: 'ghostSeatRecommendationGet#recommendation.confidenceReasons',
+    classification: 'bounded',
+    findings: [],
+    owner: 'qd103-ghost-seat-g3-g4',
+    businessMaximum: {
+      maxItems: 8,
+      source:
+        'the .max(8) of confidenceReasons in board.dto.ts: confidence has seven factors (CF-1 to CF-7), so at most 8 sentences',
+    },
+    rationale: 'The sentences that lowered the confidence of a recommendation.',
+    removeWhen: 'Review when the factors of the confidence or the labels change.',
+  },
+  {
+    key: 'ghostSeatRecommendationGet#recommendation.usageLabels',
+    classification: 'bounded',
+    findings: [],
+    owner: 'qd103-ghost-seat-g3-g4',
+    businessMaximum: {
+      maxItems: 4,
+      source: 'the .max(4) of usageLabels in board.dto.ts: the labels are P-05 and LOW_CONFIDENCE, so at most 4',
+    },
+    rationale: 'The labels of what the days of a recommendation rest on.',
+    removeWhen: 'Review when the factors of the confidence or the labels change.',
+  },
+  {
+    key: 'ghostSeatRecommendationList#confidenceReasons',
+    classification: 'bounded',
+    findings: [],
+    owner: 'qd103-ghost-seat-g3-g4',
+    businessMaximum: {
+      maxItems: 8,
+      source:
+        'the .max(8) of confidenceReasons in board.dto.ts: confidence has seven factors (CF-1 to CF-7), so at most 8 sentences',
+    },
+    rationale: 'The sentences that lowered the confidence of each recommendation of the page.',
+    removeWhen: 'Review when the factors of the confidence or the labels change.',
+  },
+  {
+    key: 'ghostSeatRecommendationList#usageLabels',
+    classification: 'bounded',
+    findings: [],
+    owner: 'qd103-ghost-seat-g3-g4',
+    businessMaximum: {
+      maxItems: 4,
+      source: 'the .max(4) of usageLabels in board.dto.ts: the labels are P-05 and LOW_CONFIDENCE, so at most 4',
+    },
+    rationale: 'The labels of what the days of each recommendation of the page rest on.',
+    removeWhen: 'Review when the factors of the confidence or the labels change.',
+  },
 ];

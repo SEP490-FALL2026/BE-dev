@@ -24,4 +24,9 @@ export const ROUTE_ERROR_CODES_OPTIMIZATION: Readonly<
   },
   ghostSeatRuleSkipList: { '404': ['GHOST_SEAT.NOT_FOUND'] },
   ghostSeatKpi5Get: { '422': ['GHOST_SEAT.PERIOD_INVALID'] },
+  ghostSeatThresholdSet: {
+    '404': ['GHOST_SEAT.APPLICATION_NOT_FOUND'],
+    '422': ['GHOST_SEAT.THRESHOLD_ORDER', 'GHOST_SEAT.APPLICATION_INTERNAL'],
+  },
+  ghostSeatThresholdDelete: { '404': ['GHOST_SEAT.APPLICATION_NOT_FOUND'] },
 };

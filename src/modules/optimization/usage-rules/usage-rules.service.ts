@@ -4,13 +4,13 @@ import { LicensingGhostSeatApi } from '../../licensing/public/licensing-ghost-se
 import type { RuleSeat } from '../../licensing/public/licensing-ghost-seat.types';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { GhostSeatSeatStateRepo } from '../ghost-seat/ghost-seat-seat-state.repo';
 import type { RulePass } from '../internal-rules/internal-rules.types';
 import type { RuleRunRecord } from '../rule-run/rule-run.repo';
 import { periodKeyOf, scheduleOf } from '../rule-run/rule-run.policy';
 import { RuleRunService } from '../rule-run/rule-run.service';
 import { UsageRulesContextService } from './usage-rules-context.service';
 import { UsageRulesSeatService } from './usage-rules-seat.service';
-import { UsageRulesRepo } from './usage-rules.repo';
 import type { UsageApplicationContext, UsageRunContext } from './usage-rules.types';
 import { UsageStaleNoticeService } from './usage-stale-notice.service';
 
@@ -32,7 +32,7 @@ export class UsageRulesService {
     private readonly parameters: OperatingParametersApi,
     private readonly runs: RuleRunService,
     private readonly licensing: LicensingGhostSeatApi,
-    private readonly rules: UsageRulesRepo,
+    private readonly seatStates: GhostSeatSeatStateRepo,
     private readonly context: UsageRulesContextService,
     private readonly seats: UsageRulesSeatService,
     private readonly stale: UsageStaleNoticeService,
@@ -62,7 +62,7 @@ export class UsageRulesService {
     for (const applicationId of [...byApplication.keys()].sort()) {
       await this.application(run, applicationId, byApplication.get(applicationId) ?? []);
     }
-    await this.rules.deleteStaleSeatStates(
+    await this.seatStates.deleteStaleSeatStates(
       pass.organizationId,
       seats.map((seat) => seat.chainRootId),
     );

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { GhostSeatSeatStateRepo, type SeatStatus } from '../ghost-seat/ghost-seat-seat-state.repo';
 import { GhostSeatRepo } from '../ghost-seat/ghost-seat.repo';
 import type { GhostSeatRecord } from '../ghost-seat/ghost-seat.types';
 import { RuleRunQueryService } from '../rule-run/rule-run-query.service';
@@ -34,6 +35,7 @@ const pageOf = (total: number, page: number, pageSize: number) => ({
 export class BoardQueryService {
   constructor(
     private readonly repo: GhostSeatRepo,
+    private readonly seatStates: GhostSeatSeatStateRepo,
     private readonly runs: RuleRunQueryService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
@@ -87,6 +89,53 @@ export class BoardQueryService {
     const names = await this.namesOf([record]);
 
     return toDetailWire(record, names(record));
+  }
+
+  /**
+   * What the last weekly pass of `G3`/`G4` found of each seat (`FR-5.10`, `US-10-05` AC-6): one state for each seat chain. A seat with no data, an
+   * identity not matched or too little evidence has no days: it is never shown as inactive or as 0. The names come in one read each for the page.
+   */
+  async listSeatStates(query: { applicationId?: string; status?: SeatStatus; page: number; pageSize: number }) {
+    const organization = await this.organizationReads.getOrganization();
+    if (!organization) return { items: [], pagination: pageOf(0, query.page, query.pageSize) };
+    const { items, total } = await this.seatStates.seatStatePage(
+      organization.id,
+      { applicationId: query.applicationId, status: query.status },
+      { skip: (query.page - 1) * query.pageSize, take: query.pageSize },
+    );
+    const applications = new Map(
+      (await this.catalog.getCollectorApplications([...new Set(items.map((item) => item.applicationId))])).map(
+        (application) => [application.id, application.name] as const,
+      ),
+    );
+    const holders = new Map(
+      (items.length === 0
+        ? []
+        : await this.organizationReads.getEmployees([...new Set(items.map((item) => item.employeeId))])
+      ).map((employee) => [employee.id, employee] as const),
+    );
+    const hasDays = (status: SeatStatus): boolean => status === 'ACTIVE' || status === 'INACTIVE';
+
+    return {
+      items: items.map((item) => ({
+        seatChainId: item.seatChainId,
+        assignmentId: item.assignmentId,
+        application: { applicationId: item.applicationId, applicationName: applications.get(item.applicationId) ?? '' },
+        holder: holders.has(item.employeeId)
+          ? {
+              employeeId: item.employeeId,
+              employeeCode: holders.get(item.employeeId)!.employeeCode,
+              fullName: holders.get(item.employeeId)!.fullName,
+            }
+          : null,
+        status: item.status,
+        reason: item.gate,
+        lastActiveDate: hasDays(item.status) ? item.lastActiveDate : null,
+        inactiveDays: hasDays(item.status) ? item.inactiveDays : null,
+        assessedOn: item.assessedOn,
+      })),
+      pagination: pageOf(total, query.page, query.pageSize),
+    };
   }
 
   async listRuns(page: { page: number; pageSize: number }) {

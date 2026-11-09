@@ -8,6 +8,25 @@ export interface RowNames {
   holder: { employeeCode: string; fullName: string } | null;
 }
 
+/** What a G3/G4 adds to the row: the confidence with its reasons, the days, the labels and the money; empty for the other groups. */
+const usageWire = (record: GhostSeatRecord) => ({
+  confidence: record.usage?.confidence ?? null,
+  activityStatus: record.usage?.activityStatus ?? null,
+  inactiveDays: record.usage?.inactiveDays ?? null,
+  lastActiveDate: record.usage?.lastActiveDate ?? null,
+  activityAfterDecisionOn: record.activityAfterDecisionOn,
+  ...evidenceWire(record.evidence),
+});
+
+const evidenceWire = (evidence: GhostSeatRecord['evidence']) =>
+  evidence.group === 'G3' || evidence.group === 'G4'
+    ? {
+        confidenceReasons: evidence.confidence.reasons,
+        usageLabels: evidence.labels,
+        potentialSaving: evidence.potentialSaving,
+      }
+    : { confidenceReasons: [], usageLabels: [], potentialSaving: null };
+
 export const toSummaryWire = (record: GhostSeatRecord, names: RowNames) => ({
   id: record.id,
   group: record.group,
@@ -28,6 +47,7 @@ export const toSummaryWire = (record: GhostSeatRecord, names: RowNames) => ({
   revocationTaskId: record.revocationTaskId,
   labels: labelsOf(record),
   canReclaim: canReclaim(record),
+  ...usageWire(record),
   createdAt: record.createdAt.toISOString(),
 });
 

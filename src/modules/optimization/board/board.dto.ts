@@ -10,6 +10,31 @@ import {
 } from '../ghost-seat/ghost-seat.types';
 
 const group = z.enum(GHOST_SEAT_GROUPS);
+const SKIP_GATES = [
+  'PER_SEAT',
+  'INTERNAL_SOFTWARE',
+  'OPEN_RECOMMENDATION',
+  'SERVICE_ACCOUNT',
+  'LEAVE_OR_HANDOVER',
+  'NOT_USABLE',
+  'NEW_ASSIGNMENT',
+  'COVERAGE',
+  'STALE_SOURCE',
+  'EXEMPT',
+  'TIME_BOUND_ENDING',
+  'REVOCATION_IN_PROGRESS',
+  'NO_DATA',
+  'UNMATCHED_IDENTITY',
+  'INSUFFICIENT_EVIDENCE',
+] as const;
+const SEAT_STATUSES = [
+  'ACTIVE',
+  'INACTIVE',
+  'NO_DATA',
+  'UNMATCHED_IDENTITY',
+  'INSUFFICIENT_EVIDENCE',
+  'EXCLUDED',
+] as const;
 const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
@@ -32,12 +57,32 @@ export const recommendationListQuerySchema = z.strictObject({
   ...pageQuery,
 });
 
+export const seatStateListQuerySchema = z.strictObject({
+  applicationId: z.uuid().optional(),
+  status: z.enum(SEAT_STATUSES).optional(),
+  ...pageQuery,
+});
+
 export const kpi5QuerySchema = z.strictObject({ from: businessDate, to: businessDate });
 
 export const ruleRunListQuerySchema = z.strictObject(pageQuery);
 export const ruleRunIdParamSchema = z.strictObject({ id: z.uuid() });
 
 /** A row of the table of the IT Admin: what identifies it, what filters it and what can be done on it. */
+const potentialSavingSchema = z.strictObject({
+  monthlyAmountMinor: z
+    .string()
+    .nullable()
+    .meta({ description: 'One month of the seat, in minor units of the currency; the only figure that adds up.' }),
+  amountAtPointMinor: z.string().nullable().meta({
+    description:
+      'What is saved at the renewal or point of adjustment the seat can be had at; never added to what was avoided or really saved.',
+  }),
+  currency: z.string().nullable(),
+  realisableOn: responseBusinessDate.nullable(),
+  realisableAt: z.enum(['RENEWAL', 'ADJUSTMENT_POINT', 'NEXT_BILLING', 'UNKNOWN', 'NEVER']),
+});
+
 const recommendationSummarySchema = z.strictObject({
   id: z.uuid(),
   group,
@@ -63,6 +108,26 @@ const recommendationSummarySchema = z.strictObject({
     holderLeft: z.boolean().meta({ description: 'The holder of a seat a head decided on has left.' }),
   }),
   canReclaim: z.boolean(),
+  confidence: z
+    .enum(['HIGH', 'MEDIUM', 'LOW'])
+    .nullable()
+    .meta({ description: 'G3/G4 only: a level, never a percentage.' }),
+  confidenceReasons: z.array(z.string()).max(8),
+  activityStatus: z.enum(['NEVER_ACTIVE', 'INACTIVE']).nullable(),
+  inactiveDays: z
+    .number()
+    .int()
+    .nonnegative()
+    .nullable()
+    .meta({ description: 'Days covered by a source with no activity (not calendar days).' }),
+  lastActiveDate: responseBusinessDate.nullable(),
+  activityAfterDecisionOn: responseBusinessDate.nullable().meta({
+    description: 'The first day of activity after a reclaim was decided: the IT Admin weighs giving the seat back.',
+  }),
+  usageLabels: z
+    .array(z.string())
+    .meta({ description: 'What the days rest on that is weaker than a vendor report (P-05), and LOW_CONFIDENCE.' }),
+  potentialSaving: potentialSavingSchema.nullable(),
   createdAt: z.iso.datetime(),
 });
 
@@ -93,6 +158,19 @@ export const optimizationSummarySchema = z.strictObject({
     .nonnegative()
     .meta({ description: 'The G2 not closed plus the G1 open: what the dashboard of the IT Admin counts.' }),
   limitation: z.string(),
+  usage: z
+    .strictObject({
+      noSource: z.number().int().nonnegative(),
+      stale: z.number().int().nonnegative(),
+      insufficientEvidence: z.number().int().nonnegative(),
+      unmatchedIdentities: z.number().int().nonnegative(),
+      active: z.number().int().nonnegative(),
+      inactive: z.number().int().nonnegative(),
+      excluded: z.number().int().nonnegative(),
+    })
+    .meta({
+      description: 'Seats by what the last weekly pass of G3/G4 found: none of the first four is read as inactive.',
+    }),
 });
 
 const kpi5SliceSchema = z.strictObject({
@@ -112,12 +190,30 @@ export const kpi5Schema = kpi5SliceSchema.extend({
 const skipSchema = z.strictObject({
   subjectType: z.enum(['SUBSCRIPTION', 'ASSIGNMENT']),
   subjectId: z.uuid(),
-  gate: z.enum(['PER_SEAT', 'INTERNAL_SOFTWARE', 'OPEN_RECOMMENDATION']),
+  gate: z.enum(SKIP_GATES),
   detail: z.strictObject({
     pricingModel: z.string().nullable().optional(),
     provisioningType: z.string().optional(),
     recommendationId: z.uuid().optional(),
+    reason: z.string().optional(),
+    coverageDays: z.number().int().nonnegative().optional(),
+    requiredDays: z.number().int().nonnegative().optional(),
+    until: z.string().optional(),
+    sourceName: z.string().optional(),
   }),
+});
+
+/** One seat after the last weekly pass (FR-5.10): a seat with no data or an identity not matched has no days, and is never shown as inactive or as 0. */
+const seatStateSchema = z.strictObject({
+  seatChainId: z.uuid(),
+  assignmentId: z.uuid(),
+  application: z.strictObject({ applicationId: z.uuid(), applicationName: z.string() }),
+  holder: z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() }).nullable(),
+  status: z.enum(SEAT_STATUSES),
+  reason: z.enum(SKIP_GATES).nullable().meta({ description: 'The gate that left the seat out, when one did.' }),
+  lastActiveDate: responseBusinessDate.nullable(),
+  inactiveDays: z.number().int().nonnegative().nullable(),
+  assessedOn: responseBusinessDate,
 });
 
 const ruleRunSchema = z.strictObject({
@@ -137,6 +233,7 @@ const ruleRunSchema = z.strictObject({
 
 export class RecommendationIdParamDto extends createZodDto(recommendationIdParamSchema) {}
 export class RecommendationListQueryDto extends createZodDto(recommendationListQuerySchema) {}
+export class SeatStateListQueryDto extends createZodDto(seatStateListQuerySchema) {}
 export class Kpi5QueryDto extends createZodDto(kpi5QuerySchema) {}
 export class RuleRunIdParamDto extends createZodDto(ruleRunIdParamSchema) {}
 export class RuleRunListQueryDto extends createZodDto(ruleRunListQuerySchema) {}
@@ -156,4 +253,7 @@ export class RuleRunPageResponseDto extends createZodDto(
 ) {}
 export class RuleSkipPageResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ items: z.array(skipSchema), pagination })),
+) {}
+export class SeatStatePageResponseDto extends createZodDto(
+  successEnvelopeSchema(z.strictObject({ items: z.array(seatStateSchema), pagination })),
 ) {}

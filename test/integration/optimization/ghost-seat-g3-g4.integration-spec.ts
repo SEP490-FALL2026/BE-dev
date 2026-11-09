@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { addDays } from '../../../src/core/business-date';
 import { ghostSeatEvidenceJson } from '../../../src/modules/optimization/ghost-seat/ghost-seat-evidence.json';
+import { BoardQueryService } from '../../../src/modules/optimization/board/board-query.service';
+import { BoardSummaryService } from '../../../src/modules/optimization/board/board-summary.service';
+import { UsageRulesThresholdService } from '../../../src/modules/optimization/usage-rules/threshold/usage-rules-threshold.service';
 import { UsageRulesService } from '../../../src/modules/optimization/usage-rules/usage-rules.service';
 import { createDepartment } from '../../support/builders/organization.builder';
 import { pretendBusinessToday } from '../../support/pretend-today';
@@ -515,6 +518,85 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
     );
     expect(paused.rows[0].pause_transfer_id).toBe(transferId);
     expect(paused.rows[0].paused_at).not.toBeNull();
+  });
+
+  it('FR-5.10: the board gives each seat one state, a seat with no data or an identity not matched has no days, and the summary names them apart from the inactive', async () => {
+    const today = nextToday();
+    const noData = await world(
+      today,
+      [{ last: null }, { last: null }],
+      { from: addDays(today, -91), to: addDays(today, -1) },
+      { noSource: true },
+    );
+    const active = await world(today, [{ last: addDays(today, -2) }, { last: addDays(today, -80) }], {
+      from: addDays(today, -91),
+      to: addDays(today, -1),
+    });
+    await service().run(new Date());
+
+    const states = await h.ctx.app
+      .get(BoardQueryService)
+      .listSeatStates({ applicationId: noData.applicationId, page: 1, pageSize: 10 });
+    expect(states.items).toHaveLength(2);
+    expect(states.items[0]).toMatchObject({
+      status: 'NO_DATA',
+      reason: 'NO_DATA',
+      lastActiveDate: null,
+      inactiveDays: null,
+    });
+    const inactive = await h.ctx.app
+      .get(BoardQueryService)
+      .listSeatStates({ applicationId: active.applicationId, status: 'INACTIVE', page: 1, pageSize: 10 });
+    expect(inactive.items).toHaveLength(1);
+    expect(inactive.items[0].inactiveDays).toBeGreaterThanOrEqual(60);
+    const summary = await h.ctx.app.get(BoardSummaryService).summary();
+    expect(summary.usage.noSource).toBeGreaterThanOrEqual(2);
+    expect(summary.usage.inactive).toBeGreaterThanOrEqual(1);
+    expect(summary.groups.G4.unclosedCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it('FR-4.13: the thresholds of an application are set, read, audited and removed; days out of order and an unknown application are refused', async () => {
+    const today = nextToday();
+    const w = await world(today, [{ last: addDays(today, -2) }], { from: addDays(today, -91), to: addDays(today, -1) });
+    const thresholds = h.ctx.app.get(UsageRulesThresholdService);
+    const actor = {
+      appUserId: h.seed.superAdmin.appUserId,
+      roles: ['SUPER_ADMIN'],
+      sessionId: 'session-1',
+      employeeId: h.seed.superAdmin.employeeId,
+    } as never;
+
+    await expect(
+      thresholds.set(actor, w.applicationId, { monitorDays: 60, reviewDays: 30, actionDays: 90 }),
+    ).rejects.toThrow(/rise/);
+    await expect(
+      thresholds.set(actor, '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11', {
+        monitorDays: 30,
+        reviewDays: 60,
+        actionDays: 90,
+      }),
+    ).rejects.toThrow(/exist/);
+    const set = await thresholds.set(actor, w.applicationId, { monitorDays: 20, reviewDays: 40, actionDays: 80 });
+    expect(set.threshold).toMatchObject({
+      applicationId: w.applicationId,
+      monitorDays: 20,
+      reviewDays: 40,
+      actionDays: 80,
+    });
+    expect((await thresholds.list({ page: 1, pageSize: 100 })).items.map((item) => item.applicationId)).toContain(
+      w.applicationId,
+    );
+    const audit = await h.ctx.sql.query<{ action: string }>(
+      `SELECT action FROM audit_events WHERE resource_type = 'GHOST_SEAT_THRESHOLD' AND resource_id = $1 ORDER BY occurred_at`,
+      [w.applicationId],
+    );
+    expect(audit.rows.map((row) => row.action)).toEqual(['GHOST_SEAT_THRESHOLD.SET']);
+
+    await thresholds.remove(actor, w.applicationId);
+    expect((await thresholds.list({ page: 1, pageSize: 100 })).items.map((item) => item.applicationId)).not.toContain(
+      w.applicationId,
+    );
+    await expect(thresholds.remove(actor, w.applicationId)).rejects.toThrow(/exist/);
   });
 
   async function insertTransfer(employeeId: string, effectiveOn: string): Promise<string> {

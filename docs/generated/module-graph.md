@@ -97,13 +97,13 @@ flowchart BT
   operating_parameters -->|5| audit
   operating_parameters -->|2| finance
   operating_parameters -->|7| organization
-  optimization -->|4| audit
-  optimization -->|4| catalog
+  optimization -->|6| audit
+  optimization -->|5| catalog
   optimization -->|3| identity_access
   optimization -->|23| licensing
   optimization -->|7| notifications
   optimization -->|6| operating_parameters
-  optimization -->|17| organization
+  optimization -->|18| organization
   optimization -->|6| personnel
   optimization -->|9| usage
   organization -->|10| audit

@@ -43,6 +43,16 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
   `ghostSeatRecommendationReclaim` mở lại `G3`/`G4` `RECLAIM_DECIDED` sau đóng thất bại (Q-95). SQL quyết định/trả lại/miễn trừ ở
   `ghost-seat/ghost-seat-decision.repo.ts` (L0, dùng chung `board` và `decision`).
 
+- `usage-rules/` (L3 vì nhóm `threshold/` có controller; không ai import) — `G3`/`G4` hằng tuần (`qd103-ghost-seat-g3-g4`): `usage-rules.service.ts` (lượt `RULE_SCHEDULE_G3_G4`,
+  `rule_set = G3_G4`), `usage-rules-context.service.ts` (đọc một lần: bàn giao, điều chuyển, miễn trừ, khuyến nghị có sẵn; mỗi ứng dụng một `evidenceFor`),
+  `usage-rules-seat.service.ts` (một seat một transaction), `usage-gates.policy.ts` (cổng 2–4, thời hạn ≤ 1 tháng, miễn trừ, thu hồi, ba trạng thái
+  `NO_DATA`/`UNMATCHED_IDENTITY`/`INSUFFICIENT_EVIDENCE`, năng lực nguồn, cổng 5 bao phủ), `usage-assessment.policy.ts` (đếm ngày theo **ngày bao phủ**: hợp các cửa
+  sổ báo cáo tươi từ ngày dùng được, trừ nghỉ dài; ngưỡng ứng dụng > tham số tổ chức > 30/60/90), `confidence.policy.ts` (CF-1…CF-7, `HIGH/MEDIUM/LOW`, không %),
+  `usage-evidence-snapshot.policy.ts` (bằng chứng chụp lại, không khối lượng), `potential-saving.policy.ts`, `usage-negation.service.ts` + `usage-import.listener.ts`
+  (hoạt động mới ⟹ `NEGATED` ngay khi xác nhận báo cáo; đã quyết thu hồi thì chỉ đặt `activity_after_decision_on`), `usage-stale-notice.service.ts`
+  (`USAGE_SOURCE_STALE`), `threshold/` (`ghostSeatThresholdList` SUPER_ADMIN/IT_ADMIN, `Set`/`Delete` SUPER_ADMIN). `board/` thêm `ghostSeatSeatStateList` và khối
+  `usage` của tóm tắt; bảng trạng thái seat (`ghost_seat_seat_states`) ở `ghost-seat/ghost-seat-seat-state.repo.ts` (L0).
+
 ## Trạng thái và quyền
 
 `OPEN → RECLAIM_DECIDED → CLOSED` cho `G1`/`G2`. `G3`/`G4`: `OPEN` → (REVIEW/ACTION) `AWAITING_DECISION` (hoặc `WAITING_FOR_HEAD` khi phòng không có
@@ -84,7 +94,13 @@ Xem mục Verification trong [plan](../../../docs/workspace/items/qd103-ghost-se
 tạo ở đây (thuộc g3-g4); `PersonnelApi.getTransfersInOverlap`/`getTransfersByIds` thêm tối thiểu; hàng đợi là danh sách phẳng sắp theo người giữ (`holderCount`);
 chưa đăng ký `RevocationDecisionContributions` (W5 chưa có).
 
+## TẠM CHỌN của `qd103-ghost-seat-g3-g4`
+
+Xem Verification trong [plan](../../../docs/workspace/items/qd103-ghost-seat-g3-g4/plan.md): chưa có W4/W5 ⟹ `potentialSaving.realisableOn = null`, `realisableAt = 'UNKNOWN'`; `K4`/`K5` bỏ khỏi lượt;
+giá đọc qua `CatalogApi.getPlanPrice` (không thêm `LicensingApi.getSeatPricingFacts`); thông báo `USAGE_SOURCE_STALE` mang `applicationId`, `source`, `coverageTo`, `freshnessDays`
+tới IT Admin đầu tiên dùng được; `EvidenceSource.windows` thêm vào `UsageEvidenceApi` để đếm khoảng hở giữa các báo cáo.
+
 ## Chưa làm
 
-`G3`/`G4` và cổng 2–7 (`qd103-ghost-seat-g3-g4`), kho `K4` (chờ key pool), điểm điều
+kho `K4` (chờ key pool), điểm điều
 chỉnh (`nextAdjustmentPoint`), `notBefore` của tác vụ (chờ `qd103-revocation-grace-notice`).

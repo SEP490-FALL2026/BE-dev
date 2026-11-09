@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { RuleSeat } from '../../licensing/public/licensing-ghost-seat.types';
+import { GhostSeatSeatStateRepo } from '../ghost-seat/ghost-seat-seat-state.repo';
 import { GhostSeatRepo } from '../ghost-seat/ghost-seat.repo';
 import { GhostSeatService } from '../ghost-seat/ghost-seat.service';
 import { UNDECIDED_STATES } from '../ghost-seat/ghost-seat-state.policy';
@@ -27,7 +28,6 @@ import {
   type SeatStatus,
 } from './usage-gates.policy';
 import { UsageNegationService } from './usage-negation.service';
-import { UsageRulesRepo } from './usage-rules.repo';
 import type { LeaveSpan, UsageApplicationContext, UsageRunContext } from './usage-rules.types';
 
 const SYSTEM = { kind: 'SYSTEM' } as const;
@@ -76,7 +76,7 @@ export class UsageRulesSeatService {
     private readonly runner: TransactionRunner,
     private readonly repo: GhostSeatRepo,
     private readonly ghostSeats: GhostSeatService,
-    private readonly rules: UsageRulesRepo,
+    private readonly seatStates: GhostSeatSeatStateRepo,
     private readonly negation: UsageNegationService,
   ) {}
 
@@ -297,7 +297,7 @@ export class UsageRulesSeatService {
     status: SeatStatus,
     assessment: UsageAssessment | null,
   ): Promise<SeatOutcome> {
-    await this.rules.saveSeatState(c.tx, {
+    await this.seatStates.saveSeatState(c.tx, {
       seatChainId: c.seat.chainRootId,
       organizationId: c.run.organizationId,
       applicationId: c.seat.applicationId,

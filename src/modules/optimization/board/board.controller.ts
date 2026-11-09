@@ -25,6 +25,8 @@ import {
   RuleRunListQueryDto,
   RuleRunPageResponseDto,
   RuleSkipPageResponseDto,
+  SeatStateListQueryDto,
+  SeatStatePageResponseDto,
 } from './board.dto';
 import { GHOST_SEAT_ERROR_EXAMPLES as EXAMPLES, toGhostSeatApiException } from './board.http-errors';
 import { BoardKpiService } from './board-kpi.service';
@@ -92,6 +94,26 @@ export class BoardController {
   async summary() {
     try {
       return await this.summaries.summary();
+    } catch (error) {
+      throw toGhostSeatApiException(error);
+    }
+  }
+
+  @Get('ghost-seat-seat-states')
+  @RequireRoles('IT_ADMIN')
+  @ApiOperation({
+    operationId: 'ghostSeatSeatStateList',
+    summary: 'List what the last weekly pass found of each seat',
+  })
+  @ApiSuccessResponse(SeatStatePageResponseDto, {
+    message: 'GHOST_SEAT_SEAT_STATES.LISTED',
+    description:
+      'One page of seats, each with exactly one state (active, inactive, no data, identity not matched, insufficient evidence or excluded) and the gate that left it out; a seat with no data or an identity not matched has no days.',
+  })
+  @ApiErrorResponses(...AUTH_ERRORS, forbidden('an IT Admin'), QUERY_INVALID)
+  async seatStates(@Query() query: SeatStateListQueryDto) {
+    try {
+      return await this.queries.listSeatStates(query);
     } catch (error) {
       throw toGhostSeatApiException(error);
     }

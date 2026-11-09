@@ -84113,6 +84113,192 @@
         "tags": ["ghost-seats"]
       }
     },
+    "/api/v1/ghost-seat-seat-states": {
+      "get": {
+        "operationId": "ghostSeatSeatStateList",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["ACTIVE", "INACTIVE", "NO_DATA", "UNMATCHED_IDENTITY", "INSUFFICIENT_EVIDENCE", "EXCLUDED"]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of seats, each with exactly one state (active, inactive, no data, identity not matched, insufficient evidence or excluded) and the gate that left it out; a seat with no data or an identity not matched has no days.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SeatStatePageResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_SEAT_STATES.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query or the id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List what the last weekly pass found of each seat",
+        "tags": ["ghost-seats"]
+      }
+    },
     "/api/v1/ghost-seat-recommendations/{id}": {
       "get": {
         "operationId": "ghostSeatRecommendationGet",
@@ -86125,6 +86311,614 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Give back to the head a reclaim they decided, with a reason (once)",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-thresholds": {
+      "get": {
+        "operationId": "ghostSeatThresholdList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The applications that have thresholds of their own; the others use the parameter of the organization.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ThresholdListResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_THRESHOLDS.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin or an IT Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body or the id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the thresholds of days without use set for applications",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-thresholds/{applicationId}": {
+      "put": {
+        "operationId": "ghostSeatThresholdSet",
+        "parameters": [
+          { "name": "applicationId", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ThresholdBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The thresholds apply from the next weekly pass; the change is audited with the days before and after.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ThresholdResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_THRESHOLD.SET" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The application does not exist (GHOST_SEAT.APPLICATION_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "GHOST_SEAT.APPLICATION_NOT_FOUND": {
+                    "summary": "The application does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.APPLICATION_NOT_FOUND",
+                        "message": "The application does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The days do not rise (GHOST_SEAT.THRESHOLD_ORDER), the application is internal (GHOST_SEAT.APPLICATION_INTERNAL) or the body is invalid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.THRESHOLD_ORDER": {
+                    "summary": "The thresholds must rise (watch < review < action) and stay within 1 to 365 days.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.THRESHOLD_ORDER",
+                        "message": "The thresholds must rise (watch < review < action) and stay within 1 to 365 days.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.APPLICATION_INTERNAL": {
+                    "summary": "An internal application has no thresholds of unused days.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.APPLICATION_INTERNAL",
+                        "message": "An internal application has no thresholds of unused days.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Set the thresholds of days without use of an application",
+        "tags": ["ghost-seats"]
+      },
+      "delete": {
+        "operationId": "ghostSeatThresholdDelete",
+        "parameters": [
+          { "name": "applicationId", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The application goes back to the thresholds of the organization from the next weekly pass.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ThresholdDeletedResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_THRESHOLD.DELETED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The application has no thresholds of its own (GHOST_SEAT.APPLICATION_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "GHOST_SEAT.APPLICATION_NOT_FOUND": {
+                    "summary": "The application does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.APPLICATION_NOT_FOUND",
+                        "message": "The application does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body or the id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Remove the thresholds of an application",
         "tags": ["ghost-seats"]
       }
     },
@@ -111809,6 +112603,77 @@
                       "additionalProperties": false
                     },
                     "canReclaim": { "type": "boolean" },
+                    "confidence": {
+                      "type": "string",
+                      "enum": ["HIGH", "MEDIUM", "LOW", null],
+                      "description": "G3/G4 only: a level, never a percentage.",
+                      "nullable": true
+                    },
+                    "confidenceReasons": { "maxItems": 8, "type": "array", "items": { "type": "string" } },
+                    "activityStatus": {
+                      "type": "string",
+                      "enum": ["NEVER_ACTIVE", "INACTIVE", null],
+                      "nullable": true
+                    },
+                    "inactiveDays": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Days covered by a source with no activity (not calendar days).",
+                      "nullable": true
+                    },
+                    "lastActiveDate": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD.",
+                      "nullable": true
+                    },
+                    "activityAfterDecisionOn": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "The first day of activity after a reclaim was decided: the IT Admin weighs giving the seat back.",
+                      "nullable": true
+                    },
+                    "usageLabels": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "description": "What the days rest on that is weaker than a vendor report (P-05), and LOW_CONFIDENCE."
+                    },
+                    "potentialSaving": {
+                      "type": "object",
+                      "properties": {
+                        "monthlyAmountMinor": {
+                          "description": "One month of the seat, in minor units of the currency; the only figure that adds up.",
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "amountAtPointMinor": {
+                          "description": "What is saved at the renewal or point of adjustment the seat can be had at; never added to what was avoided or really saved.",
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "currency": { "type": "string", "nullable": true },
+                        "realisableOn": {
+                          "type": "string",
+                          "format": "date",
+                          "description": "A calendar date as YYYY-MM-DD.",
+                          "nullable": true
+                        },
+                        "realisableAt": {
+                          "type": "string",
+                          "enum": ["RENEWAL", "ADJUSTMENT_POINT", "NEXT_BILLING", "UNKNOWN", "NEVER"]
+                        }
+                      },
+                      "required": [
+                        "monthlyAmountMinor",
+                        "amountAtPointMinor",
+                        "currency",
+                        "realisableOn",
+                        "realisableAt"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
                     "createdAt": { "type": "string", "format": "date-time" }
                   },
                   "required": [
@@ -111828,6 +112693,14 @@
                     "revocationTaskId",
                     "labels",
                     "canReclaim",
+                    "confidence",
+                    "confidenceReasons",
+                    "activityStatus",
+                    "inactiveDays",
+                    "lastActiveDate",
+                    "activityAfterDecisionOn",
+                    "usageLabels",
+                    "potentialSaving",
                     "createdAt"
                   ],
                   "additionalProperties": false
@@ -111920,9 +112793,153 @@
                 "maximum": 9007199254740991,
                 "description": "The G2 not closed plus the G1 open: what the dashboard of the IT Admin counts."
               },
-              "limitation": { "type": "string" }
+              "limitation": { "type": "string" },
+              "usage": {
+                "type": "object",
+                "properties": {
+                  "noSource": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "stale": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "insufficientEvidence": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "unmatchedIdentities": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "active": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "inactive": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "excluded": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": [
+                  "noSource",
+                  "stale",
+                  "insufficientEvidence",
+                  "unmatchedIdentities",
+                  "active",
+                  "inactive",
+                  "excluded"
+                ],
+                "additionalProperties": false,
+                "description": "Seats by what the last weekly pass of G3/G4 found: none of the first four is read as inactive."
+              }
             },
-            "required": ["groups", "counted", "limitation"],
+            "required": ["groups", "counted", "limitation", "usage"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "SeatStatePageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "seatChainId": { "type": "string", "format": "uuid" },
+                    "assignmentId": { "type": "string", "format": "uuid" },
+                    "application": {
+                      "type": "object",
+                      "properties": {
+                        "applicationId": { "type": "string", "format": "uuid" },
+                        "applicationName": { "type": "string" }
+                      },
+                      "required": ["applicationId", "applicationName"],
+                      "additionalProperties": false
+                    },
+                    "holder": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ACTIVE",
+                        "INACTIVE",
+                        "NO_DATA",
+                        "UNMATCHED_IDENTITY",
+                        "INSUFFICIENT_EVIDENCE",
+                        "EXCLUDED"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "PER_SEAT",
+                        "INTERNAL_SOFTWARE",
+                        "OPEN_RECOMMENDATION",
+                        "SERVICE_ACCOUNT",
+                        "LEAVE_OR_HANDOVER",
+                        "NOT_USABLE",
+                        "NEW_ASSIGNMENT",
+                        "COVERAGE",
+                        "STALE_SOURCE",
+                        "EXEMPT",
+                        "TIME_BOUND_ENDING",
+                        "REVOCATION_IN_PROGRESS",
+                        "NO_DATA",
+                        "UNMATCHED_IDENTITY",
+                        "INSUFFICIENT_EVIDENCE",
+                        null
+                      ],
+                      "description": "The gate that left the seat out, when one did.",
+                      "nullable": true
+                    },
+                    "lastActiveDate": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD.",
+                      "nullable": true
+                    },
+                    "inactiveDays": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "nullable": true },
+                    "assessedOn": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD."
+                    }
+                  },
+                  "required": [
+                    "seatChainId",
+                    "assignmentId",
+                    "application",
+                    "holder",
+                    "status",
+                    "reason",
+                    "lastActiveDate",
+                    "inactiveDays",
+                    "assessedOn"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -112032,6 +113049,73 @@
                     "additionalProperties": false
                   },
                   "canReclaim": { "type": "boolean" },
+                  "confidence": {
+                    "type": "string",
+                    "enum": ["HIGH", "MEDIUM", "LOW", null],
+                    "description": "G3/G4 only: a level, never a percentage.",
+                    "nullable": true
+                  },
+                  "confidenceReasons": { "maxItems": 8, "type": "array", "items": { "type": "string" } },
+                  "activityStatus": { "type": "string", "enum": ["NEVER_ACTIVE", "INACTIVE", null], "nullable": true },
+                  "inactiveDays": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Days covered by a source with no activity (not calendar days).",
+                    "nullable": true
+                  },
+                  "lastActiveDate": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "activityAfterDecisionOn": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "The first day of activity after a reclaim was decided: the IT Admin weighs giving the seat back.",
+                    "nullable": true
+                  },
+                  "usageLabels": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "What the days rest on that is weaker than a vendor report (P-05), and LOW_CONFIDENCE."
+                  },
+                  "potentialSaving": {
+                    "type": "object",
+                    "properties": {
+                      "monthlyAmountMinor": {
+                        "description": "One month of the seat, in minor units of the currency; the only figure that adds up.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "amountAtPointMinor": {
+                        "description": "What is saved at the renewal or point of adjustment the seat can be had at; never added to what was avoided or really saved.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "currency": { "type": "string", "nullable": true },
+                      "realisableOn": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "A calendar date as YYYY-MM-DD.",
+                        "nullable": true
+                      },
+                      "realisableAt": {
+                        "type": "string",
+                        "enum": ["RENEWAL", "ADJUSTMENT_POINT", "NEXT_BILLING", "UNKNOWN", "NEVER"]
+                      }
+                    },
+                    "required": [
+                      "monthlyAmountMinor",
+                      "amountAtPointMinor",
+                      "currency",
+                      "realisableOn",
+                      "realisableAt"
+                    ],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "createdAt": { "type": "string", "format": "date-time" },
                   "evidence": {
                     "type": "object",
@@ -112071,6 +113155,14 @@
                   "revocationTaskId",
                   "labels",
                   "canReclaim",
+                  "confidence",
+                  "confidenceReasons",
+                  "activityStatus",
+                  "inactiveDays",
+                  "lastActiveDate",
+                  "activityAfterDecisionOn",
+                  "usageLabels",
+                  "potentialSaving",
                   "createdAt",
                   "evidence",
                   "holderLeftOn",
@@ -112192,6 +113284,73 @@
                     "additionalProperties": false
                   },
                   "canReclaim": { "type": "boolean" },
+                  "confidence": {
+                    "type": "string",
+                    "enum": ["HIGH", "MEDIUM", "LOW", null],
+                    "description": "G3/G4 only: a level, never a percentage.",
+                    "nullable": true
+                  },
+                  "confidenceReasons": { "maxItems": 8, "type": "array", "items": { "type": "string" } },
+                  "activityStatus": { "type": "string", "enum": ["NEVER_ACTIVE", "INACTIVE", null], "nullable": true },
+                  "inactiveDays": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Days covered by a source with no activity (not calendar days).",
+                    "nullable": true
+                  },
+                  "lastActiveDate": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "activityAfterDecisionOn": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "The first day of activity after a reclaim was decided: the IT Admin weighs giving the seat back.",
+                    "nullable": true
+                  },
+                  "usageLabels": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "What the days rest on that is weaker than a vendor report (P-05), and LOW_CONFIDENCE."
+                  },
+                  "potentialSaving": {
+                    "type": "object",
+                    "properties": {
+                      "monthlyAmountMinor": {
+                        "description": "One month of the seat, in minor units of the currency; the only figure that adds up.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "amountAtPointMinor": {
+                        "description": "What is saved at the renewal or point of adjustment the seat can be had at; never added to what was avoided or really saved.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "currency": { "type": "string", "nullable": true },
+                      "realisableOn": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "A calendar date as YYYY-MM-DD.",
+                        "nullable": true
+                      },
+                      "realisableAt": {
+                        "type": "string",
+                        "enum": ["RENEWAL", "ADJUSTMENT_POINT", "NEXT_BILLING", "UNKNOWN", "NEVER"]
+                      }
+                    },
+                    "required": [
+                      "monthlyAmountMinor",
+                      "amountAtPointMinor",
+                      "currency",
+                      "realisableOn",
+                      "realisableAt"
+                    ],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "createdAt": { "type": "string", "format": "date-time" },
                   "evidence": {
                     "type": "object",
@@ -112231,6 +113390,14 @@
                   "revocationTaskId",
                   "labels",
                   "canReclaim",
+                  "confidence",
+                  "confidenceReasons",
+                  "activityStatus",
+                  "inactiveDays",
+                  "lastActiveDate",
+                  "activityAfterDecisionOn",
+                  "usageLabels",
+                  "potentialSaving",
                   "createdAt",
                   "evidence",
                   "holderLeftOn",
@@ -112339,13 +113506,37 @@
                   "properties": {
                     "subjectType": { "type": "string", "enum": ["SUBSCRIPTION", "ASSIGNMENT"] },
                     "subjectId": { "type": "string", "format": "uuid" },
-                    "gate": { "type": "string", "enum": ["PER_SEAT", "INTERNAL_SOFTWARE", "OPEN_RECOMMENDATION"] },
+                    "gate": {
+                      "type": "string",
+                      "enum": [
+                        "PER_SEAT",
+                        "INTERNAL_SOFTWARE",
+                        "OPEN_RECOMMENDATION",
+                        "SERVICE_ACCOUNT",
+                        "LEAVE_OR_HANDOVER",
+                        "NOT_USABLE",
+                        "NEW_ASSIGNMENT",
+                        "COVERAGE",
+                        "STALE_SOURCE",
+                        "EXEMPT",
+                        "TIME_BOUND_ENDING",
+                        "REVOCATION_IN_PROGRESS",
+                        "NO_DATA",
+                        "UNMATCHED_IDENTITY",
+                        "INSUFFICIENT_EVIDENCE"
+                      ]
+                    },
                     "detail": {
                       "type": "object",
                       "properties": {
                         "pricingModel": { "type": "string", "nullable": true },
                         "provisioningType": { "type": "string" },
-                        "recommendationId": { "type": "string", "format": "uuid" }
+                        "recommendationId": { "type": "string", "format": "uuid" },
+                        "reason": { "type": "string" },
+                        "coverageDays": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "requiredDays": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "until": { "type": "string" },
+                        "sourceName": { "type": "string" }
                       },
                       "additionalProperties": false
                     }
@@ -112840,6 +114031,125 @@
               }
             },
             "required": ["recommendation"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ThresholdListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "applicationId": { "type": "string", "format": "uuid" },
+                    "applicationName": { "type": "string" },
+                    "monitorDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+                    "reviewDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+                    "actionDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+                    "updatedAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": [
+                    "applicationId",
+                    "applicationName",
+                    "monitorDays",
+                    "reviewDays",
+                    "actionDays",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ThresholdBodyDto": {
+        "type": "object",
+        "properties": {
+          "monitorDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+          "reviewDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+          "actionDays": { "type": "integer", "minimum": 1, "maximum": 365 }
+        },
+        "required": ["monitorDays", "reviewDays", "actionDays"],
+        "additionalProperties": false
+      },
+      "ThresholdResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "threshold": {
+                "type": "object",
+                "properties": {
+                  "applicationId": { "type": "string", "format": "uuid" },
+                  "applicationName": { "type": "string" },
+                  "monitorDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+                  "reviewDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+                  "actionDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+                  "updatedAt": { "type": "string", "format": "date-time" }
+                },
+                "required": [
+                  "applicationId",
+                  "applicationName",
+                  "monitorDays",
+                  "reviewDays",
+                  "actionDays",
+                  "updatedAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": ["threshold"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ThresholdDeletedResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": { "applicationId": { "type": "string", "format": "uuid" } },
+            "required": ["applicationId"],
             "additionalProperties": false,
             "nullable": true
           }

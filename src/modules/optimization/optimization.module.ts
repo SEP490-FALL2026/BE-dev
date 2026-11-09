@@ -25,6 +25,7 @@ import { DecisionFollowUpSweeper } from './decision/decision-follow-up.job';
 import { DecisionRoutingService } from './decision/decision-routing.service';
 import { DecisionTransferService } from './decision/decision-transfer.service';
 import { GhostSeatDecisionRepo } from './ghost-seat/ghost-seat-decision.repo';
+import { GhostSeatSeatStateRepo } from './ghost-seat/ghost-seat-seat-state.repo';
 import { GhostSeatRepo } from './ghost-seat/ghost-seat.repo';
 import { GhostSeatRevocationListener } from './ghost-seat/ghost-seat-revocation.listener';
 import { GhostSeatService } from './ghost-seat/ghost-seat.service';
@@ -36,6 +37,8 @@ import { OptimizationApi } from './public/optimization.api';
 import { RuleRunQueryService } from './rule-run/rule-run-query.service';
 import { RuleRunRepo } from './rule-run/rule-run.repo';
 import { RuleRunService } from './rule-run/rule-run.service';
+import { UsageRulesThresholdController } from './usage-rules/threshold/usage-rules-threshold.controller';
+import { UsageRulesThresholdService } from './usage-rules/threshold/usage-rules-threshold.service';
 import { UsageImportListener } from './usage-rules/usage-import.listener';
 import { UsageNegationService } from './usage-rules/usage-negation.service';
 import { UsageRulesSweeper } from './usage-rules/usage-rules.job';
@@ -63,7 +66,7 @@ import { UsageRulesService } from './usage-rules/usage-rules.service';
     PersonnelModule,
     UsageModule,
   ],
-  controllers: [BoardController, DecisionController],
+  controllers: [BoardController, DecisionController, UsageRulesThresholdController],
   providers: [
     BoardQueryService,
     BoardSummaryService,
@@ -91,6 +94,7 @@ import { UsageRulesService } from './usage-rules/usage-rules.service';
     DecisionReminderService,
     GhostSeatDecisionRepo,
     UsageRulesRepo,
+    GhostSeatSeatStateRepo,
     UsageNegationService,
     UsageRulesContextService,
     UsageStaleNoticeService,
@@ -98,6 +102,7 @@ import { UsageRulesService } from './usage-rules/usage-rules.service';
     UsageRulesService,
     UsageRulesSweeper,
     UsageImportListener,
+    UsageRulesThresholdService,
   ],
   exports: [OptimizationApi],
 })

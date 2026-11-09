@@ -38,6 +38,14 @@ const DETAIL = {
   revocationTaskId: null,
   labels: { revocationUnderWay: false, terminatingUntil: false, holderLeft: false },
   canReclaim: true,
+  confidence: null,
+  confidenceReasons: [],
+  activityStatus: null,
+  inactiveDays: null,
+  lastActiveDate: null,
+  activityAfterDecisionOn: null,
+  usageLabels: [],
+  potentialSaving: null,
   createdAt: '2026-11-09T05:00:00.000Z',
   evidence: { group: 'G2' },
   holderLeftOn: null,
@@ -57,7 +65,13 @@ const PAGINATION = { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 };
  */
 describe('ghost seat board routes (no database)', () => {
   let app: INestApplication<App>;
-  const queries = { list: jest.fn(), get: jest.fn(), listRuns: jest.fn(), listSkips: jest.fn() };
+  const queries = {
+    list: jest.fn(),
+    get: jest.fn(),
+    listRuns: jest.fn(),
+    listSkips: jest.fn(),
+    listSeatStates: jest.fn(),
+  };
   const summaries = { summary: jest.fn() };
   const reclaims = { reclaim: jest.fn() };
   const kpis = { kpi5: jest.fn() };
@@ -87,6 +101,31 @@ describe('ghost seat board routes (no database)', () => {
       groups: { G1: SUMMARY_ROW, G2: SUMMARY_ROW, G3: SUMMARY_ROW, G4: SUMMARY_ROW },
       counted: 2,
       limitation: 'Phần mềm nội bộ: chưa có nguồn usage.',
+      usage: {
+        noSource: 2,
+        stale: 1,
+        insufficientEvidence: 3,
+        unmatchedIdentities: 4,
+        active: 5,
+        inactive: 6,
+        excluded: 7,
+      },
+    });
+    queries.listSeatStates.mockReset().mockResolvedValue({
+      items: [
+        {
+          seatChainId: ID,
+          assignmentId: ID,
+          application: { applicationId: ID, applicationName: 'Notion' },
+          holder: { employeeId: ID, employeeCode: 'E1', fullName: 'Person E1' },
+          status: 'NO_DATA',
+          reason: 'NO_DATA',
+          lastActiveDate: null,
+          inactiveDays: null,
+          assessedOn: '2026-11-09',
+        },
+      ],
+      pagination: PAGINATION,
     });
     reclaims.reclaim.mockReset().mockResolvedValue({ recommendation: DETAIL, taskId: ID });
     kpis.kpi5.mockReset().mockResolvedValue({
@@ -120,6 +159,12 @@ describe('ghost seat board routes (no database)', () => {
       method: 'get',
       path: '/api/v1/ghost-seat-optimization-summary',
       message: 'GHOST_SEAT_OPTIMIZATION_SUMMARY.READ',
+    },
+    {
+      name: 'the state of each seat',
+      method: 'get',
+      path: '/api/v1/ghost-seat-seat-states',
+      message: 'GHOST_SEAT_SEAT_STATES.LISTED',
     },
     {
       name: 'one recommendation',
@@ -174,6 +219,43 @@ describe('ghost seat board routes (no database)', () => {
       expect.objectContaining({ roles: ['IT_ADMIN'] }),
       expect.objectContaining({ group: 'G2', state: 'OPEN', departmentScope: 'MINE', pageSize: 10 }),
     );
+  });
+
+  it('FR-5.10: the state of each seat is answered with no days for a seat with no data, and refuses a status that is none (422)', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/ghost-seat-seat-states')
+      .query({ applicationId: ID, status: 'NO_DATA' })
+      .set(as('IT_ADMIN'))
+      .expect(200);
+
+    expect((response.body as { data: { items: unknown[] } }).data.items[0]).toMatchObject({
+      status: 'NO_DATA',
+      lastActiveDate: null,
+      inactiveDays: null,
+    });
+    expect(queries.listSeatStates).toHaveBeenCalledWith(
+      expect.objectContaining({ applicationId: ID, status: 'NO_DATA' }),
+    );
+    await request(app.getHttpServer())
+      .get('/api/v1/ghost-seat-seat-states')
+      .query({ status: 'DEAD' })
+      .set(as('IT_ADMIN'))
+      .expect(422);
+  });
+
+  it('US-10-05 AC-7: the summary names the seats with no source, a stale source, too little evidence or an identity not matched, apart from the inactive ones', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/ghost-seat-optimization-summary')
+      .set(as('IT_ADMIN'))
+      .expect(200);
+
+    expect((response.body as { data: { usage: unknown } }).data.usage).toMatchObject({
+      noSource: 2,
+      stale: 1,
+      insufficientEvidence: 3,
+      unmatchedIdentities: 4,
+      inactive: 6,
+    });
   });
 
   it('refuses a filter that is none (422) and a page that is too big', async () => {
