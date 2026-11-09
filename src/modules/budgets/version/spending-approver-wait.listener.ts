@@ -4,9 +4,9 @@ import { ApprovalRoleChangeListeners } from '../../identity-access/public/identi
 import type { ApprovalRoleChange } from '../../identity-access/public/identity-access.types';
 import { OrganizationChangeListeners } from '../../organization/public/organization.extension-points';
 import type { OrganizationChange } from '../../organization/public/organization.types';
-import { BudgetFactsService } from './budget-facts.service';
-import { BudgetNotifierService } from './budget-notifier.service';
-import { VersionRepo } from './version.repo';
+import { BudgetFactsService } from '../budget/budget-facts.service';
+import { BudgetNotifierService } from '../budget/budget-notifier.service';
+import { VersionRepo } from '../budget/version.repo';
 
 /**
  * The versions that were sent begin to wait for a spending approver when the one who held the role stops: the role is taken back

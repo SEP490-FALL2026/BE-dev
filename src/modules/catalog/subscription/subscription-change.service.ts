@@ -22,7 +22,7 @@ import {
 import { assertDeclarableCycle } from './pool/subscription-pool.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import { SubscriptionChangeGuard } from './subscription-change-guard.service';
-import { SubscriptionObligationService } from './subscription-obligation.service';
+import { SubscriptionObligationService } from './obligation/subscription-obligation.service';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import { SubscriptionViewService } from './subscription-view.service';
 import type { SubscriptionRecord, SubscriptionState, SubscriptionView } from './subscription.types';

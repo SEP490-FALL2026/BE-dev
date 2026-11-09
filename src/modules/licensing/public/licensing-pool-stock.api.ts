@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SharedPoolService } from '../shared-pool/shared-pool.service';
-import type { PlanStock } from './licensing-pool-stock.types';
+import type { PlanStock } from './licensing.types';
 
 /** The licensing facade for what the shared pool of a plan holds, for a module that shows it beside the work that draws on it (`P2-03`). */
 @Injectable()

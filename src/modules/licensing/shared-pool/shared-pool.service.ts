@@ -4,7 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { SeatTargetNotFoundError } from '../public/licensing.errors';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import type { PoolSubscription } from '../../catalog/public/catalog.types';
-import type { PlanStock } from '../public/licensing-pool-stock.types';
+import type { PlanStock } from '../public/licensing.types';
 import type { SubscriptionOccupancy } from './shared-pool-capacity.repo';
 import { SharedPoolAvoidedCostRepo } from './shared-pool-avoided-cost.repo';
 import { SharedPoolCapacityRepo } from './shared-pool-capacity.repo';

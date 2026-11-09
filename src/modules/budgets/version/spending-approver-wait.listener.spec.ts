@@ -1,7 +1,7 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { BudgetFactsService } from './budget-facts.service';
-import type { BudgetNotifierService } from './budget-notifier.service';
-import type { VersionRecord, VersionRepo } from './version.repo';
+import type { BudgetFactsService } from '../budget/budget-facts.service';
+import type { BudgetNotifierService } from '../budget/budget-notifier.service';
+import type { VersionRecord, VersionRepo } from '../budget/version.repo';
 import { SpendingApproverWaitListener } from './spending-approver-wait.listener';
 
 const tx = { name: 'tx' } as unknown as DbTx;

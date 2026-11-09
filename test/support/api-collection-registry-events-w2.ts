@@ -40,6 +40,18 @@ export const W2_REGISTRY_EVENTS: readonly RegistryEvent[] = [
   },
   {
     registry: 'nested',
+    key: 'budgetCycleBaseline#sharedPoolUnallocated.software',
+    change: 'added',
+    to: 'bounded',
+    bound: 'SOFTWARE_LISTED_MAX',
+    finding: 'LD-14',
+    item: 'qd103-budget-baseline-annual-check',
+    date: '2026-11-10',
+    reason:
+      'The K2/K4 subscriptions with idle seats on the line of the shared pool (AF-05): at most SOFTWARE_LISTED_MAX, with the total beside it.',
+  },
+  {
+    registry: 'nested',
     key: 'budgetCyclePackage#departments',
     change: 'added',
     to: 'bounded',

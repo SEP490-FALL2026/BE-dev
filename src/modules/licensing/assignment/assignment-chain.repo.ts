@@ -34,7 +34,7 @@ export class AssignmentChainRepo {
 
   /**
    * The assignment and every one it continues (`predecessor_id`: a renewal, a handover), the given one first: the records a request to go
-   * on using names (`access_request_renewals`), so the module of requests finds every request that holds money for the right.
+   * on using names (its renewal records), so the module of requests finds every request that holds money for the right.
    */
   async chainOf(tx: DbTx, assignmentId: string): Promise<string[]> {
     const rows = await tx.$queryRaw<{ id: string }[]>`

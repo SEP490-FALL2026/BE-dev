@@ -34,7 +34,7 @@ export interface CollectorDay {
 }
 
 /**
- * What the evidence of the usage of an application reads: the days vendors reported tied to people through the mappings in force at the moment
+ * What the evidence of the usage of an application reads: the days each vendor reported tied to people through the mappings in force at the moment
  * of reading, and the days the collectors sent. Reads only; a fixed number of statements however many days there are. The volume of use is never read.
  */
 @Injectable()

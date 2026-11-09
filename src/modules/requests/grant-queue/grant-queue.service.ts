@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import type { PlanStock } from '../../licensing/public/licensing-pool-stock.types';
+import type { PlanStock } from '../../licensing/public/licensing.types';
 import { LicensingPoolStockApi } from '../../licensing/public/licensing-pool-stock.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { GrantQueueItemWire } from './grant-queue.dto';

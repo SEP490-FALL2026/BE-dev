@@ -6,7 +6,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { AssignmentService } from '../assignment/assignment.service';
 import { SeatBaselineClosedError } from '../public/licensing.errors';
 import { SeatBaselineClosedListeners } from '../public/licensing.extension-points';
-import type { SeatBaselineClosedHolder } from '../public/licensing-seat-baseline.types';
+import type { SeatBaselineClosedHolder } from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { SeatBaselineRepo } from './seat-baseline.repo';
 

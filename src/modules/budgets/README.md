@@ -46,7 +46,7 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
   request đứng sau một trang commitment; dùng cho `request` trên dòng danh sách và để suy `vendorId` của hóa đơn. Chưa bind thì đọc
   danh sách commitment và ghi hóa đơn đều thất bại, không đoán.
 - Đăng ký vào `identity-access.approval-role-change-listeners` và `organization.change-listeners` —
-  `budget/spending-approver-wait.listener.ts`: Super Admin nhận một `CONTROLLED_WAIT_ALERT` (`subject` `BUDGET_VERSION`) mỗi
+  `version/spending-approver-wait.listener.ts`: Super Admin nhận một `CONTROLLED_WAIT_ALERT` (`subject` `BUDGET_VERSION`) mỗi
   đoạn chờ — khi gửi lúc chưa có người giữ vai, khi vai bị thu hồi, khi người giữ vai nghỉ việc (QĐ-93c, D-S16).
 - Đăng ký vào: `organization.change-listeners` (`budgets.head-change`) —
   `proposal/budget-head-change.listener.ts`; `organization.cost-center-use-readers` (`budgets.commitments`) —

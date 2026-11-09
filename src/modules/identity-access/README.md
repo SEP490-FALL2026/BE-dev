@@ -51,7 +51,7 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
 - Mở: `ApprovalRoleChangeListeners` (`identity-access.approval-role-change-listeners`,
   [public/identity-access.extension-points.ts](public/identity-access.extension-points.ts)), phát từ
   `accounts/role-grant.service.ts` (cấp/thu hồi/chuyển `SPENDING_APPROVER`) — bên đăng ký: requests
-  `reassignment/approval-role.listener.ts`, budgets `budget/spending-approver-wait.listener.ts` và licensing
+  `reassignment/approval-role.listener.ts`, budgets `version/spending-approver-wait.listener.ts` và licensing
   `subscription-renewal/spending-approver-wait.listener.ts` (báo Super Admin một lần mỗi đoạn chờ).
 - Đăng ký vào: `organization.employee-accounts` (`EmployeeAccountsHook`) — `accounts/employee-accounts.listener.ts`.
 - Token DI nội bộ, không phải point liên module: `ACCOUNT_SESSIONS` (`accounts/account-sessions.types.ts`),

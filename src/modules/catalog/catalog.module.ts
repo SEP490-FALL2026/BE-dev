@@ -53,7 +53,7 @@ import { SubscriptionFactsService } from './subscription/subscription-facts.serv
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
 import { SubscriptionPeriodService } from './subscription/subscription-period.service';
 import { SubscriptionPeriodApi } from './public/subscription-period.api';
-import { SubscriptionObligationService } from './subscription/subscription-obligation.service';
+import { SubscriptionObligationService } from './subscription/obligation/subscription-obligation.service';
 import { SubscriptionGrantingRepo } from './subscription/subscription-granting.repo';
 import { SubscriptionChangeGuard } from './subscription/subscription-change-guard.service';
 import { SubscriptionChangeService } from './subscription/subscription-change.service';

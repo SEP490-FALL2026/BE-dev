@@ -74,6 +74,22 @@ const OTHER_DECISIONS: ReadonlyMap<string, { codes: readonly string[]; reason: s
     'organization/public/cost-center-direction.api.ts',
     { codes: ['DEPARTMENT_NOT_FOUND'], reason: 'raises that refusal' },
   ],
+  [
+    'requests/request-history/request-history.errors.ts',
+    {
+      codes: ['DEPARTMENT_NOT_FOUND'],
+      reason:
+        'the 404 of `departmentAccessRequestList` for a department id that names none (P1-09), not a placement of a person',
+    },
+  ],
+  [
+    'requests/request-history/request-history.http-errors.ts',
+    { codes: ['DEPARTMENT_NOT_FOUND'], reason: 'maps that refusal' },
+  ],
+  [
+    'requests/request-history/request-history.service.ts',
+    { codes: ['DEPARTMENT_NOT_FOUND'], reason: 'raises that refusal' },
+  ],
 ]);
 
 function listSources(directory: string): string[] {

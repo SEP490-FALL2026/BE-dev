@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { isPooledPlan } from './pool/subscription-pool.policy';
+import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import { FinanceSetupIncompleteError } from '../../../organization/public/organization.errors';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import { isPooledPlan } from '../pool/subscription-pool.policy';
 import { increasesObligation, type ObligationState } from './subscription-obligation.policy';
-import type { ProvisioningType } from './subscription.types';
+import type { ProvisioningType } from '../subscription.types';
 
 /**
  * The finance gate of a change of a subscription: a change that creates, raises or extends what is owed needs

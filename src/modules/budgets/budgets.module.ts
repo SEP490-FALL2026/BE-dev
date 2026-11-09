@@ -13,7 +13,7 @@ import { OrganizationModule } from '../organization/organization.module';
 import { BudgetCostCenterUseReader } from './commitment/budget-cost-center-use.listener';
 import { BudgetHeadChangeListener } from './proposal/budget-head-change.listener';
 import { BudgetSpendingApproverGrantCheck } from './proposal/spending-approver-grant.listener';
-import { SpendingApproverWaitListener } from './budget/spending-approver-wait.listener';
+import { SpendingApproverWaitListener } from './version/spending-approver-wait.listener';
 import { BudgetNotifierService } from './budget/budget-notifier.service';
 import { BudgetProposalsController } from './proposal/budget-proposals.controller';
 import { BudgetFactsService } from './budget/budget-facts.service';

@@ -1,5 +1,5 @@
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { SpendingApproverWaitListener } from '../../../src/modules/budgets/budget/spending-approver-wait.listener';
+import { SpendingApproverWaitListener } from '../../../src/modules/budgets/version/spending-approver-wait.listener';
 import { VersionHistoryViewService } from '../../../src/modules/budgets/version/version-history-view.service';
 import { BudgetNotAHistoryReaderError } from '../../../src/modules/budgets/budget/budget.errors';
 import { BudgetHarness, type HistoryEntryWire, type Pageable, type VersionWire } from '../../support/budget-harness';

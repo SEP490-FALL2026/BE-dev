@@ -47,7 +47,7 @@ export interface GhostSeatFilter {
   tier?: GhostSeatTier;
   state?: GhostSeatState;
   applicationId?: string;
-  /** Only the recommendations of these departments, and the ones that belong to none (`G1`). */
+  /** Only the recommendations of these department ids, and the ones that belong to none (`G1`). */
   departmentIds?: readonly string[];
 }
 

@@ -1,5 +1,5 @@
-import type { BusinessDate } from '../../../core/business-date';
-import type { SubscriptionState } from './subscription.types';
+import type { BusinessDate } from '../../../../core/business-date';
+import type { SubscriptionState } from '../subscription.types';
 
 /** The part of a subscription that says what is owed and for how long: what a change can create, raise or extend. */
 export type ObligationState = Pick<

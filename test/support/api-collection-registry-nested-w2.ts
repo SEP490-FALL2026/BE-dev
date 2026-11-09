@@ -30,6 +30,20 @@ export const NESTED_ARRAYS_W2: readonly NestedArrayEntry[] = [
     removeWhen: 'Review when SOFTWARE_LISTED_MAX changes or the answer is paged.',
   },
   {
+    key: 'budgetCycleBaseline#sharedPoolUnallocated.software',
+    classification: 'bounded',
+    findings: [],
+    owner: 'qd103-budget-baseline-annual-check',
+    businessMaximum: {
+      maxItems: 50,
+      source:
+        'SOFTWARE_LISTED_MAX in baseline.policy.ts, the maxItems of the schema in cycle.dto.ts: the K2/K4 subscriptions with idle seats listed on the line of the shared pool, cut to this many; softwareTotal says how many there are',
+    },
+    rationale:
+      'the K2/K4 subscriptions with idle seats on the line of the shared pool (AF-05, QĐ-103k), cut to this many; softwareTotal says how many there are',
+    removeWhen: 'Review when SOFTWARE_LISTED_MAX changes or the answer is paged.',
+  },
+  {
     key: 'budgetCyclePackage#departments',
     classification: 'bounded',
     findings: [],

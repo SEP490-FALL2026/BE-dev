@@ -127,7 +127,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   (`application-retirement/application-retirement.service.ts`). Cả hai đọc ghế qua `SeatOccupancyHook`.
 - `lockSeatTarget`: subscription `FOR UPDATE`, plan nội bộ `FOR SHARE` tới hết transaction (`seat-target.service.ts`).
 - Thay đổi tạo/tăng/kéo dài khoản phải trả của thuê bao `K1`/`K5` có phòng sở hữu cần phòng đó có Cost Center đang dùng (F26,
-  `FINANCE.SETUP_INCOMPLETE`, `subscription-obligation.service.ts`). Thuê bao `K2`/`K4` KHÔNG có cổng này ở mọi đường tăng (PATCH, `addPoolSeat`): chi
+  `FINANCE.SETUP_INCOMPLETE`, `subscription/obligation/subscription-obligation.service.ts`). Thuê bao `K2`/`K4` KHÔNG có cổng này ở mọi đường tăng (PATCH, `addPoolSeat`): chi
   phí tính theo seat-tháng của phòng người nhận (`QĐ-103d`(2), DA4-21).
 - Gán phòng ban sở hữu: một transaction, khóa subscription, audit actor `OPERATOR`; chạy lại cùng lệnh trả
   `ALREADY_ASSIGNED` (`subscription-owner-assignment.api.ts`).
