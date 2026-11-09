@@ -265,7 +265,8 @@ describe('who holds a step when the organization or a role changes, over Postgre
         [sent.id],
       );
       const waiting = await h.stepOf(sent.id, 'NEED');
-      expect(waiting).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD', routing_row: 4 });
+      // This internal request was sent while a head held row 1; losing that head preserves its original routing row.
+      expect(waiting).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD', routing_row: 1 });
 
       await h.makeHead(headless, newHead);
 
@@ -510,7 +511,11 @@ describe('who holds a step when the organization or a role changes, over Postgre
       const c2 = await h.staff(await h.departmentWithUnit(`P-C3X-${counter}`), `C3-${counter}`);
       const sent = await h.sent(unit.head, paid, { termMonths: 1 });
       const id = sent.id;
-      expect(await h.stepOf(id, 'NEED')).toMatchObject({ state: 'NOT_REQUIRED', assignee_employee_id: null, same_person_as_spend: false });
+      expect(await h.stepOf(id, 'NEED')).toMatchObject({
+        state: 'NOT_REQUIRED',
+        assignee_employee_id: null,
+        same_person_as_spend: false,
+      });
       expect(await h.stepOf(id, 'SPEND_APPROVAL')).toMatchObject({
         assignee_employee_id: h.boss.employeeId,
         same_person_as_spend: false,

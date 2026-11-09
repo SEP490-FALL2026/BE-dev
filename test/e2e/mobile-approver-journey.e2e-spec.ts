@@ -151,7 +151,9 @@ describe('the approvers on the phone: need step, spend step and the request a he
     await post(`/access-requests/${own}/need-decision`, unit.head.account, { decision: 'APPROVE' }).expect(403);
 
     await post(`/access-requests/${own}/need-decision`, h.boss.account, { decision: 'APPROVE' }).expect(404);
-    const detail = h.dataOf<{ request: AccessRequestWire }>(await get(`/access-requests/${own}`, unit.head.account).expect(200)).request;
+    const detail = h.dataOf<{ request: AccessRequestWire }>(
+      await get(`/access-requests/${own}`, unit.head.account).expect(200),
+    ).request;
     expect(detail).toMatchObject({ state: 'AWAITING_SPEND_DECISION', needStep: { state: 'NOT_REQUIRED' } });
     expect((await queueOf(h.boss.account)).find((item) => item.requestId === own)).toMatchObject({
       routing: { mode: 'ONE_STEP' },
@@ -163,8 +165,6 @@ describe('the approvers on the phone: need step, spend step and the request a he
         WHERE r.request_id = $1 ORDER BY r.decided_at`,
       [own],
     );
-    expect(kept.rows).toEqual([
-      { kind: 'SPEND_APPROVAL', decider_role: 'SPENDING_APPROVER' },
-    ]);
+    expect(kept.rows).toEqual([{ kind: 'SPEND_APPROVAL', decider_role: 'SPENDING_APPROVER' }]);
   });
 });

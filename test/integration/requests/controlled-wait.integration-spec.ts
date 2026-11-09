@@ -270,11 +270,11 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
 
       const sent = await waitingInternal(headless, e4);
       const step = await h.stepOf(sent.id, 'NEED');
-      // Nobody takes the step in place of a head: it waits on row 4, with the request under control.
+      // Nobody takes the step in place of a head: it waits, on the row it was routed on, with the request under control.
       expect(step).toMatchObject({
         state: 'WAITING',
         assignee_employee_id: null,
-        routing_row: 4,
+        routing_row: 1,
         waiting_reason: 'NO_DEPARTMENT_HEAD',
       });
       expect(await h.state(sent.id)).toBe('WAITING_CONTROLLED');
@@ -362,7 +362,8 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
     it('lists the steps that wait, the longest first, with a stable order, in pages that add up, and shows no amount', async () => {
       n += 1;
       const headless = await h.departmentWithUnit(`P-Q${n}`);
-      for (let index = 0; index < 4; index += 1) await waitingInternal(headless, await h.staff(headless, `Q-E${n}-${index}`));
+      for (let index = 0; index < 4; index += 1)
+        await waitingInternal(headless, await h.staff(headless, `Q-E${n}-${index}`));
       const all = await listed(h.admin, { pageSize: 100 });
       const expected = (
         await h.ctx.sql.query<{ id: string }>(
@@ -398,7 +399,8 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
       const read = () => counter.run(() => listed(h.admin, { pageSize: 100 }));
       await waitingInternal(headless, await h.staff(headless, `N-E${n}-0`));
       const few = await read();
-      for (let index = 1; index < 6; index += 1) await waitingInternal(headless, await h.staff(headless, `N-E${n}-${index}`));
+      for (let index = 1; index < 6; index += 1)
+        await waitingInternal(headless, await h.staff(headless, `N-E${n}-${index}`));
       const many = await read();
 
       expect(many.result.items.length).toBeGreaterThan(few.result.items.length);

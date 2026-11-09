@@ -1,4 +1,3 @@
-
 /**
  * The rules of sending a request that costs money on to be decided as spend (`US-06-14`, `US-05-04` AC-12 to AC-16), as pure
  * decisions: which line of the plan a request is attached to, who sends it on, what stops it, and when its day may change.
@@ -43,7 +42,8 @@ export function checkSupplement(facts: {
   /** The end date the file asks for, when it asks for one, with the end date and the limits the request has. */
   term?: { requested: string; current: string | null; today: string; maxEndDate: string };
 }): SupplementRefusal | null {
-  if (facts.state !== 'AWAITING_SPEND_SUBMISSION' && facts.state !== 'AWAITING_REQUESTER_REVISION') return 'NOT_IN_QUEUE';
+  if (facts.state !== 'AWAITING_SPEND_SUBMISSION' && facts.state !== 'AWAITING_REQUESTER_REVISION')
+    return 'NOT_IN_QUEUE';
   if (!facts.priced) return 'NOT_PRICED';
   if (facts.term) {
     const { requested, current, today, maxEndDate } = facts.term;

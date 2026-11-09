@@ -142,7 +142,11 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     createdAt: step.createdAt,
     assignedAt: step.assignedAt,
     decidedAt: step.decidedAt,
-    decision: step.approvalRecord && { ...step.approvalRecord, deciderRole: step.approvalRecord.deciderRole === 'MANAGER' ? 'MANAGER' as const : 'SPENDING_APPROVER' as const },
+    decision: step.approvalRecord && {
+      ...step.approvalRecord,
+      deciderRole:
+        step.approvalRecord.deciderRole === 'MANAGER' ? ('MANAGER' as const) : ('SPENDING_APPROVER' as const),
+    },
   }));
   const first = needSteps[0];
   if (!first) throw new Error(`The request ${row.id} has no need step.`);
@@ -155,7 +159,10 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     type: row.type,
     branch: row.branch,
     state: currentStateOf(row.state),
-    routing: { mode: row.routingMode, oneStepReason: row.oneStepReason as import('./routing.policy').OneStepReason | null },
+    routing: {
+      mode: row.routingMode,
+      oneStepReason: row.oneStepReason as import('./routing.policy').OneStepReason | null,
+    },
     planId: row.planId,
     requesterEmployeeId: row.requesterEmployeeId,
     departmentId: row.departmentId,
@@ -169,7 +176,13 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
         : null,
     offPlan: row.offPlan,
     expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
-    policy: row.routingMode === 'ONE_STEP' ? { ...requestPolicyJson.decode(row.policy), chain: requestPolicyJson.decode(row.policy).chain.filter((kind) => kind !== 'NEED') } : requestPolicyJson.decode(row.policy),
+    policy:
+      row.routingMode === 'ONE_STEP'
+        ? {
+            ...requestPolicyJson.decode(row.policy),
+            chain: requestPolicyJson.decode(row.policy).chain.filter((kind) => kind !== 'NEED'),
+          }
+        : requestPolicyJson.decode(row.policy),
     submittedAt: sent.submittedAt,
     withdrawal:
       row.withdrawalRequestedAt !== null && row.withdrawnByEmployeeId !== null

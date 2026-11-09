@@ -150,10 +150,13 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
     const api = h.ctx.app.get(OrganizationApi, { strict: false });
 
     expect((await api.getDepartmentUse(department.id, today, 50)).openWork.items).toContainEqual({
-      kind: 'ACCESS_REQUEST', id: revision.id, label: null,
+      kind: 'ACCESS_REQUEST',
+      id: revision.id,
+      label: null,
     });
     expect((await api.getCostCenterUse(costCenterId, 50)).requests).toEqual({
-      total: 1, items: [{ kind: 'ACCESS_REQUEST', id: revision.id, label: null }],
+      total: 1,
+      items: [{ kind: 'ACCESS_REQUEST', id: revision.id, label: null }],
     });
     const retireDepartment = await request(h.server())
       .post(`/api/v1/departments/${department.id}/deactivate`)
@@ -162,15 +165,15 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
       .expect(409);
     expect(h.codeOf(retireDepartment)).toBe('DEPARTMENT.IN_USE');
     expect(h.detailsOf(retireDepartment).openWork).toContainEqual({
-      kind: 'ACCESS_REQUEST', id: revision.id, label: null,
+      kind: 'ACCESS_REQUEST',
+      id: revision.id,
+      label: null,
     });
     const retireCostCenter = await request(h.server())
       .post(`/api/v1/cost-centers/${costCenterId}/deactivate`)
       .set(h.as(h.finance))
       .expect(409);
     expect(h.codeOf(retireCostCenter)).toBe('COST_CENTER.IN_USE');
-    expect(h.detailsOf(retireCostCenter).requests).toEqual([
-      { kind: 'ACCESS_REQUEST', id: revision.id, label: null },
-    ]);
+    expect(h.detailsOf(retireCostCenter).requests).toEqual([{ kind: 'ACCESS_REQUEST', id: revision.id, label: null }]);
   });
 });

@@ -113,7 +113,11 @@ export class SpendBatchService {
     for (const id of [...requestIds].sort()) {
       const request = await this.requests.lockById(tx, id);
       if (!request || request.departmentId !== departmentId) throw new AccessRequestNotFoundError();
-      if (request.routing?.mode === 'ONE_STEP' || request.state !== 'AWAITING_SPEND_SUBMISSION' || !hasSpendStep(request.policy)) {
+      if (
+        request.routing?.mode === 'ONE_STEP' ||
+        request.state !== 'AWAITING_SPEND_SUBMISSION' ||
+        !hasSpendStep(request.policy)
+      ) {
         throw new SpendNotInQueueError(id);
       }
       locked.set(id, request);

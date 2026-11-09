@@ -56,14 +56,14 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     const colleague = await world.facts.employeeId('NV-DEV3');
     for (const sender of ['NV-ENGH', 'NV-DEV2']) {
       const response = await call().post(sender, '/group-requests', {
-        planId: figma, businessReason: 'Nhóm có trưởng phòng',
+        planId: figma,
+        businessReason: 'Nhóm có trưởng phòng',
         lines: [{ employeeId: head }, { employeeId: colleague }],
       });
       expect(response.status).toBe(422);
       expect(call().codeOf(response)).toBe('GROUP_REQUEST.LINES_REFUSED');
-      expect(call().detailsOf(response)).toMatchObject({
-        lines: expect.arrayContaining([{ employeeId: head, reason: 'HEAD_IN_GROUP' }]),
-      });
+      const details = call().detailsOf(response) as { lines: Array<{ employeeId: string; reason: string }> };
+      expect(details.lines).toContainEqual({ employeeId: head, reason: 'HEAD_IN_GROUP' });
     }
     expect(await world.facts.count('access_requests')).toBe(before);
   });

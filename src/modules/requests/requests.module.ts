@@ -1,4 +1,6 @@
-import { RequestsRoutingModule } from './requests-routing.module';
+import { RequestFactsService } from './access-request/request-facts.service';
+import { PendingSpendListener } from './spend/pending-spend.listener';
+import { RequestsRoutingFacadeModule } from './requests-routing-facade.module';
 import { RequestsDashboardApi } from './public/requests-dashboard.api';
 import { RequestResubmissionService } from './request-intake/request-resubmission.service';
 import { Module } from '@nestjs/common';
@@ -171,7 +173,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
  */
 @Module({
   imports: [
-    RequestsRoutingModule,
+    RequestsRoutingFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
@@ -210,6 +212,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     MyRequestsController,
   ],
   providers: [
+    RequestFactsService,
+    PendingSpendListener,
     AssessmentRepo,
     AssessmentStepRepo,
     PricingViewService,

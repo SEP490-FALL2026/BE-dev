@@ -153,8 +153,12 @@ export class AccessRequestRoleRequiredError extends Error {
 }
 
 export class AccessRequestNotAwaitingRevisionError extends Error {
-  constructor() { super('The request is not waiting for its requester to revise and send it again.'); }
+  constructor() {
+    super('The request is not waiting for its requester to revise and send it again.');
+  }
 }
 export class AccessRequestNotRequesterError extends Error {
-  constructor() { super('Only the requester may send this request again.'); }
+  constructor() {
+    super('Only the requester may send this request again.');
+  }
 }

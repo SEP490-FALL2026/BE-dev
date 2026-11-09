@@ -43,11 +43,19 @@ export interface RequestPolicy {
 /** The policy of a request for a plan of an application of this kind, with the SLA in force now. A fresh value each time. */
 export function policyFor(kind: ApplicationKind, slaWorkingDays: number, routing?: RequestRouting): RequestPolicy {
   return kind === 'INTERNAL'
-    ? { version: CURRENT_POLICY_VERSION, branch: 'INTERNAL_FREE', chain: routing?.mode === 'ONE_STEP' ? ['IT_EXECUTION'] : ['NEED', 'IT_EXECUTION'], slaWorkingDays }
+    ? {
+        version: CURRENT_POLICY_VERSION,
+        branch: 'INTERNAL_FREE',
+        chain: routing?.mode === 'ONE_STEP' ? ['IT_EXECUTION'] : ['NEED', 'IT_EXECUTION'],
+        slaWorkingDays,
+      }
     : {
         version: CURRENT_POLICY_VERSION,
         branch: 'PAID_IN_CATALOG',
-        chain: routing?.mode === 'ONE_STEP' ? ['SPEND_APPROVAL', 'IT_EXECUTION'] : ['NEED', 'SPEND_APPROVAL', 'IT_EXECUTION'],
+        chain:
+          routing?.mode === 'ONE_STEP'
+            ? ['SPEND_APPROVAL', 'IT_EXECUTION']
+            : ['NEED', 'SPEND_APPROVAL', 'IT_EXECUTION'],
         slaWorkingDays,
       };
 }
@@ -61,7 +69,10 @@ export function proposalPolicy(slaWorkingDays: number, routing?: RequestRouting)
   return {
     version: CURRENT_POLICY_VERSION,
     branch: 'NEW_SOFTWARE',
-    chain: routing?.mode === 'ONE_STEP' ? ['IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'] : ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'],
+    chain:
+      routing?.mode === 'ONE_STEP'
+        ? ['IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION']
+        : ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'],
     slaWorkingDays,
   };
 }

@@ -283,15 +283,22 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
   describe('F1-04 gọi lại không tạo bản ghi trùng @MF1 @D1', () => {
     it('BR-MF1-02 trưởng phòng tự gửi đi thẳng duyệt chi, không vào lô và chỉ quyết một lần @MF1', async () => {
       const sent = await call().post('NV-ENGH', '/access-requests', {
-        planId: await call().planId('Jira Standard'), businessReason: 'Trưởng phòng dùng cho điều phối',
+        planId: await call().planId('Jira Standard'),
+        businessReason: 'Trưởng phòng dùng cho điều phối',
       });
       expect(sent.status).toBe(201);
-      const own = call().data<{ request: { id: string; routing: { mode: string }; needStep: { state: string } } }>(sent).request;
+      const own = call().data<{ request: { id: string; routing: { mode: string }; needStep: { state: string } } }>(
+        sent,
+      ).request;
       expect(own).toMatchObject({ routing: { mode: 'ONE_STEP' }, needStep: { state: 'NOT_REQUIRED' } });
       expect(await world.facts.count('spend_batch_items', 'request_id = $1', [own.id])).toBe(0);
-      expect((await call().post('NV-CEO', `/access-requests/${own.id}/spend-approval`, { decision: 'APPROVE' })).status).toBe(200);
+      expect(
+        (await call().post('NV-CEO', `/access-requests/${own.id}/spend-approval`, { decision: 'APPROVE' })).status,
+      ).toBe(200);
       expect(await world.facts.count('approval_records', 'request_id = $1', [own.id])).toBe(1);
-      expect((await call().post('NV-CEO', `/access-requests/${own.id}/spend-approval`, { decision: 'APPROVE' })).status).toBe(409);
+      expect(
+        (await call().post('NV-CEO', `/access-requests/${own.id}/spend-approval`, { decision: 'APPROVE' })).status,
+      ).toBe(409);
     });
 
     it('trình lô, duyệt chi và hoàn tất cấp: lần hai là 409 và không thêm dòng #B0 @B0', async () => {

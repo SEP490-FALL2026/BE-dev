@@ -86,7 +86,8 @@ export function spendStageOf(
   if (!row.hasSpendStep) return null;
   const { id } = row;
   switch (row.state) {
-    case 'AWAITING_REQUESTER_REVISION': return 'RETURNED_TO_REQUESTER';
+    case 'AWAITING_REQUESTER_REVISION':
+      return 'RETURNED_TO_REQUESTER';
     case 'AWAITING_SPEND_SUBMISSION':
       return queuedStageOf(id, facts);
     case 'AWAITING_SPEND_DECISION':

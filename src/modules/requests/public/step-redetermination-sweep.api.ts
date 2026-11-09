@@ -44,14 +44,24 @@ export class StepRedeterminationSweepApi {
 
   async sweep(now: Date = new Date()): Promise<SweepResult> {
     const correlationId = randomUUID();
-    const result: SweepResult = { waitingRequests: 0, oneStepFinished: 0, holderLeftRequests: 0, dailyPassRequests: 0, failedRequests: 0 };
+    const result: SweepResult = {
+      waitingRequests: 0,
+      oneStepFinished: 0,
+      holderLeftRequests: 0,
+      dailyPassRequests: 0,
+      failedRequests: 0,
+    };
 
     await this.oneStep.markMissingHeads(now);
     for (const id of await this.oneStep.pendingIds()) {
-      try { if (await this.oneStep.finishPending(id, now)) result.oneStepFinished++; }
-      catch (error) {
+      try {
+        if (await this.oneStep.finishPending(id, now)) result.oneStepFinished++;
+      } catch (error) {
         result.failedRequests++;
-        this.logger.error(`One-step conversion failed (request ${id}): ${describeForOperator(error)}`, traceForOperator(error));
+        this.logger.error(
+          `One-step conversion failed (request ${id}): ${describeForOperator(error)}`,
+          traceForOperator(error),
+        );
       }
     }
     const waiting = await this.reassignment.waitingRequestIds();

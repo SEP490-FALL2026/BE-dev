@@ -65,17 +65,22 @@ export class SpendStatusService {
     private readonly decisions: SpendDecisionRepo,
   ) {}
 
+  private async returnedToRequester(request: AccessRequestRecord): Promise<SpendStatusView> {
+    if (request.oneStepBlockedReason)
+      return status('RETURNED_TO_REQUESTER', { blockedReasons: [request.oneStepBlockedReason] });
+    const check = await this.checks.latest(request.id);
+    return status('RETURNED_TO_REQUESTER', {
+      blockedReasons: check?.blockReasons ?? [],
+      overBy: check?.overByMinor == null ? null : { minor: check.overByMinor, currency: check.currency },
+    });
+  }
+
   async of(request: AccessRequestRecord): Promise<SpendStatusView | null> {
     if (!hasSpendStep(request.policy)) return null;
 
     switch (request.state) {
-      case 'AWAITING_REQUESTER_REVISION': {
-        const check = await this.checks.latest(request.id);
-        return status('RETURNED_TO_REQUESTER', {
-          blockedReasons: request.oneStepBlockedReason ? [request.oneStepBlockedReason] : check?.blockReasons ?? [],
-          overBy: check?.overByMinor == null ? null : { minor: check.overByMinor, currency: check.currency },
-        });
-      }
+      case 'AWAITING_REQUESTER_REVISION':
+        return this.returnedToRequester(request);
       case 'AWAITING_SPEND_SUBMISSION':
         return queuedStatus(await this.checks.latest(request.id));
       case 'AWAITING_SPEND_DECISION':

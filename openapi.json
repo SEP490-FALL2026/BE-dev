@@ -40126,7 +40126,7 @@
         },
         "responses": {
           "201": {
-            "description": "The request is fixed to its branch and chain of steps, charged to the Unit Cost Center of the department of the sender on the day, and its need step is given to the one person the routing table names. With nobody valid to hold it the request waits under control (state WAITING_CONTROLLED) and decides or refuses nothing.",
+            "description": "The request is fixed to its branch and chain of steps, charged to the Unit Cost Center of the department of the sender on the day, and its need step is given to the one person the routing table names. A requester who is the current head, or whose department has no effective head, skips the need step; paid requests are checked immediately and a blocked request stays saved for revision.",
             "content": {
               "application/json": {
                 "schema": {
@@ -40707,6 +40707,202 @@
         "tags": ["access-requests"]
       }
     },
+    "/api/v1/access-requests/{id}/resubmission": {
+      "post": {
+        "operationId": "accessRequestResubmit",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request is checked again and either waits for its requester or goes to the spending approver.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/AccessRequestResponseDto" },
+                    { "properties": { "message": { "example": "ACCESS_REQUEST.RESUBMITTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the requester sends the request again (ACCESS_REQUEST.NOT_REQUESTER).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "ACCESS_REQUEST.NOT_REQUESTER": {
+                    "summary": "The request cannot be withdrawn: NOT_REQUESTER.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.NOT_REQUESTER",
+                        "message": "The request cannot be withdrawn: NOT_REQUESTER.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The request does not exist, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "ACCESS_REQUEST.NOT_FOUND": {
+                    "summary": "The request does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.NOT_FOUND",
+                        "message": "The request does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request is not waiting for revision (ACCESS_REQUEST.NOT_AWAITING_REVISION).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "ACCESS_REQUEST.NOT_AWAITING_REVISION": {
+                    "summary": "The request is not waiting for its requester to revise and send it again.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.NOT_AWAITING_REVISION",
+                        "message": "The request is not waiting for its requester to revise and send it again.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Send a revised one-step request again",
+        "tags": ["access-requests"]
+      }
+    },
     "/api/v1/access-requests/{id}": {
       "get": {
         "operationId": "accessRequestGet",
@@ -40715,7 +40911,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The request with the person who holds its need step, the row of the routing table that named them (or why nobody holds it) and whether the same person also holds the spend step. Only the sender, the person it is for, the person who holds the step and an IT Admin read it. The person who saved a draft reads it here too, as `draft` instead of `request`: a draft is not a request yet, so it has no price, step or Cost Center, and nobody else reads it (the id of a draft that is owned by somebody else answers as one that does not exist).",
+            "description": "The request with the person who holds its need step, the row of the routing table that named them (or why nobody holds it) and its fixed one-step or via-head routing. Only the sender, the person it is for, the person who holds the step and an IT Admin read it. The person who saved a draft reads it here too, as `draft` instead of `request`: a draft is not a request yet, so it has no price, step or Cost Center, and nobody else reads it (the id of a draft that is owned by somebody else answers as one that does not exist).",
             "content": {
               "application/json": {
                 "schema": {
@@ -45576,7 +45772,7 @@
         },
         "responses": {
           "201": {
-            "description": "The head gives an earlier end date to a request back in their queue (a request with no end may be given one), or, for a request for a group, leaves people out of it, or both, with the reason. The request is priced again for the day of the file and the people who remain (the months left of the year up to the new end date), and its budget year follows; the file keeps the end date, the year and the amount before and after, how many people were left out, who and when.",
+            "description": "The head, or the requester of a one-step request awaiting revision, gives an earlier end date to a request back in their queue (a request with no end may be given one), or, for a request for a group, leaves people out of it, or both, with the reason. The request is priced again for the day of the file and the people who remain (the months left of the year up to the new end date), and its budget year follows; the file keeps the end date, the year and the amount before and after, how many people were left out, who and when.",
             "content": {
               "application/json": {
                 "schema": {
@@ -45642,22 +45838,11 @@
             }
           },
           "403": {
-            "description": "The caller does not head a department (SPEND.NOT_HEAD).",
+            "description": "Only the current head supplements a via-head request; only the requester supplements a one-step request (SPEND.NOT_HEAD, ACCESS_REQUEST.NOT_REQUESTER).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
                   "SPEND.NOT_HEAD": {
                     "summary": "Only the head of a department sends its requests on to be decided as spend.",
                     "value": {
@@ -45665,6 +45850,17 @@
                       "error": {
                         "code": "SPEND.NOT_HEAD",
                         "message": "Only the head of a department sends its requests on to be decided as spend.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.NOT_REQUESTER": {
+                    "summary": "The request cannot be withdrawn: NOT_REQUESTER.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.NOT_REQUESTER",
+                        "message": "The request cannot be withdrawn: NOT_REQUESTER.",
                         "requestId": "req_example"
                       }
                     }
@@ -46530,7 +46726,7 @@
             }
           },
           "409": {
-            "description": "The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED).",
+            "description": "The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD or SPEND.RECHECKED_RETURNED_TO_REQUESTER for a one-step request, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46565,6 +46761,18 @@
                         "code": "SPEND.RECHECKED_RETURNED_TO_HEAD",
                         "message": "The request was checked again, is blocked or uses the reserve the head has not confirmed, and went back to its head. Nothing was decided.",
                         "details": { "reasons": ["OVER_RESERVE"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SPEND.RECHECKED_RETURNED_TO_REQUESTER": {
+                    "summary": "The request was checked again and went back to its requester for revision. Nothing was decided.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SPEND.RECHECKED_RETURNED_TO_REQUESTER",
+                        "message": "The request was checked again and went back to its requester for revision. Nothing was decided.",
+                        "details": { "reasons": ["OVER_RESERVE"], "overBy": "1" },
                         "requestId": "req_example"
                       }
                     }
@@ -51790,7 +51998,7 @@
             }
           },
           "409": {
-            "description": "The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again on the people approved and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED).",
+            "description": "The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again on the people approved and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD or SPEND.RECHECKED_RETURNED_TO_REQUESTER for a one-step request, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -51825,6 +52033,18 @@
                         "code": "SPEND.RECHECKED_RETURNED_TO_HEAD",
                         "message": "The request was checked again, is blocked or uses the reserve the head has not confirmed, and went back to its head. Nothing was decided.",
                         "details": { "reasons": ["OVER_RESERVE"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SPEND.RECHECKED_RETURNED_TO_REQUESTER": {
+                    "summary": "The request was checked again and went back to its requester for revision. Nothing was decided.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SPEND.RECHECKED_RETURNED_TO_REQUESTER",
+                        "message": "The request was checked again and went back to its requester for revision. Nothing was decided.",
+                        "details": { "reasons": ["OVER_RESERVE"], "overBy": "1" },
                         "requestId": "req_example"
                       }
                     }
@@ -90147,6 +90367,7 @@
                       "AWAITING_IT_ASSESSMENT",
                       "AWAITING_SPEND_SUBMISSION",
                       "AWAITING_SPEND_DECISION",
+                      "AWAITING_REQUESTER_REVISION",
                       "REJECTED",
                       "IT_REJECTED",
                       "EXECUTING",
@@ -90156,6 +90377,19 @@
                       "WITHDRAWN",
                       "CANCELLED"
                     ]
+                  },
+                  "routing": {
+                    "type": "object",
+                    "properties": {
+                      "mode": { "type": "string", "enum": ["VIA_HEAD", "ONE_STEP"] },
+                      "oneStepReason": {
+                        "type": "string",
+                        "enum": ["REQUESTER_IS_HEAD", "NO_DEPARTMENT_HEAD", "HEAD_LEFT", null],
+                        "nullable": true
+                      }
+                    },
+                    "required": ["mode", "oneStepReason"],
+                    "additionalProperties": false
                   },
                   "plan": {
                     "type": "object",
@@ -90322,6 +90556,7 @@
                         "type": "string",
                         "enum": [
                           "NOT_SUBMITTED",
+                          "RETURNED_TO_REQUESTER",
                           "RESERVE_CONFIRMATION",
                           "BLOCKED",
                           "WAITING_SPEND_DECISION",
@@ -90331,7 +90566,16 @@
                       "blockedReasons": {
                         "maxItems": 3,
                         "type": "array",
-                        "items": { "type": "string", "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"] }
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "PRICE_EXPIRED",
+                            "NO_APPROVED_BUDGET",
+                            "OVER_RESERVE",
+                            "PRICE_MISSING",
+                            "RATE_MISSING"
+                          ]
+                        }
                       },
                       "overBy": {
                         "type": "object",
@@ -90435,7 +90679,10 @@
                     "type": "object",
                     "properties": {
                       "id": { "type": "string", "format": "uuid" },
-                      "state": { "type": "string", "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED"] },
+                      "state": {
+                        "type": "string",
+                        "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED", "NOT_REQUIRED"]
+                      },
                       "assignee": {
                         "type": "object",
                         "properties": {
@@ -90453,11 +90700,11 @@
                         "enum": ["NO_SPENDING_APPROVER", "NO_DEPARTMENT_HEAD", null],
                         "nullable": true
                       },
-                      "samePersonAsSpend": { "type": "boolean" },
                       "slaWorkingDays": {
                         "type": "integer",
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
+                        "nullable": true,
                         "minimum": 0
                       },
                       "createdAt": { "type": "string", "format": "date-time" },
@@ -90470,7 +90717,6 @@
                       "assignee",
                       "routingRow",
                       "waitingReason",
-                      "samePersonAsSpend",
                       "slaWorkingDays",
                       "createdAt",
                       "assignedAt",
@@ -90492,10 +90738,7 @@
                         "required": ["employeeId", "employeeCode", "fullName"],
                         "additionalProperties": false
                       },
-                      "deciderRole": {
-                        "type": "string",
-                        "enum": ["MANAGER", "SPENDING_APPROVER", "FALLBACK_APPROVER"]
-                      },
+                      "deciderRole": { "type": "string", "enum": ["MANAGER", "SPENDING_APPROVER"] },
                       "reason": { "type": "string", "nullable": true },
                       "decidedAt": { "type": "string", "format": "date-time" }
                     },
@@ -90555,6 +90798,7 @@
                   "type",
                   "branch",
                   "state",
+                  "routing",
                   "plan",
                   "proposal",
                   "department",
@@ -90625,6 +90869,7 @@
                       "AWAITING_IT_ASSESSMENT",
                       "AWAITING_SPEND_SUBMISSION",
                       "AWAITING_SPEND_DECISION",
+                      "AWAITING_REQUESTER_REVISION",
                       "REJECTED",
                       "IT_REJECTED",
                       "EXECUTING",
@@ -90634,6 +90879,19 @@
                       "WITHDRAWN",
                       "CANCELLED"
                     ]
+                  },
+                  "routing": {
+                    "type": "object",
+                    "properties": {
+                      "mode": { "type": "string", "enum": ["VIA_HEAD", "ONE_STEP"] },
+                      "oneStepReason": {
+                        "type": "string",
+                        "enum": ["REQUESTER_IS_HEAD", "NO_DEPARTMENT_HEAD", "HEAD_LEFT", null],
+                        "nullable": true
+                      }
+                    },
+                    "required": ["mode", "oneStepReason"],
+                    "additionalProperties": false
                   },
                   "plan": {
                     "type": "object",
@@ -90800,6 +91058,7 @@
                         "type": "string",
                         "enum": [
                           "NOT_SUBMITTED",
+                          "RETURNED_TO_REQUESTER",
                           "RESERVE_CONFIRMATION",
                           "BLOCKED",
                           "WAITING_SPEND_DECISION",
@@ -90809,7 +91068,16 @@
                       "blockedReasons": {
                         "maxItems": 3,
                         "type": "array",
-                        "items": { "type": "string", "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"] }
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "PRICE_EXPIRED",
+                            "NO_APPROVED_BUDGET",
+                            "OVER_RESERVE",
+                            "PRICE_MISSING",
+                            "RATE_MISSING"
+                          ]
+                        }
                       },
                       "overBy": {
                         "type": "object",
@@ -90913,7 +91181,10 @@
                     "type": "object",
                     "properties": {
                       "id": { "type": "string", "format": "uuid" },
-                      "state": { "type": "string", "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED"] },
+                      "state": {
+                        "type": "string",
+                        "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED", "NOT_REQUIRED"]
+                      },
                       "assignee": {
                         "type": "object",
                         "properties": {
@@ -90931,11 +91202,11 @@
                         "enum": ["NO_SPENDING_APPROVER", "NO_DEPARTMENT_HEAD", null],
                         "nullable": true
                       },
-                      "samePersonAsSpend": { "type": "boolean" },
                       "slaWorkingDays": {
                         "type": "integer",
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
+                        "nullable": true,
                         "minimum": 0
                       },
                       "createdAt": { "type": "string", "format": "date-time" },
@@ -90948,7 +91219,6 @@
                       "assignee",
                       "routingRow",
                       "waitingReason",
-                      "samePersonAsSpend",
                       "slaWorkingDays",
                       "createdAt",
                       "assignedAt",
@@ -90970,10 +91240,7 @@
                         "required": ["employeeId", "employeeCode", "fullName"],
                         "additionalProperties": false
                       },
-                      "deciderRole": {
-                        "type": "string",
-                        "enum": ["MANAGER", "SPENDING_APPROVER", "FALLBACK_APPROVER"]
-                      },
+                      "deciderRole": { "type": "string", "enum": ["MANAGER", "SPENDING_APPROVER"] },
                       "reason": { "type": "string", "nullable": true },
                       "decidedAt": { "type": "string", "format": "date-time" }
                     },
@@ -91033,6 +91300,7 @@
                   "type",
                   "branch",
                   "state",
+                  "routing",
                   "plan",
                   "proposal",
                   "department",
@@ -91402,6 +91670,7 @@
                           "AWAITING_IT_ASSESSMENT",
                           "AWAITING_SPEND_SUBMISSION",
                           "AWAITING_SPEND_DECISION",
+                          "AWAITING_REQUESTER_REVISION",
                           "REJECTED",
                           "IT_REJECTED",
                           "EXECUTING",
@@ -91411,6 +91680,19 @@
                           "WITHDRAWN",
                           "CANCELLED"
                         ]
+                      },
+                      "routing": {
+                        "type": "object",
+                        "properties": {
+                          "mode": { "type": "string", "enum": ["VIA_HEAD", "ONE_STEP"] },
+                          "oneStepReason": {
+                            "type": "string",
+                            "enum": ["REQUESTER_IS_HEAD", "NO_DEPARTMENT_HEAD", "HEAD_LEFT", null],
+                            "nullable": true
+                          }
+                        },
+                        "required": ["mode", "oneStepReason"],
+                        "additionalProperties": false
                       },
                       "plan": {
                         "type": "object",
@@ -91577,6 +91859,7 @@
                             "type": "string",
                             "enum": [
                               "NOT_SUBMITTED",
+                              "RETURNED_TO_REQUESTER",
                               "RESERVE_CONFIRMATION",
                               "BLOCKED",
                               "WAITING_SPEND_DECISION",
@@ -91588,7 +91871,13 @@
                             "type": "array",
                             "items": {
                               "type": "string",
-                              "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"]
+                              "enum": [
+                                "PRICE_EXPIRED",
+                                "NO_APPROVED_BUDGET",
+                                "OVER_RESERVE",
+                                "PRICE_MISSING",
+                                "RATE_MISSING"
+                              ]
                             }
                           },
                           "overBy": {
@@ -91701,7 +91990,7 @@
                           "id": { "type": "string", "format": "uuid" },
                           "state": {
                             "type": "string",
-                            "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED"]
+                            "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED", "NOT_REQUIRED"]
                           },
                           "assignee": {
                             "type": "object",
@@ -91720,11 +92009,11 @@
                             "enum": ["NO_SPENDING_APPROVER", "NO_DEPARTMENT_HEAD", null],
                             "nullable": true
                           },
-                          "samePersonAsSpend": { "type": "boolean" },
                           "slaWorkingDays": {
                             "type": "integer",
                             "exclusiveMinimum": true,
                             "maximum": 9007199254740991,
+                            "nullable": true,
                             "minimum": 0
                           },
                           "createdAt": { "type": "string", "format": "date-time" },
@@ -91737,7 +92026,6 @@
                           "assignee",
                           "routingRow",
                           "waitingReason",
-                          "samePersonAsSpend",
                           "slaWorkingDays",
                           "createdAt",
                           "assignedAt",
@@ -91759,10 +92047,7 @@
                             "required": ["employeeId", "employeeCode", "fullName"],
                             "additionalProperties": false
                           },
-                          "deciderRole": {
-                            "type": "string",
-                            "enum": ["MANAGER", "SPENDING_APPROVER", "FALLBACK_APPROVER"]
-                          },
+                          "deciderRole": { "type": "string", "enum": ["MANAGER", "SPENDING_APPROVER"] },
                           "reason": { "type": "string", "nullable": true },
                           "decidedAt": { "type": "string", "format": "date-time" }
                         },
@@ -91822,6 +92107,7 @@
                       "type",
                       "branch",
                       "state",
+                      "routing",
                       "plan",
                       "proposal",
                       "department",
@@ -92019,7 +92305,10 @@
                   "step": {
                     "type": "object",
                     "properties": {
-                      "state": { "type": "string", "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED"] },
+                      "state": {
+                        "type": "string",
+                        "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED", "NOT_REQUIRED"]
+                      },
                       "assignee": {
                         "type": "object",
                         "properties": {
@@ -92358,7 +92647,6 @@
             "nullable": true
           },
           "equivalentPlanId": { "type": "string", "format": "uuid", "nullable": true },
-          "proposedBusinessOwnerEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
           "controlLevel": { "type": "string", "enum": ["FULL", "PARTIAL", "UNCONTROLLABLE"] },
           "controlRiskNote": { "type": "string", "minLength": 1, "maxLength": 1000, "nullable": true },
           "quote": {
@@ -92404,12 +92692,12 @@
           "alternativeNote": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["kind", "reason"],
+        "description": "UNCONTROLLABLE requires alternativePlanId or alternativeNote.",
         "additionalProperties": false
       },
       "InternalRegistrationBodyDto": {
         "type": "object",
         "properties": {
-          "businessOwnerEmployeeId": { "type": "string", "format": "uuid" },
           "softwareName": { "type": "string", "minLength": 1, "maxLength": 200 },
           "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
           "spend": {
@@ -92448,7 +92736,6 @@
             "additionalProperties": false
           }
         },
-        "required": ["businessOwnerEmployeeId"],
         "additionalProperties": false
       },
       "CatalogLinkBodyDto": {
@@ -93159,6 +93446,7 @@
                         "AWAITING_IT_ASSESSMENT",
                         "AWAITING_SPEND_SUBMISSION",
                         "AWAITING_SPEND_DECISION",
+                        "AWAITING_REQUESTER_REVISION",
                         "REJECTED",
                         "IT_REJECTED",
                         "EXECUTING",
@@ -93433,6 +93721,19 @@
                 "items": {
                   "type": "object",
                   "properties": {
+                    "routing": {
+                      "type": "object",
+                      "properties": {
+                        "mode": { "type": "string", "enum": ["VIA_HEAD", "ONE_STEP"] },
+                        "oneStepReason": {
+                          "type": "string",
+                          "enum": ["REQUESTER_IS_HEAD", "NO_DEPARTMENT_HEAD", "HEAD_LEFT", null],
+                          "nullable": true
+                        }
+                      },
+                      "required": ["mode", "oneStepReason"],
+                      "additionalProperties": false
+                    },
                     "requestId": { "type": "string", "format": "uuid" },
                     "stepId": { "type": "string", "format": "uuid" },
                     "stepKind": { "type": "string", "enum": ["SPEND_APPROVAL"] },
@@ -93514,10 +93815,10 @@
                       "enum": ["WITHIN_BASE", "USES_RESERVE", "BLOCKED", null],
                       "nullable": true
                     },
-                    "samePersonAsSpend": { "type": "boolean" },
                     "batchId": { "type": "string", "format": "uuid", "nullable": true }
                   },
                   "required": [
+                    "routing",
                     "requestId",
                     "stepId",
                     "stepKind",
@@ -93533,7 +93834,6 @@
                     "amount",
                     "primaryCode",
                     "outcome",
-                    "samePersonAsSpend",
                     "batchId"
                   ],
                   "additionalProperties": false
@@ -93575,6 +93875,19 @@
               "spendApproval": {
                 "type": "object",
                 "properties": {
+                  "routing": {
+                    "type": "object",
+                    "properties": {
+                      "mode": { "type": "string", "enum": ["VIA_HEAD", "ONE_STEP"] },
+                      "oneStepReason": {
+                        "type": "string",
+                        "enum": ["REQUESTER_IS_HEAD", "NO_DEPARTMENT_HEAD", "HEAD_LEFT", null],
+                        "nullable": true
+                      }
+                    },
+                    "required": ["mode", "oneStepReason"],
+                    "additionalProperties": false
+                  },
                   "requestId": { "type": "string", "format": "uuid" },
                   "step": {
                     "type": "object",
@@ -93604,19 +93917,9 @@
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
                         "minimum": 0
-                      },
-                      "samePersonAsSpend": { "type": "boolean" }
+                      }
                     },
-                    "required": [
-                      "id",
-                      "state",
-                      "waitingReason",
-                      "assignee",
-                      "openedAt",
-                      "decidedAt",
-                      "slaWorkingDays",
-                      "samePersonAsSpend"
-                    ],
+                    "required": ["id", "state", "waitingReason", "assignee", "openedAt", "decidedAt", "slaWorkingDays"],
                     "additionalProperties": false
                   },
                   "request": {
@@ -93958,6 +94261,7 @@
                   }
                 },
                 "required": [
+                  "routing",
                   "requestId",
                   "step",
                   "request",
@@ -94066,7 +94370,7 @@
                     "requestId": { "type": "string", "format": "uuid" },
                     "stepId": { "type": "string", "format": "uuid" },
                     "stepKind": { "type": "string", "enum": ["NEED"] },
-                    "deciderRole": { "type": "string", "enum": ["MANAGER", "SPENDING_APPROVER", "FALLBACK_APPROVER"] },
+                    "deciderRole": { "type": "string", "enum": ["MANAGER", "SPENDING_APPROVER"] },
                     "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
                     "openedAt": { "type": "string", "format": "date-time" },
                     "assignedAt": { "type": "string", "format": "date-time", "nullable": true },
@@ -94144,8 +94448,7 @@
                       },
                       "required": ["status", "amount"],
                       "additionalProperties": false
-                    },
-                    "samePersonAsSpend": { "type": "boolean" }
+                    }
                   },
                   "required": [
                     "requestId",
@@ -94166,8 +94469,7 @@
                     "businessReasonExcerpt",
                     "termMonths",
                     "expectedEndDate",
-                    "pricing",
-                    "samePersonAsSpend"
+                    "pricing"
                   ],
                   "additionalProperties": false
                 }
@@ -94731,6 +95033,7 @@
                       "AWAITING_IT_ASSESSMENT",
                       "AWAITING_SPEND_SUBMISSION",
                       "AWAITING_SPEND_DECISION",
+                      "AWAITING_REQUESTER_REVISION",
                       "REJECTED",
                       "IT_REJECTED",
                       "EXECUTING",
@@ -94740,6 +95043,19 @@
                       "WITHDRAWN",
                       "CANCELLED"
                     ]
+                  },
+                  "routing": {
+                    "type": "object",
+                    "properties": {
+                      "mode": { "type": "string", "enum": ["VIA_HEAD", "ONE_STEP"] },
+                      "oneStepReason": {
+                        "type": "string",
+                        "enum": ["REQUESTER_IS_HEAD", "NO_DEPARTMENT_HEAD", "HEAD_LEFT", null],
+                        "nullable": true
+                      }
+                    },
+                    "required": ["mode", "oneStepReason"],
+                    "additionalProperties": false
                   },
                   "plan": {
                     "type": "object",
@@ -94906,6 +95222,7 @@
                         "type": "string",
                         "enum": [
                           "NOT_SUBMITTED",
+                          "RETURNED_TO_REQUESTER",
                           "RESERVE_CONFIRMATION",
                           "BLOCKED",
                           "WAITING_SPEND_DECISION",
@@ -94915,7 +95232,16 @@
                       "blockedReasons": {
                         "maxItems": 3,
                         "type": "array",
-                        "items": { "type": "string", "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"] }
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "PRICE_EXPIRED",
+                            "NO_APPROVED_BUDGET",
+                            "OVER_RESERVE",
+                            "PRICE_MISSING",
+                            "RATE_MISSING"
+                          ]
+                        }
                       },
                       "overBy": {
                         "type": "object",
@@ -95019,7 +95345,10 @@
                     "type": "object",
                     "properties": {
                       "id": { "type": "string", "format": "uuid" },
-                      "state": { "type": "string", "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED"] },
+                      "state": {
+                        "type": "string",
+                        "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED", "NOT_REQUIRED"]
+                      },
                       "assignee": {
                         "type": "object",
                         "properties": {
@@ -95037,11 +95366,11 @@
                         "enum": ["NO_SPENDING_APPROVER", "NO_DEPARTMENT_HEAD", null],
                         "nullable": true
                       },
-                      "samePersonAsSpend": { "type": "boolean" },
                       "slaWorkingDays": {
                         "type": "integer",
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
+                        "nullable": true,
                         "minimum": 0
                       },
                       "createdAt": { "type": "string", "format": "date-time" },
@@ -95054,7 +95383,6 @@
                       "assignee",
                       "routingRow",
                       "waitingReason",
-                      "samePersonAsSpend",
                       "slaWorkingDays",
                       "createdAt",
                       "assignedAt",
@@ -95076,10 +95404,7 @@
                         "required": ["employeeId", "employeeCode", "fullName"],
                         "additionalProperties": false
                       },
-                      "deciderRole": {
-                        "type": "string",
-                        "enum": ["MANAGER", "SPENDING_APPROVER", "FALLBACK_APPROVER"]
-                      },
+                      "deciderRole": { "type": "string", "enum": ["MANAGER", "SPENDING_APPROVER"] },
                       "reason": { "type": "string", "nullable": true },
                       "decidedAt": { "type": "string", "format": "date-time" }
                     },
@@ -95139,6 +95464,7 @@
                   "type",
                   "branch",
                   "state",
+                  "routing",
                   "plan",
                   "proposal",
                   "department",
@@ -95687,6 +96013,7 @@
                     "reason": {
                       "type": "string",
                       "enum": [
+                        "HEAD_IN_GROUP",
                         "SPENDING_APPROVER",
                         "OUTSIDE_DEPARTMENT",
                         "NOT_ACTIVE",
@@ -95814,6 +96141,7 @@
                       "AWAITING_IT_ASSESSMENT",
                       "AWAITING_SPEND_SUBMISSION",
                       "AWAITING_SPEND_DECISION",
+                      "AWAITING_REQUESTER_REVISION",
                       "REJECTED",
                       "IT_REJECTED",
                       "EXECUTING",
@@ -95823,6 +96151,19 @@
                       "WITHDRAWN",
                       "CANCELLED"
                     ]
+                  },
+                  "routing": {
+                    "type": "object",
+                    "properties": {
+                      "mode": { "type": "string", "enum": ["VIA_HEAD", "ONE_STEP"] },
+                      "oneStepReason": {
+                        "type": "string",
+                        "enum": ["REQUESTER_IS_HEAD", "NO_DEPARTMENT_HEAD", "HEAD_LEFT", null],
+                        "nullable": true
+                      }
+                    },
+                    "required": ["mode", "oneStepReason"],
+                    "additionalProperties": false
                   },
                   "plan": {
                     "type": "object",
@@ -95989,6 +96330,7 @@
                         "type": "string",
                         "enum": [
                           "NOT_SUBMITTED",
+                          "RETURNED_TO_REQUESTER",
                           "RESERVE_CONFIRMATION",
                           "BLOCKED",
                           "WAITING_SPEND_DECISION",
@@ -95998,7 +96340,16 @@
                       "blockedReasons": {
                         "maxItems": 3,
                         "type": "array",
-                        "items": { "type": "string", "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"] }
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "PRICE_EXPIRED",
+                            "NO_APPROVED_BUDGET",
+                            "OVER_RESERVE",
+                            "PRICE_MISSING",
+                            "RATE_MISSING"
+                          ]
+                        }
                       },
                       "overBy": {
                         "type": "object",
@@ -96102,7 +96453,10 @@
                     "type": "object",
                     "properties": {
                       "id": { "type": "string", "format": "uuid" },
-                      "state": { "type": "string", "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED"] },
+                      "state": {
+                        "type": "string",
+                        "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED", "NOT_REQUIRED"]
+                      },
                       "assignee": {
                         "type": "object",
                         "properties": {
@@ -96120,11 +96474,11 @@
                         "enum": ["NO_SPENDING_APPROVER", "NO_DEPARTMENT_HEAD", null],
                         "nullable": true
                       },
-                      "samePersonAsSpend": { "type": "boolean" },
                       "slaWorkingDays": {
                         "type": "integer",
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
+                        "nullable": true,
                         "minimum": 0
                       },
                       "createdAt": { "type": "string", "format": "date-time" },
@@ -96137,7 +96491,6 @@
                       "assignee",
                       "routingRow",
                       "waitingReason",
-                      "samePersonAsSpend",
                       "slaWorkingDays",
                       "createdAt",
                       "assignedAt",
@@ -96159,10 +96512,7 @@
                         "required": ["employeeId", "employeeCode", "fullName"],
                         "additionalProperties": false
                       },
-                      "deciderRole": {
-                        "type": "string",
-                        "enum": ["MANAGER", "SPENDING_APPROVER", "FALLBACK_APPROVER"]
-                      },
+                      "deciderRole": { "type": "string", "enum": ["MANAGER", "SPENDING_APPROVER"] },
                       "reason": { "type": "string", "nullable": true },
                       "decidedAt": { "type": "string", "format": "date-time" }
                     },
@@ -96222,6 +96572,7 @@
                   "type",
                   "branch",
                   "state",
+                  "routing",
                   "plan",
                   "proposal",
                   "department",
@@ -96351,7 +96702,10 @@
                       "type": "object",
                       "properties": {
                         "id": { "type": "string", "format": "uuid" },
-                        "state": { "type": "string", "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED"] },
+                        "state": {
+                          "type": "string",
+                          "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED", "NOT_REQUIRED"]
+                        },
                         "assignee": {
                           "type": "object",
                           "properties": {
@@ -96383,10 +96737,7 @@
                           "required": ["employeeId", "employeeCode", "fullName"],
                           "additionalProperties": false
                         },
-                        "deciderRole": {
-                          "type": "string",
-                          "enum": ["MANAGER", "SPENDING_APPROVER", "FALLBACK_APPROVER", "CONFLICT_SUBSTITUTE"]
-                        },
+                        "deciderRole": { "type": "string", "enum": ["MANAGER", "SPENDING_APPROVER"] },
                         "decidedAt": { "type": "string", "format": "date-time" }
                       },
                       "required": ["decision", "reason", "decidedBy", "deciderRole", "decidedAt"],
@@ -96408,10 +96759,7 @@
                           "required": ["employeeId", "employeeCode", "fullName"],
                           "additionalProperties": false
                         },
-                        "deciderRole": {
-                          "type": "string",
-                          "enum": ["MANAGER", "SPENDING_APPROVER", "FALLBACK_APPROVER", "CONFLICT_SUBSTITUTE"]
-                        },
+                        "deciderRole": { "type": "string", "enum": ["MANAGER", "SPENDING_APPROVER"] },
                         "decidedAt": { "type": "string", "format": "date-time" }
                       },
                       "required": ["decision", "reason", "decidedBy", "deciderRole", "decidedAt"],
@@ -96583,6 +96931,7 @@
                         "AWAITING_IT_ASSESSMENT",
                         "AWAITING_SPEND_SUBMISSION",
                         "AWAITING_SPEND_DECISION",
+                        "AWAITING_REQUESTER_REVISION",
                         "REJECTED",
                         "IT_REJECTED",
                         "EXECUTING",
@@ -96592,6 +96941,19 @@
                         "WITHDRAWN",
                         "CANCELLED"
                       ]
+                    },
+                    "routing": {
+                      "type": "object",
+                      "properties": {
+                        "mode": { "type": "string", "enum": ["VIA_HEAD", "ONE_STEP"] },
+                        "oneStepReason": {
+                          "type": "string",
+                          "enum": ["REQUESTER_IS_HEAD", "NO_DEPARTMENT_HEAD", "HEAD_LEFT", null],
+                          "nullable": true
+                        }
+                      },
+                      "required": ["mode", "oneStepReason"],
+                      "additionalProperties": false
                     },
                     "plan": {
                       "type": "object",
@@ -96636,7 +96998,10 @@
                     "needStep": {
                       "type": "object",
                       "properties": {
-                        "state": { "type": "string", "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED"] },
+                        "state": {
+                          "type": "string",
+                          "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED", "NOT_REQUIRED"]
+                        },
                         "assignee": {
                           "type": "object",
                           "properties": {
@@ -96664,6 +97029,7 @@
                           "type": "string",
                           "enum": [
                             "NOT_SUBMITTED",
+                            "RETURNED_TO_REQUESTER",
                             "RESERVE_CONFIRMATION",
                             "BLOCKED",
                             "WAITING_SPEND_DECISION",
@@ -96696,6 +97062,7 @@
                     "type",
                     "branch",
                     "state",
+                    "routing",
                     "plan",
                     "softwareName",
                     "beneficiary",

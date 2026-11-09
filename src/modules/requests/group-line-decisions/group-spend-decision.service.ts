@@ -106,7 +106,12 @@ export class GroupSpendDecisionService {
       if (verdict.kind === 'RETURNED') {
         await this.effects.sendBack(tx, actor, request, step, { now, reasons: verdict.reasons, check: outcome.check });
 
-        return { status: 'BOUNCED', to: request.routing?.mode === 'ONE_STEP' ? 'REQUESTER' : 'HEAD', reasons: verdict.reasons, overBy: outcome.check.overByMinor?.toString() ?? null };
+        return {
+          status: 'BOUNCED',
+          to: request.routing?.mode === 'ONE_STEP' ? 'REQUESTER' : 'HEAD',
+          reasons: verdict.reasons,
+          overBy: outcome.check.overByMinor?.toString() ?? null,
+        };
       }
 
       return {

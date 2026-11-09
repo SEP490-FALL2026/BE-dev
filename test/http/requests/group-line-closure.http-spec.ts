@@ -13,22 +13,42 @@ describe('BR-MF1-02 the line of a one-step group (HTTP contract)', () => {
   let app: INestApplication<App>;
   const employee = { employeeId: PERSON, employeeCode: 'E-1', fullName: 'An' };
   const item = {
-    employee, position: 1, state: 'NEED_CONFIRMED',
+    employee,
+    position: 1,
+    state: 'NEED_CONFIRMED',
     needStep: { id: ID, state: 'NOT_REQUIRED', assignee: null },
-    expectedEndDate: null, needDecision: null, spendDecision: null, cost: null, share: null,
-    endedAt: null, endedBy: null, endReason: null, cancelCause: null,
+    expectedEndDate: null,
+    needDecision: null,
+    spendDecision: null,
+    cost: null,
+    share: null,
+    endedAt: null,
+    endedBy: null,
+    endReason: null,
+    cancelCause: null,
   };
   const page = { items: [item], pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 } };
   beforeAll(async () => {
-    app = await createHttpContractApp({ overrides: [{ token: GroupLineQueryService, useValue: {
-      page: jest.fn().mockResolvedValue(page),
-    } }] });
+    app = await createHttpContractApp({
+      overrides: [
+        {
+          token: GroupLineQueryService,
+          useValue: {
+            page: jest.fn().mockResolvedValue(page),
+          },
+        },
+      ],
+    });
   });
-  afterAll(async () => { await app?.close(); });
+  afterAll(async () => {
+    await app?.close();
+  });
 
   it('BR-MF1-02 accepts NOT_REQUIRED without an assignee or a need decision in the response', async () => {
-    const response = await request(app.getHttpServer()).get(`/api/v1/access-requests/${ID}/lines`)
-      .set('Authorization', bearer(principal(['EMPLOYEE']))).expect(200);
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/access-requests/${ID}/lines`)
+      .set('Authorization', bearer(principal(['EMPLOYEE'])))
+      .expect(200);
     expect(bodyOf(response).data).toEqual(page);
   });
 });

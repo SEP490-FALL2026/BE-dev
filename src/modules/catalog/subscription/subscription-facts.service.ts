@@ -4,6 +4,7 @@ import type { Money } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { SubscriptionPoolService } from './pool/subscription-pool.service';
+import { SubscriptionPriceService } from './price/subscription-price.service';
 import { SubscriptionRepo } from './subscription.repo';
 import type { BaselineSubscription } from '../public/catalog.types';
 import type { SubscriptionKind } from './subscription.types';
@@ -14,6 +15,7 @@ export class SubscriptionFactsService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
     private readonly pool: SubscriptionPoolService,
+    private readonly pricing: SubscriptionPriceService,
   ) {}
 
   /** Buys one more seat on a subscription the caller holds locked (see `CatalogApi.addPoolSeat`). Throws PoolSeatNotAddableError. */
@@ -41,16 +43,7 @@ export class SubscriptionFactsService {
     /** The subscription may be cut before its term ends (`QĐ-96f`): a request on it runs to the end of the fiscal year at most. */
     allowsMidTermReduction: boolean;
   } | null> {
-    const priced = await this.subscriptions.findPricedOfPlan(planId, tx);
-
-    return (
-      priced && {
-        kind: priced.subscriptionKind === 'PERPETUAL' ? 'ONE_TIME' : 'RECURRING',
-        unitPrice: { amountMinor: priced.unitPriceMinor, currency: priced.currency },
-        billingCycle: priced.billingCycle,
-        allowsMidTermReduction: priced.allowsMidTermReduction,
-      }
-    );
+    return this.pricing.priceOfPlan(planId, tx);
   }
 
   /** The subscriptions of a plan a seat can be taken from today (the shared pool of the plan). */

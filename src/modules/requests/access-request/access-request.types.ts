@@ -1,7 +1,8 @@
 import type { Money } from '../../../core/money/money';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
-import type { BillingCycleCode, MissingPriceReason } from './pricing.policy';
+export type BillingCycleCode = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+export type MissingPriceReason = 'NO_PRICED_SUBSCRIPTION' | 'CYCLE_UNKNOWN' | 'AMOUNT_TOO_LARGE' | 'AWAITING_QUOTE';
 import type { WaitingReason } from './routing.policy';
 
 export type ReadableNeedWaitingReason = WaitingReason;
@@ -32,7 +33,7 @@ export type AccessRequestState =
   | 'WITHDRAWN'
   | 'CANCELLED';
 /** A need step is held or waiting, then decided, or closed because the request ended without a decision (`US-05-08`). */
-export type NeedStepState = 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED' | 'NOT_REQUIRED' | 'NOT_REQUIRED';
+export type NeedStepState = 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED' | 'NOT_REQUIRED';
 export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER';
 
 /** What the request costs: nothing for internal software, one amount for the year it is counted in (`QĐ-109`), or a missing price. */

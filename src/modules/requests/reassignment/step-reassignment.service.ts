@@ -160,7 +160,6 @@ export class StepReassignmentService {
     const { gone, operator } = context;
     const steps = request.steps.map((step) => ({ ...step }));
     let state = request.state;
-    let holdersChanged = false;
 
     for (const step of steps) {
       if (!OPEN.has(step.state)) continue;
@@ -274,9 +273,7 @@ export class StepReassignmentService {
         result.madeToWait += 1;
         result.alerted += await this.alert(tx, request, step, correlationId);
       }
-      if (step.kind === 'NEED' || step.kind === 'SPEND_APPROVAL') holdersChanged = true;
     }
-
   }
 
   /** The request follows the step: waiting under control while a step waits, the state of the step once it is held. */
@@ -321,5 +318,4 @@ export class StepReassignmentService {
 
     return raised ? 1 : 0;
   }
-
 }

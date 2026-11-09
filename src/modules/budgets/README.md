@@ -9,6 +9,9 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
 
 ## Public API (`public/`)
 
+- `BudgetsReadApi` (`public/budgets-read.api.ts`) — `yearFacts` chỉ đọc, cùng `BudgetFactsRepo` với `BudgetsApi`.
+  `BudgetsReadFacadeModule` dùng cho kiểm ngân sách trong worker, không controller hoặc listener vòng đời.
+
 - `BudgetsApi` ([public/budgets.api.ts](public/budgets.api.ts)) — những gì request đọc và giữ; không hàm nào sửa
   ngân sách:
   - `yearFacts` — ngân sách hiện hành của từng năm cho một Cost Center (năm chưa có ngân sách thì vắng mặt).

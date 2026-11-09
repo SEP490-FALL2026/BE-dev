@@ -123,7 +123,9 @@ describe('the need step of a request that costs money over PostgreSQL (US-05-04 
       await h.decide(sent.id, { decision: 'APPROVE' }, bystander.account).expect(404);
       expect(await h.steps(sent.id, 'FINANCE_REVIEW')).toEqual([]);
       expect(await h.steps(sent.id, 'SPEND_APPROVAL')).toEqual([]);
-      const checks = await h.ctx.sql.query(`SELECT outcome FROM request_budget_checks WHERE request_id = $1`, [sent.id]);
+      const checks = await h.ctx.sql.query(`SELECT outcome FROM request_budget_checks WHERE request_id = $1`, [
+        sent.id,
+      ]);
       expect(checks.rows).toEqual([{ outcome: 'BLOCKED' }]);
       await h.makeHead(headless, newHead);
       expect(await h.state(sent.id)).toBe('AWAITING_REQUESTER_REVISION');

@@ -36,7 +36,8 @@ export const groupBodySchema = z.strictObject({
 });
 
 const LINE_REASONS = [
-  'HEAD_IN_GROUP', 'SPENDING_APPROVER',
+  'HEAD_IN_GROUP',
+  'SPENDING_APPROVER',
   'OUTSIDE_DEPARTMENT',
   'NOT_ACTIVE',
   'EMAIL_REQUIRED',
@@ -92,7 +93,6 @@ const lineDecisionSchema = z.strictObject({
   decision: z.enum(['APPROVED', 'REJECTED']),
   reason: z.string().nullable(),
   decidedBy: employeeRef,
-  /** `FALLBACK_APPROVER` and `CONFLICT_SUBSTITUTE` are historical: a decision of before `QĐ-93`; none is written now. */
   deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER']),
   decidedAt: z.iso.datetime(),
 });

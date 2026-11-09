@@ -171,15 +171,21 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
 
       const before = await h.requestRows();
       const response = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), u.head.account).expect(422);
-      expect(response.body as Refused).toMatchObject({ error: { code: 'GROUP_REQUEST.LINES_REFUSED',
-        details: { lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] } } });
+      expect(response.body as Refused).toMatchObject({
+        error: {
+          code: 'GROUP_REQUEST.LINES_REFUSED',
+          details: { lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] },
+        },
+      });
       expect(await h.requestRows()).toBe(before);
     });
 
     it('BR-MF1-02 check reports HEAD_IN_GROUP before the head can submit a line for themselves', async () => {
       const u = await unit();
       const [e1] = await h.colleagues(u, 1);
-      const checked = h.dataOf<CheckWire>(await h.checkGroup(h.groupBody(paid, [e1, u.head]), u.head.account).expect(200));
+      const checked = h.dataOf<CheckWire>(
+        await h.checkGroup(h.groupBody(paid, [e1, u.head]), u.head.account).expect(200),
+      );
       expect(checked.lines).toContainEqual({ employeeId: u.head.employeeId, ok: false, reason: 'HEAD_IN_GROUP' });
     });
 
@@ -227,8 +233,12 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
 
       const before = await h.requestRows();
       const response = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), e1.account).expect(422);
-      expect(response.body as Refused).toMatchObject({ error: { code: 'GROUP_REQUEST.LINES_REFUSED',
-        details: { lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] } } });
+      expect(response.body as Refused).toMatchObject({
+        error: {
+          code: 'GROUP_REQUEST.LINES_REFUSED',
+          details: { lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] },
+        },
+      });
       expect(await h.requestRows()).toBe(before);
     });
 
@@ -396,7 +406,8 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       );
 
       const ids = page.items.map((item) => item.employeeId);
-      expect(ids).toEqual(expect.arrayContaining([e1.employeeId, e2.employeeId, u.head.employeeId]));
+      expect(ids).toEqual(expect.arrayContaining([e1.employeeId, e2.employeeId]));
+      expect(ids).not.toContain(u.head.employeeId);
       expect(ids).not.toContain(left.employeeId);
       for (const item of page.items) expect(Object.keys(item).sort()).toEqual(['employeeId', 'fullName', 'workEmail']);
       const searched = h.dataOf<{ items: Array<{ employeeId: string }> }>(

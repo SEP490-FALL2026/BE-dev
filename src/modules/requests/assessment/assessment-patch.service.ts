@@ -52,5 +52,4 @@ export class AssessmentPatchService {
 
     return planId;
   }
-
 }

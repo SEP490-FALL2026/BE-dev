@@ -114,10 +114,11 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       expect(await h.requestRows()).toBe(before);
     });
 
-    it('is given to the person the routing table names, as for any request', async () => {
+    it('BR-MF1-02 sends a head own proposal directly to IT assessment without a need assignee', async () => {
       const proposed = await h.proposed(head);
 
-      expect(proposed.needStep.assignee?.employeeId).toBe(boss.employeeId);
+      expect(proposed.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
+      expect(proposed.state).toBe('AWAITING_IT_ASSESSMENT');
     });
 
     it('takes no day the money is expected to go out: the person does not know it, and the budget year is worked out from today', async () => {
@@ -312,7 +313,6 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
     it.each([
       ['vendorId', { vendorId: '00000000-0000-4000-8000-000000000000' }],
       ['equivalentPlanId', { equivalentPlanId: '00000000-0000-4000-8000-000000000000' }],
-      ['proposedBusinessOwnerEmployeeId', { proposedBusinessOwnerEmployeeId: '00000000-0000-4000-8000-000000000000' }],
     ])('refuses a %s that does not exist', async (field, body) => {
       const proposed = await awaiting();
 
@@ -320,6 +320,14 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
 
       expect(h.codeOf(response)).toBe('ASSESSMENT.REFERENCE_NOT_FOUND');
       expect(h.detailsOf(response)).toEqual({ field });
+    });
+
+    it('BR-MF1-05 refuses the retired Business Owner field at validation instead of looking up its employee', async () => {
+      const proposed = await awaiting();
+      const response = await save(proposed.id, {
+        proposedBusinessOwnerEmployeeId: '00000000-0000-4000-8000-000000000000',
+      }).expect(422);
+      expect(h.codeOf(response)).toBe('VALIDATION_ERROR');
     });
 
     it('names the vendor of the proposal after a vendor of the catalog when no name is given', async () => {

@@ -95,7 +95,8 @@ export class GroupSubmissionFactsService {
     const { today, unit, target, routing } = assessed;
     const headEmployeeId = routing.departmentHeadEmployeeId;
     const senderIsHead = headEmployeeId === input.senderEmployeeId;
-    if (senderIsHead && !assessed.policy.chain.includes('NEED')) assessed.policy = { ...assessed.policy, chain: ['NEED', ...assessed.policy.chain] };
+    if (senderIsHead && !assessed.policy.chain.includes('NEED'))
+      assessed.policy = { ...assessed.policy, chain: ['NEED', ...assessed.policy.chain] };
 
     const planRefusal = checkGroupPlan(target);
     const requested = input.lines.map((line) => line.employeeId);

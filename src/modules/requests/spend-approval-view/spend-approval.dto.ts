@@ -116,7 +116,10 @@ const budgetSnapshotSchema = z.strictObject({
 
 /** A request waiting for the approver: what it is, what it costs, and the first code of its check. */
 const approvalSummarySchema = z.strictObject({
-  routing: z.strictObject({ mode: z.enum(['VIA_HEAD', 'ONE_STEP']), oneStepReason: z.enum(['REQUESTER_IS_HEAD', 'NO_DEPARTMENT_HEAD', 'HEAD_LEFT']).nullable() }),
+  routing: z.strictObject({
+    mode: z.enum(['VIA_HEAD', 'ONE_STEP']),
+    oneStepReason: z.enum(['REQUESTER_IS_HEAD', 'NO_DEPARTMENT_HEAD', 'HEAD_LEFT']).nullable(),
+  }),
   requestId: z.uuid(),
   stepId: z.uuid(),
   /** The kind of step the row is, the same key the list of the need steps carries, so a client can put the two lists in one. */
@@ -159,7 +162,10 @@ const assessmentSchema = z.strictObject({
 
 /** What the spending approver sees of the request they decide, apart from the check, its years and the review of Finance. */
 const approvalDetailSchema = z.strictObject({
-  routing: z.strictObject({ mode: z.enum(['VIA_HEAD', 'ONE_STEP']), oneStepReason: z.enum(['REQUESTER_IS_HEAD', 'NO_DEPARTMENT_HEAD', 'HEAD_LEFT']).nullable() }),
+  routing: z.strictObject({
+    mode: z.enum(['VIA_HEAD', 'ONE_STEP']),
+    oneStepReason: z.enum(['REQUESTER_IS_HEAD', 'NO_DEPARTMENT_HEAD', 'HEAD_LEFT']).nullable(),
+  }),
   requestId: z.uuid(),
   step: z.strictObject({
     id: z.uuid(),

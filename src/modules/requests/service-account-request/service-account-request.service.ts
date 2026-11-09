@@ -172,7 +172,7 @@ export class ServiceAccountRequestService {
         ),
       );
 
-    await this.sender.startOneStep(tx, actor, created.id, now);
+      await this.sender.startOneStep(tx, actor, created.id, now);
       const record = await this.requests.findById(created.id, tx);
       if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
 

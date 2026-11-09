@@ -60,11 +60,17 @@ export function toSpendApiException(error: unknown): unknown {
  * (`OVER_RESERVE`, `NO_APPROVED_BUDGET` — also when the Cost Center changed — `PRICE_EXPIRED`), or it uses the reserve and the head has not
  * confirmed it (`RESERVE_UNCONFIRMED`). Nothing was decided; the requester and the head are told.
  */
-export function toRecheckedApiException(reasons: readonly ReturnReason[], to: 'HEAD' | 'REQUESTER' = 'HEAD', overBy?: string | null): ApiException {
+export function toRecheckedApiException(
+  reasons: readonly ReturnReason[],
+  to: 'HEAD' | 'REQUESTER' = 'HEAD',
+  overBy?: string | null,
+): ApiException {
   return new ApiException(HttpStatus.CONFLICT, {
     code: to === 'REQUESTER' ? 'SPEND.RECHECKED_RETURNED_TO_REQUESTER' : 'SPEND.RECHECKED_RETURNED_TO_HEAD',
     message:
-      'The request was checked again, is blocked or uses the reserve the head has not confirmed, and went back to its head. Nothing was decided.',
+      to === 'REQUESTER'
+        ? 'The request was checked again and went back to its requester for revision. Nothing was decided.'
+        : 'The request was checked again, is blocked or uses the reserve the head has not confirmed, and went back to its head. Nothing was decided.',
     details: { reasons: [...reasons], ...(to === 'REQUESTER' ? { overBy: overBy ?? null } : {}) },
   });
 }

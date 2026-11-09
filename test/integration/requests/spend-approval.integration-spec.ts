@@ -21,7 +21,6 @@ interface YearWire {
 interface DetailWire {
   step: {
     state: string;
-    samePersonAsSpend: boolean;
     assignee: { employeeId: string } | null;
   };
   request: { state: string };
@@ -321,11 +320,11 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
       expect(await records(id)).toEqual([]);
     });
 
-    it('has two records of two decisions, each flagged as one person, when the same person holds both steps (AC-7)', async () => {
-      // A head's own request goes to the spending approver for the need (row 2), who also holds the spend step.
+    it('BR-MF1-02 a head own request has one spend decision and no same-person flags', async () => {
       const { u } = await example();
       const sent = await h.sent(u.head, plan, { termMonths: 1 });
-      await h.decide(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
+      expect(sent.needStep.state).toBe('NOT_REQUIRED');
+      expect(sent.state).toBe('AWAITING_SPEND_DECISION');
       await h.setPayments(sent.id, { amount: 10 * M });
       const id = sent.id;
 
@@ -336,11 +335,16 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
         [id],
       );
       expect(all.rows.map((row) => [row.kind, row.same_person_as_spend]).sort()).toEqual([
-        ['NEED', true],
-        ['SPEND_APPROVAL', true],
+        ['NEED', false],
+        ['SPEND_APPROVAL', false],
       ]);
       const count = await h.ctx.sql.query(`SELECT 1 FROM approval_records WHERE request_id = $1`, [id]);
-      expect(count.rowCount).toBe(2);
+      expect(count.rowCount).toBe(1);
+      const needDecisions = await h.ctx.sql.query(
+        `SELECT 1 FROM approval_records r JOIN access_request_steps s ON s.id=r.step_id WHERE r.request_id=$1 AND s.kind='NEED'`,
+        [id],
+      );
+      expect(needDecisions.rows).toEqual([]);
     });
   });
 

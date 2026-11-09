@@ -119,7 +119,10 @@ export const requestSchema = z.strictObject({
   type: z.enum(['GRANT', 'SERVICE_ACCOUNT', 'RENEWAL', 'GROUP_GRANT']),
   branch: z.enum(['INTERNAL_FREE', 'PAID_IN_CATALOG', 'NEW_SOFTWARE']),
   state: requestStateSchema,
-  routing: z.strictObject({ mode: z.enum(['VIA_HEAD', 'ONE_STEP']), oneStepReason: z.enum(['REQUESTER_IS_HEAD', 'NO_DEPARTMENT_HEAD', 'HEAD_LEFT']).nullable() }),
+  routing: z.strictObject({
+    mode: z.enum(['VIA_HEAD', 'ONE_STEP']),
+    oneStepReason: z.enum(['REQUESTER_IS_HEAD', 'NO_DEPARTMENT_HEAD', 'HEAD_LEFT']).nullable(),
+  }),
   /** The plan asked for; null for software that is not in the catalog until the IT Admin registers and links it. */
   plan: z
     .strictObject({
@@ -191,9 +194,18 @@ export const requestSchema = z.strictObject({
    */
   spend: z
     .strictObject({
-      stage: z.enum(['NOT_SUBMITTED', 'RETURNED_TO_REQUESTER', 'RESERVE_CONFIRMATION', 'BLOCKED', 'WAITING_SPEND_DECISION', 'REFUSED']),
+      stage: z.enum([
+        'NOT_SUBMITTED',
+        'RETURNED_TO_REQUESTER',
+        'RESERVE_CONFIRMATION',
+        'BLOCKED',
+        'WAITING_SPEND_DECISION',
+        'REFUSED',
+      ]),
       /** Why the request is blocked, every reason that applies; empty unless the stage is `BLOCKED`. */
-      blockedReasons: z.array(z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING', 'RATE_MISSING'])).max(3),
+      blockedReasons: z
+        .array(z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING', 'RATE_MISSING']))
+        .max(3),
       /** How far over the base (it waits for the reserve to be confirmed) or over the reserve (blocked for that); null otherwise. */
       overBy: moneySchema.nullable(),
       /** What the spending approver wrote when they refused the request. */

@@ -110,7 +110,6 @@ export class GroupResolutionService {
     request: AccessRequestRecord,
   ): Promise<void> {
     await this.requests.setState(tx, request.id, 'AWAITING_SPEND_SUBMISSION');
-
   }
 
   private async reread(tx: DbTx, requestId: string): Promise<AccessRequestRecord> {

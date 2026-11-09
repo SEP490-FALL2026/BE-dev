@@ -36,6 +36,9 @@ export class LineDecisionRepo {
       where: { requestId },
       orderBy: [{ employeeId: 'asc' }, { stage: 'asc' }],
     });
-    return rows.map((row) => ({ ...row, deciderRole: row.deciderRole === 'MANAGER' ? 'MANAGER' : 'SPENDING_APPROVER' }));
+    return rows.map((row) => ({
+      ...row,
+      deciderRole: row.deciderRole === 'MANAGER' ? 'MANAGER' : 'SPENDING_APPROVER',
+    }));
   }
 }

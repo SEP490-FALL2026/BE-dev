@@ -151,7 +151,6 @@ export function lineSpendDecidedDetail(
 /** What the audit entry of the whole spend decision says: what was checked, the reserve it used, who was approved and who refused. */
 export function groupSpendDecidedDetail(
   request: { id: string; routing?: { mode: string } },
-  step: { id: string; samePersonAsSpend?: boolean },
   decided: {
     verdicts: readonly LineVerdict[];
     checkId: string | null;

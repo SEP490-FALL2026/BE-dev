@@ -1,3 +1,4 @@
+import type { BillingCycleCode, MissingPriceReason, PricingRecord } from './access-request.types';
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addMonths, fiscalYearOf } from '../../../core/fiscal-year';
 import { MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
@@ -9,8 +10,6 @@ import { MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
  * the plan in the catalog, never from a person's hand. When there is no price nothing is guessed: the request is _missing
  * its price_ and cannot be sent on to be decided as spend (`QĐ-84e`).
  */
-
-export type BillingCycleCode = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
 
 const CYCLE_MONTHS: Readonly<Record<Exclude<BillingCycleCode, 'OTHER'>, number>> = {
   MONTHLY: 1,
@@ -38,8 +37,6 @@ export interface PricingInput {
   /** The day the right ends; null when it has no end, so the amount runs to the end of the year. */
   endDate: BusinessDate | null;
 }
-
-export type MissingPriceReason = 'NO_PRICED_SUBSCRIPTION' | 'CYCLE_UNKNOWN' | 'AMOUNT_TOO_LARGE' | 'AWAITING_QUOTE';
 
 export type Pricing =
   | {
@@ -175,4 +172,71 @@ export function requestAmountOf(input: PricingInput): Pricing {
     months,
     nextYearAmountMinor: null,
   });
+}
+
+export interface RequestPriceInput extends Pick<PricingInput, 'beneficiaries' | 'checkDate' | 'endDate' | 'from'> {
+  planId: string;
+  free: boolean;
+}
+
+export interface RequestPlanPrice {
+  kind: 'RECURRING' | 'ONE_TIME';
+  unitPrice: Money;
+  billingCycle: BillingCycleCode;
+}
+
+/** What a request for internal software costs: nothing, and no day the money goes out. */
+const NOT_APPLICABLE_PRICING: PricingRecord = {
+  status: 'NOT_APPLICABLE',
+  missingReason: null,
+  kind: null,
+  expectedEndDate: null,
+  amountMonths: null,
+  budgetYear: null,
+  amount: null,
+  unitPrice: null,
+  billingCycle: null,
+  nextYearAmount: null,
+};
+
+/** The same stored pricing record for intake and worker repricing, from the same plan-price facts. */
+export function pricingRecordFor(input: RequestPriceInput, price: RequestPlanPrice | null): PricingRecord {
+  if (input.free) return { ...NOT_APPLICABLE_PRICING, expectedEndDate: input.endDate };
+  const kind = price?.kind ?? 'RECURRING';
+  const priced = requestAmountOf({
+    kind,
+    unitPrice: price?.unitPrice ?? null,
+    billingCycle: price?.billingCycle ?? null,
+    beneficiaries: input.beneficiaries,
+    checkDate: input.checkDate,
+    from: input.from,
+    endDate: input.endDate,
+  });
+  if (priced.status === 'MISSING') {
+    return {
+      status: 'MISSING',
+      missingReason: priced.reason,
+      kind: price?.kind ?? null,
+      budgetYear: priced.budgetYear,
+      expectedEndDate: input.endDate,
+      amountMonths: null,
+      amount: null,
+      unitPrice: null,
+      billingCycle: null,
+      nextYearAmount: null,
+    };
+  }
+
+  return {
+    status: 'PRICED',
+    missingReason: null,
+    kind,
+    budgetYear: priced.budgetYear,
+    expectedEndDate: input.endDate,
+    amountMonths: priced.months,
+    amount: priced.amount,
+    unitPrice: priced.unitPrice,
+    billingCycle: priced.billingCycle,
+    nextYearAmount: priced.nextYearAmount,
+  };
 }

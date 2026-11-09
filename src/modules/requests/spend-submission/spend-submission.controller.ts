@@ -244,7 +244,12 @@ export class SpendSubmissionController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only the current head supplements a via-head request; only the requester supplements a one-step request (SPEND.NOT_HEAD, ACCESS_REQUEST.NOT_REQUESTER).', examples: [SPEND_ERROR_EXAMPLES.NOT_HEAD, ACCESS_REQUEST_ERROR_EXAMPLES.NOT_REQUESTER] },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only the current head supplements a via-head request; only the requester supplements a one-step request (SPEND.NOT_HEAD, ACCESS_REQUEST.NOT_REQUESTER).',
+      examples: [SPEND_ERROR_EXAMPLES.NOT_HEAD, ACCESS_REQUEST_ERROR_EXAMPLES.NOT_REQUESTER],
+    },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,

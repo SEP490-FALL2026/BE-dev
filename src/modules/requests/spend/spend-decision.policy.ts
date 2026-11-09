@@ -66,7 +66,6 @@ export function judgeApproval(
 export function spendDecisionRecordOf(
   of: {
     request: { id: string; routing?: { mode: string } };
-    step: { id: string; samePersonAsSpend?: boolean };
   },
   decided: {
     decision: 'APPROVED' | 'REJECTED';

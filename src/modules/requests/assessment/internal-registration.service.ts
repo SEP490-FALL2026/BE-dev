@@ -85,17 +85,28 @@ export class InternalRegistrationService {
       const standsIn = await this.gate.finishStep(tx, requestId, actor, { now });
       await this.assessments.complete(tx, requestId, actor.employeeId, now);
       await this.auditRegistered(tx, actor, request, { registered, body, withSpend, standsIn });
-      if (request.routing?.mode === 'ONE_STEP') {
-        const registeredRequest = await this.requests.findById(requestId, tx);
-        if (registeredRequest && withSpend) await this.spending.route(tx, actor, registeredRequest, 'SUBMISSION', now);
-        if (registeredRequest && !withSpend) await this.spending.start(tx, actor, requestId, now);
-      }
+      await this.startOneStep(tx, actor, requestId, request.routing?.mode === 'ONE_STEP', withSpend, now);
 
       const record = await this.requests.findById(requestId, tx);
       if (!record) throw new Error(`The request ${requestId} was not found after its software was registered.`);
 
       return record;
     });
+  }
+
+  private async startOneStep(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    id: string,
+    oneStep: boolean,
+    withSpend: boolean,
+    now: Date,
+  ): Promise<void> {
+    if (!oneStep) return;
+    const request = await this.requests.findById(id, tx);
+    if (!request) return;
+    if (withSpend) await this.spending.route(tx, actor, request, 'SUBMISSION', now);
+    else await this.spending.start(tx, actor, id, now);
   }
 
   private async auditRegistered(

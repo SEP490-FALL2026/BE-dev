@@ -35,8 +35,10 @@ const refuse = (status: HttpStatus, code: string, message: string): ApiException
 /** Maps the errors of the request routes to their HTTP answers; a database that cannot answer is a 503. */
 export function toAccessRequestApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
-  if (error instanceof AccessRequestNotRequesterError) return refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.NOT_REQUESTER', error.message);
-  if (error instanceof AccessRequestNotAwaitingRevisionError) return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_AWAITING_REVISION', error.message);
+  if (error instanceof AccessRequestNotRequesterError)
+    return refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.NOT_REQUESTER', error.message);
+  if (error instanceof AccessRequestNotAwaitingRevisionError)
+    return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_AWAITING_REVISION', error.message);
 
   if (error instanceof AccessRequestNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'ACCESS_REQUEST.NOT_FOUND', error.message);

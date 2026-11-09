@@ -72,7 +72,10 @@ describe('a row of the queue of the spending approver (US-06-01 AC-1)', () => {
   });
 
   it('BR-MF1-02 shows one-step routing without the retired same-person flag', () => {
-    const wire = approvalSummaryOf(row({ routingMode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' }), lookups({ batches: new Map() }));
+    const wire = approvalSummaryOf(
+      row({ routingMode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' }),
+      lookups({ batches: new Map() }),
+    );
     expect(wire).toMatchObject({ routing: { mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' }, batchId: null });
     expect(wire).not.toHaveProperty('samePersonAsSpend');
   });
@@ -163,9 +166,14 @@ describe('the spend step of one request and what surrounds it (US-06-01 AC-3, AC
 
   it('BR-MF1-02 one-step detail has no need decision and no retired flags', () => {
     const original = facts();
-    const wire = approvalDetailOf({ ...original, request: {
-      ...original.request, routing: { mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' }, needDecision: null,
-    } });
+    const wire = approvalDetailOf({
+      ...original,
+      request: {
+        ...original.request,
+        routing: { mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' },
+        needDecision: null,
+      },
+    });
     expect(wire.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' });
     expect(wire.need).toBeNull();
     expect(wire.step).not.toHaveProperty('samePersonAsSpend');

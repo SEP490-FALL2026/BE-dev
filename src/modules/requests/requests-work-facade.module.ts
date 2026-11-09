@@ -1,5 +1,5 @@
 import { OneStepConversionService } from './reassignment/one-step-conversion.service';
-import { RequestsRoutingModule } from './requests-routing.module';
+import { RequestsRoutingFacadeModule } from './requests-routing-facade.module';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
@@ -49,7 +49,7 @@ import { StepSlaService } from './sla/step-sla.service';
  */
 @Module({
   imports: [
-    RequestsRoutingModule,
+    RequestsRoutingFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
@@ -90,7 +90,7 @@ import { StepSlaService } from './sla/step-sla.service';
     StepSlaSweepApi,
   ],
   exports: [
-    RequestsRoutingModule,
+    RequestsRoutingFacadeModule,
     StepRedeterminationSweepApi,
     RequestStatusProjectorApi,
     StepSlaSweepApi,

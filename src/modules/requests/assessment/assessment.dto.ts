@@ -85,16 +85,23 @@ export const catalogLinkBodySchema = z.strictObject({ planId: z.uuid() });
  * software that is not eligible for the catalog (there is no outcome for free software, `QĐ-82n`), the reason that must
  * go with it, and the alternative when the IT Admin has one: a plan of the catalog, a note, or neither.
  */
-export const assessmentRejectionBodySchema = z.strictObject({
-  kind: z.enum(['UNCONTROLLABLE', 'NOT_ELIGIBLE']),
-  reason: text(REASON_MAX_LENGTH),
-  alternativePlanId: z.uuid().optional(),
-  alternativeNote: text(REASON_MAX_LENGTH).optional(),
-}).superRefine((body, context) => {
-  if (body.kind === 'UNCONTROLLABLE' && body.alternativePlanId === undefined && body.alternativeNote === undefined) {
-    context.addIssue({ code: 'custom', path: ['alternativeNote'], message: 'Give an alternative plan or note for software that cannot be controlled.' });
-  }
-}).meta({ description: 'UNCONTROLLABLE requires alternativePlanId or alternativeNote.' });
+export const assessmentRejectionBodySchema = z
+  .strictObject({
+    kind: z.enum(['UNCONTROLLABLE', 'NOT_ELIGIBLE']),
+    reason: text(REASON_MAX_LENGTH),
+    alternativePlanId: z.uuid().optional(),
+    alternativeNote: text(REASON_MAX_LENGTH).optional(),
+  })
+  .superRefine((body, context) => {
+    if (body.kind === 'UNCONTROLLABLE' && body.alternativePlanId === undefined && body.alternativeNote === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['alternativeNote'],
+        message: 'Give an alternative plan or note for software that cannot be controlled.',
+      });
+    }
+  })
+  .meta({ description: 'UNCONTROLLABLE requires alternativePlanId or alternativeNote.' });
 
 /**
  * Registering software the company built itself (`US-05-20`): its Business Owner, who must still work, and the name when it

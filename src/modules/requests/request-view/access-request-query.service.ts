@@ -26,7 +26,10 @@ export interface NeedDecisionView extends Omit<ApprovalRecordRecord, 'decidedByE
   decidedBy: EmployeeRefView;
 }
 
-export interface NeedStepView extends Omit<NeedStepRecord, 'assigneeEmployeeId' | 'samePersonAsSpend' | 'slaWorkingDays'> {
+export interface NeedStepView extends Omit<
+  NeedStepRecord,
+  'assigneeEmployeeId' | 'samePersonAsSpend' | 'slaWorkingDays'
+> {
   assignee: EmployeeRefView | null;
   slaWorkingDays: number | null;
 }
@@ -198,7 +201,9 @@ export class AccessRequestQueryService {
       throw new Error(`The request ${record.id} points at a missing record.`);
     }
 
-    const { assigneeEmployeeId, samePersonAsSpend: _retiredFlag, ...step } = needStep;
+    const { assigneeEmployeeId, ...legacyStep } = needStep;
+    const step = { ...legacyStep };
+    Reflect.deleteProperty(step, 'samePersonAsSpend');
     const decision = record.needDecision;
 
     return {
@@ -254,7 +259,11 @@ export class AccessRequestQueryService {
             },
       serviceAccount: this.serviceAccountOf(record.serviceAccount, person),
       renewal: this.renewalOf(record.renewal),
-      needStep: { ...step, slaWorkingDays: step.state === 'NOT_REQUIRED' ? null : step.slaWorkingDays, assignee: assigneeEmployeeId === null ? null : person(assigneeEmployeeId) },
+      needStep: {
+        ...step,
+        slaWorkingDays: step.state === 'NOT_REQUIRED' ? null : step.slaWorkingDays,
+        assignee: assigneeEmployeeId === null ? null : person(assigneeEmployeeId),
+      },
       needDecision:
         decision === null
           ? null

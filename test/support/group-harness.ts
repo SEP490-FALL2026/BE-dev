@@ -156,6 +156,7 @@ export class GroupHarness extends StatusHarness {
       routing_row: number;
       assignee_employee_id: string | null;
       same_person_as_spend: boolean;
+      waiting_reason: string | null;
     }>
   > {
     return (
@@ -165,8 +166,9 @@ export class GroupHarness extends StatusHarness {
         routing_row: number;
         assignee_employee_id: string | null;
         same_person_as_spend: boolean;
+        waiting_reason: string | null;
       }>(
-        `SELECT id, state::text, routing_row, assignee_employee_id, same_person_as_spend FROM access_request_steps
+        `SELECT id, state::text, routing_row, assignee_employee_id, same_person_as_spend, waiting_reason FROM access_request_steps
           WHERE request_id = $1 AND kind = 'NEED' ORDER BY sequence`,
         [requestId],
       )

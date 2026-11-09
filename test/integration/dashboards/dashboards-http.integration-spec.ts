@@ -147,7 +147,9 @@ describe('role overviews (integration, real PostgreSQL)', () => {
     it('BR-MF1-02/07: counts a request awaiting requester revision as open and removes it only when withdrawn', async () => {
       const person = await h.employeeIn(des.department, 'D-REVISION');
       const sent = await h.sent(person, await h.plan('K5'));
-      await h.ctx.sql.query(`UPDATE access_requests SET state = 'AWAITING_REQUESTER_REVISION' WHERE id = $1`, [sent.id]);
+      await h.ctx.sql.query(`UPDATE access_requests SET state = 'AWAITING_REQUESTER_REVISION' WHERE id = $1`, [
+        sent.id,
+      ]);
 
       expect((await overviewOf(OVERVIEW_PATHS.employee, person.account)).sections.requests).toEqual(
         countedAs(1, 'meAccessRequestList'),

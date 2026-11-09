@@ -11,9 +11,14 @@ import { shouldConvertOneStep } from '../step-routing/one-step-conversion.policy
 /** Marking runs in the organization transaction; completing uses a separate transaction and the standard budget check. */
 @Injectable()
 export class OneStepConversionService {
-  constructor(private readonly runner: TransactionRunner, private readonly requests: AccessRequestRepo,
-    private readonly repo: StepReassignmentRepo, private readonly organization: OrganizationReadApi,
-    private readonly spending: SpendRoutingService, private readonly audit: AuditApi) {}
+  constructor(
+    private readonly runner: TransactionRunner,
+    private readonly requests: AccessRequestRepo,
+    private readonly repo: StepReassignmentRepo,
+    private readonly organization: OrganizationReadApi,
+    private readonly spending: SpendRoutingService,
+    private readonly audit: AuditApi,
+  ) {}
 
   async markForDepartment(tx: DbTx, departmentId: string, now: Date): Promise<number> {
     await this.organization.lockDepartmentShared(tx, departmentId);
@@ -26,9 +31,29 @@ export class OneStepConversionService {
     for (const id of await this.repo.conversionIds(departmentId, tx)) {
       const request = await this.requests.lockById(tx, id);
       if (await this.repo.hasOpenSpend(tx, id)) continue;
-      if (!request || !shouldConvertOneStep({ paid: request.branch !== 'INTERNAL_FREE', mode: request.routing?.mode ?? 'VIA_HEAD', state: request.state, hasHead: false, successorRecorded: false })) continue;
+      if (
+        !request ||
+        !shouldConvertOneStep({
+          paid: request.branch !== 'INTERNAL_FREE',
+          mode: request.routing?.mode ?? 'VIA_HEAD',
+          state: request.state,
+          hasHead: false,
+          successorRecorded: false,
+        })
+      )
+        continue;
       await this.repo.markOneStep(tx, id, now);
-      await this.audit.record(tx, accessRequestAuditEvent(null, request.organizationId, 'ACCESS_REQUEST.CONVERTED_ONE_STEP', 'ACCESS_REQUEST', id, { requestId: id, oneStepReason: 'HEAD_LEFT' }));
+      await this.audit.record(
+        tx,
+        accessRequestAuditEvent(
+          null,
+          request.organizationId,
+          'ACCESS_REQUEST.CONVERTED_ONE_STEP',
+          'ACCESS_REQUEST',
+          id,
+          { requestId: id, oneStepReason: 'HEAD_LEFT' },
+        ),
+      );
       marked++;
     }
     return marked;
@@ -40,12 +65,19 @@ export class OneStepConversionService {
     }
   }
 
-  pendingIds(): Promise<string[]> { return this.repo.oneStepPendingIds(); }
+  pendingIds(): Promise<string[]> {
+    return this.repo.oneStepPendingIds();
+  }
 
   async finishPending(id: string, now: Date): Promise<boolean> {
     return this.runner.run(async (tx) => {
       const request = await this.requests.lockById(tx, id);
-      if (!request || request.routing?.mode !== 'ONE_STEP' || !['PENDING', 'WAITING_CONTROLLED', 'AWAITING_SPEND_SUBMISSION'].includes(request.state)) return false;
+      if (
+        !request ||
+        request.routing?.mode !== 'ONE_STEP' ||
+        !['PENDING', 'WAITING_CONTROLLED', 'AWAITING_SPEND_SUBMISSION'].includes(request.state)
+      )
+        return false;
       // A worker that was slower than a second worker does not open a second spend step.
       await this.spending.finishConversion(tx, request, now);
       return true;

@@ -234,7 +234,9 @@ describe('the need of the people of a request for a group, decided one by one ov
       const before = await h.requestRows();
       const refused = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), u.head.account).expect(422);
       expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
-      expect(h.detailsOf(refused)).toMatchObject({ lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] });
+      expect(h.detailsOf(refused)).toMatchObject({
+        lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }],
+      });
       expect(await h.requestRows()).toBe(before);
     });
 
@@ -244,7 +246,9 @@ describe('the need of the people of a request for a group, decided one by one ov
       const before = await h.requestRows();
       const refused = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), e1.account).expect(422);
       expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
-      expect(h.detailsOf(refused)).toMatchObject({ lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] });
+      expect(h.detailsOf(refused)).toMatchObject({
+        lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }],
+      });
       expect(await h.requestRows()).toBe(before);
     });
   });
@@ -262,7 +266,11 @@ describe('the need of the people of a request for a group, decided one by one ov
       await h.sweep();
 
       const [step] = await h.needSteps(request.id);
-      expect(step).toMatchObject({ state: 'WAITING', assignee_employee_id: null, waiting_reason: 'NO_DEPARTMENT_HEAD' });
+      expect(step).toMatchObject({
+        state: 'WAITING',
+        assignee_employee_id: null,
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
+      });
       const own = await h
         .decideLines(request.id, { lines: [approve(e1.employeeId), approve(e2.employeeId)] }, e2.account)
         .expect(403);

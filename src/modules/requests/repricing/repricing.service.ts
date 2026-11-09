@@ -8,7 +8,8 @@ import { AccessRequestNotPriceableError } from '../access-request/access-request
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import { priceFromQuote, pricingRecordOfQuote } from './quote-pricing.policy';
-import { RequestFactsService } from '../access-request/request-facts.service';
+import { pricingRecordFor } from '../access-request/pricing.policy';
+import { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 
 /** The people a request is priced for: all of them, and for a group those who have not been refused, withdrawn or left out. */
 const peopleOf = (request: AccessRequestRecord): number =>
@@ -25,7 +26,7 @@ const peopleOf = (request: AccessRequestRecord): number =>
 @Injectable()
 export class RepricingService {
   constructor(
-    private readonly assessment: RequestFactsService,
+    private readonly catalog: CatalogPricingApi,
     private readonly assessments: AssessmentReadRepo,
   ) {}
 
@@ -36,14 +37,17 @@ export class RepricingService {
       // has not reached yet (`QĐ-109b`).
       const { renewal } = request;
 
-      return this.assessment.priceFor(tx, {
-        planId: request.planId,
-        free: false,
-        beneficiaries: peopleOf(request),
-        checkDate: asOf,
-        endDate: renewal ? renewal.newExpectedEndDate : request.expectedEndDate,
-        from: renewal ? renewalStartOf({ previousEnd: renewal.previousExpectedEndDate, today: asOf }) : undefined,
-      });
+      return pricingRecordFor(
+        {
+          planId: request.planId,
+          free: false,
+          beneficiaries: peopleOf(request),
+          checkDate: asOf,
+          endDate: renewal ? renewal.newExpectedEndDate : request.expectedEndDate,
+          from: renewal ? renewalStartOf({ previousEnd: renewal.previousExpectedEndDate, today: asOf }) : undefined,
+        },
+        await this.catalog.getPlanPrice(request.planId, tx),
+      );
     }
     if (request.branch !== 'NEW_SOFTWARE') throw new AccessRequestNotPriceableError();
 

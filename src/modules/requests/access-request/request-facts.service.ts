@@ -14,7 +14,7 @@ import {
 } from './access-request.errors';
 import { hasSpendStep, policyFor, proposalPolicy, type RequestPolicy } from './access-request.policy';
 import type { PricingRecord } from './access-request.types';
-import { maxEndDateOf, requestAmountOf } from './pricing.policy';
+import { maxEndDateOf, pricingRecordFor, type RequestPriceInput } from './pricing.policy';
 import { RoutingFactsService, type GatheredRouting } from './routing-facts.service';
 import { routeNeedStep, requestRoutingOf, type RoutingDecision } from './routing.policy';
 
@@ -94,20 +94,6 @@ export interface AssessmentInput {
  * person already holds, and who the routing table gives the need step to.
  * It writes nothing and decides nothing: the callers refuse or record.
  */
-/** What a request for internal software costs: nothing, and no day the money goes out. */
-const NOT_APPLICABLE_PRICING: PricingRecord = {
-  status: 'NOT_APPLICABLE',
-  missingReason: null,
-  kind: null,
-  expectedEndDate: null,
-  amountMonths: null,
-  budgetYear: null,
-  amount: null,
-  unitPrice: null,
-  billingCycle: null,
-  nextYearAmount: null,
-};
-
 @Injectable()
 export class RequestFactsService {
   constructor(
@@ -167,7 +153,11 @@ export class RequestFactsService {
       today,
       unit,
       target,
-      policy: policyFor(target.applicationKind, input.settings.slaWorkingDays, requestRoutingOf(routeNeedStep(gathered.facts))),
+      policy: policyFor(
+        target.applicationKind,
+        input.settings.slaWorkingDays,
+        requestRoutingOf(routeNeedStep(gathered.facts)),
+      ),
       pricing,
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
       heldAccess: await this.heldAccess(input.employeeId, input.planId),
@@ -264,57 +254,7 @@ export class RequestFactsService {
    * missing price that says why. The price is the one of the main subscription of the plan, never a department's. `checkDate` is
    * the day the amount is worked out on (`QĐ-109e`): the day of sending for a provisional amount, later the day of each check.
    */
-  async priceFor(
-    tx: DbTx,
-    input: {
-      planId: string;
-      free: boolean;
-      beneficiaries: number;
-      checkDate: BusinessDate;
-      /** The day the right ends; null for a right with no end. */
-      endDate: BusinessDate | null;
-      /** The start of the new period of a request to go on using, when it is not the check date (`QĐ-109b`). */
-      from?: BusinessDate;
-    },
-  ): Promise<PricingRecord> {
-    if (input.free) return { ...NOT_APPLICABLE_PRICING, expectedEndDate: input.endDate };
-    const price = await this.catalog.getPlanPrice(input.planId, tx);
-    const kind = price?.kind ?? 'RECURRING';
-    const priced = requestAmountOf({
-      kind,
-      unitPrice: price?.unitPrice ?? null,
-      billingCycle: price?.billingCycle ?? null,
-      beneficiaries: input.beneficiaries,
-      checkDate: input.checkDate,
-      from: input.from,
-      endDate: input.endDate,
-    });
-    if (priced.status === 'MISSING') {
-      return {
-        status: 'MISSING',
-        missingReason: priced.reason,
-        kind: price?.kind ?? null,
-        budgetYear: priced.budgetYear,
-        expectedEndDate: input.endDate,
-        amountMonths: null,
-        amount: null,
-        unitPrice: null,
-        billingCycle: null,
-        nextYearAmount: null,
-      };
-    }
-
-    return {
-      status: 'PRICED',
-      missingReason: null,
-      kind,
-      budgetYear: priced.budgetYear,
-      expectedEndDate: input.endDate,
-      amountMonths: priced.months,
-      amount: priced.amount,
-      unitPrice: priced.unitPrice,
-      billingCycle: priced.billingCycle,
-      nextYearAmount: priced.nextYearAmount,
-    };
+  async priceFor(tx: DbTx, input: RequestPriceInput): Promise<PricingRecord> {
+    return pricingRecordFor(input, input.free ? null : await this.catalog.getPlanPrice(input.planId, tx));
   }
 }

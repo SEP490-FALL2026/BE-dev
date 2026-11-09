@@ -70,7 +70,7 @@ export function submissionEvents(
           assigneeEmployeeId: step.assigneeEmployeeId,
           role: entry.confirmedBySending ? 'MANAGER' : null,
           waitingReason: step.waitingReason,
-                  requesterEmployeeId: actor.employeeId,
+          requesterEmployeeId: actor.employeeId,
           beneficiaryEmployeeIds: entry.lines.map((line) => line.employeeId),
           type: 'GROUP_GRANT',
           lineCount: entry.lines.length,

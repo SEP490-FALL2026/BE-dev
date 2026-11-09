@@ -45,7 +45,8 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
     if (concerned === null) return;
 
     const waiting = await this.repo.waitingRequestIds(tx);
-    const conversionIds = change.kind === 'HEAD_PERIOD_END' ? await this.repo.conversionIds(change.departmentId, tx) : [];
+    const conversionIds =
+      change.kind === 'HEAD_PERIOD_END' ? await this.repo.conversionIds(change.departmentId, tx) : [];
     // Both operations below may take request locks. Take their union first, globally sorted, before either mutates a subset.
     await this.repo.lockIds(tx, [...concerned.requestIds, ...waiting, ...conversionIds]);
     if (change.kind === 'HEAD_PERIOD_END') await this.oneStep.markForDepartment(tx, change.departmentId, new Date());

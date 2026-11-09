@@ -119,7 +119,6 @@ describe('the queue of the need steps of the person who holds them (integration,
         // The term is the day it ends now, the last day of the sixth month (`QĐ-104a`), not months.
         termMonths: null,
         expectedEndDate: h.endDated({ termMonths: 6 }).expectedEndDate,
-        samePersonAsSpend: false,
         pricing: { status: 'PRICED' },
       });
       // The head confirms the need alone: no line of the plan is asked, and no term needs a confirmation (QĐ-101n, QĐ-98).
@@ -200,32 +199,27 @@ describe('the queue of the need steps of the person who holds them (integration,
       expect(engineeringIds).not.toContain(mine.id);
     });
 
-    it('never shows the head the request they sent for themselves: the spending approver decides its need', async () => {
+    it('BR-MF1-02 never shows anybody a need step for the request a head sent for themselves: it is one-step and has none', async () => {
       const own = await h.sent(design.head, internal, { termMonths: 1 });
 
-      expect(own.needStep).toMatchObject({ routingRow: 2, assignee: { employeeId: h.boss.employeeId } });
+      expect(own.needStep).toMatchObject({ routingRow: 2, state: 'NOT_REQUIRED', assignee: null });
       expect(await idsOf(design.head.account)).not.toContain(own.id);
-      const [row] = (await queue(h.boss.account)).filter((item) => item.requestId === own.id);
-      expect(row).toMatchObject({
-        stepKind: 'NEED',
-        deciderRole: 'SPENDING_APPROVER',
-        requester: { employeeId: design.head.employeeId },
-      });
+      expect(await idsOf(h.boss.account)).not.toContain(own.id);
       expect(await idsOf(design.member.account)).not.toContain(own.id);
     });
 
-    it('flags a head request the approver decides as held by one person for both steps, and drops it once its need is decided', async () => {
+    it('BR-MF1-02 gives the approver no need step of a head request, paid or not: the spend step is the only one it has', async () => {
       const own = await h.sent(design.head, plan, { termMonths: 1 });
-      const need = (await queue(h.boss.account)).find((item) => item.requestId === own.id);
-      expect(need).toMatchObject({ stepKind: 'NEED', samePersonAsSpend: true });
 
-      await request(h.server())
+      expect(
+        (await queue(h.boss.account)).find((item) => item.requestId === own.id && item.stepKind === 'NEED'),
+      ).toBeUndefined();
+      const refused = await request(h.server())
         .post(`/api/v1/access-requests/${own.id}/need-decision`)
         .set(h.as(h.boss.account))
-        .send({ decision: 'APPROVE' })
-        .expect(200);
-
-      expect(await idsOf(h.boss.account)).not.toContain(own.id);
+        .send({ decision: 'APPROVE' });
+      // There is no need step to decide: the route has none for the approver to reach.
+      expect([403, 404, 409]).toContain(refused.status);
     });
   });
 
@@ -278,27 +272,18 @@ describe('the queue of the need steps of the person who holds them (integration,
       expect(await idsOf(u.head.account)).not.toContain(sent.id);
     });
 
-    it('gives the line of the head to the spending approver, and the rest of the group to nobody, since the head confirmed it by sending', async () => {
+    it('BR-MF1-02 refuses a group that names the head (HEAD_IN_GROUP), so there is no line of the head for the approver to decide', async () => {
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
-      const sent = h.dataOf<{ request: { id: string } }>(
-        await h.submitGroup(h.groupBody(plan, [e1, e2, u.head]), u.head.account).expect(201),
-      ).request;
+      const before = await h.requestRows();
 
-      expect(await idsOf(u.head.account)).not.toContain(sent.id);
-      const [item] = (await queue(h.boss.account)).filter((row) => row.requestId === sent.id);
-      expect(item).toMatchObject({
-        type: 'GROUP_GRANT',
-        deciderRole: 'SPENDING_APPROVER',
-        lineCount: 1,
-        beneficiary: null,
+      const refused = await h.submitGroup(h.groupBody(plan, [e1, e2, u.head]), u.head.account).expect(422);
+
+      expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+      expect(h.detailsOf(refused)).toMatchObject({
+        lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }],
       });
-      expect(await idsOf(e1.account)).not.toContain(sent.id);
-
-      await h
-        .decideLines(sent.id, { lines: [{ employeeId: u.head.employeeId, decision: 'APPROVE' }] }, h.boss.account)
-        .expect(200);
-      expect(await idsOf(h.boss.account)).not.toContain(sent.id);
+      expect(await h.requestRows()).toBe(before);
     });
 
     it('filters by the kind of request, so a phone that does not decide groups can leave them out', async () => {

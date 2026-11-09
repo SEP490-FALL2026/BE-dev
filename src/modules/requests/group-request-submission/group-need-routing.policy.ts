@@ -47,15 +47,32 @@ export function planNeedSteps<Line extends { employeeId: string }>(
   input: NeedRoutingInput<Line>,
 ): PlannedNeedStep<Line>[] {
   const { slaWorkingDays } = input;
-  if (input.senderIsHead) return [{ lines: [...input.lines], confirmedBySending: true, step: held(input.senderEmployeeId, SENT_BY_HEAD_ROW, slaWorkingDays) }];
+  if (input.senderIsHead)
+    return [
+      {
+        lines: [...input.lines],
+        confirmedBySending: true,
+        step: held(input.senderEmployeeId, SENT_BY_HEAD_ROW, slaWorkingDays),
+      },
+    ];
   const decision = routeNeedStep(input.facts);
   const oneStep = decision.outcome === 'NOT_REQUIRED';
-  const planned: PlannedNeedStep<Line>[] = [{
-    lines: [...input.lines], confirmedBySending: false,
-    step: decision.outcome === 'ASSIGNED'
-      ? held(decision.assigneeEmployeeId, SENT_BY_EMPLOYEE_ROW, slaWorkingDays)
-      : { state: oneStep ? 'NOT_REQUIRED' : 'WAITING', assigneeEmployeeId: null, routingRow: decision.row, waitingReason: decision.reason, slaWorkingDays },
-  }];
+  const planned: PlannedNeedStep<Line>[] = [
+    {
+      lines: [...input.lines],
+      confirmedBySending: false,
+      step:
+        decision.outcome === 'ASSIGNED'
+          ? held(decision.assigneeEmployeeId, SENT_BY_EMPLOYEE_ROW, slaWorkingDays)
+          : {
+              state: oneStep ? 'NOT_REQUIRED' : 'WAITING',
+              assigneeEmployeeId: null,
+              routingRow: decision.row,
+              waitingReason: decision.reason,
+              slaWorkingDays,
+            },
+    },
+  ];
 
   return planned;
 }
@@ -90,7 +107,10 @@ export function groupLineRowsOf<Line extends { employeeId: string; expectedEndDa
     entry.lines.map((line) => ({
       requestId,
       employeeId: line.employeeId,
-      state: entry.confirmedBySending || entry.step.state === 'NOT_REQUIRED' ? ('NEED_CONFIRMED' as const) : ('AWAITING_NEED' as const),
+      state:
+        entry.confirmedBySending || entry.step.state === 'NOT_REQUIRED'
+          ? ('NEED_CONFIRMED' as const)
+          : ('AWAITING_NEED' as const),
       needStepId: stepIds[index],
       expectedEndDate: line.expectedEndDate ?? null,
     })),

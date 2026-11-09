@@ -53,7 +53,7 @@ export class SpendDecisionRecorder {
     decided: SpendDecided,
   ): Promise<SpendDecisionResult> {
     const { request, step, now } = of;
-    const recorded = spendDecisionRecordOf({ request, step }, decided);
+    const recorded = spendDecisionRecordOf({ request }, decided);
     await this.decisions.record(tx, {
       organizationId: request.organizationId,
       requestId: request.id,

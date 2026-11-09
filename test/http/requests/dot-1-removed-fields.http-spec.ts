@@ -41,13 +41,19 @@ function without(value: object, at: string, field: string): object {
 const DROPPED: Call[] = [
   {
     name: 'BR-MF1-05 SBF-15 assessment no longer accepts proposedBusinessOwnerEmployeeId',
-    method: 'put', path: `/api/v1/access-requests/${ID}/assessment`, role: 'IT_ADMIN',
-    body: { classification: 'INTERNAL' }, dropped: { proposedBusinessOwnerEmployeeId: ID },
+    method: 'put',
+    path: `/api/v1/access-requests/${ID}/assessment`,
+    role: 'IT_ADMIN',
+    body: { classification: 'INTERNAL' },
+    dropped: { proposedBusinessOwnerEmployeeId: ID },
   },
   {
     name: 'BR-MF1-05 SBF-15 internal registration no longer accepts businessOwnerEmployeeId',
-    method: 'post', path: `/api/v1/access-requests/${ID}/internal-registration`, role: 'IT_ADMIN',
-    body: {}, dropped: { businessOwnerEmployeeId: ID },
+    method: 'post',
+    path: `/api/v1/access-requests/${ID}/internal-registration`,
+    role: 'IT_ADMIN',
+    body: {},
+    dropped: { businessOwnerEmployeeId: ID },
   },
   {
     name: 'renewal: termConfirmation (step 6)',

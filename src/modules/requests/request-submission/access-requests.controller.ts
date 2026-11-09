@@ -134,15 +134,35 @@ export class AccessRequestsController {
   @HttpCode(HttpStatus.OK)
   @AuthenticatedOnly()
   @ApiOperation({ operationId: 'accessRequestResubmit', summary: 'Send a revised one-step request again' })
-  @ApiSuccessResponse(AccessRequestResponseDto, { message: 'ACCESS_REQUEST.RESUBMITTED', description: 'The request is checked again and either waits for its requester or goes to the spending approver.' })
-  @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND,
-    { status: HttpStatus.FORBIDDEN, description: 'Only the requester sends the request again (ACCESS_REQUEST.NOT_REQUESTER).', examples: [EXAMPLES.NOT_REQUESTER] },
-    { status: HttpStatus.CONFLICT, description: 'The request is not waiting for revision (ACCESS_REQUEST.NOT_AWAITING_REVISION).', examples: [EXAMPLES.NOT_AWAITING_REVISION] },
-    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).', examples: [VALIDATION_EXAMPLE] })
+  @ApiSuccessResponse(AccessRequestResponseDto, {
+    message: 'ACCESS_REQUEST.RESUBMITTED',
+    description: 'The request is checked again and either waits for its requester or goes to the spending approver.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    NOT_FOUND,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only the requester sends the request again (ACCESS_REQUEST.NOT_REQUESTER).',
+      examples: [EXAMPLES.NOT_REQUESTER],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'The request is not waiting for revision (ACCESS_REQUEST.NOT_AWAITING_REVISION).',
+      examples: [EXAMPLES.NOT_AWAITING_REVISION],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
+  )
   async resubmit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RequestIdParamDto) {
     try {
       return { request: toWire(await this.queries.view(await this.resubmissions.resubmit(actor, params.id))) };
-    } catch (error) { throw toAccessRequestApiException(error); }
+    } catch (error) {
+      throw toAccessRequestApiException(error);
+    }
   }
 
   @Get(':id')

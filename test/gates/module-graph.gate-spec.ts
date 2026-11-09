@@ -60,6 +60,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'AuditModule: AuditApi',
   // G5 (ADR-0016): the budgets facade the check of a request reads the figures through, and registers its listener with.
   'BudgetsModule: BudgetsApi',
+  // The worker prices and checks conversions through read-only contracts, without mounting the HTTP contexts.
+  'BudgetsReadFacadeModule: BudgetsReadApi',
+  'CatalogPricingFacadeModule: CatalogPricingApi',
   // The extension points the requests context binds (public/budgets.extension-points.ts): what waits to be decided as spend, the release guard and the facts of a commitment request.
   'BudgetsModule: PendingSpendContributions',
   'BudgetsModule: CommitmentReleaseGuardHook',

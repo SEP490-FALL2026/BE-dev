@@ -67,7 +67,13 @@ export function checkLineCount(facts: LineCountFacts): LineCountRefusals {
 
 /** The first reason a person cannot be a line, in the order a caller should learn it; the spending approver is never a party of a Request, so they come first (`D-S21`). */
 export type LineReason =
-  'SPENDING_APPROVER' | 'HEAD_IN_GROUP' | 'OUTSIDE_DEPARTMENT' | BeneficiaryRefusal | 'TERM_REQUIRED' | 'HAS_ACCESS' | 'HAS_OPEN_REQUEST';
+  | 'SPENDING_APPROVER'
+  | 'HEAD_IN_GROUP'
+  | 'OUTSIDE_DEPARTMENT'
+  | BeneficiaryRefusal
+  | 'TERM_REQUIRED'
+  | 'HAS_ACCESS'
+  | 'HAS_OPEN_REQUEST';
 
 /** What is known of one person who was named, read on the day. */
 export interface LineFacts {

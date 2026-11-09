@@ -84,7 +84,10 @@ export class StepTargetService {
 
         return decision.outcome === 'ASSIGNED'
           ? { assigneeEmployeeId: decision.assigneeEmployeeId, routingRow: decision.row }
-          : { assigneeEmployeeId: null, reason: decision.outcome === 'NOT_REQUIRED' ? 'NO_DEPARTMENT_HEAD' : decision.reason };
+          : {
+              assigneeEmployeeId: null,
+              reason: decision.outcome === 'NOT_REQUIRED' ? 'NO_DEPARTMENT_HEAD' : decision.reason,
+            };
       }
       case 'SPEND_APPROVAL': {
         const assignment = routeSpendStep(people, facts.spendingApproverEmployeeId);

@@ -146,7 +146,7 @@ export class ProposalService {
         ),
       );
 
-    await this.spendRouting.start(tx, actor, created.id, now);
+      await this.spendRouting.start(tx, actor, created.id, now);
       const record = await this.repo.findById(created.id, tx);
       if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
 

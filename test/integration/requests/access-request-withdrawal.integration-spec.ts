@@ -174,18 +174,20 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
     });
 
     it('withdraws a request that waits under control, with no one to hold its step (AC-6)', async () => {
+      const executive = await h.departmentWithUnit(`P-WC${(counter += 1)}`);
+      const head = await h.staff(executive, `WC-H${counter}`);
+      await h.makeHead(executive, head);
+      // The budget is decided while an approver still exists; the approver is taken away only after.
+      await h.budgetFor({ department: executive, head, member: head }, { total: 100 * M });
       await h.clearRole('SPENDING_APPROVER');
       try {
-        const executive = await h.departmentWithUnit(`P-WC${(counter += 1)}`);
-        const head = await h.staff(executive, `WC-H${counter}`);
-        await h.makeHead(executive, head);
         const sent = await h.sent(head, plan, { termMonths: 1 });
         expect(sent.state).toBe('WAITING_CONTROLLED');
 
         const response = await h.withdrawRequest(sent.id, {}, head.account).expect(200);
 
-        expect(wire(response)).toMatchObject({ state: 'WITHDRAWN', needStep: { state: 'CLOSED' } });
-        expect((await stepStates(sent.id)).every((step) => step.state === 'CLOSED')).toBe(true);
+        expect(wire(response)).toMatchObject({ state: 'WITHDRAWN', needStep: { state: 'NOT_REQUIRED' } });
+        expect((await stepStates(sent.id)).every((step) => ['CLOSED', 'NOT_REQUIRED'].includes(step.state))).toBe(true);
       } finally {
         await h.setRole('SPENDING_APPROVER', h.boss);
       }
