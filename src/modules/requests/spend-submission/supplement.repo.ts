@@ -8,13 +8,13 @@ export interface SupplementRecord {
   reason: string;
   changedByEmployeeId: string;
   createdAt: Date;
-  beforeExpectedSpendOn: BusinessDate;
-  afterExpectedSpendOn: BusinessDate;
-  beforeBudgetYear: number;
-  afterBudgetYear: number;
+  beforeExpectedSpendOn: BusinessDate | null;
+  afterExpectedSpendOn: BusinessDate | null;
+  beforeBudgetYear: number | null;
+  afterBudgetYear: number | null;
   beforeAmountMinor: bigint;
   afterAmountMinor: bigint;
-  currency: string;
+  currency: string | null;
 }
 
 export type NewSupplement = Omit<SupplementRecord, 'number' | 'createdAt'> & {
