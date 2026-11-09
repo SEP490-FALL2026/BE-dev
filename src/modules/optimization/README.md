@@ -24,12 +24,15 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
   (`ghost-seat-evidence.json.ts`), mọi SQL (`ghost-seat.repo.ts`), các hành vi có audit (`ghost-seat.service.ts`) và listener kết cục thu hồi
   (`ghost-seat-revocation.listener.ts`).
 - `rule-run/` — lượt chạy: claim `INSERT … ON CONFLICT DO NOTHING`, nhận lại sau 2 giờ khi `attempt < 3`, khóa kỳ theo ngày/tuần
-  (`RULE_SCHEDULE_G1_G2`), lý do bỏ qua (`rule-run-skip-detail.json.ts`).
+  (`RULE_SCHEDULE_G1_G2`), lý do bỏ qua (`rule-run-skip-detail.json.ts`). Mọi lượt (lịch hay chạy tay) giữ session advisory lock
+  `ghost-seat-rule-run:<tổ chức>:<bộ luật>` (`ruleRunLockName`) suốt lượt; lượt chạy tay có kỳ riêng `MANUAL-<ISO instant>` (`manualPeriodKeyOf`).
 - `internal-rules/` — `G1` (`internal-rules-g1.service.ts`), `G2` + dọn (`internal-rules-g2.service.ts`), luật thuần (`internal-rules.policy.ts`),
   điểm vào của lượt (`internal-rules.service.ts`), job (`internal-rules.job.ts`, `InternalRulesSweeper`).
 - `board/` — HTTP: `ghostSeatRecommendationList`/`Get` (bảng, lọc `group`/`tier`/`state`/`applicationId`/`departmentScope MINE|ALL`), `ghostSeatOptimizationSummaryGet`
   (bốn nhóm tách riêng + `limitation` phần mềm nội bộ), `ghostSeatRecommendationReclaim` (mở thu hồi `G2` qua `LicensingApi.openRevocation`, nguồn
-  `ABRUPT_DEPARTURE`, không `timing`/`notice`), `ghostSeatRuleRunList` + `ghostSeatRuleSkipList` (lượt chạy và lý do bỏ qua, phân trang), `ghostSeatKpi5Get`
+  `ABRUPT_DEPARTURE`, không `timing`/`notice`), `ghostSeatRuleRunList` + `ghostSeatRuleSkipList` (lượt chạy và lý do bỏ qua, phân trang), `ghostSeatRuleRunCreate`
+  (`POST /ghost-seat-rule-runs`, chạy tay `G1G2`/`G3G4` ngay — `board-rule-run.service.ts`, 409 `GHOST_SEAT.RULE_RUN_BUSY`, audit
+  `GHOST_SEAT.RULE_RUN_REQUESTED`), `ghostSeatKpi5Get`
   (SUPER_ADMIN). Quyền: IT_ADMIN cho bảng/chi tiết/tóm tắt/thu hồi; IT_ADMIN và SUPER_ADMIN cho lượt chạy; SUPER_ADMIN cho `KPI-5`.
 
 - `decision/` (L3, không import `board`; dùng `ghost-seat` L0) — hàng đợi trưởng phòng cho `G3`/`G4` (`qd103-ghost-seat-manager-decision`):
@@ -66,7 +69,8 @@ về `OPEN`. Đóng kèm lý do `ACCEPTED`, `SUPERSEDED`, `SEAT_ENDED`, `FREE_SE
 ## Job
 
 `InternalRulesSweeper` chạy trong tiến trình API: lần đầu sau 5 phút, rồi mỗi 60 phút; khóa kỳ theo `RULE_SCHEDULE_G1_G2` nên chạy một lần cho
-mỗi kỳ dù có nhiều instance. Chạy tay: `InternalRulesService.run(now)`.
+mỗi kỳ dù có nhiều instance. Chạy tay: `InternalRulesService.run(now)`; qua HTTP (IT Admin, Super Admin): `POST /api/v1/ghost-seat-rule-runs`
+(`InternalRulesService.runNow`/`UsageRulesService.runNow`: kỳ riêng, cùng advisory lock với job; khuyến nghị không trùng nhờ partial UNIQUE mở).
 
 `DecisionFollowUpSweeper` (mỗi giờ, lần đầu sau 6 phút): tạm dừng/tiếp tục theo điều chuyển → định tuyến → theo dõi trưởng phòng → thông báo quá hạn (ngày làm việc,
 một lần cho trưởng phòng + IT Admin phụ trách) → nhắc miễn trừ ≤ 7 ngày (một lần) và đánh dấu `ended_at` miễn trừ đã qua. Chạy tay: `DecisionFollowUpService.run(now)`.

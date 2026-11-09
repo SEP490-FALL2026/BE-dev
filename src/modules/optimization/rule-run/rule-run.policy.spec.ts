@@ -1,4 +1,12 @@
-import { RUN_MAX_ATTEMPTS, RUN_TAKEOVER_AFTER_MS, canTakeOver, periodKeyOf, scheduleOf } from './rule-run.policy';
+import {
+  RUN_MAX_ATTEMPTS,
+  RUN_TAKEOVER_AFTER_MS,
+  canTakeOver,
+  manualPeriodKeyOf,
+  periodKeyOf,
+  ruleRunLockName,
+  scheduleOf,
+} from './rule-run.policy';
 
 describe('rule run policy', () => {
   it('keys a daily run by the day and a weekly run by the ISO week', () => {
@@ -38,5 +46,18 @@ describe('rule run policy', () => {
     expect(scheduleOf('WEEKLY')).toBe('WEEKLY');
     expect(scheduleOf('DAILY')).toBe('DAILY');
     expect(scheduleOf(undefined)).toBe('DAILY');
+  });
+
+  it('AF-01: keys a run by hand by its instant, never as a day or a week the schedule claims', () => {
+    const key = manualPeriodKeyOf(new Date('2026-11-10T03:04:05.006Z'));
+
+    expect(key).toBe('MANUAL-2026-11-10T03:04:05.006Z');
+    expect(key).not.toBe(periodKeyOf('DAILY', '2026-11-10'));
+    expect(manualPeriodKeyOf(new Date('2026-11-10T03:04:05.007Z'))).not.toBe(key);
+  });
+
+  it('AF-01: one lock per organization and set of rules, the same for a scheduled run and a run by hand', () => {
+    expect(ruleRunLockName('org', 'G1_G2')).toBe('ghost-seat-rule-run:org:G1_G2');
+    expect(ruleRunLockName('org', 'G1_G2')).not.toBe(ruleRunLockName('org', 'G3_G4'));
   });
 });

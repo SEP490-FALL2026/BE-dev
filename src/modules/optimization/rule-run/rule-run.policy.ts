@@ -27,6 +27,19 @@ export function periodKeyOf(schedule: RuleSchedule, today: BusinessDate): string
   return schedule === 'WEEKLY' ? isoWeekOf(today) : today;
 }
 
+/**
+ * The key of a run asked for by hand (`POST /ghost-seat-rule-runs`): a key of its own for each instant, so a period the schedule
+ * already ran does not stop it. What it makes stays unique all the same: an open recommendation is one per subscription or seat chain.
+ */
+export function manualPeriodKeyOf(now: Date): string {
+  return `MANUAL-${now.toISOString()}`;
+}
+
+/** The name of the advisory lock one run of a set of rules holds, scheduled or by hand: two never run side by side. */
+export function ruleRunLockName(organizationId: string, ruleSet: 'G1_G2' | 'G3_G4'): string {
+  return `ghost-seat-rule-run:${organizationId}:${ruleSet}`;
+}
+
 /** Whether a run that already exists for the period may be taken over now (the claim is atomic; this is the same rule for a test). */
 export function canTakeOver(
   run: { status: 'RUNNING' | 'COMPLETED' | 'FAILED'; startedAt: Date; attempt: number },

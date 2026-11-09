@@ -1,4 +1,4 @@
-import { Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -21,6 +21,8 @@ import {
   RecommendationListQueryDto,
   RecommendationPageResponseDto,
   RecommendationResponseDto,
+  RuleRunCreateBodyDto,
+  RuleRunCreateResponseDto,
   RuleRunIdParamDto,
   RuleRunListQueryDto,
   RuleRunPageResponseDto,
@@ -32,6 +34,7 @@ import { GHOST_SEAT_ERROR_EXAMPLES as EXAMPLES, toGhostSeatApiException } from '
 import { BoardKpiService } from './board-kpi.service';
 import { BoardQueryService } from './board-query.service';
 import { BoardReclaimService } from './board-reclaim.service';
+import { BoardRuleRunService } from './board-rule-run.service';
 import { BoardSummaryService } from './board-summary.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -60,6 +63,7 @@ export class BoardController {
     private readonly summaries: BoardSummaryService,
     private readonly reclaims: BoardReclaimService,
     private readonly kpis: BoardKpiService,
+    private readonly ruleRuns: BoardRuleRunService,
   ) {}
 
   @Get('ghost-seat-recommendations')
@@ -189,6 +193,37 @@ export class BoardController {
   async runs(@Query() query: RuleRunListQueryDto) {
     try {
       return await this.queries.listRuns(query);
+    } catch (error) {
+      throw toGhostSeatApiException(error);
+    }
+  }
+
+  @Post('ghost-seat-rule-runs')
+  @RequireRoles('IT_ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({
+    operationId: 'ghostSeatRuleRunCreate',
+    summary: 'Run the rules of wasted seats now',
+  })
+  @ApiSuccessResponse(RuleRunCreateResponseDto, {
+    status: HttpStatus.CREATED,
+    message: 'GHOST_SEAT_RULE_RUN.COMPLETED',
+    description:
+      'Runs G1/G2 and G3/G4 (or the set named) now, whatever period the schedule already ran, and answers each run with what it made, changed, closed and left out by gate. Running again makes no recommendation twice: an open one is updated.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    forbidden('an IT Admin or the Super Admin'),
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'A run of the same set of rules (scheduled or by hand) is under way (GHOST_SEAT.RULE_RUN_BUSY); a set run before it in the same call is named in the details.',
+      examples: [EXAMPLES.RULE_RUN_BUSY],
+    },
+    { ...QUERY_INVALID, description: 'The body is invalid (VALIDATION_ERROR).' },
+  )
+  async runNow(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RuleRunCreateBodyDto) {
+    try {
+      return await this.ruleRuns.runNow(actor, body.rules);
     } catch (error) {
       throw toGhostSeatApiException(error);
     }

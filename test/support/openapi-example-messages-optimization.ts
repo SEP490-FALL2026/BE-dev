@@ -10,6 +10,7 @@ export const SUCCESS_MESSAGES_OPTIMIZATION: Readonly<Record<string, string>> = {
   ghostSeatQueueList: 'GHOST_SEAT_QUEUE.LISTED',
   ghostSeatRecommendationReclaim: 'GHOST_SEAT_RECOMMENDATION.RECLAIM_OPENED',
   ghostSeatRecommendationReturn: 'GHOST_SEAT_RECOMMENDATION.RETURNED',
+  ghostSeatRuleRunCreate: 'GHOST_SEAT_RULE_RUN.COMPLETED',
   ghostSeatRuleRunList: 'GHOST_SEAT_RULE_RUNS.LISTED',
   ghostSeatRuleSkipList: 'GHOST_SEAT_RULE_SKIPS.LISTED',
   ghostSeatSeatStateList: 'GHOST_SEAT_SEAT_STATES.LISTED',

@@ -13,6 +13,7 @@ import { BoardController } from './board/board.controller';
 import { BoardKpiService } from './board/board-kpi.service';
 import { BoardQueryService } from './board/board-query.service';
 import { BoardReclaimService } from './board/board-reclaim.service';
+import { BoardRuleRunService } from './board/board-rule-run.service';
 import { BoardSummaryService } from './board/board-summary.service';
 import { DecisionController } from './decision/decision.controller';
 import { DecisionQueueService } from './decision/decision-queue.service';
@@ -72,6 +73,7 @@ import { UsageRulesService } from './usage-rules/usage-rules.service';
     BoardSummaryService,
     BoardReclaimService,
     BoardKpiService,
+    BoardRuleRunService,
     OptimizationApi,
     RuleRunQueryService,
     GhostSeatRepo,

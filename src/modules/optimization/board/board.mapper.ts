@@ -1,4 +1,5 @@
 import type { GhostSeatRecord } from '../ghost-seat/ghost-seat.types';
+import type { RuleRunRecord } from '../rule-run/rule-run.repo';
 import { canReclaim, confidenceLabelOf, headEvidenceOf, labelsOf } from './board.policy';
 
 /** The names a row of the table shows besides the ids it keeps. */
@@ -62,4 +63,20 @@ export const toDetailWire = (record: GhostSeatRecord, names: RowNames, reader: D
   closedAt: record.closedAt?.toISOString() ?? null,
   supersededById: record.supersededById,
   createdRunId: record.createdRunId,
+});
+
+/** A run of the rules as the IT Admin reads it: how it ended and what it counted, never the error text of the operator. */
+export const toRuleRunWire = (run: RuleRunRecord) => ({
+  id: run.id,
+  ruleSet: run.ruleSet,
+  periodKey: run.periodKey,
+  status: run.status,
+  attempt: run.attempt,
+  startedAt: run.startedAt.toISOString(),
+  finishedAt: run.finishedAt?.toISOString() ?? null,
+  createdCount: run.createdCount,
+  updatedCount: run.updatedCount,
+  closedCount: run.closedCount,
+  skippedCount: run.skippedCount,
+  failedCount: run.failedCount,
 });

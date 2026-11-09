@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { RuleRunService } from '../rule-run/rule-run.service';
+import { RuleRunService, type RunTally } from '../rule-run/rule-run.service';
 import type { RuleRunRecord } from '../rule-run/rule-run.repo';
 import { periodKeyOf, scheduleOf } from '../rule-run/rule-run.policy';
 import { InternalRulesG1Service } from './internal-rules-g1.service';
@@ -26,16 +26,30 @@ export class InternalRulesService {
   ) {}
 
   /** The run of the period `now` falls in, or null when there is nothing to run (no organization yet, or the period is taken). */
-  async run(now: Date = new Date()): Promise<RuleRunRecord | null> {
+  run(now: Date = new Date()): Promise<RuleRunRecord | null> {
+    return this.start(now, 'SCHEDULE');
+  }
+
+  /**
+   * A run asked for by hand (`POST /ghost-seat-rule-runs`): the same rules, now, whatever period the schedule already ran. Null when
+   * there is no organization yet or another run of `G1`/`G2` is under way.
+   */
+  runNow(now: Date = new Date()): Promise<RuleRunRecord | null> {
+    return this.start(now, 'BY_HAND');
+  }
+
+  private async start(now: Date, mode: 'SCHEDULE' | 'BY_HAND'): Promise<RuleRunRecord | null> {
     const organization = await this.organizationReads.getOrganization();
     if (!organization) return null;
     const today = await this.organizationReads.businessToday(now);
-    const schedule = scheduleOf(await this.parameters.getValue(RULE_SCHEDULE_PARAMETER));
-
-    return this.runs.execute(organization.id, 'G1_G2', periodKeyOf(schedule, today), now, async (tally) => {
+    const work = async (tally: RunTally): Promise<void> => {
       const pass = { organizationId: organization.id, today, now, tally };
       await this.g1.pass(pass);
       await this.g2.pass(pass);
-    });
+    };
+    if (mode === 'BY_HAND') return this.runs.executeNow(organization.id, 'G1_G2', now, work);
+    const schedule = scheduleOf(await this.parameters.getValue(RULE_SCHEDULE_PARAMETER));
+
+    return this.runs.execute(organization.id, 'G1_G2', periodKeyOf(schedule, today), now, work);
   }
 }

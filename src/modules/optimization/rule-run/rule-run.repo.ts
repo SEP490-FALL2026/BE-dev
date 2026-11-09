@@ -203,6 +203,17 @@ export class RuleRunRepo {
     };
   }
 
+  /** How many subjects a run left out, by the gate that left each out. */
+  async skipCountsByGate(runId: string): Promise<Partial<Record<SkipGate, number>>> {
+    const rows = await this.prisma.ghostSeatRuleSkip.groupBy({
+      by: ['gate'],
+      where: { runId },
+      _count: { _all: true },
+    });
+
+    return Object.fromEntries(rows.map((row) => [row.gate, row._count._all]));
+  }
+
   async find(runId: string, organizationId: string, tx?: DbTx): Promise<RuleRunRecord | null> {
     const row = await (tx ?? this.prisma).ghostSeatRuleRun.findFirst({ where: { id: runId, organizationId } });
 

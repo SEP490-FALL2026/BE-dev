@@ -6,7 +6,7 @@ import { GhostSeatSeatStateRepo, type SeatStatus } from '../ghost-seat/ghost-sea
 import { GhostSeatRepo } from '../ghost-seat/ghost-seat.repo';
 import type { GhostSeatRecord } from '../ghost-seat/ghost-seat.types';
 import { RuleRunQueryService } from '../rule-run/rule-run-query.service';
-import { toDetailWire, toSummaryWire, type DetailReader, type RowNames } from './board.mapper';
+import { toDetailWire, toRuleRunWire, toSummaryWire, type DetailReader, type RowNames } from './board.mapper';
 import { departmentsOfScope, type DepartmentScope } from './board.policy';
 import { GhostSeatNotDeciderError, GhostSeatNotFoundError } from './board.errors';
 
@@ -147,20 +147,7 @@ export class BoardQueryService {
     });
 
     return {
-      items: items.map((run) => ({
-        id: run.id,
-        ruleSet: run.ruleSet,
-        periodKey: run.periodKey,
-        status: run.status,
-        attempt: run.attempt,
-        startedAt: run.startedAt.toISOString(),
-        finishedAt: run.finishedAt?.toISOString() ?? null,
-        createdCount: run.createdCount,
-        updatedCount: run.updatedCount,
-        closedCount: run.closedCount,
-        skippedCount: run.skippedCount,
-        failedCount: run.failedCount,
-      })),
+      items: items.map(toRuleRunWire),
       pagination: pageOf(total, page.page, page.pageSize),
     };
   }
