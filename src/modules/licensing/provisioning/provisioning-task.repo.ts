@@ -59,10 +59,17 @@ export class ProvisioningTaskRepo {
       createdByAppUserId: string;
       /** The tries the task gets, from the retries the configuration allows now. */
       maxAttempts: number;
+      /** Pkg 9 (MF1-F): Purchase kind when buying seats from pool (POOL_TOP_UP for K2, KEY_PURCHASE for K4). */
+      purchaseKind?: 'POOL_TOP_UP' | 'KEY_PURCHASE';
+      /** Pkg 9 (MF1-F): Purchase reason when pool exhausted. */
+      purchaseReason?: string;
     },
   ): Promise<ProvisioningTaskRecord> {
     const row = await tx.provisioningTask.create({
-      data: { ...input, kind: 'GRANT' },
+      data: {
+        ...input,
+        kind: 'GRANT',
+      },
       include: WITH_ASSIGNMENT,
     });
 

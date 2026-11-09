@@ -78,6 +78,15 @@ export class ProvisioningGrantWriter {
       effectiveFrom: today,
       expectedEndDate: this.endOfSeat(claimed, today),
     });
+    
+    // Pkg 9 (MF1-F): Determine purchase kind (POOL_TOP_UP for K2, KEY_PURCHASE for K4)
+    let purchaseKind: 'POOL_TOP_UP' | 'KEY_PURCHASE' | undefined;
+    let purchaseReason: string | undefined;
+    if (input.purchase) {
+      purchaseKind = plan.provisioningType === 'K2' ? 'POOL_TOP_UP' : plan.provisioningType === 'K4' ? 'KEY_PURCHASE' : undefined;
+      purchaseReason = input.purchase.reason;
+    }
+    
     const task = await this.repo.insert(tx, {
       organizationId: organization.id,
       assignmentId: assignment.id,
@@ -86,6 +95,8 @@ export class ProvisioningGrantWriter {
       defaultResponsibleEmployeeId: inCharge?.itAdminEmployeeId ?? null,
       createdByAppUserId: actor.appUserId,
       maxAttempts,
+      purchaseKind,
+      purchaseReason,
     });
     await this.audit.record(
       tx,
