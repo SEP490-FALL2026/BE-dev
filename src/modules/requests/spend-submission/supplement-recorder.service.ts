@@ -54,7 +54,15 @@ export class SupplementRecorder {
         'ACCESS_REQUEST.SUPPLEMENT_ADDED',
         'ACCESS_REQUEST',
         request.id,
-        supplementAuditDetail(request.id, saved, dropped),
+        supplementAuditDetail(request.id, {
+          number: saved.number,
+          beforeExpectedSpendOn: saved.beforeExpectedSpendOn ?? '',
+          afterExpectedSpendOn: saved.afterExpectedSpendOn ?? '',
+          beforeBudgetYear: saved.beforeBudgetYear ?? 0,
+          afterBudgetYear: saved.afterBudgetYear ?? 0,
+          beforeAmountMinor: saved.beforeAmountMinor ?? 0n,
+          afterAmountMinor: saved.afterAmountMinor ?? 0n,
+        }, dropped),
       ),
     );
 

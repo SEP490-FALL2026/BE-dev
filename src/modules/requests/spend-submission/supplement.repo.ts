@@ -73,8 +73,8 @@ export class SupplementRepo {
     afterExpectedSpendOn: Date | null;
     beforeBudgetYear: number | null;
     afterBudgetYear: number | null;
-    beforeAmountMinor: bigint;
-    afterAmountMinor: bigint;
+    beforeAmountMinor: bigint | null;
+    afterAmountMinor: bigint | null;
     currency: string | null;
   }): SupplementRecord {
     return {
@@ -86,8 +86,8 @@ export class SupplementRepo {
       afterExpectedSpendOn: row.afterExpectedSpendOn ? fromDateColumn(row.afterExpectedSpendOn) : null,
       beforeBudgetYear: row.beforeBudgetYear ?? 0,
       afterBudgetYear: row.afterBudgetYear ?? 0,
-      beforeAmountMinor: row.beforeAmountMinor,
-      afterAmountMinor: row.afterAmountMinor,
+      beforeAmountMinor: row.beforeAmountMinor ?? null,
+      afterAmountMinor: row.afterAmountMinor ?? null,
       currency: row.currency ?? 'VND',
     };
   }

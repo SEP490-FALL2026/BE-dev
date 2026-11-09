@@ -53,7 +53,7 @@ export class SupplementQueryService {
           changedBy,
           createdAt: record.createdAt.toISOString(),
           budgetYear: { before: record.beforeBudgetYear ?? 0, after: record.afterBudgetYear ?? 0 },
-          amount: { before: money(record.beforeAmountMinor), after: money(record.afterAmountMinor) },
+          amount: { before: money(record.beforeAmountMinor ?? 0n), after: money(record.afterAmountMinor ?? 0n) },
           droppedCount: (dropped.get(record.number) ?? []).length,
         };
       }),
