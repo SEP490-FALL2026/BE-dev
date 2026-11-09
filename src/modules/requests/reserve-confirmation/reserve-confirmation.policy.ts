@@ -19,12 +19,9 @@ export function checkConfirmer(facts: {
   beneficiaryEmployeeIds: readonly string[];
 }): ConfirmerRefusal | null {
   if (facts.headedDepartmentId === null || facts.headedDepartmentId !== facts.requestDepartmentId) return 'NOT_HEAD';
-  if (
-    facts.actorEmployeeId === facts.requesterEmployeeId ||
-    facts.beneficiaryEmployeeIds.includes(facts.actorEmployeeId)
-  ) {
-    return 'CONFIRMER_IS_BENEFICIARY';
-  }
+  // A request for a group is the head's own act for their people, so the head who sent it confirms it (`BR-MF1-06h`); only a head who is
+  // one of the people the request is for is a party to it.
+  if (facts.beneficiaryEmployeeIds.includes(facts.actorEmployeeId)) return 'CONFIRMER_IS_BENEFICIARY';
 
   return null;
 }

@@ -20,9 +20,12 @@ describe('BR-MF1-06h: who confirms that a request uses the reserve', () => {
     expect(checkConfirmer({ ...facts, ...change })).toBe('NOT_HEAD');
   });
 
-  it('QT 1.6: is never the head when they asked for the request or are given it', () => {
-    expect(checkConfirmer({ ...facts, requesterEmployeeId: 'head' })).toBe('CONFIRMER_IS_BENEFICIARY');
+  it('QT 1.6: is never the head when they are one of the people the request is for', () => {
     expect(checkConfirmer({ ...facts, beneficiaryEmployeeIds: ['staff', 'head'] })).toBe('CONFIRMER_IS_BENEFICIARY');
+  });
+
+  it('BR-MF1-06h: the head who sent a request for a group confirms it: a request of the head for their people is theirs to confirm', () => {
+    expect(checkConfirmer({ ...facts, requesterEmployeeId: 'head' })).toBeNull();
   });
 
   it('M-11: the head of the day confirms whoever headed before: nothing about the person who was head when the request was checked', () => {
