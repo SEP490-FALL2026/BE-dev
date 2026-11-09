@@ -25857,7 +25857,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The newest 50 confirmations recorded and how many there are, whether the Business Owner of today has confirmed, the first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.",
+            "description": "The newest 50 confirmations recorded and how many there are, whether the Business Owner of today has confirmed (true when the application names no Business Owner, QĐ-104: nothing to confirm), the first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26174,7 +26174,7 @@
             }
           },
           "422": {
-            "description": "The id is invalid (VALIDATION_ERROR), or the Business Owner of today has not confirmed (APPLICATION.RETIREMENT_NEEDS_CONFIRMATION).",
+            "description": "The id is invalid (VALIDATION_ERROR), or the Business Owner of today has not confirmed (APPLICATION.RETIREMENT_NEEDS_CONFIRMATION); an application that names no Business Owner needs no confirmation.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -30043,7 +30043,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3, K4), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
+            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -30104,13 +30104,13 @@
                     }
                   },
                   "PROVISIONING.TYPE_NOT_SUPPORTED": {
-                    "summary": "A K4 plan cannot be granted yet.",
+                    "summary": "A K3 plan cannot be granted yet.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "PROVISIONING.TYPE_NOT_SUPPORTED",
-                        "message": "A K4 plan cannot be granted yet.",
-                        "details": { "provisioningType": "K4" },
+                        "message": "A K3 plan cannot be granted yet.",
+                        "details": { "provisioningType": "K3" },
                         "requestId": "req_example"
                       }
                     }
@@ -31087,7 +31087,7 @@
         },
         "responses": {
           "200": {
-            "description": "The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key. A task of the kind EXTEND (the extension of a right whose renewal was approved, BR-MF1-08d) grants nothing: completing it writes the record that follows the renewed one and completes the renewal.",
+            "description": "The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key. A K4 grant names the free key of the store its seat is given (licenseKeyId; a key bought with the grant is imported into the store first): the key becomes ASSIGNED to the seat in the same transaction (LICENSE_KEY.ASSIGNED in the audit trail). A K2 or K4 grant taken from the pool with nothing bought records the cost it avoided; the request of a K4 grant taken from the pool gives back all of its commitment (GRANTED_FROM_POOL). A task of the kind EXTEND (the extension of a right whose renewal was approved, BR-MF1-08d) grants nothing: completing it writes the record that follows the renewed one and completes the renewal.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31185,7 +31185,7 @@
             }
           },
           "404": {
-            "description": "The task does not exist (PROVISIONING_TASK.NOT_FOUND).",
+            "description": "The task does not exist (PROVISIONING_TASK.NOT_FOUND) or the key named does not (LICENSE_KEY.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -31200,13 +31200,24 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "LICENSE_KEY.NOT_FOUND": {
+                    "summary": "The license key does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.NOT_FOUND",
+                        "message": "The license key does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
             }
           },
           "409": {
-            "description": "PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, or IS_REVOCATION (a revocation is completed by its own route).",
+            "description": "PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, or IS_REVOCATION (a revocation is completed by its own route); the key named is not free in the store (LICENSE_KEY.NOT_IN_STORE: another grant took it), was withdrawn from it (LICENSE_KEY.WITHDRAWN) or belongs to another purchase than the seat (LICENSE_KEY.SUBSCRIPTION_MISMATCH). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -31229,6 +31240,39 @@
                       "error": {
                         "code": "PROVISIONING_TASK.IS_REVOCATION",
                         "message": "The task is not in a state that allows this: IS_REVOCATION.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_KEY.NOT_IN_STORE": {
+                    "summary": "The license key cannot be used this way: NOT_IN_STORE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.NOT_IN_STORE",
+                        "message": "The license key cannot be used this way: NOT_IN_STORE.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_KEY.WITHDRAWN": {
+                    "summary": "The license key cannot be used this way: WITHDRAWN.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.WITHDRAWN",
+                        "message": "The license key cannot be used this way: WITHDRAWN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_KEY.SUBSCRIPTION_MISMATCH": {
+                    "summary": "The license key cannot be used this way: SUBSCRIPTION_MISMATCH.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.SUBSCRIPTION_MISMATCH",
+                        "message": "The license key cannot be used this way: SUBSCRIPTION_MISMATCH.",
                         "requestId": "req_example"
                       }
                     }
@@ -31280,7 +31324,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED): the task is unchanged.",
+            "description": "The request is invalid (VALIDATION_ERROR), has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), a K4 grant names no key (PROVISIONING.KEY_REQUIRED) or a grant of another kind names one (PROVISIONING.KEY_NOT_APPLICABLE): the task is unchanged.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -31304,6 +31348,28 @@
                       "error": {
                         "code": "PROVISIONING_TASK.EVIDENCE_REQUIRED",
                         "message": "The completion of a task needs the evidence of what was done.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING.KEY_REQUIRED": {
+                    "summary": "The grant of a K4 seat is completed with the key of the store it gives (licenseKeyId).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING.KEY_REQUIRED",
+                        "message": "The grant of a K4 seat is completed with the key of the store it gives (licenseKeyId).",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING.KEY_NOT_APPLICABLE": {
+                    "summary": "Only the grant of a K4 seat is completed with a license key.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING.KEY_NOT_APPLICABLE",
+                        "message": "Only the grant of a K4 seat is completed with a license key.",
                         "requestId": "req_example"
                       }
                     }
@@ -32687,7 +32753,7 @@
         },
         "responses": {
           "200": {
-            "description": "The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K1 as RENEWAL_CANCELLED with evidence, the day the paid period ends (paidThroughOn) and what is known of the access: UNTIL_PAID_END, or CUT with the day (accessCutOn) and its evidence. The assignment ends the same day for K2 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.",
+            "description": "The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K4 as KEY_DEACTIVATED with evidence, and its key goes back to the store (keyDisposition RETURN_TO_STORE, the default) or back and withdrawn from it at once (WITHDRAW, with a withdrawalReason: a key that may not move to another device), with LICENSE_KEY.RETURNED_TO_STORE (and LICENSE_KEY.WITHDRAWN) in the audit trail; K1 as RENEWAL_CANCELLED with evidence, the day the paid period ends (paidThroughOn) and what is known of the access: UNTIL_PAID_END, or CUT with the day (accessCutOn) and its evidence. The assignment ends the same day for K2, K4 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.",
             "content": {
               "application/json": {
                 "schema": {
@@ -32892,7 +32958,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, or no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED).",
+            "description": "The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), or no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -32960,6 +33026,17 @@
                       "error": {
                         "code": "REVOCATION.ACCESS_STATE_INVALID",
                         "message": "The completion of the revocation is not valid: ACCESS_STATE_INVALID.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REVOCATION.WITHDRAWAL_REASON_REQUIRED": {
+                    "summary": "The completion of the revocation is not valid: WITHDRAWAL_REASON_REQUIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REVOCATION.WITHDRAWAL_REASON_REQUIRED",
+                        "message": "The completion of the revocation is not valid: WITHDRAWAL_REASON_REQUIRED.",
                         "requestId": "req_example"
                       }
                     }
@@ -33622,7 +33699,13 @@
             "name": "status",
             "required": false,
             "in": "query",
-            "schema": { "type": "string", "enum": ["IN_STORE", "ASSIGNED", "RETIRED"] }
+            "schema": { "type": "string", "enum": ["IN_STORE", "ASSIGNED"] }
+          },
+          {
+            "name": "withdrawn",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] }
           },
           {
             "name": "page",
@@ -33645,7 +33728,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The keys of the purchase, the oldest first, each with its last four characters only, and the capacity summary. warning is KEY_COUNT_DIFFERS when the keys are not as many as the seats bought and QUANTITY_UNKNOWN while the seats bought are not known.",
+            "description": "The keys of the purchase, the oldest first, each with its last four characters only, the seat it is given to while ASSIGNED and its withdrawal, and the capacity summary. A key is IN_STORE or ASSIGNED; a withdrawn key stays IN_STORE with withdrawnAt and is found with withdrawn=true. usableKeys counts the keys assigned or in the store and not withdrawn. warning is KEY_COUNT_DIFFERS when the keys are not as many as the seats bought and QUANTITY_UNKNOWN while the seats bought are not known.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33820,7 +33903,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The key in full. Every call writes an event of the audit trail (who, when, which key) in the same transaction, and the answer is never cached.",
+            "description": "The key in full. Every call writes an event of the audit trail (who, when, which key, the seat it is given to) in the same transaction, and the answer is never cached.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33898,6 +33981,27 @@
                       "error": {
                         "code": "LICENSE_KEY.NOT_FOUND",
                         "message": "The license key does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The key was withdrawn from the store and is not opened any more (LICENSE_KEY.WITHDRAWN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "LICENSE_KEY.WITHDRAWN": {
+                    "summary": "The license key cannot be used this way: WITHDRAWN.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.WITHDRAWN",
+                        "message": "The license key cannot be used this way: WITHDRAWN.",
                         "requestId": "req_example"
                       }
                     }
@@ -33984,6 +34088,280 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Reveal a license key in full",
+        "tags": ["license-keys"]
+      }
+    },
+    "/api/v1/license-keys/{id}/withdrawal": {
+      "post": {
+        "operationId": "licenseKeyWithdraw",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WithdrawalBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The key stays in the vault (status IN_STORE) with withdrawnAt and withdrawalReason: it is no longer counted as usable, never given to a seat again and cannot be revealed. A withdrawal cannot be undone. One event of the audit trail (LICENSE_KEY.WITHDRAWN) is written in the same transaction.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/KeyResponseDto" },
+                    { "properties": { "message": { "example": "LICENSE_KEY.WITHDRAWN" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin works the vault of license keys.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The key does not exist (LICENSE_KEY.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "LICENSE_KEY.NOT_FOUND": {
+                    "summary": "The license key does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.NOT_FOUND",
+                        "message": "The license key does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The key is assigned to a seat (LICENSE_KEY.ASSIGNED: revoke the seat, which puts the key back or withdraws it) or was withdrawn already (LICENSE_KEY.ALREADY_WITHDRAWN). Nothing is written.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "LICENSE_KEY.ASSIGNED": {
+                    "summary": "The license key cannot be used this way: ASSIGNED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.ASSIGNED",
+                        "message": "The license key cannot be used this way: ASSIGNED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_KEY.ALREADY_WITHDRAWN": {
+                    "summary": "The license key cannot be used this way: ALREADY_WITHDRAWN.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.ALREADY_WITHDRAWN",
+                        "message": "The license key cannot be used this way: ALREADY_WITHDRAWN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id or the reason is invalid: a reason of 1 to 500 characters is required (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Withdraw a free license key from the store, with a reason",
         "tags": ["license-keys"]
       }
     },
@@ -34956,7 +35334,7 @@
                       "error": {
                         "code": "REVOCATION.TYPE_NOT_SUPPORTED",
                         "message": "The seat cannot be revoked: TYPE_NOT_SUPPORTED.",
-                        "details": { "provisioningType": "K4" },
+                        "details": { "provisioningType": "K3" },
                         "requestId": "req_example"
                       }
                     }
@@ -38474,7 +38852,7 @@
                       "error": {
                         "code": "REVOCATION.TYPE_NOT_SUPPORTED",
                         "message": "The seat cannot be revoked: TYPE_NOT_SUPPORTED.",
-                        "details": { "provisioningType": "K4" },
+                        "details": { "provisioningType": "K3" },
                         "requestId": "req_example"
                       }
                     }
@@ -95697,7 +96075,14 @@
                       "reasonCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "completion": {
                         "type": "string",
-                        "enum": ["ACCOUNT_REMOVED", "ALREADY_GONE", "RENEWAL_CANCELLED", "OFF_SYSTEM_REVOKED", null],
+                        "enum": [
+                          "ACCOUNT_REMOVED",
+                          "ALREADY_GONE",
+                          "RENEWAL_CANCELLED",
+                          "OFF_SYSTEM_REVOKED",
+                          "KEY_DEACTIVATED",
+                          null
+                        ],
                         "nullable": true
                       },
                       "accessState": { "type": "string", "enum": ["CUT", "UNTIL_PAID_END", null], "nullable": true },
@@ -95793,6 +96178,7 @@
                             "RECORD_ACCESS_STATE",
                             "REMOVE_FROM_WORKSPACE",
                             "REVOKE_IN_INTERNAL_SOFTWARE",
+                            "DEACTIVATE_KEY_ON_DEVICE",
                             "CONFIRM_WITH_EVIDENCE"
                           ]
                         },
@@ -96001,7 +96387,14 @@
                         "reasonCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                         "completion": {
                           "type": "string",
-                          "enum": ["ACCOUNT_REMOVED", "ALREADY_GONE", "RENEWAL_CANCELLED", "OFF_SYSTEM_REVOKED", null],
+                          "enum": [
+                            "ACCOUNT_REMOVED",
+                            "ALREADY_GONE",
+                            "RENEWAL_CANCELLED",
+                            "OFF_SYSTEM_REVOKED",
+                            "KEY_DEACTIVATED",
+                            null
+                          ],
                           "nullable": true
                         },
                         "accessState": { "type": "string", "enum": ["CUT", "UNTIL_PAID_END", null], "nullable": true },
@@ -96219,7 +96612,14 @@
                       "reasonCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "completion": {
                         "type": "string",
-                        "enum": ["ACCOUNT_REMOVED", "ALREADY_GONE", "RENEWAL_CANCELLED", "OFF_SYSTEM_REVOKED", null],
+                        "enum": [
+                          "ACCOUNT_REMOVED",
+                          "ALREADY_GONE",
+                          "RENEWAL_CANCELLED",
+                          "OFF_SYSTEM_REVOKED",
+                          "KEY_DEACTIVATED",
+                          null
+                        ],
                         "nullable": true
                       },
                       "accessState": { "type": "string", "enum": ["CUT", "UNTIL_PAID_END", null], "nullable": true },
@@ -96315,6 +96715,7 @@
                             "RECORD_ACCESS_STATE",
                             "REMOVE_FROM_WORKSPACE",
                             "REVOKE_IN_INTERNAL_SOFTWARE",
+                            "DEACTIVATE_KEY_ON_DEVICE",
                             "CONFIRM_WITH_EVIDENCE"
                           ]
                         },
@@ -96406,7 +96807,10 @@
       },
       "CompleteBodyDto": {
         "type": "object",
-        "properties": { "evidence": { "default": "", "type": "string", "maxLength": 2000 } },
+        "properties": {
+          "evidence": { "default": "", "type": "string", "maxLength": 2000 },
+          "licenseKeyId": { "type": "string", "format": "uuid" }
+        },
         "additionalProperties": false
       },
       "FailureBodyDto": {
@@ -96425,7 +96829,7 @@
         "properties": {
           "completion": {
             "type": "string",
-            "enum": ["ACCOUNT_REMOVED", "ALREADY_GONE", "RENEWAL_CANCELLED", "OFF_SYSTEM_REVOKED"]
+            "enum": ["ACCOUNT_REMOVED", "ALREADY_GONE", "RENEWAL_CANCELLED", "OFF_SYSTEM_REVOKED", "KEY_DEACTIVATED"]
           },
           "evidence": { "default": "", "type": "string", "maxLength": 2000 },
           "note": { "type": "string", "maxLength": 1000 },
@@ -96440,7 +96844,9 @@
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
-          "accessEvidence": { "type": "string", "maxLength": 2000 }
+          "accessEvidence": { "type": "string", "maxLength": 2000 },
+          "keyDisposition": { "type": "string", "enum": ["RETURN_TO_STORE", "WITHDRAW"] },
+          "withdrawalReason": { "type": "string", "maxLength": 500 }
         },
         "required": ["completion"],
         "additionalProperties": false
@@ -96528,10 +96934,22 @@
                     "id": { "type": "string", "format": "uuid" },
                     "subscriptionId": { "type": "string", "format": "uuid" },
                     "masked": { "type": "string" },
-                    "status": { "type": "string", "enum": ["IN_STORE", "ASSIGNED", "RETIRED"] },
-                    "importedAt": { "type": "string", "format": "date-time" }
+                    "status": { "type": "string", "enum": ["IN_STORE", "ASSIGNED"] },
+                    "importedAt": { "type": "string", "format": "date-time" },
+                    "assignmentId": { "type": "string", "format": "uuid", "nullable": true },
+                    "withdrawnAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "withdrawalReason": { "type": "string", "nullable": true }
                   },
-                  "required": ["id", "subscriptionId", "masked", "status", "importedAt"],
+                  "required": [
+                    "id",
+                    "subscriptionId",
+                    "masked",
+                    "status",
+                    "importedAt",
+                    "assignmentId",
+                    "withdrawnAt",
+                    "withdrawalReason"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -96584,6 +97002,53 @@
             "type": "object",
             "properties": { "id": { "type": "string", "format": "uuid" }, "value": { "type": "string" } },
             "required": ["id", "value"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "WithdrawalBodyDto": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 500 } },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
+      "KeyResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "subscriptionId": { "type": "string", "format": "uuid" },
+                  "masked": { "type": "string" },
+                  "status": { "type": "string", "enum": ["IN_STORE", "ASSIGNED"] },
+                  "importedAt": { "type": "string", "format": "date-time" },
+                  "assignmentId": { "type": "string", "format": "uuid", "nullable": true },
+                  "withdrawnAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "withdrawalReason": { "type": "string", "nullable": true }
+                },
+                "required": [
+                  "id",
+                  "subscriptionId",
+                  "masked",
+                  "status",
+                  "importedAt",
+                  "assignmentId",
+                  "withdrawnAt",
+                  "withdrawalReason"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": ["key"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -105577,6 +106042,23 @@
                       "additionalProperties": false
                     },
                     "reserveUsed": { "type": "boolean" },
+                    "flags": {
+                      "type": "object",
+                      "properties": {
+                        "manyPaidSoftware": {
+                          "type": "object",
+                          "properties": {
+                            "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                            "reason": { "type": "string" }
+                          },
+                          "required": ["count", "reason"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        }
+                      },
+                      "required": ["manyPaidSoftware"],
+                      "additionalProperties": false
+                    },
                     "awaitingMe": { "type": "boolean" }
                   },
                   "required": [
@@ -105600,6 +106082,7 @@
                     "requester",
                     "department",
                     "reserveUsed",
+                    "flags",
                     "awaitingMe"
                   ],
                   "additionalProperties": false
@@ -105799,7 +106282,24 @@
                       "required": ["id", "code", "name"],
                       "additionalProperties": false
                     },
-                    "reserveUsed": { "type": "boolean" }
+                    "reserveUsed": { "type": "boolean" },
+                    "flags": {
+                      "type": "object",
+                      "properties": {
+                        "manyPaidSoftware": {
+                          "type": "object",
+                          "properties": {
+                            "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                            "reason": { "type": "string" }
+                          },
+                          "required": ["count", "reason"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        }
+                      },
+                      "required": ["manyPaidSoftware"],
+                      "additionalProperties": false
+                    }
                   },
                   "required": [
                     "id",
@@ -105821,7 +106321,8 @@
                     "withdrawal",
                     "requester",
                     "department",
-                    "reserveUsed"
+                    "reserveUsed",
+                    "flags"
                   ],
                   "additionalProperties": false
                 }
@@ -108141,7 +108642,8 @@
                         "PARTICIPANT_WITHDRAWN",
                         "REMAINDER",
                         "REVOKED",
-                        "LATE_GRANT"
+                        "LATE_GRANT",
+                        "GRANTED_FROM_POOL"
                       ]
                     },
                     "reasonText": { "type": "string", "nullable": true },

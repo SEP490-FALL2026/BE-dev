@@ -82,13 +82,13 @@ flowchart BT
   installation -->|2| finance
   installation -->|11| identity_access
   installation -->|8| organization
-  licensing -->|32| audit
+  licensing -->|34| audit
   licensing -->|55| catalog
   licensing -->|2| finance
   licensing -->|8| identity_access
   licensing -->|7| notifications
-  licensing -->|6| operating_parameters
-  licensing -->|57| organization
+  licensing -->|8| operating_parameters
+  licensing -->|59| organization
   onboarding -->|2| catalog
   onboarding -->|2| data_import
   onboarding -->|2| identity_access
@@ -98,9 +98,9 @@ flowchart BT
   operating_parameters -->|2| finance
   operating_parameters -->|7| organization
   optimization -->|7| audit
-  optimization -->|6| catalog
+  optimization -->|8| catalog
   optimization -->|4| identity_access
-  optimization -->|23| licensing
+  optimization -->|24| licensing
   optimization -->|7| notifications
   optimization -->|6| operating_parameters
   optimization -->|18| organization
@@ -117,15 +117,15 @@ flowchart BT
   personnel -->|4| operating_parameters
   personnel -->|88| organization
   personnel -->|6| requests
-  requests -->|58| audit
-  requests -->|20| budgets
-  requests -->|28| catalog
+  requests -->|60| audit
+  requests -->|23| budgets
+  requests -->|29| catalog
   requests -->|9| finance
-  requests -->|28| identity_access
-  requests -->|44| licensing
+  requests -->|30| identity_access
+  requests -->|50| licensing
   requests -->|7| notifications
-  requests -->|10| operating_parameters
-  requests -->|80| organization
+  requests -->|12| operating_parameters
+  requests -->|85| organization
   usage -->|7| audit
   usage -->|7| catalog
   usage -->|15| devices
