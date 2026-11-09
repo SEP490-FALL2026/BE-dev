@@ -113,6 +113,8 @@ const EXPECTED_KEYS = [
   'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
   'FORECAST_ERROR_THRESHOLD_PERCENT',
   'BUDGET_RESERVE_DEFAULT_PERCENT',
+  'BUDGET_ZBB_KPI3_BELOW_PERCENT',
+  'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
   'TRANSFER_REVIEW_WORKING_DAYS',
   'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
   'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
@@ -195,6 +197,14 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['SPEND_SUBMISSION_WAIT_WORKING_DAYS', 'Hạn chờ trình duyệt chi', 'WORKFLOW', 'working days', 'ngày làm việc'],
       ['FORECAST_ERROR_THRESHOLD_PERCENT', 'Ngưỡng sai số dự báo chi phí', 'BUDGET', 'percent', '%'],
       ['BUDGET_RESERVE_DEFAULT_PERCENT', 'Tỷ lệ dự phòng mặc định của ngân sách năm', 'BUDGET', 'percent', '%'],
+      [
+        'BUDGET_ZBB_KPI3_BELOW_PERCENT',
+        'Ngưỡng sử dụng dưới đó dòng ngân sách cần giải trình ZBB',
+        'BUDGET',
+        'percent',
+        '%',
+      ],
+      ['BUDGET_ZBB_PRICE_INCREASE_PERCENT', 'Ngưỡng tăng đơn giá cần giải trình ZBB', 'BUDGET', 'percent', '%'],
       [
         'TRANSFER_REVIEW_WORKING_DAYS',
         'Hạn rà soát quyền sau điều chuyển',

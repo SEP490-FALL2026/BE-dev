@@ -65,4 +65,4 @@ Module nhỏ, chưa chia capability; mọi file ở gốc module.
 - Unit: `src/modules/operating-parameters/**/*.spec.ts`; HTTP: `test/http/operating-parameters/`; integration:
   `test/integration/operating-parameters/`.
 
-- Tham số có chủ: định nghĩa có `owner` (`SUPER_ADMIN` mặc định, `FINANCE` cho `BUDGET_RESERVE_DEFAULT_PERCENT`). `PUT` chỉ vai chủ sửa được (vai khác, kể cả Super Admin với khóa của Finance ⟹ 403); `GET` danh sách và lịch sử: Super Admin đọc mọi khóa, Finance chỉ khóa Finance sở hữu (`QĐ-103z`(1)).
+- Tham số có chủ: định nghĩa có `owner` (`SUPER_ADMIN` mặc định, `FINANCE` cho `BUDGET_RESERVE_DEFAULT_PERCENT`, `BUDGET_ZBB_KPI3_BELOW_PERCENT` (70) và `BUDGET_ZBB_PRICE_INCREASE_PERCENT` (10): ngưỡng giải trình ZBB của dòng `BM-10`, `QĐ-94l`). `PUT` chỉ vai chủ sửa được (vai khác, kể cả Super Admin với khóa của Finance ⟹ 403); `GET` danh sách và lịch sử: Super Admin đọc mọi khóa, Finance chỉ khóa Finance sở hữu (`QĐ-103z`(1)).

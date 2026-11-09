@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `9c7f386`, BE `d9c46552`.
 - Phụ trách: chat code `SEP-Start 75: coder mainflow`. Thiết kế ban đầu bởi: AI chat review (W2, 08/11/2026).
 - Owner review: chưa review. Peer review: chat review (R2).
-- Triển khai: `not-started`. PR: chưa có.
+- Triển khai: `in-progress` (09/11/2026: phần luật thuần và 2 tham số xong — `proposal-line-rules.policy`, `BUDGET_ZBB_*`; còn Task 1–5 gắn DB: migration, DTO/sender/phiên bản/gói, seed, gỡ `REVISION`/`SUPERSEDED`; chờ Docker để chạy integration). PR: chưa có.
 
 ## Before coding
 

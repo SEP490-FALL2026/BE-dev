@@ -133,6 +133,32 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     owner: 'FINANCE',
   },
   {
+    key: 'BUDGET_ZBB_KPI3_BELOW_PERCENT',
+    label: 'Ngưỡng sử dụng dưới đó dòng ngân sách cần giải trình ZBB',
+    group: 'BUDGET',
+    shape: { kind: 'int', min: 1, max: 100 },
+    default: 70,
+    unit: 'percent',
+    unitLabel: '%',
+    description:
+      'A line of a budget proposal needs the reduced zero-based-budget explanation when the usage of what runs today (KPI-3) is known and below this share.',
+    source: 'QĐ-94l, FR-5.15(1)',
+    owner: 'FINANCE',
+  },
+  {
+    key: 'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
+    label: 'Ngưỡng tăng đơn giá cần giải trình ZBB',
+    group: 'BUDGET',
+    shape: { kind: 'int', min: 1, max: 100 },
+    default: 10,
+    unit: 'percent',
+    unitLabel: '%',
+    description:
+      'A line of a budget proposal needs the reduced zero-based-budget explanation when its unit price is more than this share above the monthly price of today.',
+    source: 'QĐ-94l, FR-5.15(1)',
+    owner: 'FINANCE',
+  },
+  {
     key: 'TRANSFER_REVIEW_WORKING_DAYS',
     label: 'Hạn rà soát quyền sau điều chuyển',
     group: 'PERSONNEL',
