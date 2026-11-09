@@ -190,15 +190,15 @@ bị từ chối `HEAD_IN_GROUP`; Request mới trong khoảng trống kế nhi�
 
 ### Bằng chứng (nhánh `feat/mf1-g7`, worktree `be-mf1-g7`, 09/11/2026)
 
-| Lệnh | Kết quả thật |
-| ---- | ------------ |
-| `pnpm typecheck`, `arch:check`, `rules:check`, `format:check`, `arch:docs:check`, `prisma:validate` | exit 0 |
-| `pnpm lint` | 0 lỗi (đã sửa 1 lỗi `no-unsafe-member-access` ở `one-step-routing-migration.integration-spec.ts`) |
-| `pnpm test` (unit) | 389 suite, 4 993 test, 0 lỗi |
-| `pnpm test:gates` | 16 suite, 330 test, 0 lỗi |
-| `pnpm test:http` | 78 suite: 77 xanh; 1 suite đỏ do `openapi-presentation` (mô tả `PackageResponseDto` của gói 5 chứa mã `QĐ-100h`/`QĐ-109c`) — không thuộc gói 7, sửa ở nhánh gom |
-| `pnpm test:integration` — 16 file của gói 7 (định tuyến một bước, migration, chuyển khi mất trưởng phòng, bổ sung/tỷ giá, nhóm, hàng đợi nhu cầu, chờ có kiểm soát, thông báo, rút lại, điều chuyển) | 16/16 suite xanh sau khi cập nhật test cũ theo luật một bước |
-| `pnpm test:integration` — 13 file còn lại của plan (seed, seed-rerun, gia hạn, đóng do nghỉ việc/điều chuyển, dashboards, nội bộ, dịch vụ, bổ sung chi, constraints) | 13/13 suite, 247 test xanh |
+| Lệnh                                                                                                                                                                                                 | Kết quả thật                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm typecheck`, `arch:check`, `rules:check`, `format:check`, `arch:docs:check`, `prisma:validate`                                                                                                  | exit 0                                                                                                                                                          |
+| `pnpm lint`                                                                                                                                                                                          | 0 lỗi (đã sửa 1 lỗi `no-unsafe-member-access` ở `one-step-routing-migration.integration-spec.ts`)                                                               |
+| `pnpm test` (unit)                                                                                                                                                                                   | 389 suite, 4 993 test, 0 lỗi                                                                                                                                    |
+| `pnpm test:gates`                                                                                                                                                                                    | 16 suite, 330 test, 0 lỗi                                                                                                                                       |
+| `pnpm test:http`                                                                                                                                                                                     | 78 suite: 77 xanh; 1 suite đỏ do `openapi-presentation` (mô tả `PackageResponseDto` của gói 5 chứa mã `QĐ-100h`/`QĐ-109c`) — không thuộc gói 7, sửa ở nhánh gom |
+| `pnpm test:integration` — 16 file của gói 7 (định tuyến một bước, migration, chuyển khi mất trưởng phòng, bổ sung/tỷ giá, nhóm, hàng đợi nhu cầu, chờ có kiểm soát, thông báo, rút lại, điều chuyển) | 16/16 suite xanh sau khi cập nhật test cũ theo luật một bước                                                                                                    |
+| `pnpm test:integration` — 13 file còn lại của plan (seed, seed-rerun, gia hạn, đóng do nghỉ việc/điều chuyển, dashboards, nội bộ, dịch vụ, bổ sung chi, constraints)                                 | 13/13 suite, 247 test xanh                                                                                                                                      |
 
 `pnpm check`, `test:e2e`, `test:flows`, `test:scripts`, `test:integration:serial` và toàn bộ integration CHƯA chạy ở nhánh này — chạy ở nhánh gom.
 Chưa xác nhận review/accepted.
