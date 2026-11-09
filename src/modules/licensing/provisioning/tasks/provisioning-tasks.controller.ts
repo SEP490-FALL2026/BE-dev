@@ -388,7 +388,7 @@ export class ProvisioningTasksController {
   @RequireRoles('IT_ADMIN')
   @ApiOperation({
     operationId: 'provisioningTaskCancel',
-    summary: 'Close the failed task of a withdrawn request, or a revocation no reason asks for, as cancelled',
+    summary: 'Cancel the failed task of a withdrawn request, or a revocation',
   })
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.CANCELLED',

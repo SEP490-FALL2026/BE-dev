@@ -154,7 +154,7 @@ model Application {
   vendor                    Vendor?                             @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   dictionaryLine            VendorServiceLine?                  @relation(fields: [dictionaryLineId], references: [id], onDelete: Restrict)
   functionalGroup           FunctionalGroup?                    @relation(fields: [functionalGroupId], references: [id], onDelete: Restrict)
-  businessOwner             Employee?                           @relation(fields: [businessOwnerEmployeeId], references: [id])
+  businessOwner             Employee?                           @relation(fields: [businessOwnerEmployeeId], references: [id], onDelete: Restrict)
   proposals                 VendorDictionaryProposal[]
   plans                     Plan[]
   applicationBusinessOwners ApplicationBusinessOwner[]
@@ -249,7 +249,8 @@ model PlanUsageRate {
   assessedOn     DateTime @map("assessed_on") @db.Date
   updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
 
-  plan Plan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  plan         Plan         @relation(fields: [planId], references: [id], onDelete: Restrict)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
   @@map("plan_usage_rates")

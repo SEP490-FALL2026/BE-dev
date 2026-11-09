@@ -119,7 +119,8 @@ describe('headEvidenceOf — M5-44 (SoD-2, FR-4.12): a head reads the evidence i
     const text = JSON.stringify(headEvidenceOf(evidence));
 
     expect(text).not.toMatch(
-      /matchMethod|ALIAS_RULE|ageDays|activityDefinition|strictness|sourceId|reasons|employeeId/,
+      // `"ageDays"` as a key: `coverageDays`, which the head does read, also ends with those letters.
+      /matchMethod|ALIAS_RULE|"ageDays"|activityDefinition|strictness|sourceId|reasons|employeeId/,
     );
   });
 });

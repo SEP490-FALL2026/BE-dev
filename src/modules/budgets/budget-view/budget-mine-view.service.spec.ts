@@ -13,7 +13,9 @@ function setup() {
     ceilings: [
       {
         departmentId: 'department',
-        totalMinor: 100n,
+        // AF-16: Finance edits the ceiling to 120 after publishing 100; the head reads the published 100.
+        totalMinor: 120n,
+        publishedTotalMinor: 100n,
         signedCommitmentsMinor: 20n,
         plannedSeatsMinor: 70n,
         priorityMinor: 10n,

@@ -11,12 +11,7 @@ const pagination = z.strictObject({
   totalPages: z.number().int().nonnegative(),
 });
 
-const reason = z
-  .string()
-  .trim()
-  .min(3)
-  .max(1000)
-  .meta({ description: 'Why: 3 to 1000 characters, for every choice (`US-10-06` AC-5).' });
+const reason = z.string().trim().min(3).max(1000).meta({ description: 'Why: 3 to 1000 characters, for every choice.' });
 const choice = z.enum(['KEEP', 'RECLAIM', 'EXEMPT']);
 
 export const queueQuerySchema = z.strictObject({
@@ -33,9 +28,10 @@ export const decisionBodySchema = z
       .meta({ description: 'The recommendations the one choice and reason apply to (1 to 50), all or none.' }),
     choice,
     reason,
-    exemptUntil: businessDate
-      .optional()
-      .meta({ description: 'Only for EXEMPT: the last day, after today and at most 12 months from today.' }),
+    exemptUntil: businessDate.optional().meta({
+      description:
+        'Only for EXEMPT: the last day as YYYY-MM-DD, after today and at most 12 months from today; it must exist (2026-02-30 is refused).',
+    }),
   })
   .superRefine((body, context) => {
     if (body.choice !== 'EXEMPT' && body.exemptUntil !== undefined) {
@@ -44,10 +40,9 @@ export const decisionBodySchema = z
   });
 
 export const decisionListQuerySchema = z.strictObject({
-  selfDecided: z
-    .enum(['true', 'false'])
-    .optional()
-    .meta({ description: 'true: only what a head decided on their own seat (the report of `US-10-03` AC-13).' }),
+  selfDecided: z.enum(['true', 'false']).optional().meta({
+    description: 'true: only what a head decided on their own seat (the report of a head on their own seats).',
+  }),
   page: queueQuerySchema.shape.page,
   pageSize: queueQuerySchema.shape.pageSize,
 });
@@ -130,8 +125,8 @@ const returnedSchema = z.strictObject({
 });
 
 export class QueueQueryDto extends createZodDto(queueQuerySchema) {}
-export class DecisionBodyDto extends createZodDto(decisionBodySchema) {}
-export class ReturnBodyDto extends createZodDto(returnBodySchema) {}
+export class GhostSeatDecisionBodyDto extends createZodDto(decisionBodySchema) {}
+export class GhostSeatReturnBodyDto extends createZodDto(returnBodySchema) {}
 export class RecommendationIdParamDto extends createZodDto(recommendationIdParamSchema) {}
 export class QueuePageResponseDto extends createZodDto(successEnvelopeSchema(queuePageSchema)) {}
 export class DecisionCreatedResponseDto extends createZodDto(

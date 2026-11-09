@@ -91,7 +91,7 @@ export class BudgetsController {
   @ApiSuccessResponse(MineVersionPageResponseDto, {
     message: 'BUDGET.VERSIONS_LISTED',
     description:
-      'The sent versions of the Cost Center the caller heads today, newest first, with the base, reserve and total Finance set (QĐ-100p).',
+      'The sent versions of the Cost Center the caller heads today, newest first, with the base, reserve and total Finance set.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, MINE_INVALID)
   async mineVersions(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineVersionsQueryDto) {

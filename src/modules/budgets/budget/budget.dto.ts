@@ -1,5 +1,6 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
+import { responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { LINE_DESCRIPTION_MAX, REASON_MAX } from './budget.policy';
 import { LINE_TYPES } from './budget-line-zbb.json';
@@ -365,7 +366,11 @@ const mineSchema = z.strictObject({
     .strictObject({ total: moneyView, signedCommitments: moneyView, plannedSeats: moneyView, priority: moneyView })
     .nullable(),
   cycle: z
-    .strictObject({ submissionDeadline: z.iso.date(), decisionDeadline: z.iso.date(), published: z.boolean() })
+    .strictObject({
+      submissionDeadline: responseBusinessDate,
+      decisionDeadline: responseBusinessDate,
+      published: z.boolean(),
+    })
     .nullable(),
   version: z.strictObject({ id: z.uuid(), number: z.number().int().positive() }).nullable(),
   /** The refusal of the spending approver when the latest version of the year was refused: the head reads why. */
@@ -417,9 +422,9 @@ export const mineVersionSummarySchema = z.strictObject({
   state: z.enum(['SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'EXPIRED']),
   sentAt: z.iso.datetime(),
   base: moneyView.meta({
-    description: 'The base Finance set in the version, in the currency of the version (QĐ-100p).',
+    description: 'The base Finance set in the version, in the currency of the version.',
   }),
-  reserve: moneyView.meta({ description: 'The reserve on top of the base (QĐ-100h).' }),
+  reserve: moneyView.meta({ description: 'The reserve on top of the base.' }),
   total: moneyView.meta({ description: 'Base plus reserve.' }),
 });
 const importSchema = z.strictObject({

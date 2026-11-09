@@ -14,7 +14,7 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { DecisionReturnService } from './decision-return.service';
 import {
-  DecisionBodyDto,
+  GhostSeatDecisionBodyDto,
   DecisionCreatedResponseDto,
   DecisionListQueryDto,
   DecisionPageResponseDto,
@@ -22,7 +22,7 @@ import {
   QueuePageResponseDto,
   QueueQueryDto,
   RecommendationIdParamDto,
-  ReturnBodyDto,
+  GhostSeatReturnBodyDto,
   ReturnedResponseDto,
 } from './decision.dto';
 import { DECISION_ERROR_EXAMPLES as EXAMPLES, toDecisionApiException } from './decision.http-errors';
@@ -55,7 +55,7 @@ export class DecisionController {
   @RequireRoles('MANAGER')
   @ApiOperation({
     operationId: 'ghostSeatQueueList',
-    summary: 'List the recommendations about the seats of my department that wait for my decision',
+    summary: 'List the seat recommendations of my department waiting for my decision',
   })
   @ApiSuccessResponse(QueuePageResponseDto, {
     message: 'GHOST_SEAT_QUEUE.LISTED',
@@ -75,7 +75,7 @@ export class DecisionController {
   @RequireRoles('SUPER_ADMIN')
   @ApiOperation({
     operationId: 'ghostSeatDecisionList',
-    summary: 'List what heads decided about wasted seats, or only what they decided on their own seats',
+    summary: 'List the decisions of heads on wasted seats',
   })
   @ApiSuccessResponse(DecisionPageResponseDto, {
     message: 'GHOST_SEAT_DECISIONS.LISTED',
@@ -99,7 +99,7 @@ export class DecisionController {
   @RequireRoles('MANAGER', 'IT_ADMIN')
   @ApiOperation({
     operationId: 'ghostSeatExemptionList',
-    summary: 'List the exemptions of the seats of my department (an IT Admin reads all of them)',
+    summary: 'List the exemptions of the seats of my department',
   })
   @ApiSuccessResponse(ExemptionPageResponseDto, {
     message: 'GHOST_SEAT_EXEMPTIONS.LISTED',
@@ -147,7 +147,7 @@ export class DecisionController {
       examples: [VALIDATION_EXAMPLE, EXAMPLES.EXEMPTION_TOO_LONG],
     },
   )
-  async decide(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DecisionBodyDto) {
+  async decide(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: GhostSeatDecisionBodyDto) {
     try {
       const items = await this.decisions.decide(actor, {
         recommendationIds: body.items.map((item) => item.recommendationId),
@@ -192,7 +192,7 @@ export class DecisionController {
   async returnToHead(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: RecommendationIdParamDto,
-    @Body() body: ReturnBodyDto,
+    @Body() body: GhostSeatReturnBodyDto,
   ) {
     try {
       const record = await this.returns.returnToHead(actor, params.id, body.reason);

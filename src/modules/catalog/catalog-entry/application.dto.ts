@@ -76,7 +76,7 @@ const applicationSummarySchema = z.strictObject({
       status: z.enum(['ACTIVE', 'TERMINATED']),
     })
     .nullable()
-    .meta({ description: 'Null for an application declared without one: QĐ-104 removed the Business Owner.' }),
+    .meta({ description: 'Null for an application declared without one: the Business Owner is no longer required.' }),
   businessOwnerReplacementRequired: z.boolean(),
   usageCollectionDefault: z.literal('NOT_COLLECTED').nullable(),
   functionalGroup: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),

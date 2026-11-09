@@ -25857,7 +25857,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The newest 50 confirmations recorded and how many there are, whether the Business Owner of today has confirmed (true when the application names no Business Owner, QĐ-104: nothing to confirm), the first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.",
+            "description": "The newest 50 confirmations recorded and how many there are, whether the Business Owner of today has confirmed (true when the application names no Business Owner: nothing to confirm), the first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.",
             "content": {
               "application/json": {
                 "schema": {
@@ -32735,7 +32735,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Close the failed task of a withdrawn request, or a revocation no reason asks for, as cancelled",
+        "summary": "Cancel the failed task of a withdrawn request, or a revocation",
         "tags": ["provisioning-tasks"]
       }
     },
@@ -50152,7 +50152,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the seat, the new end date (newEndDate; or, deprecated, the months more extensionMonths 1 to 12, exactly one of the two) and the reason are required, and nothing else is taken. The new end must be after the end the right has and at most twelve months after it (RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE, with details.previousEndDate and details.maxEndDate; QĐ-108a). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end, a holder who uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED). Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the seat, the new end date (newEndDate; or, deprecated, the months more extensionMonths 1 to 12, exactly one of the two) and the reason are required, and nothing else is taken. The new end must be after the end the right has and at most twelve months after it (RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE, with details.previousEndDate and details.maxEndDate). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end, a holder who uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -59656,7 +59656,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The sent versions of the Cost Center the caller heads today, newest first, with the base, reserve and total Finance set (QĐ-100p).",
+            "description": "The sent versions of the Cost Center the caller heads today, newest first, with the base, reserve and total Finance set.",
             "content": {
               "application/json": {
                 "schema": {
@@ -76781,8 +76781,8 @@
                 "properties": {
                   "file": { "type": "string", "format": "binary" },
                   "sourceId": { "type": "string", "format": "uuid" },
-                  "coverageFrom": { "type": "string", "format": "date" },
-                  "coverageTo": { "type": "string", "format": "date" }
+                  "coverageFrom": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+                  "coverageTo": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
                 }
               }
             }
@@ -76856,7 +76856,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin imports the usage of a vendor: a head of department never reads the raw usage.",
+            "description": "Only an IT Admin works with the usage imports of a vendor: a head of department never reads the raw usage.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -77212,7 +77212,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin imports the usage of a vendor: a head of department never reads the raw usage.",
+            "description": "Only an IT Admin works with the usage imports of a vendor: a head of department never reads the raw usage.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -77411,7 +77411,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin imports the usage of a vendor: a head of department never reads the raw usage.",
+            "description": "Only an IT Admin works with the usage imports of a vendor: a head of department never reads the raw usage.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -77618,7 +77618,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin imports the usage of a vendor: a head of department never reads the raw usage.",
+            "description": "Only an IT Admin works with the usage imports of a vendor: a head of department never reads the raw usage.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -77913,7 +77913,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin imports the usage of a vendor: a head of department never reads the raw usage.",
+            "description": "Only an IT Admin works with the usage imports of a vendor: a head of department never reads the raw usage.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -86020,7 +86020,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "List the recommendations about the seats of my department that wait for my decision",
+        "summary": "List the seat recommendations of my department waiting for my decision",
         "tags": ["ghost-seats"]
       }
     },
@@ -86032,7 +86032,7 @@
             "name": "selfDecided",
             "required": false,
             "in": "query",
-            "description": "true: only what a head decided on their own seat (the report of `US-10-03` AC-13).",
+            "description": "true: only what a head decided on their own seat (the report of a head on their own seats).",
             "schema": { "type": "string", "enum": ["true", "false"] }
           },
           {
@@ -86198,7 +86198,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "List what heads decided about wasted seats, or only what they decided on their own seats",
+        "summary": "List the decisions of heads on wasted seats",
         "tags": ["ghost-seats"]
       },
       "post": {
@@ -86206,7 +86206,7 @@
         "parameters": [],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DecisionBodyDto" } } }
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GhostSeatDecisionBodyDto" } } }
         },
         "responses": {
           "201": {
@@ -86643,7 +86643,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "List the exemptions of the seats of my department (an IT Admin reads all of them)",
+        "summary": "List the exemptions of the seats of my department",
         "tags": ["ghost-seats"]
       }
     },
@@ -86655,7 +86655,7 @@
         ],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReturnBodyDto" } } }
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GhostSeatReturnBodyDto" } } }
         },
         "responses": {
           "200": {
@@ -92475,7 +92475,7 @@
                       },
                       "required": ["employeeId", "employeeCode", "fullName", "status"],
                       "additionalProperties": false,
-                      "description": "Null for an application declared without one: QĐ-104 removed the Business Owner.",
+                      "description": "Null for an application declared without one: the Business Owner is no longer required.",
                       "nullable": true
                     },
                     "businessOwnerReplacementRequired": { "type": "boolean" },
@@ -92606,7 +92606,7 @@
                 },
                 "required": ["employeeId", "employeeCode", "fullName", "status"],
                 "additionalProperties": false,
-                "description": "Null for an application declared without one: QĐ-104 removed the Business Owner.",
+                "description": "Null for an application declared without one: the Business Owner is no longer required.",
                 "nullable": true
               },
               "businessOwnerReplacementRequired": { "type": "boolean" },
@@ -92693,7 +92693,7 @@
                 },
                 "required": ["employeeId", "employeeCode", "fullName", "status"],
                 "additionalProperties": false,
-                "description": "Null for an application declared without one: QĐ-104 removed the Business Owner.",
+                "description": "Null for an application declared without one: the Business Owner is no longer required.",
                 "nullable": true
               },
               "businessOwnerReplacementRequired": { "type": "boolean" },
@@ -92832,7 +92832,7 @@
                 },
                 "required": ["employeeId", "employeeCode", "fullName", "status"],
                 "additionalProperties": false,
-                "description": "Null for an application declared without one: QĐ-104 removed the Business Owner.",
+                "description": "Null for an application declared without one: the Business Owner is no longer required.",
                 "nullable": true
               },
               "businessOwnerReplacementRequired": { "type": "boolean" },
@@ -103433,14 +103433,11 @@
       "ReturnBodyDto": {
         "type": "object",
         "properties": {
-          "reason": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 1000,
-            "description": "Why: 3 to 1000 characters, for every choice (`US-10-06` AC-5)."
-          }
+          "assignmentId": { "type": "string", "format": "uuid" },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "fromRequestId": { "type": "string", "format": "uuid" }
         },
-        "required": ["reason"],
+        "required": ["assignmentId", "reason"],
         "additionalProperties": false
       },
       "ReturnResponseDto": {
@@ -107458,32 +107455,11 @@
       "DecisionBodyDto": {
         "type": "object",
         "properties": {
-          "items": {
-            "minItems": 1,
-            "maxItems": 50,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": { "recommendationId": { "type": "string", "format": "uuid" } },
-              "required": ["recommendationId"],
-              "additionalProperties": false
-            },
-            "description": "The recommendations the one choice and reason apply to (1 to 50), all or none."
-          },
-          "choice": { "type": "string", "enum": ["KEEP", "RECLAIM", "EXEMPT"] },
-          "reason": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 1000,
-            "description": "Why: 3 to 1000 characters, for every choice (`US-10-06` AC-5)."
-          },
-          "exemptUntil": {
-            "description": "Only for EXEMPT: the last day, after today and at most 12 months from today.",
-            "type": "string",
-            "format": "date"
-          }
+          "decision": { "type": "string", "enum": ["APPROVE", "REJECT", "REQUEST_CHANGES"] },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
-        "required": ["items", "choice", "reason"],
+        "required": ["decision"],
+        "description": "A refusal (REJECT) or a request to look again (REQUEST_CHANGES) gives its reason; an approval (APPROVE) gives none.",
         "additionalProperties": false
       },
       "VersionLinePageResponseDto": {
@@ -107941,12 +107917,12 @@
                       "submissionDeadline": {
                         "type": "string",
                         "format": "date",
-                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        "description": "A calendar date as YYYY-MM-DD."
                       },
                       "decisionDeadline": {
                         "type": "string",
                         "format": "date",
-                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        "description": "A calendar date as YYYY-MM-DD."
                       },
                       "published": { "type": "boolean" }
                     },
@@ -108170,14 +108146,14 @@
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "The base Finance set in the version, in the currency of the version (QĐ-100p)."
+                      "description": "The base Finance set in the version, in the currency of the version."
                     },
                     "reserve": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "The reserve on top of the base (QĐ-100h)."
+                      "description": "The reserve on top of the base."
                     },
                     "total": {
                       "type": "object",
@@ -109440,7 +109416,7 @@
             "properties": {
               "basis": {
                 "type": "string",
-                "description": "A seat held is charged to the department of the person who holds it (QĐ-103k); the idle seats of the shared pool are in sharedPoolUnallocated.",
+                "description": "A seat held is charged to the department of the person who holds it; the idle seats of the shared pool are in sharedPoolUnallocated.",
                 "enum": ["HOLDER_DEPARTMENT"]
               },
               "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
@@ -109501,7 +109477,7 @@
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "The seats the people of the department hold (QĐ-103k), counted the way the warehouse counts them: a future start and a service account they answer for included."
+                            "description": "The seats the people of the department hold, counted the way the warehouse counts them: a future start and a service account they answer for included."
                           },
                           "monthlyUnitPrice": {
                             "type": "object",
@@ -109752,7 +109728,7 @@
                     "headStatus": {
                       "type": "string",
                       "enum": ["HAS_HEAD", "HEAD_TO_COME", "NO_HEAD"],
-                      "description": "Whether somebody heads the department today, somebody is named to head it later, or nobody is (`QĐ-100h`)."
+                      "description": "Whether somebody heads the department today, somebody is named to head it later, or nobody is."
                     },
                     "baselineAllowed": {
                       "type": "boolean",
@@ -109781,7 +109757,7 @@
                           "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                           "required": ["amount", "currency"],
                           "additionalProperties": false,
-                          "description": "The lines counted: a CANCEL line is shown and not added (QĐ-109c)."
+                          "description": "The lines counted: a CANCEL line is shown and not added."
                         },
                         "state": { "type": "string", "enum": ["SUBMITTED", "REVIEWED"] },
                         "lines": {
@@ -113117,8 +113093,8 @@
                   "window": {
                     "type": "object",
                     "properties": {
-                      "from": { "type": "string" },
-                      "to": { "type": "string" },
+                      "from": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                      "to": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
                       "basis": { "type": "string", "enum": ["DECLARED", "DERIVED"] }
                     },
                     "required": ["from", "to", "basis"],
@@ -113145,7 +113121,7 @@
                   "warnings": { "maxItems": 10, "type": "array", "items": { "type": "string" } },
                   "unmappedEventTypes": { "maxItems": 200, "type": "array", "items": { "type": "string" } },
                   "trackingNoticeRequired": { "type": "boolean" },
-                  "recordedOn": { "type": "string" }
+                  "recordedOn": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." }
                 },
                 "required": [
                   "window",
@@ -113353,8 +113329,12 @@
                       "window": {
                         "type": "object",
                         "properties": {
-                          "from": { "type": "string" },
-                          "to": { "type": "string" },
+                          "from": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "A calendar date as YYYY-MM-DD."
+                          },
+                          "to": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
                           "basis": { "type": "string", "enum": ["DECLARED", "DERIVED"] }
                         },
                         "required": ["from", "to", "basis"],
@@ -113381,7 +113361,11 @@
                       "warnings": { "maxItems": 10, "type": "array", "items": { "type": "string" } },
                       "unmappedEventTypes": { "maxItems": 200, "type": "array", "items": { "type": "string" } },
                       "trackingNoticeRequired": { "type": "boolean" },
-                      "recordedOn": { "type": "string" }
+                      "recordedOn": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "A calendar date as YYYY-MM-DD."
+                      }
                     },
                     "required": [
                       "window",
@@ -116236,6 +116220,37 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "GhostSeatDecisionBodyDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": { "recommendationId": { "type": "string", "format": "uuid" } },
+              "required": ["recommendationId"],
+              "additionalProperties": false
+            },
+            "description": "The recommendations the one choice and reason apply to (1 to 50), all or none."
+          },
+          "choice": { "type": "string", "enum": ["KEEP", "RECLAIM", "EXEMPT"] },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Why: 3 to 1000 characters, for every choice."
+          },
+          "exemptUntil": {
+            "description": "Only for EXEMPT: the last day as YYYY-MM-DD, after today and at most 12 months from today; it must exist (2026-02-30 is refused).",
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": ["items", "choice", "reason"],
+        "additionalProperties": false
+      },
       "DecisionCreatedResponseDto": {
         "type": "object",
         "properties": {
@@ -116272,6 +116287,19 @@
           }
         },
         "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "GhostSeatReturnBodyDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Why: 3 to 1000 characters, for every choice."
+          }
+        },
+        "required": ["reason"],
         "additionalProperties": false
       },
       "ReturnedResponseDto": {
@@ -117084,7 +117112,7 @@
                     },
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
-                    "description": "The people active in a vendor with no seat to cover the day (`FR-4.8`): the open findings of the vendor usage import."
+                    "description": "The people active in a vendor with no seat to cover the day: the open findings of the vendor usage import."
                   },
                   "cancellationDeadlines": {
                     "type": "object",

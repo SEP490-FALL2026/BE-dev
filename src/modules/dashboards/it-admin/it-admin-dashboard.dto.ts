@@ -19,7 +19,7 @@ const itAdminDashboardSchema = z.strictObject({
     grantTasks: section('The grant tasks not finished whose IT Admin in charge by default is the caller.'),
     revocationTasks: section('The revocation tasks not finished whose IT Admin in charge by default is the caller.'),
     discrepancies: section(
-      'The people active in a vendor with no seat to cover the day (`FR-4.8`): the open findings of the vendor usage import.',
+      'The people active in a vendor with no seat to cover the day: the open findings of the vendor usage import.',
     ),
     cancellationDeadlines: section(
       'Not counted here: the rows are all the subscriptions of `subscriptionList`, and the client keeps the ones whose `noticeDeadline` is near. The list has no filter by deadline yet.',

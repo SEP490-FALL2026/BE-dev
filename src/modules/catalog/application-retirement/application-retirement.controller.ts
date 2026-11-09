@@ -103,7 +103,7 @@ export class ApplicationRetirementController {
   @ApiSuccessResponse(RetirementResponseDto, {
     message: 'APPLICATION.RETIREMENT_FETCHED',
     description:
-      'The newest 50 confirmations recorded and how many there are, whether the Business Owner of today has confirmed (true when the application names no Business Owner, QĐ-104: nothing to confirm), the first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.',
+      'The newest 50 confirmations recorded and how many there are, whether the Business Owner of today has confirmed (true when the application names no Business Owner: nothing to confirm), the first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

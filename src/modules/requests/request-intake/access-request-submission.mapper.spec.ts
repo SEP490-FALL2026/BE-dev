@@ -88,6 +88,8 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
       costCenterId: 'cc-1',
       policyVersion: 3,
       hasSpendStep: true,
+      // GH-3 (BR-MF1-01g): how many paid applications the person used when it was sent; null when not flagged.
+      manyPaidSoftwareCount: null,
       slaWorkingDays: 2,
       pricingStatus: 'COMPUTED',
       amountMinor: '1200',

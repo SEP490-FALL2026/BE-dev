@@ -50,7 +50,7 @@ const SUBMIT_ERRORS = [
   {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The form is incomplete or invalid (VALIDATION_ERROR): the seat, the new end date (newEndDate; or, deprecated, the months more extensionMonths 1 to 12, exactly one of the two) and the reason are required, and nothing else is taken. The new end must be after the end the right has and at most twelve months after it (RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE, with details.previousEndDate and details.maxEndDate; QĐ-108a). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end, a holder who uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED). Nothing is written.',
+      'The form is incomplete or invalid (VALIDATION_ERROR): the seat, the new end date (newEndDate; or, deprecated, the months more extensionMonths 1 to 12, exactly one of the two) and the reason are required, and nothing else is taken. The new end must be after the end the right has and at most twelve months after it (RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE, with details.previousEndDate and details.maxEndDate). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end, a holder who uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED). Nothing is written.',
     examples: [
       VALIDATION_EXAMPLE,
       RENEWAL_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE,

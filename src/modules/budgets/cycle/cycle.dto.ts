@@ -108,7 +108,7 @@ const softwareView = z.strictObject({
   }),
   seatsAssigned: z.number().int().meta({
     description:
-      'The seats the people of the department hold (QĐ-103k), counted the way the warehouse counts them: a future start and a service account they answer for included.',
+      'The seats the people of the department hold, counted the way the warehouse counts them: a future start and a service account they answer for included.',
   }),
   monthlyUnitPrice: moneyView.nullable(),
   monthsRunning: z.number().int().min(0).max(12),
@@ -173,7 +173,7 @@ const sharedPoolLineView = z.strictObject({
 export const baselineSchema = z.strictObject({
   basis: z.literal('HOLDER_DEPARTMENT').meta({
     description:
-      'A seat held is charged to the department of the person who holds it (QĐ-103k); the idle seats of the shared pool are in sharedPoolUnallocated.',
+      'A seat held is charged to the department of the person who holds it; the idle seats of the shared pool are in sharedPoolUnallocated.',
   }),
   year: z.number().int(),
   currency: z.string(),
@@ -214,8 +214,7 @@ const packageDepartmentView = z.strictObject({
       'The ceiling the head was told when the cycle was published; null before the first publication. The flags over the ceiling are judged against it (S4-01).',
   }),
   headStatus: z.enum(['HAS_HEAD', 'HEAD_TO_COME', 'NO_HEAD']).meta({
-    description:
-      'Whether somebody heads the department today, somebody is named to head it later, or nobody is (`QĐ-100h`).',
+    description: 'Whether somebody heads the department today, somebody is named to head it later, or nobody is.',
   }),
   baselineAllowed: z.boolean().meta({
     description:
@@ -235,7 +234,7 @@ const packageDepartmentView = z.strictObject({
   proposal: z
     .strictObject({
       id: z.uuid(),
-      total: moneyView.meta({ description: 'The lines counted: a CANCEL line is shown and not added (QĐ-109c).' }),
+      total: moneyView.meta({ description: 'The lines counted: a CANCEL line is shown and not added.' }),
       state: z.enum(['SUBMITTED', 'REVIEWED']),
       lines: z.array(packageLineView).max(200).meta({
         description:

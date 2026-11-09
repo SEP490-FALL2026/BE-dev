@@ -106,6 +106,7 @@ model Organization {
   employeeLeaves                     EmployeeLeave[]
   offboardingCases                   OffboardingCase[]
   personnelNotices                   PersonnelNotice[]
+  planUsageRates                     PlanUsageRate[]
 
   @@map("organizations")
 }

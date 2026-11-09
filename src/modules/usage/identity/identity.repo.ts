@@ -15,6 +15,21 @@ import {
   type UnmatchedStatus,
 } from './identity.types';
 
+/**
+ * The most identifiers one statement names: PostgreSQL takes at most 32 767 bound parameters, and a report of a vendor may name 50 000 people,
+ * so a longer list is read in slices of this many (`US-10-02`, the performance case of the confirmation).
+ */
+const IDENTIFIERS_PER_STATEMENT = 10_000;
+
+const slicesOf = (identifiers: readonly string[]): string[][] => {
+  const slices: string[][] = [];
+  for (let start = 0; start < identifiers.length; start += IDENTIFIERS_PER_STATEMENT) {
+    slices.push(identifiers.slice(start, start + IDENTIFIERS_PER_STATEMENT));
+  }
+
+  return slices;
+};
+
 const toMapping = (row: Prisma.UsageIdentityMappingGetPayload<object>): MappingRecord => ({ ...row });
 const toUnmatched = (row: Prisma.UsageUnmatchedIdentityGetPayload<object>): UnmatchedRecord => ({ ...row });
 
@@ -32,12 +47,15 @@ export class IdentityRepo {
     normalizedIdentifiers: readonly string[],
     tx?: DbTx,
   ): Promise<Map<string, MappingRecord>> {
-    if (normalizedIdentifiers.length === 0) return new Map();
-    const rows = await (tx ?? this.prisma).usageIdentityMapping.findMany({
-      where: { applicationId, identifierType, normalizedIdentifier: { in: [...normalizedIdentifiers] }, endedAt: null },
-    });
+    const mappings = new Map<string, MappingRecord>();
+    for (const slice of slicesOf(normalizedIdentifiers)) {
+      const rows = await (tx ?? this.prisma).usageIdentityMapping.findMany({
+        where: { applicationId, identifierType, normalizedIdentifier: { in: slice }, endedAt: null },
+      });
+      for (const row of rows) mappings.set(row.normalizedIdentifier, toMapping(row));
+    }
 
-    return new Map(rows.map((row) => [row.normalizedIdentifier, toMapping(row)]));
+    return mappings;
   }
 
   /** The identifiers of these that had a mapping the IT Admin ended: the match never ties them again by itself (`FR-4.6`, `INV-12`). */
@@ -47,19 +65,17 @@ export class IdentityRepo {
     normalizedIdentifiers: readonly string[],
     tx?: DbTx,
   ): Promise<Set<string>> {
-    if (normalizedIdentifiers.length === 0) return new Set();
-    const rows = await (tx ?? this.prisma).usageIdentityMapping.findMany({
-      where: {
-        applicationId,
-        identifierType,
-        normalizedIdentifier: { in: [...normalizedIdentifiers] },
-        endedAt: { not: null },
-      },
-      select: { normalizedIdentifier: true },
-      distinct: ['normalizedIdentifier'],
-    });
+    const ended = new Set<string>();
+    for (const slice of slicesOf(normalizedIdentifiers)) {
+      const rows = await (tx ?? this.prisma).usageIdentityMapping.findMany({
+        where: { applicationId, identifierType, normalizedIdentifier: { in: slice }, endedAt: { not: null } },
+        select: { normalizedIdentifier: true },
+        distinct: ['normalizedIdentifier'],
+      });
+      for (const row of rows) ended.add(row.normalizedIdentifier);
+    }
 
-    return new Set(rows.map((row) => row.normalizedIdentifier));
+    return ended;
   }
 
   /** Writes the mapping unless one is in force already (the unique index of the identifier says which wins); returns its id or null. */

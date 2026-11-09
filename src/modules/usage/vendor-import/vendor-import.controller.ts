@@ -71,7 +71,8 @@ const COMMON_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
   {
     status: HttpStatus.FORBIDDEN,
-    description: 'Only an IT Admin imports the usage of a vendor: a head of department never reads the raw usage.',
+    description:
+      'Only an IT Admin works with the usage imports of a vendor: a head of department never reads the raw usage.',
     examples: [FORBIDDEN_EXAMPLE],
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
@@ -190,8 +191,8 @@ export class VendorImportController {
       properties: {
         file: { type: 'string', format: 'binary' },
         sourceId: { type: 'string', format: 'uuid' },
-        coverageFrom: { type: 'string', format: 'date' },
-        coverageTo: { type: 'string', format: 'date' },
+        coverageFrom: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+        coverageTo: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
       },
     },
   })
