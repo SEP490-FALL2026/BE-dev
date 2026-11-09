@@ -186,7 +186,12 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       const checked = h.dataOf<CheckWire>(
         await h.checkGroup(h.groupBody(paid, [e1, u.head]), u.head.account).expect(200),
       );
-      expect(checked.lines).toContainEqual({ employeeId: u.head.employeeId, ok: false, reason: 'HEAD_IN_GROUP' });
+      expect(checked.lines).toContainEqual({
+        employeeId: u.head.employeeId,
+        ok: false,
+        reason: 'HEAD_IN_GROUP',
+        manyPaidSoftware: null,
+      });
     });
 
     it('refuses a request of the head alone: a group names two people at least, and the request of one is an individual one (QĐ-100aa)', async () => {

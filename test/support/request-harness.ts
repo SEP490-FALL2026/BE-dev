@@ -107,12 +107,32 @@ export class RequestHarness extends ProvisioningHarness {
 
   /**
    * Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. The suites of
-   * other rules send many requests for one person, so GH-2 (`REQUEST_OPEN_NEW_LIMIT`, BR-MF1-01f) is raised to its most here; the suite of
-   * the limits (`request-limits.integration-spec.ts`) sets it back to the default.
+   * other rules send many requests for one person, often for the same plan while the first is still open, so the disposable database of the
+   * suite leaves every request and every line of a group out of GH-1 and GH-2 (BR-MF1-01e/f): a trigger of the test database only marks each
+   * new row with an exemption, the one value the count of the limits skips and nothing else reads. GH-2 (`REQUEST_OPEN_NEW_LIMIT`) is raised to
+   * its most as well. The suites of the limits call `enforceRequestLimits` to judge the limits as the product does.
    */
   override async start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
     await SeatHarness.prototype.start.call(this, options);
     await this.setParameter('REQUEST_OPEN_NEW_LIMIT', 20).expect(200);
+    await this.ctx.sql.query(`
+      CREATE OR REPLACE FUNCTION test_harness_exempt_from_request_limits() RETURNS trigger AS $$
+      BEGIN
+        IF NEW.limit_exemption IS NULL THEN NEW.limit_exemption := 'TRANSFER_OVERLAP'; END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql`);
+    for (const table of ['access_requests', 'access_request_lines']) {
+      await this.ctx.sql.query(`CREATE TRIGGER test_harness_exempt_from_request_limits BEFORE INSERT ON ${table}
+        FOR EACH ROW EXECUTE FUNCTION test_harness_exempt_from_request_limits()`);
+    }
+  }
+
+  /** Judges GH-1, GH-2 and GH-3 as the product does: the exemption of `start` is no longer written on new rows. */
+  async enforceRequestLimits(): Promise<void> {
+    for (const table of ['access_requests', 'access_request_lines']) {
+      await this.ctx.sql.query(`DROP TRIGGER IF EXISTS test_harness_exempt_from_request_limits ON ${table}`);
+    }
   }
 
   /** One job title (free text) for everybody a spec makes. */

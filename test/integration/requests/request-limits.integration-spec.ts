@@ -29,6 +29,7 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
 
   beforeAll(async () => {
     await h.start();
+    await h.enforceRequestLimits();
     await h.setParameter('REQUEST_OPEN_NEW_LIMIT', 3).expect(200);
     await h.setParameter('PAID_SOFTWARE_FLAG_THRESHOLD', 10).expect(200);
     design = await h.departmentWithUnit('P-GH');

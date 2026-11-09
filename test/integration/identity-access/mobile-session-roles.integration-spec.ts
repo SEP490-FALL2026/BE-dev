@@ -452,8 +452,14 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       .set(bearer(token))
       .send(h.form(await h.plan('K5')))
       .expect(201);
-    const wire = h.dataOf<{ request: { needStep: { assignee: { employeeId: string } | null } } }>(sent).request;
-    expect(wire.needStep.assignee?.employeeId).toBe(h.boss.employeeId);
+    const wire = h.dataOf<{
+      request: {
+        needStep: { assignee: { employeeId: string } | null };
+        routing: { mode: string; oneStepReason: string | null };
+      };
+    }>(sent).request;
+    // MF1-D (one-step routing): the own request of a head goes one step, to nobody of a need step; never to the head themself.
+    expect(wire.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' });
     expect(wire.needStep.assignee?.employeeId).not.toBe(head.employeeId);
   });
 

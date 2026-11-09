@@ -191,7 +191,7 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     );
     expect(h.codeOf(await retire(applicationId).expect(409))).toBe('APPLICATION.RETIREMENT_BLOCKED');
 
-    await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = valid_from WHERE id = $1`, [seat]);
+    await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = valid_from + 1 WHERE id = $1`, [seat]);
     expect(
       h.dataOf<{ retirement: { canRetire: boolean } }>(await retirement(applicationId).expect(200)).retirement
         .canRetire,

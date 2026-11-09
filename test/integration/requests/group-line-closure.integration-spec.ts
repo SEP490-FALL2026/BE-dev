@@ -237,7 +237,8 @@ describe('removing a person who left from a request for a group (integration, re
 
       expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.ALREADY_ENDED');
       expect(await h.lineStates(id)).toEqual(['COMPLETED', 'APPROVED']);
-      expect(await releases(id)).toEqual([]);
+      // The refused closure gives nothing back; only the days before the K2 grant of the seat went back when it was completed (M-10).
+      expect((await releases(id)).filter((row) => row.reason !== 'LATE_GRANT')).toEqual([]);
     });
   });
 

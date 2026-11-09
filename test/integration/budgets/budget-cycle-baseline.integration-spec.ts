@@ -233,7 +233,15 @@ describe('the baseline and the package of a budget cycle (integration, real Post
       const owner = await department();
       const holders = await department();
       await holdFor(owner, holders.department, 3);
-      await h.ctx.sql.query(`UPDATE subscriptions SET owner_department_id = NULL WHERE id = $1`, [owner.subscription]);
+      // A K2 subscription is created with no department since AF-05; the owner is kept for life, so the fixture lifts the guard for its one write.
+      await h.ctx.sql.query(`ALTER TABLE subscriptions DISABLE TRIGGER subscriptions_owner_immutable`);
+      try {
+        await h.ctx.sql.query(`UPDATE subscriptions SET owner_department_id = NULL WHERE id = $1`, [
+          owner.subscription,
+        ]);
+      } finally {
+        await h.ctx.sql.query(`ALTER TABLE subscriptions ENABLE TRIGGER subscriptions_owner_immutable`);
+      }
 
       const wire = h.dataOf<BaselineWire>(await baseline().expect(200));
 

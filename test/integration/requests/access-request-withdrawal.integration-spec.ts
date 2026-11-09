@@ -350,7 +350,16 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       const refused = await h.withdrawRequest(id, {}, u.member.account).expect(409);
 
       expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.GRANT_COMPLETED');
-      expect(await commitmentOf(id)).toMatchObject({ state: 'HELD', released_minor: '0' });
+      // The refused withdrawal gives nothing back; only the days of the month before the K2 grant went back when it was completed (M-10).
+      expect(await commitmentOf(id)).toMatchObject({ state: 'HELD' });
+      const reasons = (
+        await h.ctx.sql.query<{ reason: string }>(
+          `SELECT DISTINCT r.reason::text AS reason FROM budget_commitment_releases r
+             JOIN budget_commitments c ON c.id = r.commitment_id WHERE c.request_id = $1`,
+          [id],
+        )
+      ).rows.map((row) => row.reason);
+      expect(reasons.filter((reason) => reason !== 'LATE_GRANT')).toEqual([]);
     });
   });
 

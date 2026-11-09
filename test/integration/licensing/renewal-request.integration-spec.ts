@@ -57,6 +57,19 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
   /** The last day of a renewal of `months` months of a right that ends on `previousEnd`, as the server works it out. */
   const endAfter = (previousEnd: string | undefined, months: number) =>
     renewalEndOf({ previousEnd: previousEnd ?? '', today: h.today(), months });
+  /**
+   * BR-MF1-08a: a renewal is sent only from RENEWAL_WINDOW_DAYS (at most 90) before the end. A right that ends on 31/12 can be renewed from
+   * early October; the window is widened to its most for the cases of QĐ-109b, and on a day it cannot open yet the case checks the refusal
+   * instead. True when the renewal can be sent today.
+   */
+  const windowOpensFor = async (days: number, unit: Unit, assignmentId: string): Promise<boolean> => {
+    await h.setParameter('RENEWAL_WINDOW_DAYS', 90).expect(200);
+    if (days <= 90) return true;
+    const refused = await h.renew(body(assignmentId, 3), unit.member.account).expect(409);
+    expect(h.codeOf(refused)).toBe('RENEWAL_REQUEST.WINDOW_NOT_OPEN');
+
+    return false;
+  };
   const approve = (id: string, unit: Unit) => h.decide(id, { decision: 'APPROVE' }, unit.head.account);
   /** The head confirms the need of a paid renewal, sends it on, and the approver decides it. */
   const approvePaid = async (id: string, unit: Unit, amount = 5 * M) => {
@@ -81,6 +94,20 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       )
     ).rows;
   const holds = (assignmentId: string) => h.ctx.app.get(LicensingRenewalApi).hasPendingRenewal(assignmentId);
+  /**
+   * BR-MF1-08d (RV-03): approval no longer extends the right; it opens an IT task EXTEND, and the record that follows is written when the
+   * IT Admin extends the right with the vendor and completes the task.
+   */
+  const extend = async (requestId: string) => {
+    const [task] = (
+      await h.ctx.sql.query<{ id: string }>(
+        `SELECT id FROM provisioning_tasks WHERE request_id = $1 AND kind = 'EXTEND' AND status = 'QUEUED'`,
+        [requestId],
+      )
+    ).rows;
+    await h.claim(task.id).expect(200);
+    await h.complete(task.id, { evidence: 'Extended with the vendor' }).expect(200);
+  };
 
   describe('a request of its own, which approval turns into the record that follows (AC-1)', () => {
     it('renews a right of internal software: the old record keeps its end, a new one begins there and nobody is waited for', async () => {
@@ -107,6 +134,8 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       expect(await holds(assignmentId)).toBe(true);
 
       await approve(request.id, unit).expect(200);
+      expect(await h.state(request.id)).toBe('AWAITING_EXECUTION');
+      await extend(request.id);
 
       const old = await h.seatRow(assignmentId);
       expect(old).toMatchObject({ valid_until: end, expected_end_date: end });
@@ -125,7 +154,8 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       expect(done.state).toBe('COMPLETED');
       expect(done.renewal?.applied?.successorAssignmentId).toBe(next.id);
       expect((await h.renewalOf(request.id)).successor_assignment_id).toBe(next.id);
-      expect(await h.count('provisioning_tasks')).toBe(tasksBefore);
+      // The one task is the extension the IT Admin completed (BR-MF1-08d); no grant task is made.
+      expect(await h.count('provisioning_tasks')).toBe(tasksBefore + 1);
       expect(await holds(assignmentId)).toBe(false);
       // The record that renews the right is never granted by the IT Admin.
       expect(h.codeOf(await h.grant({ requestId: request.id }).expect(409))).toBe('PROVISIONING.REQUEST_ENDED');
@@ -142,6 +172,8 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       expect(request).toMatchObject({ branch: 'PAID_IN_CATALOG', termMonths: 3 });
 
       await approvePaid(request.id, unit);
+      expect(await h.state(request.id)).toBe('AWAITING_EXECUTION');
+      await extend(request.id);
 
       expect(await h.state(request.id)).toBe('COMPLETED');
       expect(await commitmentOf(request.id)).toEqual([
@@ -171,6 +203,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       const year = Number(h.today().slice(0, 4));
       const days = Math.round((Date.UTC(year, 11, 31) - Date.parse(`${h.today()}T00:00:00Z`)) / 86_400_000);
       const { unit, assignmentId } = await holder(paid, days);
+      if (!(await windowOpensFor(days, unit, assignmentId))) return;
 
       const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
 
@@ -184,6 +217,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       const year = Number(h.today().slice(0, 4));
       const days = Math.round((Date.UTC(year, 11, 31) - Date.parse(`${h.today()}T00:00:00Z`)) / 86_400_000);
       const { unit, assignmentId } = await holder(paid, days);
+      if (!(await windowOpensFor(days, unit, assignmentId))) return;
       const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
       await approve(request.id, unit).expect(200);
       await h.sendOn([request.id], unit.head.account).expect(201);
@@ -234,6 +268,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       const firstEnd = endAfter(end, 6);
       const first = await h.renewed(unit.member.account, body(assignmentId, 6));
       await approve(first.request.id, unit).expect(200);
+      await extend(first.request.id);
       const [current] = await h.successorsOf(assignmentId);
       expect(first.request.renewal?.consecutiveMonths).toBe(monthsBetween(since, firstEnd));
 
@@ -247,6 +282,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       expect(second.request.renewal?.consecutiveMonths).toBeGreaterThan(12);
 
       await approve(second.request.id, unit).expect(200);
+      await extend(second.request.id);
       expect(await h.state(second.request.id)).toBe('COMPLETED');
       expect((await h.successorsOf(current.id))[0]).toMatchObject({ expected_end_date: secondEnd });
     });
@@ -259,6 +295,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
 
       expect(request.renewal?.consecutiveMonths).toBe(monthsBetween(since, endAfter(end, 3)));
       await approve(request.id, unit).expect(200);
+      await extend(request.id);
       expect(await h.state(request.id)).toBe('COMPLETED');
       expect((await h.steps(request.id, 'NEED')).length).toBe(1);
     });
@@ -372,6 +409,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       const chained = await holder({ planId: internalPlan }, 5);
       const first = await h.renewed(chained.unit.member.account, body(chained.assignmentId, 3));
       await approve(first.request.id, chained.unit).expect(200);
+      await extend(first.request.id);
       counter += 1;
       const service = await h.departmentWithHead(`P-RN${counter}`);
       const serviceSeat = randomUUID();

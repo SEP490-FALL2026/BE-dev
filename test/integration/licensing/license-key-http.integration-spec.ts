@@ -166,12 +166,16 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     expect(h.dataOf<ListData>(response).items[0].masked).toBe(`••••${secret.slice(-4)}`);
     expect(JSON.stringify(response.body)).not.toContain(secret);
     expect(JSON.stringify(response.body)).not.toContain(row.fingerprint);
+    // BR-MF1-09 (K4 key pool): a key also names the seat it is assigned to and whether it was withdrawn from the store, with why.
     expect(Object.keys(h.dataOf<ListData>(response).items[0]).sort()).toEqual([
+      'assignmentId',
       'id',
       'importedAt',
       'masked',
       'status',
       'subscriptionId',
+      'withdrawalReason',
+      'withdrawnAt',
     ]);
     expect(row.ciphertext.includes(Buffer.from(secret))).toBe(false);
     expect(row.ciphertext.length).toBeGreaterThan(28 + secret.length - 1);
