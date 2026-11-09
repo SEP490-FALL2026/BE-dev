@@ -1,4 +1,4 @@
-import type { BusinessDate } from './business-date';
+import type { BusinessDate } from '../../../core/business-date';
 
 /**
  * The cost a seat has in the days of a month (`BR-MF1-08`, `M-06`, `M-10`): the commitment of a K1 or K2 right is a price a month, and when

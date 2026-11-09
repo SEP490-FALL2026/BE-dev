@@ -10,6 +10,17 @@ import { liveIdsByPlan, liveSiblingsOf, poolWarnings } from './pool/subscription
 import { SubscriptionRepo } from './subscription.repo';
 import type { SubscriptionRecord, SubscriptionView, TaxEstimateSummary } from './subscription.types';
 
+type LiveOfPlans = { byPlan: Map<string, string[]>; has: (id: string) => boolean };
+
+/** The most live subscriptions of one plan an answer names: duplicates exist only while the seat baseline is open, a few at most. */
+const MERGE_CANDIDATES_MAX = 20;
+
+const mergeCandidatesOf = (live: LiveOfPlans, record: SubscriptionRecord): string[] =>
+  live.has(record.id) ? liveSiblingsOf(live.byPlan, record.planId, record.id).slice(0, MERGE_CANDIDATES_MAX) : [];
+
+const mergeWarnings = (mergeCandidateIds: readonly string[]): 'SHOULD_MERGE'[] =>
+  mergeCandidateIds.length > 0 ? ['SHOULD_MERGE'] : [];
+
 /**
  * A subscription as it is answered: the stored data with everything derived when it is read — the notice deadline and
  * its source, the alert dates the operating parameter sets now, the data-quality warning, the tax profile of the vendor
@@ -62,7 +73,7 @@ export class SubscriptionViewService {
     const views: SubscriptionView[] = [];
     for (const record of records) {
       // The rule against a second live subscription of a K2 or K4 plan: answered at every phase of the baseline, so the IT Admin sees what to fold (`QĐ-104k`(3)).
-      const mergeCandidateIds = live.has(record.id) ? liveSiblingsOf(live.byPlan, record.planId, record.id) : [];
+      const mergeCandidateIds = mergeCandidatesOf(live, record);
       const notice = deriveNotice(noticeInputOf(record));
       const missing = missingData({
         kind: record.kind,
@@ -133,11 +144,7 @@ export class SubscriptionViewService {
         isPrimaryForPlan: record.isPrimaryForPlan,
         noticeDeadline: { value: notice.deadline, source: notice.source },
         alerts: { baseDate: notice.baseDate, dates: alertDates(notice.baseDate, daysBefore) },
-        warnings: [
-          ...noticeWarnings(notice.source),
-          ...poolWarnings(record),
-          ...(mergeCandidateIds.length > 0 ? (['SHOULD_MERGE'] as const) : []),
-        ],
+        warnings: [...noticeWarnings(notice.source), ...poolWarnings(record), ...mergeWarnings(mergeCandidateIds)],
         mergeCandidateIds,
         taxProfile: { status: group ? 'DECLARED' : 'MISSING', group },
         taxEstimate,

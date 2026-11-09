@@ -19,6 +19,7 @@ import { ServiceAccountDutyService } from './assignment/service-account-duty/ser
 import { ServiceAccountDutySweeper } from './assignment/service-account-duty/service-account-duty.job';
 import { ServiceAccountSpendingApproverGrantCheck } from './assignment/service-account-duty/spending-approver-grant.listener';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
+import { RevocationCompletedFactsReader } from './provisioning/revocation-completion/revocation-completed-facts.service';
 import { AssignmentChainRepo } from './assignment/assignment-chain.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
 import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
@@ -171,6 +172,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingAlerts,
     AssignmentRepo,
     AssignmentChainRepo,
+    RevocationCompletedFactsReader,
     AssignmentDepartmentRepo,
     AssignmentSeatOccupancy,
     AssignmentServiceAccountReader,

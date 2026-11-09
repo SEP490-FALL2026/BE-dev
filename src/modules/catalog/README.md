@@ -15,6 +15,10 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
   - `getPlanPrice(planId, tx?)` — giá của plan từ thuê bao chính (`pickPriceSource`: cờ `is_primary_for_plan`, không có thì giá tháng quy đổi cao nhất,
     hòa thì `start_date` cũ hơn rồi `id`), không theo phòng (S1-02, `BR-MF1-07`); trả `{ kind: RECURRING | ONE_TIME, unitPrice, billingCycle }`, thuê bao
     `PERPETUAL` có giá ⟹ `ONE_TIME` (khóa `K4`).
+  - `getGrantableSubscriptions(planId, today, tx?)` / `getGrantableSubscriptionsOfPlans` (nhiều plan, một lần đọc) — thuê bao `ACTIVE` chưa có kỳ kế tiếp, còn hiệu lực hôm
+    nay (bản `DRAFT` không cấp được), thứ tự: thuê bao chính trước, rồi giá tháng cao nhất (`orderBySourcePreference`); `getSubscriptionPrice`.
+  - `addPoolSeat(tx, actor, subscriptionId)` — +1 `purchased_quantity` của thuê bao `ACTIVE` đang bị bên gọi khóa (`lockSeatTarget`), gói năm tăng giữa
+    kỳ được, không hỏi Cost Center của phòng sở hữu; dùng khi `provisioningTaskGrant` có `purchase` mà kho hết và khi cấp `K1` (mỗi lần cấp tự +1).
   - `getSubscriptionIdsOwnedBy`, `getApplicationsOwnedBy`, `getWorkspaceDutiesOf` — thứ một phòng ban/người đang giữ.
   - `registerInternalSoftware` — đăng ký phần mềm nội bộ trong transaction của bên gọi (US-05-20).
   - `getVendorName`, `getOnboardingFacts` — tên vendor; số ứng dụng/plan/subscription cho checklist onboarding.
@@ -26,7 +30,7 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
 - `public/subscription-owner-assignment.errors.ts` — `AssignmentRefusedError`;
   `public/subscription-owner-assignment.types.ts` — `AssignmentCommand`, `AssignmentResult`.
 - `public/catalog.types.ts` — `SeatTarget`, `SeatTargetRef`, `PlanSummary`, `PlanRevocationInfo`, `WorkspaceDuty`…
-- `public/catalog.extension-points.ts` — `SeatOccupancyHook` và contract `SeatOccupancyReader`.
+- `public/catalog.extension-points.ts` — `SeatOccupancyHook` và contract `SeatOccupancyReader`; `SeatBaselinePhaseHook` (`catalog.seat-baseline-phase`) và `SeatBaselinePhase`.
 
 ## Bảng sở hữu
 
@@ -40,6 +44,8 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
 
 - Mở: `SeatOccupancyHook` (`catalog.seat-occupancy`, Hook) — bên bind: licensing
   `assignment/assignment-seat-occupancy.listener.ts`. Chưa bind thì `get()` ném lỗi, không để rule đi qua.
+- Mở: `SeatBaselinePhaseHook` (`catalog.seat-baseline-phase`, Hook) — bên bind: licensing `seat-baseline/seat-baseline-phase.listener.ts`; cho
+  biết baseline đã đóng chưa để chặn trùng thuê bao K2/K4. Chưa bind ⟹ coi như đã đóng (chặn).
 - Đăng ký vào: `organization.department-use-readers` (`DepartmentUseContributions`, tên `catalog.subscriptions`) —
   `subscription/subscription-department-use.listener.ts`.
 
@@ -99,8 +105,13 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `WORKING`, đọc không khóa (một vai bị thu ngay sau kiểm tra không bị chặn). Cờ thuê bao chính: `PATCH isPrimaryForPlan` khóa
   `plans FOR UPDATE`, gỡ cờ ở thuê bao khác cùng gói rồi đặt; chỉ thuê bao `ACTIVE` chưa có kỳ kế tiếp
   (`PRIMARY_NOT_ELIGIBLE`); unique index chặn đua còn lại (409 `PRIMARY_CONFLICT`). Kỳ gia hạn kế thừa kỳ cam kết, người phụ
-  trách, mức tối thiểu và cờ chính (`SubscriptionPeriodService.recordNext`). Cột phòng sở hữu và chặn trùng (ứng dụng, gói) chưa
-  đổi: W4/W5.
+  trách, mức tối thiểu và cờ chính (`SubscriptionPeriodService.recordNext`). Cột phòng sở hữu chưa bỏ (W5; API tạo vẫn bắt `ownerDepartmentId`).
+  Chặn trùng (R-E02, `QĐ-104k`(3)), chỉ plan `K2`/`K4`: thuê bao "đang sống" khác của cùng plan = `DRAFT`, hoặc `ACTIVE` chưa có kỳ kế tiếp và (`PERPETUAL` hoặc
+  không có `end_date` hoặc `end_date` ≥ hôm nay). Có ≥ 1: baseline chưa đóng ⟹ cho ghi, đọc trả `warnings` có `SHOULD_MERGE` + `mergeCandidateIds`
+  (ở mọi giai đoạn); đã đóng (hoặc hook chưa bind) ⟹ 409 `SUBSCRIPTION.DUPLICATE_PLAN` (`details.subscriptionIds`). Kỳ gia hạn không là trùng.
+  Khóa: `declareIn` khóa `plans FOR UPDATE` TRƯỚC (chưa có dòng thuê bao để khóa); `complete` khóa thuê bao `FOR UPDATE` → `plans FOR UPDATE`. Mọi
+  ghi khác giữ thứ tự thuê bao → plan. F-012: `recordNext` chỉ chuyển cờ chính sang kỳ mới khi kỳ mới ghi `ACTIVE`; kỳ `DRAFT` để cờ ở kỳ cũ và
+  `subscriptionComplete` chuyển cờ trong cùng transaction.
   Thứ tự khóa của `PATCH isPrimaryForPlan`: dòng thuê bao → `plans FOR UPDATE` → gỡ cờ ở thuê bao khác. Một ghi khác đang giữ
   dòng thuê bao đang là chính và chờ plan có thể gây deadlock (`40P01` ⟹ 503 thử lại được, không phải 409): chấp nhận ở W1.
 - Chuỗi kỳ: `subscriptions.renewed_from_id` đặt một lần lúc tạo, cùng plan/phòng sở hữu, kỳ TERM, bắt đầu sau kỳ cũ (trigger
@@ -109,8 +120,9 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   retire ứng dụng chỉ khi Business Owner đã xác nhận và không còn assignment/subscription chặn
   (`application-retirement/application-retirement.service.ts`). Cả hai đọc ghế qua `SeatOccupancyHook`.
 - `lockSeatTarget`: subscription `FOR UPDATE`, plan nội bộ `FOR SHARE` tới hết transaction (`seat-target.service.ts`).
-- Thay đổi tạo/tăng/kéo dài khoản phải trả cần phòng ban sở hữu có Cost Center đang dùng (F26,
-  `FINANCE.SETUP_INCOMPLETE`, `subscription.service.ts`).
+- Thay đổi tạo/tăng/kéo dài khoản phải trả của thuê bao `K1`/`K5` có phòng sở hữu cần phòng đó có Cost Center đang dùng (F26,
+  `FINANCE.SETUP_INCOMPLETE`, `subscription-obligation.service.ts`). Thuê bao `K2`/`K4` KHÔNG có cổng này ở mọi đường tăng (PATCH, `addPoolSeat`): chi
+  phí tính theo seat-tháng của phòng người nhận (`QĐ-103d`(2), DA4-21).
 - Gán phòng ban sở hữu: một transaction, khóa subscription, audit actor `OPERATOR`; chạy lại cùng lệnh trả
   `ALREADY_ASSIGNED` (`subscription-owner-assignment.api.ts`).
 

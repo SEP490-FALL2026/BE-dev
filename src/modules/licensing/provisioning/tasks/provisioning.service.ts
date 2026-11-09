@@ -1,13 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogApi } from '../../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
-import {
-  ProvisioningBeneficiaryDepartedError,
-  ProvisioningTaskNotFoundError,
-  SeatTargetNotFoundError,
-} from '../../public/licensing.errors';
+import { ProvisioningBeneficiaryDepartedError, ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
 import { GrantRequestGateHook, RevocationListeners } from '../../public/licensing.extension-points';
 import type { ProvisioningChannel, ProvisioningTaskStatus } from '../../public/licensing.types';
 import { cleanEvidence, cleanFailureReason, nextStatus } from '../provisioning.policy';
@@ -37,7 +32,6 @@ export class ProvisioningService {
     private readonly revocation: RevocationListeners,
     private readonly sharedPool: SharedPoolService,
     private readonly assignments: AssignmentService,
-    private readonly catalog: CatalogApi,
   ) {}
 
   /** The queue, the oldest first: `MINE` the tasks this IT Admin is in charge of, `GENERAL` those nobody works by default. */
@@ -126,14 +120,13 @@ export class ProvisioningService {
         const completedOn = await this.organizationReads.businessToday(now, tx);
         await this.assignments.recordGranted(tx, locked.assignmentId, completedOn);
         if (locked.requestId !== null) {
-          const plan = await this.catalog.findSeatTarget({ planId: locked.assignment.planId }, tx);
-          if (!plan) throw new SeatTargetNotFoundError('PLAN');
-          const pooled = plan.provisioningType === 'K2' || plan.provisioningType === 'K4';
+          const provisioningType = await this.sharedPool.provisioningTypeOf(tx, locked.assignment.planId);
+          const pooled = provisioningType === 'K2' || provisioningType === 'K4';
           // From the pool means taken from a free seat or key: a K2 or K4 grant with nothing bought for it (`BR-MF1-09c`).
           const fromPool = pooled && locked.purchase === null;
           await this.gate.get().reportOutcome(tx, locked.requestId, 'COMPLETED', locked.assignment.employeeId, {
             fromPool,
-            provisioningType: plan.provisioningType,
+            provisioningType,
             grantedOn: completedOn,
             assignmentId: locked.assignmentId,
           });
@@ -147,7 +140,7 @@ export class ProvisioningService {
                 requestId: locked.requestId,
                 planId: locked.assignment.planId,
                 subscriptionId: locked.assignment.subscriptionId,
-                provisioningType: plan.provisioningType as 'K2' | 'K4',
+                provisioningType,
               },
             });
           }

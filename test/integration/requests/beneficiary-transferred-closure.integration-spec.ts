@@ -62,7 +62,6 @@ describe('closing a request because its person was transferred (integration, rea
     return sent.id;
   };
   /** A seat is taken on the subscription the department of the request owns (F20), which the harness gives every department. */
-  const ownOf = (u: Unit): string => h.owned.subscriptionFor(subscriptionId, u.department.id);
   const granted = async (requestId: string): Promise<string> =>
     h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId }).expect(201)).task.id;
   const commitmentOf = async (requestId: string) =>
@@ -145,7 +144,7 @@ describe('closing a request because its person was transferred (integration, rea
       const u = await example();
       const id = await approvedFor(u, u.person, 10 * M);
       await granted(id);
-      const free = await h.freeSeats(ownOf(u));
+      const free = await h.freeSeats(subscriptionId);
       await h.moveTo(u.person.employeeId, u.target.department.id);
 
       const refused = await h.closeForDeparture(id, reason, h.it1).expect(422);
@@ -161,7 +160,7 @@ describe('closing a request because its person was transferred (integration, rea
       expect(await h.state(id)).toBe('CANCELLED');
       expect(await taskOf(id)).toMatchObject({ status: 'CANCELLED' });
       expect(await commitmentOf(id)).toMatchObject({ state: 'RELEASED' });
-      expect(await h.freeSeats(ownOf(u))).toBe((free ?? 0) + 1);
+      expect(await h.freeSeats(subscriptionId)).toBe((free ?? 0) + 1);
     });
 
     it('needs the same confirmation for a task that failed, and then cancels it', async () => {
@@ -224,7 +223,7 @@ describe('closing a request because its person was transferred (integration, rea
       const people = await h.colleagues(u, count);
       const target = await h.departmentWithHead(`P-TGT${n}`);
 
-      return { u, people, target, id: await h.groupApproved(u, plan, people), own: ownOf(u) };
+      return { u, people, target, id: await h.groupApproved(u, plan, people), own: subscriptionId };
     };
     const releases = async (id: string) =>
       (

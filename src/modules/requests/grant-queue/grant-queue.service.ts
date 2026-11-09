@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import type { PlanStock } from '../../licensing/public/licensing-pool-stock.types';
 import { LicensingPoolStockApi } from '../../licensing/public/licensing-pool-stock.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { GrantQueueItemWire } from './grant-queue.dto';
@@ -41,7 +42,7 @@ export class GrantQueueService {
         : this.organizationReads.getEmployees([
             ...new Set(rows.flatMap((row) => [row.requesterEmployeeId, row.beneficiaryEmployeeId])),
           ]),
-      rows.length === 0 ? Promise.resolve(new Map()) : this.poolStock.getStockOfPlans(planIds),
+      rows.length === 0 ? Promise.resolve(new Map<string, PlanStock>()) : this.poolStock.getStockOfPlans(planIds),
     ]);
     const ref = (id: string) => {
       const found = people.find((employee) => employee.id === id);

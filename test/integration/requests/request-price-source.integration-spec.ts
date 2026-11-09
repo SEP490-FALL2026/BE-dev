@@ -15,7 +15,7 @@ describe('what a request is priced by (integration, real PostgreSQL)', () => {
   beforeAll(async () => {
     await h.start();
     // 1 000 000 VND per seat per month, billed monthly, bought for the seeded department: the harness gives every department of the
-    // suite a subscription of the same plan at the same price (owned-subscriptions.ts), and a test changes the one it is about.
+    // suite a subscription of the same plan at the same price (the pool is shared: no department owns a copy), and a test changes the one it is about.
     pricedPlan = await h.planOf(await h.subscription(10));
   }, 240000);
 

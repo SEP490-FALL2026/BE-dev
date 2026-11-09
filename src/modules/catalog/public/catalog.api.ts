@@ -25,7 +25,6 @@ import { DocumentAttachRefusedError } from './catalog.errors';
 import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { SubscriptionFactsService } from '../subscription/subscription-facts.service';
-import { SubscriptionPoolService } from '../subscription/pool/subscription-pool.service';
 import { SeatTargetService } from '../subscription/seat-target.service';
 import { VendorFactsService } from '../vendor/vendor-facts.service';
 import {
@@ -48,7 +47,6 @@ export class CatalogApi {
     private readonly internalRegistration: InternalSoftwareRegistrationService,
     private readonly applicationLookup: ApplicationFactsService,
     private readonly documents: DocumentService,
-    private readonly pool: SubscriptionPoolService,
   ) {}
 
   /**
@@ -129,7 +127,7 @@ export class CatalogApi {
    * that owns the subscription, if any. Throws PoolSeatNotAddableError for a subscription that is absent or a draft.
    */
   addPoolSeat(tx: DbTx, actor: AuthenticatedPrincipal, subscriptionId: string): Promise<number> {
-    return this.pool.addSeat(tx, actor, subscriptionId);
+    return this.subscriptions.addSeat(tx, actor, subscriptionId);
   }
 
   /** What one subscription is bought at (unit price and billing cycle); null when it has no price. */

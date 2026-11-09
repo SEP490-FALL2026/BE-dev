@@ -4,7 +4,6 @@ import request from 'supertest';
 import { addDays } from '../../src/core/business-date';
 import { addMonths } from '../../src/core/fiscal-year';
 import { ApiAccount } from './api-accounts';
-import { OwnedSubscriptions } from './owned-subscriptions';
 import { clearSpendingApprover, insertEmployeeWithoutPlacement, setSpendingApprover } from './builders/account.builder';
 import { assignHead } from './builders/organization.builder';
 import { ProvisioningHarness } from './provisioning-harness';
@@ -102,9 +101,6 @@ export interface Department {
  */
 export class RequestHarness extends ProvisioningHarness {
   private titleName: string | null = null;
-
-  /** The pool of seats is one for every department (`BR-MF1-09`): see owned-subscriptions.ts. */
-  readonly owned = new OwnedSubscriptions();
 
   /** Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. */
   override start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {

@@ -174,7 +174,12 @@ describe('the subscription that still holds the pool of its plan (R-E02, QĐ-104
 
   it('lists the live ones by plan and leaves out the subscription being written, a renewal included', () => {
     const live = liveIdsByPlan(
-      [row({ id: 'a' }), row({ id: 'b', status: 'DRAFT' }), row({ id: 'c', endDate: '2025-01-01' }), row({ id: 'd', planId: 'p2' })],
+      [
+        row({ id: 'a' }),
+        row({ id: 'b', status: 'DRAFT' }),
+        row({ id: 'c', endDate: '2025-01-01' }),
+        row({ id: 'd', planId: 'p2' }),
+      ],
       TODAY,
     );
 

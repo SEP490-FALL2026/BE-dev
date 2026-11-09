@@ -105,7 +105,9 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
               WHERE table_name = 'subscriptions' AND column_name = 'owner_department_id'`,
           )
         ).rows[0].is_nullable,
-      ).toBe('NO');
+        // Rewritten for QĐ-103d: the column is nullable since `shared_pool_grant` (a pool no department owns, to be dropped in W5), but the API
+        // still requires the owner of a new subscription and the trigger above keeps it.
+      ).toBe('YES');
       expect(dataOf<SubscriptionWire>(await get(created.id).expect(200)).ownerDepartmentId).toBe(h.seed.departmentId);
     });
 

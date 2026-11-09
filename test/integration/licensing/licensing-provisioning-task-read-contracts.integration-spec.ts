@@ -26,6 +26,8 @@ const SUMMARY_KEYS = [
   'maxAttempts',
   'nextRetryAt',
   'plan',
+  // BR-MF1-09: what was bought with the grant (null for a task with no purchase).
+  'purchase',
   'requestId',
   'revocation',
   'status',

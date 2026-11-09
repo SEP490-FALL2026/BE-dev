@@ -63,6 +63,7 @@ model LicenseAssignment {
   successors          LicenseAssignment[]               @relation("AssignmentChain")
   baselineImport      SeatBaselineImport?               @relation(fields: [baselineImportId], references: [id], onDelete: Restrict)
   provisioningTasks   ProvisioningTask[]
+  poolGrantAvoidedCosts PoolGrantAvoidedCost[]
   returnRequests      ReturnRequest[]
   handoverDuties      HandoverDuty[]
   dutyNotices         ServiceAccountDutyNotice[]
@@ -179,13 +180,14 @@ model ProvisioningTask {
   // Purchase when provisioning from shared pool: reason to buy additional seats, when bought, what kind.
   purchaseKind                 ProvisioningPurchaseKind? @map("purchase_kind")
   purchaseReason               String?                  @map("purchase_reason")
-  purchasedAt                  DateTime?                @map("purchased_at") @db.Timestamptz(3)
+  purchasedAt                  DateTime?                @map("purchased_at") @db.Timestamptz(6)
   createdByAppUserId           String                   @map("created_by_app_user_id") @db.Uuid
   createdAt                    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                    DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization        Organization             @relation(fields: [organizationId], references: [id])
   assignment          LicenseAssignment        @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  poolGrantAvoidedCost PoolGrantAvoidedCost?
   defaultResponsible  Employee?                @relation("TaskDefaultResponsible", fields: [defaultResponsibleEmployeeId], references: [id], onDelete: Restrict)
   reasons             ProvisioningTaskReason[]
   returnRequest       ReturnRequest?
@@ -645,28 +647,33 @@ model SubscriptionDeadlineEvent {
 // Append-only: triggers block UPDATE/DELETE (QĐ-106e, R-E06).
 // No Prisma relations (queried by SQL raw to avoid circular dependencies during parallel worktree development).
 model PoolGrantAvoidedCost {
-  id                 String   @id @default(uuid()) @db.Uuid
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId     String   @map("organization_id") @db.Uuid
   provisioningTaskId String   @unique @map("provisioning_task_id") @db.Uuid
   assignmentId       String   @map("assignment_id") @db.Uuid
   requestId          String   @map("request_id") @db.Uuid
   planId             String   @map("plan_id") @db.Uuid
-  // K2 (recurring) or K4 (one-time); null means no provisioning type (should not happen, but for completeness).
+  // K2 (recurring) or K4 (one-time): the CHECK of the table holds nothing else.
   provisioningType   String   @map("provisioning_type")
-  // Months of the cost (≤ 12 for K2; NULL for K4 one-time cost).
-  months             Int?
+  // Months of the cost (1 to 12 for K2; NULL for the one-time cost of a K4 key).
+  months             Int?     @db.SmallInt
   // Unit price (per month for K2, total for K4), in minor currency units.
   unitMinor          BigInt   @map("unit_minor")
-  // Total avoided cost = unitMinor × coalesce(months, 1).
+  // Total avoided cost = unitMinor x coalesce(months, 1): the CHECK of the table holds it.
   amountMinor        BigInt   @map("amount_minor")
   currency           String   @db.Char(3)
-  // Date the cost was recorded (the date the task was completed).
+  // The day the task was completed.
   recordedOn         DateTime @map("recorded_on") @db.Date
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  @@index([organizationId])
-  @@index([assignmentId])
-  @@index([requestId])
-  @@index([recordedOn])
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  provisioningTask ProvisioningTask  @relation(fields: [provisioningTaskId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  assignment       LicenseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  plan             Plan              @relation(fields: [planId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([organizationId], map: "pool_grant_avoided_costs_organization_id")
+  @@index([assignmentId], map: "pool_grant_avoided_costs_assignment_id")
+  @@index([requestId], map: "pool_grant_avoided_costs_request_id")
+  @@index([recordedOn], map: "pool_grant_avoided_costs_recorded_on")
   @@map("pool_grant_avoided_costs")
 }

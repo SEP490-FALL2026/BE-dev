@@ -146,6 +146,36 @@ describe('provisioning queue routes (e2e, no database)', () => {
     expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
   });
 
+  // BR-MF1-09b / P0-05: the subscription is optional (the pool of the plan gives one) and a purchase carries only a reason.
+  it.each([
+    [
+      'a purchase that names its own kind (the kind follows from the plan)',
+      { requestId: ID, purchase: { kind: 'POOL_TOP_UP' } },
+    ],
+    ['a purchase with a reason of more than 500 characters', { requestId: ID, purchase: { reason: 'x'.repeat(501) } }],
+    ['a purchase whose reason is blank', { requestId: ID, purchase: { reason: '   ' } }],
+  ])('turns away a grant with %s with 422', async (_name, body) => {
+    const response = await request(app.getHttpServer())
+      .post(BASE)
+      .set('Authorization', bearer(principal(['IT_ADMIN'])))
+      .send(body)
+      .expect(422);
+
+    expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('accepts a grant with no subscription named and a purchase with or without a reason (the gate then answers)', async () => {
+    for (const purchase of [{}, { reason: 'the pool is empty' }]) {
+      const response = await request(app.getHttpServer())
+        .post(BASE)
+        .set('Authorization', bearer(principal(['IT_ADMIN'])))
+        .send({ requestId: ID, purchase })
+        .expect(404);
+
+      expect(bodyOf(response).error.code).toBe('REQUEST.NOT_FOUND');
+    }
+  });
+
   it('answers REQUEST.NOT_FOUND to a grant of a request the gate does not know, and writes nothing', async () => {
     const response = await request(app.getHttpServer())
       .post(BASE)

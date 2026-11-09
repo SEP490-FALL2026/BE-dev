@@ -54,7 +54,7 @@ describe('a request for a service account after the installation over PostgreSQL
     await h.withApprover();
     // The seats are set up while the baseline is open: three free of ten on one subscription, none free on the other.
     // The accounts of this suite belong to many departments, and a request is priced by the subscription of its own department (F38):
-    // the harness gives every department the suite makes a subscription of each plan the seeded department holds (owned-subscriptions.ts).
+    // the harness gives every department the suite makes a subscription of each plan the seeded department holds (it no longer does: the pool is shared).
     subscriptionId = await h.subscription(10, 'K2');
     paidPlan = await h.planOf(subscriptionId);
     fullSubscription = await h.subscription(1, 'K2');

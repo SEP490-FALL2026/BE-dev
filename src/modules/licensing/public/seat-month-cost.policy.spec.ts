@@ -1,4 +1,4 @@
-import { monthCostBefore, releaseOnLateGrant, releaseOnRevocation } from './seat-month-cost';
+import { monthCostBefore, releaseOnLateGrant, releaseOnRevocation } from './seat-month-cost.policy';
 
 describe('monthCostBefore (RV-07)', () => {
   it('costs nothing on day 1 of the month', () => {

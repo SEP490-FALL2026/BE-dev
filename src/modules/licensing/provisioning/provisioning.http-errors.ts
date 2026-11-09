@@ -205,7 +205,8 @@ export const PROVISIONING_GRANT_EXAMPLES = {
     PROVISIONING_ERROR_EXAMPLES.BENEFICIARY_DEPARTED,
     example(new ProvisioningBeneficiaryNotStartedError('<request-id>', '2026-01-01')),
     example(new SeatApplicationRetiredError()),
-    example(new AssignmentConflictError('SEAT_CAPACITY', 0)),
+    example(new AssignmentConflictError('SEAT_CAPACITY', 0, 2)),
+    example(new PurchaseNotAllowedError(2, ['<subscription-id>'])),
   ],
   UNPROCESSABLE: [
     example(new GrantRequestRefusedError('BENEFICIARY_REQUIRED')),
@@ -219,7 +220,6 @@ export const PROVISIONING_GRANT_EXAMPLES = {
         employeeIds: ['<employee-id>'],
       }),
     ),
-    example(new ProvisioningSubscriptionError('REQUIRED')),
     example(new ProvisioningSubscriptionError('NOT_ALLOWED')),
     example(new ProvisioningSubscriptionError('PLAN_MISMATCH')),
     example(new SeatQuantityUnknownError()),
@@ -227,6 +227,7 @@ export const PROVISIONING_GRANT_EXAMPLES = {
     example(new AssignmentConflictError('OVERLAP', 0)),
     example(new AssignmentConflictError('IDENTIFIER_IN_USE', 0)),
     example(new AssignmentConflictError('EXPECTED_END_REQUIRED', 0)),
-    example(new AssignmentConflictError('SUBSCRIPTION_DEPARTMENT_MISMATCH', 0)),
+    example(new PurchaseNotApplicableError()),
+    example(new PurchaseReasonRequiredError()),
   ],
 } as const;

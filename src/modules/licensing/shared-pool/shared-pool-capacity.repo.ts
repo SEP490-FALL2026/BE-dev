@@ -26,7 +26,7 @@ export class SharedPoolCapacityRepo {
     return this.read(tx, subscriptionIds, today);
   }
 
-  /** The same without a transaction, for a read of many subscriptions at once (the queue of grants): one statement whatever their number. */
+  /** The same without a transaction, for a read of many subscription rows at once (the queue of grants): one statement whatever their number. */
   occupancyOfMany(
     subscriptionIds: readonly string[],
     today: BusinessDate,

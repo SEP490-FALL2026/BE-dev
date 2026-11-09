@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { SeatTargetNotFoundError } from '../public/licensing.errors';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import type { PoolSubscription } from '../../catalog/public/catalog.types';
 import type { PlanStock } from '../public/licensing-pool-stock.types';
@@ -55,6 +56,14 @@ export class SharedPoolService {
     );
 
     return stockFrom(subscriptions, occupancy);
+  }
+
+  /** The kind of provisioning of the plan. Throws SeatTargetNotFoundError when the plan does not exist. */
+  async provisioningTypeOf(tx: DbTx, planId: string): Promise<ProvisioningType> {
+    const target = await this.catalog.findSeatTarget({ planId }, tx);
+    if (!target) throw new SeatTargetNotFoundError('PLAN');
+
+    return target.provisioningType;
   }
 
   /**

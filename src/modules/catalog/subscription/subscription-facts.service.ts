@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { Money } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { SubscriptionRepo } from './subscription.repo';
 import type { BaselineSubscription } from '../public/catalog.types';
 import type { SubscriptionKind } from './subscription.types';
@@ -9,7 +11,15 @@ import type { SubscriptionKind } from './subscription.types';
 /** What the rules of another capability need to know of the subscriptions of some plans: their kind and their end. */
 @Injectable()
 export class SubscriptionFactsService {
-  constructor(private readonly subscriptions: SubscriptionRepo) {}
+  constructor(
+    private readonly subscriptions: SubscriptionRepo,
+    private readonly pool: SubscriptionPoolService,
+  ) {}
+
+  /** Buys one more seat on a subscription the caller holds locked (see `CatalogApi.addPoolSeat`). Throws PoolSeatNotAddableError. */
+  addSeat(tx: DbTx, actor: AuthenticatedPrincipal, subscriptionId: string): Promise<number> {
+    return this.pool.addSeat(tx, actor, subscriptionId);
+  }
 
   /** The active subscriptions these departments own, for the baseline of the budget: one statement for any number of departments. */
   baselineOf(departmentIds: readonly string[], tx?: DbTx): Promise<BaselineSubscription[]> {
