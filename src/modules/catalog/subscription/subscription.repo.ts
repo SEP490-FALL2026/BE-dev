@@ -30,11 +30,11 @@ const WITH_PLAN = {
 type Row = Prisma.SubscriptionGetPayload<{ include: typeof WITH_PLAN }>;
 
 /**
- * The subscriptions a department can price a plan by: active, owned by that department, with a unit price, a currency and a
- * billing cycle. A draft has no price to rely on, and the price of another department's subscription is never used.
+ * The subscriptions that can price a plan: active, with a unit price, a currency and
+ * a billing cycle. **Gói 9: Kho dùng chung — không lọc theo phòng sở hữu** (owner_department_id nullable; chỉ có giá).
+ * A draft has no price to rely on.
  */
-const pricedOf = (ownerDepartmentId: string): Prisma.SubscriptionWhereInput => ({
-  ownerDepartmentId,
+const pricedOf = (): Prisma.SubscriptionWhereInput => ({
   status: 'ACTIVE',
   unitPriceMinor: { not: null },
   unitPriceCurrency: { not: null },
@@ -81,7 +81,7 @@ function toRecord(row: Row): SubscriptionRecord {
     planId: row.planId,
     planName: row.plan.name,
     planPricingModel: row.plan.pricingModel,
-    ownerDepartmentId: row.ownerDepartmentId,
+    ownerDepartmentId: row.ownerDepartmentId, // nullable gói 9: kho dùng chung
     applicationId: application.id,
     applicationName: application.name,
     applicationKind: application.kind,
@@ -234,13 +234,13 @@ export class SubscriptionRepo {
   }
 
   /**
-   * The price a plan is bought at for the department of a request: the unit price and billing cycle of the newest active
-   * subscription of that department that has both, and never the one of another department (`QĐ-89a`, F38). A draft has no
-   * price to rely on; two active subscriptions of one plan are told apart by the later start, then the id.
+   * The price a plan is bought at (kho dùng chung, không lọc theo phòng sở hữu): 
+   * the unit price and billing cycle of the newest active subscription with price. 
+   * **Gói 9:** Không kiểm department — chọn từ kho dùng chung cho mọi phòng.
    */
   async findPricedOfPlan(
     planId: string,
-    ownerDepartmentId: string,
+    ownerDepartmentId: string, // deprecated gói 9, giữ signature tương thích
     tx?: DbTx,
   ): Promise<{
     unitPriceMinor: bigint;
@@ -249,7 +249,7 @@ export class SubscriptionRepo {
     allowsMidTermReduction: boolean;
   } | null> {
     const row = await (tx ?? this.prisma).subscription.findFirst({
-      where: { planId, ...pricedOf(ownerDepartmentId) },
+      where: { planId, ...pricedOf() },
       orderBy: PRICED_FIRST,
       select: { unitPriceMinor: true, unitPriceCurrency: true, billingCycle: true, allowsMidTermReduction: true },
     });
@@ -264,18 +264,17 @@ export class SubscriptionRepo {
   }
 
   /**
-   * The billing cycle of the subscription `findPricedOfPlan` would price each of these plans by for the department, in one
-   * read for any number of plans (the same filter and order, the first row of each plan wins); a plan with none is absent.
+   * The billing cycles of subscriptions pricing these plans (kho dùng chung, không lọc phòng); one per plan.
    */
   async findPricedCyclesOfPlans(
     planIds: readonly string[],
-    ownerDepartmentId: string,
+    ownerDepartmentId: string, // deprecated gói 9, giữ signature tương thích
     tx?: DbTx,
   ): Promise<Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER'>> {
     const cycles = new Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER'>();
     if (planIds.length === 0) return cycles;
     const rows = await (tx ?? this.prisma).subscription.findMany({
-      where: { planId: { in: [...planIds] }, ...pricedOf(ownerDepartmentId) },
+      where: { planId: { in: [...planIds] }, ...pricedOf() },
       orderBy: [{ planId: 'asc' }, ...PRICED_FIRST],
       select: { planId: true, billingCycle: true },
     });

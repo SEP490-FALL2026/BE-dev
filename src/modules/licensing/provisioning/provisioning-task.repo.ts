@@ -375,6 +375,9 @@ export class ProvisioningTaskRepo {
               closeReason: null,
               accessEvidence: null,
               completionNote: null,
+              purchaseKind: null, // Gói 9: mua thêm tùy chọn
+              purchaseReason: null,
+              purchasedAt: null,
             }),
           ),
           total: await tx.provisioningTask.count({ where }),
