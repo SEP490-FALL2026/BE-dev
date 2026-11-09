@@ -51,6 +51,8 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
           purchasedQuantity: 5,
           unitPrice: { amount: '1000000', currency: 'VND' },
           billingCycle: 'MONTHLY',
+          commitmentTermMonths: 1,
+          responsibleItAdminEmployeeId: h.it1.employeeId,
           startDate: '2025-01-05',
           ...extra,
         })
@@ -171,6 +173,54 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     });
   });
 
+  it('QĐ-104: an application that names no Business Owner is retired by the IT Admin with no confirmation, still only when nothing holds it', async () => {
+    const { applicationId, planId, subscriptionId } = await cleanApplication();
+    await h.ctx.sql.query(`UPDATE applications SET business_owner_employee_id = NULL WHERE id = $1`, [applicationId]);
+    const seat = await insertAssignment(people[1], planId, subscriptionId);
+
+    expect(
+      h.dataOf<{ retirement: { confirmed: boolean; canRetire: boolean } }>(await retirement(applicationId).expect(200))
+        .retirement,
+    ).toMatchObject({
+      confirmed: true,
+      canRetire: false,
+    });
+    // Nobody confirms in place of an owner that does not exist.
+    expect(h.codeOf(await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(422))).toBe(
+      'APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER',
+    );
+    expect(h.codeOf(await retire(applicationId).expect(409))).toBe('APPLICATION.RETIREMENT_BLOCKED');
+
+    await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = valid_from + 1 WHERE id = $1`, [seat]);
+    expect(
+      h.dataOf<{ retirement: { canRetire: boolean } }>(await retirement(applicationId).expect(200)).retirement
+        .canRetire,
+    ).toBe(true);
+    expect(h.dataOf<{ status: string }>(await retire(applicationId).expect(200)).status).toBe('RETIRED');
+    const row = (
+      await h.ctx.sql.query<{
+        catalog_status: string;
+        retirement_confirmation_id: string | null;
+        retired_by_app_user_id: string;
+      }>(`SELECT catalog_status, retirement_confirmation_id, retired_by_app_user_id FROM applications WHERE id = $1`, [
+        applicationId,
+      ])
+    ).rows[0];
+    expect(row).toEqual({
+      catalog_status: 'RETIRED',
+      retirement_confirmation_id: null,
+      retired_by_app_user_id: h.it1.appUserId,
+    });
+    const retired = (await h.auditEvents('Application', applicationId)).filter(
+      (event) => event.action === 'APPLICATION.RETIRED',
+    );
+    expect(retired).toHaveLength(1);
+    expect(retired[0]).toMatchObject({
+      actor_app_user_id: h.it1.appUserId,
+      after: { status: 'RETIRED', confirmationId: null, businessOwnerEmployeeId: null, note: null },
+    });
+  });
+
   it('DB-09: the last look at what holds the application is taken in the transaction that holds the locks', async () => {
     const { applicationId } = await cleanApplication();
     await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
@@ -287,6 +337,7 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
         purchasedQuantity: 50,
         unitPrice: { amount: '500000', currency: 'VND' },
         startDate: '2026-03-15',
+        responsibleItAdminEmployeeId: h.it1.employeeId,
       })
       .expect(201);
     const assignmentId = await insertAssignment(people[3], planId, null, { from: '2026-04-01' });

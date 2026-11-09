@@ -7,13 +7,14 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { PendingRenewal } from './licensing-renewal.types';
 import type { RenewalFinancialReader, RenewalUsageReader } from './licensing-subscription-renewal.types';
-import type { SeatBaselineClosedHolder } from './licensing-seat-baseline.types';
+import type { SeatBaselineClosedHolder } from './licensing.types';
 import type { PendingFileQuery, PendingPersonnelFile } from './licensing-service-account.types';
 import type {
   GrantOutcome,
   GrantRequestAnswer,
   RevocationContext,
   RevocationReasonFacts,
+  GrantOutcomeFacts,
   RevocationTaskFacts,
 } from './licensing.types';
 
@@ -32,8 +33,29 @@ export interface GrantRequestGate {
    * the state of a request being carried out (what lets it be granted once). Any answer but `GRANTABLE` leaves it as it was.
    */
   claimForGrant(tx: DbTx, requestId: string, employeeId?: string): Promise<GrantRequestAnswer>;
-  /** Inside the transaction that completes or closes as failed the task of a grant: says how the request ended. */
-  reportOutcome(tx: DbTx, requestId: string, outcome: GrantOutcome, employeeId?: string): Promise<void>;
+  /**
+   * Inside the transaction that completes or closes as failed the task of a grant: says how the request ended. A completed grant also says
+   * what was granted (`facts`): from the pool or not, the kind, the day, the assignment.
+   */
+  reportOutcome(
+    tx: DbTx,
+    requestId: string,
+    outcome: GrantOutcome,
+    employeeId?: string,
+    facts?: GrantOutcomeFacts,
+  ): Promise<void>;
+  /**
+   * Inside the transaction in which the IT Admin completes the task of an extension (`BR-MF1-08d`): the renewal the task answers for is
+   * applied (the record that follows the old one is written) and the request ends, as the module of requests decides. `actor` is the IT
+   * Admin who completed it.
+   */
+  reportExtended(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void>;
+  /**
+   * Inside the transaction in which the IT Admin closes the failed task of an extension (`BR-MF1-08d`): the extension will not be done, so
+   * the renewal the task answers for fails as a failed grant does (what was held goes back) and the right keeps the end it had. A request
+   * that is not a renewal waiting for the task changes nothing. `actor` is the IT Admin who closed it.
+   */
+  reportExtensionFailed(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void>;
   /** Whether the request waits for the IT Admin to close the task of its grant as cancelled: nothing else is decided on it. */
   isWithdrawing(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean>;
   /**
@@ -55,7 +77,7 @@ export class GrantRequestGateHook extends Hook<GrantRequestGate> {
  * What a revocation tells the modules that extend it (`g6-handover-confirmation`, and the return of a seat of
  * `g5-return-and-renewal-requests`), in the transaction of each moment: they open their step when it opens (`OPENED`), may refuse
  * to let the work start or end by throwing at `BEFORE_WORK`, learn how the work ended (`AFTER_WORK`), and are told when the task
- * is closed as failed (`CLOSED_FAILED`). The status of the task says which moment of the work it is: before the task is taken it is
+ * is closed as failed (`CLOSED_FAILED`) or a source takes back one of its reasons (`REASON_WITHDRAWN`). The status of the task says which moment of the work it is: before the task is taken it is
  * `QUEUED` or `RETRY_SCHEDULED`, before it is completed `IN_PROGRESS`; after it is `IN_PROGRESS` or `COMPLETED`.
  */
 export type RevocationEvent =
@@ -70,6 +92,19 @@ export type RevocationEvent =
       context: RevocationContext;
       actor: AuthenticatedPrincipal;
       now: Date;
+    }
+  | {
+      /**
+       * A source took back one of its reasons (`withdrawRevocationReason`). `remaining` are the reasons that still stand, the first first;
+       * `cancelled` is true when none stood and the task ended as cancelled (`task.status` is then `CANCELLED`).
+       */
+      moment: 'REASON_WITHDRAWN';
+      task: RevocationTaskFacts;
+      withdrawn: RevocationReasonFacts;
+      remaining: readonly RevocationReasonFacts[];
+      cancelled: boolean;
+      now: Date;
+      actor: AuthenticatedPrincipal;
     }
   | { moment: 'BEFORE_WORK'; task: RevocationTaskFacts; now: Date }
   | { moment: 'AFTER_WORK'; task: RevocationTaskFacts; now: Date; actor: AuthenticatedPrincipal }

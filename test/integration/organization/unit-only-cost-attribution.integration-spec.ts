@@ -194,6 +194,7 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
           .send({ code, name: `Department ${code}` })
           .then(created),
       );
+      await h.ctx.sql.query(`UPDATE departments SET effective_from = DATE '2020-01-01' WHERE id = $1`, [made.id]);
       await h.costCenterFor(made.id);
 
       return made;

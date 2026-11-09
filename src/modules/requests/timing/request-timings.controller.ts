@@ -59,7 +59,6 @@ function wireOf(timings: Awaited<ReturnType<RequestTimingService['timingsOf']>>)
     NEED: null,
     IT_ASSESSMENT: null,
     QUEUE_WAIT: null,
-    FINANCE_REVIEW: null,
     SPEND_DECISION: null,
     GRANT: null,
   };

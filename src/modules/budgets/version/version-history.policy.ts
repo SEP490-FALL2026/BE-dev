@@ -4,6 +4,7 @@
  * `YYYY-MM-DD`, a number as its digits), and the order a reader sees them in. The record is written in the transaction of the
  * edit by `VersionHistoryService`; nothing here reads a database.
  */
+import type { LineType, ZbbExplanation } from '../budget/budget-line-zbb.json';
 
 /** The most fields one entry of the history shows: the widest edit is a line, which has eleven. */
 export const HISTORY_CHANGES_MAX = 16;
@@ -23,6 +24,8 @@ export interface FigureFacts {
   quarters: readonly [bigint, bigint, bigint, bigint] | null;
   /** Why the reserve is not the default share of the base. */
   reserveReason: string | null;
+  /** Why Finance moved the base (`QĐ-100v`). */
+  baseReason?: string | null;
 }
 
 export interface LineFacts {
@@ -32,7 +35,13 @@ export interface LineFacts {
   amountMinor: bigint;
   financeComment: string | null;
   adjustmentReason: string | null;
+  lineType: LineType;
+  zbb: ZbbExplanation | null;
+  priorityRank: number | null;
 }
+
+/** The explanation of a line as the history keeps it: its compact JSON, or null. */
+const zbbText = (zbb: ZbbExplanation | null): string | null => (zbb === null ? null : JSON.stringify(zbb));
 
 /** The order a reader sees the fields in: the figures, then the line fields; any other name follows, alphabetically. */
 const FIELD_ORDER: readonly string[] = [
@@ -46,12 +55,16 @@ const FIELD_ORDER: readonly string[] = [
   // An entry written before QĐ-97b can still carry the reason of a revision.
   'reason',
   'reserveReason',
+  'baseReason',
   'description',
   'planId',
   'seats',
   'amount',
   'financeComment',
   'adjustmentReason',
+  'lineType',
+  'priorityRank',
+  'zbb',
   'fileName',
   'contentType',
   'sizeBytes',
@@ -83,7 +96,7 @@ export function figureChange(
   const amount = (minor: bigint | null) => (minor === null ? null : money(minor));
   const quarter = (facts: FigureFacts, index: 0 | 1 | 2 | 3) => amount(facts.quarters?.[index] ?? null);
 
-  return changeOf([
+  const change = changeOf([
     ['base', amount(before.baseMinor), amount(after.baseMinor)],
     ['reserve', amount(before.reserveMinor), amount(after.reserveMinor)],
     ['total', amount(before.totalMinor), amount(after.totalMinor)],
@@ -92,7 +105,18 @@ export function figureChange(
     ['q3', quarter(before, 2), quarter(after, 2)],
     ['q4', quarter(before, 3), quarter(after, 3)],
     ['reserveReason', before.reserveReason, after.reserveReason],
+    ['baseReason', before.baseReason ?? null, after.baseReason ?? null],
   ]);
+
+  // The same reason given again for a second change of the base is still the reason of that change (`QĐ-100v`).
+  if (change && 'base' in change.after && !('baseReason' in change.after) && after.baseReason) {
+    return {
+      before: { ...change.before, baseReason: before.baseReason ?? null },
+      after: { ...change.after, baseReason: after.baseReason },
+    };
+  }
+
+  return change;
 }
 
 /** The fields an edit of one line changed (`VersionLineService.updateLine` and the move of a window). */
@@ -108,6 +132,9 @@ export function lineChange(
     ['amount', money(before.amountMinor), money(after.amountMinor)],
     ['financeComment', before.financeComment, after.financeComment],
     ['adjustmentReason', before.adjustmentReason, after.adjustmentReason],
+    ['lineType', before.lineType, after.lineType],
+    ['priorityRank', text(before.priorityRank), text(after.priorityRank)],
+    ['zbb', zbbText(before.zbb), zbbText(after.zbb)],
   ]);
 }
 
@@ -125,6 +152,9 @@ export function lineSnapshot(
     amount: money(line.amountMinor),
     financeComment: line.financeComment,
     adjustmentReason: line.adjustmentReason,
+    lineType: line.lineType,
+    priorityRank: text(line.priorityRank),
+    zbb: zbbText(line.zbb),
   };
 }
 

@@ -117,11 +117,12 @@ export class TransfersController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), ${GROUNDS_REFUSALS}, or the head of the department they leave is not provided for (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE).`,
+      description: `The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), the destination takes effect later than the day (DEPARTMENT_NOT_YET_EFFECTIVE), ${GROUNDS_REFUSALS}, or the head of the department they leave is not provided for (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE).`,
       examples: [
         VALIDATION_EXAMPLE,
         ...DAY_EXAMPLES,
         EXAMPLES.DEPARTMENT_NOT_FOUND,
+        EXAMPLES.DEPARTMENT_NOT_YET_EFFECTIVE,
         ...GROUNDS_EXAMPLES,
         EXAMPLES.HEAD_SUCCESSOR_REQUIRED,
         EXAMPLES.SUCCESSOR_NOT_A_MEMBER_ON_DATE,

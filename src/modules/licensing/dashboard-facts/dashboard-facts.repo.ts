@@ -89,7 +89,7 @@ export class DashboardFactsRepo {
         const openSaasIssues = await tx.saasIssue.count({
           where: { assignedItAdminEmployeeId: employeeId, state: { in: [...UNRESOLVED_SAAS_ISSUE] } },
         });
-        const keysInStore = await tx.licenseKey.count({ where: { status: 'IN_STORE' } });
+        const keysInStore = await tx.licenseKey.count({ where: { status: 'IN_STORE', withdrawnAt: null } });
 
         return { openGrantTasks, openRevocationTasks, openSaasIssues, keysInStore };
       },
@@ -102,7 +102,7 @@ function toFacts(row: {
   validFrom: Date;
   validUntil: Date | null;
   expectedEndDate: Date | null;
-  provisioningTasks: { kind: 'GRANT' | 'REVOKE'; status: string }[];
+  provisioningTasks: { kind: 'GRANT' | 'REVOKE' | 'EXTEND'; status: string }[];
   successors: { id: string }[];
 }): RightFacts {
   const tasks = row.provisioningTasks;

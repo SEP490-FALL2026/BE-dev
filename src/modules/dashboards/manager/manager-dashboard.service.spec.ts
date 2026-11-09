@@ -1,6 +1,7 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { OptimizationApi } from '../../optimization/public/optimization.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
 import { RequestsDashboardApi } from '../../requests/public/requests-dashboard.api';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
@@ -17,26 +18,33 @@ const actor = (roles: readonly string[]): AuthenticatedPrincipal => ({
 
 const DEPARTMENT = { id: 'd-des', code: 'P-DES', name: 'Design', active: true, costCenterActive: true };
 
-function serviceWith(headed: { departmentId: string } | null = { departmentId: 'd-des' }, needApprovals = 3) {
+function serviceWith(
+  headed: { departmentId: string } | null = { departmentId: 'd-des' },
+  needApprovals = 3,
+  queued = 4,
+) {
   const departmentFacts = jest.fn().mockResolvedValue({ seatsInUse: 12 });
   const openTransferReviews = jest.fn().mockResolvedValue(2);
   const needDecisionsHeldBy = jest.fn().mockResolvedValue(needApprovals);
+  const departmentCounts = jest.fn().mockResolvedValue({ queued });
   const service = new ManagerDashboardService(
     {
       businessToday: () => Promise.resolve('2026-10-23'),
       getHeadedDepartment: jest.fn().mockResolvedValue(headed),
       getDepartmentBrief: jest.fn().mockResolvedValue(DEPARTMENT),
+      getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }),
     } as unknown as OrganizationReadApi,
     { departmentFacts } as unknown as LicensingDashboardApi,
     { openTransferReviews } as unknown as PersonnelDashboardApi,
     { needDecisionsHeldBy } as unknown as RequestsDashboardApi,
+    { departmentCounts } as unknown as OptimizationApi,
   );
 
-  return { service, departmentFacts, openTransferReviews, needDecisionsHeldBy };
+  return { service, departmentFacts, openTransferReviews, needDecisionsHeldBy, departmentCounts };
 }
 
 describe('ManagerDashboardService', () => {
-  // US-12-15 AC-3: the department of the head only; cost and usage say they have no source and show no zero.
+  // US-12-15 AC-3: the department of the head only; cost says it has no source and shows no zero; the ghost seats are counted from the queue.
   it('reads the department the head heads, counting the need approvals waiting for them', async () => {
     const { service, departmentFacts, openTransferReviews, needDecisionsHeldBy } = serviceWith();
 
@@ -60,7 +68,12 @@ describe('ManagerDashboardService', () => {
       sourceOperationId: null,
       reason: 'FINANCE_FIGURES_NOT_DELIVERED',
     });
-    expect(overview.sections.ghostSeats).toMatchObject({ state: 'NOT_AVAILABLE', reason: 'USAGE_DATA_NOT_DELIVERED' });
+    expect(overview.sections.ghostSeats).toEqual({
+      state: 'COUNTED',
+      count: 4,
+      sourceOperationId: 'ghostSeatQueueList',
+      reason: null,
+    });
     expect(overview.sections.spendQueue).toMatchObject({ state: 'AT_SOURCE', sourceOperationId: 'spendQueueList' });
     for (const key of ['remaining', 'budgetCheck', 'companyTotal', 'kpi5'])
       expect(overview.sections).not.toHaveProperty(key);

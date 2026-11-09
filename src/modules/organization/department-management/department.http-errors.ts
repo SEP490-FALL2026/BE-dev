@@ -12,7 +12,9 @@ import {
   DepartmentItAdminInvalidError,
   DepartmentNameInvalidError,
   DepartmentNotFoundError,
+  DepartmentNotYetEffectiveError,
   DepartmentOutOfScopeError,
+  DepartmentOutsideBudgetPeriodError,
   DepartmentUpdateEmptyError,
   HeadAssignmentError,
 } from '../department/department.errors';
@@ -40,6 +42,14 @@ export function toDepartmentApiException(error: unknown): unknown {
   }
   if (error instanceof DepartmentCodeInvalidError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.CODE_INVALID', error.message);
+  }
+  if (error instanceof DepartmentOutsideBudgetPeriodError) {
+    return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.OUTSIDE_BUDGET_PERIOD', error.message);
+  }
+  if (error instanceof DepartmentNotYetEffectiveError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.NOT_YET_EFFECTIVE', error.message, {
+      effectiveFrom: error.effectiveFrom,
+    });
   }
   if (error instanceof DepartmentCodeTakenError) {
     return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.CODE_TAKEN', error.message);
@@ -90,6 +100,8 @@ export const DEPARTMENT_ERROR_EXAMPLES = {
   DEPARTMENT_OUT_OF_SCOPE: example(new DepartmentOutOfScopeError()),
   DEPARTMENT_CODE_INVALID: example(new DepartmentCodeInvalidError()),
   DEPARTMENT_CODE_TAKEN: example(new DepartmentCodeTakenError('D01')),
+  DEPARTMENT_OUTSIDE_BUDGET_PERIOD: example(new DepartmentOutsideBudgetPeriodError()),
+  DEPARTMENT_NOT_YET_EFFECTIVE: example(new DepartmentNotYetEffectiveError('2027-01-01')),
   DEPARTMENT_NAME_INVALID: example(new DepartmentNameInvalidError()),
   DEPARTMENT_IT_ADMIN_INVALID: example(new DepartmentItAdminInvalidError()),
   DEPARTMENT_UPDATE_EMPTY: example(new DepartmentUpdateEmptyError()),

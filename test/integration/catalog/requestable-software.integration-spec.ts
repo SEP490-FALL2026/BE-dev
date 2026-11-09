@@ -82,15 +82,19 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       ...(kind === 'INTERNAL' ? {} : { pricingModel: 'PER_SEAT', controlLevel: 'FULL' }),
     });
     for (const { departmentId, cycle } of pricedFor) {
-      await declareSubscription(h.ctx, h.it1.accessToken, {
+      const subscriptionId = await declareSubscription(h.ctx, h.it1.accessToken, {
         ownerDepartmentId: departmentId,
         planId,
         kind: 'TERM',
         unitPrice: { amount: '1000000', currency: 'VND' },
-        billingCycle: cycle ?? 'MONTHLY',
+        // A new write takes only MONTHLY or ANNUAL: a cycle that cannot be counted in months is data written earlier.
+        billingCycle: cycle === 'OTHER' ? 'MONTHLY' : (cycle ?? 'MONTHLY'),
         startDate: '2026-01-05',
         purchasedQuantity: 10,
       });
+      if (cycle === 'OTHER') {
+        await h.ctx.sql.query(`UPDATE subscriptions SET billing_cycle = 'OTHER' WHERE id = $1`, [subscriptionId]);
+      }
     }
 
     return { applicationId, planId };
@@ -239,7 +243,8 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       ['internal software', () => internal, 'NOT_APPLICABLE', null],
       ['paid software nobody prices', () => unpriced, 'MISSING', 'NO_PRICED_SUBSCRIPTION'],
       ['paid software billed in a cycle that is not counted', () => otherCycle, 'MISSING', 'CYCLE_UNKNOWN'],
-      ['paid software only another department prices', () => pricedElsewhere, 'MISSING', 'NO_PRICED_SUBSCRIPTION'],
+      // BR-MF1-07 (S1-02): the plan has a price whichever department owns the subscription that gives it.
+      ['paid software only another department has a subscription of', () => pricedElsewhere, 'PRICED', null],
     ])('%s', async (_name, which, status, missingReason) => {
       const row = await planRow(designer, which().planId);
       const preview = await h.previewed(designer, which().planId);
@@ -249,12 +254,10 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       expect(row.canSubmit).toBe(true);
     });
 
-    it('prices a plan by the department of the caller: the other department sees its own subscription', async () => {
+    it('BR-MF1-07: prices a plan by its main subscription whichever department asks: the other department sees the same price (S1-02)', async () => {
+      // Rewritten from "by the department of the caller": the pool of a plan is the plan's, so is its price.
       expect((await planRow(outsider, pricedElsewhere.planId)).price.status).toBe('PRICED');
-      expect((await planRow(outsider, saas.planId)).price).toEqual({
-        status: 'MISSING',
-        missingReason: 'NO_PRICED_SUBSCRIPTION',
-      });
+      expect((await planRow(outsider, saas.planId)).price).toEqual({ status: 'PRICED', missingReason: null });
     });
 
     it('lets a department with no Cost Center pick paid software but not send it, as the preview refuses it, and still send internal software', async () => {

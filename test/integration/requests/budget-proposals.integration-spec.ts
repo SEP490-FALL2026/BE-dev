@@ -258,10 +258,21 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
         version: { id: version.id, number: 1 },
         proposal: { id: proposal.id, total: { amount: '70000000' } },
       });
+      // MF4-C (BR-MF4-05): the screen of the head also reads the figures of its own budget, the cycle and the published ceiling.
       expect(Object.keys(mine).sort()).toEqual([
+        'base',
+        'committed',
         'costCenter',
+        'cycle',
+        'departmentCeiling',
         'latestRefusal',
+        'overBudget',
+        'pendingSpend',
         'proposal',
+        'remainingBase',
+        'remainingWithReserve',
+        'reserve',
+        'spent',
         'status',
         'total',
         'version',

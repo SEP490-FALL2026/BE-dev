@@ -10,6 +10,7 @@ import {
   requiresConfirmation,
   shortDueOn,
   takesOver,
+  withdrawalReconsiders,
   type DutyFacts,
 } from './handover-confirmer.policy';
 
@@ -214,5 +215,25 @@ describe('what an unconfirmed duty does to the work, and the deadline', () => {
     expect(shortDueOn('2026-10-23', 1, new Set())).toBe('2026-10-26');
     expect(shortDueOn('2026-10-23', 1, new Set(['2026-10-26']))).toBe('2026-10-27');
     expect(shortDueOn('2026-10-22', 2, new Set())).toBe('2026-10-26');
+  });
+});
+
+describe('withdrawalReconsiders — M5-03 (FR-2.12, QĐ-66p): a reason taken back never cancels a duty that is not its own', () => {
+  it('leaves a duty of a departure case alone, even when the task is cancelled', () => {
+    const departure = { caseRefId: 'case-1', source: 'DEPARTURE' as const };
+
+    expect(withdrawalReconsiders(departure, ['DEPARTURE'], false)).toBe(false);
+    expect(withdrawalReconsiders(departure, [], true)).toBe(false);
+  });
+
+  it('leaves a duty whose own source still stands on a task that goes on', () => {
+    expect(
+      withdrawalReconsiders({ caseRefId: null, source: 'TIME_LIMITED_EXPIRY' }, ['TIME_LIMITED_EXPIRY'], false),
+    ).toBe(false);
+  });
+
+  it('looks again at the duty of the ghost seat taken back, and at any duty of a task that no longer goes on', () => {
+    expect(withdrawalReconsiders({ caseRefId: null, source: 'GHOST_SEAT' }, ['TIME_LIMITED_EXPIRY'], false)).toBe(true);
+    expect(withdrawalReconsiders({ caseRefId: null, source: 'GHOST_SEAT' }, [], true)).toBe(true);
   });
 });

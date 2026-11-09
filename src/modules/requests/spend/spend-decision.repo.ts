@@ -8,8 +8,6 @@ export interface SpendDecisionRecord {
   requestId: string;
   checkId: string | null;
   decision: 'APPROVED' | 'REJECTED';
-  overrideReason: string | null;
-  overrideYears: number[];
   decidedByEmployeeId: string;
   decidedAt: Date;
 }
@@ -24,8 +22,6 @@ export interface NewSpendDecision {
   deciderRole: 'SPENDING_APPROVER';
   reason: string | null;
   checkId: string | null;
-  overrideReason: string | null;
-  overrideYears: readonly number[];
   decidedByEmployeeId: string;
   decidedAt: Date;
   requestState: AccessRequestState;
@@ -33,7 +29,7 @@ export interface NewSpendDecision {
 
 /**
  * The one writer of what the spending approver decided: the step, the request, the electronic approval record and the
- * snapshot with its override, written together. The record and the snapshot are never changed (`INV-05`).
+ * snapshot, written together. The record and the snapshot are never changed (`INV-05`).
  */
 @Injectable()
 export class SpendDecisionRepo {
@@ -64,8 +60,6 @@ export class SpendDecisionRepo {
         requestId: input.requestId,
         checkId: input.checkId,
         decision: input.decision,
-        overrideReason: input.overrideReason,
-        overrideYears: [...input.overrideYears],
         decidedByEmployeeId: input.decidedByEmployeeId,
         decidedAt: input.decidedAt,
       },
@@ -73,15 +67,12 @@ export class SpendDecisionRepo {
   }
 
   /** What the approver decided, the newest if the request was decided more than once. */
-  async latest(
-    requestId: string,
-    tx?: DbTx,
-  ): Promise<(SpendDecisionRecord & { reason: string | null; bySubstitute: boolean }) | null> {
+  async latest(requestId: string, tx?: DbTx): Promise<(SpendDecisionRecord & { reason: string | null }) | null> {
     const db = tx ?? this.prisma;
     const row = await db.spendDecision.findFirst({
       where: { requestId },
       orderBy: { decidedAt: 'desc' },
-      include: { step: { select: { approvalRecord: { select: { reason: true, deciderRole: true } } } } },
+      include: { step: { select: { approvalRecord: { select: { reason: true } } } } },
     });
     if (!row) return null;
     const { step, ...decision } = row;
@@ -89,7 +80,6 @@ export class SpendDecisionRepo {
     return {
       ...decision,
       reason: step.approvalRecord?.reason ?? null,
-      bySubstitute: step.approvalRecord?.deciderRole === 'CONFLICT_SUBSTITUTE',
     };
   }
 }

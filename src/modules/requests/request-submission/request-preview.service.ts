@@ -10,6 +10,22 @@ import type { PreviewBodyDto, PreviewWire } from './request-preview.dto';
 import { buildChain, spendSubmissionOf } from './request-preview.policy';
 import { PricingViewService } from '../request-view/pricing-view.service';
 import { RequestFactsService } from '../access-request/request-facts.service';
+import type { PricingRecord } from '../access-request/access-request.types';
+import { annualVendorAmountOf } from '../access-request/pricing.policy';
+import { RequestLimitsService } from '../request-limits/request-limits.service';
+import type { LimitVerdict } from '../request-limits/request-limits.policy';
+
+/** The request can be sent as it is: nobody holds it already, nothing blocks the parties, and the end date fits (`FR-2.8`, `US-05-23` AC-9). */
+const canSubmitOf = (
+  assessed: { heldAccess: unknown; endDateOutOfRange: boolean; termRequired: boolean },
+  blockedBy: unknown,
+  limits: Pick<LimitVerdict, 'refusal'>,
+): boolean =>
+  assessed.heldAccess === null &&
+  blockedBy === null &&
+  !assessed.endDateOutOfRange &&
+  !assessed.termRequired &&
+  limits.refusal === null;
 
 /**
  * What a person is shown before they send a request (`US-05-01`): the cost with its estimated tax, the chain of people who
@@ -25,11 +41,12 @@ export class RequestPreviewService {
     private readonly catalog: CatalogApi,
     private readonly pricing: PricingViewService,
     private readonly requestParties: RequestPartyEligibilityApi,
+    private readonly limits: RequestLimitsService,
   ) {}
 
   /** Throws RequestPartyIneligibleError (only `UNPLACED`), AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError and AccessRequestSpendDateNotAllowedError. */
   async preview(actor: AuthenticatedPrincipal, body: PreviewBodyDto): Promise<PreviewWire> {
-    const { assessed, vendorId, blockedBy } = await this.read(actor, body);
+    const { assessed, vendorId, blockedBy, limits, limitSettings } = await this.read(actor, body);
     const { unit, target, policy, pricing, routing } = assessed;
     // A plan of the catalog is always one of the first two branches; only a proposal takes the third.
     if (policy.branch === 'NEW_SOFTWARE') throw new Error('A plan of the catalog cannot be a proposal.');
@@ -50,7 +67,6 @@ export class RequestPreviewService {
 
       return found ? { employeeId: found.id, employeeCode: found.employeeCode, fullName: found.fullName } : null;
     };
-    const paid = policy.branch === 'PAID_IN_CATALOG';
 
     return {
       plan: {
@@ -60,26 +76,49 @@ export class RequestPreviewService {
         applicationName: target.applicationName,
       },
       branch: policy.branch,
-      termMonths: body.termMonths,
+      expectedEndDate: body.expectedEndDate ?? null,
       department: { id: department.id, code: department.code, name: department.name },
       costCenter: costCenter && { id: costCenter.id, code: costCenter.code, name: costCenter.name },
-      termLimit: assessed.termLimit,
+      maxEndDate: assessed.maxEndDate,
+      termRequired: assessed.termRequired,
+      annualVendorAmount: await this.annualVendorAmountOf(pricing),
       existingAccess: assessed.heldAccess,
       blockedBy,
-      canSubmit: assessed.heldAccess === null && blockedBy === null && !assessed.termBeyondLimit,
+      limits: {
+        openNewCount: limits.openCount,
+        openNewMax: limitSettings.openLimit,
+        paidSoftwareCount: limits.paidSoftwareCount,
+        paidSoftwareThreshold: limitSettings.paidThreshold,
+        reasonRequired: limits.manyPaidSoftware !== null,
+        refusal: limits.refusal,
+        openRequestId: limits.openRequestId,
+      },
+      canSubmit: canSubmitOf(assessed, blockedBy, limits),
       budgetYear: pricing.budgetYear,
       pricing: priceView,
       costEstimate,
       spendSubmission: spendSubmissionOf(policy, pricing.status),
       chain: chain.map(({ assigneeEmployeeId, ...step }) => ({ ...step, assignee: person(assigneeEmployeeId) })),
-      possibleExtraSteps: paid ? [{ kind: 'FINANCE_REVIEW', beforeStep: 'SPEND_APPROVAL' }] : [],
       totalExpectedWorkingDays: chain.reduce((sum, step) => sum + step.expectedWorkingDays, 0),
     };
+  }
+
+  /** The year of the price of the plan at the vendor, written for a reader; null when nothing is priced. */
+  private async annualVendorAmountOf(pricing: PricingRecord) {
+    if (pricing.status !== 'PRICED' || pricing.kind === null || pricing.unitPrice === null) return null;
+    const annual = annualVendorAmountOf({
+      kind: pricing.kind,
+      unitPrice: pricing.unitPrice,
+      billingCycle: pricing.billingCycle,
+    });
+
+    return annual && (await this.pricing.moneyView(annual));
   }
 
   /** What the preview is made of, read in one transaction that locks nothing: who is refused (before the department is read), the facts of sending and the vendor. */
   private async read(actor: AuthenticatedPrincipal, body: PreviewBodyDto) {
     const settings = await this.assessment.settings();
+    const limitSettings = await this.limits.settings();
 
     return this.runner.run(async (tx) => {
       const blockedBy = await this.requestParties.blockOf(
@@ -90,12 +129,26 @@ export class RequestPreviewService {
       const assessed = await this.assessment.assess(tx, {
         employeeId: actor.employeeId,
         planId: body.planId,
-        termMonths: body.termMonths,
+        expectedEndDate: body.expectedEndDate ?? null,
         now: new Date(),
         settings,
         lockDepartment: false,
       });
-      return { blockedBy, assessed, vendorId: await this.catalog.getPlanVendorId(body.planId, tx) };
+      const limits = await this.limits.judgeOne(tx, {
+        employeeId: actor.employeeId,
+        planId: body.planId,
+        applicationId: assessed.target.applicationId,
+        today: assessed.today,
+        settings: limitSettings,
+      });
+
+      return {
+        blockedBy,
+        assessed,
+        limits,
+        limitSettings,
+        vendorId: await this.catalog.getPlanVendorId(body.planId, tx),
+      };
     });
   }
 }

@@ -84,7 +84,7 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
     );
     await patch(subscriptionId, { purchasedQuantity: 8 }).expect(200);
     await patch(subscriptionId, { purchasedQuantity: 12 }).expect(200);
-    await patch(subscriptionId, { billingCycle: 'ANNUAL' }).expect(200);
+    await patch(subscriptionId, { billingCycle: 'ANNUAL', commitmentTermMonths: 12 }).expect(200);
     expect(await quantityOf(subscriptionId)).toBe(12);
   });
 
@@ -199,6 +199,8 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
       unitPrice: { amount: '500000', currency: 'VND' },
       startDate: '2026-01-05',
       billingCycle: 'MONTHLY',
+      commitmentTermMonths: 1,
+      responsibleItAdminEmployeeId: h.it1.employeeId,
     }).expect(200);
 
     const task = await h.granted(people[0], planId, { subscriptionId: draft });
@@ -296,6 +298,8 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
             purchasedQuantity: 5,
             unitPrice: { amount: '1000000', currency: 'VND' },
             billingCycle: 'MONTHLY',
+            commitmentTermMonths: 1,
+            responsibleItAdminEmployeeId: h.it1.employeeId,
             startDate: '2026-01-05',
           })
           .expect(201),

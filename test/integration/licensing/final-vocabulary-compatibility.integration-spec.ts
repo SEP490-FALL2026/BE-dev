@@ -99,23 +99,19 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
       await h.proposalLines(proposal.id, unit.head.account).expect(200);
     });
 
-    it('reads the check of the budget that Finance’s outcome made again, with its trigger (F65)', async () => {
+    it('refuses the trigger the Finance outcome gave a check: the Finance review is gone, so no new check carries it (F65, QĐ-97c)', async () => {
       const unit = await h.departmentWithHead(`P-VC-${(sequence += 1)}`);
       await h.budgetFor(unit, { total: 100 * M });
-      const requestId = await h.paidRequest(unit, paidPlan, { year: h.year, dueOn: `${h.year}-12-15`, amount: 10 * M });
+      const requestId = await h.paidRequest(unit, paidPlan, { year: h.year, amount: 10 * M });
       const outcome = await h.route(requestId, unit.head.account);
       if (outcome.status !== 'ROUTED') throw new Error(`not checkable: ${outcome.reason}`);
-      const updated = await rewrite(
-        'request_budget_checks',
-        `trigger = 'FINANCE_OUTCOME_WHILE_WAITING'`,
-        'request_id = $1',
-        [requestId],
-      );
-      expect(updated.rowCount).toBeGreaterThan(0);
+
+      await expect(
+        rewrite('request_budget_checks', `trigger = 'FINANCE_OUTCOME_WHILE_WAITING'`, 'request_id = $1', [requestId]),
+      ).rejects.toMatchObject({ code: '23514' });
 
       const check = h.dataOf<{ budgetCheck: { trigger: string } }>(await h.checkOf(requestId).expect(200)).budgetCheck;
-
-      expect(check.trigger).toBe('FINANCE_OUTCOME_WHILE_WAITING');
+      expect(check.trigger).not.toBe('FINANCE_OUTCOME_WHILE_WAITING');
     });
 
     it('reads the task and the list of a seat taken away by the review of a transfer, with its source (F21)', async () => {

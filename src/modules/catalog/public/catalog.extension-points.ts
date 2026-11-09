@@ -45,3 +45,20 @@ export class SeatOccupancyHook extends Hook<SeatOccupancyReader> {
     super('catalog.seat-occupancy');
   }
 }
+
+/** Where the installation of the organization stands, as far as the rules of the catalog that only bind after it need to know. */
+export interface SeatBaselinePhase {
+  /** True once the seat baseline of the organization is closed: from then on a second subscription of a K2 or K4 plan is refused (`QĐ-104k`(3)). */
+  isClosed(tx: DbTx, organizationId: string): Promise<boolean>;
+}
+
+/**
+ * The phase of the seat baseline, bound by `licensing`. While it is open a duplicate subscription of a shared-pool plan is only warned
+ * about; once closed it is refused. Unbound, the catalog takes the baseline as closed, so nothing is let through by accident.
+ */
+@Injectable()
+export class SeatBaselinePhaseHook extends Hook<SeatBaselinePhase> {
+  constructor() {
+    super('catalog.seat-baseline-phase');
+  }
+}

@@ -88,9 +88,11 @@ export class EmployeeManualService {
         // test fixed the clock.
         const memberSince = businessDateAt(now ?? (await this.employees.recordingInstant(tx)), organization.timeZone);
         // Lock order: the department, then the employee rows that get written.
+        // A department that takes effect later takes nobody in: judged on the day of the entry in the calendar the department was made in.
+        const entryDay = businessDateAt(now ?? new Date(), organization.timeZone);
         const departmentCode = input.departmentCode?.trim().toUpperCase() ?? '';
         const department = departmentCode
-          ? await this.departments.lockForEntry(tx, organization.id, departmentCode)
+          ? await this.departments.lockForEntry(tx, organization.id, departmentCode, entryDay)
           : null;
         const jobTitle = normalizeDisplayName(input.jobTitle ?? '') || null;
         const workEmail = input.workEmail?.trim() || null;

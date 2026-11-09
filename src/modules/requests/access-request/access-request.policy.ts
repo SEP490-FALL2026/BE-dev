@@ -1,3 +1,4 @@
+import type { RequestRouting } from './routing.policy';
 /**
  * The branch and the chain of step kinds of a request, and the SLA of its steps, fixed when it is sent (`US-05-02`
  * AC-3, AC-9). Paid or licensed software that is already in the catalog always has a spend step, whatever the seats left
@@ -12,11 +13,24 @@ export const ACCESS_REQUEST_BRANCHES = ['INTERNAL_FREE', 'PAID_IN_CATALOG', 'NEW
 export type AccessRequestBranchCode = (typeof ACCESS_REQUEST_BRANCHES)[number];
 
 export const CHAIN_STEPS = ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'] as const;
+/**
+ * The state a request is read as. The migration that retired the review of Finance put every request that waited for it back in the queue
+ * of its head, and a CHECK refuses the two states from then on, so a row has them only in a database that was not migrated; it is read as
+ * waiting in that queue rather than as a state nothing handles. Generic over the states the database holds, so the two retired ones leave the
+ * type of what is read (`QĐ-97c`).
+ */
+export function currentStateOf<S extends string>(
+  state: S,
+): Exclude<S, 'AWAITING_FINANCE_REVIEW' | 'AWAITING_BUDGET'> | 'AWAITING_SPEND_SUBMISSION' {
+  return (state === 'AWAITING_FINANCE_REVIEW' || state === 'AWAITING_BUDGET' ? 'AWAITING_SPEND_SUBMISSION' : state) as
+    Exclude<S, 'AWAITING_FINANCE_REVIEW' | 'AWAITING_BUDGET'> | 'AWAITING_SPEND_SUBMISSION';
+}
+
 /** A link of the chain of a request. `IT_EXECUTION` is the task of the IT Admin, not an approval step. */
 export type ChainStep = (typeof CHAIN_STEPS)[number];
 
 /** The version of the rules of this policy; a request keeps the version it was sent under. */
-export const CURRENT_POLICY_VERSION = 1;
+export const CURRENT_POLICY_VERSION = 2;
 
 export interface RequestPolicy {
   version: number;
@@ -27,13 +41,21 @@ export interface RequestPolicy {
 }
 
 /** The policy of a request for a plan of an application of this kind, with the SLA in force now. A fresh value each time. */
-export function policyFor(kind: ApplicationKind, slaWorkingDays: number): RequestPolicy {
+export function policyFor(kind: ApplicationKind, slaWorkingDays: number, routing?: RequestRouting): RequestPolicy {
   return kind === 'INTERNAL'
-    ? { version: CURRENT_POLICY_VERSION, branch: 'INTERNAL_FREE', chain: ['NEED', 'IT_EXECUTION'], slaWorkingDays }
+    ? {
+        version: CURRENT_POLICY_VERSION,
+        branch: 'INTERNAL_FREE',
+        chain: routing?.mode === 'ONE_STEP' ? ['IT_EXECUTION'] : ['NEED', 'IT_EXECUTION'],
+        slaWorkingDays,
+      }
     : {
         version: CURRENT_POLICY_VERSION,
         branch: 'PAID_IN_CATALOG',
-        chain: ['NEED', 'SPEND_APPROVAL', 'IT_EXECUTION'],
+        chain:
+          routing?.mode === 'ONE_STEP'
+            ? ['SPEND_APPROVAL', 'IT_EXECUTION']
+            : ['NEED', 'SPEND_APPROVAL', 'IT_EXECUTION'],
         slaWorkingDays,
       };
 }
@@ -43,11 +65,14 @@ export function policyFor(kind: ApplicationKind, slaWorkingDays: number): Reques
  * Admin, the spend decision, then the grant. It has a spend step always: the only way out of it that skips the spend is
  * the rejection of the assessment or the registration of internal software, which end or change the request.
  */
-export function proposalPolicy(slaWorkingDays: number): RequestPolicy {
+export function proposalPolicy(slaWorkingDays: number, routing?: RequestRouting): RequestPolicy {
   return {
     version: CURRENT_POLICY_VERSION,
     branch: 'NEW_SOFTWARE',
-    chain: ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'],
+    chain:
+      routing?.mode === 'ONE_STEP'
+        ? ['IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION']
+        : ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'],
     slaWorkingDays,
   };
 }
@@ -88,6 +113,57 @@ export function canViewRequest(actor: ViewingActor, request: ViewFacts): boolean
     actor.employeeId === request.needStepAssigneeEmployeeId ||
     (request.needStepAssigneeEmployeeIds ?? []).includes(actor.employeeId) ||
     actor.roles.includes('IT_ADMIN')
+  );
+}
+
+/**
+ * What else decides who reads a request, beyond the people who have a part in it: the department it was sent from, the department
+ * the caller heads today, and how far it went on its way to the money. Loaded once for one read.
+ */
+export interface ReadFacts extends ViewFacts {
+  isGroup: boolean;
+  departmentId: string;
+  /** The department the caller heads today; null when they head none. */
+  actorHeadsDepartmentId: string | null;
+  /** A spend step was opened on the request, whatever became of it since. */
+  spendStepOpened: boolean;
+  /** The spend was approved, so a commitment was made for the request (released since or not). */
+  spendApproved: boolean;
+}
+
+/** Whether the caller reads the request, and, when they read it only as one person of a request for a group, whose line. */
+export type ReadAccess = { read: false } | { read: true; onlyLineOf: string | null };
+
+/**
+ * Who reads a request and its history: the sender, whoever holds or held a need step, an IT Admin, the head today of the department
+ * it was sent from, a spending approver once a spend step was opened on it, Finance once its spend was approved. A person it is for
+ * reads it too, but of a request for a group only their own line. There is no branch for the Super Admin, who files and decides no
+ * business record (`SoD-1`): they read none. Reading gives no right to act; every action keeps its own policy.
+ */
+export function canReadRequest(actor: ViewingActor, facts: ReadFacts): ReadAccess {
+  if (decidesOrSent(actor, facts) || oversees(actor, facts)) return { read: true, onlyLineOf: null };
+  if (facts.beneficiaryEmployeeIds.includes(actor.employeeId)) {
+    return { read: true, onlyLineOf: facts.isGroup ? actor.employeeId : null };
+  }
+
+  return { read: false };
+}
+
+/** The sender and whoever holds or held a need step of the request. */
+const decidesOrSent = (actor: ViewingActor, facts: ReadFacts): boolean =>
+  actor.employeeId === facts.requesterEmployeeId ||
+  actor.employeeId === facts.needStepAssigneeEmployeeId ||
+  (facts.needStepAssigneeEmployeeIds ?? []).includes(actor.employeeId);
+
+/** The roles that oversee requests, each as far as it reaches: the IT Admin, the head today, the spending approver, Finance. */
+function oversees(actor: ViewingActor, facts: ReadFacts): boolean {
+  const { roles } = actor;
+
+  return (
+    roles.includes('IT_ADMIN') ||
+    (facts.actorHeadsDepartmentId !== null && facts.actorHeadsDepartmentId === facts.departmentId) ||
+    (roles.includes('SPENDING_APPROVER') && facts.spendStepOpened) ||
+    (roles.includes('FINANCE') && facts.spendApproved)
   );
 }
 

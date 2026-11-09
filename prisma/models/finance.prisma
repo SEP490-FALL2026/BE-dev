@@ -16,6 +16,7 @@ model Currency {
   requestSupplements   RequestSupplement[]       @relation("RequestSupplementCurrency")
   lineAmounts          AccessRequestLineAmount[] @relation("LineAmountCurrency")
   budgetProposals      BudgetProposal[]          @relation("BudgetProposalCurrency")
+  budgetCycles         BudgetCycle[]             @relation("BudgetCycleCurrency")
   budgetVersions       BudgetVersion[]           @relation("BudgetVersionCurrency")
   budgetCommitments    BudgetCommitment[]        @relation("BudgetCommitmentCurrency")
   invoices             Invoice[]                 @relation("InvoiceCurrency")

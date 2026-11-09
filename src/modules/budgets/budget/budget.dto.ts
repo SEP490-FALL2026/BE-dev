@@ -1,7 +1,9 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
+import { responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { LINE_DESCRIPTION_MAX, REASON_MAX } from './budget.policy';
+import { LINE_TYPES } from './budget-line-zbb.json';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 /** An amount a person gives: always in the reporting currency, which the system knows (`QĐ-98`). */
@@ -10,10 +12,29 @@ const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
 const year = z.number().int().min(2000).max(2200);
 export const LINES_MAX = 200;
 
+/** The kind of purchase of a line (`QĐ-101n`): carry on, change, buy new, or give up. */
+const lineType = z.enum(LINE_TYPES).meta({
+  description:
+    'RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL gives it up: a CANCEL amount is shown and never added to the total.',
+});
+/** The reduced zero-based-budget explanation of a line (`QĐ-94l`): four short answers of 1 to 1000 characters. */
+const zbbBody = z.strictObject({
+  purpose: text(REASON_MAX),
+  alternatives: text(REASON_MAX),
+  consequenceIfNot: text(REASON_MAX),
+  usageIndicator: text(REASON_MAX),
+});
+const zbbView = z.strictObject({
+  purpose: z.string(),
+  alternatives: z.string(),
+  consequenceIfNot: z.string(),
+  usageIndicator: z.string(),
+});
+const priorityRank = z.number().int().min(1).max(100000);
+
 /**
- * A line of a proposal or a version (`QĐ-82d`): what is bought, how much, where in the year it is bought, how long it
- * serves and how it repeats. The window, the service period and the cycle may be left out here so that a form that
- * lacks them is told which line and which fields (`US-06-10` AC-2), not simply refused.
+ * A line of a proposal or a version (`QĐ-82d`): what is bought (a plan or a description), the seats, the amount of the year, its kind and
+ * its place in the order of priority, and the zero-based-budget explanation when the rules ask for it (`QĐ-94l`).
  */
 const lineBodyShape = z.strictObject({
   planId: z.uuid().optional(),
@@ -21,18 +42,37 @@ const lineBodyShape = z.strictObject({
   seats: z.number().int().min(1).max(100000).optional(),
   amount: money,
   note: text(REASON_MAX).optional(),
+  lineType,
+  zbb: zbbBody.optional(),
+  /** Optional here: a proposal line requires it (`lineBody`), a line Finance adds may leave it out. */
+  priorityRank: priorityRank.optional(),
 });
+const planOrDescription = {
+  message: 'Give the plan or a description of the line.',
+  path: ['description'],
+};
+/** A line of a proposal: the head gives the rank, once in the proposal (`QT 4.4`). */
 const lineBody = lineBodyShape
-  .refine((line) => line.planId !== undefined || line.description !== undefined, {
-    message: 'Give the plan or a description of the line.',
-    path: ['description'],
-  })
+  .extend({ priorityRank })
+  .refine((line) => line.planId !== undefined || line.description !== undefined, planOrDescription)
   .meta({
-    description: 'A line is a plan or a description, the seats, the amount of the year and a note.',
+    description:
+      'A line is a plan or a description, the seats, the amount of the year, its kind, its priority rank and a note; the explanation (zbb) is required for NEW lines and where the rules ask.',
+  });
+/** A line Finance adds to a version: the kind is given; the rank and the explanation may be left out. */
+const financeLineBody = lineBodyShape
+  .refine((line) => line.planId !== undefined || line.description !== undefined, planOrDescription)
+  .meta({
+    description:
+      'A line Finance adds: a plan or a description, the seats, the amount of the year and its kind; the priority rank and the explanation are optional.',
   });
 
 export const proposalBodySchema = z.strictObject({
   year,
+  costCenterId: z.uuid().optional().meta({
+    description:
+      'The Cost Center the work is for, when the person answers for more than one that year (a department they head and one that starts on 1 January).',
+  }),
   lines: z.array(lineBody).min(1).max(LINES_MAX),
   attachmentIds: z
     .array(z.uuid())
@@ -86,17 +126,31 @@ const versionFigures = {
   /** A forecast by quarter, never a limit: the four add up to the total or it is not saved (`US-06-09` AC-6). */
   quarters: quarters.nullable(),
 };
-/** A first version of a Cost Center and year, built from the proposal that waits for Finance. */
-export const versionBodySchema = z.strictObject({
+/** A first version from the proposal that waits for Finance (`source` PROPOSAL, the default): the proposal and the base. */
+const proposalVersionBody = z.strictObject({
+  source: z.literal('PROPOSAL').optional(),
   proposalId: z.uuid(),
   base: versionFigures.base,
   reserve: versionFigures.reserve.optional(),
   reserveReason: versionFigures.reserveReason.optional(),
   quarters: versionFigures.quarters.optional(),
 });
+/** A first version built from the baseline (`source` BASELINE): only the Cost Center and the year; the base and the lines are the baseline's. */
+const baselineVersionBody = z.strictObject({
+  source: z.literal('BASELINE'),
+  costCenterId: z.uuid(),
+  year: z.number().int().min(2000).max(2200),
+});
+/**
+ * A first version of a Cost Center and year: from the proposal that waits for Finance (`source` PROPOSAL, the default), or from the
+ * baseline when nobody heads the department at the deadline (`source` BASELINE, `QĐ-100h`). A field of the other source is a 422 `unrecognized_keys`.
+ */
+export const versionBodySchema = z.discriminatedUnion('source', [proposalVersionBody, baselineVersionBody]);
 export const versionPatchSchema = z
   .strictObject({
     base: versionFigures.base,
+    /** Why the base is changed: required when `base` differs from the one the draft has (`QĐ-100v`). */
+    baseReason: text(REASON_MAX),
     reserve: versionFigures.reserve,
     /** `null` takes the reason away: the reserve is the default share again, or is sent with another reason. */
     reserveReason: versionFigures.reserveReason.nullable(),
@@ -113,11 +167,15 @@ export const linePatchSchema = z
     amount: money,
     financeComment: text(REASON_MAX).nullable(),
     adjustmentReason: text(REASON_MAX).nullable(),
+    lineType,
+    /** `null` takes the explanation away; absent keeps it. */
+    zbb: zbbBody.nullable(),
+    priorityRank: priorityRank.nullable(),
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
   .meta({ minProperties: 1, description: 'Give at least one field.' });
-export const addLinesBodySchema = z.strictObject({ lines: z.array(lineBody).min(1).max(LINES_MAX) });
+export const addLinesBodySchema = z.strictObject({ lines: z.array(financeLineBody).min(1).max(LINES_MAX) });
 
 export const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -134,10 +192,22 @@ export const versionListQuerySchema = z.strictObject({
   ...pageQuery,
 });
 export const pageQuerySchema = z.strictObject(pageQuery);
-export const mineQuerySchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2200) });
-export const mineLinesQuerySchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2200), ...pageQuery });
+const mineCostCenter = z.uuid().optional().meta({
+  description:
+    'The Cost Center asked about, when the caller answers for more than one that year (a department they head and one that starts on 1 January).',
+});
+export const mineQuerySchema = z.strictObject({
+  year: z.coerce.number().int().min(2000).max(2200),
+  costCenterId: mineCostCenter,
+});
+export const mineLinesQuerySchema = z.strictObject({
+  year: z.coerce.number().int().min(2000).max(2200),
+  costCenterId: mineCostCenter,
+  ...pageQuery,
+});
 export const mineVersionsQuerySchema = z.strictObject({
   year: z.coerce.number().int().min(2000).max(2200).optional(),
+  costCenterId: mineCostCenter,
   ...pageQuery,
 });
 export const budgetsQuerySchema = z.strictObject({
@@ -189,6 +259,8 @@ const proposalSummarySchema = z.strictObject({
   total: moneyView,
   submittedAt: z.iso.datetime(),
 });
+/** Where a version stands (`QĐ-97b`: a version is never replaced, so `SUPERSEDED` is not one; the database refuses it). */
+const versionState = z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'EXPIRED']);
 const proposalLineSchema = z.strictObject({
   position: z.number().int().positive(),
   description: z.string(),
@@ -196,18 +268,26 @@ const proposalLineSchema = z.strictObject({
   seats: z.number().int().nullable(),
   amount: moneyView,
   note: z.string().nullable(),
+  lineType,
+  zbb: zbbView.nullable(),
+  priorityRank: z.number().int().positive(),
+  /** The part of the line that carries the proposal over the published ceiling of the department; null when the line is not flagged. */
+  overCeiling: moneyView.nullable(),
 });
 const versionSchema = z.strictObject({
   id: z.uuid(),
   costCenter: costCenterRef,
   year: z.number().int(),
   number: z.number().int().positive(),
-  kind: z.enum(['INITIAL', 'REVISION']),
-  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
+  state: versionState,
   proposalId: z.uuid().nullable(),
   /** The refused version this one follows when it is made again from the same proposal; set by the system. */
   rejectedPredecessorId: z.uuid().nullable(),
   base: moneyView,
+  /** Why Finance moved the base, when it did (`QĐ-100v`). */
+  baseReason: z.string().nullable(),
+  /** Where the version came from: the head's proposal, or the baseline Finance built when nobody headed the department (`QĐ-100h`). */
+  origin: z.enum(['PROPOSAL', 'BASELINE_NO_HEAD']),
   reserve: moneyView,
   /** The share of the base the reserve defaults to when the version was made; null for a version made before `QĐ-98`. */
   reservePercent: z.number().int().nullable(),
@@ -244,8 +324,7 @@ const versionSummarySchema = z.strictObject({
   costCenter: costCenterRef,
   year: z.number().int(),
   number: z.number().int().positive(),
-  kind: z.enum(['INITIAL', 'REVISION']),
-  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
+  state: versionState,
   total: moneyView,
   createdAt: z.iso.datetime(),
   sentAt: z.iso.datetime().nullable(),
@@ -259,13 +338,40 @@ const versionLineSchema = z.strictObject({
   amount: moneyView,
   financeComment: z.string().nullable(),
   adjustmentReason: z.string().nullable(),
+  lineType,
+  zbb: zbbView.nullable(),
+  /** Copied from the proposal; null for a line Finance added with none. */
+  priorityRank: z.number().int().positive().nullable(),
+  /** The part of the proposal line this adjusts that carried the proposal over the published ceiling (B3 flag); null when it was not flagged or the line is Finance's own. */
+  overCeiling: moneyView.nullable(),
 });
-/** What a head of department sees of the budget of the department: the lines of the current budget, never what is left. */
+const budgetNumbersSchema = {
+  base: moneyView.nullable(),
+  reserve: moneyView.nullable(),
+  total: moneyView.nullable(),
+  committed: moneyView,
+  spent: moneyView,
+  pendingSpend: moneyView,
+  remainingBase: moneyView.nullable(),
+  remainingWithReserve: moneyView.nullable(),
+  overBudget: z.boolean(),
+};
+/** The head reads their own figures and the published department ceiling, without company totals. */
 const mineSchema = z.strictObject({
   costCenter: costCenterRef,
   year: z.number().int(),
   status: z.enum(['ACTIVE', 'NO_ACTIVE_BUDGET']),
-  total: moneyView.nullable(),
+  ...budgetNumbersSchema,
+  departmentCeiling: z
+    .strictObject({ total: moneyView, signedCommitments: moneyView, plannedSeats: moneyView, priority: moneyView })
+    .nullable(),
+  cycle: z
+    .strictObject({
+      submissionDeadline: responseBusinessDate,
+      decisionDeadline: responseBusinessDate,
+      published: z.boolean(),
+    })
+    .nullable(),
   version: z.strictObject({ id: z.uuid(), number: z.number().int().positive() }).nullable(),
   /** The refusal of the spending approver when the latest version of the year was refused: the head reads why. */
   latestRefusal: z.strictObject({ reason: z.string(), at: z.iso.datetime() }).nullable(),
@@ -274,20 +380,15 @@ const mineSchema = z.strictObject({
 const tableRowSchema = z.strictObject({
   costCenter: costCenterRef,
   year: z.number().int(),
-  versionId: z.uuid(),
-  number: z.number().int().positive(),
-  /** The base of the current version, before the reserve. */
-  base: moneyView,
-  /** The reserve of the current version, kept apart from the base. */
-  reserve: moneyView,
-  total: moneyView,
-  /** What is held against the budget by the commitments attached to it. */
-  committed: moneyView,
-  /** What has become an expense, which a commitment is not any more (`FR-5.8`). */
-  spent: moneyView,
-  /** The budget less what is held and what is spent; negative when more was committed than the budget allows (`US-06-07` AC-3). */
-  remaining: moneyView,
+  status: z.enum(['ACTIVE', 'NO_BUDGET']),
+  versionId: z.uuid().nullable(),
+  number: z.number().int().positive().nullable(),
+  ...budgetNumbersSchema,
+  remaining: moneyView.nullable(),
   overCommitted: z.boolean(),
+  priorPeriodAdjustment: moneyView.meta({
+    description: 'Invoices of the commitment year recorded on or after local midnight on 1 January of the next year.',
+  }),
 });
 const summaryTotalSchema = z.strictObject({
   currency: z.string(),
@@ -297,6 +398,9 @@ const summaryTotalSchema = z.strictObject({
   committed: moneyView,
   spent: moneyView,
   remaining: moneyView,
+  pendingSpend: moneyView,
+  remainingBase: moneyView,
+  remainingWithReserve: moneyView,
   costCenterCount: z.number().int().nonnegative(),
   /** The Cost Centers whose budget is less than what is held and spent against it. */
   overBudgetCount: z.number().int().nonnegative(),
@@ -304,6 +408,8 @@ const summaryTotalSchema = z.strictObject({
 /** The company-wide figures of a year, added up for each currency: Cost Centers of two currencies are never added together. */
 const budgetSummarySchema = z.strictObject({
   year: z.number().int(),
+  annualCeiling: moneyView.nullable(),
+  sharedPoolReserve: moneyView.nullable(),
   /** Keyed by currency code, empty when no Cost Center has a current budget for the year. */
   totals: z.record(z.string(), summaryTotalSchema),
   /** When the last invoice was recorded, which is when the spent figure was last brought up to date; null when none was. */
@@ -313,8 +419,13 @@ export const mineVersionSummarySchema = z.strictObject({
   id: z.uuid(),
   year,
   number: z.number().int().positive(),
-  state: z.enum(['SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
+  state: z.enum(['SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'EXPIRED']),
   sentAt: z.iso.datetime(),
+  base: moneyView.meta({
+    description: 'The base Finance set in the version, in the currency of the version.',
+  }),
+  reserve: moneyView.meta({ description: 'The reserve on top of the base.' }),
+  total: moneyView.meta({ description: 'Base plus reserve.' }),
 });
 const importSchema = z.strictObject({
   added: z.number().int().nonnegative(),
@@ -326,7 +437,11 @@ export class BudgetProposalBodyDto extends createZodDto(proposalBodySchema) {}
 export class ResubmissionBodyDto extends createZodDto(resubmissionBodySchema) {}
 export class BudgetProposalReturnBodyDto extends createZodDto(returnBodySchema) {}
 export class DecisionBodyDto extends createZodDto(decisionBodySchema) {}
-export class VersionBodyDto extends createZodDto(versionBodySchema) {}
+/** A union is not a class to extend: the value makes the DTO of the route and the same name is the type of what it validates. */
+export const VersionBodyDto = Object.defineProperty(createZodDto(versionBodySchema), 'name', {
+  value: 'VersionBodyDto',
+});
+export type VersionBodyDto = z.infer<typeof versionBodySchema>;
 export class VersionPatchDto extends createZodDto(versionPatchSchema) {}
 export class LinePatchDto extends createZodDto(linePatchSchema) {}
 export class AddLinesBodyDto extends createZodDto(addLinesBodySchema) {}

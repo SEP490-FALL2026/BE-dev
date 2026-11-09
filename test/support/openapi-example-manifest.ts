@@ -21,6 +21,8 @@ import { ROUTE_ERROR_CODES_BUDGETS } from './openapi-example-route-codes-budgets
 import { ROUTE_ERROR_CODES_CATALOG } from './openapi-example-route-codes-catalog';
 import { ROUTE_ERROR_CODES_DATA_IMPORT } from './openapi-example-route-codes-data-import';
 import { SUCCESS_MESSAGES_DEVICES } from './openapi-example-messages-devices';
+import { SUCCESS_MESSAGES_OPTIMIZATION } from './openapi-example-messages-optimization';
+import { SUCCESS_MESSAGES_USAGE } from './openapi-example-messages-usage';
 import { ROUTE_ERROR_CODES_DEVICES } from './openapi-example-route-codes-devices';
 import { ROUTE_ERROR_CODES_FINANCE } from './openapi-example-route-codes-finance';
 import { ROUTE_ERROR_CODES_HEALTH } from './openapi-example-route-codes-health';
@@ -28,14 +30,18 @@ import { ROUTE_ERROR_CODES_IDENTITY_ACCESS } from './openapi-example-route-codes
 import { ROUTE_ERROR_CODES_LICENSING } from './openapi-example-route-codes-licensing';
 import { ROUTE_ERROR_CODES_OPERATING_PARAMETERS } from './openapi-example-route-codes-operating-parameters';
 import { ROUTE_ERROR_CODES_ORGANIZATION } from './openapi-example-route-codes-organization';
+import { ROUTE_ERROR_CODES_OPTIMIZATION } from './openapi-example-route-codes-optimization';
 import { ROUTE_ERROR_CODES_PERSONNEL } from './openapi-example-route-codes-personnel';
 import { ROUTE_ERROR_CODES_REQUESTS } from './openapi-example-route-codes-requests';
 import { ROUTE_ERROR_CODES_REQUESTS_SPEND } from './openapi-example-route-codes-requests-spend';
+import { ROUTE_ERROR_CODES_USAGE } from './openapi-example-route-codes-usage';
 
 export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '422' | '429' | '500' | '503';
 
 export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   ...SUCCESS_MESSAGES_DEVICES,
+  ...SUCCESS_MESSAGES_OPTIMIZATION,
+  ...SUCCESS_MESSAGES_USAGE,
   accessRequestAssessmentComplete: 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
   accessRequestAssessmentGet: 'ACCESS_REQUEST.ASSESSMENT_FETCHED',
   accessRequestAssessmentReject: 'ACCESS_REQUEST.ASSESSMENT_REJECTED',
@@ -60,6 +66,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   accessRequestServiceAccountSubmit: 'ACCESS_REQUEST.SERVICE_ACCOUNT_SUBMITTED',
   accessRequestSimilarSeatList: 'ACCESS_REQUEST.SIMILAR_SEATS_LISTED',
   accessRequestSubmit: 'ACCESS_REQUEST.SUBMITTED',
+  accessRequestResubmit: 'ACCESS_REQUEST.RESUBMITTED',
   accessRequestSupplementAdd: 'ACCESS_REQUEST.SUPPLEMENT_ADDED',
   accessRequestSupplementList: 'ACCESS_REQUEST.SUPPLEMENTS_LISTED',
   accessRequestTimingsGet: 'ACCESS_REQUEST.TIMINGS_FETCHED',
@@ -102,13 +109,17 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   budgetCheckYearList: 'BUDGET_CHECK.YEARS_LISTED',
   budgetCommitmentList: 'BUDGET_COMMITMENT.LISTED',
   budgetCommitmentInvoiceList: 'BUDGET_COMMITMENT.INVOICES_LISTED',
+  budgetCycleBaseline: 'BUDGET_CYCLE.BASELINE_FETCHED',
+  budgetCycleGet: 'BUDGET_CYCLE.FETCHED',
+  budgetCycleList: 'BUDGET_CYCLE.LISTED',
+  budgetCyclePackage: 'BUDGET_CYCLE.PACKAGE_FETCHED',
+  budgetCycleOpen: 'BUDGET_CYCLE.OPENED',
+  budgetCyclePublish: 'BUDGET_CYCLE.PUBLISHED',
+  budgetCycleUpdate: 'BUDGET_CYCLE.UPDATED',
+  budgetDepartmentCeilingsSet: 'BUDGET_CYCLE.CEILINGS_SET',
   budgetCommitmentInvoiceRecord: 'BUDGET_COMMITMENT.INVOICE_RECORDED',
   budgetCommitmentRelease: 'BUDGET_COMMITMENT.RELEASED',
   budgetCommitmentReleases: 'BUDGET_COMMITMENT.RELEASES_LISTED',
-  budgetInformationAnswer: 'BUDGET_INFORMATION.ANSWERED',
-  budgetInformationAsk: 'BUDGET_INFORMATION.ASKED',
-  budgetInformationList: 'BUDGET_INFORMATION.LISTED',
-  budgetInformationOfRequest: 'BUDGET_INFORMATION.LISTED',
   budgetMine: 'BUDGET.FETCHED',
   budgetMineLineList: 'BUDGET.LINES_LISTED',
   budgetMineVersionList: 'BUDGET.VERSIONS_LISTED',
@@ -189,9 +200,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   employeeUpdateOfficialFields: 'EMPLOYEE.UPDATED',
   exchangeRateList: 'EXCHANGE_RATE.LISTED',
   exchangeRateRecord: 'EXCHANGE_RATE.RECORDED',
-  financeReviewComplete: 'FINANCE_REVIEW.COMPLETED',
-  financeReviewGet: 'FINANCE_REVIEW.FETCHED',
-  financeReviewList: 'FINANCE_REVIEW.LISTED',
   functionalGroupCreate: 'FUNCTIONAL_GROUP.CREATED',
   functionalGroupList: 'FUNCTIONAL_GROUP.LISTED',
   functionalGroupUpdate: 'FUNCTIONAL_GROUP.UPDATED',
@@ -210,6 +218,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   licenseKeyImport: 'LICENSE_KEY.IMPORTED',
   licenseKeyList: 'LICENSE_KEY.LISTED',
   licenseKeyReveal: 'LICENSE_KEY.REVEALED',
+  licenseKeyWithdraw: 'LICENSE_KEY.WITHDRAWN',
   longLeaveChangeList: 'LONG_LEAVE.CHANGES_LISTED',
   longLeaveChangeReturnDate: 'LONG_LEAVE.RETURN_DATE_CHANGED',
   longLeaveConfirmReturn: 'LONG_LEAVE.RETURNED',
@@ -218,6 +227,10 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   longLeaveStart: 'LONG_LEAVE.STARTED',
   managerDashboardGet: 'DASHBOARD.MANAGER_RETRIEVED',
   meAccessRequestList: 'ME.ACCESS_REQUESTS_LISTED',
+  departmentAccessRequestList: 'ACCESS_REQUEST_HISTORY.DEPARTMENT_LISTED',
+  accessRequestList: 'ACCESS_REQUEST_HISTORY.LISTED',
+  accessRequestEventList: 'ACCESS_REQUEST_HISTORY.EVENTS_LISTED',
+  accessRequestAuditFlagList: 'ACCESS_REQUEST_HISTORY.AUDIT_FLAGS_LISTED',
   meChangePassword: 'AUTH.PASSWORD_CHANGED',
   needDecisionList: 'NEED_DECISION.LISTED',
   meDepartureNoticeGet: 'ME.DEPARTURE_NOTICE_RETRIEVED',
@@ -314,6 +327,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   spendBatchList: 'SPEND_BATCH.LISTED',
   spendBatchSubmit: 'SPEND_BATCH.SUBMITTED',
   spendQueueList: 'SPEND_QUEUE.LISTED',
+  spendReserveConfirm: 'SPEND.RESERVE_CONFIRMED',
   stepCongestionIncidentList: 'STEP_CONGESTION.INCIDENTS_LISTED',
   stepCongestionIncidentRecord: 'STEP_CONGESTION.INCIDENT_RECORDED',
   stepCongestionList: 'STEP_CONGESTION.LISTED',
@@ -375,9 +389,11 @@ const PARTS = [
   ROUTE_ERROR_CODES_LICENSING,
   ROUTE_ERROR_CODES_OPERATING_PARAMETERS,
   ROUTE_ERROR_CODES_ORGANIZATION,
+  ROUTE_ERROR_CODES_OPTIMIZATION,
   ROUTE_ERROR_CODES_PERSONNEL,
   ROUTE_ERROR_CODES_REQUESTS,
   ROUTE_ERROR_CODES_REQUESTS_SPEND,
+  ROUTE_ERROR_CODES_USAGE,
 ];
 export const ROUTE_ERROR_CODE_PARTS: readonly string[][] = PARTS.map((part) => Object.keys(part));
 export const ROUTE_ERROR_CODES: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> =

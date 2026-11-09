@@ -13,3 +13,17 @@ export class LicenseKeyDecryptionError extends Error {
     this.name = 'LicenseKeyDecryptionError';
   }
 }
+
+/**
+ * Why a key cannot be given out or withdrawn now (`QĐ-103d`, `QĐ-103v`): it is not free in the store, it was withdrawn from it, it is
+ * assigned, it was withdrawn already, or it belongs to another purchase than the seat it is given to.
+ */
+export type LicenseKeyStateProblem =
+  'NOT_IN_STORE' | 'WITHDRAWN' | 'ASSIGNED' | 'ALREADY_WITHDRAWN' | 'SUBSCRIPTION_MISMATCH';
+
+export class LicenseKeyStateError extends Error {
+  constructor(readonly problem: LicenseKeyStateProblem) {
+    super(`The license key cannot be used this way: ${problem}.`);
+    this.name = 'LicenseKeyStateError';
+  }
+}

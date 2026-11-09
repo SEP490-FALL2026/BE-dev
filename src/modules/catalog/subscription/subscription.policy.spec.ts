@@ -267,6 +267,10 @@ describe('what an update of a subscription makes of its state, and when it is a 
     noticePeriodDays: 60 as number | null,
     autoRenew: false,
     allowsMidTermReduction: true,
+    commitmentTermMonths: 12 as number | null,
+    responsibleItAdminEmployeeId: 'it-1' as string | null,
+    vendorMinimumSeats: 3 as number | null,
+    isPrimaryForPlan: false,
   };
 
   it('keeps what the update does not give', () => {
@@ -285,6 +289,10 @@ describe('what an update of a subscription makes of its state, and when it is a 
         noticePeriodDays: null,
         autoRenew: true,
         allowsMidTermReduction: false,
+        commitmentTermMonths: 1,
+        responsibleItAdminEmployeeId: 'it-2',
+        vendorMinimumSeats: null,
+        isPrimaryForPlan: true,
       }),
     ).toEqual({
       purchasedQuantity: 12,
@@ -296,6 +304,10 @@ describe('what an update of a subscription makes of its state, and when it is a 
       noticePeriodDays: null,
       autoRenew: true,
       allowsMidTermReduction: false,
+      commitmentTermMonths: 1,
+      responsibleItAdminEmployeeId: 'it-2',
+      vendorMinimumSeats: null,
+      isPrimaryForPlan: true,
     });
   });
 
@@ -335,6 +347,7 @@ describe('what a declared subscription starts as (US-04-03)', () => {
     expect(declaredStateOf({})).toEqual({
       purchasedQuantity: null,
       billingCycle: null,
+      commitmentTermMonths: null,
       startDate: null,
       endDate: null,
       renewalDate: null,
@@ -342,6 +355,9 @@ describe('what a declared subscription starts as (US-04-03)', () => {
       noticePeriodDays: null,
       autoRenew: false,
       allowsMidTermReduction: false,
+      responsibleItAdminEmployeeId: null,
+      vendorMinimumSeats: null,
+      isPrimaryForPlan: false,
     });
   });
 
@@ -357,10 +373,14 @@ describe('what a declared subscription starts as (US-04-03)', () => {
         noticePeriodDays: 60,
         autoRenew: true,
         allowsMidTermReduction: true,
+        commitmentTermMonths: 12,
+        responsibleItAdminEmployeeId: 'it-1',
+        vendorMinimumSeats: 3,
       }),
     ).toEqual({
       purchasedQuantity: 5,
       billingCycle: 'ANNUAL',
+      commitmentTermMonths: 12,
       startDate: '2026-01-01',
       endDate: '2026-12-31',
       renewalDate: '2026-12-31',
@@ -368,6 +388,9 @@ describe('what a declared subscription starts as (US-04-03)', () => {
       noticePeriodDays: 60,
       autoRenew: true,
       allowsMidTermReduction: true,
+      responsibleItAdminEmployeeId: 'it-1',
+      vendorMinimumSeats: 3,
+      isPrimaryForPlan: false,
     });
   });
 });

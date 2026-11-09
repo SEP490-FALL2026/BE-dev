@@ -19,7 +19,8 @@ worker không.
    (khóa duy nhất của `organization_change_announcements`, đánh dấu nhắc một lần cho mỗi đối tượng và ngày, trạng thái đã đóng của đề
    xuất/phiên bản), không bởi việc chỉ có một tiến trình chạy. Sweeper đóng năm (`BudgetYearEndSweeper`) lấy khóa dòng đề xuất, khóa
    dòng phiên bản rồi khóa năm `budget-year:<cost_center_id>:<năm>` theo đúng thứ tự mà mọi người ghi ngân sách dùng; chạy hai lần
-   không tạo thêm bản ghi (kiểm bằng test).
+   không tạo thêm bản ghi (kiểm bằng test). Sweeper khoản cam kết 01/01 (`YearStartCommitmentsSweeper`) dùng dấu chạy `year_start_commitment_runs` và
+   khóa duy nhất (Request, năm) của khoản; nó khóa hàng Request trước, rồi khóa năm của Cost Center — cùng thứ tự với mọi ghi ngân sách.
 3. Sweeper không phát sinh ghi mà không có sự kiện nguồn: mỗi lần chạy chỉ ghi khi có dòng đến hạn, trong một giao dịch cho từng
    Cost Center và năm.
 

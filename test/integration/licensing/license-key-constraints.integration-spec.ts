@@ -159,17 +159,24 @@ describe('license keys (integration, PostgreSQL constraints)', () => {
     expect((await insertKey({ organizationId: randomUUID() })).code).toBe('23503');
   });
 
-  it('refuses a status that is not one of the three', async () => {
+  // Rewritten for BR-MF1-09 / QĐ-103d (L3-21): two statuses; RETIRED is gone and an assigned key names its assignment.
+  it('refuses a status that is not one of the two, and a key assigned to no seat', async () => {
     expect((await insertKey({ status: 'LOST' })).code).toBe('22P02');
-    for (const status of ['IN_STORE', 'ASSIGNED', 'RETIRED']) expect((await insertKey({ status })).code).toBeNull();
+    expect((await insertKey({ status: 'RETIRED' })).code).toBe('22P02');
+    expect((await insertKey({ status: 'ASSIGNED' })).code).toBe('23514');
+    expect((await insertKey({ status: 'IN_STORE' })).code).toBeNull();
   });
 
-  it('never deletes a key, and moves nothing but its status', async () => {
+  it('never deletes a key, and moves nothing but its state', async () => {
     const { id } = await insertKey();
 
     expect(await sqlState(sql, `DELETE FROM license_keys WHERE id = $1`, [id])).toBe('55000');
-    expect(await sqlState(sql, `UPDATE license_keys SET status = 'ASSIGNED' WHERE id = $1`, [id])).toBeNull();
-    expect(await sqlState(sql, `UPDATE license_keys SET status = 'RETIRED' WHERE id = $1`, [id])).toBeNull();
+    expect(await sqlState(sql, `UPDATE license_keys SET status = 'ASSIGNED' WHERE id = $1`, [id])).toBe('23514');
+    expect(
+      await sqlState(sql, `UPDATE license_keys SET withdrawn_at = now(), withdrawal_reason = 'gone' WHERE id = $1`, [
+        id,
+      ]),
+    ).toBeNull();
     for (const [column, value] of [
       ['fingerprint', hex()],
       ['masked', '••••9999'],

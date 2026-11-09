@@ -28,7 +28,7 @@ export function submissionOf(kind: ApplicationKind, hasCostCenter: boolean): Sub
  * billing cycle of the subscription the department prices it by (`undefined` when it has none), and a cycle the system cannot
  * count in months leaves the price missing. A missing price does not stop the request: it stops only its spend step.
  */
-export function priceOf(kind: ApplicationKind, cycle: BillingCycle | undefined): PriceAvailability {
+export function priceOf(kind: ApplicationKind, cycle: BillingCycle | 'ONE_TIME' | undefined): PriceAvailability {
   if (!costsMoney(kind)) return { status: 'NOT_APPLICABLE', missingReason: null };
   if (cycle === undefined) return { status: 'MISSING', missingReason: 'NO_PRICED_SUBSCRIPTION' };
   if (cycle === 'OTHER') return { status: 'MISSING', missingReason: 'CYCLE_UNKNOWN' };

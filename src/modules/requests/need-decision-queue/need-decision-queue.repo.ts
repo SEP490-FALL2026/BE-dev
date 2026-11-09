@@ -30,6 +30,7 @@ const ROW_SELECT = {
       requesterEmployeeId: true,
       businessReason: true,
       termMonths: true,
+      expectedEndDate: true,
       pricingStatus: true,
       amountMinor: true,
       amountCurrency: true,

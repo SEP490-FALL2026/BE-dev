@@ -76,7 +76,10 @@ export class ProvisioningCancellationService {
     input: GrantCancelInput,
   ): Promise<GrantCancellation> {
     const cause = input.cause ?? 'REQUESTER_WITHDREW';
-    switch (grantCancelAction(task.status, cause, input.evidence !== undefined)) {
+    const action = grantCancelAction(task.status, cause, input.evidence !== undefined);
+    // An extension (`EXTEND`) that failed has nothing for the IT Admin to undo: the right was not extended and no seat was taken, and the
+    // IT Admin cannot close it as cancelled (`ProvisioningDecisionService.cancel` is for a grant), so it is cancelled with the request.
+    switch (task.kind === 'EXTEND' && action === 'WAIT_FOR_IT_ADMIN' ? 'CANCEL' : action) {
       case 'RUNNING':
         return { status: 'RUNNING' };
       case 'EVIDENCE_REQUIRED':
@@ -89,12 +92,15 @@ export class ProvisioningCancellationService {
         return { status: 'FAILED', taskId: task.id };
       case 'CANCEL': {
         const reason = cancelReasonOf(cause);
-        await this.assignments.cancel(tx, actor, {
-          organizationId: input.organizationId,
-          assignmentId: task.assignmentId,
-          requestId: input.requestId,
-          now: input.now,
-        });
+        // The assignment of an extension is the right itself, held before the renewal: it keeps its old end, only the task ends.
+        if (task.kind !== 'EXTEND') {
+          await this.assignments.cancel(tx, actor, {
+            organizationId: input.organizationId,
+            assignmentId: task.assignmentId,
+            requestId: input.requestId,
+            now: input.now,
+          });
+        }
         await this.tasks.markCancelled(tx, task.id, actor.appUserId, reason, input.now);
         await this.audit.record(
           tx,

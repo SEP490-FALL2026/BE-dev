@@ -3,9 +3,43 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { employeeRef, requestSchema, requestStateSchema } from '../access-request/access-request.dto';
 import { isStateList } from './my-requests.policy';
-import { MY_REQUEST_TYPES, MY_REQUEST_VIEWS } from './my-requests.types';
+import { LINE_STATES } from '../access-request/group-request.types';
+import { MY_REQUEST_INVOLVEMENTS, MY_REQUEST_TYPES, MY_REQUEST_VIEWS } from './my-requests.types';
 
 const instant = z.iso.datetime({ offset: true });
+
+/** The narrowing every list of requests shares: the page, the view, the states, the type and the window of the moment sent. */
+export const requestListQueryShape = {
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+  view: z.enum(MY_REQUEST_VIEWS).optional().meta({
+    description:
+      'open: the requests that are not over, one that waits for the IT Admin to close the task of a withdrawal included. ended: the requests nothing is left to do in (completed, refused, failed, withdrawn, cancelled). Left out: both.',
+  }),
+  state: z.string().max(400).refine(isStateList, 'A comma-separated list of states of a request.').optional().meta({
+    description:
+      'One or more states of a request, comma-separated and none twice (for example PENDING,AWAITING_SPEND_DECISION); a draft is not a state of a request. Narrows within view when both are given.',
+  }),
+  type: z.enum(MY_REQUEST_TYPES).optional(),
+  from: instant.optional().meta({
+    description:
+      'The first moment the request was sent that is read (included). Must be earlier than to when both are given.',
+  }),
+  to: instant
+    .optional()
+    .meta({ description: 'The moment after the last one the request was sent that is read (excluded).' }),
+};
+
+/** Refuses a window of the moment sent that is empty or backwards: `from` must come before `to`. */
+export function refineWindow(query: { from?: string; to?: string }, context: z.RefinementCtx): void {
+  if (query.from !== undefined && query.to !== undefined && new Date(query.from) >= new Date(query.to)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['from'],
+      message: 'from must be earlier than to (the window is half-open).',
+    });
+  }
+}
 
 /**
  * Strict: a parameter that is not here (an `employeeId`, a `requesterId`) is refused rather than ignored, so a client can never
@@ -13,34 +47,13 @@ const instant = z.iso.datetime({ offset: true });
  */
 export const myRequestsQuerySchema = z
   .strictObject({
-    page: z.coerce.number().int().positive().default(1),
-    pageSize: z.coerce.number().int().positive().max(100).default(20),
-    view: z.enum(MY_REQUEST_VIEWS).optional().meta({
+    ...requestListQueryShape,
+    involvement: z.enum(MY_REQUEST_INVOLVEMENTS).optional().meta({
       description:
-        'open: the requests that are not over, one that waits for the IT Admin to close the task of a withdrawal included. ended: the requests nothing is left to do in (completed, refused, failed, withdrawn, cancelled). Left out: both.',
+        'SENT (the default): the requests the caller sent. FOR_ME: the requests the caller is one of the people for, a request for a group somebody else sent included. ALL: both.',
     }),
-    state: z.string().max(400).refine(isStateList, 'A comma-separated list of states of a request.').optional().meta({
-      description:
-        'One or more states of a request, comma-separated and none twice (for example PENDING,AWAITING_BUDGET); a draft is not a state of a request. Narrows within view when both are given.',
-    }),
-    type: z.enum(MY_REQUEST_TYPES).optional(),
-    from: instant.optional().meta({
-      description:
-        'The first moment the request was sent that is read (included). Must be earlier than to when both are given.',
-    }),
-    to: instant
-      .optional()
-      .meta({ description: 'The moment after the last one the request was sent that is read (excluded).' }),
   })
-  .superRefine((query, context) => {
-    if (query.from !== undefined && query.to !== undefined && new Date(query.from) >= new Date(query.to)) {
-      context.addIssue({
-        code: 'custom',
-        path: ['from'],
-        message: 'from must be earlier than to (the window is half-open).',
-      });
-    }
-  });
+  .superRefine(refineWindow);
 
 const needStepStates = requestSchema.shape.needStep.shape.state;
 const waitingReasons = requestSchema.shape.needStep.shape.waitingReason;
@@ -57,6 +70,7 @@ export const myRequestSummarySchema = z.strictObject({
   type: requestSchema.shape.type,
   branch: requestSchema.shape.branch,
   state: requestStateSchema,
+  routing: requestSchema.shape.routing,
   /** The plan asked for; null for software that is not in the catalog until the IT Admin registers and links it. */
   plan: requestSchema.shape.plan,
   /** What the sender called software that is not in the catalog; null for any other request. */
@@ -65,7 +79,10 @@ export const myRequestSummarySchema = z.strictObject({
   beneficiary: employeeRef.nullable(),
   /** How many people the request is for: 1 for any request but one for a group. */
   lineCount: z.number().int().positive(),
-  termMonths: z.number().int().positive(),
+  /** Only a request made before `QĐ-104a` has a term in months. */
+  termMonths: z.number().int().positive().nullable(),
+  /** The day the right ends as the sender chose it; null for a right with no end (`QĐ-104a`). */
+  expectedEndDate: z.string().nullable(),
   submittedAt: z.iso.datetime(),
   /** The last time the record of the request was changed. */
   updatedAt: z.iso.datetime(),
@@ -82,6 +99,13 @@ export const myRequestSummarySchema = z.strictObject({
   withdrawal: z.strictObject({ withdrawnAt: z.iso.datetime().nullable() }).nullable(),
   /** A hint for the screen from the policy of the withdrawal: the withdrawal itself judges again when it is asked. */
   canWithdraw: z.boolean(),
+  /** SENT when the caller sent the request (for themselves or for others), FOR_ME when somebody else sent it for them. */
+  involvement: z.enum(['SENT', 'FOR_ME']),
+  /**
+   * The caller's own line of a request for a group somebody else sent for them: its state and why it ended without a grant. Null for
+   * any other row; the lines of the others are never answered here.
+   */
+  myLine: z.strictObject({ state: z.enum(LINE_STATES), outcomeReason: z.string().nullable() }).nullable(),
 });
 
 const pageSchema = z.strictObject({

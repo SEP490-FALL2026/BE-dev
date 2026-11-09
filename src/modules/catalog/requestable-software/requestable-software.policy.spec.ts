@@ -41,8 +41,11 @@ describe('what a person may ask for from the catalog', () => {
       expect(priceOf('SAAS', 'OTHER')).toEqual({ status: 'MISSING', missingReason: 'CYCLE_UNKNOWN' });
     });
 
-    it.each(['MONTHLY', 'QUARTERLY', 'ANNUAL'] as const)('prices a plan billed %s', (cycle) => {
-      expect(priceOf('LICENSED', cycle)).toEqual({ status: 'PRICED', missingReason: null });
-    });
+    it.each(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'ONE_TIME'] as const)(
+      'prices a plan billed %s (a perpetual purchase is one time, BR-MF1-07)',
+      (cycle) => {
+        expect(priceOf('LICENSED', cycle)).toEqual({ status: 'PRICED', missingReason: null });
+      },
+    );
   });
 });

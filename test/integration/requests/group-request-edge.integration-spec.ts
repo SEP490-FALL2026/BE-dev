@@ -4,10 +4,8 @@ import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
 const M = 1_000_000;
-
-interface Refused {
-  error: { code: string; details?: { missing?: string[]; extra?: string[] } };
-}
+/** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 
 describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-8, AC-9, AC-16, US-06-08 AC-10)', () => {
   let counter = 0;
@@ -57,7 +55,7 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     expect(checked).toMatchObject({
       hasSpendStep: true,
       lineCount: 5,
-      pricing: { status: 'PRICED', amount: { amount: '60000000' } },
+      pricing: { status: 'PRICED', amount: { amount: String(5 * M * monthsLeft) } },
     });
     expect(sent).toMatchObject({
       branch: 'PAID_IN_CATALOG',
@@ -66,20 +64,18 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     });
   });
 
-  it('closes the step of the head when every person of it was withdrawn, and keeps the request for the line that is left (FR-3.16, US-05-17)', async () => {
+  it('MF1-D: a group that names its head is refused before any step is made (FR-3.16, US-05-17, BR-MF1-02)', async () => {
     const u = await unit();
     const plan = await h.planOf(await h.subscription(10));
     const [e1, e2] = await h.colleagues(u, 2);
-    const id = h.dataOf<{ request: { id: string } }>(
-      await h.submitGroup(h.groupBody(plan, [e1, e2, u.head]), e1.account).expect(201),
-    ).request.id;
+    const rows = await h.requestRows();
 
-    await h.withdrawLine(id, e1.employeeId, {}, e1.account).expect(200);
-    await h.withdrawLine(id, e2.employeeId, {}, e1.account).expect(200);
+    // MF1-D (BR-MF1-02): a head is no line of a group any more; the group is refused for that line and nothing is written.
+    const refused = await h.submitGroup(h.groupBody(plan, [e1, e2, u.head]), e1.account).expect(422);
 
-    expect((await h.needSteps(id)).map((step) => step.state)).toEqual(['CLOSED', 'PENDING']);
-    expect(await h.lineStates(id)).toEqual(['WITHDRAWN', 'WITHDRAWN', 'AWAITING_NEED']);
-    expect(await h.state(id)).toBe('PENDING');
+    expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+    expect(h.detailsOf(refused)).toEqual({ lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] });
+    expect(await h.requestRows()).toBe(rows);
   });
 
   it('reads the seats of one person of a group for the head who holds their step, and for nobody else (US-05-04 AC-3)', async () => {
@@ -87,7 +83,8 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     const plan = await h.planOf(await h.subscription(10));
     const [e1, e2] = await h.colleagues(u, 2);
     const id = h.dataOf<{ request: { id: string } }>(
-      await h.submitGroup(h.groupBody(plan, [e1, e2, u.head]), e1.account).expect(201),
+      // MF1-D: the head is no line of a group; asking the seats of the head is asking for a person who is not in it.
+      await h.submitGroup(h.groupBody(plan, [e1, e2]), e1.account).expect(201),
     ).request.id;
     const outsider = await h.colleague(await unit());
 
@@ -131,7 +128,7 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     ).toEqual(expect.arrayContaining(['NEED', 'SPEND_DECISION', 'GRANT']));
   });
 
-  it('gives a person who is not staff no end day of the sender: the line has none, sending one is refused, and the seat ends with the term (AC-8, Q-03, R-15)', async () => {
+  it('FR-2.8, R-D01: needs the end date of the group for a person who is not staff, gives it to every line, and the seat ends with it (AC-8)', async () => {
     const u = await unit();
     const subscription = await h.subscription(10);
     const plan = await h.planOf(subscription);
@@ -142,13 +139,18 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
       lines: [{ employeeId: e1.employeeId }, { employeeId: e2.employeeId, expectedEndDate: '2099-12-31' }],
     };
 
+    // Rewritten from "no end day of the sender": the group names one end date for all of its people now (`QĐ-104a`, `FR-2.8`).
+    const end = effectiveEndOf({ start: h.today(), months: 3 });
+
     const refused = await h.submitGroup(withDay, u.head.account).expect(422);
+    const refusedNone = await h.submitGroup(h.groupBody(plan, [e1, e2]), u.head.account).expect(422);
     const sent = h.dataOf<{ request: { id: string } }>(
-      await h.submitGroup(h.groupBody(plan, [e1, e2]), u.head.account).expect(201),
+      await h.submitGroup(h.groupBody(plan, [e1, e2], { expectedEndDate: end }), u.head.account).expect(201),
     ).request;
 
     expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
-    expect((await h.lineRows(sent.id)).map((line) => line.expected_end_date)).toEqual([null, null]);
+    expect(h.codeOf(refusedNone)).toBe('GROUP_REQUEST.LINES_REFUSED');
+    expect((await h.lineRows(sent.id)).map((line) => line.expected_end_date)).toEqual([end, end]);
 
     await h.sendOn([sent.id], u.head.account).expect(201);
     await h
@@ -162,42 +164,32 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
         )
         .expect(201);
     }
-    // Nobody gave the seat a day: it ends with the term the request asked for (12 months for a group), as the intern's does.
+    // The seat ends with the end date the group named.
     const seats = await h.ctx.sql.query<{ employee_id: string; expected_end_date: string | null }>(
       `SELECT employee_id, expected_end_date::text FROM license_assignments WHERE employee_id = ANY($1::uuid[])`,
       [[e1.employeeId, e2.employeeId]],
     );
-    const end = effectiveEndOf({ start: h.today(), months: 12, flexible: false, fiscalYearStartMonth: 1 });
     expect(Object.fromEntries(seats.rows.map((row) => [row.employee_id, row.expected_end_date]))).toEqual({
       [e1.employeeId]: end,
       [e2.employeeId]: end,
     });
   });
 
-  it('refuses the head who declares their own line in the step of the others: it is not a line of that step (AC-16)', async () => {
+  it('MF1-D: refuses the head as a line of the group, so no head declares their own line in a step (AC-16, BR-MF1-02)', async () => {
     const u = await unit();
     const plan = await h.planOf(await h.subscription(10));
     const [e1, e2] = await h.colleagues(u, 2);
-    const id = h.dataOf<{ request: { id: string } }>(
-      await h.submitGroup(h.groupBody(plan, [e1, e2, u.head]), e1.account).expect(201),
-    ).request.id;
+    const rows = await h.requestRows();
 
-    const attempt = await h
-      .decideLines(
-        id,
-        { lines: [approve(e1.employeeId), approve(e2.employeeId), approve(u.head.employeeId)] },
-        u.head.account,
-      )
-      .expect(422);
+    // MF1-D (BR-MF1-02): a head is no line of a group any more; the group is refused for that line and nothing is written.
+    const refused = await h.submitGroup(h.groupBody(plan, [e1, e2, u.head]), e1.account).expect(422);
 
-    expect((attempt.body as Refused).error).toMatchObject({
-      code: 'GROUP_REQUEST.LINES_MISMATCH',
-      details: { extra: [u.head.employeeId] },
-    });
-    expect(await h.lineStates(id)).toEqual(['AWAITING_NEED', 'AWAITING_NEED', 'AWAITING_NEED']);
+    expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+    expect(h.detailsOf(refused)).toEqual({ lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] });
+    expect(await h.requestRows()).toBe(rows);
   });
 
-  it('checks the people approved again when the approver decides: an exception that Finance has not looked at goes back, and nobody is decided (AC-9)', async () => {
+  it('BR-MF1-07c: checks the people approved again when the approver decides: a request that is blocked now goes back to its head, and nobody is decided (AC-9)', async () => {
     counter += 1;
     const u = await h.departmentWithHead(`P-Y${counter}`);
     const plan = await h.planOf(await h.subscription(100));
@@ -215,11 +207,14 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
       .decideSpendLines(id, { lines: people.map((person) => approve(person.employeeId)) }, h.boss.account)
       .expect(409);
 
-    expect(h.codeOf(bounced)).toBe('SPEND.RECHECKED_NEEDS_FINANCE_REVIEW');
+    expect(h.codeOf(bounced)).toBe('SPEND.RECHECKED_RETURNED_TO_HEAD');
+    expect((bounced.body as { error: { details: { reasons: string[] } } }).error.details.reasons).toEqual([
+      'OVER_RESERVE',
+    ]);
     expect(await h.lineStates(id)).toEqual(['NEED_CONFIRMED', 'NEED_CONFIRMED']);
     expect(await h.commitments(id)).toEqual([]);
     expect((await h.steps(id, 'SPEND_APPROVAL')).map((step) => step.state)).toEqual(['CLOSED']);
-    expect((await h.steps(id, 'FINANCE_REVIEW')).map((step) => step.state)).toEqual(['PENDING']);
+    expect(await h.state(id)).toBe('AWAITING_SPEND_SUBMISSION');
   });
 
   it('has no line of the spending approver any more: the group is refused for that line, and nothing is written (US-05-17 AC-18, D-S21)', async () => {

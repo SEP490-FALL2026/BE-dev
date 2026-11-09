@@ -1,4 +1,4 @@
-import type { BusinessDate } from '../../../core/business-date';
+import { addDays, type BusinessDate } from '../../../core/business-date';
 
 /**
  * The rules of the renewal of a right that ends on a day (`US-05-14`): who asks, which right may be renewed, whether the ask comes
@@ -77,4 +77,22 @@ export function checkRenewable(facts: {
  */
 export function routeRenewal(facts: { today: BusinessDate; previousEnd: BusinessDate }): 'RENEWAL' | 'NEW_REQUEST' {
   return facts.today <= facts.previousEnd ? 'RENEWAL' : 'NEW_REQUEST';
+}
+
+/**
+ * The window of the renewal (`BR-MF1-08a`, `QĐ-108b`): it opens `windowDays` days before the approved end and runs to the end (today
+ * counts). `windowDays` is the one the window was recorded with when it opened, or the parameter in force when it is not recorded yet.
+ */
+export function renewalWindowOf(facts: { today: BusinessDate; previousEnd: BusinessDate; windowDays: number }): {
+  open: boolean;
+  opensOn: BusinessDate;
+} {
+  const opensOn = addDays(facts.previousEnd, -facts.windowDays);
+
+  return { open: facts.today >= opensOn, opensOn };
+}
+
+/** The new end asked for fits (`QĐ-108a`): after the end the right has, and not after `maxEnd` (twelve months after it). */
+export function newEndFits(facts: { previousEnd: BusinessDate; newEnd: BusinessDate; maxEnd: BusinessDate }): boolean {
+  return facts.newEnd > facts.previousEnd && facts.newEnd <= facts.maxEnd;
 }

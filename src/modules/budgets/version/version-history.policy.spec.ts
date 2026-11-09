@@ -34,6 +34,9 @@ const line: LineFacts = {
   amountMinor: 50_000_000n,
   financeComment: null,
   adjustmentReason: null,
+  lineType: 'RENEW',
+  zbb: null,
+  priorityRank: 1,
 };
 
 describe('the figures an edit of a version changed (F66, spec J.4)', () => {
@@ -62,6 +65,16 @@ describe('the figures an edit of a version changed (F66, spec J.4)', () => {
         q4: '20000000',
         reserveReason: 'The plan buys more in the autumn',
       },
+    });
+  });
+
+  it('shows the reason of the base again when a second change of the base is given with the same reason (QĐ-100v)', () => {
+    const before: FigureFacts = { ...figures, baseReason: 'The licences cost more' };
+    const after: FigureFacts = { ...before, baseMinor: 55_000_000n, totalMinor: 75_000_000n };
+
+    expect(figureChange(before, after, money)).toEqual({
+      before: { base: '60000000', total: '80000000', baseReason: 'The licences cost more' },
+      after: { base: '55000000', total: '75000000', baseReason: 'The licences cost more' },
     });
   });
 
@@ -96,11 +109,14 @@ describe('the fields an edit of a line changed', () => {
       amountMinor: 1n,
       financeComment: 'c',
       adjustmentReason: 'r',
+      lineType: 'CANCEL',
+      zbb: { purpose: 'p', alternatives: 'a', consequenceIfNot: 'c', usageIndicator: 'u' },
+      priorityRank: 2,
     };
     const change = lineChange(line, everything, money);
 
     expect(Object.keys(change?.after ?? {}).length).toBeLessThanOrEqual(HISTORY_CHANGES_MAX);
-    expect(Object.keys(change?.after ?? {})).toHaveLength(6);
+    expect(Object.keys(change?.after ?? {})).toHaveLength(9);
   });
 });
 

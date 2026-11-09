@@ -130,3 +130,7 @@ anh em) → `role-duties`, `transfer`, `transfer-review` → `notice` → `leave
   [module structure](../../../docs/rules/module-structure.md).
 
 A successor named in a transfer or departure must hold `MANAGER` and must not hold `SPENDING_APPROVER`; the same refusal reaches notices and the controlled CLI.
+
+## PersonnelApi: bàn giao và điều chuyển cho luật ghế không dùng
+
+- `getHandingOverCases(employeeIds)` — `OffboardingCase` `HANDING_OVER` (repo `transfer/personnel-overlap.repo.ts`); `getTransfersInOverlap(employeeIds, onDate)` — điều chuyển đã hiệu lực, chưa đóng/huỷ (DA6-15).

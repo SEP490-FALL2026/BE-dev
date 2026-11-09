@@ -54,7 +54,7 @@ describe('a request for a service account after the installation over PostgreSQL
     await h.withApprover();
     // The seats are set up while the baseline is open: three free of ten on one subscription, none free on the other.
     // The accounts of this suite belong to many departments, and a request is priced by the subscription of its own department (F38):
-    // the harness gives every department the suite makes a subscription of each plan the seeded department holds (owned-subscriptions.ts).
+    // the harness gives every department the suite makes a subscription of each plan the seeded department holds (it no longer does: the pool is shared).
     subscriptionId = await h.subscription(10, 'K2');
     paidPlan = await h.planOf(subscriptionId);
     fullSubscription = await h.subscription(1, 'K2');
@@ -204,7 +204,7 @@ describe('a request for a service account after the installation over PostgreSQL
     it('keeps the account of a non-human subject for the sender, charged to the Unit of their department (AC-1)', async () => {
       const u = await example();
 
-      const sent = await h.sentService(u.member, paidPlan, { termMonths: 12 });
+      const sent = await h.sentService(u.member, paidPlan);
 
       expect(sent).toMatchObject({
         type: 'SERVICE_ACCOUNT',
@@ -224,8 +224,8 @@ describe('a request for a service account after the installation over PostgreSQL
           boundary: { state: 'PENDING', reason: null, decidedBy: null, decidedAt: null, selfExecuted: false },
         },
       });
-      // The price of the plan for the term, for one subject: 1 million a month, twelve months, once.
-      expect(Number(sent.pricing.amount?.amount)).toBe(12 * M);
+      // The price of the plan for one subject: 1 million a month for the months left of the year, with no end (`BR-MF1-06`).
+      expect(Number(sent.pricing.amount?.amount)).toBe(h.monthsOf(12) * M);
       const submitted = await events('ACCESS_REQUEST.SUBMITTED', sent.id);
       expect(submitted).toMatchObject([{ after: { type: 'SERVICE_ACCOUNT' } }]);
       expect((await events('ACCESS_REQUEST.NEED_STEP_ROUTED', sent.id)).length).toBe(1);
@@ -260,7 +260,8 @@ describe('a request for a service account after the installation over PostgreSQL
       await h.sendOn([sent.id], bare.head.account).expect(201);
 
       expect(await h.state(withBudget)).toBe('AWAITING_EXECUTION');
-      expect(await h.state(sent.id)).toBe('AWAITING_FINANCE_REVIEW');
+      // BR-MF1-06g(3)(ii): blocked, it stays in the queue of its head and nothing is made for Finance.
+      expect(await h.state(sent.id)).toBe('AWAITING_SPEND_SUBMISSION');
       const years = h.dataOf<{ items: { code: string }[] }>(await h.checkYears(sent.id).expect(200)).items;
       expect(years.map((year) => year.code)).toEqual(['NO_ACTIVE_BUDGET']);
     });

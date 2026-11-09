@@ -53,7 +53,7 @@ describe('the check of the budget by year over PostgreSQL (US-06-12 AC-11 to AC-
   const years = async (requestId: string) =>
     h.dataOf<{ items: YearRowWire[] }>(await h.checkYears(requestId).expect(200)).items;
   const checkWire = async (requestId: string) =>
-    h.dataOf<{ budgetCheck: { route: string; bindingTotal: { amount: string }; yearCount: number } }>(
+    h.dataOf<{ budgetCheck: { outcome: string; bindingTotal: { amount: string }; yearCount: number } }>(
       await h.checkOf(requestId).expect(200),
     ).budgetCheck;
   const rows = (table: string) => h.budgetRows(table);
@@ -62,7 +62,7 @@ describe('the check of the budget by year over PostgreSQL (US-06-12 AC-11 to AC-
     it('uses the budget of the next year for a payment in it, and leaves this year as it was (AC-11)', async () => {
       const u = await unit();
       await h.budgetFor(u, { total: 100 * M });
-      const id = await h.paidRequest(u, plan, { year: h.next, dueOn: `${h.next}-01-10`, amount: 10 * M });
+      const id = await h.paidRequest(u, plan, { year: h.next, amount: 10 * M });
 
       await checked(id, u);
 
@@ -113,56 +113,47 @@ describe('the check of the budget by year over PostgreSQL (US-06-12 AC-11 to AC-
       const table = h.dataOf<{ items: Array<Record<string, unknown> & { costCenter: { id: string } }> }>(
         await h.table(h.finance, { year: h.year, pageSize: 100 }).expect(200),
       );
+      // RV-10: the table also counts what waits for the spend decision (this request, 10), which its own check leaves out.
       expect(table.items.find((row) => row.costCenter.id === u.department.unitId)).toMatchObject({
         committed: { amount: String(30 * M) },
         spent: { amount: String(20 * M) },
-        remaining: { amount: String(50 * M) },
+        remaining: { amount: String(40 * M) },
         overCommitted: false,
       });
     });
   });
 
-  describe('a request over several years (AC-15, AC-16, AC-18)', () => {
-    it('checks every year on its own slice and never the whole against the first year (AC-15)', async () => {
+  describe('a request has one amount for one year (QĐ-109; was AC-15, AC-16, AC-18 over several years)', () => {
+    it('QĐ-109: checks the one year of the amount on its own slice (AC-15)', async () => {
+      // Rewritten from "every year on its own slice": the schedule over years is gone, so is the year without a budget it made.
       const u = await unit();
       await h.budgetFor(u, { total: 5_000_000 });
-      const id = await h.paidRequest(u, plan, {
-        schedule: [
-          { dueOn: `${h.year}-11-01`, amount: 2_400_000, year: h.year },
-          { dueOn: `${h.next}-11-01`, amount: 2_400_000, year: h.next },
-        ],
-      });
+      const id = await h.paidRequest(u, plan, { amount: 2_400_000, year: h.year });
 
       const outcome = await checked(id, u);
 
-      expect(outcome.route).toBe('FINANCE_REVIEW');
+      expect(outcome.outcome).toBe('WITHIN_BASE');
       expect(await years(id)).toEqual([
         expect.objectContaining({ year: h.year, code: 'BUDGET_OK', shareBasisPoints: 4800 }),
-        expect.objectContaining({ year: h.next, code: 'NO_ACTIVE_BUDGET', remaining: null }),
       ]);
-      expect(await checkWire(id)).toMatchObject({ bindingTotal: { amount: '4800000' }, yearCount: 2 });
+      expect(await checkWire(id)).toMatchObject({ bindingTotal: { amount: '2400000' }, yearCount: 1 });
     });
 
-    it('does not check a period that is only a forecast, and does not add it to what binds (AC-18)', async () => {
+    it('QĐ-109: has no forecast of a later payment to check or to add to what binds (AC-18)', async () => {
       const u = await unit();
       await h.budgetFor(u, { total: 100 * M });
-      const id = await h.paidRequest(u, plan, {
-        schedule: [
-          { dueOn: `${h.year}-11-01`, amount: 2_400_000, year: h.year },
-          { dueOn: `${h.next}-11-01`, amount: 2_400_000, year: h.next, binding: false },
-        ],
-      });
+      const id = await h.paidRequest(u, plan, { amount: 2_400_000, year: h.year });
 
       const outcome = await checked(id, u);
 
-      expect(outcome.route).toBe('SPEND_APPROVAL');
+      expect(outcome.outcome).toBe('WITHIN_BASE');
       expect(await years(id)).toEqual([expect.objectContaining({ year: h.year, code: 'BUDGET_OK' })]);
       expect(await checkWire(id)).toMatchObject({ bindingTotal: { amount: '2400000' }, yearCount: 1 });
     });
   });
 
-  describe('what a payment costs the company (QĐ-60a)', () => {
-    it('adds the tax that is not deducted to the payment, and nothing for the tax that is', async () => {
+  describe('what the amount costs the company (FR-3.2, QĐ-109)', () => {
+    it('is the price before tax: no estimate of the tax that is not deducted is added to the amount that is checked', async () => {
       const u = await unit();
       await h.budgetFor(u, { total: 100 * M });
       const taxed = await h.paidRequest(u, taxedPlan, { amount: 20 * M });
@@ -171,7 +162,7 @@ describe('the check of the budget by year over PostgreSQL (US-06-12 AC-11 to AC-
       await checked(taxed, u);
       await checked(plain, u);
 
-      expect((await years(taxed))[0].cost).toEqual({ amount: String(21 * M), currency: 'VND' });
+      expect((await years(taxed))[0].cost).toEqual({ amount: String(20 * M), currency: 'VND' });
       expect((await years(plain))[0].cost).toEqual({ amount: String(20 * M), currency: 'VND' });
     });
   });
@@ -202,7 +193,7 @@ describe('the check of the budget by year over PostgreSQL (US-06-12 AC-11 to AC-
 
       await h.setPayments(sent.id, { amount: 10 * M });
 
-      expect(await h.route(sent.id, u.head.account)).toMatchObject({ status: 'ROUTED', route: 'SPEND_APPROVAL' });
+      expect(await h.route(sent.id, u.head.account)).toMatchObject({ status: 'ROUTED', outcome: 'WITHIN_BASE' });
     });
 
     it('is not checked in a currency with no rate for the day, and is converted when there is one', async () => {

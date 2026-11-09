@@ -15,7 +15,9 @@ export interface SpendRecordInput {
   step: SpendStepRecord;
   verdicts: readonly LineVerdict[];
   checkId: string | null;
-  override: { reason: string; years: readonly number[] } | null;
+  /** The check the approval is on needs the reserve, and the line of reason the head gave when they confirmed it. */
+  usesReserve: boolean;
+  reserveReason: string | null;
   now: Date;
 }
 
@@ -57,8 +59,6 @@ export class GroupSpendRecordService {
       deciderRole,
       reason: outcome === 'REJECTED' ? stepRefusalReason(verdicts) : null,
       checkId: input.checkId,
-      overrideReason: input.override?.reason ?? null,
-      overrideYears: input.override?.years ?? [],
       decidedByEmployeeId: actor.employeeId,
       decidedAt: now,
       requestState: outcome === 'APPROVED' ? 'AWAITING_EXECUTION' : 'REJECTED',

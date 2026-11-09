@@ -28,8 +28,7 @@ export interface VersionWire {
   costCenter: { id: string; code: string };
   year: number;
   number: number;
-  kind: 'INITIAL' | 'REVISION';
-  state: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED';
+  state: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'EXPIRED';
   proposalId: string | null;
   basedOnVersionId: string | null;
   rejectedPredecessorId: string | null;
@@ -93,6 +92,21 @@ export class BudgetHarness extends RequestHarness {
     this.reporting = (
       await this.ctx.sql.query<{ reporting_currency: string }>(`SELECT reporting_currency FROM organizations LIMIT 1`)
     ).rows[0].reporting_currency;
+    // A head proposes only once the cycle of the year was published (Q-02): the years the suites use have one, written as a fixture.
+    for (let year = this.year; year <= this.year + 3; year += 1) await this.publishedCycle(year);
+  }
+
+  /** The budget cycle of a year as a fixture: published once, a ceiling no division reaches, no division. Idempotent. */
+  async publishedCycle(year: number): Promise<void> {
+    await this.ctx.sql.query(
+      `INSERT INTO budget_cycles (id, organization_id, year, submission_deadline, decision_deadline, annual_ceiling_minor,
+         shared_pool_reserve_minor, currency, opened_by_employee_id, opened_at, published_by_employee_id, published_at,
+         first_published_at, updated_at)
+       SELECT gen_random_uuid(), o.id, $1, make_date($1, 12, 1), make_date($1, 12, 15), 100000000000000, 0, $2, $3, now(), $3, now(), now(), now()
+         FROM organizations o
+       ON CONFLICT (organization_id, year) DO NOTHING`,
+      [year, this.reporting, this.finance.employeeId],
+    );
   }
 
   money = (amount: string | number) => ({ amount: String(amount) });
@@ -102,8 +116,13 @@ export class BudgetHarness extends RequestHarness {
     description: 'Figma Organization 10 seats',
     seats: 10,
     amount: this.money(50_000_000),
+    lineType: 'RENEW',
     ...extra,
   });
+
+  /** Gives each line that has none its priority rank, by its place (`QT 4.4`): a test that does not care about the rank still sends a valid proposal. */
+  ranked = (lines: object[]): object[] =>
+    lines.map((line, index) => ({ lineType: 'RENEW', priorityRank: index + 1, ...line }));
 
   /** The two lines of the example of the stories: Figma 50 and Miro 20. */
   twoLines = () => [
@@ -117,11 +136,15 @@ export class BudgetHarness extends RequestHarness {
 
   proposalBody = (_costCenterId: string, lines: object[] = this.twoLines(), year = this.next) => ({
     year,
-    lines,
+    lines: this.ranked(lines),
   });
 
-  submitProposal = (body: object, account: ApiAccount) =>
-    request(this.server()).post('/api/v1/budget-proposals').set(this.as(account)).send(body);
+  /** Sends a proposal; a line the test gives no kind or rank gets `RENEW` and its place (the form requires both, `QT 4.4`). */
+  submitProposal = (body: { lines?: object[]; [field: string]: unknown }, account: ApiAccount) =>
+    request(this.server())
+      .post('/api/v1/budget-proposals')
+      .set(this.as(account))
+      .send(body.lines ? { ...body, lines: this.ranked(body.lines) } : body);
   proposalList = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/budget-proposals').query(query).set(this.as(account));
   proposalOf = (id: string, account: ApiAccount) =>
@@ -132,8 +155,11 @@ export class BudgetHarness extends RequestHarness {
     request(this.server()).post(`/api/v1/budget-proposals/${id}/withdrawal`).set(this.as(account));
   giveBack = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/budget-proposals/${id}/return`).set(this.as(account)).send(body);
-  resubmit = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/budget-proposals/${id}/resubmission`).set(this.as(account)).send(body);
+  resubmit = (id: string, body: { lines?: object[]; [field: string]: unknown }, account: ApiAccount) =>
+    request(this.server())
+      .post(`/api/v1/budget-proposals/${id}/resubmission`)
+      .set(this.as(account))
+      .send(body.lines ? { ...body, lines: this.ranked(body.lines) } : body);
 
   /** The head sends a proposal and it is returned, failing on anything but 201. */
   async budgetProposed(head: Person, costCenterId: string, lines?: object[], year?: number): Promise<ProposalWire> {
@@ -151,12 +177,19 @@ export class BudgetHarness extends RequestHarness {
     request(this.server()).get('/api/v1/budget-versions').query(query).set(this.as(account));
   versionLines = (id: string, account: ApiAccount = this.finance, query: Record<string, string | number> = {}) =>
     request(this.server()).get(`/api/v1/budget-versions/${id}/lines`).query(query).set(this.as(account));
+  /** An edit of a draft; a change of the base carries the reason it needs (`QĐ-100v`) unless the test names one (or none, with `baseReason: undefined`). */
   updateVersion = (id: string, body: object, account: ApiAccount = this.finance) =>
-    request(this.server()).put(`/api/v1/budget-versions/${id}`).set(this.as(account)).send(body);
+    request(this.server())
+      .put(`/api/v1/budget-versions/${id}`)
+      .set(this.as(account))
+      .send('base' in body && !('baseReason' in body) ? { baseReason: 'Finance moved the base', ...body } : body);
   updateLine = (id: string, position: number, body: object, account: ApiAccount = this.finance) =>
     request(this.server()).put(`/api/v1/budget-versions/${id}/lines/${position}`).set(this.as(account)).send(body);
   addLines = (id: string, lines: object[], account: ApiAccount = this.finance) =>
-    request(this.server()).post(`/api/v1/budget-versions/${id}/lines`).set(this.as(account)).send({ lines });
+    request(this.server())
+      .post(`/api/v1/budget-versions/${id}/lines`)
+      .set(this.as(account))
+      .send({ lines: lines.map((line) => ({ lineType: 'RENEW', ...line })) });
   sendVersion = (id: string, account: ApiAccount = this.finance) =>
     request(this.server()).post(`/api/v1/budget-versions/${id}/submission`).set(this.as(account));
   versionHistory = (id: string, account: ApiAccount = this.finance, query: Record<string, string | number> = {}) =>

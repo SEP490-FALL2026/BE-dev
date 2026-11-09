@@ -1,4 +1,4 @@
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v4/installation';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -7,6 +7,7 @@ import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments'
 import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
+import { SHARED_DEMO_V4_REQUEST_STATES } from '../../support/seed-demo-v4-states';
 
 /**
  * `pnpm ops:seed` at the edges of the year, on a controlled clock: only `Date` is faked (the API and the command
@@ -24,7 +25,7 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
     runSeed({
       args: {
         mode,
-        fixture: 'shared-demo-v3',
+        fixture: 'shared-demo-v4',
         apiUrl: baseUrl,
         operator: 'TEST-CALENDAR',
         environment: 'LOCAL_TEST',
@@ -117,24 +118,22 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
     const budgets = await ctx.sql.query<{ year: number; n: number }>(
       'SELECT year, count(*)::int AS n FROM budget_versions GROUP BY year ORDER BY year',
     );
+    // Shared demo v4: every department with a Cost Center holds an approved version of 2026; of 2027 Marketing's waits for the spending
+    // approver and Sales' was sent back for changes (Engineering and IT stay at a proposal).
     expect(budgets.rows).toEqual([
-      { year: 2026, n: 3 },
-      { year: 2027, n: 3 },
+      { year: 2026, n: 8 },
+      { year: 2027, n: 2 },
+    ]);
+    // The seed opened and published the cycle of the year and of the next one (a head proposes only once it was published).
+    const cycles = await ctx.sql.query<{ year: number; published: boolean }>(
+      'SELECT year, first_published_at IS NOT NULL AS published FROM budget_cycles ORDER BY year',
+    );
+    expect(cycles.rows).toEqual([
+      { year: 2026, published: true },
+      { year: 2027, published: true },
     ]);
 
-    expect(await requestStates()).toEqual({
-      R1: 'COMPLETED',
-      R2: 'AWAITING_SPEND_DECISION',
-      R3: 'PENDING',
-      R4: 'REJECTED',
-      R5: 'WITHDRAWN',
-      R6: 'AWAITING_EXECUTION',
-      R7: 'AWAITING_SPEND_SUBMISSION',
-      R8: 'AWAITING_IT_ASSESSMENT',
-      R9: 'AWAITING_FINANCE_REVIEW',
-      R10: 'COMPLETED',
-      R11: 'COMPLETED',
-    });
+    expect(await requestStates()).toEqual(SHARED_DEMO_V4_REQUEST_STATES);
   }, 600000);
 
   it('refuses plan and apply once the year has turned, writing nothing', async () => {

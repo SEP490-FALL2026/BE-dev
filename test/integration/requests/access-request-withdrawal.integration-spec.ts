@@ -130,8 +130,6 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
     ).rows;
   const granted = async (requestId: string) =>
     h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId }).expect(201)).task;
-  /** The seat of a request sits on the subscription its own department owns, not on the seeded department's (`QĐ-89a`). */
-  const ownOf = (u: Unit): string => h.owned.subscriptionFor(subscriptionId, u.department.id);
 
   describe('a request that is still being decided (AC-1, AC-2, AC-6)', () => {
     it('ends as withdrawn, closes the step that waited and keeps who withdrew, when and why (AC-1)', async () => {
@@ -165,35 +163,31 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       expect(await h.state(sent.id)).toBe('WITHDRAWN');
     });
 
-    it('closes the question to Finance that waits for an answer, and the spend step with it (AC-2)', async () => {
+    it('closes the spend step with the withdrawal (AC-2; the question to Finance is retired, QĐ-97c)', async () => {
       const u = await example();
       const id = await h.waitingForApprover(u, plan, { amount: 15 * M });
-      await h.askFinance(id, { question: 'Is there room in the budget?' }, h.boss.account).expect(201);
 
       await h.withdrawRequest(id, {}, u.member.account).expect(200);
 
-      const question = await h.ctx.sql.query<{ state: string; close_reason: string }>(
-        `SELECT state::text, close_reason::text FROM budget_information_requests WHERE request_id = $1`,
-        [id],
-      );
-      expect(question.rows).toEqual([{ state: 'CLOSED', close_reason: 'REQUEST_WITHDRAWN' }]);
       expect((await stepStates(id)).filter((step) => step.state === 'PENDING' || step.state === 'WAITING')).toEqual([]);
       expect((await stepStates(id)).find((step) => step.kind === 'SPEND_APPROVAL')?.state).toBe('CLOSED');
     });
 
     it('withdraws a request that waits under control, with no one to hold its step (AC-6)', async () => {
+      const executive = await h.departmentWithUnit(`P-WC${(counter += 1)}`);
+      const head = await h.staff(executive, `WC-H${counter}`);
+      await h.makeHead(executive, head);
+      // The budget is decided while an approver still exists; the approver is taken away only after.
+      await h.budgetFor({ department: executive, head, member: head }, { total: 100 * M });
       await h.clearRole('SPENDING_APPROVER');
       try {
-        const executive = await h.departmentWithUnit(`P-WC${(counter += 1)}`);
-        const head = await h.staff(executive, `WC-H${counter}`);
-        await h.makeHead(executive, head);
         const sent = await h.sent(head, plan, { termMonths: 1 });
         expect(sent.state).toBe('WAITING_CONTROLLED');
 
         const response = await h.withdrawRequest(sent.id, {}, head.account).expect(200);
 
-        expect(wire(response)).toMatchObject({ state: 'WITHDRAWN', needStep: { state: 'CLOSED' } });
-        expect((await stepStates(sent.id)).every((step) => step.state === 'CLOSED')).toBe(true);
+        expect(wire(response)).toMatchObject({ state: 'WITHDRAWN', needStep: { state: 'NOT_REQUIRED' } });
+        expect((await stepStates(sent.id)).every((step) => ['CLOSED', 'NOT_REQUIRED'].includes(step.state))).toBe(true);
       } finally {
         await h.setRole('SPENDING_APPROVER', h.boss);
       }
@@ -307,7 +301,7 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       const u = await example();
       const id = await approved(u, 15 * M);
       const task = await granted(id);
-      const free = await h.freeSeats(ownOf(u));
+      const free = await h.freeSeats(subscriptionId);
       expect(await h.state(id)).toBe('EXECUTING');
 
       await h.withdrawRequest(id, { reason: 'Not needed after all' }, u.member.account).expect(200);
@@ -321,7 +315,7 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       const assignment = await assignmentOf(task.id);
       expect(assignment).toMatchObject({ failed_at: null, valid_until: assignment.valid_from });
       expect(assignment.cancelled_at).not.toBeNull();
-      expect(await h.freeSeats(ownOf(u))).toBe((free ?? 0) + 1);
+      expect(await h.freeSeats(subscriptionId)).toBe((free ?? 0) + 1);
       expect(await commitmentOf(id)).toMatchObject({ state: 'RELEASED', released_minor: String(15 * M) });
       expect((await events('ACCESS_REQUEST.WITHDRAWN', id)).length).toBe(1);
       expect((await events('PROVISIONING_TASK.CANCELLED', id)).length).toBe(1);
@@ -356,7 +350,16 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       const refused = await h.withdrawRequest(id, {}, u.member.account).expect(409);
 
       expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.GRANT_COMPLETED');
-      expect(await commitmentOf(id)).toMatchObject({ state: 'HELD', released_minor: '0' });
+      // The refused withdrawal gives nothing back; only the days of the month before the K2 grant went back when it was completed (M-10).
+      expect(await commitmentOf(id)).toMatchObject({ state: 'HELD' });
+      const reasons = (
+        await h.ctx.sql.query<{ reason: string }>(
+          `SELECT DISTINCT r.reason::text AS reason FROM budget_commitment_releases r
+             JOIN budget_commitments c ON c.id = r.commitment_id WHERE c.request_id = $1`,
+          [id],
+        )
+      ).rows.map((row) => row.reason);
+      expect(reasons.filter((reason) => reason !== 'LATE_GRANT')).toEqual([]);
     });
   });
 
@@ -367,7 +370,7 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       const task = await granted(id);
       await h.claim(task.id).expect(200);
       await h.fail(task.id, { reason: 'The invitation bounced' }).expect(200);
-      const free = await h.freeSeats(ownOf(u));
+      const free = await h.freeSeats(subscriptionId);
 
       const waiting = wire(await h.withdrawRequest(id, { reason: 'Not needed' }, u.member.account).expect(200));
 
@@ -377,7 +380,7 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       });
       expect(await taskOf(id)).toMatchObject({ status: 'FAILED' });
       expect(await commitmentOf(id)).toMatchObject({ state: 'HELD', released_minor: '0' });
-      expect(await h.freeSeats(ownOf(u))).toBe(free);
+      expect(await h.freeSeats(subscriptionId)).toBe(free);
 
       // Nothing but cancelling is left to the IT Admin, and the requester cannot withdraw twice.
       for (const refused of [
@@ -404,7 +407,7 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       const assignment = await assignmentOf(task.id);
       expect(assignment.cancelled_at).not.toBeNull();
       expect(assignment.failed_at).toBeNull();
-      expect(await h.freeSeats(ownOf(u))).toBe((free ?? 0) + 1);
+      expect(await h.freeSeats(subscriptionId)).toBe((free ?? 0) + 1);
       expect((await events('ACCESS_REQUEST.GRANT_FAILED', id)).length).toBe(0);
     });
 

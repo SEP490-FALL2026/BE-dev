@@ -126,7 +126,7 @@ describe('the outcomes of a request told to the context that listens (integratio
     await h.roomFor(u);
     const [e1, e2, e3] = await h.colleagues(u, 3);
     const id = await h.groupApproved(u, plan, [e1, e2, e3]);
-    const own = h.owned.subscriptionFor(subscriptionId, u.department.id);
+    const own = subscriptionId;
     const task = h.dataOf<{ task: TaskWire }>(
       await h
         .grantLine({ requestId: id, beneficiaryEmployeeId: e1.employeeId, subscriptionId: own }, h.it1)

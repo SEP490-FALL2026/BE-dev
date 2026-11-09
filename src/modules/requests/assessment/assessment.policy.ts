@@ -135,7 +135,9 @@ export function registeredShapeOf(
     policy: {
       version: CURRENT_POLICY_VERSION,
       branch: 'INTERNAL_FREE',
-      chain: ['NEED', 'IT_ASSESSMENT', 'IT_EXECUTION'],
+      chain: sent.chain.includes('NEED')
+        ? ['NEED', 'IT_ASSESSMENT', 'IT_EXECUTION']
+        : ['IT_ASSESSMENT', 'IT_EXECUTION'],
       slaWorkingDays: sent.slaWorkingDays,
     },
     state: 'AWAITING_EXECUTION',

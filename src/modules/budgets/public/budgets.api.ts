@@ -8,7 +8,10 @@ import type {
   CommitmentReleaseInput,
   HeldCommitment,
   ReleasedCommitment,
+  SeatCommitment,
   YearBudgetFacts,
+  YearStartHoldInput,
+  YearStartHoldResult,
 } from './budgets.types';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 
@@ -30,8 +33,10 @@ export class BudgetsApi {
   }
 
   /**
-   * The request holds the amount of each year against the budget of its Cost Center, in the transaction of the decision that
-   * approved it (`US-06-04`). Throws BudgetCommitmentExistsError when it already holds one for a year.
+   * The request holds one commitment, for the current fiscal year, against the approved budget of its Cost Center, in the transaction of the
+   * decision that approved it (`US-06-04`, `FR-5.8`): `items` is exactly one entry, above nothing, of the current year. Throws
+   * BudgetCommitmentNotHoldableError (BUDGET.COMMITMENT_NOT_HOLDABLE: not one year, not the current year, not above nothing, or no approved
+   * version of the year) and BudgetCommitmentExistsError when it already holds one for the year.
    */
   holdForRequest(tx: DbTx, actor: AuthenticatedPrincipal, input: CommitmentHoldInput): Promise<HeldCommitment[]> {
     return this.commitments.hold(tx, actor, input);
@@ -44,6 +49,30 @@ export class BudgetsApi {
    */
   releaseForRequest(tx: DbTx, input: CommitmentReleaseInput): Promise<ReleasedCommitment[]> {
     return this.commitments.release(tx, input);
+  }
+
+  /**
+   * The commitments still held of these requests for the years from `fromYear` (the years before are closed and left as they are), with their
+   * rows locked until the transaction ends: what the release by day of one seat is worked out on (`RV-07`, `M-06`, `M-10`) before the caller
+   * gives it back with `releaseForRequest` in the same transaction. Locks no request row and no year.
+   */
+  lockSeatCommitments(tx: DbTx, requestIds: readonly string[], fromYear: number): Promise<SeatCommitment[]> {
+    return this.commitments.lockSeatCommitments(tx, requestIds, fromYear);
+  }
+
+  /**
+   * The pass of 01/01 holds one commitment for the new year for each request (`FR-5.8`(6), `QĐ-109a`), in the transaction of the caller, which holds
+   * the rows of the requests locked before it calls (the order of the locks of this context: the request, then the year). A request that holds one for
+   * the year already is left as it was; one whose Cost Center has no approved budget of the year holds it waiting for a budget, attached when a
+   * version is approved. Nothing is judged against the budget. Throws BudgetCommitmentNotHoldableError for an amount that is not above nothing.
+   */
+  holdYearStart(tx: DbTx, input: YearStartHoldInput): Promise<YearStartHoldResult> {
+    return this.commitments.holdYearStart(tx, input);
+  }
+
+  /** The requests, among these, that hold a commitment for the year already, whatever its state and origin, in one read. */
+  listRequestsHoldingYear(tx: DbTx, requestIds: readonly string[], year: number): Promise<Set<string>> {
+    return this.commitments.requestsHoldingYear(tx, requestIds, year);
   }
 
   /** What each of the requests was committed for, one entry for each commitment, in one read: for a list that counts and adds them. */

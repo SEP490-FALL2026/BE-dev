@@ -2,9 +2,9 @@ import { HELD_ROUTING_ROWS, reasonExcerptOf, REASON_EXCERPT_LENGTH } from './nee
 
 describe('the rows of the routing table that put a step in a queue', () => {
   it('are the ones that give the step to a person, never row 8, which gives it to nobody', () => {
-    expect([...HELD_ROUTING_ROWS]).toEqual([1, 2, 5, 9]);
-    // Row 8 gives the step to nobody; rows 3 and 4 are not written any more, and none is ever in a queue.
-    for (const row of [3, 4, 8]) expect(HELD_ROUTING_ROWS).not.toContain(row);
+    expect([...HELD_ROUTING_ROWS]).toEqual([1, 5, 9]);
+    // Row 8 gives the step to nobody; row 2 needs no need approver and rows 3 and 4 name nobody, and none is ever in a queue.
+    for (const row of [2, 3, 4, 8]) expect(HELD_ROUTING_ROWS).not.toContain(row);
   });
 });
 

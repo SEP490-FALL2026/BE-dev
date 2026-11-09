@@ -44,6 +44,16 @@ export class HandoverRevocationHook implements OnModuleInit {
     switch (event.moment) {
       case 'OPENED':
         return this.handovers.openFromTask(tx, event.actor, event.task, event.reasons, event.context, event.now);
+      case 'REASON_WITHDRAWN':
+        // A reason was taken back: the duty is looked at again from the reasons that stand (a task cancelled owes nothing).
+        return this.handovers.reconcileWithdrawn(
+          tx,
+          event.actor,
+          event.task,
+          event.remaining,
+          event.cancelled,
+          event.now,
+        );
       case 'BEFORE_WORK':
         return this.beforeWork(tx, event.task, event.now);
       case 'AFTER_WORK':

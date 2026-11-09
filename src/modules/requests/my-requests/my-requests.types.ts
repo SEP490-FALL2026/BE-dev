@@ -1,3 +1,4 @@
+import type { BusinessDate } from '../../../core/business-date';
 import type {
   AccessRequestKind,
   AccessRequestState,
@@ -6,7 +7,6 @@ import type {
 } from '../access-request/access-request.types';
 import type { AccessRequestBranchCode } from '../access-request/access-request.policy';
 import type { CheckRecord } from '../spend/budget-check.repo';
-import type { FinanceReviewRecord } from '../spend/finance-review.repo';
 
 /** The state of a request that was sent: every state but `DRAFT`, which is not a request until it is sent. */
 export type SentState = Exclude<AccessRequestState, 'DRAFT'>;
@@ -23,9 +23,30 @@ export const MY_REQUEST_TYPES = [
   'GROUP_GRANT',
 ] as const satisfies readonly AccessRequestKind[];
 
-/** What the list is narrowed by; never by person: the person is the caller. */
+/** Which requests of the caller "my requests" lists: those they sent (the default), those they are one of the people for, or both. */
+export const MY_REQUEST_INVOLVEMENTS = ['SENT', 'FOR_ME', 'ALL'] as const;
+export type MyRequestInvolvement = (typeof MY_REQUEST_INVOLVEMENTS)[number];
+
+/**
+ * Whose requests a page is read from. The first three are the caller's own; `DEPARTMENT` is every request sent from one department;
+ * `OVERSIGHT` is what a role that watches the whole organization reads: every request, or those a spend step was opened on, or those
+ * whose spend was approved (the union of what the roles of the caller give).
+ */
+export type RequestScope =
+  | { kind: 'SENT_BY' | 'FOR' | 'SENT_BY_OR_FOR'; employeeId: string }
+  | { kind: 'DEPARTMENT'; departmentId: string }
+  | { kind: 'OVERSIGHT'; all: boolean; spendStepOpened: boolean; spendApproved: boolean };
+
+/** What a page is narrowed by within its scope; only the routes of the people who oversee requests name a person or a department. */
 export interface MyRequestFilter {
-  requesterEmployeeId: string;
+  scope: RequestScope;
+  /** Sent by or for this person. */
+  employeeId?: string;
+  departmentId?: string;
+  /** Requests sent through the one-step route. */
+  oneStep?: boolean;
+  /** Requests for which the head confirmed the reserve of the budget. */
+  reserveUsed?: boolean;
   /** Every state a row may have: a request that was sent, never a draft, narrowed by `view` and `state`. */
   states: readonly SentState[];
   type?: AccessRequestKind;
@@ -45,12 +66,16 @@ export interface MyRequestNeedStep {
 
 /** A request of the caller as the repository reads it for a row of the list: no price, no check, no commitment, no reason. */
 export interface MyRequestRow {
+  routing?: import('../access-request/routing.policy').RequestRouting;
   id: string;
   type: AccessRequestKind;
   branch: AccessRequestBranchCode;
   state: SentState;
+  requesterEmployeeId: string;
+  departmentId: string;
   planId: string | null;
-  termMonths: number;
+  termMonths: number | null;
+  expectedEndDate: BusinessDate | null;
   submittedAt: Date;
   updatedAt: Date;
   /** Whether the chain of the request has a spend step: only then is there a stage on the way to the spending approver. */
@@ -63,18 +88,16 @@ export interface MyRequestRow {
   withdrawal: { withdrawnAt: Date | null } | null;
 }
 
-/** The newest budget check of a request, as far as the stage of a request in the queue of its head needs it: no figure of a budget. */
-export type QueuedCheck = Pick<CheckRecord, 'route' | 'staleCostEvidence' | 'ranAt'>;
-
-/** The newest review of Finance of a request: how it ended and when. The note Finance wrote stays in the detail. */
-export type QueuedReview = Pick<FinanceReviewRecord, 'outcome' | 'decidedAt'>;
+/** The newest budget check of a request, as far as the stage of a request in the queue of its head needs it: no figure of what is left. */
+export type QueuedCheck = Pick<
+  CheckRecord,
+  'outcome' | 'route' | 'blockReasons' | 'staleCostEvidence' | 'overBaseByMinor' | 'overByMinor' | 'currency'
+>;
 
 /** What decides the stage of the requests of one page, read once for the page. */
 export interface SpendStageFacts {
   checks: ReadonlyMap<string, QueuedCheck>;
-  reviews: ReadonlyMap<string, QueuedReview>;
-  /** The requests that hold an open Finance review step, and those that hold an open spend step. */
-  openFinanceReview: ReadonlySet<string>;
+  /** The requests that hold an open spend step. */
   openSpendApproval: ReadonlySet<string>;
   /** The requests whose newest spend decision refused them, with what the approver wrote. */
   spendRefusals: ReadonlyMap<string, { reason: string | null }>;
@@ -86,4 +109,10 @@ export interface OutcomeFacts {
   needRefusals: ReadonlyMap<string, string | null>;
   /** What the IT Admin wrote when they refused the software at the gate, by request. */
   assessmentRefusals: ReadonlyMap<string, string>;
+}
+
+/** The line of the caller in a request for a group: its state and why it ended without a grant, if it did. */
+export interface MyLine {
+  state: import('../access-request/group-request.types').LineState;
+  outcomeReason: string | null;
 }

@@ -1,4 +1,6 @@
 import type { NestedClassification, RegistryEvent } from './api-collection-registry';
+import { W2_REGISTRY_EVENTS } from './api-collection-registry-events-w2';
+import { W3_REGISTRY_EVENTS } from './api-collection-registry-events-w3';
 
 export const closedException = (
   key: string,
@@ -65,6 +67,8 @@ export const removedByDecision = (key: string, from: NestedClassification): Regi
  * its difference. Prompt 10 (23/10/2026, commit 4cc9a47) closed these with the remediation items of the G0-G4 review.
  */
 export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
+  ...W2_REGISTRY_EVENTS,
+  ...W3_REGISTRY_EVENTS,
   // QĐ-93a, D-S19 (Owner 01/11/2026): `GET /me` returns `roles` as one array of the granted roles; the object { direct, derived, effective } goes.
   ...['meGet#roles.direct', 'meGet#roles.derived', 'meGet#roles.effective'].map((key): RegistryEvent => ({
     registry: 'nested',

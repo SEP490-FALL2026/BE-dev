@@ -40,6 +40,24 @@ export interface SeatTarget {
   allowsMidTermReduction: boolean;
 }
 
+/** A subscription a seat can be taken from today, with the seats bought; a draft takes no seat (`US-04-03` AC-6). */
+export interface PoolSubscription {
+  subscriptionId: string;
+  purchasedQuantity: number | null;
+  /** The subscription that prices the plan (`Q-04`): the one a grant that names no subscription takes first. */
+  isPrimaryForPlan: boolean;
+}
+
+/** What one subscription is bought at: the price a seat granted from it would have cost (`QĐ-106e`). */
+export interface SubscriptionPrice {
+  kind: 'RECURRING' | 'ONE_TIME';
+  unitPrice: { amountMinor: bigint; currency: string };
+  /** The unit price converted to the reporting currency when it was recorded; null when it was not converted. */
+  reportingUnitPrice: { amountMinor: bigint; currency: string } | null;
+  /** `OTHER` for a perpetual purchase, which has no billing cycle. */
+  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+}
+
 /** How much of the catalog exists, for the onboarding checklist: judged from the data, not from how it was entered. */
 export interface CatalogOnboardingFacts {
   applications: number;
@@ -67,6 +85,18 @@ export interface PlanRevocationInfo {
   dataLossOnRemoval: boolean;
 }
 
+/** An active subscription not taken over by a later period that runs, which grants seats on a day, as the rules of wasted seats read it (`FR-4.9` gate 1). */
+export interface RuleSubscription {
+  subscriptionId: string;
+  planId: string;
+  applicationId: string;
+  provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  /** Null while the plan has no pricing model; the rules take only `PER_SEAT`. */
+  pricingModel: 'PER_SEAT' | 'FLAT_RATE' | 'CONCURRENT' | 'CONSUMPTION' | 'PER_HOST' | null;
+  /** The seats bought; null when the subscription has none. */
+  purchasedQuantity: number | null;
+}
+
 /** A plan and the application it belongs to, by name, for the views that list seats. */
 export interface PlanSummary {
   planId: string;
@@ -87,4 +117,38 @@ export interface WorkspaceDuty {
   role: 'PRIMARY_OWNER' | 'OWNER' | 'ADMIN';
   /** The plan declares an emergency account: only that it exists, never its name, its holder or any secret. */
   emergencyAccountDeclared: boolean;
+}
+
+/**
+ * What the last weekly pass of the usage rules (MF-5) found of one plan priced per seat (`KPI-3`, `QĐ-109d`): of the seats it could judge
+ * (`assessedSeats`), how many showed activity in the 30 days before the pass (`activeSeats`).
+ */
+export interface PlanUsageRate {
+  planId: string;
+  activeSeats: number;
+  assessedSeats: number;
+}
+
+/**
+ * An active subscription of the company, as the baseline of the budget reads it (`FR-5.15`): what runs, at what price, for how long. Its
+ * cost follows the people who hold its seats (`QĐ-103k`), so the department that may own it is not part of it.
+ */
+export interface BaselineSubscription {
+  subscriptionId: string;
+  planId: string;
+  planName: string;
+  applicationName: string;
+  /** `K2`/`K4` is the shared pool of the company (`QĐ-103d`): its idle seats are the pool's line of the baseline. */
+  provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  /** The seats bought; null for a purchase that has none (perpetual, or priced another way). */
+  purchasedQuantity: number | null;
+  /** The unit price in the reporting currency as recorded when the price was; null when it has none. */
+  unitPriceReportingMinor: bigint | null;
+  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null;
+  startDate: string | null;
+  endDate: string | null;
+  /** The day it renews by itself, when it does. */
+  renewalDate: string | null;
+  /** A later period of this purchase was recorded (`renewedFromId` points here): the year to come is that period's. */
+  hasSuccessor: boolean;
 }

@@ -53,12 +53,13 @@ describe('the source of a revocation (US-07-05 AC-3, AC-11)', () => {
 describe('which seat may be revoked (US-07-05 AC-8, US-03-04 AC-17)', () => {
   const personalOpen = { kind: 'PERSONAL', open: true, provisioningType: 'K2' } as const;
 
-  it.each(['K1', 'K2', 'K5'] as const)('lets an open personal seat of %s be revoked', (provisioningType) => {
+  // Rewritten for BR-MF1-09 / QĐ-103d: a K4 seat is revoked like any seat and its key goes back to the store; only K3 has no revocation.
+  it.each(['K1', 'K2', 'K4', 'K5'] as const)('lets an open personal seat of %s be revoked', (provisioningType) => {
     expect(problemOf(() => assertRevocable({ ...personalOpen, provisioningType }))).toBeNull();
   });
 
-  it.each(['K3', 'K4'] as const)('refuses a seat of %s, which has no revocation yet', (provisioningType) => {
-    expect(problemOf(() => assertRevocable({ ...personalOpen, provisioningType }))).toBe('TYPE_NOT_SUPPORTED');
+  it('refuses a seat of K3, which has no revocation', () => {
+    expect(problemOf(() => assertRevocable({ ...personalOpen, provisioningType: 'K3' }))).toBe('TYPE_NOT_SUPPORTED');
   });
 
   it('refuses a service account, whoever answers for it and whatever its kind', () => {
@@ -96,12 +97,12 @@ describe('which seat may be revoked (US-07-05 AC-8, US-03-04 AC-17)', () => {
 });
 
 describe('how a revocation is completed, by kind (US-07-05 AC-1, AC-4, AC-5, AC-8)', () => {
-  it('has one way for K1 and K5, two for K2, and none for K3 and K4', () => {
+  it('has one way for K1, K4 and K5, two for K2, and none for K3', () => {
     expect(completionsFor('K1')).toEqual(['RENEWAL_CANCELLED']);
     expect(completionsFor('K2')).toEqual(['ACCOUNT_REMOVED', 'ALREADY_GONE']);
+    expect(completionsFor('K4')).toEqual(['KEY_DEACTIVATED']);
     expect(completionsFor('K5')).toEqual(['OFF_SYSTEM_REVOKED']);
     expect(completionsFor('K3')).toEqual([]);
-    expect(completionsFor('K4')).toEqual([]);
   });
 
   it.each([
@@ -112,6 +113,7 @@ describe('how a revocation is completed, by kind (US-07-05 AC-1, AC-4, AC-5, AC-
     ['K1', 'ALREADY_GONE'],
     ['K3', 'ACCOUNT_REMOVED'],
     ['K4', 'OFF_SYSTEM_REVOKED'],
+    ['K2', 'KEY_DEACTIVATED'],
   ] as const)('refuses %s completed as %s', (type, completion) => {
     expect(problemOf(() => planCompletion({ completion, evidence: 'x' }, context(type)))).toBe(
       'COMPLETION_NOT_ALLOWED',
@@ -371,7 +373,10 @@ describe('the card of a revocation (US-07-05 AC-1, AC-5, AC-8)', () => {
       'CONFIRM_WITH_EVIDENCE',
     ]);
     expect(stepsFor('K3', 'a@x.vn', 'REVOKE')).toEqual([]);
-    expect(stepsFor('K4', 'a@x.vn', 'REVOKE')).toEqual([]);
+    expect(stepsFor('K4', 'a@x.vn', 'REVOKE').map((step) => step.code)).toEqual([
+      'DEACTIVATE_KEY_ON_DEVICE',
+      'CONFIRM_WITH_EVIDENCE',
+    ]);
   });
 
   it('says when each kind is done, and leaves the grant as it was', () => {

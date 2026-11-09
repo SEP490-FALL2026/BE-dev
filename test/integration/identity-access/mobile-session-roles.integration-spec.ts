@@ -171,8 +171,8 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       // An operation the mobile app does not offer is still answered by role alone, whatever the client says it is.
       for (const [, label] of CHANNELS) {
         await get('/api/v1/provisioning-tasks', h.it1.accessToken, label).expect(200);
-        await get('/api/v1/finance-reviews', h.it1.accessToken, label).expect(403);
-        await get('/api/v1/finance-reviews', h.finance.accessToken, label).expect(200);
+        await get('/api/v1/spend-batches', h.it1.accessToken, label).expect(403);
+        await get('/api/v1/spend-batches', h.finance.accessToken, label).expect(200);
       }
     });
   });
@@ -239,11 +239,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       const planId = await h.plan('K5');
       const token = employee.account.accessToken;
       await get('/api/v1/notifications', token).expect(200);
-      await request(h.server())
-        .post('/api/v1/access-requests/preview')
-        .set(bearer(token))
-        .send({ planId, termMonths: 6 })
-        .expect(200);
+      await request(h.server()).post('/api/v1/access-requests/preview').set(bearer(token)).send({ planId }).expect(200);
       const requests = await h.requestRows();
 
       await adminPost(`/api/v1/app-users/${employee.account.appUserId}/lock`, {
@@ -255,7 +251,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
         get('/api/v1/notifications', token),
         get('/api/v1/notifications/unread-count', token),
         get('/api/v1/access-requests/drafts', token),
-        request(h.server()).post('/api/v1/access-requests/preview').set(bearer(token)).send({ planId, termMonths: 6 }),
+        request(h.server()).post('/api/v1/access-requests/preview').set(bearer(token)).send({ planId }),
         request(h.server()).post('/api/v1/access-requests').set(bearer(token)).send(h.form(planId)),
         request(h.server()).post('/api/v1/notifications/read-all').set(bearer(token)),
       ];
@@ -368,7 +364,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
     // Role-gated operations, one per role, read from the guard of each route: what each kind of account may open.
     const GATED: [string, string, string][] = [
       ['IT_ADMIN', 'GET', '/api/v1/provisioning-tasks'],
-      ['FINANCE', 'GET', '/api/v1/finance-reviews'],
+      ['FINANCE', 'GET', '/api/v1/spend-batches'],
       ['MANAGER', 'GET', '/api/v1/spend-queue'],
       ['SUPER_ADMIN', 'GET', '/api/v1/app-users'],
     ];
@@ -456,8 +452,14 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       .set(bearer(token))
       .send(h.form(await h.plan('K5')))
       .expect(201);
-    const wire = h.dataOf<{ request: { needStep: { assignee: { employeeId: string } | null } } }>(sent).request;
-    expect(wire.needStep.assignee?.employeeId).toBe(h.boss.employeeId);
+    const wire = h.dataOf<{
+      request: {
+        needStep: { assignee: { employeeId: string } | null };
+        routing: { mode: string; oneStepReason: string | null };
+      };
+    }>(sent).request;
+    // MF1-D (one-step routing): the own request of a head goes one step, to nobody of a need step; never to the head themself.
+    expect(wire.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' });
     expect(wire.needStep.assignee?.employeeId).not.toBe(head.employeeId);
   });
 

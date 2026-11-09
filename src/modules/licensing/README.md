@@ -12,9 +12,14 @@ dashboards; gốc `src/app/app.module.ts`.
 
 ## Public API (`public/`)
 
-- Facade, mỗi facade ≤ 8 phụ thuộc, tên method không đổi; consumer inject facade sở hữu method (module export cả bảy):
+- Facade, mỗi facade ≤ 8 phụ thuộc, tên method không đổi; consumer inject facade sở hữu method (module export các facade này):
   - `LicensingApi` ([public/licensing.api.ts](public/licensing.api.ts)) — thu hồi, task grant, ghế của người:
-    - `openRevocation` — cửa duy nhất mở thu hồi một ghế cá nhân, cho mọi nguồn (trả ghế, nghỉ việc, hết hạn…).
+    - `openRevocation` — cửa duy nhất mở thu hồi một ghế cá nhân, cho mọi nguồn (trả ghế, nghỉ việc, hết hạn…); tham số
+      tùy chọn `timing { dueOn?, notBefore? }` (mốc không-trước, ân hạn do MF-5 truyền) và `notice { holder: true }` (báo
+      người giữ `REVOCATION_UPCOMING`, một lần theo `(source, referenceId)`); không truyền ⟹ hành vi như cũ.
+    - `withdrawRevocationReason` — nguồn gỡ lý do của chính mình: còn lý do khác ⟹ `CONTINUES`; hết lý do ⟹ tác vụ
+      `CANCELLED` (`NO_LONGER_APPLIES`, ghế không đổi), riêng tác vụ `IN_PROGRESS` chỉ hủy khi
+      `cancelInProgressClaimedBy` đúng người nhận, ngược lại `IT_ADMIN_TO_CLOSE`; gọi lại ⟹ `NOT_FOUND`/`ALREADY_ENDED`.
     - `lockGrantOfRequest`, `completedGrantOfRequest`, `cancelGrantOfRequest` — task grant của một request;
       `recordProvisioningFailure` — ghi lần thử connector lỗi (US-07-04).
     - `listPersonalSeatsOf`, `countPersonalSeatsOf`, `getSeatsHeldInPlans`, `listTerminatingAccess`,
@@ -23,12 +28,19 @@ dashboards; gốc `src/app/app.module.ts`.
     - `pageHeldSoftwareOf` — phần mềm người đó đang giữ hôm nay (ghế cá nhân đã bắt đầu, chưa hỏng/hủy/hết), một trang và
       tổng, cùng snapshot `RepeatableRead`, 3 câu lệnh dù bao nhiêu ghế; trưởng phòng đọc một thành viên
       (`personnel/department-member`).
+  - `LicensingUsageApi` ([public/licensing-usage.api.ts](public/licensing-usage.api.ts)) — ghế đọc cho usage nhà cung cấp
+    (`qd103-vendor-usage-import`): `listAssignmentIntervals` (các khoảng giữ ghế của một ứng dụng hoặc vài plan trong `[from, to]`, kèm
+    `chainRootId` và `usableOn` theo `QĐ-77n` — mắt xích đầu của chuỗi gia hạn; 3 câu lệnh dù bao nhiêu ghế),
+    `findHoldersByAccountIdentifiers` (người giữ hoặc từng giữ ghế dưới một định danh tài khoản), `listCurrentHolders` (người đang giữ
+    ghế một ứng dụng, người nhận thông báo theo dõi). Chỉ đọc; `usage` là bên gọi.
   - `LicensingHandoverApi` ([public/licensing-handover.api.ts](public/licensing-handover.api.ts)) — bàn giao:
     `openHandoverDuties`, `reconcileHandoverDuties`, `cancelHandoverDuties`, `getHandoverDutiesOf`.
   - `LicensingRenewalApi` ([public/licensing-renewal.api.ts](public/licensing-renewal.api.ts)) — trả ghế và gia hạn
     (US-05-14): `getAssignmentFacts`, `renewAssignment`, `hasPendingRenewal`.
   - `LicensingOpenGrantsApi` ([public/licensing-open-grants.api.ts](public/licensing-open-grants.api.ts)) —
-    `listOpenGrantTasksOfBeneficiary`.
+    `listOpenGrantTasksOfBeneficiary`, `listHeldSeatsOfRequests` (seat của Request còn giữ ngày `on`, đi theo chuỗi `predecessor_id` — `HANDOVER`,
+    gia hạn quyền, `RENEWAL_CARRY` — tới bản ghi đang chạy, từ grant của Request hoặc bản ghi Request nêu; trả phòng sở hữu hiện tại và các bản
+    ghi sau gốc; là thứ khoản 01/01 đếm, `BR-MF1-09e`).
   - `LicensingServiceAccountApi` ([public/licensing-service-account.api.ts](public/licensing-service-account.api.ts)) —
     `listServiceAccountDuties`, `remindServiceAccountDuties` (nhắc IT Admin phụ trách phòng sở hữu vào hộp thông báo, gọi từ
     hook hồ sơ của personnel).
@@ -46,7 +58,7 @@ dashboards; gốc `src/app/app.module.ts`.
 ## Bảng sở hữu
 
 - `license_assignments`, `seat_baseline_states`, `provisioning_tasks`, `provisioning_task_reasons`, `handover_duties`,
-  `service_account_duty_notices`, `assignment_expiry_reminders`, `license_keys`, `license_key_reveal_windows`,
+  `service_account_duty_notices`, `assignment_expiry_reminders`, `assignment_renewal_windows`, `license_keys`, `license_key_reveal_windows`,
   `saas_issues`, `saas_issue_entries`, `saas_issue_counters`, `subscription_renewals`,
   `subscription_renewal_released_seats`, `subscription_deadline_events` (`prisma/models/licensing.prisma`).
 
@@ -55,10 +67,12 @@ dashboards; gốc `src/app/app.module.ts`.
 - Mở `GrantRequestGateHook` (`licensing.grant-request-gate`, Hook) — requests
   `access-request/grant/access-request-grant.listener.ts`.
 - Mở `RevocationListeners` (`licensing.revocation`, Listeners) — licensing `handover/handover-revocation.listener.ts`,
-  requests `return-request/return-revocation.listener.ts`.
+  requests `return-request/return-revocation.listener.ts`. Moment: `OPENED`, `BEFORE_WORK`, `AFTER_WORK`, `CLOSED_FAILED`,
+  `REASON_WITHDRAWN { task, withdrawn, remaining, cancelled }` (bàn giao tính lại duty từ `remaining`; return bỏ qua).
 - Mở `RenewalHoldHook` (`licensing.renewal-hold`, Hook) — requests `renewal-request/renewal-hold.listener.ts`.
 - Mở `ResponsibleDeadlineHook` (`licensing.responsible-deadline`, Hook) — personnel
   `service-account/personnel-file-deadlines.listener.ts`.
+- Bind `SeatBaselinePhaseHook` (catalog, `catalog.seat-baseline-phase`) — `seat-baseline/seat-baseline-phase.listener.ts`.
 - Mở `SeatBaselineClosedListeners` (`licensing.seat-baseline-closed`, Listeners) — personnel
   `transfer-review/post-setup-review.listener.ts`.
 - Mở `RenewalFinancialContributions` (`licensing.renewal-financial-snapshot`, Contributions) — chưa có bên thêm: module
@@ -99,7 +113,11 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   (`departmentId` null, `D-S18`): `requirementOf` bỏ nguồn `DEPARTURE`/`ABRUPT_DEPARTURE`, nên không có nghĩa vụ trưởng phòng ở
   `open` lẫn `openFromTask` và tác vụ thu hồi không bị giữ; nguồn khác (IT, trả về) giữ nguyên.
 - `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts`.
-- `license-key/` — kho key của mua đứt K4 (US-04-12); `license-keys.controller.ts`; `LicenseKeyService`.
+  Cửa sổ Request tiếp tục (BR-MF1-08a): `expiry-renewal-window.job.ts` mỗi giờ ghi `assignment_renewal_windows` (số ngày lúc mở, bất biến)
+  và báo người giữ + trưởng phòng một lần (`RENEWAL_WINDOW_OPENED`). Tác vụ `EXTEND` (`provisioning/tasks/provisioning-extension.service.ts`,
+  mở qua `LicensingRenewalApi.openExtension`) hoàn tất ⟹ `GrantRequestGate.reportExtended`.
+- `license-key/` — kho key của mua đứt K4 (US-04-12) và kho khóa dùng chung (`QĐ-103d`); `license-keys.controller.ts`; `LicenseKeyService`
+  (nhập, liệt kê, xem đầy đủ, rút khỏi kho `licenseKeyWithdraw`), `LicenseKeyAssignmentService` (gán khóa khi hoàn tất cấp K4, lấy lại khi thu hồi).
 - `my-software/` — "Phần mềm của tôi" (US-12-15 AC-2, US-16-01 AC-1): `my-software.controller.ts`
   (`GET /me/software-rights`, mọi tài khoản đã đăng nhập (`QĐ-95d`), chỉ quyền cá nhân của chính người gọi), `MySoftwareService`, `MySoftwareRepo`;
   trạng thái theo ngày nghiệp vụ ở `my-software.policy.ts`. Không đọc khóa K4, giá, Cost Center hay định danh tài khoản.
@@ -127,6 +145,36 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   `assignment/service-account-duty/`, dòng 38 `K1` của người nghỉ ở `provisioning/revocation-completion/`; hạng mục
   `a03-license-inbox-alerts`).
 
+## Kho dùng chung (`shared-pool/`, L0)
+
+- Capability không controller, không import capability licensing nào (đọc bảng bằng SQL), chỉ `CatalogApi`; `provisioning` và `public/LicensingPoolStockApi` dùng nó.
+  Seat của mọi thuê bao K2/K4 cùng plan là một kho cho mọi phòng (`QĐ-103d`): cấp không kiểm phòng sở hữu, Assignment cá nhân ghi `owning_department_id` =
+  phòng người nhận lúc cấp (tài khoản dịch vụ giữ phòng của tài khoản). `stockOf`: `free` = Σ (`purchased_quantity` − đỉnh số Assignment trên mỗi ngày từ hôm nay
+  trở đi, đếm như trigger `license_assignments_seat_capacity`: Assignment `valid_from` tương lai, kể cả seat mang sang kỳ ghi trước ngày bắt đầu, chiếm chỗ
+  từ ngày đầu của nó) trên thuê bao cấp được (không gồm `DRAFT`; kỳ đang chạy và kỳ kế tiếp chưa bắt đầu/còn nháp là một kho); `inRevocation` =
+  Assignment chưa kết thúc có tác vụ thu hồi chưa đóng.
+- `provisioningTaskGrant`: `subscriptionId` tùy chọn (không có ⟹ `chooseSubscription`: thuê bao chính, ưu tiên cái còn chỗ Trống; K5 không được có);
+  có mà không thuộc `getGrantableSubscriptions` của gói hôm nay (kỳ đã hết, hoặc kỳ kế tiếp đã chạy) ⟹ 422 `PROVISIONING.SUBSCRIPTION_NOT_GRANTABLE`.
+  `purchase?: { reason? }` chỉ K2/K4 (K khác ⟹ 422 `PURCHASE_NOT_APPLICABLE`): còn Trống ⟹ 409 `PURCHASE_NOT_ALLOWED` (audit
+  `PROVISIONING_TASK.PURCHASE_REFUSED` ghi ở transaction riêng sau rollback); hết kho + còn seat đang thu hồi + thiếu lý do ⟹ 422
+  `PURCHASE_REASON_REQUIRED`; ngược lại `CatalogApi.addPoolSeat` (+1 seat/lần) rồi ghi Assignment, task có `purchase_kind` (`POOL_TOP_UP`/`KEY_PURCHASE`).
+  Không `purchase` mà thuê bao hết chỗ ⟹ 409 `LICENSE_ASSIGNMENT.SEAT_CAPACITY` kèm `details.freeSeatsInPool`. K1 không thuộc kho: mỗi lần cấp tự +1 số lượng
+  trong cùng transaction, không cổng phòng sở hữu (S1-04), và tác vụ ghi `purchase_kind = K1_SUBSCRIPTION` (dấu đã mua cho hóa đơn `SBF-19`).
+- _Tránh được_ (`BR-MF1-09c`): hoàn tất tác vụ cấp K2/K4 không mua ⟹ `recordAvoided` một dòng (idempotent theo tác vụ), theo tiền báo cáo (giá đã quy
+  đổi lúc ghi giá; K4 = giá mua của thuê bao `PERPETUAL`); `reportOutcome(..., facts)` báo `fromPool`,
+  `provisioningType`, `grantedOn`, `assignmentId` cho `requests` (audit `GRANT_COMPLETED.after.fromPool`).
+- Kho khóa K4 (`BR-MF1-09`, `QĐ-103d`, `QĐ-103v`, Q-10 B): khóa chỉ có hai trạng thái `IN_STORE`/`ASSIGNED` (gắn đúng một Assignment cùng thuê bao); rút
+  khỏi kho là hành động có lý do (`withdrawn_*`), khóa vẫn `IN_STORE`, không đếm, không cấp, không xem đầy đủ, không hoàn tác (trigger `license_key_guard`).
+  `free` của gói K4 = min(seat Trống, khóa Trống chưa rút − tác vụ cấp K4 đang mở chưa gắn khóa) mỗi thuê bao. Hoàn tất cấp K4 bắt buộc `licenseKeyId`
+  (khóa mua thêm phải nhập trước); thu hồi K4 hoàn tất bằng `KEY_DEACTIVATED`, khóa về kho Trống hoặc về kho và rút ngay (`keyDisposition: WITHDRAW` + lý do).
+  Thứ tự khóa: cấp = task → thuê bao → khóa → Assignment; thu hồi = task → thuê bao → Assignment → khóa; rút = thuê bao → khóa (cùng khóa thuê bao trước
+  nên không vòng). `requests` giải phóng toàn bộ cam kết của Request K4 cấp từ kho (`GRANTED_FROM_POOL`); thu hồi K4 không đổi cam kết (giá một lần).
+  Chưa làm: gắn thiết bị công ty đã đăng ký (`deviceId`, `DeviceRegistryHook`).
+- `grantQueueList` (module `requests`) đọc `stock { kind, free, inRevocation }` qua `LicensingPoolStockApi.getStockOfPlans` (số lần đọc cố định, không N+1).
+- Thu hồi hoàn tất phát `RevocationTaskFacts.completed` (`grantRequestId` qua chuỗi `predecessor_id` — `assignment-chain.repo.ts`, `provisioningType`, `endedOn`,
+  `paidThroughOn`, `sources`) để module cam kết giải phóng theo ngày (`public/seat-month-cost.policy.ts`: RV-07, M-10). Phần ghi vào cam kết thuộc `budgets`/`requests`, chưa nối.
+- Thứ tự khóa của grant: request → thuê bao `FOR UPDATE` → plan `FOR SHARE` → người; đếm `free` không khóa thuê bao khác của plan.
+
 ## Bất biến quan trọng
 
 - Assignment không bao giờ bị xóa; chỉ đổi khi kết thúc, failed hoặc cancelled, ngày dự kiến kết thúc đã đặt thì không
@@ -134,6 +182,12 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   chồng thời gian trên cùng subscription/plan (`license_assignments_personal_no_overlap`, INV-02).
 - Thu hồi chỉ mở qua `openRevocation`, trong transaction của nguồn; ghế được trả khi task hoàn tất; gọi lại cùng nguồn
   và reference không đổi gì.
+- Mốc thu hồi (`BR-MF5-04`): mỗi lý do giữ `due_on`/`not_before` của nơi gọi; tác vụ giữ mốc suy ra từ các lý do còn hiệu
+  lực — **lý do không mốc thắng ân hạn** (một lý do không `not_before` ⟹ tác vụ không mốc, R-J08), ngược lại `MIN`.
+  `claim` và `revocation-completion` trước `not_before` ⟹ 409 `PROVISIONING_TASK.NOT_BEFORE` (`details.notBefore`).
+- **Lý do đã gỡ không được đọc ở đâu** (chỉ `listAllOf` cho lịch sử trên thẻ tác vụ): `find`, `listOf`, `countOf`,
+  `listRevocationsOpenedFor`, `listPersonalSeatsOf` (đang thu hồi), bàn giao đều lọc `withdrawn_at IS NULL`; index
+  duy nhất lý do là partial `WHERE withdrawn_at IS NULL` nên mở lại cùng `(source, reference)` trên cùng tác vụ được.
 - Thứ tự khóa: task grant trước request (`lockGrantOfRequest`); đích ghế subscription `FOR UPDATE`, plan nội bộ
   `FOR SHARE`; `createBaselineAssignments` giữ baseline state `FOR SHARE` nên việc đóng baseline phải chờ. Đóng
   baseline là vĩnh viễn (không route mở lại); sau đó assignment chỉ đến từ request.

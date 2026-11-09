@@ -14,9 +14,6 @@ const quote: Quote = {
   billingCycle: 'MONTHLY',
   validFrom: '2026-10-01',
   validUntil: null,
-  commitmentMonths: null,
-  paymentFrequency: null,
-  firstPaymentOn: null,
 };
 const complete = (over: Partial<AssessmentFields> = {}): AssessmentFields => ({
   classification: 'PAID_LICENSED',
@@ -233,7 +230,7 @@ describe('registering internal software for a proposal (US-05-20 AC-3 -> AC-5, A
     expect(registeredShapeOf(false, { ...sent, chain: [...sent.chain] })).toEqual({
       branch: 'INTERNAL_FREE',
       policy: {
-        version: 1,
+        version: 2,
         branch: 'INTERNAL_FREE',
         chain: ['NEED', 'IT_ASSESSMENT', 'IT_EXECUTION'],
         slaWorkingDays: 2,

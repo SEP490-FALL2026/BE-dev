@@ -4,7 +4,7 @@ import type { OrganizationReadApi } from '../../organization/public/organization
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import type { AssessmentRecord } from '../access-request/assessment-record.types';
 import type { BudgetCheckRepo } from '../spend/budget-check.repo';
-import { codesOf } from '../spend/budget-check.policy';
+import { codesOf, type BlockReason, type BudgetOutcome, type YearResult } from '../spend/budget-check.policy';
 import type { SpendDecisionRepo } from '../spend/spend-decision.repo';
 import type { SpendWireViewService } from '../spend/spend-wire-view.service';
 import type { SpendStepRepo } from '../spend/spend-step.repo';
@@ -78,6 +78,10 @@ export function approvalSummaryOf(row: OpenSpendRow, lookups: QueueLookups): App
 
   return {
     requestId: row.requestId,
+    routing: {
+      mode: request.routingMode ?? 'VIA_HEAD',
+      oneStepReason: (request.oneStepReason ?? null) as import('../access-request/routing.policy').OneStepReason | null,
+    },
     stepId: row.id,
     stepKind: 'SPEND_APPROVAL',
     openedAt: row.createdAt.toISOString(),
@@ -91,8 +95,7 @@ export function approvalSummaryOf(row: OpenSpendRow, lookups: QueueLookups): App
     costCenter: { id: center.id, code: center.code },
     amount: amountOf(request, lookups.units),
     primaryCode: check ? (codesOf(check)[0] ?? null) : null,
-    samePersonAsSpend: row.samePersonAsSpend,
-    noIndependentReview: row.noIndependentReview,
+    outcome: check?.outcome === 'WITHIN_BASE' || check?.outcome === 'USES_RESERVE' ? check.outcome : null,
     batchId: lookups.batches.get(row.requestId) ?? null,
   };
 }
@@ -113,7 +116,53 @@ export interface DetailFacts {
   person: Person;
   center: { id: string; code: string };
   cost: ApprovalDetailWire['cost'];
-  latestBudgetInformation: ApprovalDetailWire['latestBudgetInformation'];
+  budgetSnapshot: ApprovalDetailWire['budgetSnapshot'];
+  annualVendorAmount: ApprovalDetailWire['annualVendorAmount'];
+}
+
+/** What the budget snapshot is made of: the year a check read, what the check said, and the confirmation that opened the step. */
+export interface SnapshotFacts {
+  year: YearResult;
+  outcome: BudgetOutcome;
+  blockReasons: readonly BlockReason[];
+  overBaseByMinor: bigint | null;
+  overByMinor: bigint | null;
+  /** The check the decision kept; null when the snapshot is the check made at the moment of reading. */
+  decisionCheckId: string | null;
+  computedAt: Date;
+  confirmation: { reason: string; confirmedByEmployeeId: string; confirmedAt: Date } | null;
+  money: (minor: bigint) => { amount: string; currency: string };
+  person: (id: string) => ApprovalSummaryWire['requester'];
+}
+
+/** The budget of the Cost Center as a check read it (`BR-MF1-06e`): the two levels, what is spent, held and waiting, and what is left. */
+export function budgetSnapshotOf(facts: SnapshotFacts): NonNullable<ApprovalDetailWire['budgetSnapshot']> {
+  const { year, money } = facts;
+  const optional = (minor: bigint | null) => (minor === null ? null : money(minor));
+
+  return {
+    year: year.year,
+    base: optional(year.baseMinor),
+    reserve: optional(year.reserveMinor),
+    spent: optional(year.spentMinor),
+    committed: optional(year.heldMinor),
+    pending: optional(year.pendingMinor),
+    remainingBase: optional(year.remainingBaseMinor),
+    remainingWithReserve: optional(year.remainingWithReserveMinor),
+    outcome: facts.outcome,
+    blockedReasons: [...facts.blockReasons],
+    overBaseBy: optional(facts.overBaseByMinor),
+    overBy: optional(facts.overByMinor),
+    reserveConfirmation: facts.confirmation
+      ? {
+          reason: facts.confirmation.reason,
+          confirmedBy: facts.person(facts.confirmation.confirmedByEmployeeId),
+          confirmedAt: facts.confirmation.confirmedAt.toISOString(),
+        }
+      : null,
+    decisionSnapshotCheckId: facts.decisionCheckId,
+    computedAt: facts.computedAt.toISOString(),
+  };
 }
 
 /** The plans the detail names: the plan of the request, and the equivalent tool of the assessment of a proposal. */
@@ -153,8 +202,6 @@ function stepView(step: DetailStep, person: Person): ApprovalDetailWire['step'] 
     openedAt: step.createdAt.toISOString(),
     decidedAt: step.decidedAt?.toISOString() ?? null,
     slaWorkingDays: step.slaWorkingDays,
-    samePersonAsSpend: step.samePersonAsSpend,
-    noIndependentReview: step.noIndependentReview,
   };
 }
 
@@ -171,6 +218,7 @@ function requestView(facts: DetailFacts): ApprovalDetailWire['request'] {
     costCenter: { id: center.id, code: center.code },
     businessReason: request.businessReason,
     termMonths: request.termMonths,
+    expectedEndDate: request.expectedEndDate,
     budgetYear: request.pricing.budgetYear,
   };
 }
@@ -195,6 +243,7 @@ export function approvalDetailOf(facts: DetailFacts): ApprovalDetailWire {
 
   return {
     requestId: facts.requestId,
+    routing: request.routing ?? { mode: 'VIA_HEAD', oneStepReason: null },
     step: stepView(facts.step, person),
     request: requestView(facts),
     need: request.needDecision
@@ -214,6 +263,7 @@ export function approvalDetailOf(facts: DetailFacts): ApprovalDetailWire {
           decidedAt: decision.decidedAt.toISOString(),
         }
       : null,
-    latestBudgetInformation: facts.latestBudgetInformation,
+    budgetSnapshot: facts.budgetSnapshot,
+    annualVendorAmount: facts.annualVendorAmount,
   };
 }

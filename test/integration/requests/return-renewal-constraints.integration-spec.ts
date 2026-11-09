@@ -269,6 +269,15 @@ describe('what the database refuses about a return and a renewal (US-05-13, US-0
       }
 
       await h.decide(made.requestId, { decision: 'APPROVE' }, made.unit.head.account).expect(200);
+      // BR-MF1-08d: the record is written when the IT Admin completes the task EXTEND that approval opened.
+      const [extension] = (
+        await h.ctx.sql.query<{ id: string }>(
+          `SELECT id FROM provisioning_tasks WHERE request_id = $1 AND kind = 'EXTEND'`,
+          [made.requestId],
+        )
+      ).rows;
+      await h.claim(extension.id).expect(200);
+      await h.complete(extension.id, { evidence: 'Extended with the vendor' }).expect(200);
       const detail = await h.renewalOf(made.requestId);
       expect(detail.successor_assignment_id).not.toBeNull();
       expect(

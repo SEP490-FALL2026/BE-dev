@@ -60,14 +60,19 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'AuditModule: AuditApi',
   // G5 (ADR-0016): the budgets facade the check of a request reads the figures through, and registers its listener with.
   'BudgetsModule: BudgetsApi',
-  // The extension points the requests context binds (public/budgets.extension-points.ts): the change listeners and the release guard.
-  'BudgetsModule: BudgetChangeListeners',
+  // The worker prices and checks conversions through read-only contracts, without mounting the HTTP contexts.
+  'BudgetsReadFacadeModule: BudgetsReadApi',
+  'CatalogPricingFacadeModule: CatalogPricingApi',
+  // The extension points the requests context binds (public/budgets.extension-points.ts): what waits to be decided as spend, the release guard and the facts of a commitment request.
+  'BudgetsModule: PendingSpendContributions',
   'BudgetsModule: CommitmentReleaseGuardHook',
   'BudgetsModule: CommitmentRequestFactsHook',
   // G4 (ADR-0013): the catalog facade licensing reads the seat targets (subscription or internal plan) through.
   'CatalogModule: CatalogApi',
   // The extension point licensing binds its reader of occupied seats to (public/catalog.extension-points.ts).
   'CatalogModule: SeatOccupancyHook',
+  // The phase of the seat baseline licensing binds, so the rule against a second K2 or K4 subscription knows whether it is closed.
+  'CatalogModule: SeatBaselinePhaseHook',
   'CatalogModule: SubscriptionPeriodApi',
   // H8.3 (A4-10): the data-import facade; onboarding reads the latest people import through it.
   'DataImportModule: DataImportApi',
@@ -88,11 +93,20 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'LicensingModule: LicensingApi',
   'LicensingModule: LicensingRenewalApi',
   'LicensingModule: LicensingHandoverApi',
+  'LicensingModule: LicensingGhostSeatApi',
+  // qd103-vendor-usage-import: the seats and holders the usage import matches identities against, and the one door to the usage evidence the rules of wasted seats read.
+  'LicensingModule: LicensingUsageApi',
+  'UsageModule: UsageEvidenceApi',
+  // qd103-ghost-seat-g3-g4: the extension point the rules of wasted seats bind to deny a recommendation when a report is confirmed.
+  'UsageModule: UsageImportListeners',
   'LicensingModule: LicensingOpenGrantsApi',
+  'OptimizationModule: OptimizationApi',
   'LicensingModule: LicensingServiceAccountApi',
   'LicensingModule: LicensingSeatBaselineApi',
   // G8 (US-12-15): the counts of licensing the role overviews read.
   'LicensingModule: LicensingDashboardApi',
+  // P2-03: what the shared pool of a plan holds, which the queue of grants of requests shows beside each request.
+  'LicensingModule: LicensingPoolStockApi',
   // The extension points requests and personnel bind or add to (public/licensing.extension-points.ts).
   'LicensingModule: GrantRequestGateHook',
   'LicensingModule: RevocationListeners',
@@ -147,8 +161,6 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // G5 (FR-3.11): the inbox the routes of `NotificationsHttpModule` read, held once in the module that gives the notices.
   'NotificationsModule: InboxService',
   'OperatingParametersModule: OperatingParametersApi',
-  // B-01 (US-01-04): the extension point the budgets module binds its fiscal-year-start lock to.
-  'OperatingParametersModule: ParameterLockContributions',
   // G6 (ADR-0017): the extension point the flows that follow a personnel file (the owner of a service account) add their hooks to.
   'PersonnelModule: PersonnelFileHookContributions',
   // G6 (US-03-03): the days a person was on long leave, read by the rules of the recommendations of G7.
@@ -162,6 +174,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'OrganizationModule: DepartmentUseContributions',
   'OrganizationModule: CostCenterUseContributions',
   'OrganizationModule: DepartmentServiceAccountReaderHook',
+  'OrganizationModule: DepartmentCreationWindowHook',
   'OrganizationModule: EmployeeAccountsHook',
   // G6 (ADR-0017): the writes of history (a placement and a head period written ahead of their day) the personnel context calls.
   'OrganizationModule: OrganizationHistoryApi',

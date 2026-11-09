@@ -114,7 +114,7 @@ export class RequestableSoftwareService {
     submitter: Submitter,
   ): Promise<Array<T & Omit<RequestablePlanView, keyof RequestablePlanRecord>>> {
     const paid = plans.filter((plan) => costsMoney(plan.application.kind)).map((plan) => plan.id);
-    const cycles = await this.subscriptions.pricedCyclesOfPlans(paid, submitter.departmentId);
+    const cycles = await this.subscriptions.pricedCyclesOfPlans(paid);
 
     return plans.map((plan) => ({
       ...plan,

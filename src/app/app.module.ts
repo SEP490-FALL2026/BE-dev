@@ -18,6 +18,7 @@ import { LicensingModule } from '../modules/licensing/licensing.module';
 import { NotificationsHttpModule } from '../modules/notifications/notifications-http.module';
 import { OnboardingModule } from '../modules/onboarding/onboarding.module';
 import { PersonnelModule } from '../modules/personnel/personnel.module';
+import { OptimizationModule } from '../modules/optimization/optimization.module';
 import { OperatingParametersHttpModule } from '../modules/operating-parameters/operating-parameters-http.module';
 import { OrganizationHttpModule } from '../modules/organization/organization-http.module';
 import { OrganizationModule } from '../modules/organization/organization.module';
@@ -52,6 +53,7 @@ import { HttpInfrastructureModule } from '../infrastructure/http/http-infrastruc
     BudgetsModule,
     OnboardingModule,
     IdentityAccessModule,
+    OptimizationModule,
     DashboardsModule,
     SecurityModule.register({ verifierModule: IdentityAccessModule, deviceVerifierModule: DevicesModule }),
   ],

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import type { OutcomeFacts, QueuedCheck, QueuedReview } from './my-requests.types';
+import type { BlockReason } from '../spend/budget-check.policy';
+import type { MyLine, OutcomeFacts, QueuedCheck } from './my-requests.types';
 
 const unique = (ids: readonly string[]): string[] => [...new Set(ids)];
 
@@ -21,30 +22,26 @@ export class MyRequestsFactsRepo {
       where: { requestId: { in: unique(requestIds) } },
       orderBy: [{ requestId: 'asc' }, { number: 'desc' }],
       distinct: ['requestId'],
-      select: { requestId: true, route: true, staleCostEvidence: true, ranAt: true },
+      select: {
+        requestId: true,
+        route: true,
+        staleCostEvidence: true,
+        outcome: true,
+        blockReasons: true,
+        overBaseByMinor: true,
+        overByMinor: true,
+        currency: true,
+      },
     });
 
-    return new Map(rows.map((row) => [row.requestId, row]));
+    return new Map(rows.map((row) => [row.requestId, { ...row, blockReasons: row.blockReasons as BlockReason[] }]));
   }
 
-  /** How the newest review of Finance of each request ended, and when. */
-  async latestReviews(requestIds: readonly string[]): Promise<Map<string, QueuedReview>> {
-    if (requestIds.length === 0) return new Map();
-    const rows = await this.prisma.requestFinanceReview.findMany({
-      where: { requestId: { in: unique(requestIds) } },
-      orderBy: [{ requestId: 'asc' }, { decidedAt: 'desc' }],
-      distinct: ['requestId'],
-      select: { requestId: true, outcome: true, decidedAt: true },
-    });
-
-    return new Map(rows.map((row) => [row.requestId, row]));
-  }
-
-  /** The requests that hold an open step of the kind (held or waiting). */
-  async withOpenStep(requestIds: readonly string[], kind: 'FINANCE_REVIEW' | 'SPEND_APPROVAL'): Promise<Set<string>> {
+  /** The requests that hold an open spend step (held or waiting). */
+  async withOpenSpendStep(requestIds: readonly string[]): Promise<Set<string>> {
     if (requestIds.length === 0) return new Set();
     const rows = await this.prisma.accessRequestStep.findMany({
-      where: { requestId: { in: unique(requestIds) }, kind, state: { in: ['PENDING', 'WAITING'] } },
+      where: { requestId: { in: unique(requestIds) }, kind: 'SPEND_APPROVAL', state: { in: ['PENDING', 'WAITING'] } },
       select: { requestId: true },
     });
 
@@ -81,6 +78,61 @@ export class MyRequestsFactsRepo {
     });
 
     return new Map(rows.map((row) => [row.stepId, row.reason]));
+  }
+
+  /**
+   * The line of one person in each of these requests for a group: its state, and why it ended without a grant (what the person who
+   * refused it wrote, else what was written when it was closed). Only that person's line is read.
+   */
+  async linesOf(requestIds: readonly string[], employeeId: string): Promise<Map<string, MyLine>> {
+    if (requestIds.length === 0) return new Map();
+    const rows = await this.prisma.accessRequestLine.findMany({
+      where: { requestId: { in: unique(requestIds) }, employeeId },
+      select: {
+        requestId: true,
+        state: true,
+        endReason: true,
+        decisions: { where: { decision: 'REJECTED' }, select: { reason: true }, take: 1 },
+      },
+    });
+
+    return new Map(
+      rows.map((row) => [
+        row.requestId,
+        { state: row.state, outcomeReason: row.decisions[0]?.reason ?? row.endReason },
+      ]),
+    );
+  }
+
+  /** The requests for which the head confirmed the use of the reserve of the budget: the fact, never the figure. */
+  async reserveUsed(requestIds: readonly string[]): Promise<Set<string>> {
+    if (requestIds.length === 0) return new Set();
+    const rows = await this.prisma.requestReserveConfirmation.findMany({
+      where: { requestId: { in: unique(requestIds) } },
+      select: { requestId: true },
+      distinct: ['requestId'],
+    });
+
+    return new Set(rows.map((row) => row.requestId));
+  }
+
+  /**
+   * GH-3 (`BR-MF1-01g`): the requests flagged when they were sent because the person used many paid applications, with how many and the
+   * reason given, by request; a request not flagged is absent.
+   */
+  async manyPaidSoftware(requestIds: readonly string[]): Promise<Map<string, { count: number; reason: string }>> {
+    if (requestIds.length === 0) return new Map();
+    const rows = await this.prisma.accessRequest.findMany({
+      where: { id: { in: unique(requestIds) }, manyPaidSoftware: true },
+      select: { id: true, manyPaidSoftwareCount: true, manyPaidSoftwareReason: true },
+    });
+    const flags = new Map<string, { count: number; reason: string }>();
+    for (const row of rows) {
+      if (row.manyPaidSoftwareCount === null || row.manyPaidSoftwareReason === null) continue;
+      flags.set(row.id, { count: row.manyPaidSoftwareCount, reason: row.manyPaidSoftwareReason });
+    }
+
+    return flags;
   }
 
   /** What the IT Admin wrote when they refused the software at the gate, by request. */

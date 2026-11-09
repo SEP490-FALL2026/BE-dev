@@ -166,12 +166,16 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     expect(h.dataOf<ListData>(response).items[0].masked).toBe(`••••${secret.slice(-4)}`);
     expect(JSON.stringify(response.body)).not.toContain(secret);
     expect(JSON.stringify(response.body)).not.toContain(row.fingerprint);
+    // BR-MF1-09 (K4 key pool): a key also names the seat it is assigned to and whether it was withdrawn from the store, with why.
     expect(Object.keys(h.dataOf<ListData>(response).items[0]).sort()).toEqual([
+      'assignmentId',
       'id',
       'importedAt',
       'masked',
       'status',
       'subscriptionId',
+      'withdrawalReason',
+      'withdrawnAt',
     ]);
     expect(row.ciphertext.includes(Buffer.from(secret))).toBe(false);
     expect(row.ciphertext.length).toBeGreaterThan(28 + secret.length - 1);
@@ -383,6 +387,7 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
           purchasedQuantity: 3,
           unitPrice: { amount: '5000000', currency: 'VND' },
           startDate: '2026-01-05',
+          responsibleItAdminEmployeeId: h.it1.employeeId,
         })
         .expect(201),
     ).id;
@@ -440,26 +445,26 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     });
   });
 
-  it('US-04-12 AC-12: a retired key is not counted, and an assigned one is', async () => {
+  // Rewritten for BR-MF1-09 / QĐ-103v (Q-10 B): a key withdrawn from the store replaces the retired one; the assigned keys are counted
+  // in k4-key-pool-return.integration-spec.ts, where a seat holds them.
+  it('US-04-12 AC-12: a key withdrawn from the store is not counted, and stays IN_STORE in the list', async () => {
     const subscriptionId = await h.subscription(50, 'K4');
     await imported(subscriptionId, keys(50, 'RET'));
     await h.ctx.sql.query(
-      `UPDATE license_keys SET status = 'RETIRED'
+      `UPDATE license_keys SET withdrawn_at = now(), withdrawal_reason = 'Broken'
         WHERE id IN (SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY id LIMIT 2)`,
-      [subscriptionId],
-    );
-    await h.ctx.sql.query(
-      `UPDATE license_keys SET status = 'ASSIGNED'
-        WHERE id IN (SELECT id FROM license_keys WHERE subscription_id = $1 AND status = 'IN_STORE' ORDER BY id LIMIT 3)`,
       [subscriptionId],
     );
 
     const page = await listed(subscriptionId);
 
     expect(page.summary).toEqual({ purchased: 50, usableKeys: 48, capacity: 48, warning: 'KEY_COUNT_DIFFERS' });
-    expect((await listed(subscriptionId, '&status=RETIRED')).items).toHaveLength(2);
-    expect((await listed(subscriptionId, '&status=ASSIGNED')).items).toHaveLength(3);
-    expect((await listed(subscriptionId, '&status=IN_STORE')).items).toHaveLength(45);
+    expect((await listed(subscriptionId, '&withdrawn=true')).items).toHaveLength(2);
+    expect((await listed(subscriptionId, '&withdrawn=false')).items).toHaveLength(48);
+    expect((await listed(subscriptionId, '&status=IN_STORE')).items).toHaveLength(50);
+    expect(h.codeOf(await listKeys(`subscriptionId=${subscriptionId}&status=RETIRED`).expect(422))).toBe(
+      'VALIDATION_ERROR',
+    );
   });
 
   it('US-04-12 AC-12: while the seats bought are not known the capacity is 0 and the warning says so', async () => {

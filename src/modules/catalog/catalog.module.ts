@@ -1,3 +1,4 @@
+import { CatalogPricingFacadeModule } from './catalog-pricing-facade.module';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { ObjectStorageModule } from '../../infrastructure/object-storage/object-storage.module';
@@ -7,7 +8,7 @@ import { IdentityAccessFacadeModule } from '../identity-access/identity-access-f
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { CatalogApi } from './public/catalog.api';
-import { SeatOccupancyHook } from './public/catalog.extension-points';
+import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
 import { ApplicationFactsService } from './catalog-entry/application-facts.service';
 import { ApplicationOwnerService } from './catalog-entry/application-owner.service';
 import { ApplicationRetirementController } from './application-retirement/application-retirement.controller';
@@ -37,6 +38,7 @@ import { PlanTermsRepo } from './plan-terms/plan-terms.repo';
 import { PlanTermsService } from './plan-terms/plan-terms.service';
 import { PlanTermsController } from './plan-terms/plan-terms.controller';
 import { PlanFactsService } from './plan/plan-facts.service';
+import { PlanUsageRepo } from './plan/plan-usage.repo';
 import { PlanWorkspaceService } from './plan/plan-workspace.service';
 import { PlanRepo } from './plan/plan.repo';
 import { PlanService } from './plan/plan.service';
@@ -51,11 +53,12 @@ import { SubscriptionFactsService } from './subscription/subscription-facts.serv
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
 import { SubscriptionPeriodService } from './subscription/subscription-period.service';
 import { SubscriptionPeriodApi } from './public/subscription-period.api';
-import { SubscriptionObligationService } from './subscription/subscription-obligation.service';
-import { SubscriptionRepo } from './subscription/subscription.repo';
+import { SubscriptionObligationService } from './subscription/obligation/subscription-obligation.service';
+import { SubscriptionGrantingRepo } from './subscription/subscription-granting.repo';
 import { SubscriptionChangeGuard } from './subscription/subscription-change-guard.service';
 import { SubscriptionChangeService } from './subscription/subscription-change.service';
 import { SubscriptionService } from './subscription/subscription.service';
+import { SubscriptionPoolService } from './subscription/pool/subscription-pool.service';
 import { SubscriptionPricingService } from './subscription/subscription-pricing.service';
 import { SubscriptionViewService } from './subscription/subscription-view.service';
 import { SubscriptionsController } from './subscription/subscriptions.controller';
@@ -83,6 +86,7 @@ import { VendorRepo } from './vendor/vendor.repo';
  */
 @Module({
   imports: [
+    CatalogPricingFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
@@ -128,6 +132,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     PlanService,
     PlanWorkspaceService,
     PlanRepo,
+    PlanUsageRepo,
     InternalSoftwareRegistrationService,
     VendorFactsService,
     VendorQueryService,
@@ -138,16 +143,18 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionChangeGuard,
     SubscriptionChangeService,
     SubscriptionService,
+    SubscriptionPoolService,
     SubscriptionPricingService,
     SubscriptionObligationService,
     SubscriptionDepartmentUseReader,
-    SubscriptionRepo,
+    SubscriptionGrantingRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,
     SubscriptionPeriodService,
     SeatTargetService,
     OnboardingFactsService,
     SeatOccupancyHook,
+    SeatBaselinePhaseHook,
     ContractRepo,
     ContractService,
     DocumentRepo,
@@ -166,6 +173,6 @@ import { VendorRepo } from './vendor/vendor.repo';
   ],
   // The facade licensing reads the seat targets through (ADR-0013), and the hook licensing binds its reader of occupied seats to
   // (`public/catalog.extension-points.ts`); the capability services and repos stay private.
-  exports: [CatalogApi, SubscriptionPeriodApi, SeatOccupancyHook],
+  exports: [CatalogApi, SubscriptionPeriodApi, SeatOccupancyHook, SeatBaselinePhaseHook],
 })
 export class CatalogModule {}

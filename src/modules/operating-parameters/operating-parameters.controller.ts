@@ -25,6 +25,8 @@ import {
   SetParameterBodyDto,
 } from './operating-parameters.dto';
 import { NonWorkingDatesService } from './non-working-dates.service';
+import { ParameterNotYoursError } from './operating-parameters.errors';
+import { rolesMayRead } from './parameter-definitions.policy';
 import {
   OPERATING_PARAMETERS_ERROR_EXAMPLES,
   toOperatingParametersApiException,
@@ -32,7 +34,19 @@ import {
 import { ParameterChangeService } from './parameter-change.service';
 import { OperatingParametersApi, ParameterView } from './public/operating-parameters.api';
 
+/** What the change of a parameter answers: the role that owns it sets it. */
 const AUTH_ERRORS = [
+  UNAUTHENTICATED_RESPONSE,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'Only the role that owns a parameter sets it: the Super Admin the parameters of the system, Finance the ones that carry the owner FINANCE (a request for another role is refused).',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+] as const;
+/** The non-working dates are the Super Admin's alone, to read and to write. */
+const NON_WORKING_DATE_WRITE_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
   {
     status: HttpStatus.FORBIDDEN,
@@ -41,12 +55,23 @@ const AUTH_ERRORS = [
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
 ] as const;
-/** The three reads (the list, the history of a parameter, the non-working dates) are the Super Admin's, like the writes. */
+/** The reads of the non-working dates are the Super Admin's, like the writes. */
 const READ_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
   {
     status: HttpStatus.FORBIDDEN,
     description: 'Only the Super Admin reads the operating parameters, their history and the non-working dates.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+] as const;
+/** The reads of the parameters: the Super Admin reads every one, Finance only those it owns (`QĐ-103z`(1)). */
+const PARAMETER_READ_ERRORS = [
+  UNAUTHENTICATED_RESPONSE,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'Only the Super Admin and Finance read the operating parameters; Finance reads only the ones it owns and their history.',
     examples: [FORBIDDEN_EXAMPLE],
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
@@ -100,23 +125,27 @@ export class OperatingParametersController {
   ) {}
 
   @Get('operating-parameters')
-  @RequireRoles('SUPER_ADMIN')
+  @RequireRoles('SUPER_ADMIN', 'FINANCE')
   @ApiOperation({ operationId: 'operatingParameterList', summary: 'List operating parameters' })
   @ApiSuccessResponse(ParameterListResponseDto, {
     message: 'PARAMETER.LISTED',
-    description: 'Every parameter with the value in force, its default, its unit and the domain a value must stay in.',
+    description:
+      'The parameters the caller may read with the value in force, the default, the unit and the domain a value must stay in: every parameter for the Super Admin, only the ones Finance owns for Finance.',
   })
-  @ApiErrorResponses(...READ_ERRORS)
-  async list() {
+  @ApiErrorResponses(...PARAMETER_READ_ERRORS)
+  async list(@CurrentPrincipal() actor: AuthenticatedPrincipal) {
     try {
-      return { items: (await this.parameters.list()).map(toWire) };
+      // The Super Admin reads every parameter; Finance reads the ones Finance sets (QĐ-103z(1)).
+      const visible = (await this.parameters.list()).filter((view) => rolesMayRead(actor.roles, view.key));
+
+      return { items: visible.map(toWire) };
     } catch (error) {
       throw toOperatingParametersApiException(error);
     }
   }
 
   @Put('operating-parameters/:key')
-  @RequireRoles('SUPER_ADMIN')
+  @RequireRoles('SUPER_ADMIN', 'FINANCE')
   @ApiOperation({ operationId: 'operatingParameterSet', summary: 'Set an operating parameter' })
   @ApiSuccessResponse(ParameterResponseDto, {
     message: 'PARAMETER.SET',
@@ -131,12 +160,6 @@ export class OperatingParametersController {
       examples: [VALIDATION_EXAMPLE, OPERATING_PARAMETERS_ERROR_EXAMPLES.PARAMETER_VALUE_INVALID],
     },
     PARAMETER_NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The value is locked because something was already made under it: the month the fiscal year begins cannot change once a budget version exists (PARAMETER.LOCKED).',
-      examples: [OPERATING_PARAMETERS_ERROR_EXAMPLES.PARAMETER_LOCKED],
-    },
   )
   async set(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -151,15 +174,16 @@ export class OperatingParametersController {
   }
 
   @Get('operating-parameters/:key/history')
-  @RequireRoles('SUPER_ADMIN')
+  @RequireRoles('SUPER_ADMIN', 'FINANCE')
   @ApiOperation({ operationId: 'operatingParameterHistory', summary: 'Show the history of an operating parameter' })
   @ApiSuccessResponse(ParameterHistoryResponseDto, {
     message: 'PARAMETER.HISTORY_LISTED',
     description: 'The values the parameter has had, newest first.',
   })
-  @ApiErrorResponses(...READ_ERRORS, VALIDATION_ERROR, PARAMETER_NOT_FOUND)
-  async history(@Param() params: ParameterKeyParamDto) {
+  @ApiErrorResponses(...PARAMETER_READ_ERRORS, VALIDATION_ERROR, PARAMETER_NOT_FOUND)
+  async history(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ParameterKeyParamDto) {
     try {
+      if (!rolesMayRead(actor.roles, params.key)) throw new ParameterNotYoursError(params.key);
       const history = await this.parameters.history(params.key);
 
       return {
@@ -203,7 +227,7 @@ export class OperatingParametersController {
     description: 'The day is a non-working date from now on. Today or a later day only.',
   })
   @ApiErrorResponses(
-    ...AUTH_ERRORS,
+    ...NON_WORKING_DATE_WRITE_ERRORS,
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: VALIDATION_ERROR_DESCRIPTION,
@@ -235,7 +259,7 @@ export class OperatingParametersController {
     description: 'The reason of a non-working date changes. A day before today is refused (NON_WORKING_DATE.IN_PAST).',
   })
   @ApiErrorResponses(
-    ...AUTH_ERRORS,
+    ...NON_WORKING_DATE_WRITE_ERRORS,
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: VALIDATION_ERROR_DESCRIPTION,
@@ -267,7 +291,7 @@ export class OperatingParametersController {
     description: 'The day is a working day again. A day before today is refused (NON_WORKING_DATE.IN_PAST).',
   })
   @ApiErrorResponses(
-    ...AUTH_ERRORS,
+    ...NON_WORKING_DATE_WRITE_ERRORS,
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description: VALIDATION_ERROR_DESCRIPTION,

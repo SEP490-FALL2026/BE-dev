@@ -5,25 +5,29 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { SpendEffectsService } from '../budget-information/spend-effects.service';
+import { SpendEffectsService } from '../spend-effects/spend-effects.service';
 import { RequestOutcomeService } from '../outcome/request-outcome.service';
 import { RenewalApplyService } from '../renewal-apply/renewal-apply.service';
 import { SpendDecisionRepo } from '../spend/spend-decision.repo';
-import { spendDecisionRecordOf, type BlockedReason } from '../spend/spend-decision.policy';
+import { spendDecisionRecordOf, type ReturnReason } from '../spend/spend-decision.policy';
 import type { SpendStepRecord } from '../spend/spend-step.repo';
 
 export type SpendDecisionResult =
   | { status: 'DECIDED'; decision: 'APPROVED' | 'REJECTED'; requestState: string }
-  /** The request was checked again as the approver decided and it is not for them yet: nothing was decided (`US-06-01` AC-18). */
-  | { status: 'BOUNCED'; to: 'FINANCE_REVIEW' }
-  | { status: 'BOUNCED'; to: 'HEAD'; reason: BlockedReason };
+  /**
+   * The request was checked again as the approver decided and it is not for them now: it is blocked, or uses a reserve nobody confirmed. It
+   * went back to its head and nothing was decided (`US-06-01` AC-18, `BR-MF1-07c`).
+   */
+  | { status: 'BOUNCED'; to: 'HEAD' | 'REQUESTER'; reasons: ReturnReason[]; overBy?: string | null };
 
 /** What a decision of the spend step is written with (`US-06-01` AC-2, AC-5): the record, the hold of an approval, the audit and what follows. */
 export interface SpendDecided {
   decision: 'APPROVED' | 'REJECTED';
   checkId: string | null;
   reason: string | null;
-  override: { reason: string; years: readonly number[] } | null;
+  /** The check the approval is on needs the reserve, and the line of reason the head gave when they confirmed it. */
+  usesReserve: boolean;
+  reserveReason: string | null;
 }
 
 /**
@@ -49,7 +53,7 @@ export class SpendDecisionRecorder {
     decided: SpendDecided,
   ): Promise<SpendDecisionResult> {
     const { request, step, now } = of;
-    const recorded = spendDecisionRecordOf({ request, step }, decided);
+    const recorded = spendDecisionRecordOf({ request }, decided);
     await this.decisions.record(tx, {
       organizationId: request.organizationId,
       requestId: request.id,
@@ -59,8 +63,6 @@ export class SpendDecisionRecorder {
       deciderRole: recorded.deciderRole,
       reason: decided.reason,
       checkId: decided.checkId,
-      overrideReason: decided.override?.reason ?? null,
-      overrideYears: decided.override?.years ?? [],
       decidedByEmployeeId: actor.employeeId,
       decidedAt: now,
       requestState: recorded.requestState,
@@ -81,9 +83,9 @@ export class SpendDecisionRecorder {
     // A refusal ends the request for the person it was for, without a grant.
     if (decided.decision === 'REJECTED') await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
 
-    // A renewal needs nobody to carry it out: approved in full, it is applied here, in the transaction of the decision.
+    // A renewal approved in full is extended by the IT Admin (`BR-MF1-08d`): its task is opened here, in the transaction of the decision.
     if (decided.decision === 'APPROVED' && request.type === 'RENEWAL') {
-      await this.renewals.apply(tx, actor, request, now);
+      await this.renewals.requestExtension(tx, actor, request, now);
 
       return { status: 'DECIDED', decision: decided.decision, requestState: await this.stateOf(tx, request.id) };
     }

@@ -10,7 +10,7 @@ import {
   ProvisioningTaskStateError,
   ProvisioningTypeNotSupportedError,
 } from '../public/licensing.errors';
-import { ProvisioningItAdminRequiredError } from './provisioning.errors';
+import { ProvisioningItAdminRequiredError, ProvisioningKeyError } from './provisioning.errors';
 import type {
   ProvisioningAction,
   ProvisioningChannel,
@@ -59,8 +59,8 @@ export function stepsFor(
 
 /**
  * The steps of the card of a revocation (`US-07-05`): K1 cancels the renewal at the provider and records what is known of the
- * access, K2 removes the member under the name of the IT Admin who works (`QĐ-77d`), K5 revokes in the internal software.
- * K3 is specified only and K4 waits for the company devices: neither has a card.
+ * access, K2 removes the member under the name of the IT Admin who works (`QĐ-77d`), K4 deactivates the key on the device it was used
+ * on (the key goes back to the store, `QĐ-103d`), K5 revokes in the internal software. K3 is specified only: it has no card.
  */
 function revocationStepsFor(type: ProvisioningKind): TaskStep[] {
   switch (type) {
@@ -68,6 +68,8 @@ function revocationStepsFor(type: ProvisioningKind): TaskStep[] {
       return [{ code: 'CANCEL_RENEWAL_ON_PROVIDER' }, { code: 'RECORD_ACCESS_STATE' }, CONFIRM];
     case 'K2':
       return [{ code: 'REMOVE_FROM_WORKSPACE', adminIdentity: 'ACTING_IT_ADMIN' }, CONFIRM];
+    case 'K4':
+      return [{ code: 'DEACTIVATE_KEY_ON_DEVICE' }, CONFIRM];
     case 'K5':
       return [{ code: 'REVOKE_IN_INTERNAL_SOFTWARE' }, CONFIRM];
     default:
@@ -101,19 +103,26 @@ export function doneWhenFor(type: ProvisioningKind, taskKind: ProvisioningTaskKi
   }
 }
 
-/** K3 is specified only (`RB-4`) and K4 needs the key store and the company devices: neither is granted yet. */
+/** K3 is specified only (`RB-4`): it is not granted. K4 is granted from the key pool of the plan (`QĐ-103d`). */
 export function assertGrantableType(type: ProvisioningKind): void {
-  if (type === 'K3' || type === 'K4') throw new ProvisioningTypeNotSupportedError(type);
+  if (type === 'K3') throw new ProvisioningTypeNotSupportedError(type);
 }
 
-/** K1 and K2 take a seat on a subscription the IT Admin picks; K5 holds no seat and takes none (`US-07-01` AC-11). */
-export function assertSubscriptionChoice(type: ProvisioningKind, subscriptionId: string | undefined): void {
-  if (type === 'K5') {
-    if (subscriptionId !== undefined) throw new ProvisioningSubscriptionError('NOT_ALLOWED');
+/**
+ * The key a completion names (`BR-MF1-09`, `QĐ-103d`): a K4 grant is completed by giving its seat a free key of the store, so it names
+ * one; a grant of any other kind names none. Throws ProvisioningKeyError.
+ */
+export function assertKeyFits(type: ProvisioningKind, licenseKeyId: string | undefined): void {
+  if (type === 'K4' && licenseKeyId === undefined) throw new ProvisioningKeyError('KEY_REQUIRED');
+  if (type !== 'K4' && licenseKeyId !== undefined) throw new ProvisioningKeyError('KEY_NOT_APPLICABLE');
+}
 
-    return;
-  }
-  if (subscriptionId === undefined) throw new ProvisioningSubscriptionError('REQUIRED');
+/**
+ * K1 and K2 take a seat on a subscription: the one the IT Admin names, or, when none is named, the one the shared pool of the plan gives
+ * (`P0-05`: the primary subscription of the plan, the one that has a free seat first). K5 holds no seat and takes none (`US-07-01` AC-11).
+ */
+export function assertSubscriptionChoice(type: ProvisioningKind, subscriptionId: string | undefined): void {
+  if (type === 'K5' && subscriptionId !== undefined) throw new ProvisioningSubscriptionError('NOT_ALLOWED');
 }
 
 /**

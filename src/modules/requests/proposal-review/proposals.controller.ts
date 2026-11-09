@@ -30,6 +30,7 @@ import { AssessmentService } from '../assessment/assessment.service';
 import { CatalogLinkService } from '../assessment/catalog-link.service';
 import { InternalRegistrationService } from '../assessment/internal-registration.service';
 import { ProposalService } from '../assessment/proposal.service';
+import { ACCESS_REQUEST_ERROR_EXAMPLES as ACCESS_EXAMPLES } from '../access-request/access-request.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const IT_ONLY_DESCRIPTION =
@@ -95,14 +96,18 @@ export class ProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
-      examples: [EXAMPLES.NO_DEPARTMENT, EXAMPLES.FINANCE_SETUP_INCOMPLETE],
+        'The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE). A proposal counts as a request for new access: the sender already has as many open as they may (ACCESS_REQUEST.OPEN_LIMIT_REACHED, GH-2, BR-MF1-01f).',
+      examples: [EXAMPLES.NO_DEPARTMENT, EXAMPLES.FINANCE_SETUP_INCOMPLETE, ACCESS_EXAMPLES.OPEN_LIMIT_REACHED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.REQUEST_PARTY_INELIGIBLE],
+        'The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). A person who already uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED, details.count and details.threshold; GH-3). Nothing is written.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.REQUEST_PARTY_INELIGIBLE,
+        ACCESS_EXAMPLES.MANY_PAID_SOFTWARE_REASON_REQUIRED,
+      ],
     },
   )
   async propose(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: ProposalBodyDto) {
@@ -190,14 +195,8 @@ export class ProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), or the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, PAYMENT_FREQUENCY_INVALID, AMOUNT_TOO_LARGE). Nothing is written and the request stays with the IT Admin.',
-      examples: [
-        VALIDATION_EXAMPLE,
-        EXAMPLES.INCOMPLETE,
-        EXAMPLES.QUOTE_NOT_IN_FORCE,
-        EXAMPLES.PAYMENT_FREQUENCY_INVALID,
-        EXAMPLES.AMOUNT_TOO_LARGE,
-      ],
+        'The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), or the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE). Nothing is written and the request stays with the IT Admin.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.INCOMPLETE, EXAMPLES.QUOTE_NOT_IN_FORCE, EXAMPLES.AMOUNT_TOO_LARGE],
     },
   )
   async completeAssessment(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RequestIdParamDto) {
@@ -269,7 +268,6 @@ export class ProposalsController {
         EXAMPLES.INCOMPLETE_DATA_SENSITIVITY,
         EXAMPLES.QUOTE_PERIOD_INVALID,
         EXAMPLES.QUOTE_NOT_IN_FORCE,
-        EXAMPLES.PAYMENT_FREQUENCY_INVALID,
         EXAMPLES.AMOUNT_TOO_LARGE,
         EXAMPLES.MONEY_SCALE_EXCEEDED,
         EXAMPLES.MONEY_OUT_OF_RANGE,

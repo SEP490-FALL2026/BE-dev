@@ -31,7 +31,8 @@ export class GroupSpendReport {
       step: SpendStepRecord;
       verdicts: readonly LineVerdict[];
       checkId: string | null;
-      override: { reason: string; years: readonly number[] } | null;
+      usesReserve: boolean;
+      reserveReason: string | null;
       now: Date;
       deciderRole: string;
       outcome: 'APPROVED' | 'REJECTED';
@@ -61,10 +62,11 @@ export class GroupSpendReport {
         decided.outcome === 'APPROVED' ? 'ACCESS_REQUEST.SPEND_APPROVED' : 'ACCESS_REQUEST.SPEND_REJECTED',
         'ACCESS_REQUEST_STEP',
         step.id,
-        groupSpendDecidedDetail(request, step, {
+        groupSpendDecidedDetail(request, {
           verdicts,
           checkId: decided.checkId,
-          override: decided.override,
+          usesReserve: decided.usesReserve,
+          reserveReason: decided.reserveReason,
           decision: decided.outcome,
           deciderRole,
         }),

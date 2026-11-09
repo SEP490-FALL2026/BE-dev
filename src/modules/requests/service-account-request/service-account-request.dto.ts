@@ -1,6 +1,6 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
-import { REASON_MAX_LENGTH, TERM_MONTHS_MAX } from '../access-request/access-request.dto';
+import { REASON_MAX_LENGTH } from '../access-request/access-request.dto';
 
 /** The longest identifier a vendor keeps for an account: the bound of an address, as for any account of a seat. */
 export const IDENTIFIER_MAX_LENGTH = 254;
@@ -15,8 +15,7 @@ export const serviceAccountSubmitSchema = z.strictObject({
   purpose: z.string().trim().min(1).max(REASON_MAX_LENGTH),
   expectedIdentifier: z.string().trim().min(1).max(IDENTIFIER_MAX_LENGTH),
   businessReason: z.string().trim().min(1).max(REASON_MAX_LENGTH),
-  termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
-  /** The day the money is expected to go out (paid software only); it fixes the budget year. Today when left out. */
+  // No end date: the seat of a service account has none, and a paid one counts to the end of the year (`US-05-21`, `QĐ-104a`).
 });
 
 /** The verdict of the IT Admin: a refusal gives its reason, an acceptance gives none. */

@@ -44,7 +44,7 @@ export class RevocationTasksController {
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.REVOCATION_COMPLETED',
     description:
-      'The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K1 as RENEWAL_CANCELLED with evidence, the day the paid period ends (paidThroughOn) and what is known of the access: UNTIL_PAID_END, or CUT with the day (accessCutOn) and its evidence. The assignment ends the same day for K2 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.',
+      'The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K4 as KEY_DEACTIVATED with evidence, and its key goes back to the store (keyDisposition RETURN_TO_STORE, the default) or back and withdrawn from it at once (WITHDRAW, with a withdrawalReason: a key that may not move to another device), with LICENSE_KEY.RETURNED_TO_STORE (and LICENSE_KEY.WITHDRAWN) in the audit trail; K1 as RENEWAL_CANCELLED with evidence, the day the paid period ends (paidThroughOn) and what is known of the access: UNTIL_PAID_END, or CUT with the day (accessCutOn) and its evidence. The assignment ends the same day for K2, K4 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -58,13 +58,13 @@ export class RevocationTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), is not in progress or is completed already (NOT_IN_PROGRESS), is not for a person (NOT_MANUAL), or the assignment is no longer open (LICENSE_ASSIGNMENT.NOT_OPEN): nothing changes.',
-      examples: [EXAMPLES.NOT_REVOCATION, EXAMPLES.NOT_IN_PROGRESS],
+        'The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), is not in progress or is completed already (NOT_IN_PROGRESS), is not for a person (NOT_MANUAL), is still in its grace (NOT_BEFORE, details.notBefore: the first day it can be completed), or the assignment is no longer open (LICENSE_ASSIGNMENT.NOT_OPEN): nothing changes.',
+      examples: [EXAMPLES.NOT_REVOCATION, EXAMPLES.NOT_IN_PROGRESS, EXAMPLES.NOT_BEFORE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, or no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED).',
+        'The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), or no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED).',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.COMPLETION_NOT_ALLOWED,
@@ -72,6 +72,7 @@ export class RevocationTasksController {
         EXAMPLES.PAID_THROUGH_REQUIRED,
         EXAMPLES.ACCESS_STATE_REQUIRED,
         EXAMPLES.ACCESS_STATE_INVALID,
+        EXAMPLES.WITHDRAWAL_REASON_REQUIRED,
         EXAMPLES.EVIDENCE_REQUIRED,
       ],
     },

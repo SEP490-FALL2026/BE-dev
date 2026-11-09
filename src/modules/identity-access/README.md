@@ -51,7 +51,7 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
 - Mở: `ApprovalRoleChangeListeners` (`identity-access.approval-role-change-listeners`,
   [public/identity-access.extension-points.ts](public/identity-access.extension-points.ts)), phát từ
   `accounts/role-grant.service.ts` (cấp/thu hồi/chuyển `SPENDING_APPROVER`) — bên đăng ký: requests
-  `reassignment/approval-role.listener.ts`, budgets `budget/spending-approver-wait.listener.ts` và licensing
+  `reassignment/approval-role.listener.ts`, budgets `version/spending-approver-wait.listener.ts` và licensing
   `subscription-renewal/spending-approver-wait.listener.ts` (báo Super Admin một lần mỗi đoạn chờ).
 - Đăng ký vào: `organization.employee-accounts` (`EmployeeAccountsHook`) — `accounts/employee-accounts.listener.ts`.
 - Token DI nội bộ, không phải point liên module: `ACCOUNT_SESSIONS` (`accounts/account-sessions.types.ts`),
@@ -90,7 +90,7 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
   Tối đa một người giữ mỗi vai `SUPER_ADMIN`, `FINANCE`, `SPENDING_APPROVER` trong tổ chức; các guard trưởng phòng giữ nguyên.
 - Tạo tài khoản nhận `role?` (mặc định `EMPLOYEE`), từ chối trường `roles`. Đổi vai bằng `PUT /app-users/{id}/role`, trả `ROLE.CHANGED`;
   đổi cùng vai là no-op. Hai route POST/DELETE `role-grants` đã bỏ (404), các mã lỗi tổ hợp vai/đã cấp/chưa cấp đã bỏ.
-- `/me.roles` vẫn là mảng, hiện có một phần tử; `/me.selfServiceOnly` đã bỏ. `MANAGER` chỉ có phạm vi ở phòng đang đứng đầu.
+- `/me.roles` vẫn là mảng, hiện có một phần tử; `/me.selfServiceOnly` đã bỏ. `MANAGER` chỉ có phạm vi ở phòng đang đứng đầu (`QĐ-93a`, `QĐ-95e`); người sắp làm trưởng phòng của một phòng chưa hiệu lực giữ grant nhưng vai không hiệu lực, `/me.upcomingUnits` cho FE biết các đơn vị đó (`QĐ-106k`) và chỉ các route B3 của `budgets` nhận họ (`RequireRolesOrGrants`, service xét đơn vị).
 - `SUPER_ADMIN` chỉ đổi chủ bằng `pnpm ops:recover transfer-role`; route đổi vai từ chối nó. Recovery chuẩn bị người nhận với
   `EMPLOYEE`; hoàn tất thay người nhận thành `SUPER_ADMIN` và người cũ thành `EMPLOYEE`, audit before/after đúng vai. Tài khoản gắn đúng một
   người: trigger `app_users_employee_immutable` từ chối đổi `employee_id`.

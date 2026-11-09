@@ -108,7 +108,6 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   CONTROL_LEVEL_UNCONTROLLABLE: example(new AssessmentUncontrollableError()),
   QUOTE_NOT_IN_FORCE: quote('QUOTE_NOT_IN_FORCE'),
   QUOTE_PERIOD_INVALID: quote('QUOTE_PERIOD_INVALID'),
-  PAYMENT_FREQUENCY_INVALID: quote('PAYMENT_FREQUENCY_INVALID'),
   AMOUNT_TOO_LARGE: quote('AMOUNT_TOO_LARGE'),
   ALTERNATIVE_PLAN_NOT_FOUND: example(new AssessmentReferenceNotFoundError('alternativePlanId')),
   // One message template whose field varies (details.field names it): the vendor stands for the fields of the save.

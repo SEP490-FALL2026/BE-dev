@@ -1,4 +1,13 @@
-import { capacityOf, judgeBatch, maskKey, warningOf } from './license-key.policy';
+import { LicenseKeyStateError } from './license-key.errors';
+import {
+  assertAssignable,
+  assertWithdrawable,
+  capacityOf,
+  judgeBatch,
+  maskKey,
+  warningOf,
+  type KeyState,
+} from './license-key.policy';
 
 const key = (n: number) => `KEY-${String(n).padStart(4, '0')}-ABCDE-12345`;
 
@@ -96,5 +105,35 @@ describe('the capacity of a purchase (US-04-12 AC-1, AC-12, INV-01)', () => {
     expect(warningOf({ purchased: 50, usableKeys: 48 })).toBe('KEY_COUNT_DIFFERS');
     expect(warningOf({ purchased: 50, usableKeys: 52 })).toBe('KEY_COUNT_DIFFERS');
     expect(warningOf({ purchased: null, usableKeys: 30 })).toBe('QUANTITY_UNKNOWN');
+  });
+});
+
+describe('BR-MF1-09: the keys of the pool (QĐ-103d, QĐ-103v, Q-10 B)', () => {
+  const free: KeyState = { subscriptionId: 'sub-1', status: 'IN_STORE', withdrawnAt: null };
+  const problemOf = (run: () => void): string | null => {
+    try {
+      run();
+
+      return null;
+    } catch (error) {
+      return error instanceof LicenseKeyStateError ? error.problem : 'OTHER';
+    }
+  };
+
+  it('gives a free key of the store to a seat of its own purchase', () => {
+    expect(problemOf(() => assertAssignable(free, 'sub-1'))).toBeNull();
+  });
+
+  it('refuses a key already assigned, a withdrawn key, and a key of another purchase', () => {
+    expect(problemOf(() => assertAssignable({ ...free, status: 'ASSIGNED' }, 'sub-1'))).toBe('NOT_IN_STORE');
+    expect(problemOf(() => assertAssignable({ ...free, withdrawnAt: new Date() }, 'sub-1'))).toBe('WITHDRAWN');
+    expect(problemOf(() => assertAssignable(free, 'sub-2'))).toBe('SUBSCRIPTION_MISMATCH');
+    expect(problemOf(() => assertAssignable(free, null))).toBe('SUBSCRIPTION_MISMATCH');
+  });
+
+  it('withdraws only a free key, once', () => {
+    expect(problemOf(() => assertWithdrawable(free))).toBeNull();
+    expect(problemOf(() => assertWithdrawable({ ...free, status: 'ASSIGNED' }))).toBe('ASSIGNED');
+    expect(problemOf(() => assertWithdrawable({ ...free, withdrawnAt: new Date() }))).toBe('ALREADY_WITHDRAWN');
   });
 });

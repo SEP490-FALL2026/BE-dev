@@ -3,6 +3,7 @@ import { fromDateColumn } from '../../../core/business-date';
 import { toPricing } from './access-request-pricing.mapper';
 import type { NeedStepState, AccessRequestRecord, ReadableNeedWaitingReason } from './access-request.types';
 import { requestPolicyJson } from './access-request.json';
+import { currentStateOf } from './access-request.policy';
 
 /** What a request is read as: the columns, the people it is for, its need steps with their decisions, and the lines of a group. */
 export const SELECT_REQUEST = {
@@ -11,6 +12,11 @@ export const SELECT_REQUEST = {
   type: true,
   branch: true,
   state: true,
+  routingMode: true,
+  oneStepReason: true,
+  oneStepBlockedReason: true,
+  manyPaidSoftwareCount: true,
+  manyPaidSoftwareReason: true,
   planId: true,
   requesterEmployeeId: true,
   departmentId: true,
@@ -19,18 +25,19 @@ export const SELECT_REQUEST = {
   termMonths: true,
   pricingStatus: true,
   priceMissingReason: true,
-  expectedSpendOn: true,
+  priceKind: true,
   budgetYear: true,
+  amountMonths: true,
   amountMinor: true,
   amountCurrency: true,
   unitPriceMinor: true,
   billingCycle: true,
-  paymentSchedule: true,
+  expectedEndDate: true,
+  nextYearAmountMinor: true,
   planLineVersionId: true,
   planLinePosition: true,
   planLineConfirmed: true,
   offPlan: true,
-  expectedEndDate: true,
   policy: true,
   submittedAt: true,
   withdrawalRequestedAt: true,
@@ -123,6 +130,21 @@ function sentColumns(row: RequestRow): { costCenterId: string | null; submittedA
   return { costCenterId: row.costCenterId, submittedAt: row.submittedAt };
 }
 
+/** GH-3 of the request (`BR-MF1-01g`): the count and the reason are written together, or neither. */
+export function manyPaidSoftwareOf(row: {
+  manyPaidSoftwareCount: number | null;
+  manyPaidSoftwareReason: string | null;
+}): { count: number; reason: string } | null {
+  return row.manyPaidSoftwareCount !== null && row.manyPaidSoftwareReason !== null
+    ? { count: row.manyPaidSoftwareCount, reason: row.manyPaidSoftwareReason }
+    : null;
+}
+
+/** The columns GH-3 writes on a request or a line (`BR-MF1-01g`): none when it is not flagged. */
+export function manyPaidSoftwareColumns(flag: { count: number; reason: string } | null | undefined) {
+  return flag ? { manyPaidSoftware: true, manyPaidSoftwareCount: flag.count, manyPaidSoftwareReason: flag.reason } : {};
+}
+
 export function toRecord(row: RequestRow): AccessRequestRecord {
   const sent = sentColumns(row);
   const needSteps = row.steps.map((step) => ({
@@ -137,18 +159,28 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     createdAt: step.createdAt,
     assignedAt: step.assignedAt,
     decidedAt: step.decidedAt,
-    decision: step.approvalRecord,
+    decision: step.approvalRecord && {
+      ...step.approvalRecord,
+      deciderRole:
+        step.approvalRecord.deciderRole === 'MANAGER' ? ('MANAGER' as const) : ('SPENDING_APPROVER' as const),
+    },
   }));
   const first = needSteps[0];
   if (!first) throw new Error(`The request ${row.id} has no need step.`);
   const { decision: firstDecision, ...step } = first;
 
   return {
+    oneStepBlockedReason: row.oneStepBlockedReason as 'PRICE_MISSING' | 'RATE_MISSING' | null,
+    manyPaidSoftware: manyPaidSoftwareOf(row),
     id: row.id,
     organizationId: row.organizationId,
     type: row.type,
     branch: row.branch,
-    state: row.state,
+    state: currentStateOf(row.state),
+    routing: {
+      mode: row.routingMode,
+      oneStepReason: row.oneStepReason as import('./routing.policy').OneStepReason | null,
+    },
     planId: row.planId,
     requesterEmployeeId: row.requesterEmployeeId,
     departmentId: row.departmentId,
@@ -162,7 +194,13 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
         : null,
     offPlan: row.offPlan,
     expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
-    policy: requestPolicyJson.decode(row.policy),
+    policy:
+      row.routingMode === 'ONE_STEP'
+        ? {
+            ...requestPolicyJson.decode(row.policy),
+            chain: requestPolicyJson.decode(row.policy).chain.filter((kind) => kind !== 'NEED'),
+          }
+        : requestPolicyJson.decode(row.policy),
     submittedAt: sent.submittedAt,
     withdrawal:
       row.withdrawalRequestedAt !== null && row.withdrawnByEmployeeId !== null

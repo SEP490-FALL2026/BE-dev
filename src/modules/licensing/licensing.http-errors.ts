@@ -68,8 +68,14 @@ export function toLicensingApiException(error: unknown): unknown {
     return refuse(UNPROCESSABLE, 'LICENSE_ASSIGNMENT.EXPECTED_END_REQUIRED', error.message);
   }
   if (error instanceof AssignmentConflictError) {
-    if (error.conflict === 'SEAT_CAPACITY')
-      return refuse(HttpStatus.CONFLICT, 'LICENSE_ASSIGNMENT.SEAT_CAPACITY', error.message);
+    if (error.conflict === 'SEAT_CAPACITY') {
+      return refuse(
+        HttpStatus.CONFLICT,
+        'LICENSE_ASSIGNMENT.SEAT_CAPACITY',
+        error.message,
+        error.freeSeatsInPool === undefined ? undefined : { freeSeatsInPool: error.freeSeatsInPool },
+      );
+    }
     if (error.conflict === 'EXPECTED_END_REQUIRED') {
       return refuse(UNPROCESSABLE, 'LICENSE_ASSIGNMENT.EXPECTED_END_REQUIRED', error.message);
     }

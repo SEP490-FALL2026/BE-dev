@@ -295,6 +295,10 @@ describe('the departure of a person, the revocations and the closing (integratio
          VALUES ($1, $2, 'PERSONAL', 'REQUEST', $3, $4, $5, 'k4@acme.vn', 'k4@acme.vn', '2026-01-05', 'ACTUAL', $6)`,
         [k4Seat, h.seed.organizationId, await h.planOf(k4), k4, person.employeeId, randomUUID()],
       );
+      // BR-MF1-09 / QĐ-103d: K4 is revocable now (its key goes back to the store); K3 is the kind left with no revocation.
+      await h.ctx.sql.query(`UPDATE plans SET provisioning_type = 'K3', pricing_model = NULL WHERE id = $1`, [
+        await h.planOf(k4),
+      ]);
       seats.push(k4Seat);
       const wire = await h.recordedCase(person);
       await h.leaveOnLastDay(wire.id).expect(200);
@@ -304,13 +308,13 @@ describe('the departure of a person, the revocations and the closing (integratio
 
       const named = await h.revokeRights(wire.id, { assignmentIds: [k2Seat, k4Seat] });
       expect([named.status, h.codeOf(named)]).toEqual([409, 'OFFBOARDING_CASE.REVOCATION_NOT_SUPPORTED']);
-      expect(h.detailsOf(named)).toMatchObject({ assignmentId: k4Seat, provisioningType: 'K4' });
+      expect(h.detailsOf(named)).toMatchObject({ assignmentId: k4Seat, provisioningType: 'K3' });
       expect(await h.taskCount()).toBe(tasks);
 
       const rights = await rightsOf(wire.id);
       expect(rights.find((right) => right.assignmentId === k4Seat)).toMatchObject({
         revocable: false,
-        provisioningType: 'K4',
+        provisioningType: 'K3',
       });
       await h.revokeRights(wire.id, {}).expect(200);
       expect(await h.taskCount()).toBe(tasks + 2);

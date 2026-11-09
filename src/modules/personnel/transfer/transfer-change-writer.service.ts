@@ -1,3 +1,4 @@
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -47,6 +48,7 @@ export class TransferChangeWriter {
     private readonly audit: AuditApi,
     private readonly hooks: PersonnelFileHooks,
     private readonly notifier: PersonnelNotifier,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** Moves the day: judged on the new day and on who follows the head, then the periods go back and are written again. */
@@ -61,9 +63,12 @@ export class TransferChangeWriter {
     const periodStart = (await this.history.getPlacementStart(tx, held.closesPlacementId)) ?? today;
     const handover = held.headHandover;
     const chosen: SuccessorChoice | undefined = input.successor ?? previousSuccessorChoice(handover);
+    // The destination takes nobody in before the day it takes effect, whatever day the transfer is moved to (`QĐ-104e(3)`).
+    const destination = await this.organizationReads.getDepartmentBrief(held.toDepartmentId, tx);
     const refusal = rescheduleRefusal({
       ...this.pendingFacts(held, today, periodStart, input),
       newEffectiveOn,
+      destinationEffectiveFrom: destination?.effectiveFrom ?? null,
       successor: await this.guard.successorFacts(tx, {
         required: handover !== null,
         chosen,

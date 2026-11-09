@@ -144,24 +144,35 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
       expect(await recordsOf(sent.id)).toEqual([]);
     });
 
-    it('does not let a head decide their own request: the spending approver does, in that role', async () => {
+    it('MF1-D: a head never decides their own request, and nobody decides a need step for it: it goes one step (BR-MF1-02)', async () => {
       const sent = await h.sent(head, internalPlan);
 
       expect(h.codeOf(await h.decide(sent.id, approve, head.account).expect(403))).toBe('ACCESS_REQUEST.OWN_REQUEST');
-      const after = await decided(sent.id, approve, boss.account);
-
-      expect(after.needDecision).toMatchObject({
-        decidedBy: { employeeId: boss.employeeId },
-        deciderRole: 'SPENDING_APPROVER',
-      });
+      expect(sent.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' });
+      expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
+      // Nobody holds the step: the approver is not its assignee, so the request is not theirs to decide (NOT_THE_ASSIGNEE answers 404).
+      const byApprover = await h.decide(sent.id, approve, boss.account);
+      expect([byApprover.status, h.codeOf(byApprover)]).toEqual([404, 'ACCESS_REQUEST.NOT_FOUND']);
+      expect(
+        (await h.ctx.sql.query<{ state: string }>(`SELECT state FROM access_requests WHERE id = $1`, [sent.id])).rows[0]
+          .state,
+      ).toBe('AWAITING_EXECUTION');
     });
 
-    it('leaves a request that waits for a head undecided, for the person who asked and for everybody else (QĐ-93c)', async () => {
+    it('MF1-D: a request from a department with no head goes one step; nobody decides a need step for it (QĐ-93c, BR-MF1-02)', async () => {
       const sent = await h.sent(waiter, internalPlan);
 
-      expect(sent.state).toBe('WAITING_CONTROLLED');
-      expect(h.codeOf(await h.decide(sent.id, approve, h.it1).expect(403))).toBe('ACCESS_REQUEST.NOT_THE_ASSIGNEE');
-      expect(h.codeOf(await h.decide(sent.id, approve, waiter.account).expect(403))).toBe('ACCESS_REQUEST.OWN_REQUEST');
+      expect(sent.state).toBe('AWAITING_EXECUTION');
+      expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
+      const byIt = await h.decide(sent.id, approve, h.it1);
+      // The IT Admin reads the request (by role), so is told it is not theirs to decide rather than that it is not there.
+      expect([byIt.status, h.codeOf(byIt)]).toEqual([403, 'ACCESS_REQUEST.NOT_THE_ASSIGNEE']);
+      const byRequester = await h.decide(sent.id, approve, waiter.account);
+      expect([byRequester.status, h.codeOf(byRequester)]).toEqual([403, 'ACCESS_REQUEST.OWN_REQUEST']);
+      expect(
+        (await h.ctx.sql.query<{ state: string }>(`SELECT state FROM access_requests WHERE id = $1`, [sent.id])).rows[0]
+          .state,
+      ).toBe('AWAITING_EXECUTION');
     });
 
     it('decides a step once: the second decision finds it decided and writes no second record', async () => {
@@ -184,7 +195,8 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
 
       const response = await h.submit(h.form(internalPlan, { termMonths: 13 }), designer.account).expect(422);
 
-      expect(h.codeOf(response)).toBe('VALIDATION_ERROR');
+      // An end date past a year from today is the domain's refusal (`US-05-23` AC-9), not a malformed body.
+      expect(h.codeOf(response)).toBe('ACCESS_REQUEST.END_DATE_OUT_OF_RANGE');
       expect(await h.requestRows()).toBe(before);
     });
 

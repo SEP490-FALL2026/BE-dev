@@ -69,6 +69,22 @@ export class DepartmentInUseError extends Error {
   }
 }
 
+/** A department is made only in the budgeting period of the next year (`QĐ-104e(3)`): the cycle of that year is not open, or was published. */
+export class DepartmentOutsideBudgetPeriodError extends Error {
+  constructor() {
+    super('A department is made only while the budget cycle of the next year is open and was never published.');
+    this.name = 'DepartmentOutsideBudgetPeriodError';
+  }
+}
+
+/** The department takes effect later than the day asked for: nobody is placed in it, and no head starts, before that day. */
+export class DepartmentNotYetEffectiveError extends Error {
+  constructor(readonly effectiveFrom: string) {
+    super(`The department takes effect on ${effectiveFrom}.`);
+    this.name = 'DepartmentNotYetEffectiveError';
+  }
+}
+
 /** An inactive department takes no new head or member. */
 export class DepartmentInactiveError extends Error {
   constructor() {

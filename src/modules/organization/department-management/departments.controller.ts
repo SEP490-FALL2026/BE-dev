@@ -108,8 +108,12 @@ export class DepartmentsController {
   })
   @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, CREATE_INVALID, {
     status: HttpStatus.CONFLICT,
-    description: 'The code is taken (DEPARTMENT.CODE_TAKEN).',
-    examples: [DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_CODE_TAKEN],
+    description:
+      'The code is taken (DEPARTMENT.CODE_TAKEN), or the budget cycle of the next year is not open or was published, so a department made now would have no budget (DEPARTMENT.OUTSIDE_BUDGET_PERIOD).',
+    examples: [
+      DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_CODE_TAKEN,
+      DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_OUTSIDE_BUDGET_PERIOD,
+    ],
   })
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateDepartmentBodyDto) {
     try {

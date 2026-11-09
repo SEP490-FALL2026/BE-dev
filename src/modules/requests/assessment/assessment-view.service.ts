@@ -92,9 +92,6 @@ export class AssessmentViewService {
       billingCycle: quote.billingCycle,
       validFrom: quote.validFrom,
       validUntil: quote.validUntil,
-      commitmentMonths: quote.commitmentMonths,
-      paymentFrequency: quote.paymentFrequency,
-      firstPaymentOn: quote.firstPaymentOn,
     };
   }
 }

@@ -2,6 +2,9 @@ import { GroupHarness } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
+const M = 1_000_000;
+/** The months of a group that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 
 interface RequestWire {
   id: string;
@@ -71,7 +74,7 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
         requester: { employeeId: u.head.employeeId },
         beneficiary: null,
         lineCount: 3,
-        pricing: { status: 'PRICED', amount: { amount: '36000000' }, unitPrice: { amount: '1000000' } },
+        pricing: { status: 'PRICED', amount: { amount: String(3 * M * monthsLeft) }, unitPrice: { amount: '1000000' } },
       });
       expect(await h.lineStates(request.id)).toEqual(['NEED_CONFIRMED', 'NEED_CONFIRMED', 'NEED_CONFIRMED']);
       const steps = await h.needSteps(request.id);
@@ -153,7 +156,8 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
         )
         .expect(422);
 
-      expect(h.codeOf(long)).toBe('VALIDATION_ERROR');
+      // An end date past a year from today is refused as the domain says it (`US-05-23` AC-9), the confirmation in words as a field that is gone.
+      expect(h.codeOf(long)).toBe('GROUP_REQUEST.TERM_BEYOND_LIMIT');
       expect(h.codeOf(confirmed)).toBe('VALIDATION_ERROR');
       expect(await h.requestRows()).toBe(rows);
       expect((await sent(u.head.account, h.groupBody(paid, [e1, e2], { termMonths: 12 }))).type).toBe('GROUP_GRANT');
@@ -161,37 +165,33 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
   });
 
   describe('the head among the people (US-05-03 AC-8, US-05-17 AC-3, AC-16)', () => {
-    it('confirms the others by sending and gives the line of the head to the person who decides a head of their own request', async () => {
+    it('BR-MF1-02 refuses the head in their own group before creating requests or steps', async () => {
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
 
-      const request = await sent(u.head.account, h.groupBody(paid, [e1, e2, u.head]));
-
-      expect(request.state).toBe('PENDING');
-      const steps = await h.needSteps(request.id);
-      expect(steps.map((step) => [step.state, step.routing_row, step.assignee_employee_id])).toEqual([
-        ['APPROVED', 5, u.head.employeeId],
-        ['PENDING', 2, h.boss.employeeId],
-      ]);
-      const lines = await h.lineRows(request.id);
-      expect(lines.map((line) => [line.employee_id, line.state, line.need_step_id])).toEqual([
-        [e1.employeeId, 'NEED_CONFIRMED', steps[0].id],
-        [e2.employeeId, 'NEED_CONFIRMED', steps[0].id],
-        [u.head.employeeId, 'AWAITING_NEED', steps[1].id],
-      ]);
+      const before = await h.requestRows();
+      const response = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), u.head.account).expect(422);
+      expect(response.body as Refused).toMatchObject({
+        error: {
+          code: 'GROUP_REQUEST.LINES_REFUSED',
+          details: { lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] },
+        },
+      });
+      expect(await h.requestRows()).toBe(before);
     });
 
-    it('lets the head decide none of their own line', async () => {
+    it('BR-MF1-02 check reports HEAD_IN_GROUP before the head can submit a line for themselves', async () => {
       const u = await unit();
       const [e1] = await h.colleagues(u, 1);
-      const request = await sent(u.head.account, h.groupBody(paid, [e1, u.head]));
-
-      const attempt = await h
-        .decideLines(request.id, { lines: [{ employeeId: u.head.employeeId, decision: 'APPROVE' }] }, u.head.account)
-        .expect(403);
-
-      expect(h.codeOf(attempt)).toBe('ACCESS_REQUEST.OWN_REQUEST');
-      expect(await h.lineStates(request.id)).toEqual(['NEED_CONFIRMED', 'AWAITING_NEED']);
+      const checked = h.dataOf<CheckWire>(
+        await h.checkGroup(h.groupBody(paid, [e1, u.head]), u.head.account).expect(200),
+      );
+      expect(checked.lines).toContainEqual({
+        employeeId: u.head.employeeId,
+        ok: false,
+        reason: 'HEAD_IN_GROUP',
+        manyPaidSoftware: null,
+      });
     });
 
     it('refuses a request of the head alone: a group names two people at least, and the request of one is an individual one (QĐ-100aa)', async () => {
@@ -232,17 +232,19 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       expect(decisions.rowCount).toBe(0);
     });
 
-    it('gives the line of the head to the spending approver in a second step, and the others to the head, when the head is named', async () => {
+    it('BR-MF1-02 an employee cannot include the head in the group either', async () => {
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
 
-      const request = await sent(e1.account, h.groupBody(paid, [e1, e2, u.head]));
-
-      const steps = await h.needSteps(request.id);
-      expect(steps.map((step) => [step.state, step.routing_row, step.assignee_employee_id])).toEqual([
-        ['PENDING', 9, u.head.employeeId],
-        ['PENDING', 2, h.boss.employeeId],
-      ]);
+      const before = await h.requestRows();
+      const response = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), e1.account).expect(422);
+      expect(response.body as Refused).toMatchObject({
+        error: {
+          code: 'GROUP_REQUEST.LINES_REFUSED',
+          details: { lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] },
+        },
+      });
+      expect(await h.requestRows()).toBe(before);
     });
 
     it('stops an Employee at ten people and names the most', async () => {
@@ -275,8 +277,8 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       expect(checked.lines.map((line) => [line.employeeId, line.ok, line.reason])).toEqual([
         [e1.employeeId, true, null],
         [outsider.employeeId, false, 'OUTSIDE_DEPARTMENT'],
-        // An intern is taken like anyone: the end day is not the sender's to give (`QĐ-98`, `Q-03`).
-        [e2.employeeId, true, null],
+        // An intern has a term: the group has to name the end date for them (`FR-2.8`).
+        [e2.employeeId, false, 'TERM_REQUIRED'],
         [e3.employeeId, false, 'EMAIL_REQUIRED'],
       ]);
       expect(refused.body as Refused).toMatchObject({
@@ -285,6 +287,7 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
           details: {
             lines: [
               { employeeId: outsider.employeeId, reason: 'OUTSIDE_DEPARTMENT' },
+              { employeeId: e2.employeeId, reason: 'TERM_REQUIRED' },
               { employeeId: e3.employeeId, reason: 'EMAIL_REQUIRED' },
             ],
           },
@@ -293,20 +296,28 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       expect(await h.requestRows()).toBe(rows);
     });
 
-    it('takes no end day of an intern from the sender: the line has none, and sending one is refused (Q-03)', async () => {
+    it('FR-2.8: needs the end date of the group for an intern, takes it for every line, and takes no end date of one line alone', async () => {
+      // Rewritten from "takes no end day of an intern from the sender" (Q-03): the group names one end date for all of its people now.
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
       await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN' WHERE id = $1`, [e2.employeeId]);
-      const withDay = {
+      const perLine = {
         ...h.groupBody(paid, [e1, e2]),
         lines: [{ employeeId: e1.employeeId }, { employeeId: e2.employeeId, expectedEndDate: '2099-12-31' }],
       };
 
-      const refused = await h.submitGroup(withDay, u.head.account).expect(422);
-      const request = await sent(u.head.account, h.groupBody(paid, [e1, e2]));
+      const refusedLine = await h.submitGroup(perLine, u.head.account).expect(422);
+      const refusedNone = await h.submitGroup(h.groupBody(paid, [e1, e2]), u.head.account).expect(422);
+      const request = await sent(u.head.account, h.groupBody(paid, [e1, e2], { expectedEndDate: h.today() }));
 
-      expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
-      expect((await h.lineRows(request.id)).map((line) => line.expected_end_date)).toEqual([null, null]);
+      expect(h.codeOf(refusedLine)).toBe('VALIDATION_ERROR');
+      expect(refusedNone.body as Refused).toMatchObject({
+        error: {
+          code: 'GROUP_REQUEST.LINES_REFUSED',
+          details: { lines: [{ employeeId: e2.employeeId, reason: 'TERM_REQUIRED' }] },
+        },
+      });
+      expect((await h.lineRows(request.id)).map((line) => line.expected_end_date)).toEqual([h.today(), h.today()]);
     });
 
     it('names a person twice, and refuses a plan that is not for a group by what it grants and never by its name', async () => {
@@ -381,8 +392,8 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       expect(checked).toMatchObject({
         hasSpendStep: true,
         lineCount: 2,
-        amountPerPerson: { amount: '12000000' },
-        pricing: { status: 'PRICED', amount: { amount: '24000000' } },
+        amountPerPerson: { amount: String(M * monthsLeft) },
+        pricing: { status: 'PRICED', amount: { amount: String(2 * M * monthsLeft) } },
       });
       expect(Object.keys(checked)).not.toContain('outsideStandard');
       expect([old.status, h.codeOf(old)]).toEqual([422, 'VALIDATION_ERROR']);
@@ -400,7 +411,8 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       );
 
       const ids = page.items.map((item) => item.employeeId);
-      expect(ids).toEqual(expect.arrayContaining([e1.employeeId, e2.employeeId, u.head.employeeId]));
+      expect(ids).toEqual(expect.arrayContaining([e1.employeeId, e2.employeeId]));
+      expect(ids).not.toContain(u.head.employeeId);
       expect(ids).not.toContain(left.employeeId);
       for (const item of page.items) expect(Object.keys(item).sort()).toEqual(['employeeId', 'fullName', 'workEmail']);
       const searched = h.dataOf<{ items: Array<{ employeeId: string }> }>(

@@ -1,4 +1,5 @@
 import type { DemoAccountSpec } from '../../../modules/installation/public/demo-accounts.types';
+import { dayOffset } from '../demo-dates';
 import { emailOf, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoDepartment, DemoPerson } from '../fixture/demo-fixture.types';
@@ -17,8 +18,8 @@ interface DepartmentProfile extends DepartmentRow {
   itAdmin: { employeeCode: string } | null;
 }
 
-/** Every date a person started is a fixed past day: the dataset never invents a hire date of today. */
-const HIRE_DATE = '2025-01-06';
+/** Everybody started 400 days before today: a seat granted in the past never precedes the person it is for. */
+const HIRE_DAYS_AGO = 400;
 const same = (a: string, b: string) => a.normalize('NFC').trim() === b.normalize('NFC').trim();
 
 async function departments(ctx: DemoRunContext): Promise<StepOutcome> {
@@ -77,7 +78,7 @@ async function employees(ctx: DemoRunContext): Promise<StepOutcome> {
       fullName: person.fullName,
       workEmail: emailOf(ctx, person.code),
       employmentType: person.employmentType,
-      hireDate: HIRE_DATE,
+      hireDate: dayOffset(ctx.today, -HIRE_DAYS_AGO),
       departmentCode: person.department,
     });
     ctx.ids.employees.set(person.code, created.id);

@@ -369,12 +369,51 @@ export class EmployeeRepo {
     return row;
   }
 
+  /** The department of the latest placement begun by `onDate`, ended or not: where a person who left last worked. */
+  async lastPlacementIdsBy(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ departmentId: string } | null> {
+    return (tx ?? this.prisma).employeePlacement.findFirst({
+      where: { employeeId, validFrom: { lte: toDateColumn(onDate) } },
+      orderBy: [{ validFrom: 'desc' }, { id: 'desc' }],
+      select: { departmentId: true },
+    });
+  }
+
   /** The employees with these codes, as far as they exist; unlocked, for the import judgement that names people by code. */
   async findEmployeesByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {
     if (employeeCodes.length === 0) return [];
     const rows = await (tx ?? this.prisma).employee.findMany({ where: { employeeCode: { in: [...employeeCodes] } } });
 
     return rows.map(toEmployeeRecord);
+  }
+
+  /** The people whose normalized work email is one of these, those who left included: a vendor report names people who have left. */
+  async findEmployeesByNormalizedEmails(
+    normalizedEmails: readonly string[],
+    tx?: DbTx,
+  ): Promise<
+    {
+      id: string;
+      employeeCode: string;
+      workEmail: string;
+      normalizedWorkEmail: string;
+      status: EmployeeRecord['status'];
+    }[]
+  > {
+    if (normalizedEmails.length === 0) return [];
+    const rows = await (tx ?? this.prisma).employee.findMany({
+      where: { normalizedWorkEmail: { in: [...normalizedEmails] } },
+      select: { id: true, employeeCode: true, workEmail: true, normalizedWorkEmail: true, status: true },
+    });
+
+    return rows.flatMap((row) =>
+      row.workEmail !== null && row.normalizedWorkEmail !== null
+        ? [{ ...row, workEmail: row.workEmail, normalizedWorkEmail: row.normalizedWorkEmail }]
+        : [],
+    );
   }
 
   /** The distinct, lower-case domains of the work emails of everyone the organization has ever employed. */

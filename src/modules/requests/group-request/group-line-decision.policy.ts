@@ -17,7 +17,7 @@ export interface LineDeciderFacts {
   stepEmployeeIds: readonly string[];
   /** Who holds the step; null while it waits for somebody. */
   assigneeEmployeeId: string | null;
-  stepState: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
+  stepState: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED' | 'NOT_REQUIRED';
   /** Whether the decision approves at least one line. */
   approves: boolean;
 }
@@ -148,14 +148,14 @@ export function lineSpendDecidedDetail(
   };
 }
 
-/** What the audit entry of the whole spend decision says: what was checked, the override and its years, who was approved and who refused. */
+/** What the audit entry of the whole spend decision says: what was checked, the reserve it used, who was approved and who refused. */
 export function groupSpendDecidedDetail(
-  request: { id: string },
-  step: { id: string; samePersonAsSpend: boolean; noIndependentReview: boolean },
+  request: { id: string; routing?: { mode: string } },
   decided: {
     verdicts: readonly LineVerdict[];
     checkId: string | null;
-    override: { reason: string; years: readonly number[] } | null;
+    usesReserve: boolean;
+    reserveReason: string | null;
     decision: 'APPROVED' | 'REJECTED';
     deciderRole: string;
   },
@@ -163,12 +163,11 @@ export function groupSpendDecidedDetail(
   return {
     requestId: request.id,
     checkId: decided.checkId,
+    oneStep: request.routing?.mode === 'ONE_STEP',
     decision: decided.decision,
     deciderRole: decided.deciderRole,
-    override: decided.override !== null,
-    overrideYears: (decided.override?.years ?? []).join(','),
-    samePersonAsSpend: step.samePersonAsSpend,
-    noIndependentReview: step.noIndependentReview,
+    usesReserve: decided.usesReserve,
+    reserveReason: decided.reserveReason,
     requestState: decided.decision === 'APPROVED' ? 'AWAITING_EXECUTION' : 'REJECTED',
     lineCount: decided.verdicts.length,
     approvedEmployeeIds: decided.verdicts.filter((v) => v.decision === 'APPROVE').map((v) => v.employeeId),

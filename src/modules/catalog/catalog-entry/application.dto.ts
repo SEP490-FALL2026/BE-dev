@@ -21,7 +21,8 @@ export const declareApplicationBodySchema = z.strictObject({
   dictionaryServiceLineId: z.uuid().optional(),
   domains: textList.optional(),
   dataSensitivity: sensitivity,
-  businessOwnerEmployeeId: z.uuid(),
+  // QĐ-104 removed the Business Owner: no longer asked for; an application declared without one has none.
+  businessOwnerEmployeeId: z.uuid().optional(),
   communication: z.strictObject({
     personToPersonMessaging: z.boolean(),
     callsOrMeetings: z.boolean(),
@@ -67,12 +68,15 @@ const applicationSummarySchema = z.strictObject({
   vendor: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   dataSensitivity: sensitivity,
   isCommunicationService: z.boolean(),
-  businessOwner: z.strictObject({
-    employeeId: z.uuid(),
-    employeeCode: z.string(),
-    fullName: z.string(),
-    status: z.enum(['ACTIVE', 'TERMINATED']),
-  }),
+  businessOwner: z
+    .strictObject({
+      employeeId: z.uuid(),
+      employeeCode: z.string(),
+      fullName: z.string(),
+      status: z.enum(['ACTIVE', 'TERMINATED']),
+    })
+    .nullable()
+    .meta({ description: 'Null for an application declared without one: the Business Owner is no longer required.' }),
   businessOwnerReplacementRequired: z.boolean(),
   usageCollectionDefault: z.literal('NOT_COLLECTED').nullable(),
   functionalGroup: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),

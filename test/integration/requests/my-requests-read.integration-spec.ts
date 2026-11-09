@@ -33,6 +33,7 @@ const FINANCE_TABLES = [
   'spend_batches',
   'spend_batch_items',
   'budget_information_requests',
+  'request_reserve_confirmations',
   'exchange_rates',
   'vendor_tax_profiles',
   'subscriptions',

@@ -31,8 +31,9 @@ describe('GET /spend-batches (HTTP contract, no database)', () => {
     expect(bodyOf(response).error.code).toBe('AUTHENTICATION_REQUIRED');
   });
 
-  it('refuses every role but Finance with 403 and reads nothing', async () => {
-    for (const roles of [['MANAGER'], ['EMPLOYEE'], ['IT_ADMIN'], ['SUPER_ADMIN'], ['SPENDING_APPROVER'], []]) {
+  it('refuses every role but Finance and the spending approver with 403 and reads nothing', async () => {
+    // FIX-BUDGET 6a: the spending approver, who decides the requests of a batch, reads the list of batches too.
+    for (const roles of [['MANAGER'], ['EMPLOYEE'], ['IT_ADMIN'], ['SUPER_ADMIN'], []]) {
       const response = await request(app.getHttpServer())
         .get('/api/v1/spend-batches')
         .set('Authorization', bearer(principal(roles)))

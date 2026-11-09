@@ -15,6 +15,7 @@ const ROW = {
   type: 'GRANT',
   branch: 'PAID_IN_CATALOG',
   state: 'PENDING',
+  routing: { mode: 'VIA_HEAD', oneStepReason: null },
   plan: {
     planId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d13',
     planName: 'Business',
@@ -24,7 +25,8 @@ const ROW = {
   softwareName: null,
   beneficiary: PERSON,
   lineCount: 1,
-  termMonths: 6,
+  termMonths: null,
+  expectedEndDate: '2027-03-31',
   submittedAt: '2026-10-30T02:00:00.000Z',
   updatedAt: '2026-10-30T02:00:00.000Z',
   needStep: { state: 'PENDING', assignee: PERSON, waitingReason: null },
@@ -32,6 +34,8 @@ const ROW = {
   outcome: null,
   withdrawal: null,
   canWithdraw: true,
+  involvement: 'SENT',
+  myLine: null,
 };
 const PAGE = { items: [ROW], pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 } };
 
@@ -75,20 +79,57 @@ describe('my requests route (e2e, no database)', () => {
     expect(list).toHaveBeenCalledWith(expect.objectContaining({ employeeId: 'e-77' }), { page: 1, pageSize: 20 });
   });
 
+  it('BR-MF1-02 returns one-step revision with NOT_REQUIRED need and no retired flags', async () => {
+    const item = {
+      ...ROW,
+      state: 'AWAITING_REQUESTER_REVISION',
+      routing: { mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' },
+      needStep: { state: 'NOT_REQUIRED', assignee: null, waitingReason: null },
+    };
+    list.mockResolvedValue({ ...PAGE, items: [item] });
+    const response = await get(PATH).expect(200);
+    const data = bodyOf(response).data as unknown as { items: unknown[] };
+    expect(data.items).toEqual([item]);
+    expect(data.items[0]).not.toHaveProperty('samePersonAsSpend');
+  });
+
   it('reads every narrowing and gives them to the service as they are', async () => {
     await get(
-      `${PATH}?view=open&state=PENDING,AWAITING_BUDGET&type=GROUP_GRANT&from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z&page=2&pageSize=5`,
+      `${PATH}?view=open&state=PENDING,AWAITING_SPEND_DECISION&type=GROUP_GRANT&from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z&page=2&pageSize=5`,
     ).expect(200);
 
     expect(list).toHaveBeenCalledWith(expect.anything(), {
       page: 2,
       pageSize: 5,
       view: 'open',
-      state: 'PENDING,AWAITING_BUDGET',
+      state: 'PENDING,AWAITING_SPEND_DECISION',
       type: 'GROUP_GRANT',
       from: '2026-10-01T00:00:00Z',
       to: '2026-11-01T00:00:00Z',
     });
+  });
+
+  it.each(['SENT', 'FOR_ME', 'ALL'])('gives the involvement %s to the service as it is', async (involvement) => {
+    await get(`${PATH}?involvement=${involvement}`).expect(200);
+
+    expect(list).toHaveBeenCalledWith(expect.anything(), { page: 1, pageSize: 20, involvement });
+  });
+
+  it('answers the line of the caller in a request for a group somebody else sent for them', async () => {
+    const item = {
+      ...ROW,
+      type: 'GROUP_GRANT',
+      beneficiary: null,
+      lineCount: 3,
+      canWithdraw: false,
+      involvement: 'FOR_ME',
+      myLine: { state: 'NEED_REJECTED', outcomeReason: 'Not this quarter' },
+    };
+    list.mockResolvedValue({ ...PAGE, items: [item] });
+
+    const response = await get(`${PATH}?involvement=FOR_ME`).expect(200);
+
+    expect((bodyOf(response).data as unknown as { items: unknown[] }).items).toEqual([item]);
   });
 
   it.each([
@@ -115,6 +156,8 @@ describe('my requests route (e2e, no database)', () => {
     ['a type that does not exist', `${PATH}?type=RETURN`],
     ['a moment that is not one', `${PATH}?from=yesterday`],
     ['a window that ends before it begins', `${PATH}?from=2026-11-01T00:00:00Z&to=2026-10-01T00:00:00Z`],
+    ['an involvement that does not exist', `${PATH}?involvement=OTHERS`],
+    ['a person named beside the involvement', `${PATH}?involvement=FOR_ME&employeeId=${ID}`],
   ])('turns away %s, 422', async (_name, path) => {
     const response = await get(path).expect(422);
 
@@ -162,6 +205,6 @@ describe('my requests route and the Super Admin (e2e, no database)', () => {
       .set('Authorization', bearer(principal(['SUPER_ADMIN'])))
       .expect(200);
     expect(bodyOf(response).data).toMatchObject({ items: [], pagination: { totalItems: 0 } });
-    expect(pageOf).toHaveBeenCalledWith(expect.objectContaining({ requesterEmployeeId: 'e1' }));
+    expect(pageOf).toHaveBeenCalledWith(expect.objectContaining({ scope: { kind: 'SENT_BY', employeeId: 'e1' } }));
   });
 });

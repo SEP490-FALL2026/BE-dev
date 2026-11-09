@@ -19,6 +19,7 @@ import { OrganizationApi } from './public/organization.api';
 import { OrganizationReadApi } from './public/organization-read.api';
 import {
   CostCenterUseContributions,
+  DepartmentCreationWindowHook,
   DepartmentServiceAccountReaderHook,
   DepartmentUseContributions,
   EmployeeAccountsHook,
@@ -42,6 +43,7 @@ import {
     DepartmentUseContributions,
     CostCenterUseContributions,
     DepartmentServiceAccountReaderHook,
+    DepartmentCreationWindowHook,
     EmployeeAccountsHook,
     OrganizationChangeService,
     AnnouncementRepo,
@@ -77,6 +79,7 @@ import {
     DepartmentUseContributions,
     CostCenterUseContributions,
     DepartmentServiceAccountReaderHook,
+    DepartmentCreationWindowHook,
     EmployeeAccountsHook,
   ],
 })

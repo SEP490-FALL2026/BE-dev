@@ -57,6 +57,36 @@ export class AccessRequestAlreadyHoldsAccessError extends Error {
   }
 }
 
+/** GH-1 (`BR-MF1-01e`): the person already has a request for new access of the plan open. */
+export class AccessRequestOpenRequestExistsError extends Error {
+  constructor(readonly requestId: string) {
+    super('The person already has a request for this plan open.');
+    this.name = 'AccessRequestOpenRequestExistsError';
+  }
+}
+
+/** GH-2 (`BR-MF1-01f`): the person already has as many requests for new access open as they may. */
+export class AccessRequestOpenLimitReachedError extends Error {
+  constructor(
+    readonly limit: number,
+    readonly openRequestIds: readonly string[],
+  ) {
+    super('The person already has as many requests for new access open as they may.');
+    this.name = 'AccessRequestOpenLimitReachedError';
+  }
+}
+
+/** GH-3 (`BR-MF1-01g`): the person uses many paid applications already, so a reason is needed to ask for another one. */
+export class AccessRequestManyPaidSoftwareReasonRequiredError extends Error {
+  constructor(
+    readonly count: number,
+    readonly threshold: number,
+  ) {
+    super('The person uses many paid applications already: a reason is required to ask for another one.');
+    this.name = 'AccessRequestManyPaidSoftwareReasonRequiredError';
+  }
+}
+
 /** The request cannot be priced for another day: its quote is not in force then, or does not say how it is paid. */
 export class AccessRequestNotPriceableError extends Error {
   constructor() {
@@ -65,16 +95,24 @@ export class AccessRequestNotPriceableError extends Error {
   }
 }
 
-/** The term asked for is longer than a request may ask for, or a flexible plan would run past the end of the fiscal year (`US-05-01` AC-4, `QĐ-98`). */
-export class AccessRequestTermBeyondLimitError extends Error {
-  constructor(
-    readonly maxMonths: number,
-    readonly endsBy: string | null,
-  ) {
+/**
+ * The end date asked for is before today or later than a year from today (`US-05-23` AC-9, `QĐ-104a`): the last day a right may
+ * end is the day before the same day twelve months later. A draft saved with a date that no longer fits must be saved again.
+ */
+export class AccessRequestEndDateOutOfRangeError extends Error {
+  constructor(readonly maxEndDate: string) {
     super(
-      'The term is longer than a request may ask for: at most 12 months. A draft saved with a longer term must be saved again with a shorter one.',
+      'The end date is before today or more than a year from today. A draft saved with such a date must be saved again with a date inside the year.',
     );
-    this.name = 'AccessRequestTermBeyondLimitError';
+    this.name = 'AccessRequestEndDateOutOfRangeError';
+  }
+}
+
+/** The person it is for is not staff (a contractor, a freelancer, an intern) and the request names no end date (`FR-2.8`). */
+export class AccessRequestTermRequiredError extends Error {
+  constructor() {
+    super('A contractor, a freelancer or an intern gets access for a term: give the end date.');
+    this.name = 'AccessRequestTermRequiredError';
   }
 }
 
@@ -141,5 +179,16 @@ export class AccessRequestRoleRequiredError extends Error {
   constructor(readonly role: 'IT_ADMIN') {
     super(`Only the role ${role} may do this.`);
     this.name = 'AccessRequestRoleRequiredError';
+  }
+}
+
+export class AccessRequestNotAwaitingRevisionError extends Error {
+  constructor() {
+    super('The request is not waiting for its requester to revise and send it again.');
+  }
+}
+export class AccessRequestNotRequesterError extends Error {
+  constructor() {
+    super('Only the requester may send this request again.');
   }
 }

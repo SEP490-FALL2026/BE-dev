@@ -138,3 +138,27 @@ export class EmployeeAccountsHook extends Hook<EmployeeAccounts> {
     super('organization.employee-accounts');
   }
 }
+
+/**
+ * Whether a department may be made today, from the budget cycles (`QĐ-104e(3)`, `R-I10`): `OPEN` while the cycle of the next year was
+ * never published, with the day the new department takes effect (1 January of that year); `CLOSED` otherwise (a department made in
+ * the middle of the year would have no budget); `NO_CYCLE_YET` while the organization has no cycle at all (the installation).
+ */
+export type DepartmentCreationWindow =
+  { kind: 'OPEN'; effectiveFrom: BusinessDate } | { kind: 'CLOSED' } | { kind: 'NO_CYCLE_YET' };
+
+/** What the organization asks of the budget cycles when a department is made, read in the transaction of the creation. */
+export interface DepartmentCreationWindowReader {
+  windowOn(tx: DbTx, organizationId: string, today: BusinessDate): Promise<DepartmentCreationWindow>;
+}
+
+/**
+ * The reader of the window a department may be made in, bound by `budgets`. Only the API makes departments and it loads `budgets`;
+ * the installation creates its first department by another door and never asks.
+ */
+@Injectable()
+export class DepartmentCreationWindowHook extends Hook<DepartmentCreationWindowReader> {
+  constructor() {
+    super('organization.department-creation-window');
+  }
+}

@@ -4,7 +4,8 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { StopReason } from './spend-submission.policy';
 
-export type BatchItemOutcome = 'SENT_TO_APPROVER' | 'SENT_TO_FINANCE' | 'STOPPED';
+/** `SENT_TO_FINANCE` is read from batches made before: Finance has no review any more. */
+export type BatchItemOutcome = 'SENT_TO_APPROVER' | 'SENT_TO_FINANCE' | 'AWAITING_RESERVE_CONFIRMATION' | 'STOPPED';
 export type LeftReason = 'RETURNED_BY_FINANCE' | 'CONFLICT_OF_INTEREST' | 'REQUEST_WITHDRAWN' | 'REQUEST_CANCELLED';
 
 export interface BatchRecord {

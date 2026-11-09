@@ -1,18 +1,20 @@
 import type { AuditValue } from '../../audit/public/audit.types';
 import type { SubmitBodyDto } from '../access-request/access-request.dto';
 import { hasSpendStep } from '../access-request/access-request.policy';
-import type { NewAccessRequest } from '../access-request/access-request.types';
+import type { ManyPaidSoftwareFlag, NewAccessRequest } from '../access-request/access-request.types';
 import type { Assessment } from '../access-request/request-facts.service';
 
 /** What a request that is sent is made of: who sent it, what they asked for, what it was judged by, and the day. */
 export interface SubmittedRequest {
   actor: { employeeId: string; appUserId: string };
   organizationId: string;
-  body: Pick<SubmitBodyDto, 'planId' | 'termMonths' | 'businessReason'>;
+  body: Pick<SubmitBodyDto, 'planId' | 'expectedEndDate' | 'businessReason'>;
   assessed: Pick<Assessment, 'unit' | 'policy' | 'pricing' | 'routing'>;
   now: Date;
   /** The draft the request is sent from: its row becomes the request. */
   draftId?: string;
+  /** GH-3 of the person, when the request is flagged (`BR-MF1-01g`). */
+  manyPaidSoftware?: ManyPaidSoftwareFlag | null;
 }
 
 /** The state the request starts in: pending with the person the table named, or waiting under control when nobody valid exists. */
@@ -36,21 +38,21 @@ export function newRequestOf(facts: SubmittedRequest): NewAccessRequest {
     departmentId: unit.departmentId,
     costCenterId: unit.costCenter?.id ?? null,
     businessReason: body.businessReason,
-    termMonths: body.termMonths,
-    expectedEndDate: null,
+    termMonths: null,
+    expectedEndDate: body.expectedEndDate ?? null,
     pricing,
     policy,
     createdByAppUserId: actor.appUserId,
     now: facts.now,
     needStep: {
-      state: assigned ? 'PENDING' : 'WAITING',
+      state: decision.outcome === 'NOT_REQUIRED' ? 'NOT_REQUIRED' : assigned ? 'PENDING' : 'WAITING',
       assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
       routingRow: decision.row,
       waitingReason: assigned ? null : decision.reason,
-      samePersonAsSpend: assigned && decision.samePersonAsSpend,
       slaWorkingDays: policy.slaWorkingDays,
     },
     draftId: facts.draftId ?? null,
+    manyPaidSoftware: facts.manyPaidSoftware ?? null,
   };
 }
 
@@ -63,7 +65,7 @@ export function submittedAuditDetail(facts: SubmittedRequest): { [key: string]: 
     branch: policy.branch,
     state: startState(assessed.routing),
     planId: body.planId,
-    termMonths: body.termMonths,
+    expectedEndDate: body.expectedEndDate ?? null,
     requesterEmployeeId: actor.employeeId,
     beneficiaryEmployeeIds: [actor.employeeId],
     departmentId: unit.departmentId,
@@ -75,7 +77,7 @@ export function submittedAuditDetail(facts: SubmittedRequest): { [key: string]: 
     amountMinor: pricing.amount?.amountMinor.toString() ?? null,
     amountCurrency: pricing.amount?.currency ?? null,
     budgetYear: pricing.budgetYear,
-    expectedSpendOn: pricing.expectedSpendOn,
+    manyPaidSoftwareCount: facts.manyPaidSoftware?.count ?? null,
   };
 }
 
@@ -92,7 +94,6 @@ export function routedAuditDetail(facts: SubmittedRequest, requestId: string): {
     assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
     role: assigned ? decision.role : null,
     waitingReason: assigned ? null : decision.reason,
-    samePersonAsSpend: assigned && decision.samePersonAsSpend,
     requesterEmployeeId: facts.actor.employeeId,
     departmentId: unit.departmentId,
     departmentHeadEmployeeId: routing.departmentHeadEmployeeId,

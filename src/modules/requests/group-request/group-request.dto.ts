@@ -1,9 +1,9 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import {
   REASON_MAX_LENGTH,
-  TERM_MONTHS_MAX,
   employeeRef,
   moneySchema,
   pricingSchema,
@@ -27,20 +27,31 @@ const reason = z.string().trim().min(1).max(REASON_MAX_LENGTH);
 export const groupBodySchema = z.strictObject({
   planId: z.uuid(),
   lines: z
-    .array(z.strictObject({ employeeId: z.uuid() }))
+    .array(
+      z.strictObject({
+        employeeId: z.uuid(),
+        /** GH-3 (`BR-MF1-01g`): why this person asks for one more paid application; required only at the threshold. */
+        manyPaidSoftwareReason: reason.optional(),
+      }),
+    )
     .min(1)
     .max(GROUP_BODY_LINES_MAX),
   businessReason: reason,
-  termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
+  /** The day the access of every person named ends; absent for no end, and then each person who is not staff is refused (`FR-2.8`). */
+  expectedEndDate: businessDate.optional(),
 });
 
 const LINE_REASONS = [
+  'HEAD_IN_GROUP',
   'SPENDING_APPROVER',
   'OUTSIDE_DEPARTMENT',
   'NOT_ACTIVE',
   'EMAIL_REQUIRED',
   'HAS_ACCESS',
   'HAS_OPEN_REQUEST',
+  'TERM_REQUIRED',
+  'OPEN_LIMIT_REACHED',
+  'MANY_PAID_SOFTWARE_REASON_REQUIRED',
 ] as const;
 
 /** What the check of a group says: every reason of every person at once, and what it would cost; nothing is written. */
@@ -53,20 +64,24 @@ const checkSchema = z.strictObject({
   tooManyLines: z.strictObject({ max: z.number().int().positive() }).nullable(),
   /** The fewest different people a request for a group names, when fewer were named. */
   tooFewLines: z.strictObject({ min: z.number().int().positive() }).nullable(),
-  /** The longest term the plan takes from today, and whether the term asked for is beyond it. */
-  termLimit: z.strictObject({ maxMonths: z.number().int().positive(), endsBy: z.string().nullable() }),
-  termBeyondLimit: z.boolean(),
+  /** The last day a right asked for today may end, and whether the end date asked for is outside it (`US-05-23` AC-9). */
+  maxEndDate: z.string(),
+  endDateOutOfRange: z.boolean(),
   lines: z.array(
     z.strictObject({
       employeeId: z.uuid(),
       ok: z.boolean(),
       reason: z.enum([...LINE_REASONS, 'DUPLICATE_LINE']).nullable(),
+      /** GH-3 of the person: how many paid applications they use and the threshold; null when the line is not flagged. */
+      manyPaidSoftware: z
+        .strictObject({ count: z.number().int().nonnegative(), threshold: z.number().int() })
+        .nullable(),
     }),
   ),
   lineCount: z.number().int().nonnegative(),
   hasSpendStep: z.boolean(),
   pricing: pricingSchema,
-  /** The unit price for the whole term, for one person; null when the plan has no price. */
+  /** What one person of the request costs for the months counted; null when the plan has no price or nobody is named. */
   amountPerPerson: moneySchema.nullable(),
 });
 
@@ -90,8 +105,7 @@ const lineDecisionSchema = z.strictObject({
   decision: z.enum(['APPROVED', 'REJECTED']),
   reason: z.string().nullable(),
   decidedBy: employeeRef,
-  /** `FALLBACK_APPROVER` and `CONFLICT_SUBSTITUTE` are historical: a decision of before `QĐ-93`; none is written now. */
-  deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER', 'FALLBACK_APPROVER', 'CONFLICT_SUBSTITUTE']),
+  deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER']),
   decidedAt: z.iso.datetime(),
 });
 
@@ -103,7 +117,7 @@ const lineSchema = z.strictObject({
   /** The need step that holds this person: the head's for the others, a step of its own for the head. */
   needStep: z.strictObject({
     id: z.uuid(),
-    state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED']),
+    state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED', 'NOT_REQUIRED']),
     assignee: employeeRef.nullable(),
   }),
   /** The day the access of this person ends, when they are not staff. */

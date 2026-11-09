@@ -45,12 +45,26 @@ describe('grantAnswerFor a request of a person (US-07-01 AC-3, AC-16)', () => {
     });
   });
 
+  it('R-D01: a request with no term in months and no end date has a seat with no end, and one with an end date ends with it', () => {
+    const open = { ...request('AWAITING_EXECUTION'), termMonths: null };
+
+    expect(grantAnswerFor(open)).toMatchObject({ status: 'GRANTABLE', expectedEndDate: null, termBound: false });
+    expect(grantAnswerFor({ ...open, expectedEndDate: '2027-02-19' })).toMatchObject({
+      status: 'GRANTABLE',
+      expectedEndDate: '2027-02-19',
+      termBound: true,
+    });
+    expect(grantAnswerFor({ ...open, branch: 'INTERNAL_FREE', expectedEndDate: '2027-02-19' })).toMatchObject({
+      termBound: true,
+    });
+  });
+
   it('is not in the catalog while software that was proposed has no plan', () => {
     expect(grantAnswerFor({ ...request('AWAITING_EXECUTION'), planId: null })).toEqual({ status: 'NOT_IN_CATALOG' });
   });
 
   it('is not approved enough while a step is open, and ended once the request is over', () => {
-    for (const state of ['PENDING', 'AWAITING_SPEND_DECISION', 'AWAITING_FINANCE_REVIEW'] as const) {
+    for (const state of ['PENDING', 'AWAITING_SPEND_DECISION', 'AWAITING_SPEND_SUBMISSION'] as const) {
       expect(grantAnswerFor(request(state))).toEqual({ status: 'NOT_APPROVED' });
     }
     for (const state of ['REJECTED', 'IT_REJECTED', 'EXECUTING', 'COMPLETED', 'FAILED', 'WITHDRAWN'] as const) {

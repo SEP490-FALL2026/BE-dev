@@ -121,7 +121,7 @@ export class ApplicationRepo {
   async markRetired(
     tx: DbTx,
     applicationId: string,
-    input: { appUserId: string; confirmationId: string; now: Date },
+    input: { appUserId: string; confirmationId: string | null; now: Date },
   ): Promise<void> {
     await tx.application.update({
       where: { id: applicationId },
@@ -187,11 +187,12 @@ export class ApplicationRepo {
   /** The distinct Business Owners of all applications now: whose status decides which applications need a new one. */
   async currentOwnerIds(): Promise<string[]> {
     const rows = await this.prisma.application.findMany({
+      where: { businessOwnerEmployeeId: { not: null } },
       distinct: ['businessOwnerEmployeeId'],
       select: { businessOwnerEmployeeId: true },
     });
 
-    return rows.map((row) => row.businessOwnerEmployeeId);
+    return rows.flatMap((row) => (row.businessOwnerEmployeeId === null ? [] : [row.businessOwnerEmployeeId]));
   }
 
   /** The first `take` applications still in use whose Business Owner is this employee, by name, and how many there are. */
@@ -233,7 +234,15 @@ export class ApplicationRepo {
           take,
         });
 
-        return { items: rows, total: await tx.application.count({ where }) };
+        // The filter names the owners, so every row has one.
+        return {
+          items: rows.flatMap((row) =>
+            row.businessOwnerEmployeeId === null
+              ? []
+              : [{ ...row, businessOwnerEmployeeId: row.businessOwnerEmployeeId }],
+          ),
+          total: await tx.application.count({ where }),
+        };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );

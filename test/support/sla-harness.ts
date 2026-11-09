@@ -127,11 +127,6 @@ export class SlaHarness extends StatusHarness {
     return [
       request(server).post(`/api/v1/access-requests/${requestId}/need-decision`).set(as).send({ decision: 'APPROVE' }),
       request(server).post(`/api/v1/access-requests/${requestId}/spend-approval`).set(as).send({ decision: 'APPROVE' }),
-      request(server).post(`/api/v1/access-requests/${requestId}/finance-review`).set(as).send({
-        outcome: 'ASSESSED',
-        opinion: 'A decision made in the place of Finance',
-        direction: 'RECOMMEND_OVERRIDE',
-      }),
       request(server)
         .post(`/api/v1/spend-batches/${batchId}/decisions`)
         .set(as)

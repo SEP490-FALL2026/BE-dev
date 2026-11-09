@@ -16,8 +16,9 @@ interface ItemWire {
 interface QueueWire {
   requestId: string;
   stage: string;
-  blockedReason: string | null;
-  financeReturnReason: string | null;
+  budgetOutcome: string | null;
+  blockedReasons: string[];
+  overBy: { currency: string } | null;
   readyToSubmit: boolean;
 }
 
@@ -183,7 +184,7 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
   });
 
   describe('a request that stops does not hold the others back (AC-9, AC-12)', () => {
-    it('stays with the reason and without a step, and the head reads no figure of the budget (AC-9)', async () => {
+    it('BR-MF1-06i(iv): stays with the reason and without a step, and the head reads no figure of what is left (AC-9)', async () => {
       const ok = await waiting();
       const stale = await h.staleRequest(design);
 
@@ -191,53 +192,196 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
 
       expect((await items(batch.id)).map((item) => [item.outcome, item.stopReason])).toEqual([
         ['SENT_TO_APPROVER', null],
-        ['STOPPED', 'STALE_COST_EVIDENCE'],
+        ['STOPPED', 'PRICE_EXPIRED'],
       ]);
       expect(await h.steps(stale, 'SPEND_APPROVAL')).toEqual([]);
-      expect(await h.steps(stale, 'FINANCE_REVIEW')).toEqual([]);
       const row = (await queue()).find((item) => item.requestId === stale);
-      expect(row).toMatchObject({ stage: 'BLOCKED', blockedReason: 'STALE_COST_EVIDENCE', readyToSubmit: true });
+      expect(row).toMatchObject({ stage: 'BLOCKED', blockedReasons: ['PRICE_EXPIRED'], readyToSubmit: true });
       const text = JSON.stringify((await h.spendQueue(design.head.account, { pageSize: 100 })).body);
       expect(text).not.toMatch(/remaining|INSUFFICIENT|HIGH_VALUE|NO_ACTIVE_BUDGET|budget":\{/);
     });
 
-    it('goes to Finance first when it needs a review, while the others go to the approver, and stays in its batch (AC-12)', async () => {
+    it('BR-MF1-06g(3)(i): a request over the base and the reserve stays in the queue, blocked, and the others go to the approver (AC-12)', async () => {
       const ok = await waiting();
       const big = await waiting(1500 * M);
       const batch = await send([ok, big]);
 
-      expect((await items(batch.id)).map((item) => item.outcome)).toEqual(['SENT_TO_APPROVER', 'SENT_TO_FINANCE']);
-      expect(await h.steps(big, 'SPEND_APPROVAL')).toEqual([]);
-      expect(await h.steps(big, 'FINANCE_REVIEW')).toEqual([expect.objectContaining({ state: 'PENDING' })]);
-
-      await h
-        .completeReview(big, { outcome: 'ASSESSED', opinion: 'Reviewed', direction: 'RECOMMEND_APPROVE' })
-        .expect(200);
-
-      expect(await h.steps(big, 'SPEND_APPROVAL')).toEqual([
-        expect.objectContaining({ state: 'PENDING', assignee_employee_id: h.boss.employeeId }),
+      expect((await items(batch.id)).map((item) => [item.outcome, item.stopReason])).toEqual([
+        ['SENT_TO_APPROVER', null],
+        ['STOPPED', 'OVER_RESERVE'],
       ]);
-      expect((await items(batch.id)).find((item) => item.requestId === big)).toMatchObject({
-        outcome: 'SENT_TO_FINANCE',
-        leftReason: null,
+      expect(await h.steps(big, 'SPEND_APPROVAL')).toEqual([]);
+      expect(await h.state(big)).toBe('AWAITING_SPEND_SUBMISSION');
+      expect((await queue()).find((item) => item.requestId === big)).toMatchObject({
+        stage: 'BLOCKED',
+        budgetOutcome: 'BLOCKED',
+        blockedReasons: ['OVER_RESERVE'],
+        overBy: { currency: 'VND' },
       });
     });
 
-    it('leaves the batch when Finance gives it back, and is in the queue with the reason and no figure (AC-13)', async () => {
+    it('BR-MF1-06i: has no item that goes to Finance and none that Finance gives back: the batch never leaves a request for it', async () => {
       const id = await waiting(1500 * M);
+
       const batch = await send([id]);
 
-      await h.completeReview(id, { outcome: 'RETURN_TO_HEAD', reason: 'Too much: reduce the scope' }).expect(200);
+      const [item] = await items(batch.id);
+      expect(item).toMatchObject({ outcome: 'STOPPED', leftReason: null, leftAt: null });
+      expect(await h.ctx.sql.query(`SELECT 1 FROM spend_batch_items WHERE outcome = 'SENT_TO_FINANCE'`)).toHaveProperty(
+        'rowCount',
+        0,
+      );
+    });
+  });
 
-      expect((await items(batch.id))[0]).toMatchObject({
-        leftReason: 'RETURNED_BY_FINANCE',
-        requestState: 'AWAITING_SPEND_SUBMISSION',
+  describe('BR-MF1-06h, RV-11: a request that uses the reserve waits for the line of reason of the head', () => {
+    let counter = 0;
+    /** 100 base and 50 reserve: a request of 120 uses the reserve, one of 10 is within the base. */
+    const reserveUnit = async (): Promise<Unit> => {
+      counter += 1;
+      const unit = await h.departmentWithHead(`P-RS${counter}`);
+      await h.budgetFor(unit, { total: 100 * M, reserve: 50 * M });
+
+      return unit;
+    };
+    const submit = async (unit: Unit, ids: string[], confirmations?: { requestId: string; reason: string }[]) =>
+      h.dataOf<{ batch: { id: string }; results: Array<Record<string, unknown>> }>(
+        await h.sendOn(ids, unit.head.account, confirmations).expect(201),
+      );
+
+    it('BR-MF1-06h: stays in the queue, with no step, when no reason is given: the item says it awaits the confirmation', async () => {
+      const unit = await reserveUnit();
+      const uses = await waiting(120 * M, unit);
+
+      const { batch, results } = await submit(unit, [uses]);
+
+      expect(results).toEqual([
+        {
+          requestId: uses,
+          outcome: 'AWAITING_RESERVE_CONFIRMATION',
+          stopReason: null,
+          reserveConfirmation: 'NOT_GIVEN',
+        },
+      ]);
+      expect((await items(batch.id, unit.head.account))[0]).toMatchObject({ outcome: 'AWAITING_RESERVE_CONFIRMATION' });
+      expect(await h.steps(uses, 'SPEND_APPROVAL')).toEqual([]);
+      expect(await h.state(uses)).toBe('AWAITING_SPEND_SUBMISSION');
+      const row = (await queue(unit.head.account)).find((item) => item.requestId === uses);
+      expect(row).toMatchObject({ stage: 'RESERVE_CONFIRMATION', budgetOutcome: 'USES_RESERVE', blockedReasons: [] });
+    });
+
+    it('RV-11: sends it on in the same act when the head gives a reason, keeps the confirmation on the step it opened', async () => {
+      const unit = await reserveUnit();
+      const uses = await waiting(120 * M, unit);
+
+      const { results } = await submit(unit, [uses], [{ requestId: uses, reason: 'The release cannot wait' }]);
+
+      expect(results).toEqual([
+        { requestId: uses, outcome: 'SENT_TO_APPROVER', stopReason: null, reserveConfirmation: 'APPLIED' },
+      ]);
+      const kept = await h.ctx.sql.query<{ reason: string; confirmed_by_employee_id: string }>(
+        `SELECT c.reason, c.confirmed_by_employee_id FROM request_reserve_confirmations c
+           JOIN access_request_steps s ON s.id = c.spend_step_id WHERE c.request_id = $1 AND s.kind = 'SPEND_APPROVAL'`,
+        [uses],
+      );
+      expect(kept.rows).toEqual([
+        { reason: 'The release cannot wait', confirmed_by_employee_id: unit.head.employeeId },
+      ]);
+      expect(await h.state(uses)).toBe('AWAITING_SPEND_DECISION');
+    });
+
+    it('RV-11: ignores a confirmation given for a request that does not use the reserve, and says so', async () => {
+      const unit = await reserveUnit();
+      const within = await waiting(10 * M, unit);
+      const blocked = await waiting(400 * M, unit);
+
+      const { results } = await submit(
+        unit,
+        [within, blocked],
+        [
+          { requestId: within, reason: 'Not needed' },
+          { requestId: blocked, reason: 'Not enough either' },
+        ],
+      );
+
+      expect(results).toEqual([
+        { requestId: within, outcome: 'SENT_TO_APPROVER', stopReason: null, reserveConfirmation: 'IGNORED' },
+        { requestId: blocked, outcome: 'STOPPED', stopReason: 'OVER_RESERVE', reserveConfirmation: 'IGNORED' },
+      ]);
+      const none = await h.ctx.sql.query(
+        `SELECT 1 FROM request_reserve_confirmations WHERE request_id = ANY($1::uuid[])`,
+        [[within, blocked]],
+      );
+      expect(none.rowCount).toBe(0);
+    });
+
+    it('RV-11: refuses the whole batch with 422 when a confirmation names a request that is not in it, and writes nothing', async () => {
+      const unit = await reserveUnit();
+      const inBatch = await waiting(10 * M, unit);
+      const outside = await waiting(120 * M, unit);
+      const before = await batches();
+
+      const response = await h
+        .sendOn([inBatch], unit.head.account, [{ requestId: outside, reason: 'Not part of the batch' }])
+        .expect(422);
+
+      expect(h.codeOf(response)).toBe('SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH');
+      expect(await batches()).toBe(before);
+      expect(await h.state(inBatch)).toBe('AWAITING_SPEND_SUBMISSION');
+    });
+
+    it('P0-04: the endpoint confirms a request left in the queue, after which the approver holds the step', async () => {
+      const unit = await reserveUnit();
+      const uses = await waiting(120 * M, unit);
+      await submit(unit, [uses]);
+
+      const done = h.dataOf<{ reserveConfirmation: Record<string, unknown> }>(
+        await h.confirmReserve(uses, { reason: 'Customer deadline' }, unit.head.account).expect(200),
+      ).reserveConfirmation;
+
+      expect(done).toMatchObject({
+        result: 'SPEND_STEP_OPENED',
+        budgetOutcome: 'USES_RESERVE',
+        confirmationKept: true,
       });
-      expect((await items(batch.id))[0].leftAt).not.toBeNull();
-      expect((await queue()).find((item) => item.requestId === id)).toMatchObject({
-        stage: 'RETURNED_BY_FINANCE',
-        financeReturnReason: 'Too much: reduce the scope',
-      });
+      expect(await h.steps(uses, 'SPEND_APPROVAL')).toEqual([
+        expect.objectContaining({ state: 'PENDING', assignee_employee_id: h.boss.employeeId }),
+      ]);
+      expect(h.codeOf(await h.confirmReserve(uses, { reason: 'Again' }, unit.head.account).expect(409))).toBe(
+        'SPEND.RESERVE_NOT_PENDING',
+      );
+    });
+
+    it('M-11: the confirmation stays when the head changes, and a request not yet confirmed goes to the successor', async () => {
+      const unit = await reserveUnit();
+      const confirmed = await waiting(120 * M, unit);
+      const waitingOne = await waiting(25 * M, unit); // 150 in all less the 120 that wait: it still uses the reserve
+      await submit(unit, [confirmed], [{ requestId: confirmed, reason: 'Kept through the change' }]);
+      await submit(unit, [waitingOne]);
+      counter += 1;
+      const successor = await h.staff(unit.department, `SUC-${counter}`);
+      await h.makeHead(unit.department, successor);
+
+      expect((await queue(successor.account)).map((item) => item.requestId)).toContain(waitingOne);
+      const kept = await h.ctx.sql.query(`SELECT 1 FROM request_reserve_confirmations WHERE request_id = $1`, [
+        confirmed,
+      ]);
+      expect(kept.rowCount).toBe(1);
+      await h.confirmReserve(waitingOne, { reason: 'The successor decides' }, successor.account).expect(200);
+    });
+
+    it('QT 1.6: the head who is a party to the request does not confirm it; another department head is refused too', async () => {
+      const unit = await reserveUnit();
+      const other = await reserveUnit();
+      const uses = await waiting(120 * M, unit);
+      await submit(unit, [uses]);
+
+      expect(h.codeOf(await h.confirmReserve(uses, { reason: 'x' }, other.head.account).expect(403))).toBe(
+        'SPEND.NOT_HEAD',
+      );
+      await h.confirmReserve(uses, { reason: 'x' }, unit.member.account).expect(403);
+      await h.confirmReserve(uses, { reason: 'x' }, h.finance).expect(403);
+      await h.confirmReserve(uses, { reason: 'x' }, h.boss.account).expect(403);
     });
   });
 

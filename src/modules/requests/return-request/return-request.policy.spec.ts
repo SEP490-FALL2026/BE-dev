@@ -59,7 +59,8 @@ describe('when a seat may be returned (US-05-13)', () => {
   it('takes a personal seat that is held, of a plan that has a revocation, whose grant is done or none was needed', () => {
     expect(checkReturnable(returnable)).toBeNull();
     expect(checkReturnable({ ...returnable, grant: 'NONE' })).toBeNull();
-    for (const provisioningType of ['K1', 'K2', 'K5'] as const) {
+    // BR-MF1-09 / QĐ-103d: a K4 key goes back to the store like any seat.
+    for (const provisioningType of ['K1', 'K2', 'K4', 'K5'] as const) {
       expect(checkReturnable({ ...returnable, provisioningType })).toBeNull();
     }
   });
@@ -67,8 +68,11 @@ describe('when a seat may be returned (US-05-13)', () => {
   it('gives the first reason it cannot, in the order a person should learn it', () => {
     expect(checkReturnable({ ...returnable, open: false, kind: 'SERVICE', provisioningType: 'K4' })).toBe('NOT_OPEN');
     expect(checkReturnable({ ...returnable, kind: 'SERVICE', provisioningType: 'K4' })).toBe('SERVICE_ACCOUNT');
-    expect(checkReturnable({ ...returnable, provisioningType: 'K4', grant: 'NOT_COMPLETED' })).toBe(
+    expect(checkReturnable({ ...returnable, provisioningType: 'K3', grant: 'NOT_COMPLETED' })).toBe(
       'PLAN_NOT_SUPPORTED',
+    );
+    expect(checkReturnable({ ...returnable, provisioningType: 'K4', grant: 'NOT_COMPLETED' })).toBe(
+      'GRANT_NOT_COMPLETED',
     );
     expect(checkReturnable({ ...returnable, provisioningType: 'K3' })).toBe('PLAN_NOT_SUPPORTED');
     expect(checkReturnable({ ...returnable, grant: 'NOT_COMPLETED' })).toBe('GRANT_NOT_COMPLETED');

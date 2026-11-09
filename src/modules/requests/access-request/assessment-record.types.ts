@@ -32,7 +32,6 @@ export interface AssessmentFields {
 }
 
 export type QuoteCycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
-export type QuotePaymentFrequency = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'UPFRONT_ONCE';
 
 export interface Quote {
   /** The price before tax of one person for one billing cycle. */
@@ -40,11 +39,6 @@ export interface Quote {
   billingCycle: QuoteCycle;
   validFrom: BusinessDate;
   validUntil: BusinessDate | null;
-  /** How many months the contract binds the company; null when the whole term is paid up front. */
-  commitmentMonths: number | null;
-  paymentFrequency: QuotePaymentFrequency | null;
-  /** The day of the first payment; the day the money is expected to go out when the quote does not say. */
-  firstPaymentOn: BusinessDate | null;
 }
 
 /** What the Employee declares when the software is not in the catalog (`US-05-06` AC-1). */

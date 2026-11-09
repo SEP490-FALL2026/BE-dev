@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { CatalogApi } from '../../catalog/public/catalog.api';
 import { RequestPartyEligibilityApi } from '../../identity-access/public/request-party-eligibility.api';
 import { AssignmentNotFoundError } from '../../licensing/public/licensing.errors';
 import { LicensingRenewalApi } from '../../licensing/public/licensing-renewal.api';
 import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import type { BusinessDate } from '../../../core/business-date';
 import { RenewalRequestRefusedError } from './renewal-request.errors';
 
 /**
@@ -19,14 +20,17 @@ export class RenewalSeatFactsService {
     private readonly licensingRenewals: LicensingRenewalApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly requestParties: RequestPartyEligibilityApi,
-    private readonly catalog: CatalogApi,
+    private readonly parameters: OperatingParametersApi,
   ) {}
 
-  /** Whether the subscription the seat is taken on can be cut mid-term: a renewal of it ends at the fiscal year (`QĐ-98`, R-15). */
-  async isFlexible(tx: DbTx, subscriptionId: string | null): Promise<boolean> {
-    if (subscriptionId === null) return false;
+  /**
+   * The days of the window of the renewal of the right ending on `previousEnd` (`QĐ-108b`): those it was recorded with when it opened, or
+   * the parameter in force when it has not been recorded yet. Read without a lock: a recorded window never changes.
+   */
+  async windowDaysOf(tx: DbTx, assignmentId: string, previousEnd: BusinessDate): Promise<number> {
+    const recorded = await this.licensingRenewals.renewalWindowOf(assignmentId, previousEnd, tx);
 
-    return (await this.catalog.findSeatTarget({ subscriptionId }, tx))?.allowsMidTermReduction ?? false;
+    return recorded?.windowDays ?? Number(await this.parameters.getValue('RENEWAL_WINDOW_DAYS'));
   }
 
   /** Throws RenewalRequestRefusedError (the seat is not there) and RequestPartyIneligibleError. */

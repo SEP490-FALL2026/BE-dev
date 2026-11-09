@@ -43,10 +43,11 @@ export class WithdrawalService {
     return this.runner.run(async (tx) => {
       const { request, now } = await this.preconditions.require(tx, actor, requestId, reason);
       const why = { reason, now };
-      if (
-        request.state === 'EXECUTING' &&
-        (await this.writer.cancelGrant(tx, actor, request, why)) === 'WAITING_FOR_IT'
-      ) {
+      // A renewal approved and waiting for the IT Admin to extend the right (`AWAITING_EXECUTION`) has its task open already: it is
+      // cancelled like the grant of a request being carried out (`BR-MF1-08d`).
+      const taskOpen =
+        request.state === 'EXECUTING' || (request.type === 'RENEWAL' && request.state === 'AWAITING_EXECUTION');
+      if (taskOpen && (await this.writer.cancelGrant(tx, actor, request, why)) === 'WAITING_FOR_IT') {
         return this.reread(tx, request.id);
       }
       await this.writer.finish(tx, actor, request, why);

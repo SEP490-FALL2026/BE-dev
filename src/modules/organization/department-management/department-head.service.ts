@@ -10,11 +10,20 @@ import { EmployeeRecordService } from '../employee/employee-record.service';
 import { OrganizationChangeService } from '../change-announcement/organization-change.service';
 import { EmployeeAccountsHook } from '../public/organization.extension-points';
 import type { EmployeeRecord, NewOrganizationChange } from '../public/organization.types';
-import { DepartmentInactiveError, DepartmentNotFoundError, HeadAssignmentError } from '../department/department.errors';
+import {
+  DepartmentInactiveError,
+  DepartmentNotFoundError,
+  DepartmentNotYetEffectiveError,
+  HeadAssignmentError,
+} from '../department/department.errors';
 import { lockAndReadEmployee, requireOrganization } from './department-facts.service';
 import { assertMayChangeOrganization, successorProblem } from '../department/department.policy';
 import { DepartmentRepo } from '../department/department.repo';
-import { DEPARTMENT_HEAD_HISTORY_LIMIT, HeadPeriodChanges } from '../department/department.types';
+import {
+  DEPARTMENT_HEAD_HISTORY_LIMIT,
+  type DepartmentRecord,
+  HeadPeriodChanges,
+} from '../department/department.types';
 import { HeadPeriodRecord } from '../organization-structure.types';
 
 /** The period in force on `day`, if any: periods are `[validFrom, validTo)`. */
@@ -83,7 +92,11 @@ export class DepartmentHeadService {
 
     await this.runner.run(async (tx) => {
       // Lock order (protocol): the department, then the employee, then the account.
-      await this.lockActiveDepartment(tx, departmentId);
+      const department = await this.lockActiveDepartment(tx, departmentId);
+      // A head of a department made for next year starts on the day it takes effect, not before (`QĐ-104e(3)`).
+      if (input.effectiveFrom < department.effectiveFrom) {
+        throw new DepartmentNotYetEffectiveError(department.effectiveFrom);
+      }
       const employee = await this.requireCandidate(tx, departmentId, input.employeeId, input.effectiveFrom);
 
       const periods = await this.departments.headHistory(tx, departmentId, DEPARTMENT_HEAD_HISTORY_LIMIT);
@@ -263,10 +276,12 @@ export class DepartmentHeadService {
   }
 
   /** The department row `FOR UPDATE`, the first lock of every head change (T-11); it must exist and be in use. */
-  private async lockActiveDepartment(tx: DbTx, departmentId: string): Promise<void> {
+  private async lockActiveDepartment(tx: DbTx, departmentId: string): Promise<DepartmentRecord> {
     const department = await this.repo.lock(tx, departmentId, 'UPDATE');
     if (!department) throw new DepartmentNotFoundError();
     if (department.status !== 'ACTIVE') throw new DepartmentInactiveError();
+
+    return department;
   }
 
   /** The person who is to head the department from `day`: the employee, then the account (the lock order), then the placement. */

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import { formatAmount } from '../../../core/money/money';
-import { MoneyOutOfRangeError } from '../../../core/money/money.errors';
+import { formatAmount, parseDecimalAmount } from '../../../core/money/money';
+import { CurrencyNotSupportedError, MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditEventInput, AuditValue } from '../../audit/public/audit.types';
@@ -16,6 +16,7 @@ import {
   BudgetCurrencyError,
   BudgetNotAReaderError,
   BudgetNotFinanceError,
+  BudgetCostCenterRequiredError,
   BudgetNotYourCostCenterError,
   BudgetPlanNotFoundError,
 } from './budget.errors';
@@ -135,16 +136,6 @@ export class BudgetFactsService {
     return Number(await this.parameters.getValue('BUDGET_RESERVE_DEFAULT_PERCENT'));
   }
 
-  /** The month the fiscal year begins in; read before a transaction opens. */
-  async fiscalYearStartMonth(): Promise<number> {
-    return Number(await this.parameters.getValue('FISCAL_YEAR_START_MONTH'));
-  }
-
-  /** The month the fiscal year begins in, kept from changing until `tx` ends: read by what makes the first version of a budget. */
-  async holdFiscalYearStartMonth(tx: DbTx): Promise<number> {
-    return Number(await this.parameters.holdValue(tx, 'FISCAL_YEAR_START_MONTH'));
-  }
-
   today(now: Date, tx?: DbTx): Promise<BusinessDate> {
     return this.organizationReads.businessToday(now, tx);
   }
@@ -197,24 +188,81 @@ export class BudgetFactsService {
   }
 
   /**
-   * The Cost Center whose department the person heads today, or null: only the head of a department answers for the
-   * Cost Center of that department (`US-06-10` AC-3).
+   * The units the person answers for in `year`: the department they head today and, for a department made for that year, the one
+   * they are to head from the day it takes effect, 1 January of the year (`QĐ-106k`, R-I05). With no `year`, every upcoming unit.
    */
-  async headedCostCenter(employeeId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
-    return (await this.headedUnit(employeeId, today, tx))?.costCenter?.id ?? null;
+  async headedUnitsFor(employeeId: string, today: BusinessDate, year?: number, tx?: DbTx): Promise<HeadedUnit[]> {
+    const current = await this.headedUnit(employeeId, today, tx);
+    const upcoming = (await this.organizationReads.getUpcomingHeadedUnits(employeeId, today, tx))
+      .filter((unit) => year === undefined || unit.effectiveFrom === `${year}-01-01`)
+      .map((unit) => ({
+        departmentId: unit.departmentId,
+        costCenter: unit.costCenter && { id: unit.costCenter.id, inUse: unit.costCenter.status === 'ACTIVE' },
+      }));
+
+    return [...(current ? [current] : []), ...upcoming];
   }
 
   /**
-   * The Cost Center the person answers for as the head of its department. Throws BudgetNotYourCostCenterError when they head no
-   * department, and FinanceSetupIncompleteError when the department has no Cost Center in use yet: that is told before
-   * anything else is looked at, because the head cannot propose until Finance has made one.
+   * The Cost Centers the person answers for (`US-06-10` AC-3): the one of the department they head today, and the one of a department
+   * they are to head from the day it takes effect. Only the head of a department answers for the Cost Center of that department.
    */
-  async requireHeadedCostCenter(employeeId: string, today: BusinessDate, tx?: DbTx): Promise<string> {
-    const unit = await this.headedUnit(employeeId, today, tx);
-    if (unit === null) throw new BudgetNotYourCostCenterError();
+  async headedCostCenters(employeeId: string, today: BusinessDate, tx?: DbTx): Promise<string[]> {
+    const units = await this.headedUnitsFor(employeeId, today, undefined, tx);
+
+    return units.flatMap((unit) => (unit.costCenter ? [unit.costCenter.id] : []));
+  }
+
+  /**
+   * The unit the work of `year` is for: the only one the person answers for, or the one they name. Throws
+   * BudgetNotYourCostCenterError when they answer for none (or not for the one they name) and BudgetCostCenterRequiredError when
+   * they answer for more than one and name none.
+   */
+  async pickHeadedUnit(
+    employeeId: string,
+    today: BusinessDate,
+    pick: { year?: number; costCenterId?: string },
+    tx?: DbTx,
+  ): Promise<HeadedUnit> {
+    const units = await this.headedUnitsFor(employeeId, today, pick.year, tx);
+    if (units.length === 0) throw new BudgetNotYourCostCenterError();
+    if (pick.costCenterId !== undefined) {
+      const named = units.find((unit) => unit.costCenter?.id === pick.costCenterId);
+      if (named) return named;
+      // The only unit they answer for has no Cost Center in use (it was retired): the work is still theirs, and the caller tells the setup is incomplete.
+      if (units.length === 1 && units[0].costCenter === null) return units[0];
+      throw new BudgetNotYourCostCenterError();
+    }
+    if (units.length > 1) throw new BudgetCostCenterRequiredError();
+
+    return units[0];
+  }
+
+  /**
+   * The Cost Center the person answers for as the head of its department in `pick.year`. Throws BudgetNotYourCostCenterError when
+   * they head no department, BudgetCostCenterRequiredError and FinanceSetupIncompleteError when the department has no Cost Center in
+   * use yet: that is told before anything else is looked at, because the head cannot propose until Finance has made one.
+   */
+  async requireHeadedCostCenter(
+    employeeId: string,
+    today: BusinessDate,
+    tx?: DbTx,
+    pick: { year?: number; costCenterId?: string } = {},
+  ): Promise<string> {
+    const unit = await this.pickHeadedUnit(employeeId, today, pick, tx);
     if (unit.costCenter === null || !unit.costCenter.inUse) throw new FinanceSetupIncompleteError(unit.departmentId);
 
     return unit.costCenter.id;
+  }
+
+  /**
+   * That the person heads a unit with a Cost Center in use, whichever: a document is declared before the proposal it goes with, so
+   * it does not yet say which. Throws BudgetNotYourCostCenterError and FinanceSetupIncompleteError.
+   */
+  async requireHeadOfAnyUnit(employeeId: string, today: BusinessDate, tx?: DbTx): Promise<void> {
+    const units = await this.headedUnitsFor(employeeId, today, undefined, tx);
+    if (units.length === 0) throw new BudgetNotYourCostCenterError();
+    if (!units.some((unit) => unit.costCenter?.inUse)) throw new FinanceSetupIncompleteError(units[0].departmentId);
   }
 
   /**
@@ -234,16 +282,17 @@ export class BudgetFactsService {
     return found?.departmentId === unit.departmentId;
   }
 
-  /** Throws BudgetNotYourCostCenterError. */
-  async requireHead(employeeId: string, costCenterId: string, today: BusinessDate, tx?: DbTx): Promise<void> {
-    if ((await this.headedCostCenter(employeeId, today, tx)) !== costCenterId) throw new BudgetNotYourCostCenterError();
-  }
-
-  /** Who heads the department today, or null when nobody does (`QĐ-92d(1)`). */
+  /**
+   * Who answers for the budget of the department today, or null when nobody does (`QĐ-92d(1)`): the head of today and, for a department
+   * that is not yet in effect, the person who is to head it from the day it takes effect (`QĐ-106k`: they send, withdraw and send again
+   * before it starts, so the notices of that work are theirs).
+   */
   async currentHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
-    return (
-      (await this.organizationReads.getDepartmentHeads([departmentId], today, tx)).get(departmentId)?.employeeId ?? null
-    );
+    const head =
+      (await this.organizationReads.getDepartmentHeads([departmentId], today, tx)).get(departmentId)?.employeeId ??
+      null;
+
+    return head ?? (await this.organizationReads.getUpcomingHeadOf(departmentId, today, tx));
   }
 
   /**
@@ -306,6 +355,20 @@ export class BudgetFactsService {
     if (minor <= 0n) throw new MoneyOutOfRangeError();
 
     return minor;
+  }
+
+  /** Reads amounts in whole minor units of one currency, the minor unit read once: a cycle keeps the currency it was opened in. */
+  async parserOf(currency: string, tx?: DbTx): Promise<(input: { amount: string }) => bigint> {
+    const found = await this.finance.findCurrency(currency, tx);
+    if (!found) throw new CurrencyNotSupportedError(currency);
+
+    return (input) => {
+      const minor = parseDecimalAmount(input.amount, found.minorUnit);
+      // A budget never holds a negative amount.
+      if (minor < 0n) throw new MoneyOutOfRangeError();
+
+      return minor;
+    };
   }
 
   async formatter(currency: string): Promise<(minor: bigint) => MoneyView> {

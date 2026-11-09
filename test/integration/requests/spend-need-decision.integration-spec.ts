@@ -109,63 +109,53 @@ describe('the need step of a request that costs money over PostgreSQL (US-05-04 
   });
 
   describe('a request nobody can send on in a batch (US-06-14 AC-8)', () => {
-    it('waits for the head in a department with no head: no check, no spend step, no queue, and nobody decides its need in place of one (QĐ-93c)', async () => {
+    it('BR-MF1-02 headless paid submission checks immediately and remains saved for revision without a budget', async () => {
       const headless = await h.departmentWithUnit('P-HR');
       const member = await h.staff(headless, 'HR-E1');
       const newHead = await h.staff(headless, 'HR-H8');
       const bystander = await h.staff(await h.departmentWithUnit('P-FB'), 'FB-R0');
       const sent = await h.sent(member, plan, { termMonths: 1 });
-
       expect(await h.steps(sent.id, 'NEED')).toEqual([
-        expect.objectContaining({ state: 'WAITING', assignee_employee_id: null, waiting_reason: 'NO_DEPARTMENT_HEAD' }),
+        expect.objectContaining({ state: 'NOT_REQUIRED', assignee_employee_id: null, waiting_reason: null }),
       ]);
-      expect(await h.state(sent.id)).toBe('WAITING_CONTROLLED');
-      // Not the spending approver and not a person of another department can decide it: the request is not theirs to see.
+      expect(await h.state(sent.id)).toBe('AWAITING_REQUESTER_REVISION');
       await h.decide(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(404);
       await h.decide(sent.id, { decision: 'APPROVE' }, bystander.account).expect(404);
       expect(await h.steps(sent.id, 'FINANCE_REVIEW')).toEqual([]);
       expect(await h.steps(sent.id, 'SPEND_APPROVAL')).toEqual([]);
-
-      // A head is named: the step goes to them, and they decide it; the request then waits in the queue of the head to be sent on.
-      await h.makeHead(headless, newHead);
-      expect(await h.steps(sent.id, 'NEED')).toEqual([
-        expect.objectContaining({ state: 'PENDING', assignee_employee_id: newHead.employeeId, waiting_reason: null }),
+      const checks = await h.ctx.sql.query(`SELECT outcome FROM request_budget_checks WHERE request_id = $1`, [
+        sent.id,
       ]);
-      // The head of a request that costs money confirms the need alone: no line of the plan is chosen (QĐ-101n).
-      await h.decide(sent.id, { decision: 'APPROVE' }, newHead.account).expect(200);
-      expect(await h.state(sent.id)).toBe('AWAITING_SPEND_SUBMISSION');
-      expect(await h.steps(sent.id, 'FINANCE_REVIEW')).toEqual([]);
-      expect(await h.steps(sent.id, 'SPEND_APPROVAL')).toEqual([]);
+      expect(checks.rows).toEqual([{ outcome: 'BLOCKED' }]);
+      await h.makeHead(headless, newHead);
+      expect(await h.state(sent.id)).toBe('AWAITING_REQUESTER_REVISION');
+      expect(await h.steps(sent.id, 'NEED')).toEqual([
+        expect.objectContaining({ state: 'NOT_REQUIRED', assignee_employee_id: null, waiting_reason: null }),
+      ]);
     });
 
-    it('goes straight to the approver when the check is in order and the approver approved the need of a head', async () => {
-      const unit = await h.departmentWithHead('P-NS9');
-      await h.budgetFor(unit, { total: 100 * M });
-
-      const sent = await h.sent(unit.head, plan, { termMonths: 1 });
-      await h.decide(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
-      await h.setPayments(sent.id, { amount: 10 * M });
-      const id = sent.id;
-
-      expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
-      expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([
+    it('BR-MF1-02 the head own request goes straight to spend without an approver need decision', async () => {
+      const u = await h.departmentWithHead('P-NS9');
+      await h.budgetFor(u, { total: 100 * M });
+      const sent = await h.sent(u.head, plan, { termMonths: 1 });
+      expect(await h.state(sent.id)).toBe('AWAITING_SPEND_DECISION');
+      expect(await h.steps(sent.id, 'NEED')).toEqual([expect.objectContaining({ state: 'NOT_REQUIRED' })]);
+      expect(await decisions(sent.id)).toBe(0);
+      expect(await h.steps(sent.id, 'SPEND_APPROVAL')).toEqual([
         expect.objectContaining({ state: 'PENDING', assignee_employee_id: h.boss.employeeId }),
       ]);
     });
 
-    it('holds a proposal of new software of a department with no head until a head decides its need, and then goes to the IT Admin', async () => {
+    it('BR-MF1-02 a headless new-software proposal goes immediately to IT assessment and keeps that routing', async () => {
       const headless = await h.departmentWithUnit('P-HN');
       await h.setItAdminInCharge(headless, { employeeId: h.it1.employeeId, account: h.it1 });
       const proposed = await h.proposed(await h.staff(headless, 'HN-E1'));
       const newHead = await h.staff(headless, 'HN-H1');
-
-      expect(await h.state(proposed.id)).toBe('WAITING_CONTROLLED');
-      expect(await h.steps(proposed.id, 'IT_ASSESSMENT')).toEqual([]);
-
-      await h.makeHead(headless, newHead);
-      await h.decide(proposed.id, { decision: 'APPROVE' }, newHead.account).expect(200);
-
       expect(await h.state(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
+      expect(await h.steps(proposed.id, 'NEED')).toEqual([expect.objectContaining({ state: 'NOT_REQUIRED' })]);
+      await h.makeHead(headless, newHead);
+      expect(await h.state(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
+      expect(await decisions(proposed.id)).toBe(0);
     });
 
     it('waits in the queue of the head when the head approved it and is not the approver', async () => {

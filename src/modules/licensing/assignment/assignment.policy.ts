@@ -1,14 +1,12 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { EmployeeWorkState } from '../../organization/public/organization.types';
 import {
-  AssignmentConflictError,
   AssignmentEffectiveDateInvalidError,
   AssignmentExpectedEndRequiredError,
   AssignmentNotOpenError,
   AssignmentNotServiceAccountError,
   AssignmentResponsibleInvalidError,
 } from '../public/licensing.errors';
-import type { SeatBaselineClosedHolder } from '../public/licensing-seat-baseline.types';
 import type { AssignmentDateBasis, AssignmentRecord, AssignmentView } from '../public/licensing.types';
 import { AssignmentResponsibleAfterDeadlineError } from './service-account.errors';
 
@@ -23,56 +21,6 @@ export const assignmentCreatedSnapshot = (record: AssignmentRecord, importId: st
   effectiveFromBasis: record.effectiveFromBasis,
   importId,
 });
-
-/**
- * A seat sits on a subscription of its own department (`QĐ-89a`): a subscription takes no seat of another department. What
- * is compared is the department of the seat (the owning department of a service account, the department of the request for a
- * grant) with the department that owns the subscription; an internal plan has no subscription and no owner, and nothing is
- * compared. Throws AssignmentConflictError (`SUBSCRIPTION_DEPARTMENT_MISMATCH`) before anything is written; `index` is the row of
- * a baseline, 0 for a request.
- */
-export function assertSubscriptionDepartment(
-  target: { ownerDepartmentId: string | null },
-  owningDepartmentId: string | null,
-  index: number,
-): void {
-  if (target.ownerDepartmentId === null || owningDepartmentId === null) return;
-  if (target.ownerDepartmentId !== owningDepartmentId) {
-    throw new AssignmentConflictError('SUBSCRIPTION_DEPARTMENT_MISMATCH', index);
-  }
-}
-
-const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
-
-/**
- * The people who hold a seat on a subscription another department owns, with those seats (`QĐ-89e`): the seats are grouped
- * by person; a person whose department on the day is unknown, or is the one that owns the subscription, is left out. One entry
- * for each person, sorted by employee id and then assignment id, so the same facts always give the same event.
- */
-export function holdersOfOtherDepartments(
-  seats: readonly { assignmentId: string; employeeId: string; owningDepartmentId: string }[],
-  departmentOf: ReadonlyMap<string, string>,
-): SeatBaselineClosedHolder[] {
-  const byPerson = new Map<string, SeatBaselineClosedHolder>();
-  for (const seat of seats) {
-    const own = departmentOf.get(seat.employeeId);
-    if (own === undefined || own === seat.owningDepartmentId) continue;
-    const holder = byPerson.get(seat.employeeId) ?? {
-      employeeId: seat.employeeId,
-      employeeDepartmentId: own,
-      assignments: [],
-    };
-    holder.assignments.push({ assignmentId: seat.assignmentId, owningDepartmentId: seat.owningDepartmentId });
-    byPerson.set(seat.employeeId, holder);
-  }
-
-  return [...byPerson.values()]
-    .map((holder) => ({
-      ...holder,
-      assignments: [...holder.assignments].sort((a, b) => byText(a.assignmentId, b.assignmentId)),
-    }))
-    .sort((a, b) => byText(a.employeeId, b.employeeId));
-}
 
 /** `2026-10-01` as `01/10/2026`. */
 const dayMonthYear = (date: BusinessDate): string => `${date.slice(8, 10)}/${date.slice(5, 7)}/${date.slice(0, 4)}`;
@@ -137,4 +85,19 @@ export function assertResponsibleChange(
   if (TIME_LIMITED.has(holder.employmentType) && change.expectedEndDate === null) {
     throw new AssignmentExpectedEndRequiredError();
   }
+}
+
+/** The day a first assignment could be used from its `valid_from` and its grant tasks that were not dropped; null while one is still open. */
+export function usableDayOf(
+  validFrom: BusinessDate,
+  grants: readonly { status: string; completedAt: Date | null }[],
+  toBusinessDate: (instant: Date) => BusinessDate,
+): BusinessDate | null {
+  if (grants.some((grant) => grant.status !== 'COMPLETED')) return null;
+  const done = grants
+    .flatMap((grant) => (grant.completedAt ? [toBusinessDate(grant.completedAt)] : []))
+    .sort()
+    .at(-1);
+
+  return done !== undefined && done > validFrom ? done : validFrom;
 }

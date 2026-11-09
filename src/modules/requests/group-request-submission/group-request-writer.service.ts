@@ -1,3 +1,4 @@
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -19,10 +20,13 @@ export interface GroupWritten {
   body: {
     planId: string;
     businessReason: string;
-    termMonths: number;
   };
   draftId: string | null;
 }
+
+/** Each line carries the GH-3 flag of its person with the reason the sender gave (`BR-MF1-01g`). */
+const withFlags = <Line extends { employeeId: string }>(lines: Line[], judged: GroupJudgement) =>
+  lines.map((line) => ({ ...line, manyPaidSoftware: judged.manyPaidSoftware.get(line.employeeId) ?? null }));
 
 /**
  * Writes the request for a group once everything about it was judged (`US-05-17`, `US-05-03` AC-8, AC-14): the request with the first need
@@ -32,6 +36,7 @@ export interface GroupWritten {
 @Injectable()
 export class GroupRequestWriter {
   constructor(
+    private readonly spendRouting: SpendRoutingService,
     private readonly requests: AccessRequestRepo,
     private readonly lines: RequestLineRepo,
     private readonly decisions: LineDecisionRepo,
@@ -56,7 +61,7 @@ export class GroupRequestWriter {
       departmentId: unit.departmentId,
       costCenterId: unit.costCenter?.id ?? null,
       businessReason: body.businessReason,
-      termMonths: body.termMonths,
+      termMonths: null,
       pricing: judged.pricing,
       policy,
       createdByAppUserId: actor.appUserId,
@@ -68,7 +73,7 @@ export class GroupRequestWriter {
     for (const entry of rest) {
       stepIds.push(await this.requests.addNeedStep(tx, { requestId: created.id, step: entry.step, now }));
     }
-    await this.lines.insertMany(tx, groupLineRowsOf(created.id, planned, stepIds));
+    await this.lines.insertMany(tx, withFlags(groupLineRowsOf(created.id, planned, stepIds), judged));
 
     const confirmed = planned.findIndex((entry) => entry.confirmedBySending);
     if (confirmed >= 0) {
@@ -87,7 +92,7 @@ export class GroupRequestWriter {
       organizationId,
       requestId: created.id,
       planId: body.planId,
-      termMonths: body.termMonths,
+      expectedEndDate: judged.pricing.expectedEndDate,
       state,
       judged,
       planned,
@@ -96,6 +101,7 @@ export class GroupRequestWriter {
       await this.audit.record(tx, event);
     }
 
+    await this.spendRouting.start(tx, actor, created.id, now);
     const request = await this.requests.findById(created.id, tx);
     if (!request) throw new Error(`The request ${created.id} was not found after it was written.`);
 

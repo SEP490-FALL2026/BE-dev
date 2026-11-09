@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { manyPaidSoftwareColumns } from '../access-request/access-request-record.mapper';
 import { fromDateColumn, toDateColumn } from '../../../core/business-date';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
@@ -11,6 +12,8 @@ export interface NewLine {
   state: Extract<LineState, 'AWAITING_NEED' | 'NEED_CONFIRMED'>;
   needStepId: string;
   expectedEndDate: string | null;
+  /** GH-3 of the person (`BR-MF1-01g`), with the reason the sender gave for them; absent or null when not flagged. */
+  manyPaidSoftware?: { count: number; reason: string } | null;
 }
 
 /** What a move of a line writes with the new state: when and by whom it ended, why, and when a withdrawal was asked. */
@@ -72,6 +75,7 @@ export class RequestLineRepo {
         state: line.state,
         needStepId: line.needStepId,
         expectedEndDate: line.expectedEndDate ? toDateColumn(line.expectedEndDate) : null,
+        ...manyPaidSoftwareColumns(line.manyPaidSoftware),
       })),
     });
   }

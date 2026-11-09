@@ -80,7 +80,7 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
   };
 
   describe('one commitment for the cost that falls on the company (AC-1, AC-5)', () => {
-    it('holds 21 million for a request that costs 20 before tax, on the snapshot it was approved on, and leaves 19 million', async () => {
+    it('FR-3.2, QĐ-109: holds 20 million for a request that costs 20 before tax (no estimate of tax is added), on the snapshot it was approved on, and leaves 20 million', async () => {
       const { u, version } = await example();
       const id = await h.waitingForApprover(u, taxedPlan, { amount: 20 * M });
 
@@ -90,7 +90,7 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
       expect(await held(id)).toHaveLength(1);
       expect(commitment).toMatchObject({
         year: h.year,
-        amount_minor: String(21 * M),
+        amount_minor: String(20 * M),
         state: 'HELD',
         attached_version_id: version.id,
         unattached_reason: null,
@@ -101,13 +101,13 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
       );
       expect(commitment.snapshot_check_id).toBe(snapshot.rows[0].check_id);
       expect(await row(u)).toMatchObject({
-        committed: { amount: String(41 * M) },
-        remaining: { amount: String(19 * M) },
+        committed: { amount: String(40 * M) },
+        remaining: { amount: String(20 * M) },
       });
       const view = h.dataOf<{
         spendApproval: { cost: { estimatedCost: { amount: string }; deductibleTax: { amount: string } } };
       }>(await h.approvalOf(id, h.boss.account).expect(200)).spendApproval;
-      // The tax that is deducted is shown apart and is not in what is held.
+      // The estimate of the tax is shown to the approver as information; it is not in what is held.
       expect(view.cost).toMatchObject({
         estimatedCost: { amount: String(21 * M) },
         deductibleTax: { amount: String(2 * M) },
@@ -119,16 +119,12 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
       expect(events.rowCount).toBe(1);
     });
 
-    it('leaves Finance nothing to record or confirm, and the IT Admin can grant it at once (AC-2)', async () => {
+    it('QĐ-97c: leaves Finance nothing to record or confirm (no review of Finance exists), and the IT Admin can grant it at once (AC-2)', async () => {
       const { u } = await example();
       const id = await approved(u, 15 * M);
 
-      const queue = h.dataOf<{ items: Array<{ requestId: string }> }>(
-        await h.reviewQueue(h.finance, { pageSize: 100 }).expect(200),
-      );
-
-      expect(queue.items.map((item) => item.requestId)).not.toContain(id);
-      expect(await h.steps(id, 'FINANCE_REVIEW')).toEqual([]);
+      const reviews = await h.ctx.sql.query(`SELECT 1 FROM request_finance_reviews WHERE request_id = $1`, [id]);
+      expect(reviews.rowCount).toBe(0);
       await h.grant({ requestId: id, subscriptionId }).expect(201);
     });
 
@@ -196,27 +192,15 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
   });
 
   describe('which year, and how many (AC-10 to AC-13)', () => {
-    it('is the year of the day the money goes out, whole, and leaves the year it is approved in as it was (AC-10)', async () => {
-      const { u } = await example();
-      await h.budgetFor(u, { total: 100 * M, year: h.next });
-      const before = await row(u);
-      const id = await approved(u, 10 * M, plan, { year: h.next, dueOn: `${h.next}-01-05` });
+    // FR-5.8a: the old test of a commitment for a later year (AC-10) is removed: a commitment is held for the current year only; the refusal
+    // of another year is judged in commitment-current-year.integration-spec.ts.
 
-      expect(await held(id)).toEqual([expect.objectContaining({ year: h.next, amount_minor: String(10 * M) })]);
-      expect(await row(u)).toEqual(before);
-      expect(await row(u, h.next)).toMatchObject({ remaining: { amount: String(90 * M) } });
-    });
-
-    it('is one for each year the binding payments fall in, each attached to the budget of its own year (AC-11, US-06-07 AC-7)', async () => {
+    it('QĐ-109: is one, for the year the amount is counted in, attached to the budget of that year and touching no other (AC-11, US-06-07 AC-7)', async () => {
+      // Rewritten from "one for each year the binding payments fall in": a request has one amount for one year now, not a schedule.
       const u = await unit();
       await h.budgetFor(u, { total: 5_000_000 });
       await h.budgetFor(u, { total: 32 * M, year: h.next });
-      const id = await h.paidRequest(u, plan, {
-        schedule: [
-          { dueOn: `${h.year}-11-01`, amount: 2_400_000, year: h.year },
-          { dueOn: `${h.next}-11-01`, amount: 2_400_000, year: h.next },
-        ],
-      });
+      const id = await h.paidRequest(u, plan, { amount: 2_400_000, year: h.year });
       await h.sendOn([id], u.head.account).expect(201);
 
       await approve(id).expect(200);
@@ -228,26 +212,15 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
           attached_version_id: expect.any(String) as string,
           unattached_reason: null,
         }),
-        expect.objectContaining({
-          year: h.next,
-          amount_minor: '2400000',
-          attached_version_id: expect.any(String) as string,
-          unattached_reason: null,
-        }),
       ]);
-      // Each year loses its own payment only.
       expect(await row(u)).toMatchObject({ remaining: { amount: '2600000' } });
-      expect(await row(u, h.next)).toMatchObject({ remaining: { amount: String(32 * M - 2_400_000) } });
+      expect(await row(u, h.next)).toMatchObject({ remaining: { amount: String(32 * M) } });
     });
 
-    it('is none for a period that is only a forecast (AC-12)', async () => {
+    it('QĐ-109: holds nothing for a later year: there is no forecast of a payment, the amount of the year is all (AC-12)', async () => {
+      // Rewritten from "is none for a period that is only a forecast": the schedule that had forecasts is gone.
       const { u } = await example();
-      const id = await h.paidRequest(u, plan, {
-        schedule: [
-          { dueOn: `${h.year}-11-01`, amount: 2_400_000, year: h.year },
-          { dueOn: `${h.next}-11-01`, amount: 2_400_000, year: h.next, binding: false },
-        ],
-      });
+      const id = await h.paidRequest(u, plan, { amount: 2_400_000, year: h.year });
       await h.sendOn([id], u.head.account).expect(201);
       await approve(id).expect(200);
 

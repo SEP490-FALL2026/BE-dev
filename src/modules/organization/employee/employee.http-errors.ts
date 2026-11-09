@@ -3,7 +3,11 @@ import { FORBIDDEN_ERROR } from '../../../infrastructure/http/errors/access-erro
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { EmployeeNotFoundError } from '../public/organization.errors';
-import { DepartmentInactiveError, DepartmentNotFoundError } from '../department/department.errors';
+import {
+  DepartmentInactiveError,
+  DepartmentNotFoundError,
+  DepartmentNotYetEffectiveError,
+} from '../department/department.errors';
 import { refuse, toOrganizationApiException } from '../organization.http-errors';
 import {
   FirstPlacementError,
@@ -41,6 +45,11 @@ export function toEmployeeApiException(error: unknown): unknown {
     return refuse(HttpStatus.NOT_FOUND, 'DEPARTMENT.NOT_FOUND', error.message);
   if (error instanceof DepartmentInactiveError)
     return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.INACTIVE', error.message);
+  if (error instanceof DepartmentNotYetEffectiveError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.NOT_YET_EFFECTIVE', error.message, {
+      effectiveFrom: error.effectiveFrom,
+    });
+  }
   return toOrganizationApiException(error);
 }
 
@@ -51,6 +60,7 @@ export const EMPLOYEE_ERROR_EXAMPLES = {
   EMPLOYEE_NOT_FOUND: example(new EmployeeNotFoundError('<employee-id>')),
   DEPARTMENT_NOT_FOUND: example(new DepartmentNotFoundError()),
   DEPARTMENT_INACTIVE: example(new DepartmentInactiveError()),
+  DEPARTMENT_NOT_YET_EFFECTIVE: example(new DepartmentNotYetEffectiveError('2027-01-01')),
   EMPLOYEE_ALREADY_PLACED: example(new FirstPlacementError('ALREADY_PLACED')),
   EMPLOYEE_INACTIVE: example(new FirstPlacementError('EMPLOYEE_INACTIVE')),
   EMPLOYEE_LEAVING: example(new FirstPlacementError('EMPLOYEE_LEAVING')),

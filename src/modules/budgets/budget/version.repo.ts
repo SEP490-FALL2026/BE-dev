@@ -18,6 +18,10 @@ export interface VersionRecord {
   proposalId: string | null;
   basedOnVersionId: string | null;
   baseMinor: bigint;
+  /** Why Finance moved the base, when it did (`QĐ-100v`). */
+  baseReason: string | null;
+  /** Where the version came from: the head's proposal, or the baseline Finance built when nobody headed the department (`QĐ-100h`). */
+  origin: 'PROPOSAL' | 'BASELINE_NO_HEAD';
   reserveMinor: bigint;
   totalMinor: bigint;
   currency: string;
@@ -50,6 +54,8 @@ export interface NewVersion {
   proposalId: string | null;
   basedOnVersionId: string | null;
   rejectedPredecessorId?: string | null;
+  /** Built from the baseline (`QĐ-100h`) rather than from a proposal; the default is a proposal. */
+  origin?: 'PROPOSAL' | 'BASELINE_NO_HEAD';
   baseMinor: bigint;
   reserveMinor: bigint;
   currency: string;
@@ -65,6 +71,7 @@ export interface NewVersion {
 /** The fields of a version Finance changes while it is a draft: a key that is present is written. */
 export interface VersionPatch {
   baseMinor?: bigint;
+  baseReason?: string | null;
   reserveMinor?: bigint;
   reserveReason?: string | null;
   quarters?: [bigint, bigint, bigint, bigint] | null;
@@ -82,6 +89,8 @@ const toRecord = (row: Prisma.BudgetVersionGetPayload<object>): VersionRecord =>
   proposalId: row.proposalId,
   basedOnVersionId: row.basedOnVersionId,
   baseMinor: row.baseMinor,
+  baseReason: row.baseReason,
+  origin: row.origin,
   reserveMinor: row.reserveMinor,
   totalMinor: row.totalMinor,
   currency: row.currency,
@@ -165,6 +174,7 @@ export class VersionRepo {
         proposalId: input.proposalId,
         basedOnVersionId: input.basedOnVersionId,
         rejectedPredecessorId: input.rejectedPredecessorId ?? null,
+        origin: input.origin ?? 'PROPOSAL',
         baseMinor: input.baseMinor,
         reserveMinor: input.reserveMinor,
         totalMinor: total,
@@ -232,11 +242,6 @@ export class VersionRepo {
     return rows.map((row) => row.id);
   }
 
-  /** Whether any version of any Cost Center and year exists, in whatever state: what locks the month the fiscal year begins. */
-  async anyExists(tx: DbTx): Promise<boolean> {
-    return (await tx.budgetVersion.findFirst({ select: { id: true } })) !== null;
-  }
-
   /** The current version of the Cost Center and year, if any: at most one (INV-21). */
   async current(costCenterId: string, year: number, tx?: DbTx): Promise<VersionRecord | null> {
     const row = await (tx ?? this.prisma).budgetVersion.findFirst({ where: { costCenterId, year, state: 'APPROVED' } });
@@ -264,6 +269,21 @@ export class VersionRepo {
     });
 
     return row ? toRecord(row) : null;
+  }
+
+  /** The versions built from the baseline that are still in progress (a draft, sent, or sent back to be looked at again) of this Cost Center. */
+  async baselineInProgressOf(costCenterId: string, tx?: DbTx): Promise<VersionRecord[]> {
+    const rows = await (tx ?? this.prisma).budgetVersion.findMany({
+      where: {
+        costCenterId,
+        origin: 'BASELINE_NO_HEAD',
+        state: { in: ['DRAFT', 'SENT', 'CHANGES_REQUESTED'] },
+        detachedAt: null,
+      },
+      orderBy: [{ year: 'asc' }, { number: 'asc' }],
+    });
+
+    return rows.map(toRecord);
   }
 
   /** The newest version made from the proposal, whatever its state: what says whether the proposal can be followed (F63). */
@@ -316,8 +336,12 @@ export class VersionRepo {
       id: string;
       year: number;
       number: number;
-      state: 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED';
+      state: 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'EXPIRED';
       sentAt: Date;
+      baseMinor: bigint;
+      reserveMinor: bigint;
+      totalMinor: bigint;
+      currency: string;
     }[];
     total: number;
   }> {
@@ -337,6 +361,10 @@ export class VersionRepo {
             number: true,
             state: true,
             sentAt: true,
+            baseMinor: true,
+            reserveMinor: true,
+            totalMinor: true,
+            currency: true,
           },
           orderBy: [{ year: 'desc' }, { number: 'desc' }, { id: 'asc' }],
           skip: options.skip,
@@ -349,8 +377,13 @@ export class VersionRepo {
             id: r.id,
             year: r.year,
             number: r.number,
-            state: r.state as 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED',
+            // A sent version: never a draft, and never SUPERSEDED (`budget_versions_no_superseded`).
+            state: r.state as 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'EXPIRED',
             sentAt: r.sentAt!,
+            baseMinor: r.baseMinor,
+            reserveMinor: r.reserveMinor,
+            totalMinor: r.totalMinor,
+            currency: r.currency,
           })),
           total,
         };
@@ -376,7 +409,28 @@ export class VersionRepo {
         totalMinor: nextBase + nextReserve,
         ...(patch.quarters !== undefined ? quarterColumns(patch.quarters) : {}),
         ...(patch.reserveReason !== undefined ? { reserveReason: patch.reserveReason } : {}),
+        ...(patch.baseReason !== undefined ? { baseReason: patch.baseReason } : {}),
       },
+    });
+  }
+
+  /**
+   * The versions of the year the annual check counts (`QĐ-103i`): those that were sent, asked for changes or approved and were not
+   * detached, newest first. The caller keeps the newest of each Cost Center.
+   */
+  async countedInYear(organizationId: string, year: number, tx?: DbTx): Promise<VersionRecord[]> {
+    const rows = await (tx ?? this.prisma).budgetVersion.findMany({
+      where: { organizationId, year, state: { in: ['SENT', 'CHANGES_REQUESTED', 'APPROVED'] }, detachedAt: null },
+      orderBy: [{ number: 'desc' }, { id: 'asc' }],
+    });
+
+    return rows.map(toRecord);
+  }
+
+  /** How many versions of the year wait for the spending approver (sent and not decided). */
+  countSentOfYear(organizationId: string, year: number, tx?: DbTx): Promise<number> {
+    return (tx ?? this.prisma).budgetVersion.count({
+      where: { organizationId, year, state: 'SENT', detachedAt: null },
     });
   }
 

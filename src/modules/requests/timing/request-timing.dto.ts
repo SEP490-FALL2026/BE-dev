@@ -16,7 +16,6 @@ const segmentsSchema = z.strictObject({
   NEED: segmentSchema.nullable(),
   IT_ASSESSMENT: segmentSchema.nullable(),
   QUEUE_WAIT: segmentSchema.nullable(),
-  FINANCE_REVIEW: segmentSchema.nullable(),
   SPEND_DECISION: segmentSchema.nullable(),
   GRANT: segmentSchema.nullable(),
 });

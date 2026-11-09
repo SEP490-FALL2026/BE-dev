@@ -17,6 +17,7 @@ export interface LockedStep {
   requestId: string;
   organizationId: string;
   departmentId: string;
+  requesterEmployeeId: string;
   kind: SlaStepKind;
   state: 'PENDING' | 'WAITING';
   assigneeEmployeeId: string | null;
@@ -54,6 +55,7 @@ interface LockedStepRow {
   request_id: string;
   organization_id: string;
   department_id: string;
+  requester_employee_id: string;
   kind: SlaStepKind;
   state: 'PENDING' | 'WAITING';
   assignee_employee_id: string | null;
@@ -100,7 +102,7 @@ export class SlaSubjectRepo {
   /** Takes the lock on a step that is still open; null when it was closed meanwhile or somebody else holds the lock. */
   async lockOpenStep(tx: DbTx, stepId: string): Promise<LockedStep | null> {
     const rows = await tx.$queryRaw<LockedStepRow[]>`
-      SELECT s.id, s.request_id, r.organization_id, r.department_id, s.kind::text AS kind, s.state::text AS state,
+      SELECT s.id, s.request_id, r.organization_id, r.department_id, r.requester_employee_id, s.kind::text AS kind, s.state::text AS state,
              s.assignee_employee_id, s.created_at, s.sla_working_days
         FROM access_request_steps s
         JOIN access_requests r ON r.id = s.request_id
@@ -114,6 +116,7 @@ export class SlaSubjectRepo {
           requestId: row.request_id,
           organizationId: row.organization_id,
           departmentId: row.department_id,
+          requesterEmployeeId: row.requester_employee_id,
           kind: row.kind,
           state: row.state,
           assigneeEmployeeId: row.assignee_employee_id,
@@ -160,15 +163,5 @@ export class SlaSubjectRepo {
           queuedAt: row.spend_queued_at,
         }
       : null;
-  }
-
-  /** The id of the oldest question to Finance still open on the step, or null: the one a reminder to Finance names. */
-  async openFinanceQuestion(tx: DbTx, stepId: string): Promise<string | null> {
-    const rows = await tx.$queryRaw<{ id: string }[]>`
-      SELECT q.id FROM budget_information_requests q
-       WHERE q.step_id = ${stepId}::uuid AND q.state = 'OPEN'
-       ORDER BY q.asked_at, q.id LIMIT 1`;
-
-    return rows[0]?.id ?? null;
   }
 }

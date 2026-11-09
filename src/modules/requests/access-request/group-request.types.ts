@@ -45,6 +45,14 @@ export const ENDED_LINE_STATES: readonly LineState[] = [
 
 export const isEnded = (state: LineState): boolean => ENDED_LINE_STATES.includes(state);
 
+/** The states of the line of a person in a request for a group that is still open for them: what they count as open. */
+export const OPEN_LINE_STATES = [
+  'AWAITING_NEED',
+  'NEED_CONFIRMED',
+  'APPROVED',
+  'EXECUTING',
+] as const satisfies readonly LineState[];
+
 /** One person of a request as the services read them. */
 export interface LineRecord {
   requestId: string;

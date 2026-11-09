@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeAccountIdentifier } from '../public/account-identifier.policy';
 import type { BusinessDate } from '../../../core/business-date';
+import { endAfterGrant } from '../../../core/term-limit';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -8,7 +9,6 @@ import type { SeatTarget, SeatTargetRef } from '../../catalog/public/catalog.typ
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError } from '../public/licensing.errors';
-import type { SeatBaselineClosedHolder } from '../public/licensing-seat-baseline.types';
 import type {
   AssignmentHolder,
   AssignmentRecord,
@@ -20,11 +20,7 @@ import type {
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { toAssignmentFailure } from './assignment-conflicts.repo';
 import { AssignmentDepartmentRepo } from './assignment-department.repo';
-import {
-  assertSubscriptionDepartment,
-  assignmentCreatedSnapshot,
-  holdersOfOtherDepartments,
-} from './assignment.policy';
+import { assignmentCreatedSnapshot } from './assignment.policy';
 import { assertBaselineTarget, assertSeatTargetUsable, toSeatTargetRef } from './baseline-target.policy';
 import { AssignmentRepo } from './assignment.repo';
 
@@ -44,6 +40,20 @@ interface EndWithoutSeatInput {
  */
 @Injectable()
 export class AssignmentService {
+  /** How many seats each of these subscriptions holds as of `day`: the count of the seats of the warehouse (INV-01), in one statement. */
+  countHoldingOfSubscriptions(ids: readonly string[], day: BusinessDate, tx?: DbTx): Promise<Map<string, number>> {
+    return this.repo.countHoldingOfSubscriptions(ids, day, tx);
+  }
+
+  /** The seats of these subscriptions held as of `day`, by holder (the person, or who answers for a service account), in one statement. */
+  countHoldingByHolder(
+    ids: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ subscriptionId: string; employeeId: string; seats: number }[]> {
+    return this.repo.countHoldingByHolder(ids, day, tx);
+  }
+
   constructor(
     private readonly repo: AssignmentRepo,
     private readonly byDepartment: AssignmentDepartmentRepo,
@@ -106,39 +116,6 @@ export class AssignmentService {
     return this.repo.countBaseline();
   }
 
-  /**
-   * The people who hold, on `day`, a seat the baseline wrote on a subscription owned by another department than the one they are in
-   * (`QĐ-89e`), read in the transaction that closes the baseline. A seat written before a personal seat carried its department
-   * is judged against the owner of its subscription.
-   */
-  async baselineHoldersOfOtherDepartments(tx: DbTx, day: BusinessDate): Promise<SeatBaselineClosedHolder[]> {
-    const rows = await this.byDepartment.openBaselineSeats(day, tx);
-    if (rows.length === 0) return [];
-    const unowned = [...new Set(rows.flatMap((row) => (row.owningDepartmentId === null ? [row.subscriptionId] : [])))];
-    const ownerOf = new Map<string, string>();
-    for (const subscriptionId of unowned.sort()) {
-      const target = await this.catalog.findSeatTarget({ subscriptionId }, tx);
-      if (target?.ownerDepartmentId) ownerOf.set(subscriptionId, target.ownerDepartmentId);
-    }
-    const seats = rows.flatMap((row) => {
-      const owner = row.owningDepartmentId ?? ownerOf.get(row.subscriptionId);
-
-      return owner === undefined
-        ? []
-        : [{ assignmentId: row.assignmentId, employeeId: row.employeeId, owningDepartmentId: owner }];
-    });
-    const units = await this.organizationReads.getOwningUnits(
-      [...new Set(seats.map((seat) => seat.employeeId))],
-      day,
-      tx,
-    );
-
-    return holdersOfOtherDepartments(
-      seats,
-      new Map([...units].map(([employeeId, unit]) => [employeeId, unit.departmentId])),
-    );
-  }
-
   existingOf(target: SeatTarget, tx?: DbTx): Promise<ExistingAssignment[]> {
     return this.repo.existingOf({ subscriptionId: target.subscriptionId, planId: target.planId }, tx);
   }
@@ -155,7 +132,7 @@ export class AssignmentService {
   ): Promise<AssignmentRecord[]> {
     const created: AssignmentRecord[] = [];
     for (const [index, row] of input.rows.entries()) {
-      assertSubscriptionDepartment(input.target, row.owningDepartmentId, index);
+      // Gói 9: bỏ guard phòng — cấp từ kho được phép cấp qua phòng (không kiểm owner_department_id).
       let record: AssignmentRecord;
       try {
         record = await this.repo.insert(tx, {
@@ -200,12 +177,10 @@ export class AssignmentService {
 
   /**
    * Writes the seat a request is granted, in the caller transaction (which holds the lock of the seat target), with its
-   * audit event: a personal seat, or a service account with its reason, owning department and Cost Center (`US-05-21`). A seat
-   * on a subscription belongs to the department that owns it, and the request may be granted only on a subscription of its own
-   * department (`departmentId`): there is no pool of seats between departments (`QĐ-89a`). Throws AssignmentConflictError
-   * when the subscription is another department's (before anything is written), or when the database refuses the seat: an
-   * overlap, the seats all taken, the identifier in use, no expected end date for time-limited staff, or a rule of the baseline or
-   * of the owning department.
+   * audit event: a personal seat, or a service account with its reason, owning department and Cost Center (`US-05-21`). The seats
+   * of a subscription are one pool for every department (`QĐ-103d`): the seat is held by the department of the request
+   * (`departmentId`), the department of the person it is for. Throws AssignmentConflictError when the database refuses the seat:
+   * an overlap, the seats all taken, the identifier in use, no expected end date for time-limited staff, or a rule of the baseline.
    */
   async createFromRequest(
     tx: DbTx,
@@ -213,7 +188,7 @@ export class AssignmentService {
     input: {
       organizationId: string;
       requestId: string;
-      /** The department of the request. */
+      /** The department of the request: the department of the person the seat is for. */
       departmentId: string;
       target: SeatTarget;
       holder: AssignmentHolder;
@@ -222,9 +197,9 @@ export class AssignmentService {
     },
   ): Promise<AssignmentRecord> {
     const { holder } = input;
-    assertSubscriptionDepartment(input.target, input.departmentId, 0);
-    // A personal seat on a subscription carries the department that owns it, as a service account carries the one that owns it.
-    const owningDepartmentId = holder.kind === 'SERVICE' ? holder.owningDepartmentId : input.target.ownerDepartmentId;
+    // The pool of seats is shared by every department (`QĐ-103d`): a personal seat carries the department of the person it is for on the
+    // day of the grant, whoever owns the subscription; a service account carries the department that owns the account.
+    const owningDepartmentId = holder.kind === 'SERVICE' ? holder.owningDepartmentId : input.departmentId;
     let record: AssignmentRecord;
     try {
       record = await this.repo.insert(tx, {
@@ -315,6 +290,20 @@ export class AssignmentService {
         { [failed ? 'failedAt' : 'cancelledAt']: input.now.toISOString(), requestId: input.requestId },
       ),
     );
+  }
+
+  /**
+   * The task of the grant is completed on `grantedOn`: that is the day the right begins, and the end it asked for is cut to a year from
+   * it at the latest (`BR-MF1-06a`, `QĐ-106b`). A seat with no end asked for keeps none. `valid_from` is not touched (the database keeps it).
+   */
+  async recordGranted(tx: DbTx, assignmentId: string, grantedOn: BusinessDate): Promise<void> {
+    const current = await this.repo.find(assignmentId, tx);
+    if (!current) throw new AssignmentNotFoundError();
+
+    await this.repo.markGranted(tx, assignmentId, {
+      grantedOn,
+      expectedEndDate: endAfterGrant({ expectedEndDate: current.expectedEndDate, grantedOn }),
+    });
   }
 
   /** The seats bought, taken and free on today in the organization calendar. Throws SeatTargetNotFoundError. */

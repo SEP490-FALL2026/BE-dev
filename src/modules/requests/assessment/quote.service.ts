@@ -5,7 +5,7 @@ import { FinanceApi } from '../../finance/public/finance.api';
 import type { PricingRecord } from '../access-request/access-request.types';
 import { AssessmentIncompleteError, AssessmentQuoteRefusedError } from './assessment.errors';
 import type { Quote } from '../access-request/assessment-record.types';
-import { priceFromQuote } from './quote-pricing.policy';
+import { priceFromQuote, pricingRecordOfQuote } from '../repricing/quote-pricing.policy';
 import type { AssessmentPatchDto } from './assessment.dto';
 
 /**
@@ -31,45 +31,29 @@ export class QuoteService {
       billingCycle: input.billingCycle,
       validFrom: input.validFrom,
       validUntil,
-      commitmentMonths: input.commitmentMonths ?? null,
-      paymentFrequency: input.paymentFrequency ?? null,
-      firstPaymentOn: input.firstPaymentOn ?? null,
     };
   }
 
   /**
-   * The request priced by the quote, as it is kept. Throws AssessmentIncompleteError when the quote does not say how a term
-   * of several billing cycles is paid, and AssessmentQuoteRefusedError when it is not in force or cannot be laid out.
+   * The request priced by the quote on `checkDate`, as it is kept (`QĐ-109e`). Throws AssessmentIncompleteError when the quote has
+   * no price, and AssessmentQuoteRefusedError when it is not in force or too large.
    */
   price(
     quote: Quote,
-    request: { termMonths: number; beneficiaries: number; expectedSpendOn: BusinessDate },
-    context: { today: BusinessDate; fiscalYearStartMonth: number },
+    request: { beneficiaries: number; endDate: BusinessDate | null },
+    context: { checkDate: BusinessDate },
   ): PricingRecord {
     const priced = priceFromQuote({
       quote,
-      termMonths: request.termMonths,
       beneficiaries: request.beneficiaries,
-      today: context.today,
-      expectedSpendOn: request.expectedSpendOn,
-      fiscalYearStartMonth: context.fiscalYearStartMonth,
+      checkDate: context.checkDate,
+      endDate: request.endDate,
     });
     if (priced.status === 'REFUSED') {
-      if (priced.reason === 'SCHEDULE_REQUIRED' || priced.reason === 'PRICE_REQUIRED') {
-        throw new AssessmentIncompleteError(priced.missing);
-      }
+      if (priced.reason === 'PRICE_REQUIRED') throw new AssessmentIncompleteError(priced.missing);
       throw new AssessmentQuoteRefusedError(priced.reason);
     }
 
-    return {
-      status: 'PRICED',
-      missingReason: null,
-      expectedSpendOn: priced.firstPaymentOn,
-      budgetYear: priced.budgetYear,
-      amount: priced.amount,
-      unitPrice: priced.unitPrice,
-      billingCycle: priced.billingCycle,
-      schedule: priced.periods,
-    };
+    return pricingRecordOfQuote(priced, request.endDate);
   }
 }

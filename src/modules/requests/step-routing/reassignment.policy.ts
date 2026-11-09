@@ -6,7 +6,7 @@
  */
 
 /** The kinds of step that are given to a person to decide. The task of the IT Admin to carry out a grant is not one of them (`BR-03.4`). */
-export type ReassignableStepKind = 'NEED' | 'FINANCE_REVIEW' | 'SPEND_APPROVAL' | 'IT_ASSESSMENT';
+export type ReassignableStepKind = 'NEED' | 'SPEND_APPROVAL' | 'IT_ASSESSMENT';
 
 /**
  * The events that make a step be looked at again. Closed: the four of `FR-3.16` (the department of the requester, the head of a
@@ -60,7 +60,6 @@ export const WAITING_REASON_CODES = [
   'NO_SPENDING_APPROVER',
   'NO_DEPARTMENT_HEAD',
   'SPENDING_APPROVER_IS_PARTY',
-  'NO_FINANCE_REVIEWER',
   'NO_IT_ADMIN_IN_CHARGE',
 ] as const;
 export type WaitingReasonCode = (typeof WAITING_REASON_CODES)[number];
@@ -122,14 +121,12 @@ export function decideReassignment(
 /**
  * What the Super Admin or the IT Admin does to end a wait: the configuration that is missing, by the reason the step waits.
  */
-export type ConfigurationHint =
-  'CONFIGURE_SPENDING_APPROVER' | 'GRANT_FINANCE_ROLE' | 'ASSIGN_DEPARTMENT_HEAD' | 'NAME_IT_ADMIN_IN_CHARGE';
+export type ConfigurationHint = 'CONFIGURE_SPENDING_APPROVER' | 'ASSIGN_DEPARTMENT_HEAD' | 'NAME_IT_ADMIN_IN_CHARGE';
 
 const HINTS: Record<WaitingReasonCode, ConfigurationHint> = {
   NO_SPENDING_APPROVER: 'CONFIGURE_SPENDING_APPROVER',
   NO_DEPARTMENT_HEAD: 'ASSIGN_DEPARTMENT_HEAD',
   SPENDING_APPROVER_IS_PARTY: 'CONFIGURE_SPENDING_APPROVER',
-  NO_FINANCE_REVIEWER: 'GRANT_FINANCE_ROLE',
   NO_IT_ADMIN_IN_CHARGE: 'NAME_IT_ADMIN_IN_CHARGE',
 };
 
@@ -155,9 +152,5 @@ export function requestStateFor(kind: ReassignableStepKind, held: boolean): stri
   if (kind === 'IT_ASSESSMENT') return null;
   if (!held) return 'WAITING_CONTROLLED';
 
-  return kind === 'NEED'
-    ? 'PENDING'
-    : kind === 'FINANCE_REVIEW'
-      ? 'AWAITING_FINANCE_REVIEW'
-      : 'AWAITING_SPEND_DECISION';
+  return kind === 'NEED' ? 'PENDING' : 'AWAITING_SPEND_DECISION';
 }

@@ -1,9 +1,11 @@
+import { BudgetsReadFacadeModule } from './budgets-read-facade.module';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { ObjectStorageModule } from '../../infrastructure/object-storage/object-storage.module';
 import { AuditModule } from '../audit/audit.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { FinanceModule } from '../finance/finance.module';
+import { LicensingModule } from '../licensing/licensing.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
@@ -11,33 +13,40 @@ import { OrganizationModule } from '../organization/organization.module';
 import { BudgetCostCenterUseReader } from './commitment/budget-cost-center-use.listener';
 import { BudgetHeadChangeListener } from './proposal/budget-head-change.listener';
 import { BudgetSpendingApproverGrantCheck } from './proposal/spending-approver-grant.listener';
-import { FiscalYearStartLockReader } from './version/fiscal-year-start-lock.listener';
-import { SpendingApproverWaitListener } from './budget/spending-approver-wait.listener';
-import { BudgetFactsRepo } from './budget/budget-facts.repo';
+import { SpendingApproverWaitListener } from './version/spending-approver-wait.listener';
 import { BudgetNotifierService } from './budget/budget-notifier.service';
 import { BudgetProposalsController } from './proposal/budget-proposals.controller';
 import { BudgetFactsService } from './budget/budget-facts.service';
-import { BudgetYearLockRepo } from './budget/budget-year-lock.repo';
 import { BudgetVersionLinesController } from './version/budget-version-lines.controller';
 import { BudgetVersionsController } from './version/budget-versions.controller';
+import { BudgetViewRepo } from './budget-view/budget-view.repo';
+import { BudgetViewNumbersService } from './budget-view/budget-view-numbers.service';
+import { BudgetTableViewService } from './budget-view/budget-table-view.service';
 import { BudgetViewService } from './budget-view/budget-view.service';
 import { BudgetsController } from './budget-view/budgets.controller';
 import { BudgetsApi } from './public/budgets.api';
 import {
-  BudgetChangeListeners,
   CommitmentReleaseGuardHook,
   CommitmentRequestFactsHook,
+  PendingSpendContributions,
 } from './public/budgets.extension-points';
 import { BudgetCommitmentsController } from './commitment/budget-commitments.controller';
-import { CommitmentRepo } from './budget/commitment.repo';
 import { CommitmentService } from './commitment/commitment.service';
-import { InvoiceRepo } from './budget/invoice.repo';
 import { BudgetInvoicesController } from './invoice/budget-invoices.controller';
+import { BudgetCyclesController } from './cycle/budget-cycles.controller';
+import { BaselineService } from './cycle/baseline.service';
+import { CycleDeadlineSweeper } from './cycle/cycle-deadline.job';
+import { CycleDeadlineService } from './cycle/cycle-deadline.service';
+import { CycleRepo } from './cycle/cycle.repo';
+import { PackageService } from './cycle/package.service';
+import { CycleService } from './cycle/cycle.service';
+import { DepartmentCreationWindowListener } from './cycle/department-creation-window.listener';
 import { InvoiceService } from './invoice/invoice.service';
 import { DecisionRepo } from './budget/decision.repo';
 import { LineImportService } from './version/line-import.service';
 import { ProposalRepo } from './budget/proposal.repo';
 import { ProposalService } from './proposal/proposal.service';
+import { ProposalLineJudge } from './proposal/proposal-line-judge.service';
 import { ProposalSender } from './proposal/proposal-sender.service';
 import { ProposalAttachmentBinder } from './attachment/proposal-attachment-binder.service';
 import { ProposalViewService } from './proposal/proposal-view.service';
@@ -49,9 +58,9 @@ import { VersionLineRepo } from './budget/version-line.repo';
 import { VersionDecisionJudge } from './version/version-decision-judge.service';
 import { VersionDecisionWriter } from './version/version-decision-writer.service';
 import { VersionDecisionService } from './version/version-decision.service';
-import { VersionLineMovedNotifier } from './version/version-line-moved.service';
 import { VersionLineService } from './version/version-line.service';
 import { VersionRepo } from './budget/version.repo';
+import { VersionBaselineCreationService } from './version/version-baseline-creation.service';
 import { VersionCreationService } from './version/version-creation.service';
 import { VersionFigures } from './version/version-figures.service';
 import { VersionTrail } from './version/version-trail.service';
@@ -82,12 +91,14 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
  */
 @Module({
   imports: [
+    BudgetsReadFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
     IdentityAccessFacadeModule,
     FinanceModule,
     CatalogModule,
+    LicensingModule,
     NotificationsModule,
     OperatingParametersModule,
     ObjectStorageModule,
@@ -99,6 +110,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetsController,
     BudgetCommitmentsController,
     BudgetInvoicesController,
+    BudgetCyclesController,
     BudgetAttachmentUploadsController,
     BudgetAttachmentReadsController,
   ],
@@ -108,13 +120,11 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     VersionLineRepo,
     VersionHistoryRepo,
     DecisionRepo,
-    CommitmentRepo,
-    InvoiceRepo,
-    BudgetYearLockRepo,
     BudgetFactsService,
     BudgetNotifierService,
     ProposalViewService,
     ProposalService,
+    ProposalLineJudge,
     ProposalSender,
     ProposalAttachmentBinder,
     VersionViewService,
@@ -124,8 +134,8 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     VersionFigures,
     VersionTrail,
     VersionCreationService,
+    VersionBaselineCreationService,
     VersionService,
-    VersionLineMovedNotifier,
     VersionLineService,
     VersionDecisionJudge,
     VersionDecisionWriter,
@@ -142,20 +152,28 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetAttachmentLinkService,
     BudgetAttachmentExpiryService,
     BudgetAttachmentExpirySweeper,
+    BudgetViewRepo,
+    BudgetViewNumbersService,
+    BudgetTableViewService,
     BudgetViewService,
-    BudgetFactsRepo,
-    BudgetChangeListeners,
+    CycleRepo,
+    CycleService,
+    BaselineService,
+    PackageService,
+    CycleDeadlineService,
+    CycleDeadlineSweeper,
+    DepartmentCreationWindowListener,
+    PendingSpendContributions,
     CommitmentReleaseGuardHook,
     CommitmentRequestFactsHook,
     BudgetCostCenterUseReader,
     BudgetHeadChangeListener,
     BudgetSpendingApproverGrantCheck,
-    FiscalYearStartLockReader,
     SpendingApproverWaitListener,
     CommitmentService,
     InvoiceService,
     BudgetsApi,
   ],
-  exports: [BudgetsApi, BudgetChangeListeners, CommitmentReleaseGuardHook, CommitmentRequestFactsHook],
+  exports: [BudgetsApi, PendingSpendContributions, CommitmentReleaseGuardHook, CommitmentRequestFactsHook],
 })
 export class BudgetsModule {}

@@ -199,7 +199,12 @@ describe('the migration of invoices over a database that holds commitments (inte
 
       return JSON.stringify(copy);
     };
-    expect(after.map(withoutApplied)).toEqual((JSON.parse(before) as Record<string, unknown>[]).map(withoutApplied));
+    // Columns later migrations add to the commitments (they postdate this one) are not what it is about: the rows compare on the columns they had.
+    const beforeRows = JSON.parse(before) as Record<string, unknown>[];
+    const columns = Object.keys(beforeRows[0] ?? {});
+    const asBefore = (row: Record<string, unknown>) =>
+      Object.fromEntries(columns.map((column) => [column, row[column]]));
+    expect(after.map((row) => withoutApplied(asBefore(row)))).toEqual(beforeRows.map(withoutApplied));
     expect(after.map((row) => row.applied_minor)).toEqual(['0', '0', '0']);
   });
 

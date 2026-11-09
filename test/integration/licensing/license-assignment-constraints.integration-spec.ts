@@ -238,7 +238,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
     );
   });
 
-  it('owns a service account by a department and charges it to that department Unit; a personal seat may carry the department that owns its subscription (QĐ-86c, QĐ-89a)', async () => {
+  it('owns a service account by a department and charges it to that department Unit; a personal seat carries the department of its holder (QĐ-86c, QĐ-103d)', async () => {
     const subscriptionId = await fresh();
     const { unit: otherUnit } = await newDepartmentWithUnit('P-OTHER');
     const { department: retired, unit: retiredUnit } = await newDepartmentWithUnit('P-OLD', 'INACTIVE');
@@ -253,13 +253,14 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
         owningDepartmentId: null,
       }),
     ).toBe('23514');
-    // A personal seat carries the department that owns its subscription, or none; the trigger of the subscription refuses another one.
+    // A personal seat carries the department of its holder, whoever owns the subscription (QĐ-103d): the trigger that refused another
+    // department than the owner's is gone, so the seat of a holder of another department is stored (rewritten: it was 23514).
     expect(
       await personal(subscriptionId, { kind: 'PERSONAL', employeeId: other, owningDepartmentId: department }),
     ).toBeNull();
-    expect(await personal(subscriptionId, { kind: 'PERSONAL', employeeId: staff, owningDepartmentId: retired })).toBe(
-      '23514',
-    );
+    expect(
+      await personal(subscriptionId, { kind: 'PERSONAL', employeeId: staff, owningDepartmentId: retired }),
+    ).toBeNull();
     expect(await personal(subscriptionId, { ...service, identifier: 'wrong-unit', costCenterId: otherUnit })).toBe(
       '23514',
     );

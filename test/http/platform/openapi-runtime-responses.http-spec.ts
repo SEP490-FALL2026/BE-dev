@@ -48,9 +48,10 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
         .map((candidate) => candidate.operationId)
         .sort();
 
-    it('declares the 400 and 413 of the multipart limits on the three upload routes, which are the only multipart routes', () => {
+    it('declares the 400 and 413 of the multipart limits on the four upload routes, which are the only multipart routes', () => {
       // budgetVersionImport (G5) takes one file under the same limits (Prompt 02: it declared neither answer).
-      const uploads = ['budgetVersionImport', 'employeeImportUpload', 'seatBaselineImportUpload'];
+      // usageImportUpload (MF-5) takes the report of a vendor under the same limits.
+      const uploads = ['budgetVersionImport', 'employeeImportUpload', 'seatBaselineImportUpload', 'usageImportUpload'];
       expect(idsWhere((candidate) => Boolean(candidate.requestBody?.content?.['multipart/form-data']))).toEqual(
         uploads,
       );
@@ -63,7 +64,8 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
         });
         expect(responses['400']?.description).toContain('HTTP_BAD_REQUEST');
         expect(responses['413']?.description).toContain('HTTP_PAYLOAD_TOO_LARGE');
-        expect(responses['413']?.description).toContain('2 MiB');
+        // A vendor usage report may be larger: its own limit is 10 MiB (MF-5); the other uploads keep 2 MiB.
+        expect(responses['413']?.description).toContain(id === 'usageImportUpload' ? '10 MiB' : '2 MiB');
       }
     });
 
@@ -84,6 +86,7 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
         'budgetVersionImport',
         'employeeImportUpload',
         'seatBaselineImportUpload',
+        'usageImportUpload',
       ]);
     });
 

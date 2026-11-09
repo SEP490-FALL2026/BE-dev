@@ -298,7 +298,10 @@ describe('budget version attachments (integration, real PostgreSQL)', () => {
     await h.uploaded(SAMPLE_XLSX, h.finance, { versionId: version.id });
     expect(await lines()).toBe(before);
 
-    const csv = ['cost_center_code,description,amount', `${version.costCenter.code},Imported one,1000`].join('\n');
+    const csv = [
+      'cost_center_code,description,amount,line_type',
+      `${version.costCenter.code},Imported one,1000,RENEW`,
+    ].join('\n');
     await h.importLines(version.id, csv).expect(201);
     expect(await lines()).toBe(before + 1);
   });

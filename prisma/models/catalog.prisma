@@ -133,7 +133,8 @@ model Application {
   normalizedName              String          @map("normalized_name")
   dictionaryLineId            String?         @map("dictionary_line_id") @db.Uuid
   functionalGroupId           String?         @map("functional_group_id") @db.Uuid
-  businessOwnerEmployeeId     String          @map("business_owner_employee_id") @db.Uuid
+  // QĐ-104 removed the Business Owner: null for an application declared since; older rows keep the person they named.
+  businessOwnerEmployeeId     String?         @map("business_owner_employee_id") @db.Uuid
   dataSensitivity             DataSensitivity @map("data_sensitivity")
   commPersonToPersonMessaging Boolean         @map("comm_person_to_person_messaging")
   commCallsOrMeetings         Boolean         @map("comm_calls_or_meetings")
@@ -153,7 +154,7 @@ model Application {
   vendor                    Vendor?                             @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   dictionaryLine            VendorServiceLine?                  @relation(fields: [dictionaryLineId], references: [id], onDelete: Restrict)
   functionalGroup           FunctionalGroup?                    @relation(fields: [functionalGroupId], references: [id], onDelete: Restrict)
-  businessOwner             Employee                            @relation(fields: [businessOwnerEmployeeId], references: [id])
+  businessOwner             Employee?                           @relation(fields: [businessOwnerEmployeeId], references: [id], onDelete: Restrict)
   proposals                 VendorDictionaryProposal[]
   plans                     Plan[]
   applicationBusinessOwners ApplicationBusinessOwner[]
@@ -218,10 +219,12 @@ model Plan {
   application            Application               @relation(fields: [applicationId], references: [id])
   workspaceProfile       PlanWorkspaceProfile?
   subscriptions          Subscription[]
+  usageRate              PlanUsageRate?
   terms                  PlanTerms?
   termOpinions           PlanTermOpinion[]
   seatBaselineImports    SeatBaselineImport[]
   licenseAssignments     LicenseAssignment[]
+  poolGrantAvoidedCosts  PoolGrantAvoidedCost[]
   accessRequests         AccessRequest[]
   returnRequests         ReturnRequest[]
   assessmentsEquivalent  AccessRequestAssessment[] @relation("AssessmentEquivalentPlan")
@@ -232,6 +235,25 @@ model Plan {
   @@unique([organizationId, applicationId, normalizedName])
   @@index([applicationId])
   @@map("plans")
+}
+
+// KPI-3 of a plan priced per seat (QĐ-109d): how many of its seats showed activity in the 30 days before the last weekly pass of the usage
+// rules (MF-5), over how many that pass could judge. The pass (optimization) replaces the rows of the organization through the catalog
+// facade; the budget reads them over the seats bought. A plan with no row has no figure. The CHECKs and the foreign key to the
+// organization are in the migration 20261110040100_catalog_plan_usage_rates.
+model PlanUsageRate {
+  planId         String   @id @map("plan_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  activeSeats    Int      @map("active_seats")
+  assessedSeats  Int      @map("assessed_seats")
+  assessedOn     DateTime @map("assessed_on") @db.Date
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
+
+  plan         Plan         @relation(fields: [planId], references: [id], onDelete: Restrict)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@map("plan_usage_rates")
 }
 
 // The workspace of a K2 plan (QĐ-77d): who owns and administers it, and the emergency account. No secret is stored.
@@ -309,6 +331,8 @@ model Subscription {
   priceReportingCurrency String?            @map("price_reporting_currency") @db.Char(3)
   priceExchangeRateId    String?            @map("price_exchange_rate_id") @db.Uuid
   billingCycle           BillingCycle?      @map("billing_cycle")
+  // The months the purchase commits to, 1 or 12 (QĐ-103e); a perpetual purchase has none (a CHECK). A new active term needs it (checked by the application).
+  commitmentTermMonths   Int?               @map("commitment_term_months") @db.SmallInt
   startDate              DateTime?          @map("start_date") @db.Date
   endDate                DateTime?          @map("end_date") @db.Date
   renewalDate            DateTime?          @map("renewal_date") @db.Date
@@ -316,8 +340,14 @@ model Subscription {
   noticePeriodDays       Int?               @map("notice_period_days")
   autoRenew              Boolean            @default(false) @map("auto_renew")
   allowsMidTermReduction Boolean            @default(false) @map("allows_mid_term_reduction")
-  // The department that owns the purchase (QĐ-89a): required, and never changed once set (a trigger).
-  ownerDepartmentId      String             @map("owner_department_id") @db.Uuid
+  // The IT Admin who answers for the subscription (QĐ-103v(4)): set when it is declared; null only for data older than the rule or a draft.
+  responsibleItAdminEmployeeId String?      @map("responsible_it_admin_employee_id") @db.Uuid
+  // The least number of seats the vendor sells (QĐ-103e), when it says one.
+  vendorMinimumSeats     Int?               @map("vendor_minimum_seats")
+  // The subscription that prices the plan when there are several of it (Q-04): at most one per plan (a unique partial index).
+  isPrimaryForPlan       Boolean            @default(false) @map("is_primary_for_plan")
+  // The department that owns the purchase (QĐ-89a): nullable since gói 9 (phần cấp từ kho không được ghi phòng sở hữu).
+  ownerDepartmentId      String?            @map("owner_department_id") @db.Uuid
   // The period this one continues (QĐ-16): set once, when the outcome of a renewal is recorded; a period has at most one
   // successor (the unique index) and the link never changes (a trigger).
   renewedFromId          String?            @unique @map("renewed_from_id") @db.Uuid
@@ -326,7 +356,8 @@ model Subscription {
 
   organization        Organization                 @relation(fields: [organizationId], references: [id])
   plan                Plan                         @relation(fields: [planId], references: [id])
-  ownerDepartment     Department                   @relation("SubscriptionOwnerDepartment", fields: [ownerDepartmentId], references: [id], onDelete: Restrict)
+  ownerDepartment     Department?                  @relation("SubscriptionOwnerDepartment", fields: [ownerDepartmentId], references: [id], onDelete: Restrict)
+  responsibleItAdmin  Employee?                    @relation("SubscriptionResponsibleItAdmin", fields: [responsibleItAdminEmployeeId], references: [id], onDelete: Restrict)
   renewedFrom         Subscription?                @relation("SubscriptionRenewalChain", fields: [renewedFromId], references: [id], onDelete: Restrict)
   renewedBy           Subscription?                @relation("SubscriptionRenewalChain")
   renewalCases        SubscriptionRenewal[]        @relation("RenewalOfPeriod")
@@ -341,6 +372,7 @@ model Subscription {
 
   @@index([planId])
   @@index([ownerDepartmentId])
+  @@index([responsibleItAdminEmployeeId])
   @@map("subscriptions")
 }
 

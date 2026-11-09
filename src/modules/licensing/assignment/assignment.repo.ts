@@ -144,6 +144,20 @@ export class AssignmentRepo {
     return this.find(id, tx);
   }
 
+  /**
+   * Records the day the task of the grant was completed, with the end the seat has from then on: the end it asked for, at the latest a
+   * year after that day (`QĐ-106b`). The only write of `granted_on`, once, when the task completes.
+   */
+  async markGranted(tx: DbTx, id: string, input: { grantedOn: BusinessDate; expectedEndDate: BusinessDate | null }) {
+    await tx.licenseAssignment.update({
+      where: { id },
+      data: {
+        grantedOn: toDateColumn(input.grantedOn),
+        expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
+      },
+    });
+  }
+
   /** Ends the assignment the day `until` (that day no longer counts). */
   async end(tx: DbTx, id: string, until: BusinessDate): Promise<void> {
     await tx.licenseAssignment.update({ where: { id }, data: { validUntil: toDateColumn(until) } });
@@ -203,6 +217,46 @@ export class AssignmentRepo {
   /** The assignments of the subscription that have not ended and have not failed as of `day` (a future start included). */
   async countHolding(subscriptionId: string, day: BusinessDate, tx?: DbTx): Promise<number> {
     return (tx ?? this.prisma).licenseAssignment.count({ where: { subscriptionId, ...HOLDING(day) } });
+  }
+
+  /** How many seats each of these purchases has held as of `day` (`HOLDING`: a future start and a service account included), one statement. */
+  async countHoldingOfSubscriptions(
+    ids: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, number>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).licenseAssignment.groupBy({
+      by: ['subscriptionId'],
+      where: { subscriptionId: { in: [...ids] }, ...HOLDING(day) },
+      _count: { _all: true },
+    });
+
+    return new Map(rows.flatMap((row) => (row.subscriptionId === null ? [] : [[row.subscriptionId, row._count._all]])));
+  }
+
+  /**
+   * The seats of these purchases held as of `day` (`HOLDING`), by the person who holds each or answers for it (a service account), in one
+   * statement: what charges a seat to the department of its holder (`QĐ-103k`).
+   */
+  async countHoldingByHolder(
+    ids: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ subscriptionId: string; employeeId: string; seats: number }[]> {
+    if (ids.length === 0) return [];
+    const rows = await (tx ?? this.prisma).licenseAssignment.groupBy({
+      by: ['subscriptionId', 'employeeId'],
+      where: { subscriptionId: { in: [...ids] }, ...HOLDING(day) },
+      _count: { _all: true },
+      orderBy: [{ subscriptionId: 'asc' }, { employeeId: 'asc' }],
+    });
+
+    return rows.flatMap((row) =>
+      row.subscriptionId === null
+        ? []
+        : [{ subscriptionId: row.subscriptionId, employeeId: row.employeeId, seats: row._count._all }],
+    );
   }
 
   /** Which of these ids have an assignment that has not ended and has not failed as of `day`, in one statement. */

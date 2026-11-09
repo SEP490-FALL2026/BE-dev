@@ -1,3 +1,4 @@
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -26,6 +27,7 @@ export interface RenewalSubmitted {
 @Injectable()
 export class RenewalRequestWriter {
   constructor(
+    private readonly spendRouting: SpendRoutingService,
     private readonly requests: AccessRequestRepo,
     private readonly renewals: RenewalRequestRepo,
     private readonly assessment: RequestFactsService,
@@ -43,6 +45,8 @@ export class RenewalRequestWriter {
       settings: RequestSettings;
       previousEnd: BusinessDate;
       newEnd: BusinessDate;
+      /** The months from the end the right has to the new end, worked out by the system (`BR-MF1-08b`). */
+      termMonths: number;
       /** The day the new term begins: the money is priced and charged to the budget year from this day, not from today (R-M3). */
       spendStartsOn: BusinessDate;
       now: Date;
@@ -50,17 +54,18 @@ export class RenewalRequestWriter {
   ): Promise<RenewalSubmitted> {
     const { body, facts, now } = input;
     const { newEnd } = input;
-    const termMonths = body.extensionMonths;
+    const { termMonths } = input;
     const consecutiveMonths = monthsBetween(facts.chainStartsOn, newEnd);
 
     const assessed = await this.assessment.assess(tx, {
       employeeId: facts.employeeId,
       requesterEmployeeId: actor.employeeId,
       planId: facts.planId,
-      termMonths,
+      // The new period is priced from the day it begins to the end it asks for, in the year it is judged in (`QĐ-109b`, `QĐ-109e`).
+      expectedEndDate: newEnd,
+      pricingFrom: input.spendStartsOn,
       now,
       settings: input.settings,
-      expectedSpendOn: input.spendStartsOn,
       lockDepartment: true,
     });
     const organizationId = (await this.requireOrganization(tx)).id;
@@ -79,6 +84,7 @@ export class RenewalRequestWriter {
       previousEnd: input.previousEnd,
       consecutiveMonths,
     });
+    await this.spendRouting.start(tx, actor, created.id, new Date());
     const record = await this.requests.findById(created.id, tx);
     if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
     const final = await this.requests.findById(created.id, tx);

@@ -17,9 +17,8 @@ export const SENT_STATES: readonly SentState[] = [
   'AWAITING_EXECUTION',
   'AWAITING_IT_ASSESSMENT',
   'AWAITING_SPEND_SUBMISSION',
-  'AWAITING_FINANCE_REVIEW',
-  'AWAITING_BUDGET',
   'AWAITING_SPEND_DECISION',
+  'AWAITING_REQUESTER_REVISION',
   'REJECTED',
   'IT_REJECTED',
   'EXECUTING',
@@ -87,12 +86,10 @@ export function spendStageOf(
   if (!row.hasSpendStep) return null;
   const { id } = row;
   switch (row.state) {
+    case 'AWAITING_REQUESTER_REVISION':
+      return 'RETURNED_TO_REQUESTER';
     case 'AWAITING_SPEND_SUBMISSION':
       return queuedStageOf(id, facts);
-    case 'AWAITING_FINANCE_REVIEW':
-      return 'WAITING_FINANCE_REVIEW';
-    case 'AWAITING_BUDGET':
-      return 'WAITING_BUDGET';
     case 'AWAITING_SPEND_DECISION':
       return 'WAITING_SPEND_DECISION';
     case 'WAITING_CONTROLLED':
@@ -104,17 +101,13 @@ export function spendStageOf(
   }
 }
 
-/** A request in the queue of its head: given back by Finance, stopped by the data, or not yet sent on. */
+/** A request in the queue of its head: blocked, waiting for the head to confirm the reserve, or not yet sent on. */
 function queuedStageOf(id: string, facts: SpendStageFacts): SpendStage {
-  const review = facts.reviews.get(id);
-
-  return queuedStatus(facts.checks.get(id) ?? null, review ? { ...review, reason: null } : null).stage;
+  return queuedStatus(facts.checks.get(id) ?? null).stage;
 }
 
-/** A request that waits under control is read by the step that is open: Finance's review first, then the spend step. */
+/** A request that waits under control is read by the spend step that is open. */
 function controlledStageOf(id: string, facts: SpendStageFacts): SpendStage | null {
-  if (facts.openFinanceReview.has(id)) return 'WAITING_FINANCE_REVIEW';
-
   return facts.openSpendApproval.has(id) ? 'WAITING_SPEND_DECISION' : null;
 }
 

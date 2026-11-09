@@ -128,7 +128,6 @@ describe('the spending approver is no party of a Request, on every way to make o
       kind: 'INDIVIDUAL',
       planId: paidPlan,
       businessReason: 'Design the new brand',
-      termMonths: 6,
     });
 
     it('is not saved for the spending approver, whatever its kind', async () => {
@@ -138,7 +137,6 @@ describe('the spending approver is no party of a Request, on every way to make o
         planId: paidPlan,
         lines: [{ employeeId: h.boss.employeeId }],
         businessReason: 'The new brand needs the shared workspace',
-        termMonths: 6,
       };
       const service = {
         kind: 'SERVICE_ACCOUNT',
@@ -146,7 +144,6 @@ describe('the spending approver is no party of a Request, on every way to make o
         purpose: 'Build bot of the CI pipeline',
         expectedIdentifier: 'ci-bot-9',
         businessReason: 'Run the builds',
-        termMonths: 1,
       };
 
       for (const body of [individual(), group, service]) {
@@ -169,7 +166,6 @@ describe('the spending approver is no party of a Request, on every way to make o
           planId: paidPlan,
           lines: [{ employeeId: u.member.employeeId }, { employeeId: h.boss.employeeId }],
           businessReason: 'The new brand needs the shared workspace',
-          termMonths: 6,
         },
         u.head,
       );

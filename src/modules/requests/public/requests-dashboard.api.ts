@@ -14,7 +14,7 @@ export class RequestsDashboardApi {
   /** The open requests this person sent, whatever their role, including requests sent before their current role. */
   async openRequestsSentBy(employeeId: string): Promise<number> {
     return this.myRequests.countOf({
-      requesterEmployeeId: employeeId,
+      scope: { kind: 'SENT_BY', employeeId },
       states: statesOf('open', undefined),
     });
   }

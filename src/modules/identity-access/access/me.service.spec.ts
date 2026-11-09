@@ -28,6 +28,8 @@ function service(options: { headed?: { departmentId: string } | null } = {}) {
     getEmployeeProfile: () => Promise.resolve(PROFILE),
     getHeadedDepartment: headed,
     getDepartmentBrief: brief,
+    getUpcomingHeadedUnits: () => Promise.resolve([]),
+    getDepartmentBriefs: () => Promise.resolve([]),
   } as unknown as OrganizationReadApi;
   const accounts = { findLoginEmail: () => Promise.resolve('an@acme.vn') } as unknown as AccountRecordService;
 

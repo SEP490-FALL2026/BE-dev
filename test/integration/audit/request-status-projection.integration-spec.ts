@@ -462,6 +462,93 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
     });
   });
 
+  describe('what the check of the budget tells (BR-MF1-06g, BR-MF1-06i, BR-MF1-07c, US-06-16 AC-6)', () => {
+    /** 100 base, 20 held, 40 spent and a reserve of 10: 40 left of the base, 50 with the reserve. */
+    const reserveUnit = async (): Promise<Unit> => {
+      const u = await example();
+      counter += 1;
+      const richer = await h.departmentWithHead(`P-JR${counter}`);
+      await h.budgetFor(richer, { total: 100 * M, held: 20 * M, spent: 40 * M, reserve: 10 * M });
+      await h.setItAdminInCharge(richer.department, { employeeId: h.it1.employeeId, account: h.it1 });
+      void u;
+
+      return richer;
+    };
+    const told = async (employeeId: string, code: string, requestId: string) =>
+      (await h.noticesOf(employeeId, code)).filter((row) => row.subject_id === requestId);
+
+    it('BR-MF1-06h: tells the head to confirm a request that uses the reserve, with no figure, and never Finance', async () => {
+      const u = await reserveUnit();
+      const id = await h.paidRequest(u, plan, { amount: 45 * M });
+      // The check is made by somebody other than the head (a request the head cannot send on), so the head is told.
+      await h.route(id, h.boss.account, ['SPENDING_APPROVER']);
+      await h.project();
+
+      const notices = await told(u.head.employeeId, 'REQUEST_RESERVE_CONFIRMATION_NEEDED', id);
+
+      expect(notices).toHaveLength(1);
+      expect(notices[0].params).toEqual({ requestId: id });
+      expect(await told(h.finance.employeeId, 'REQUEST_RESERVE_CONFIRMATION_NEEDED', id)).toEqual([]);
+      expect(await told(u.member.employeeId, 'REQUEST_RESERVE_CONFIRMATION_NEEDED', id)).toEqual([]);
+    });
+
+    it('BR-MF1-06i: tells the one who asked, with the reasons as codes, when the request is blocked; not Finance, not the IT Admin', async () => {
+      const u = await reserveUnit();
+      const id = await h.paidRequest(u, plan, { amount: 60 * M });
+      await h.sendOn([id], u.head.account).expect(201);
+      await h.project();
+
+      const notices = await told(u.member.employeeId, 'REQUEST_BUDGET_BLOCKED', id);
+
+      expect(notices.map((row) => row.params)).toEqual([{ requestId: id, reasons: 'OVER_RESERVE' }]);
+      for (const other of [h.finance.employeeId, h.it1.employeeId]) {
+        expect(await told(other, 'REQUEST_BUDGET_BLOCKED', id)).toEqual([]);
+      }
+    });
+
+    it('BR-MF1-06i(iv): tells the IT Admin in charge too when the price is no longer valid', async () => {
+      const u = await example();
+      const id = await h.staleRequest(u);
+      await h.sendOn([id], u.head.account).expect(201);
+      await h.project();
+
+      const requester = (
+        await h.ctx.sql.query<{ requester_employee_id: string }>(
+          `SELECT requester_employee_id FROM access_requests WHERE id = $1`,
+          [id],
+        )
+      ).rows[0].requester_employee_id;
+
+      expect((await told(requester, 'REQUEST_BUDGET_BLOCKED', id)).map((row) => row.params)).toEqual([
+        { requestId: id, reasons: 'PRICE_EXPIRED' },
+      ]);
+      expect(await told(h.it1.employeeId, 'REQUEST_BUDGET_BLOCKED', id)).toHaveLength(1);
+      expect(await told(h.finance.employeeId, 'REQUEST_BUDGET_BLOCKED', id)).toEqual([]);
+    });
+
+    it('US-06-16 AC-6: tells the one who asked and the head, not Finance, when the check at the decision sent the request back', async () => {
+      const u = await example();
+      const id = await h.waitingForApprover(u, plan, { amount: 20 * M });
+      const version = (
+        await h.ctx.sql.query<{ id: string }>(
+          `SELECT id FROM budget_versions WHERE cost_center_id = $1 AND year = $2 AND state = 'APPROVED'`,
+          [u.department.unitId, h.year],
+        )
+      ).rows[0].id;
+      await h.commit(u, version, h.year, 25 * M, 'HELD');
+      await h.decideSpend(id, { decision: 'APPROVE' }, h.boss.account).expect(409);
+      await h.project();
+
+      for (const person of [u.member.employeeId, u.head.employeeId]) {
+        expect((await told(person, 'REQUEST_RETURNED_AT_DECISION', id)).map((row) => row.params)).toEqual([
+          { requestId: id, reasons: 'OVER_RESERVE' },
+        ]);
+      }
+      expect(await told(h.finance.employeeId, 'REQUEST_RETURNED_AT_DECISION', id)).toEqual([]);
+      expect(await told(h.boss.employeeId, 'REQUEST_RETURNED_AT_DECISION', id)).toEqual([]);
+    });
+  });
+
   describe('what no notice ever carries (INF-06, FR-3.11)', () => {
     it('has no key that names a secret, an amount or a finding of the budget in any notice made by the specs of this suite', async () => {
       const { rows } = await h.ctx.sql.query<{ keys: string[]; text: string }>(

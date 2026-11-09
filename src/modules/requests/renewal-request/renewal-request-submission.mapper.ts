@@ -29,11 +29,10 @@ function needStepOf(facts: RenewalSubmission): NewNeedStep {
   const named = decision.outcome === 'ASSIGNED';
 
   return {
-    state: named ? 'PENDING' : 'WAITING',
+    state: decision.outcome === 'NOT_REQUIRED' ? 'NOT_REQUIRED' : named ? 'PENDING' : 'WAITING',
     assigneeEmployeeId: named ? decision.assigneeEmployeeId : null,
     routingRow: decision.row,
     waitingReason: named ? null : decision.reason,
-    samePersonAsSpend: named && decision.samePersonAsSpend,
     slaWorkingDays: policy.slaWorkingDays,
   };
 }
@@ -93,7 +92,6 @@ export function renewalSubmittedDetail(facts: RenewalSubmission, seat: RenewedSe
     amountMinor: pricing.amount?.amountMinor.toString() ?? null,
     amountCurrency: pricing.amount?.currency ?? null,
     budgetYear: pricing.budgetYear,
-    expectedSpendOn: pricing.expectedSpendOn,
     assignmentId: seat.assignmentId,
     previousExpectedEndDate: seat.previousEnd,
     newExpectedEndDate: facts.newEnd,
@@ -122,6 +120,5 @@ export function renewalRoutedDetail(facts: RenewalSubmission, requestId: string)
     assigneeEmployeeId: named ? decision.assigneeEmployeeId : null,
     role: named ? decision.role : null,
     waitingReason: named ? null : decision.reason,
-    samePersonAsSpend: named && decision.samePersonAsSpend,
   };
 }

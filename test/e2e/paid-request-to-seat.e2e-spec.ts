@@ -121,7 +121,7 @@ describe('a paid request from the employee to the seat (e2e, D-1)', () => {
     expect(seats).toEqual([
       expect.objectContaining({ id: task.assignmentId, source: 'REQUEST', kind: 'PERSONAL', planId }),
     ]);
-    const ownSubscription = h.owned.subscriptionFor(subscriptionId, unit.department.id);
+    const ownSubscription = subscriptionId;
     expect(seats[0].subscriptionId).toBe(ownSubscription);
     const usage = h.dataOf<{ occupied: number }>(await h.seatUsage(ownSubscription).expect(200));
     expect(usage.occupied).toBe(1);

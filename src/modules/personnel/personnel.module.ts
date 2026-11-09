@@ -83,6 +83,7 @@ import { TransferClosureService } from './transfer/transfer-closure.service';
 import { TransferEffectiveListener } from './transfer/transfer-effective.listener';
 import { TransferGuardService } from './transfer/transfer-guard.service';
 import { TransferNoticeRecorder } from './notice/transfer-notice.listener';
+import { PersonnelOverlapRepo } from './transfer/personnel-overlap.repo';
 import { TransferQueryService } from './transfer/transfer-query.service';
 import { TransferSettlementService } from './transfer/transfer-settlement.service';
 import { TransferRepo } from './transfer/transfer.repo';
@@ -169,6 +170,7 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     TransferChangeService,
     TransferClosureService,
     TransferQueryService,
+    PersonnelOverlapRepo,
     TransferReviewRepo,
     TransferReviewListRepo,
     TransferReviewService,

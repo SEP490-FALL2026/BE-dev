@@ -44,9 +44,6 @@ const ASSESSMENT_FIELDS = {
   quoteBillingCycle: true,
   quoteValidFrom: true,
   quoteValidUntil: true,
-  commitmentMonths: true,
-  paymentFrequency: true,
-  firstPaymentOn: true,
   savedByEmployeeId: true,
 } as const;
 
@@ -69,9 +66,6 @@ function quoteOf(row: AssessmentColumns): Quote | null {
     billingCycle: row.quoteBillingCycle,
     validFrom: fromDateColumn(row.quoteValidFrom),
     validUntil: row.quoteValidUntil ? fromDateColumn(row.quoteValidUntil) : null,
-    commitmentMonths: row.commitmentMonths,
-    paymentFrequency: row.paymentFrequency,
-    firstPaymentOn: row.firstPaymentOn ? fromDateColumn(row.firstPaymentOn) : null,
   };
 }
 

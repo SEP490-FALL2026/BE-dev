@@ -62,7 +62,7 @@ export class MySoftwareRepo {
               where: {
                 OR: [
                   { kind: 'GRANT', status: { in: [...OPEN_GRANT_TASK_STATUSES] } },
-                  { kind: 'REVOKE', status: { in: [...OPEN_REVOCATION] } },
+                  { kind: 'REVOKE', status: { in: [...OPEN_REVOCATION] }, reasons: { some: { withdrawnAt: null } } },
                   { kind: 'REVOKE', status: 'COMPLETED', accessState: 'UNTIL_PAID_END' },
                 ],
               },
@@ -94,7 +94,7 @@ function toRow(row: {
   validFromBasis: AssignmentDateBasis;
   validUntil: Date | null;
   expectedEndDate: Date | null;
-  provisioningTasks: { kind: 'GRANT' | 'REVOKE'; status: string }[];
+  provisioningTasks: { kind: 'GRANT' | 'REVOKE' | 'EXTEND'; status: string }[];
   successors: { id: string }[];
 }): MyRightRow {
   const tasks = row.provisioningTasks;

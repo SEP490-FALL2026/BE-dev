@@ -2,8 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AssignmentRenewalService } from '../assignment/renewal/assignment-renewal.service';
+import type { BusinessDate } from '../../../core/business-date';
+import { ExpiryRenewalWindowRepo } from '../expiry/expiry-renewal-window.repo';
+import { ProvisioningExtensionService } from '../provisioning/tasks/provisioning-extension.service';
 import type { AssignmentFacts, RenewAssignmentInput, RenewedAssignment } from './licensing-renewal.types';
 import { RenewalHoldHook } from './licensing.extension-points';
+import { AssignmentRenewalRefusedError } from './licensing.errors';
 
 /**
  * The licensing facade for the renewal of a seat that has an end date (`US-05-14`): what the seat is judged by, the renewal itself, and
@@ -14,7 +18,47 @@ export class LicensingRenewalApi {
   constructor(
     private readonly renewals: AssignmentRenewalService,
     private readonly renewalHold: RenewalHoldHook,
+    private readonly extensions: ProvisioningExtensionService,
+    private readonly windows: ExpiryRenewalWindowRepo,
   ) {}
+
+  /**
+   * Opens the IT task that extends a right whose renewal was approved (`BR-MF1-08d`), in the transaction of the approval, under the lock
+   * of the seat. Throws AssignmentNotFoundError and AssignmentRenewalRefusedError.
+   */
+  openExtension(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { assignmentId: string; requestId: string; now: Date },
+  ): Promise<{ taskId: string }> {
+    return this.openExtensionOf(tx, actor, input);
+  }
+
+  private async openExtensionOf(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { assignmentId: string; requestId: string; now: Date },
+  ): Promise<{ taskId: string }> {
+    // Judged under the lock of the subscription and then of the seat, as a renewal is: a seat that ended or is being revoked is not extended.
+    const facts = await this.renewals.read(tx, input.assignmentId, true);
+    if (facts.kind === 'SERVICE') throw new AssignmentRenewalRefusedError('SERVICE_ACCOUNT');
+    if (!facts.open) throw new AssignmentRenewalRefusedError('NOT_OPEN');
+    if (facts.revocationLive) throw new AssignmentRenewalRefusedError('REVOCATION_PENDING');
+
+    return this.extensions.open(tx, actor, { ...input, holderEmployeeId: facts.employeeId });
+  }
+
+  /**
+   * The window of the renewal of the right ending on `expectedEndDate`, when it was recorded as open: the days in force when it opened and
+   * the day it opened (`QĐ-108b`). Null when it has not been recorded yet: the caller judges by the parameter in force.
+   */
+  renewalWindowOf(
+    assignmentId: string,
+    expectedEndDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ windowDays: number; opensOn: BusinessDate } | null> {
+    return this.windows.find(assignmentId, expectedEndDate, tx);
+  }
 
   /**
    * A seat as the return and the renewal of it judge it: its dates, whether it is open, the chain of records before it, what the

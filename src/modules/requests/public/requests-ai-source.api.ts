@@ -22,7 +22,7 @@ interface SourceRow {
   /** The people on the step of a request for a group, as its queue counts them; null for a request for one person. */
   groupSize: number | null;
   reason: string;
-  termMonths: number;
+  termMonths: number | null;
   price: { minor: bigint; currency: string } | null;
 }
 

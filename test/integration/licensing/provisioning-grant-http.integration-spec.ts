@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount } from '../../support/api-accounts';
 import { effectiveEndOf } from '../../../src/core/term-limit';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
@@ -221,30 +222,36 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(h.codeOf(named)).toBe('PROVISIONING.SUBSCRIPTION_NOT_ALLOWED');
   });
 
-  it('refuses a K1 or K2 grant with no subscription, with one of another plan, or with none that exists', async () => {
-    const { planId } = await k2();
+  // Rewritten for P0-05: the subscription is optional (it was 422 SUBSCRIPTION_REQUIRED); the cases of another plan and of none that exists stay.
+  it('takes the subscription of the plan when a K1 or K2 grant names none; refuses one of another plan, or none that exists, or a plan with nothing to take a seat from', async () => {
+    const { subscriptionId: own, planId } = await k2();
     const other = await h.subscription(5, 'K2');
 
-    const none = await h.grant({ requestId: h.gate.grantable(e5, planId) }).expect(422);
-    const mismatch = await h.grant({ requestId: h.gate.grantable(e5, planId), subscriptionId: other }).expect(422);
+    const none = await h.grant({ requestId: h.gate.grantable(e5, planId) }).expect(201);
+    const mismatch = await h.grant({ requestId: h.gate.grantable(e6, planId), subscriptionId: other }).expect(422);
     const missing = await h
-      .grant({ requestId: h.gate.grantable(e5, planId), subscriptionId: randomUUID() })
+      .grant({ requestId: h.gate.grantable(e6, planId), subscriptionId: randomUUID() })
       .expect(404);
+    const draftPlan = await h.planOf(await h.draftSubscription('K2'));
+    const nothing = await h.grant({ requestId: h.gate.grantable(e6, draftPlan) }).expect(404);
 
-    expect(h.codeOf(none)).toBe('PROVISIONING.SUBSCRIPTION_REQUIRED');
+    expect(h.dataOf<{ task: { subscriptionId: string } }>(none).task.subscriptionId).toBe(own);
     expect(h.codeOf(mismatch)).toBe('PROVISIONING.SUBSCRIPTION_PLAN_MISMATCH');
     expect(h.codeOf(missing)).toBe('SUBSCRIPTION.NOT_FOUND');
+    expect(h.codeOf(nothing)).toBe('SUBSCRIPTION.NOT_FOUND');
     expect(await tasksOf(other)).toBe(0);
   });
 
-  it('refuses K4, which needs the key store and a company device, and keeps no assignment or task', async () => {
+  // Rewritten for BR-MF1-09 / QĐ-103d: K4 is granted from the key pool (k4-key-pool-grant.integration-spec.ts); K3 stays refused.
+  it('refuses K3, which is only specified, and keeps no assignment or task', async () => {
     const subscriptionId = await h.subscription(5, 'K4');
     const planId = await h.planOf(subscriptionId);
+    await h.ctx.sql.query(`UPDATE plans SET provisioning_type = 'K3', pricing_model = NULL WHERE id = $1`, [planId]);
 
     const refused = await h.grant({ requestId: h.gate.grantable(e5, planId), subscriptionId }).expect(409);
 
     expect(h.codeOf(refused)).toBe('PROVISIONING.TYPE_NOT_SUPPORTED');
-    expect(h.detailsOf(refused)).toMatchObject({ provisioningType: 'K4' });
+    expect(h.detailsOf(refused)).toMatchObject({ provisioningType: 'K3' });
     expect(await tasksOf(subscriptionId)).toBe(0);
   });
 
@@ -339,9 +346,8 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
           [employeeId],
         )
       ).rows.map((row) => row.expected_end_date);
-    /** The last day of the term the request asked for (6 months in `grantable`), cut at the end of the fiscal year for a flexible plan. */
-    const termEnd = (flexible: boolean) =>
-      effectiveEndOf({ start: h.today(), months: 6, flexible, fiscalYearStartMonth: 1 });
+    /** The last day of the term the request asked for (6 months in `grantable`): never cut at the end of the calendar year (`QĐ-104a`). */
+    const termEnd = () => effectiveEndOf({ start: h.today(), months: 6 });
 
     it.each([
       ['a contractor', 'CONTRACTOR'],
@@ -354,7 +360,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
 
       await h.grant({ requestId: h.gate.grantable(person, planId), subscriptionId }).expect(201);
 
-      expect(await seatEndOf(person)).toEqual([termEnd(false)]);
+      expect(await seatEndOf(person)).toEqual([termEnd()]);
     });
 
     it('gives the seat of free internal software no end by term: it costs nothing and has no term to bind (R-H1)', async () => {
@@ -376,17 +382,21 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
       expect(await seatEndOf(person)).toEqual([null]);
     });
 
-    it('cuts the end at the end of the fiscal year when the subscription the seat is taken on is flexible, and no later (R-M1)', async () => {
+    it('does not cut the end at the end of the calendar year, even when the subscription the seat is taken on is flexible (R-D03)', async () => {
       const { subscriptionId, planId } = await k2();
       await h.ctx.sql.query(`UPDATE subscriptions SET allows_mid_term_reduction = true WHERE id = $1`, [
         subscriptionId,
       ]);
       const person = await h.member('P-DES', 'E-END-FLEX', designer);
+      // A fixed day, so that the six months cross 31/12 whatever day the suite runs on (F-010).
+      pretendBusinessToday(h.ctx.app, '2026-11-15');
+      try {
+        await h.grant({ requestId: h.gate.grantable(person, planId), subscriptionId }).expect(201);
+      } finally {
+        jest.restoreAllMocks();
+      }
 
-      await h.grant({ requestId: h.gate.grantable(person, planId), subscriptionId }).expect(201);
-
-      expect(await seatEndOf(person)).toEqual([termEnd(true)]);
-      expect(termEnd(true) <= `${h.today().slice(0, 4)}-12-31`).toBe(true);
+      expect(await seatEndOf(person)).toEqual(['2027-05-14']);
     });
 
     it('takes no end day in the body of the grant: the IT Admin has no authority to set the approved term', async () => {
@@ -474,5 +484,85 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
         ])
       ).rows[0].source,
     ).toBe('REQUEST');
+  });
+
+  describe('the day the right begins is the day the task of the grant is completed (BR-MF1-06a, RV-04, S1-01)', () => {
+    const seat = async (assignmentId: string) =>
+      (
+        await h.ctx.sql.query<{ valid_from: string; granted_on: string | null; expected_end_date: string | null }>(
+          `SELECT to_char(valid_from, 'YYYY-MM-DD') AS valid_from, to_char(granted_on, 'YYYY-MM-DD') AS granted_on,
+                  to_char(expected_end_date, 'YYYY-MM-DD') AS expected_end_date
+             FROM license_assignments WHERE id = $1`,
+          [assignmentId],
+        )
+      ).rows[0];
+    const grantableTo = (employeeId: string, planId: string, expectedEndDate: string | null) =>
+      h.gate.answer({
+        status: 'GRANTABLE',
+        seat: 'PERSONAL',
+        employeeId,
+        planId,
+        departmentId: h.gate.defaultDepartmentId,
+        expectedEndDate,
+        termMonths: 0,
+        termBound: expectedEndDate !== null,
+      });
+
+    it('BR-MF1-06a: a request made on 10/11 and granted on 13/11 begins on 13/11: granted_on is written, valid_from is not touched', async () => {
+      const { subscriptionId, planId } = await k2();
+      const person = await h.member('P-DES', 'E-GRANTED', designer);
+      pretendBusinessToday(h.ctx.app, '2026-11-10');
+      let task;
+      try {
+        task = await h.granted(person, planId, { subscriptionId });
+        expect(await seat(task.assignmentId)).toMatchObject({ valid_from: '2026-11-10', granted_on: null });
+        pretendBusinessToday(h.ctx.app, '2026-11-13');
+        await h.claim(task.id).expect(200);
+        await h.complete(task.id, { evidence: 'The account was added by hand' }).expect(200);
+      } finally {
+        jest.restoreAllMocks();
+      }
+
+      expect(await seat(task.assignmentId)).toMatchObject({ valid_from: '2026-11-10', granted_on: '2026-11-13' });
+    });
+
+    it('BR-MF1-06a: the end is the end the request asked for, a year from the completion at the latest (QĐ-106b)', async () => {
+      const { subscriptionId, planId } = await k2();
+      const early = await h.member('P-DES', 'E-GRANTED-EARLY', designer);
+      const late = await h.member('P-DES', 'E-GRANTED-LATE', designer);
+      pretendBusinessToday(h.ctx.app, '2026-11-10');
+      const tasks = [];
+      try {
+        // 09/11/2027 is the longest end a request sent on 10/11/2026 may ask for; a seat asked to end later is cut a year after completion.
+        tasks.push(await h.grant({ requestId: grantableTo(early, planId, '2027-11-09'), subscriptionId }).expect(201));
+        tasks.push(await h.grant({ requestId: grantableTo(late, planId, '2028-02-01'), subscriptionId }).expect(201));
+        const [first, second] = tasks.map(
+          (response) => h.dataOf<{ task: { id: string; assignmentId: string } }>(response).task,
+        );
+        pretendBusinessToday(h.ctx.app, '2026-11-13');
+        await h.claim(first.id).expect(200);
+        await h.claim(second.id).expect(200);
+        await h.complete(first.id, { evidence: 'Done' }).expect(200);
+        await h.complete(second.id, { evidence: 'Done' }).expect(200);
+
+        expect((await seat(first.assignmentId)).expected_end_date).toBe('2027-11-09');
+        expect((await seat(second.assignmentId)).expected_end_date).toBe('2027-11-12');
+      } finally {
+        jest.restoreAllMocks();
+      }
+    });
+
+    it('BR-MF1-06a: a seat with no end asked for keeps none when it is completed', async () => {
+      const { subscriptionId, planId } = await k2();
+      const person = await h.member('P-DES', 'E-GRANTED-OPEN', designer);
+      const task = h.dataOf<{ task: { id: string; assignmentId: string } }>(
+        await h.grant({ requestId: grantableTo(person, planId, null), subscriptionId }).expect(201),
+      ).task;
+
+      await h.claim(task.id).expect(200);
+      await h.complete(task.id, { evidence: 'Done' }).expect(200);
+
+      expect(await seat(task.assignmentId)).toMatchObject({ expected_end_date: null, granted_on: h.today() });
+    });
   });
 });

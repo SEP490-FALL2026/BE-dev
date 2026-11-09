@@ -45,6 +45,17 @@ export class DevicesApi {
   }
 
   /**
+   * Who held each of these registrations and from which day to which (the end day is exclusive; null while open): the days of usage a collector
+   * sent are tied to the person who held the machine on that day. A registration that does not exist is absent.
+   */
+  registrationHolders(
+    registrationIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<Array<{ registrationId: string; employeeId: string; validFrom: Date; validUntil: Date | null }>> {
+    return this.repo.holdersOf(registrationIds, tx);
+  }
+
+  /**
    * What a decision on data needs of the machine behind a credential — its state, the window of data accepted, whether the status of
    * tools is acknowledged, and the zone the days are told in — with its registration locked `FOR SHARE` until the caller's
    * transaction ends. Throws DeviceCredentialRevokedError when the credential was revoked or its registration ended since the guard.

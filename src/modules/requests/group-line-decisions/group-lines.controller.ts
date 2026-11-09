@@ -1,3 +1,4 @@
+import { SPEND_ERROR_EXAMPLES } from '../spend/spend.http-errors';
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
@@ -60,7 +61,7 @@ export class GroupLinesController {
   @ApiSuccessResponse(LinesResponseDto, {
     message: 'GROUP_REQUEST.LINES_LISTED',
     description:
-      'The people of a request for a group in the order they were named, each with the state of their own, the step that holds them, what each costs, what was decided for them at the need and the spend, the share of the commitment they stand for once approved, and how and why they ended. The sender, whoever holds a step and an IT Admin see every person; a person the request is for sees only their own line.',
+      'The people of a request for a group in the order they were named, each with the state of their own, the step that holds them, what each costs, what was decided for them at the need and the spend, the share of the commitment they stand for once approved, and how and why they ended. The sender, whoever holds a step, the head today of its department, an IT Admin, a spending approver once a spend step was opened on it and Finance once its spend was approved see every person; a person the request is for sees only their own line, and the Super Admin none.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -145,24 +146,19 @@ export class GroupLinesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).',
+        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again on the people approved and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD or SPEND.RECHECKED_RETURNED_TO_REQUESTER for a one-step request, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED).',
       examples: [
         GROUP_REQUEST_ERROR_EXAMPLES.NO_SPEND_STEP,
-        GROUP_REQUEST_ERROR_EXAMPLES.REVIEWER_IS_APPROVER,
         GROUP_REQUEST_ERROR_EXAMPLES.NOT_CHECKABLE,
-        GROUP_REQUEST_ERROR_EXAMPLES.RECHECKED_NEEDS_FINANCE_REVIEW,
         GROUP_REQUEST_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_HEAD,
+        SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_REQUESTER,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal without its reason); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); a year of the budget has less money than the request costs, or none (SPEND.OVERRIDE_REQUIRED, with the years): it cannot be approved.',
-      examples: [
-        VALIDATION_EXAMPLE,
-        GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH,
-        GROUP_REQUEST_ERROR_EXAMPLES.OVERRIDE_REQUIRED,
-      ],
+        'The body is invalid (VALIDATION_ERROR: a refusal without its reason); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who).',
+      examples: [VALIDATION_EXAMPLE, GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH],
     },
   )
   async decideSpend(
@@ -172,7 +168,7 @@ export class GroupLinesController {
   ) {
     try {
       const result = await this.spends.decide(actor, params.id, body);
-      if (result.status === 'BOUNCED') throw toRecheckedApiException(result);
+      if (result.status === 'BOUNCED') throw toRecheckedApiException(result.reasons, result.to, result.overBy);
 
       return { spendApproval: await this.approvals.detail(actor, params.id) };
     } catch (error) {

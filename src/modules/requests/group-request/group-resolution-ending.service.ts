@@ -5,14 +5,13 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { BudgetInformationService } from '../budget-information/budget-information.service';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 import { requestEndingOf } from './group-resolution.policy';
 
 /**
  * Every line has ended: the request ends with the outcome of the most that was done, and nothing is left open on it (`US-05-17`,
- * `US-05-08`): its steps are closed, it leaves its batch, the questions of budget still open are closed, and what says who closed it and
+ * `US-05-08`): its steps are closed, it leaves its batch, and what says who closed it and
  * why is written; the Audit Trail says it was resolved, by the actor, or by the system when the grant gate moved it.
  */
 @Injectable()
@@ -21,7 +20,6 @@ export class GroupResolutionEnding {
     private readonly requests: AccessRequestRepo,
     private readonly steps: SpendStepRepo,
     private readonly batches: SpendBatchRepo,
-    private readonly questions: BudgetInformationService,
     private readonly audit: AuditApi,
   ) {}
 
@@ -36,7 +34,6 @@ export class GroupResolutionEnding {
     await this.steps.closeAllOpen(tx, request.id, now);
     const leaving = outcome === 'CANCELLED' ? 'REQUEST_CANCELLED' : 'REQUEST_WITHDRAWN';
     if (outcome === 'WITHDRAWN' || outcome === 'CANCELLED') await this.batches.markLeft(tx, request.id, leaving, now);
-    if (actor !== null) await this.questions.closeOpen(tx, actor, request, leaving, now);
 
     await this.write(tx, request, requestEndingOf(outcome, request.lines, request.requesterEmployeeId, now));
     await this.audit.record(

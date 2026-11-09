@@ -16,12 +16,15 @@ export interface MyRequestLookups {
   facts: SpendStageFacts & OutcomeFacts;
 }
 
+/** What every list of requests says of a row, before what only one list adds (who the caller is to it, their own line). */
+export type RequestSummaryCore = Omit<MyRequestSummaryWire, 'involvement' | 'myLine'>;
+
 /** A row of the list as the wire carries it: the dates written as text, the people named, the stage and the reason read from the facts. */
 export function toSummary(
   row: MyRequestRow,
   requesterEmployeeId: string,
   lookups: MyRequestLookups,
-): MyRequestSummaryWire {
+): RequestSummaryCore {
   const person = (id: string | null): EmployeeRef | null => {
     if (id === null) return null;
 
@@ -35,11 +38,13 @@ export function toSummary(
     type: row.type,
     branch: row.branch,
     state: row.state,
+    routing: row.routing ?? { mode: 'VIA_HEAD', oneStepReason: null },
     plan: planId === null ? null : (lookups.plans.get(planId) ?? failMissing('plan', planId, row.id)),
     softwareName: lookups.softwareNames.get(row.id) ?? null,
     beneficiary: person(row.beneficiaryEmployeeId),
     lineCount: row.lineCount,
     termMonths: row.termMonths,
+    expectedEndDate: row.expectedEndDate,
     submittedAt: row.submittedAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     needStep: {
