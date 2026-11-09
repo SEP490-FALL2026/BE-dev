@@ -5,7 +5,7 @@ import { BudgetCycleNotFoundError } from '../budget/budget.errors';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { ProposalRepo } from '../budget/proposal.repo';
 import { VersionRepo } from '../budget/version.repo';
-import { DEPARTMENTS_LISTED_MAX } from './baseline.policy';
+import { inOrderOf, listedDepartments } from './baseline.policy';
 import type { PackageWire } from './cycle.dto';
 import type { ProposalRecord } from '../budget/proposal.repo';
 import type { VersionRecord } from '../budget/version.repo';
@@ -65,8 +65,9 @@ export class PackageService {
     if (!cycle) throw new BudgetCycleNotFoundError();
 
     const departmentIds = await this.organizationReads.getActiveDepartmentIds(year);
+    const listedIds = listedDepartments(departmentIds, undefined);
     const [briefs, costCenters, format] = await Promise.all([
-      this.organizationReads.getDepartmentBriefs(departmentIds),
+      this.organizationReads.getDepartmentBriefs(listedIds),
       this.organizationReads.getUnitCostCenterIds(departmentIds),
       this.facts.formatter(cycle.currency),
     ]);
@@ -86,10 +87,11 @@ export class PackageService {
     const sum = (versions: Iterable<VersionRecord>) =>
       [...versions].reduce((total, version) => total + version.baseMinor + version.reserveMinor, 0n);
     const versionsTotal = sum(counted.values());
-    const listedCostCenters = new Set(costCenterIds);
+    // The departments listed are the first ones by id: a version of the Cost Center of one that was cut off is outside them.
+    const listedCostCenters = new Set(listedIds.flatMap((id) => costCenters.get(id) ?? []));
     const outside = sum([...counted.values()].filter((version) => !listedCostCenters.has(version.costCenterId)));
     const proposalsTotal = [...proposals.values()].reduce((total, proposal) => total + proposal.totalMinor, 0n);
-    const listed = briefs.slice(0, DEPARTMENTS_LISTED_MAX).map((brief) => {
+    const listed = inOrderOf(listedIds, briefs).map((brief) => {
       const costCenterId = costCenters.get(brief.id) ?? '';
 
       return departmentOf(

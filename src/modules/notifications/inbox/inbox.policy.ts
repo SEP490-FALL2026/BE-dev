@@ -97,6 +97,13 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   // The cycle of a year opened and a department ceiling published: the year and the department, never the figure (FIGURE_WORDS).
   BUDGET_CYCLE_OPENED: ['cycleId', 'year', 'submissionDeadline'],
   BUDGET_DEPARTMENT_CEILING_PUBLISHED: ['cycleId', 'year', 'departmentId'],
+  // The deadlines of the cycle: the year, the day, and how many departments or versions (a count, never a figure of money).
+  BUDGET_PROPOSAL_DEADLINE_REMINDER: ['cycleId', 'year', 'costCenterId', 'submissionDeadline'],
+  BUDGET_NO_HEAD_AT_DEADLINE: ['cycleId', 'year', 'departmentCount', 'submissionDeadline'],
+  BUDGET_SUBMISSION_DEADLINE_PASSED: ['cycleId', 'year', 'departmentCount', 'submissionDeadline'],
+  BUDGET_DECISION_DEADLINE_REMINDER: ['cycleId', 'year', 'versionCount', 'decisionDeadline'],
+  BUDGET_COST_CENTER_SETUP_DUE: ['cycleId', 'year', 'departmentId'],
+  BUDGET_BASELINE_VERSION_HEAD_ASSIGNED: ['versionId', 'costCenterId', 'year'],
   // The alerts of the rights (`a03-license-inbox-alerts`): the right, the person, the day and the role asked; never a key, an
   // account identifier, a price or the text of a note.
   LICENSE_EXPIRY_REMINDER: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'audience'],

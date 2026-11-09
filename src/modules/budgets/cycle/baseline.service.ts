@@ -14,7 +14,8 @@ import { BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
 import {
-  DEPARTMENTS_LISTED_MAX,
+  inOrderOf,
+  listedDepartments,
   SOFTWARE_LISTED_MAX,
   baselineVersionRefusal,
   shouldSuggestRenewal,
@@ -28,18 +29,20 @@ type Reading = {
   year: number;
   today: BusinessDate;
   seats: Map<string, number>;
+  /** The subscriptions the company has decided to end: they are not renewed (`Q-162`). */
+  ending: ReadonlySet<string>;
   spent: bigint;
   format: (minor: bigint) => { amount: string; currency: string };
 };
 
 /** One department of the baseline: its subscriptions, the seats they hold and what the year is estimated to cost at today's prices. */
-function departmentOf(
+export function departmentOf(
   brief: { id: string; code: string; name: string },
   costCenterId: string | null,
   subscriptions: readonly BaselineSubscription[],
   reading: Reading,
 ): BaselineWire['departments'][number] {
-  const { year, today, seats, spent, format } = reading;
+  const { year, today, seats, ending, spent, format } = reading;
   const software: BaselineWire['departments'][number]['software'] = [];
   let total = 0n;
   let purchased = 0;
@@ -47,7 +50,12 @@ function departmentOf(
   let unknown = false;
   for (const subscription of subscriptions) {
     const held = seats.get(subscription.subscriptionId) ?? 0;
-    const { monthlyMinor: monthly, months, costMinor: cost } = subscriptionCost(year, today, held, subscription);
+    const terminated = ending.has(subscription.subscriptionId);
+    const {
+      monthlyMinor: monthly,
+      months,
+      costMinor: cost,
+    } = subscriptionCost(year, today, held, subscription, terminated);
     total += cost ?? 0n;
     unknown ||= cost === null;
     purchased += subscription.purchasedQuantity ?? 0;
@@ -63,7 +71,7 @@ function departmentOf(
       monthlyUnitPrice: monthly === null ? null : format(monthly),
       monthsRunning: months,
       estimatedAnnualCost: cost === null ? null : format(cost),
-      suggestRenewal: shouldSuggestRenewal(year, subscription.endDate, today),
+      suggestRenewal: shouldSuggestRenewal(year, today, subscription, terminated),
     });
   }
 
@@ -109,10 +117,7 @@ export class BaselineService {
     if (!cycle) throw new BudgetCycleNotFoundError();
 
     const inYear = await this.organizationReads.getActiveDepartmentIds(year);
-    const wanted = (departmentId === undefined ? inYear : inYear.filter((id) => id === departmentId)).slice(
-      0,
-      DEPARTMENTS_LISTED_MAX,
-    );
+    const wanted = listedDepartments(inYear, departmentId);
     const [briefs, costCenters, history, subscriptions, format] = await Promise.all([
       this.organizationReads.getDepartmentBriefs(wanted),
       this.organizationReads.getUnitCostCenterIds(wanted),
@@ -120,10 +125,9 @@ export class BaselineService {
       this.catalog.getBaselineSubscriptions(wanted),
       this.facts.formatter(cycle.currency),
     ]);
-    const seats = await this.licensing.countSeatsOfSubscriptions(
-      subscriptions.map((subscription) => subscription.subscriptionId),
-      today,
-    );
+    const subscriptionIds = subscriptions.map((subscription) => subscription.subscriptionId);
+    const seats = await this.licensing.countSeatsOfSubscriptions(subscriptionIds, today);
+    const ending = await this.licensing.getSubscriptionIdsToEnd(subscriptionIds);
     const thisYear = Number(today.slice(0, 4));
     // The spend of the year sits on whichever Cost Center the department was charged to when it was recorded: all of them count.
     const spent = await this.commitments.totals(
@@ -133,11 +137,12 @@ export class BaselineService {
     const byDepartment = new Map<string, BaselineSubscription[]>();
     for (const row of subscriptions)
       byDepartment.set(row.departmentId, [...(byDepartment.get(row.departmentId) ?? []), row]);
-    const departments = briefs.map((brief) =>
+    const departments = inOrderOf(wanted, briefs).map((brief) =>
       departmentOf(brief, costCenters.get(brief.id) ?? null, byDepartment.get(brief.id) ?? [], {
         year,
         today,
         seats,
+        ending,
         spent: (history.get(brief.id) ?? []).reduce(
           (sum, costCenterId) => sum + (spent.get(heldKey(costCenterId, thisYear))?.spent ?? 0n),
           0n,
@@ -166,19 +171,14 @@ export class BaselineService {
     tx: DbTx,
     costCenterId: string,
     year: number,
+    today: BusinessDate,
   ): Promise<{ departmentId: string; currency: string }> {
-    const today = await this.facts.today(new Date(), tx);
     const cycle = await this.cycles.lockByYear(tx, await this.facts.organizationId(tx), year, 'UPDATE');
     const unit = await this.facts.costCenterInUse(costCenterId, tx);
-    if (
-      cycle !== null &&
-      cycle.firstPublishedAt !== null &&
-      !(await this.isInCycle(cycle, unit.departmentId, year, tx))
-    )
-      throw new BudgetBaselineVersionNotAllowedError('DEPARTMENT_NOT_IN_CYCLE');
     const heads = await this.organizationReads.getDepartmentHeads([unit.departmentId], today, tx);
     const refusal = baselineVersionRefusal({
       cyclePublishedOnce: cycle !== null && cycle.firstPublishedAt !== null,
+      inCycle: cycle !== null && (await this.isInCycle(cycle, unit.departmentId, year, tx)),
       today,
       submissionDeadline: cycle?.submissionDeadline ?? today,
       headsToday: heads.has(unit.departmentId),
@@ -211,19 +211,17 @@ export class BaselineService {
   async renewalLinesOf(
     departmentId: string,
     year: number,
+    today: BusinessDate,
     tx?: DbTx,
   ): Promise<{ description: string; planId: string; seats: number | null; amountMinor: bigint }[]> {
-    const today = await this.facts.today(new Date(), tx);
     const subscriptions = await this.catalog.getBaselineSubscriptions([departmentId], tx);
-    const seats = await this.licensing.countSeatsOfSubscriptions(
-      subscriptions.map((subscription) => subscription.subscriptionId),
-      today,
-      tx,
-    );
+    const subscriptionIds = subscriptions.map((subscription) => subscription.subscriptionId);
+    const seats = await this.licensing.countSeatsOfSubscriptions(subscriptionIds, today, tx);
+    const ending = await this.licensing.getSubscriptionIdsToEnd(subscriptionIds, tx);
 
     return subscriptions.flatMap((subscription) => {
       const held = seats.get(subscription.subscriptionId) ?? 0;
-      const { costMinor } = subscriptionCost(year, today, held, subscription);
+      const { costMinor } = subscriptionCost(year, today, held, subscription, ending.has(subscription.subscriptionId));
 
       return costMinor === null || costMinor <= 0n
         ? []

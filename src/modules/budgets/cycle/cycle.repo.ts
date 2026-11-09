@@ -88,6 +88,17 @@ export const figuresOf = (cycle: CycleRecord): CycleFigures => {
 export class CycleRepo {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** The cycles of this year and the years to come, oldest first: what the deadlines are watched for. */
+  async upcomingOf(organizationId: string, fromYear: number, tx?: DbTx): Promise<CycleRecord[]> {
+    const rows = await (tx ?? this.prisma).budgetCycle.findMany({
+      where: { organizationId, year: { gte: fromYear } },
+      include: WITH_CEILINGS,
+      orderBy: { year: 'asc' },
+    });
+
+    return rows.map(toRecord);
+  }
+
   /** Whether the organization has any cycle at all, whatever the year or the state. */
   async anyExists(organizationId: string, tx?: DbTx): Promise<boolean> {
     return (await (tx ?? this.prisma).budgetCycle.count({ where: { organizationId }, take: 1 })) > 0;

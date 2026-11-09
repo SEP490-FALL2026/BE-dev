@@ -8,6 +8,8 @@ import type { OrganizationChange } from '../../organization/public/organization.
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { ProposalRepo } from '../budget/proposal.repo';
+import { VersionRepo } from '../budget/version.repo';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 
 /**
  * A person became the head of a department (`HEAD_PERIOD_START`): the proposals Finance gave back that wait to be sent again or
@@ -21,6 +23,8 @@ export class BudgetHeadChangeListener implements OrganizationChangeListener, OnM
 
   constructor(
     private readonly proposals: ProposalRepo,
+    private readonly versions: VersionRepo,
+    private readonly organizationReads: OrganizationReadApi,
     private readonly facts: BudgetFactsService,
     private readonly notifier: BudgetNotifierService,
     private readonly changes: OrganizationChangeListeners,
@@ -32,6 +36,19 @@ export class BudgetHeadChangeListener implements OrganizationChangeListener, OnM
 
   async onChange(tx: DbTx, change: OrganizationChange): Promise<void> {
     if (change.kind !== 'HEAD_PERIOD_START') return;
+    await this.tellOfBaselineVersions(tx, change.departmentId, change.headEmployeeId);
+    await this.passReturnedProposals(tx, change.departmentId, change.headEmployeeId);
+  }
+
+  /** The versions Finance built from the baseline for the department and that are still in progress: the new head is told of them. */
+  private async tellOfBaselineVersions(tx: DbTx, departmentId: string, headEmployeeId: string): Promise<void> {
+    const costCenterId = (await this.organizationReads.getUnitCostCenterIds([departmentId], tx)).get(departmentId);
+    if (costCenterId === undefined) return;
+    for (const version of await this.versions.baselineInProgressOf(costCenterId, tx))
+      await this.notifier.baselineVersionHeadAssigned(tx, version, headEmployeeId);
+  }
+
+  private async passReturnedProposals(tx: DbTx, departmentId: string, headEmployeeId: string): Promise<void> {
     const waiting = await this.proposals.returned(tx);
     if (waiting.length === 0) return;
     const departments = await this.facts.departmentsOf(
@@ -39,8 +56,8 @@ export class BudgetHeadChangeListener implements OrganizationChangeListener, OnM
       tx,
     );
     for (const proposal of waiting) {
-      if (departments.get(proposal.costCenterId) !== change.departmentId) continue;
-      await this.notifier.proposalPassedToHead(tx, proposal, change.departmentId, change.headEmployeeId);
+      if (departments.get(proposal.costCenterId) !== departmentId) continue;
+      await this.notifier.proposalPassedToHead(tx, proposal, departmentId, headEmployeeId);
     }
   }
 }

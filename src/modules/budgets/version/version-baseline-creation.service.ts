@@ -37,14 +37,16 @@ export class VersionBaselineCreationService {
     const defaultPercent = await this.facts.reserveDefaultPercent();
 
     return this.runner.run(async (tx) => {
-      if (yearHasEnded(input.year, await this.facts.today(new Date(), tx))) throw new BudgetYearEndedError(input.year);
+      // One day for the whole use case: the check and the lines must not see two days if the transaction crosses midnight.
+      const today = await this.facts.today(new Date(), tx);
+      if (yearHasEnded(input.year, today)) throw new BudgetYearEndedError(input.year);
       // The cycle first (the order of the module), then the year.
-      const allowed = await this.baselines.requireVersionAllowed(tx, input.costCenterId, input.year);
+      const allowed = await this.baselines.requireVersionAllowed(tx, input.costCenterId, input.year, today);
       await this.yearLock.lock(tx, input.costCenterId, [input.year]);
       if (await this.versions.current(input.costCenterId, input.year, tx)) throw new BudgetCurrentExistsError();
       if (await this.versions.inFlight(input.costCenterId, input.year, tx)) throw new BudgetVersionInFlightError();
 
-      const lines = await this.baselines.renewalLinesOf(allowed.departmentId, input.year, tx);
+      const lines = await this.baselines.renewalLinesOf(allowed.departmentId, input.year, today, tx);
       const baseMinor = lines.reduce((sum, line) => sum + line.amountMinor, 0n);
       const organizationId = await this.facts.organizationId(tx);
       const id = await this.versions.insert(tx, {

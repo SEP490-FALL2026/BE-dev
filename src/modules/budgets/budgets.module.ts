@@ -35,6 +35,8 @@ import { InvoiceRepo } from './budget/invoice.repo';
 import { BudgetInvoicesController } from './invoice/budget-invoices.controller';
 import { BudgetCyclesController } from './cycle/budget-cycles.controller';
 import { BaselineService } from './cycle/baseline.service';
+import { CycleDeadlineSweeper } from './cycle/cycle-deadline.job';
+import { CycleDeadlineService } from './cycle/cycle-deadline.service';
 import { CycleRepo } from './cycle/cycle.repo';
 import { PackageService } from './cycle/package.service';
 import { CycleService } from './cycle/cycle.service';
@@ -158,6 +160,8 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     CycleService,
     BaselineService,
     PackageService,
+    CycleDeadlineService,
+    CycleDeadlineSweeper,
     DepartmentCreationWindowListener,
     BudgetChangeListeners,
     CommitmentReleaseGuardHook,

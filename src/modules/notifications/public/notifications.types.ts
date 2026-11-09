@@ -103,6 +103,15 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_PROPOSAL_TASK_WAITING',
   'BUDGET_CYCLE_OPENED',
   'BUDGET_DEPARTMENT_CEILING_PUBLISHED',
+  // The deadlines of the cycle (`QĐ-103i`, `R-I05`): a head who has not proposed, the departments nobody heads, how many departments have
+  // not proposed, the versions still waiting after the decision deadline, a department with no Cost Center yet, and a head named after a
+  // version was built from the baseline.
+  'BUDGET_PROPOSAL_DEADLINE_REMINDER',
+  'BUDGET_NO_HEAD_AT_DEADLINE',
+  'BUDGET_SUBMISSION_DEADLINE_PASSED',
+  'BUDGET_DECISION_DEADLINE_REMINDER',
+  'BUDGET_COST_CENTER_SETUP_DUE',
+  'BUDGET_BASELINE_VERSION_HEAD_ASSIGNED',
   // The alerts of the rights (`a03-license-inbox-alerts`, `FR-5.14`): a right about to end, a handover not confirmed, a service
   // account whose person leaves, a person who left and keeps a K1 access to the end of the paid period. Ids, codes and days only.
   'LICENSE_EXPIRY_REMINDER',

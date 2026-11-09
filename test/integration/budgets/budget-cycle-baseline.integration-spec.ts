@@ -89,6 +89,34 @@ describe('the baseline and the package of a budget cycle (integration, real Post
       );
     }
   };
+  /** A service account holds one seat of the subscription, charged to the Cost Center of the department (INV-01: it counts as a seat). */
+  const holdServiceSeat = async (unit: Awaited<ReturnType<typeof department>>) => {
+    const owner = await h.staff(unit.department, `BLV${serial}`);
+    await h.ctx.sql.query(
+      `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
+         account_identifier, normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from, valid_from_basis,
+         created_by_app_user_id)
+       SELECT gen_random_uuid(), s.organization_id, 'SERVICE', 'REQUEST', s.plan_id, s.id, $2, 'build-bot@acme.vn',
+              'build-bot@acme.vn', 'Builds the release', $3, $4, '2026-01-05', 'ACTUAL', gen_random_uuid()
+         FROM subscriptions s WHERE s.id = $1`,
+      [unit.subscription, owner.employeeId, unit.department.unitId, unit.department.id],
+    );
+  };
+  /** The company has decided to end the subscription: its renewal case is decided `CANCEL`. */
+  const orderToEnd = async (subscriptionId: string) => {
+    const proposer = await h.staff((await department()).department, `BLE${serial}`);
+    await h.ctx.sql.query(
+      `INSERT INTO subscription_renewals (id, organization_id, subscription_id, state, notice_basis, notice_base_date,
+         proposed_choice, proposed_by_employee_id, proposed_by_app_user_id, decided_choice, decision_reason,
+         decided_by_employee_id, decided_by_app_user_id, decider_role, decided_at, decided_on, decided_after_deadline,
+         execution_point, active_seats_at_decision, decision_snapshot, updated_at)
+       SELECT gen_random_uuid(), s.organization_id, s.id, 'DECIDED', 'DECLARED', current_date, 'CANCEL', $2, gen_random_uuid(),
+              'CANCEL', 'No longer needed', $2, gen_random_uuid(), 'OWNER_DEPARTMENT_HEAD', now(), current_date, false,
+              'AS_PLANNED', 0, '{}'::jsonb, now()
+         FROM subscriptions s WHERE s.id = $1`,
+      [subscriptionId, proposer.employeeId],
+    );
+  };
   const entryOf = (wire: BaselineWire, departmentId: string, subscription: string) =>
     wire.departments
       .find((row) => row.departmentId === departmentId)
@@ -115,18 +143,20 @@ describe('the baseline and the package of a budget cycle (integration, real Post
 
   it('estimates the year for the seats held, not the seats bought: the idle seats belong to the shared pool (R-I03, F-066)', async () => {
     const unit = await department();
-    await holdSeats(unit, 6);
+    await holdSeats(unit, 5);
+    await holdServiceSeat(unit);
 
     const wire = h.dataOf<BaselineWire>(await baseline().expect(200));
 
     const entry = entryOf(wire, unit.department.id, unit.subscription);
-    // 10 seats bought, 6 held (one of them starting later), 1,000,000 a month, running since January: 6 × 1,000,000 × 12.
+    // 10 seats bought, 6 held (five people, one of them starting later, and a service account), 1,000,000 a month, running since
+    // January and not ordered to end: it is renewed, 6 × 1,000,000 × 12 (F-096, Q-162).
     expect(entry).toMatchObject({
       seatsPurchased: 10,
       seatsAssigned: 6,
       seatsIdle: 4,
       monthsRunning: 12,
-      suggestRenewal: false,
+      suggestRenewal: true,
     });
     expect(entry?.monthlyUnitPrice?.amount).toBe('1000000');
     expect(entry?.estimatedAnnualCost?.amount).toBe('72000000');
@@ -142,7 +172,7 @@ describe('the baseline and the package of a budget cycle (integration, real Post
     expect(wire.kpi3).toBeNull();
   });
 
-  it('divides an annual price by twelve, stops at the end of the term, and suggests a renewal for a term that ends in the year (R-I03)', async () => {
+  it('divides an annual price by twelve and renews what runs: twelve months, whatever its end date says (R-I03, Q-162)', async () => {
     const unit = await department();
     await holdSeats(unit, 6);
     await h.ctx.sql.query(
@@ -153,9 +183,38 @@ describe('the baseline and the package of a budget cycle (integration, real Post
     const entry = entryOf(h.dataOf<BaselineWire>(await baseline().expect(200)), unit.department.id, unit.subscription);
 
     expect(entry?.monthlyUnitPrice?.amount).toBe('100000');
-    expect(entry?.monthsRunning).toBe(6);
-    expect(entry?.estimatedAnnualCost?.amount).toBe('3600000');
+    expect(entry?.monthsRunning).toBe(12);
+    expect(entry?.estimatedAnnualCost?.amount).toBe('7200000');
     expect(entry?.suggestRenewal).toBe(true);
+  });
+
+  it('counts only the months that remain for a subscription the company ordered to end, and does not propose it (Q-162, F-098)', async () => {
+    const unit = await department();
+    await holdSeats(unit, 6);
+    await h.ctx.sql.query(
+      `UPDATE subscriptions SET billing_cycle = 'ANNUAL', unit_price_minor = 1200000, price_reporting_minor = 1200000, end_date = $2 WHERE id = $1`,
+      [unit.subscription, `${year()}-06-30`],
+    );
+    await orderToEnd(unit.subscription);
+
+    const entry = entryOf(h.dataOf<BaselineWire>(await baseline().expect(200)), unit.department.id, unit.subscription);
+
+    expect(entry).toMatchObject({ monthsRunning: 6, suggestRenewal: false });
+    expect(entry?.estimatedAnnualCost?.amount).toBe('3600000');
+  });
+
+  it.each([
+    ['at the end of January of the year after', `${new Date().getFullYear() + 1}-01-31`],
+    ['with no end date', null],
+  ])('renews a subscription that ends %s: twelve months and a Renew line (Q-162, F-098)', async (_name, endDate) => {
+    const unit = await department();
+    await holdSeats(unit, 6);
+    await h.ctx.sql.query(`UPDATE subscriptions SET end_date = $2 WHERE id = $1`, [unit.subscription, endDate]);
+
+    const entry = entryOf(h.dataOf<BaselineWire>(await baseline().expect(200)), unit.department.id, unit.subscription);
+
+    expect(entry).toMatchObject({ monthsRunning: 12, suggestRenewal: true });
+    expect(entry?.estimatedAnnualCost?.amount).toBe('72000000');
   });
 
   it("keeps a subscription that ends on 31 December of this year running into the next year, at today's price (F-068)", async () => {
@@ -310,12 +369,36 @@ describe('the baseline and the package of a budget cycle (integration, real Post
       const version = await h.built(proposal.id);
       await h.sendVersion(version.id).expect(200);
       await h.ctx.sql.query(`UPDATE budget_versions SET currency = 'USD' WHERE id = $1`, [version.id]);
+      try {
+        const wire = h.dataOf<PackageWire>(await packageOf().expect(200));
 
-      const wire = h.dataOf<PackageWire>(await packageOf().expect(200));
+        expect(wire.versionsInOtherCurrency).toBe(1);
+        expect(wire.departments.find((row) => row.departmentId === a.department.id)?.version).toBeNull();
+      } finally {
+        await h.ctx.sql.query(`UPDATE budget_versions SET currency = 'VND' WHERE id = $1`, [version.id]);
+      }
+    });
 
-      expect(wire.versionsInOtherCurrency).toBeGreaterThanOrEqual(1);
-      expect(wire.departments.find((row) => row.departmentId === a.department.id)?.version).toBeNull();
-      await h.ctx.sql.query(`UPDATE budget_versions SET currency = 'VND' WHERE id = $1`, [version.id]);
+    it('puts the version of a department that is no longer listed into versionsOutsideListed, so the total is explained (F-102)', async () => {
+      const a = await department();
+      await h.ctx.sql.query(`UPDATE budget_cycles SET annual_ceiling_minor = 100000000000000 WHERE year = $1`, [
+        year(),
+      ]);
+      const proposal = await h.budgetProposed(a.head, a.department.unitId);
+      const version = await h.built(proposal.id);
+      await h.sendVersion(version.id).expect(200);
+      const before = h.dataOf<PackageWire>(await packageOf().expect(200));
+      // The department leaves the year: its Cost Center is no longer among the ones listed, but the version still counts.
+      await h.ctx.sql.query(`UPDATE cost_centers SET status = 'INACTIVE', deactivated_at = now() WHERE id = $1`, [
+        a.department.unitId,
+      ]);
+
+      const after = h.dataOf<PackageWire>(await packageOf().expect(200));
+
+      expect(BigInt(after.versionsOutsideListed.amount) - BigInt(before.versionsOutsideListed.amount)).toBe(
+        BigInt(version.base.amount) + BigInt(version.reserve.amount),
+      );
+      expect(after.versionsTotal.amount).toBe(before.versionsTotal.amount);
     });
 
     it('is for Finance and the spending approver only', async () => {

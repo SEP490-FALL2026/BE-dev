@@ -107,7 +107,7 @@ const baselineVersionBody = z.strictObject({
 });
 /**
  * A first version of a Cost Center and year: from the proposal that waits for Finance (`source` PROPOSAL, the default), or from the
- * baseline when nobody heads the department at the deadline (`source` BASELINE, `QĐ-100h`). A field of the other source is a 422 naming it.
+ * baseline when nobody heads the department at the deadline (`source` BASELINE, `QĐ-100h`). A field of the other source is a 422 `unrecognized_keys`.
  */
 export const versionBodySchema = z.discriminatedUnion('source', [proposalVersionBody, baselineVersionBody]);
 export const versionPatchSchema = z

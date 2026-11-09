@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `9c7f386`, BE `d9c46552`.
 - Phụ trách: chat code `SEP-Start 75: coder mainflow`. Thiết kế ban đầu bởi: AI chat review (W2, 08/11/2026).
 - Owner review: chưa review. Peer review: chat review (R2).
-- Triển khai: `in-progress` (09/11/2026: Task 1, kiểm B4 + `baseReason`, Task 2 (`budgetCycleBaseline`, `budgetCyclePackage`) và phiên bản từ số liệu nền xong; còn Task 4: job nhắc hạn, thông báo). PR: chưa có.
+- Triển khai: `in-progress` (09/11/2026: Task 1, kiểm B4 + `baseReason`, Task 2 (`budgetCycleBaseline`, `budgetCyclePackage`) và phiên bản từ số liệu nền xong; Task 4: job nhắc hạn, 6 mã thông báo, báo trưởng phòng mới xong 09/11/2026). PR: chưa có.
 
 ## Before coding
 

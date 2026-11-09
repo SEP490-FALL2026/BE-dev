@@ -3,8 +3,11 @@ import {
   estimatedCost,
   monthlyUnitPrice,
   monthsRunning,
+  inOrderOf,
+  listedDepartments,
   shouldSuggestRenewal,
   subscriptionCost,
+  willRenew,
 } from './baseline.policy';
 
 describe('the baseline of the budget (R-I03)', () => {
@@ -53,13 +56,38 @@ describe('the baseline of the budget (R-I03)', () => {
     expect(estimatedCost(10, null, 12)).toBeNull();
   });
 
-  it('suggests a renewal for a term that ends within the year, or ends before it and still runs today (F-068)', () => {
-    expect(shouldSuggestRenewal(2027, '2027-12-31', '2026-11-09')).toBe(true);
-    expect(shouldSuggestRenewal(2027, '2028-01-01', '2026-11-09')).toBe(false);
-    // Read in November 2026, a term that ends on 31 December 2026 runs on into 2027 at today's price.
-    expect(shouldSuggestRenewal(2027, '2026-12-31', '2026-11-09')).toBe(true);
-    expect(shouldSuggestRenewal(2027, '2026-12-31', '2027-01-15')).toBe(false);
-    expect(shouldSuggestRenewal(2027, null, '2026-11-09')).toBe(false);
+  describe('a subscription that runs today is renewed unless it was ordered to end (Q-162, F-068, F-098)', () => {
+    const today = '2026-11-09';
+    const running = { startDate: '2026-01-01', endDate: null };
+
+    it.each([
+      ['ends on 31 December', '2026-12-31'],
+      ['ends at the end of January of the year after', '2027-01-31'],
+      ['has no end date', null],
+      ['ends within the year', '2027-06-30'],
+    ])('is renewed when it %s', (_name, endDate) => {
+      expect(willRenew(today, { ...running, endDate }, false)).toBe(true);
+      expect(shouldSuggestRenewal(2027, today, { ...running, endDate }, false)).toBe(true);
+    });
+
+    it('is not renewed when it was ordered to end, nor proposed for renewal', () => {
+      expect(willRenew(today, running, true)).toBe(false);
+      expect(shouldSuggestRenewal(2027, today, { ...running, endDate: '2027-06-30' }, true)).toBe(false);
+    });
+
+    it('goes by the day it renews when it has no end date, and is not renewed once it is over', () => {
+      expect(willRenew(today, { ...running, renewalDate: '2027-01-01' }, false)).toBe(true);
+      expect(willRenew(today, { ...running, renewalDate: '2026-10-01' }, false)).toBe(false);
+      expect(willRenew('2027-02-01', { ...running, endDate: '2026-12-31' }, false)).toBe(false);
+    });
+
+    it('does not count a subscription that has not started, but proposes it when it ends within the year', () => {
+      const later = { startDate: '2027-03-01', endDate: '2027-12-31' };
+
+      expect(willRenew(today, later, false)).toBe(false);
+      expect(shouldSuggestRenewal(2027, today, later, false)).toBe(true);
+      expect(shouldSuggestRenewal(2027, today, { ...later, endDate: '2028-01-01' }, false)).toBe(false);
+    });
   });
 });
 
@@ -72,24 +100,25 @@ describe('the cost of one subscription over a year (R-I03)', () => {
   };
 
   it('puts the monthly price, the months and the estimate together, for the seats held and not the seats bought (F-066)', () => {
+    // It runs and nobody ordered it to end: twelve months (Q-162), whatever its end date says.
     expect(subscriptionCost(2027, '2026-11-09', 6, annual)).toEqual({
-      monthlyMinor: 100n,
-      months: 6,
-      costMinor: 3600n,
-    });
-    expect(subscriptionCost(2027, '2026-11-09', 0, annual)).toEqual({ monthlyMinor: 100n, months: 6, costMinor: 0n });
-  });
-
-  it('counts the twelve months for a term that ends before the year and still runs today (F-068)', () => {
-    const endsInDecember = { ...annual, endDate: '2026-12-31' };
-
-    expect(subscriptionCost(2027, '2026-11-09', 6, endsInDecember)).toEqual({
       monthlyMinor: 100n,
       months: 12,
       costMinor: 7200n,
     });
-    // Ended already when it is read: it is not running any more.
-    expect(subscriptionCost(2027, '2027-02-01', 6, endsInDecember)).toEqual({
+    expect(subscriptionCost(2027, '2026-11-09', 0, annual)).toEqual({ monthlyMinor: 100n, months: 12, costMinor: 0n });
+  });
+
+  it('counts only the months that remain for one that was ordered to end (Q-162)', () => {
+    expect(subscriptionCost(2027, '2026-11-09', 6, annual, true)).toEqual({
+      monthlyMinor: 100n,
+      months: 6,
+      costMinor: 3600n,
+    });
+  });
+
+  it('counts nothing for a term that is over when it is read', () => {
+    expect(subscriptionCost(2027, '2027-02-01', 6, { ...annual, endDate: '2026-12-31' })).toEqual({
       monthlyMinor: 100n,
       months: 0,
       costMinor: 0n,
@@ -104,6 +133,7 @@ describe('the cost of one subscription over a year (R-I03)', () => {
 describe('when a version may be built from the baseline (QĐ-100h, R-I05)', () => {
   const ready = {
     cyclePublishedOnce: true,
+    inCycle: true,
     today: '2026-12-20',
     submissionDeadline: '2026-12-15',
     headsToday: false,
@@ -117,6 +147,7 @@ describe('when a version may be built from the baseline (QĐ-100h, R-I05)', () =
 
   it.each([
     ['the cycle was never published', { cyclePublishedOnce: false }, 'CYCLE_NOT_PUBLISHED'],
+    ['the department is not in the cycle', { inCycle: false }, 'DEPARTMENT_NOT_IN_CYCLE'],
     ['it is the day of the deadline', { today: '2026-12-15' }, 'BEFORE_DEADLINE'],
     ['it is before the deadline', { today: '2026-12-01' }, 'BEFORE_DEADLINE'],
     ['somebody heads the department', { headsToday: true }, 'HAS_HEAD'],
@@ -130,6 +161,27 @@ describe('when a version may be built from the baseline (QĐ-100h, R-I05)', () =
     expect(baselineVersionRefusal({ ...ready, cyclePublishedOnce: false, headsToday: true })).toBe(
       'CYCLE_NOT_PUBLISHED',
     );
+    expect(baselineVersionRefusal({ ...ready, inCycle: false, today: '2026-12-01' })).toBe('DEPARTMENT_NOT_IN_CYCLE');
     expect(baselineVersionRefusal({ ...ready, headsToday: true, openProposal: true })).toBe('HAS_HEAD');
+  });
+});
+
+describe('the departments a read lists', () => {
+  const ids = Array.from({ length: 600 }, (_, index) => String(index).padStart(3, '0'));
+
+  it('lists the first 500 by id, and the one that was asked for when it is among them', () => {
+    expect(listedDepartments(ids, undefined)).toHaveLength(500);
+    expect(listedDepartments(ids, undefined)[499]).toBe('499');
+    expect(listedDepartments(ids, '123')).toEqual(['123']);
+    expect(listedDepartments(ids, '550')).toEqual(['550']);
+    expect(listedDepartments(ids, 'none')).toEqual([]);
+  });
+
+  it('puts what a read returned in the order of the ids, whatever order it came in', () => {
+    expect(inOrderOf(['b', 'a', 'c'], [{ id: 'c' }, { id: 'a' }, { id: 'b' }])).toEqual([
+      { id: 'b' },
+      { id: 'a' },
+      { id: 'c' },
+    ]);
   });
 });

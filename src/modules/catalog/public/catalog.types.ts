@@ -103,4 +103,6 @@ export interface BaselineSubscription {
   billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null;
   startDate: string | null;
   endDate: string | null;
+  /** The day it renews by itself, when it does. */
+  renewalDate: string | null;
 }

@@ -251,6 +251,18 @@ export class ProposalRepo {
     return { items: rows.map(toRecord), total };
   }
 
+  /** The Cost Centers among these that have a proposal for the year that was sent and not taken back (waiting, reviewed or given back). */
+  async proposedCostCenters(costCenterIds: readonly string[], year: number, tx?: DbTx): Promise<Set<string>> {
+    if (costCenterIds.length === 0) return new Set();
+    const rows = await (tx ?? this.prisma).budgetProposal.findMany({
+      where: { costCenterId: { in: [...costCenterIds] }, year, state: { in: ['SUBMITTED', 'REVIEWED', 'RETURNED'] } },
+      select: { costCenterId: true },
+      distinct: ['costCenterId'],
+    });
+
+    return new Set(rows.map((row) => row.costCenterId));
+  }
+
   /** The newest proposal that waits or is being reviewed of each of these Cost Centers for the year, by Cost Center: one statement. */
   async openOfCostCenters(
     costCenterIds: readonly string[],

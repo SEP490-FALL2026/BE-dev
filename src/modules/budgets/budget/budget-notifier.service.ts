@@ -117,6 +117,20 @@ export class BudgetNotifierService {
   }
 
   /**
+   * A person became the head of a department whose first version Finance built from the baseline and which is still in progress
+   * (`QĐ-106k`): they are told it exists, once for each version.
+   */
+  async baselineVersionHeadAssigned(tx: DbTx, version: VersionRecord, headEmployeeId: string): Promise<void> {
+    await this.tell(tx, headEmployeeId, {
+      organizationId: version.organizationId,
+      code: 'BUDGET_BASELINE_VERSION_HEAD_ASSIGNED',
+      subject: { type: 'BUDGET_VERSION', id: version.id },
+      params: { versionId: version.id, costCenterId: version.costCenterId, year: version.year },
+      eventKey: `BUDGET_BASELINE_VERSION_HEAD_ASSIGNED:${version.id}`,
+    });
+  }
+
+  /**
    * Finance sent the version: the person who decides it is told (row 18); sent again after a request to look again, it is told again.
    * `approver` is the spending approver who works, as the sending read them with the row of the grant locked (`M6`); when nobody is, the
    * version waits and the Super Admin is told, once for this stretch of waiting (`D-S16`).

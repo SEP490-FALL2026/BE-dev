@@ -3,6 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AssignmentService } from '../assignment/assignment.service';
+import { SubscriptionRenewalRepo } from '../subscription-renewal/subscription-renewal.repo';
 import { ProvisioningFailureService, type FailureRecorded } from '../provisioning/provisioning-failure.service';
 import {
   ProvisioningCancellationService,
@@ -37,6 +38,7 @@ export class LicensingApi {
     private readonly frame: ProvisioningTaskFrame,
     private readonly revocations: RevocationService,
     private readonly revocationView: RevocationViewService,
+    private readonly renewals: SubscriptionRenewalRepo,
   ) {}
 
   /**
@@ -72,6 +74,11 @@ export class LicensingApi {
     tx?: DbTx,
   ): Promise<{ items: HeldSoftware[]; total: number }> {
     return this.revocationView.heldSoftwareOf(employeeId, onDate, page, tx);
+  }
+
+  /** Which of these subscriptions the company has decided to end (the live renewal case was decided `CANCEL`), in one statement. */
+  getSubscriptionIdsToEnd(subscriptionIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.renewals.endingAmong(subscriptionIds, tx);
   }
 
   /** How many seats each of these subscriptions holds as of `onDate`, the way the warehouse counts them (a service account and a future start included), in one statement. */

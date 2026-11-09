@@ -375,6 +375,7 @@ export class SubscriptionRepo {
         billingCycle: true,
         startDate: true,
         endDate: true,
+        renewalDate: true,
         plan: { select: { name: true, application: { select: { name: true } } } },
       },
       orderBy: [{ ownerDepartmentId: 'asc' }, { id: 'asc' }],
@@ -391,6 +392,7 @@ export class SubscriptionRepo {
       billingCycle: row.billingCycle,
       startDate: row.startDate ? fromDateColumn(row.startDate) : null,
       endDate: row.endDate ? fromDateColumn(row.endDate) : null,
+      renewalDate: row.renewalDate ? fromDateColumn(row.renewalDate) : null,
     }));
   }
 

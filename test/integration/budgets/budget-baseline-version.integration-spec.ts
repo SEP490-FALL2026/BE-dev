@@ -299,9 +299,10 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
       const made = create(baselineBody(department)).then((response) => response);
       await waitForLockWaiters(observer, 1);
       await observer.query('BEGIN');
-      // The creation has taken the cycle and waits for the year: the cycle is no longer free.
+      // The creation has taken the cycle FOR UPDATE and waits for the year: even a shared lock on it is refused (FOR SHARE only
+      // conflicts with FOR UPDATE and FOR NO KEY UPDATE, so a creation that held the cycle FOR SHARE would let this one in).
       const cycleTaken = await observer
-        .query(`SELECT id FROM budget_cycles WHERE year = $1 FOR UPDATE NOWAIT`, [h.year])
+        .query(`SELECT id FROM budget_cycles WHERE year = $1 FOR SHARE NOWAIT`, [h.year])
         .then(
           () => false,
           () => true,
@@ -338,7 +339,7 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
     }
   });
 
-  it('turns away a body that mixes the two sources, or leaves out what its source needs, naming the key (422, F-077)', async () => {
+  it('turns away a body that mixes the two sources, or leaves out what its source needs, naming the kind of fault and the path (422, F-077, F-099)', async () => {
     const department = await headless();
     const proposalId = '5b1b4f7e-0a52-4b0e-9f5b-9f3c1a2d7e10';
     // The answer names the kind of the fault, and the path when the fault is a field that is missing or wrong: a field a source does

@@ -1,4 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
+import type { BaselineVersionRefusal } from '../budget/budget.errors';
 
 /**
  * The monthly price of one seat from the unit price in the reporting currency and the cycle it is paid in (`R-I03`): a year's price
@@ -36,55 +37,74 @@ export function estimatedCost(seats: number | null, monthlyMinor: bigint | null,
   return seats === null || monthlyMinor === null ? null : BigInt(seats) * monthlyMinor * BigInt(months);
 }
 
-/**
- * Whether a subscription that ends before the year is still running when the baseline is read (`today`): it will be renewed at its
- * price today, so it counts for the whole of the year to come (`FR-5.15`(0): what runs, priced at today's prices).
- */
-export const continuesIntoYear = (year: number, endDate: BusinessDate | null, today: BusinessDate): boolean =>
-  endDate !== null && endDate >= today && endDate < `${year}-01-01`;
+/** The facts of a subscription that the renewal rule reads. */
+export interface RenewalFacts {
+  startDate: BusinessDate | null;
+  endDate: BusinessDate | null;
+  /** The day it renews by itself, when it does: a subscription with no end date that renews is as good as running. */
+  renewalDate?: BusinessDate | null;
+}
 
 /**
- * Whether the budget of `year` should propose to renew a subscription (a `Renew` line, `FR-5.15`): its term ends within the year, or it
- * ends before the year but still runs today (the case of a term that ends on 31 December, read in the autumn).
+ * Whether the subscription will be renewed for the year to come (`Q-162`, TẠM CHỌN): it runs today (it has started, and its end, or its
+ * renewal day, is not behind us) and nobody has ordered it to end. A date that falls on 31 December, in January of the year after or
+ * nowhere at all makes no difference: what runs and is not stopped goes on at the price of today.
  */
-export const shouldSuggestRenewal = (year: number, endDate: BusinessDate | null, today: BusinessDate): boolean =>
-  (endDate !== null && endDate >= `${year}-01-01` && endDate <= `${year}-12-31`) ||
-  continuesIntoYear(year, endDate, today);
+export function willRenew(today: BusinessDate, subscription: RenewalFacts, terminated: boolean): boolean {
+  if (terminated) return false;
+  const started = subscription.startDate === null || subscription.startDate <= today;
+  const end = subscription.renewalDate ?? subscription.endDate;
+
+  return started && (end === null || end >= today);
+}
+
+/**
+ * Whether the budget of `year` should propose to renew a subscription (a `Renew` line, `FR-5.15`): it will be renewed (`willRenew`), or
+ * it has not started and ends within the year. A subscription that was ordered to end is never proposed.
+ */
+export function shouldSuggestRenewal(
+  year: number,
+  today: BusinessDate,
+  subscription: RenewalFacts,
+  terminated: boolean,
+): boolean {
+  if (terminated) return false;
+  const { endDate } = subscription;
+
+  return (
+    willRenew(today, subscription, terminated) ||
+    (endDate !== null && endDate >= `${year}-01-01` && endDate <= `${year}-12-31`)
+  );
+}
 
 /**
  * What one subscription is estimated to cost over a year at the prices of today (`R-I03`): the seats it HOLDS (what is assigned; the
- * seats bought and idle are the shared pool's, `QĐ-103k`), the monthly price of a seat and the months it runs; a term that ends before
- * the year and still runs today counts for the twelve months of the year.
+ * seats bought and idle are the shared pool's, `QĐ-103k`), the monthly price of a seat and the months it runs; a subscription that will
+ * be renewed counts for the twelve months of the year (`Q-162`), one that was ordered to end only for the months it still runs.
  */
 export function subscriptionCost(
   year: number,
   today: BusinessDate,
   seatsHeld: number,
-  subscription: {
-    unitPriceReportingMinor: bigint | null;
-    billingCycle: string | null;
-    startDate: BusinessDate | null;
-    endDate: BusinessDate | null;
-  },
+  subscription: RenewalFacts & { unitPriceReportingMinor: bigint | null; billingCycle: string | null },
+  terminated = false,
 ): { monthlyMinor: bigint | null; months: number; costMinor: bigint | null } {
   const monthlyMinor = monthlyUnitPrice(subscription.unitPriceReportingMinor, subscription.billingCycle);
-  const months = continuesIntoYear(year, subscription.endDate, today)
+  const months = willRenew(today, subscription, terminated)
     ? 12
     : monthsRunning(year, subscription.startDate, subscription.endDate);
 
   return { monthlyMinor, months, costMinor: estimatedCost(seatsHeld, monthlyMinor, months) };
 }
 
-export type BaselineVersionRefusal =
-  'CYCLE_NOT_PUBLISHED' | 'BEFORE_DEADLINE' | 'HAS_HEAD' | 'HAS_SUCCESSOR' | 'HAS_PROPOSAL';
-
 /**
  * Whether Finance may build the first version of a department from the baseline (`QĐ-100h`, `R-I05`): the cycle of the year was
- * published once; the day is after the submission deadline; nobody heads the department today and nobody is to head it later (a
+ * published once and the department is in it (a ceiling there, in effect by the end of the year); the day is after the submission deadline; nobody heads the department today and nobody is to head it later (a
  * successor, a department made for next year included); and no proposal waits or is being reviewed. The first that fails is named.
  */
 export function baselineVersionRefusal(input: {
   cyclePublishedOnce: boolean;
+  inCycle: boolean;
   today: BusinessDate;
   submissionDeadline: BusinessDate;
   headsToday: boolean;
@@ -92,6 +112,7 @@ export function baselineVersionRefusal(input: {
   openProposal: boolean;
 }): BaselineVersionRefusal | null {
   if (!input.cyclePublishedOnce) return 'CYCLE_NOT_PUBLISHED';
+  if (!input.inCycle) return 'DEPARTMENT_NOT_IN_CYCLE';
   if (input.today <= input.submissionDeadline) return 'BEFORE_DEADLINE';
   if (input.headsToday) return 'HAS_HEAD';
   if (input.headToCome) return 'HAS_SUCCESSOR';
@@ -107,3 +128,18 @@ export function baselineVersionRefusal(input: {
 export const DEPARTMENTS_LISTED_MAX = 500;
 /** The most subscriptions the baseline lists for one department; `softwareTotal` says how many it owns. */
 export const SOFTWARE_LISTED_MAX = 50;
+
+/** The departments a read lists: the first `DEPARTMENTS_LISTED_MAX` by id, or the one that was asked for when it is among them. */
+export function listedDepartments(inYear: readonly string[], departmentId: string | undefined): string[] {
+  return (departmentId === undefined ? inYear : inYear.filter((id) => id === departmentId)).slice(
+    0,
+    DEPARTMENTS_LISTED_MAX,
+  );
+}
+
+/** Puts what a read returned in the order of the ids it was asked for (a statement `WHERE id = ANY(...)` has no order of its own). */
+export function inOrderOf<T extends { id: string }>(ids: readonly string[], rows: readonly T[]): T[] {
+  const position = new Map(ids.map((id, index) => [id, index]));
+
+  return [...rows].sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
+}

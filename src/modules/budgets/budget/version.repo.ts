@@ -271,6 +271,21 @@ export class VersionRepo {
     return row ? toRecord(row) : null;
   }
 
+  /** The versions built from the baseline that are still in progress (a draft, sent, or sent back to be looked at again) of this Cost Center. */
+  async baselineInProgressOf(costCenterId: string, tx?: DbTx): Promise<VersionRecord[]> {
+    const rows = await (tx ?? this.prisma).budgetVersion.findMany({
+      where: {
+        costCenterId,
+        origin: 'BASELINE_NO_HEAD',
+        state: { in: ['DRAFT', 'SENT', 'CHANGES_REQUESTED'] },
+        detachedAt: null,
+      },
+      orderBy: [{ year: 'asc' }, { number: 'asc' }],
+    });
+
+    return rows.map(toRecord);
+  }
+
   /** The newest version made from the proposal, whatever its state: what says whether the proposal can be followed (F63). */
   async latestOfProposal(proposalId: string, tx?: DbTx): Promise<VersionRecord | null> {
     const row = await (tx ?? this.prisma).budgetVersion.findFirst({
@@ -397,6 +412,13 @@ export class VersionRepo {
     });
 
     return rows.map(toRecord);
+  }
+
+  /** How many versions of the year wait for the spending approver (sent and not decided). */
+  countSentOfYear(organizationId: string, year: number, tx?: DbTx): Promise<number> {
+    return (tx ?? this.prisma).budgetVersion.count({
+      where: { organizationId, year, state: 'SENT', detachedAt: null },
+    });
   }
 
   async setState(tx: DbTx, id: string, state: VersionState): Promise<void> {
