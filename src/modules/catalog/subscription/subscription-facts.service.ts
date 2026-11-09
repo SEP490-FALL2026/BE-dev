@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { Money } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { SubscriptionRepo } from './subscription.repo';
-import type { BaselineSubscription } from '../public/catalog.types';
+import type { BaselineSubscription, RuleSubscription } from '../public/catalog.types';
 import type { SubscriptionKind } from './subscription.types';
 
 /** What the rules of another capability need to know of the subscriptions of some plans: their kind and their end. */
@@ -54,6 +54,11 @@ export class SubscriptionFactsService {
     tx?: DbTx,
   ): Promise<ReadonlyMap<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER'>> {
     return this.subscriptions.findPricedCyclesOfPlans(planIds, ownerDepartmentId, tx);
+  }
+
+  /** The subscriptions that grant seats on `day` (active, no later period, not ended): what the rules of wasted seats judge. One statement. */
+  grantingOn(day: BusinessDate, tx?: DbTx): Promise<RuleSubscription[]> {
+    return this.subscriptions.grantingOn(day, tx);
   }
 
   /** The ids of every subscription and purchase a department owns, by id (what a rule about the department's work reads). */

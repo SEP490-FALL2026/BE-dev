@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type {
@@ -6,6 +7,7 @@ import type {
   CatalogOnboardingFacts,
   PlanRevocationInfo,
   PlanSummary,
+  RuleSubscription,
   WorkspaceDuty,
   SeatTarget,
   SeatTargetRef,
@@ -107,6 +109,11 @@ export class CatalogApi {
   /** The active subscriptions these departments own with their price and term: what the baseline of the budget starts from (`FR-5.15`). */
   getBaselineSubscriptions(departmentIds: readonly string[], tx?: DbTx): Promise<BaselineSubscription[]> {
     return this.subscriptions.baselineOf(departmentIds, tx);
+  }
+
+  /** The subscriptions that grant seats on `day` (active, no later period, not ended), with their plan facts, in one read. */
+  getSubscriptionsGrantingOn(day: BusinessDate, tx?: DbTx): Promise<RuleSubscription[]> {
+    return this.subscriptions.grantingOn(day, tx);
   }
 
   /** The ids of every subscription and purchase a department owns, by id: for a module that finds what belongs to the department through them. */

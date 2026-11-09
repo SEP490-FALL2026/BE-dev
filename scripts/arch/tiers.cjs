@@ -7,7 +7,9 @@ const TIERS = [
   ['catalog', 'licensing'],
   ['budgets', 'requests', 'data-import', 'devices'],
   ['personnel', 'onboarding', 'installation', 'ai-assist', 'usage'],
-  // The role overviews read through the facades of the modules below, personnel among them.
+  // The recommendations of wasted seats read the facades of licensing, catalog, organization, parameters, personnel and usage.
+  ['optimization'],
+  // The role overviews read through the facades of the modules below, personnel and optimization among them.
   ['dashboards'],
 ];
 

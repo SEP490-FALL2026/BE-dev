@@ -1,0 +1,137 @@
+// Module optimization (T7): the recommendations of wasted seats (G1 free seats of a subscription, G2 a seat of a person who left)
+// and the runs that make them. The CHECKs, the partial unique indexes of gate 8 (one open recommendation for each subscription
+// and for each seat chain) and the triggers (evidence written once, skips append-only) live in the migration
+// 20261109200100_optimization_ghost_seats. Foreign keys to the tables of other modules are in the migration only: the model
+// holds them as values, so no module's model needs to know this one.
+
+enum GhostSeatGroup {
+  G1
+  G2
+  G3
+  G4
+}
+
+// How firm a recommendation is (FR-4.12): watch, review or act on it. G1 has none.
+enum GhostSeatTier {
+  MONITOR
+  REVIEW
+  ACTION
+}
+
+enum GhostSeatState {
+  OPEN
+  PAUSED
+  RECLAIM_DECIDED
+  CLOSED
+}
+
+enum GhostSeatCloseReason {
+  ACCEPTED
+  SUPERSEDED
+  SEAT_ENDED
+  FREE_SEATS_GONE
+  OUT_OF_SCOPE
+  KEPT
+  NEGATED
+  TRANSFER_SEAT_REVOKED
+}
+
+enum GhostSeatRuleSet {
+  G1_G2
+  G3_G4
+}
+
+enum GhostSeatRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum GhostSeatGate {
+  PER_SEAT
+  INTERNAL_SOFTWARE
+  OPEN_RECOMMENDATION
+}
+
+enum GhostSeatSkipSubject {
+  SUBSCRIPTION
+  ASSIGNMENT
+}
+
+// One run of a set of rules for one period (a day or a week): claimed by INSERT ... ON CONFLICT DO NOTHING, taken over after two hours.
+model GhostSeatRuleRun {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  ruleSet        GhostSeatRuleSet   @map("rule_set")
+  periodKey      String             @map("period_key")
+  status         GhostSeatRunStatus @default(RUNNING)
+  attempt        Int                @default(1) @db.SmallInt
+  startedAt      DateTime           @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt     DateTime?          @map("finished_at") @db.Timestamptz(3)
+  createdCount   Int                @default(0) @map("created_count")
+  updatedCount   Int                @default(0) @map("updated_count")
+  closedCount    Int                @default(0) @map("closed_count")
+  skippedCount   Int                @default(0) @map("skipped_count")
+  failedCount    Int                @default(0) @map("failed_count")
+  error          String?
+
+  skips           GhostSeatRuleSkip[]
+  recommendations GhostSeatRecommendation[]
+
+  @@unique([organizationId, ruleSet, periodKey], map: "ghost_seat_rule_runs_period")
+  @@map("ghost_seat_rule_runs")
+}
+
+// Why a subject was left out of a run (append-only: a trigger).
+model GhostSeatRuleSkip {
+  id          String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId       String               @map("run_id") @db.Uuid
+  subjectType GhostSeatSkipSubject @map("subject_type")
+  subjectId   String               @map("subject_id") @db.Uuid
+  gate        GhostSeatGate
+  detail      Json                 @default("{}")
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  run GhostSeatRuleRun @relation(fields: [runId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([runId, subjectType, subjectId], map: "ghost_seat_rule_skips_subject")
+  @@map("ghost_seat_rule_skips")
+}
+
+model GhostSeatRecommendation {
+  id                     String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId         String                @map("organization_id") @db.Uuid
+  group                  GhostSeatGroup
+  state                  GhostSeatState        @default(OPEN)
+  closeReason            GhostSeatCloseReason? @map("close_reason")
+  tier                   GhostSeatTier?
+  applicationId          String                @map("application_id") @db.Uuid
+  planId                 String                @map("plan_id") @db.Uuid
+  subscriptionId         String?               @map("subscription_id") @db.Uuid
+  assignmentId           String?               @map("assignment_id") @db.Uuid
+  // The first assignment of the chain of the seat (predecessor_id): what gate 8 is unique on.
+  seatChainId            String?               @map("seat_chain_id") @db.Uuid
+  employeeId             String?               @map("employee_id") @db.Uuid
+  // The department that owns the seat when it was recommended (a G2); null for a G1, which belongs to no department (R-E02).
+  departmentId           String?               @map("department_id") @db.Uuid
+  freeSeats              Int?                  @map("free_seats")
+  countsTowardVacantCost Boolean?              @map("counts_toward_vacant_cost")
+  revocationTaskId       String?               @map("revocation_task_id") @db.Uuid
+  holderLeftOn           DateTime?             @map("holder_left_on") @db.Date
+  evidence               Json
+  createdRunId           String                @map("created_run_id") @db.Uuid
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime              @default(now()) @map("updated_at") @db.Timestamptz(3)
+  closedAt               DateTime?             @map("closed_at") @db.Timestamptz(3)
+  closedByAppUserId      String?               @map("closed_by_app_user_id") @db.Uuid
+  supersededById         String?               @map("superseded_by_id") @db.Uuid
+
+  createdRun   GhostSeatRuleRun           @relation(fields: [createdRunId], references: [id], onDelete: Restrict)
+  supersededBy GhostSeatRecommendation?   @relation("GhostSeatSuperseded", fields: [supersededById], references: [id], onDelete: Restrict)
+  supersedes   GhostSeatRecommendation[]  @relation("GhostSeatSuperseded")
+
+  @@index([organizationId, state, group], map: "ghost_seat_recommendations_board")
+  @@index([createdRunId], map: "ghost_seat_recommendations_run")
+  @@index([organizationId, createdAt], map: "ghost_seat_recommendations_created")
+  @@map("ghost_seat_recommendations")
+}

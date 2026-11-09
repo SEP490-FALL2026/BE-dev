@@ -88,6 +88,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'LicensingModule: LicensingApi',
   'LicensingModule: LicensingRenewalApi',
   'LicensingModule: LicensingHandoverApi',
+  'LicensingModule: LicensingGhostSeatApi',
   'LicensingModule: LicensingOpenGrantsApi',
   'LicensingModule: LicensingServiceAccountApi',
   'LicensingModule: LicensingSeatBaselineApi',

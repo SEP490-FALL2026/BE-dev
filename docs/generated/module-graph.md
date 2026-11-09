@@ -35,6 +35,9 @@ flowchart BT
     usage["usage"]
   end
   subgraph T7["T7"]
+    optimization["optimization"]
+  end
+  subgraph T8["T8"]
     dashboards["dashboards"]
   end
   ai_assist -->|8| audit
@@ -46,9 +49,9 @@ flowchart BT
   budgets -->|3| finance
   budgets -->|5| identity_access
   budgets -->|2| licensing
-  budgets -->|3| notifications
+  budgets -->|5| notifications
   budgets -->|3| operating_parameters
-  budgets -->|15| organization
+  budgets -->|17| organization
   catalog -->|19| audit
   catalog -->|11| finance
   catalog -->|3| identity_access
@@ -78,7 +81,7 @@ flowchart BT
   installation -->|11| identity_access
   installation -->|8| organization
   licensing -->|29| audit
-  licensing -->|49| catalog
+  licensing -->|50| catalog
   licensing -->|2| finance
   licensing -->|8| identity_access
   licensing -->|6| notifications
@@ -92,6 +95,12 @@ flowchart BT
   operating_parameters -->|5| audit
   operating_parameters -->|2| finance
   operating_parameters -->|7| organization
+  optimization -->|4| audit
+  optimization -->|2| catalog
+  optimization -->|7| licensing
+  optimization -->|2| notifications
+  optimization -->|2| operating_parameters
+  optimization -->|4| organization
   organization -->|10| audit
   organization -->|5| notifications
   personnel -->|24| audit
@@ -118,4 +127,4 @@ flowchart BT
   usage -->|3| organization
 ```
 
-79 module edges.
+85 module edges.

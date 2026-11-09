@@ -20,6 +20,11 @@ import { ServiceAccountDutySweeper } from './assignment/service-account-duty/ser
 import { ServiceAccountSpendingApproverGrantCheck } from './assignment/service-account-duty/spending-approver-grant.listener';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
+import { RuleSeatsFactsService } from './assignment/rule-seats-facts.service';
+import { RuleSeatsRepo } from './assignment/rule-seats.repo';
+import { SharedPoolCapacityRepo } from './shared-pool/shared-pool-capacity.repo';
+import { SharedPoolService } from './shared-pool/shared-pool.service';
+import { SharedPoolVacancyService } from './shared-pool/shared-pool-vacancy.service';
 import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
 import { AssignmentServiceAccountReader } from './assignment/assignment-service-account.listener';
 import { AssignmentListService } from './assignment/assignment-list.service';
@@ -71,6 +76,7 @@ import {
 import { LicensingApi } from './public/licensing.api';
 import { LicensingDashboardApi } from './public/licensing-dashboard.api';
 import { LicensingHandoverApi } from './public/licensing-handover.api';
+import { LicensingGhostSeatApi } from './public/licensing-ghost-seat.api';
 import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
 import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
@@ -279,6 +285,12 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingApi,
     LicensingDashboardApi,
     LicensingHandoverApi,
+    LicensingGhostSeatApi,
+    RuleSeatsFactsService,
+    RuleSeatsRepo,
+    SharedPoolCapacityRepo,
+    SharedPoolService,
+    SharedPoolVacancyService,
     LicensingOpenGrantsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
@@ -289,6 +301,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingApi,
     LicensingDashboardApi,
     LicensingHandoverApi,
+    LicensingGhostSeatApi,
     LicensingOpenGrantsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,

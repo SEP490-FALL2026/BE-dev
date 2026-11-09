@@ -4,7 +4,7 @@ import { formatRate, parseRate } from '../../../core/money/rate';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { BaselineSubscription } from '../public/catalog.types';
+import type { BaselineSubscription, RuleSubscription } from '../public/catalog.types';
 import type {
   NewSubscription,
   PriceSnapshotRecord,
@@ -396,6 +396,36 @@ export class SubscriptionRepo {
       endDate: row.endDate ? fromDateColumn(row.endDate) : null,
       renewalDate: row.renewalDate ? fromDateColumn(row.renewalDate) : null,
       hasSuccessor: row.renewedBy !== null,
+    }));
+  }
+
+  /**
+   * The subscriptions that grant seats on `day`: active, with no later period (nobody names it in `renewedFromId`), not ended before
+   * `day`. One statement, by id; the plan decides the rules (`PER_SEAT`, the kind of provisioning).
+   */
+  async grantingOn(day: BusinessDate, tx?: DbTx): Promise<RuleSubscription[]> {
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: {
+        status: 'ACTIVE',
+        renewedBy: null,
+        OR: [{ endDate: null }, { endDate: { gte: toDateColumn(day) } }],
+      },
+      select: {
+        id: true,
+        planId: true,
+        purchasedQuantity: true,
+        plan: { select: { applicationId: true, provisioningType: true, pricingModel: true } },
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => ({
+      subscriptionId: row.id,
+      planId: row.planId,
+      applicationId: row.plan.applicationId,
+      provisioningType: row.plan.provisioningType,
+      pricingModel: row.plan.pricingModel,
+      purchasedQuantity: row.purchasedQuantity,
     }));
   }
 
