@@ -20,10 +20,14 @@ const get = (path: string, account: ApiAccount | string = w.it1, query: Record<s
     .set({ Authorization: `Bearer ${typeof account === 'string' ? account : account.accessToken}` });
 const dataOf = (response: request.Response) => (response.body as Wire).data;
 
-/** A leaver on a K2 subscription of the world, with the open G2 the run made for the seat. */
+/**
+ * A leaver on a K2 subscription of the world, with the open G2 the run made for the seat. The leaver worked in the world's department, so the
+ * G2 answers to it and its IT Admin is the one in charge (M5-04: a G2 answers to where its holder last worked).
+ */
 const openG2 = async (code: string, type: 'K2' | 'K1' = 'K2') => {
   const subscription = await w.worldSubscription(50, type);
-  const seat = await w.leaverSeat(subscription, code);
+  const employeeId = await w.personIn(code, w.worldDepartment);
+  const seat = { employeeId, assignmentId: await w.seatOf(employeeId, subscription) };
   await w.leave(seat.employeeId);
   await w.runRules();
   const [g2] = await w.g2Of(seat.employeeId);
