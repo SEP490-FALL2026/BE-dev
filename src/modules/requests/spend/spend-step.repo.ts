@@ -30,7 +30,6 @@ export interface NewSpendStep {
   /** Null when nobody valid holds it: the step waits and says why. */
   assigneeEmployeeId: string | null;
   waitingReason: string | null;
-  samePersonAsSpend?: boolean;
   slaWorkingDays: number;
   now: Date;
 }

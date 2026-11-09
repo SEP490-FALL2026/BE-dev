@@ -112,7 +112,11 @@ export class SpendDecisionService {
     outcome: CheckOutcome,
   ): Promise<SpendDecisionResult> {
     const { request, step, now } = of;
-    if (outcome.status === 'NOT_CHECKABLE') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
+    if (outcome.status === 'NOT_CHECKABLE') {
+      if (request.routing?.mode !== 'ONE_STEP') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
+      await this.effects.sendBack(tx, actor, request, step, { now, reasons: [outcome.reason], check: null });
+      return { status: 'BOUNCED', to: 'REQUESTER', reasons: [outcome.reason], overBy: null };
+    }
 
     const confirmation = await this.confirmations.ofStep(step.id, tx);
     const verdict = judgeApproval(outcome.check, request.routing?.mode === 'ONE_STEP' || confirmation !== null);

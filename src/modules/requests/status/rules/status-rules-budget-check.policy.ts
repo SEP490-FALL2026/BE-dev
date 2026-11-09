@@ -13,6 +13,7 @@ const reasonsOf = (event: StatusEvent): string[] =>
 const BUDGET_CHECKED = (event: StatusEvent, facts: StatusFacts): NotificationIntent[] => {
   const request = requestOf(facts);
   const outcome = text(event.after, 'outcome');
+  if (outcome === 'USES_RESERVE' && text(event.after, 'routingMode') === 'ONE_STEP') return [];
   if (outcome === 'USES_RESERVE') {
     return [
       {
@@ -30,8 +31,9 @@ const BUDGET_CHECKED = (event: StatusEvent, facts: StatusFacts): NotificationInt
       recipients: [
         request.requesterEmployeeId,
         facts.departmentHeadEmployeeId,
-        reasons.includes('PRICE_EXPIRED') ? facts.itAdminEmployeeId : null,
+        reasons.some((reason) => ['PRICE_EXPIRED', 'PRICE_MISSING', 'RATE_MISSING'].includes(reason)) ? facts.itAdminEmployeeId : null,
       ],
+      includeActor: text(event.after, 'routingMode') === 'ONE_STEP',
       code: 'REQUEST_BUDGET_BLOCKED',
       params: { requestId: request.id, reasons: reasons.join(',') },
     },
@@ -39,6 +41,10 @@ const BUDGET_CHECKED = (event: StatusEvent, facts: StatusFacts): NotificationInt
 };
 
 export const BUDGET_CHECK_RULES: Readonly<Record<string, StatusRule>> = {
+  'ACCESS_REQUEST.ONE_STEP_PRICE_MISSING': {
+    subject: 'ACCESS_REQUEST', needs: ['REQUEST', 'IT_ADMIN'],
+    build: (event, facts) => [{ recipients: [requestOf(facts).requesterEmployeeId, facts.itAdminEmployeeId], includeActor: true, code: 'REQUEST_BUDGET_BLOCKED', params: { requestId: requestOf(facts).id, reasons: text(event.after, 'reason') ?? 'PRICE_MISSING' } }],
+  },
   // The head sent the request on, or confirmed the reserve, and the check said it uses the reserve or is blocked.
   'ACCESS_REQUEST.BUDGET_CHECKED': {
     subject: 'ACCESS_REQUEST',
@@ -59,7 +65,7 @@ export const BUDGET_CHECK_RULES: Readonly<Record<string, StatusRule>> = {
           recipients: [
             request.requesterEmployeeId,
             facts.departmentHeadEmployeeId,
-            reasons.includes('PRICE_EXPIRED') ? facts.itAdminEmployeeId : null,
+            reasons.some((reason) => ['PRICE_EXPIRED', 'PRICE_MISSING', 'RATE_MISSING'].includes(reason)) ? facts.itAdminEmployeeId : null,
           ],
           code: 'REQUEST_RETURNED_AT_DECISION',
           params: { requestId: request.id, reasons: reasons.join(',') },

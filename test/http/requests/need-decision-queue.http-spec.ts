@@ -33,7 +33,6 @@ const PAGE = {
       termMonths: null,
       expectedEndDate: '2027-03-31',
       pricing: { status: 'PRICED', amount: { amount: '1200000', currency: 'VND' } },
-      samePersonAsSpend: false,
     },
   ],
   pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 },

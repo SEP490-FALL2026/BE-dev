@@ -33,7 +33,7 @@ export function checkSpendDecider(facts: {
 }
 
 /** Why an approval is not saved and the request goes back to its head: the check made again blocks it, or the reserve it uses is not confirmed. */
-export type ReturnReason = BlockReason | 'RESERVE_UNCONFIRMED';
+export type ReturnReason = BlockReason | 'RESERVE_UNCONFIRMED' | 'PRICE_MISSING' | 'RATE_MISSING';
 
 export type ApprovalVerdict =
   /** The approval may be saved; `usesReserve` is whether the check made now needs the reserve (and the head confirmed it). */

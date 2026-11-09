@@ -40,7 +40,6 @@ const held = (assigneeEmployeeId: string, routingRow: number, slaWorkingDays: nu
   assigneeEmployeeId,
   routingRow,
   waitingReason: null,
-  samePersonAsSpend: false,
   slaWorkingDays,
 });
 
@@ -55,7 +54,7 @@ export function planNeedSteps<Line extends { employeeId: string }>(
     lines: [...input.lines], confirmedBySending: false,
     step: decision.outcome === 'ASSIGNED'
       ? held(decision.assigneeEmployeeId, SENT_BY_EMPLOYEE_ROW, slaWorkingDays)
-      : { state: oneStep ? 'NOT_REQUIRED' : 'WAITING', assigneeEmployeeId: null, routingRow: decision.row, waitingReason: decision.reason, samePersonAsSpend: false, slaWorkingDays },
+      : { state: oneStep ? 'NOT_REQUIRED' : 'WAITING', assigneeEmployeeId: null, routingRow: decision.row, waitingReason: decision.reason, slaWorkingDays },
   }];
 
   return planned;

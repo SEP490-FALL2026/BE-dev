@@ -76,14 +76,13 @@ describe('a row of the queue of the need steps', () => {
       termMonths: 6,
       expectedEndDate: null,
       pricing: { status: 'PRICED', amount: { amount: '123456', currency: 'VND' } },
-      samePersonAsSpend: false,
     });
     expect(JSON.stringify(item)).not.toMatch(/remaining|committed|spent|held|primaryCode|toolset|standard/i);
+    expect(item).not.toHaveProperty('samePersonAsSpend');
   });
 
   it.each([
     [1, 'MANAGER'],
-    [2, 'SPENDING_APPROVER'],
     [5, 'MANAGER'],
     [9, 'MANAGER'],
   ])('names the role of the holder from the row %i of the routing table: %s', (routingRow, role) => {

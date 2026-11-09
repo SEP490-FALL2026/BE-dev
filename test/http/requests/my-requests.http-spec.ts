@@ -15,6 +15,7 @@ const ROW = {
   type: 'GRANT',
   branch: 'PAID_IN_CATALOG',
   state: 'PENDING',
+  routing: { mode: 'VIA_HEAD', oneStepReason: null },
   plan: {
     planId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d13',
     planName: 'Business',
@@ -74,6 +75,17 @@ describe('my requests route (e2e, no database)', () => {
 
     expect(response.body).toEqual({ success: true, message: 'ME.ACCESS_REQUESTS_LISTED', data: PAGE });
     expect(list).toHaveBeenCalledWith(expect.objectContaining({ employeeId: 'e-77' }), { page: 1, pageSize: 20 });
+  });
+
+  it('BR-MF1-02 returns one-step revision with NOT_REQUIRED need and no retired flags', async () => {
+    const item = { ...ROW, state: 'AWAITING_REQUESTER_REVISION',
+      routing: { mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' },
+      needStep: { state: 'NOT_REQUIRED', assignee: null, waitingReason: null } };
+    list.mockResolvedValue({ ...PAGE, items: [item] });
+    const response = await get(PATH).expect(200);
+    const data = bodyOf(response).data as unknown as { items: unknown[] };
+    expect(data.items).toEqual([item]);
+    expect(data.items[0]).not.toHaveProperty('samePersonAsSpend');
   });
 
   it('reads every narrowing and gives them to the service as they are', async () => {

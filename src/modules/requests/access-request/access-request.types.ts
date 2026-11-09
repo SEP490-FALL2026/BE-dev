@@ -118,7 +118,6 @@ export interface NewNeedStep {
   assigneeEmployeeId: string | null;
   routingRow: number;
   waitingReason: WaitingReason | null;
-  samePersonAsSpend?: boolean;
   slaWorkingDays: number;
 }
 

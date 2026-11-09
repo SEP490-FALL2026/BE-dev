@@ -45,6 +45,7 @@ export interface MyRequestNeedStep {
 
 /** A request of the caller as the repository reads it for a row of the list: no price, no check, no commitment, no reason. */
 export interface MyRequestRow {
+  routing?: import('../access-request/routing.policy').RequestRouting;
   id: string;
   type: AccessRequestKind;
   branch: AccessRequestBranchCode;

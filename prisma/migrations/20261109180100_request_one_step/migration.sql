@@ -6,12 +6,13 @@ CREATE INDEX access_requests_department_routing_state_idx ON access_requests (de
 -- Old rows remain readable, and updates of historical rows do not rewrite their history.
 CREATE FUNCTION access_request_steps_retired_flags() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  IF NEW.same_person_as_spend OR NEW.no_independent_review THEN
+  IF (NEW.same_person_as_spend OR NEW.no_independent_review) AND
+     (TG_OP = 'INSERT' OR NEW.same_person_as_spend IS DISTINCT FROM OLD.same_person_as_spend OR NEW.no_independent_review IS DISTINCT FROM OLD.no_independent_review) THEN
     RAISE EXCEPTION 'Retired approval flags cannot be written' USING ERRCODE = '23514';
   END IF;
   RETURN NEW;
 END $$;
-CREATE TRIGGER access_request_steps_retired_flags BEFORE INSERT ON access_request_steps FOR EACH ROW EXECUTE FUNCTION access_request_steps_retired_flags();
+CREATE TRIGGER access_request_steps_retired_flags BEFORE INSERT OR UPDATE ON access_request_steps FOR EACH ROW EXECUTE FUNCTION access_request_steps_retired_flags();
 ALTER TABLE access_request_steps DROP CONSTRAINT access_request_steps_holder_check;
 ALTER TABLE access_request_steps ADD CONSTRAINT access_request_steps_holder_check CHECK (
  (state = 'PENDING' AND assignee_employee_id IS NOT NULL AND assigned_at IS NOT NULL AND waiting_reason IS NULL AND decided_at IS NULL)
@@ -21,7 +22,7 @@ ALTER TABLE access_request_steps ADD CONSTRAINT access_request_steps_holder_chec
  OR (state = 'NOT_REQUIRED' AND kind = 'NEED' AND assignee_employee_id IS NULL AND assigned_at IS NULL AND waiting_reason IS NULL AND decided_at IS NULL)
 );
 UPDATE access_requests r SET routing_mode = 'ONE_STEP', one_step_reason = CASE WHEN EXISTS (SELECT 1 FROM access_request_steps s WHERE s.request_id = r.id AND s.kind = 'NEED' AND s.routing_row IN (2,8)) THEN 'REQUESTER_IS_HEAD' ELSE 'NO_DEPARTMENT_HEAD' END
-WHERE r.state NOT IN ('DRAFT','REJECTED','IT_REJECTED','COMPLETED','FAILED','WITHDRAWN','CANCELLED') AND EXISTS (SELECT 1 FROM access_request_steps s WHERE s.request_id = r.id AND s.kind = 'NEED' AND (s.routing_row IN (2,8) OR (s.routing_row = 4 AND s.state IN ('PENDING','WAITING') AND NOT EXISTS (SELECT 1 FROM department_head_periods hp WHERE hp.department_id = r.department_id AND hp.valid_from > CURRENT_DATE))));
+WHERE r.state NOT IN ('DRAFT','REJECTED','IT_REJECTED','COMPLETED','FAILED','WITHDRAWN','CANCELLED') AND EXISTS (SELECT 1 FROM access_request_steps s WHERE s.request_id = r.id AND s.kind = 'NEED' AND (s.routing_row IN (2,8) OR (s.routing_row = 4 AND s.state IN ('PENDING','WAITING') AND NOT EXISTS (SELECT 1 FROM department_head_periods hp WHERE hp.department_id = r.department_id AND hp.valid_from > (CURRENT_TIMESTAMP AT TIME ZONE (SELECT o.time_zone FROM organizations o WHERE o.id = r.organization_id))::date))));
 UPDATE access_request_steps s SET state = 'NOT_REQUIRED', assignee_employee_id = NULL, assigned_at = NULL, waiting_reason = NULL, waiting_since = NULL, same_person_as_spend = false, no_independent_review = false WHERE s.kind = 'NEED' AND s.state IN ('PENDING','WAITING') AND EXISTS (SELECT 1 FROM access_requests r WHERE r.id = s.request_id AND r.routing_mode = 'ONE_STEP' AND NOT EXISTS (SELECT 1 FROM access_request_steps sp WHERE sp.request_id = r.id AND sp.kind = 'SPEND_APPROVAL' AND sp.state IN ('PENDING','WAITING')));
 
 -- Retired decision roles remain in enums for historical records, but new decisions use current roles only.

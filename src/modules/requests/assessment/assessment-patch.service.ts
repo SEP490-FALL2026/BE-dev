@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AssessmentRecord } from '../access-request/assessment-record.types';
 import type { AssessmentPatchDto } from './assessment.dto';
 import { AssessmentReferenceNotFoundError } from './assessment.errors';
@@ -15,19 +14,15 @@ import { QuoteService } from './quote.service';
 export class AssessmentPatchService {
   constructor(
     private readonly catalog: CatalogApi,
-    private readonly organizationReads: OrganizationReadApi,
     private readonly quotes: QuoteService,
   ) {}
 
   async toPatch(body: AssessmentPatchDto, current: AssessmentRecord): Promise<AssessmentPatch> {
-    const { opinion, quote, vendorId, equivalentPlanId, proposedBusinessOwnerEmployeeId, ...plain } = body;
+    const { opinion, quote, vendorId, equivalentPlanId, ...plain } = body;
     const patch: AssessmentPatch = { ...plain };
 
     if (vendorId !== undefined) Object.assign(patch, await this.vendorPatch(vendorId, body, current));
     if (equivalentPlanId !== undefined) patch.equivalentPlanId = await this.checkedPlan(equivalentPlanId);
-    if (proposedBusinessOwnerEmployeeId !== undefined) {
-      patch.proposedBusinessOwnerEmployeeId = await this.checkedOwner(proposedBusinessOwnerEmployeeId);
-    }
     if (opinion !== undefined) {
       patch.opinionStatus = opinion?.status ?? null;
       patch.opinionNote = opinion?.note ?? null;
@@ -58,11 +53,4 @@ export class AssessmentPatchService {
     return planId;
   }
 
-  private async checkedOwner(employeeId: string | null): Promise<string | null> {
-    if (employeeId !== null && (await this.organizationReads.getEmployees([employeeId])).length === 0) {
-      throw new AssessmentReferenceNotFoundError('proposedBusinessOwnerEmployeeId');
-    }
-
-    return employeeId;
-  }
 }

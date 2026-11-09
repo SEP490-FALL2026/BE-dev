@@ -149,3 +149,10 @@ describe('requestPolicyJson (the codec of access_requests.policy)', () => {
     }
   });
 });
+
+describe('BR-MF1-02: one-step policy chains', () => {
+  const routing = { mode: 'ONE_STEP' as const, oneStepReason: 'REQUESTER_IS_HEAD' as const };
+  it('has only IT execution for internal software', () => expect(policyFor('INTERNAL',2,routing).chain).toEqual(['IT_EXECUTION']));
+  it('has spend then IT execution for catalog paid software', () => expect(policyFor('SAAS',2,routing).chain).toEqual(['SPEND_APPROVAL','IT_EXECUTION']));
+  it('keeps assessment then spend for proposed software', () => expect(proposalPolicy(2,routing).chain).toEqual(['IT_ASSESSMENT','SPEND_APPROVAL','IT_EXECUTION']));
+});

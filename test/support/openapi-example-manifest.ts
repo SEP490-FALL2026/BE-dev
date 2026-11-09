@@ -60,6 +60,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   accessRequestServiceAccountSubmit: 'ACCESS_REQUEST.SERVICE_ACCOUNT_SUBMITTED',
   accessRequestSimilarSeatList: 'ACCESS_REQUEST.SIMILAR_SEATS_LISTED',
   accessRequestSubmit: 'ACCESS_REQUEST.SUBMITTED',
+  accessRequestResubmit: 'ACCESS_REQUEST.RESUBMITTED',
   accessRequestSupplementAdd: 'ACCESS_REQUEST.SUPPLEMENT_ADDED',
   accessRequestSupplementList: 'ACCESS_REQUEST.SUPPLEMENTS_LISTED',
   accessRequestTimingsGet: 'ACCESS_REQUEST.TIMINGS_FETCHED',

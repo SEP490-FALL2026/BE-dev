@@ -16,7 +16,7 @@ interface Session {
  * E2E of the two approvers on the phone (US-16-02, US-16-03): a paid request goes from the employee's phone to the head, who
  * reads it from the inbox, chooses the line of the plan and approves; the head sends it on as spend on the web (batches are web
  * only); the spending approver finds it in the queue of the phone, reads the snapshot and approves it alone; then a request the
- * head sent for themselves is decided by the approver twice, need and spend. Real HTTP, real PostgreSQL, the worker's
+ * head sent for themselves goes directly to one spend decision. Real HTTP, real PostgreSQL, the worker's
  * projection run by hand. It proves the BE sequence only: the native app and its screens are the Mobile developer's.
  */
 describe('the approvers on the phone: need step, spend step and the request a head sent for themselves (e2e)', () => {
@@ -52,7 +52,7 @@ describe('the approvers on the phone: need step, spend step and the request a he
       .dataOf<{ items: NoticeWire[] }>(await get('/notifications?pageSize=50', account).expect(200))
       .items.filter((item) => item.subject?.id === id);
   const queueOf = async (account: ApiAccount) =>
-    h.dataOf<{ items: Array<{ requestId: string; samePersonAsSpend: boolean }> }>(
+    h.dataOf<{ items: Array<{ requestId: string; routing: { mode: string } }> }>(
       await get('/spend-approvals?pageSize=100', account).expect(200),
     ).items;
 
@@ -140,19 +140,21 @@ describe('the approvers on the phone: need step, spend step and the request a he
     ]);
   });
 
-  it('the head sends a request for themselves; the approver decides its need, then its spend, in two decisions', async () => {
+  it('BR-MF1-02 the head sends a request for themselves; the approver decides once, without a need decision', async () => {
     const body = { planId: plan, businessReason: 'Own seat' };
     own = h.dataOf<{ request: AccessRequestWire }>(await post('/access-requests', unit.head.account, body).expect(201))
       .request.id;
     await h.project();
     expect((await inboxAbout(h.boss.account, own)).map((item) => [item.code, item.params.stepKind])).toEqual([
-      ['STEP_ASSIGNED', 'NEED'],
+      ['STEP_ASSIGNED', 'SPEND_APPROVAL'],
     ]);
     await post(`/access-requests/${own}/need-decision`, unit.head.account, { decision: 'APPROVE' }).expect(403);
 
-    await post(`/access-requests/${own}/need-decision`, h.boss.account, { decision: 'APPROVE' }).expect(200);
+    await post(`/access-requests/${own}/need-decision`, h.boss.account, { decision: 'APPROVE' }).expect(404);
+    const detail = h.dataOf<{ request: AccessRequestWire }>(await get(`/access-requests/${own}`, unit.head.account).expect(200)).request;
+    expect(detail).toMatchObject({ state: 'AWAITING_SPEND_DECISION', needStep: { state: 'NOT_REQUIRED' } });
     expect((await queueOf(h.boss.account)).find((item) => item.requestId === own)).toMatchObject({
-      samePersonAsSpend: true,
+      routing: { mode: 'ONE_STEP' },
     });
     await post(`/access-requests/${own}/spend-approval`, h.boss.account, { decision: 'APPROVE' }).expect(200);
 
@@ -162,7 +164,6 @@ describe('the approvers on the phone: need step, spend step and the request a he
       [own],
     );
     expect(kept.rows).toEqual([
-      { kind: 'NEED', decider_role: 'SPENDING_APPROVER' },
       { kind: 'SPEND_APPROVAL', decider_role: 'SPENDING_APPROVER' },
     ]);
   });

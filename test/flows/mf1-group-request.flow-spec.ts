@@ -50,6 +50,24 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     await world?.close();
   });
 
+  it('BR-MF1-02 HEAD_IN_GROUP từ chối trưởng phòng trong nhóm cho cả hai loại người gửi @MF1', async () => {
+    const before = await world.facts.count('access_requests');
+    const head = await world.facts.employeeId('NV-ENGH');
+    const colleague = await world.facts.employeeId('NV-DEV3');
+    for (const sender of ['NV-ENGH', 'NV-DEV2']) {
+      const response = await call().post(sender, '/group-requests', {
+        planId: figma, businessReason: 'Nhóm có trưởng phòng',
+        lines: [{ employeeId: head }, { employeeId: colleague }],
+      });
+      expect(response.status).toBe(422);
+      expect(call().codeOf(response)).toBe('GROUP_REQUEST.LINES_REFUSED');
+      expect(call().detailsOf(response)).toMatchObject({
+        lines: expect.arrayContaining([{ employeeId: head, reason: 'HEAD_IN_GROUP' }]),
+      });
+    }
+    expect(await world.facts.count('access_requests')).toBe(before);
+  });
+
   it('một người không phải nhóm: 422 TOO_FEW_LINES và không ghi gì #19 @B3', async () => {
     const before = await world.facts.count('access_requests');
     const dev2 = await world.facts.employeeId('NV-DEV2');

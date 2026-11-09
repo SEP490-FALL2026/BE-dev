@@ -179,8 +179,7 @@ export class SpendRoutingService {
       kind: 'SPEND_APPROVAL',
       assigneeEmployeeId: assignee,
       waitingReason: assignment.outcome === 'WAITING' ? assignment.reason : null,
-      samePersonAsSpend: false,
-      slaWorkingDays: request.policy.slaWorkingDays,
+          slaWorkingDays: request.policy.slaWorkingDays,
       now,
     });
     // One person holding the need step and the spend step is flagged on both (`US-05-03` AC-9).

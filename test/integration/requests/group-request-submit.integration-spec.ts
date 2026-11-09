@@ -165,37 +165,22 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
   });
 
   describe('the head among the people (US-05-03 AC-8, US-05-17 AC-3, AC-16)', () => {
-    it('confirms the others by sending and gives the line of the head to the person who decides a head of their own request', async () => {
+    it('BR-MF1-02 refuses the head in their own group before creating requests or steps', async () => {
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
 
-      const request = await sent(u.head.account, h.groupBody(paid, [e1, e2, u.head]));
-
-      expect(request.state).toBe('PENDING');
-      const steps = await h.needSteps(request.id);
-      expect(steps.map((step) => [step.state, step.routing_row, step.assignee_employee_id])).toEqual([
-        ['APPROVED', 5, u.head.employeeId],
-        ['PENDING', 2, h.boss.employeeId],
-      ]);
-      const lines = await h.lineRows(request.id);
-      expect(lines.map((line) => [line.employee_id, line.state, line.need_step_id])).toEqual([
-        [e1.employeeId, 'NEED_CONFIRMED', steps[0].id],
-        [e2.employeeId, 'NEED_CONFIRMED', steps[0].id],
-        [u.head.employeeId, 'AWAITING_NEED', steps[1].id],
-      ]);
+      const before = await h.requestRows();
+      const response = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), u.head.account).expect(422);
+      expect(response.body as Refused).toMatchObject({ error: { code: 'GROUP_REQUEST.LINES_REFUSED',
+        details: { lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] } } });
+      expect(await h.requestRows()).toBe(before);
     });
 
-    it('lets the head decide none of their own line', async () => {
+    it('BR-MF1-02 check reports HEAD_IN_GROUP before the head can submit a line for themselves', async () => {
       const u = await unit();
       const [e1] = await h.colleagues(u, 1);
-      const request = await sent(u.head.account, h.groupBody(paid, [e1, u.head]));
-
-      const attempt = await h
-        .decideLines(request.id, { lines: [{ employeeId: u.head.employeeId, decision: 'APPROVE' }] }, u.head.account)
-        .expect(403);
-
-      expect(h.codeOf(attempt)).toBe('ACCESS_REQUEST.OWN_REQUEST');
-      expect(await h.lineStates(request.id)).toEqual(['NEED_CONFIRMED', 'AWAITING_NEED']);
+      const checked = h.dataOf<CheckWire>(await h.checkGroup(h.groupBody(paid, [e1, u.head]), u.head.account).expect(200));
+      expect(checked.lines).toContainEqual({ employeeId: u.head.employeeId, ok: false, reason: 'HEAD_IN_GROUP' });
     });
 
     it('refuses a request of the head alone: a group names two people at least, and the request of one is an individual one (QĐ-100aa)', async () => {
@@ -236,17 +221,15 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       expect(decisions.rowCount).toBe(0);
     });
 
-    it('gives the line of the head to the spending approver in a second step, and the others to the head, when the head is named', async () => {
+    it('BR-MF1-02 an employee cannot include the head in the group either', async () => {
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
 
-      const request = await sent(e1.account, h.groupBody(paid, [e1, e2, u.head]));
-
-      const steps = await h.needSteps(request.id);
-      expect(steps.map((step) => [step.state, step.routing_row, step.assignee_employee_id])).toEqual([
-        ['PENDING', 9, u.head.employeeId],
-        ['PENDING', 2, h.boss.employeeId],
-      ]);
+      const before = await h.requestRows();
+      const response = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), e1.account).expect(422);
+      expect(response.body as Refused).toMatchObject({ error: { code: 'GROUP_REQUEST.LINES_REFUSED',
+        details: { lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] } } });
+      expect(await h.requestRows()).toBe(before);
     });
 
     it('stops an Employee at ten people and names the most', async () => {

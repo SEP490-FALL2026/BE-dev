@@ -79,6 +79,31 @@ describe('closing a request because its person was transferred (integration, rea
     ).rows[0];
 
   describe('a request for one person', () => {
+    it('BR-MF1-02/07: a request awaiting requester revision remains open and can be closed after transfer', async () => {
+      const u = await example();
+      const id = (await h.sent(u.person, plan, { termMonths: 1 })).id;
+      await h.ctx.sql.query(
+        `UPDATE access_request_steps SET state = 'NOT_REQUIRED', assignee_employee_id = NULL, assigned_at = NULL,
+           waiting_reason = NULL, waiting_since = NULL WHERE request_id = $1 AND kind = 'NEED'`,
+        [id],
+      );
+      await h.ctx.sql.query(
+        `UPDATE access_requests SET state = 'AWAITING_REQUESTER_REVISION', routing_mode = 'ONE_STEP', one_step_reason = 'HEAD_LEFT' WHERE id = $1`,
+        [id],
+      );
+      await h.moveTo(u.person.employeeId, u.target.department.id);
+
+      expect(await h.state(id)).toBe('AWAITING_REQUESTER_REVISION');
+      const response = await h.closeForDeparture(id, reason, h.it1).expect(200);
+
+      expect(h.dataOf<{ request: RequestWire }>(response).request).toMatchObject({
+        state: 'CANCELLED',
+        cancellation: { cause: 'BENEFICIARY_TRANSFERRED', note: reason.note },
+      });
+      expect(await commitmentOf(id)).toBeUndefined();
+      expect(await taskOf(id)).toBeUndefined();
+    });
+
     it('ends a request that was approved and not granted as cancelled, with the reason, and gives the money back', async () => {
       const u = await example();
       const id = await approvedFor(u, u.person, 15 * M);

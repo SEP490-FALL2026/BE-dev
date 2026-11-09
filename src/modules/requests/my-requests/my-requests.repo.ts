@@ -14,6 +14,8 @@ const SELECT_ROW = {
   type: true,
   branch: true,
   state: true,
+  routingMode: true,
+  oneStepReason: true,
   planId: true,
   termMonths: true,
   expectedEndDate: true,
@@ -43,6 +45,7 @@ function toRow(row: Row): MyRequestRow {
   return {
     id: row.id,
     type: row.type,
+    routing: { mode: row.routingMode, oneStepReason: row.oneStepReason as import('../access-request/routing.policy').OneStepReason | null },
     branch: row.branch,
     // The filter of the page has no draft among its states.
     state: row.state as SentState,

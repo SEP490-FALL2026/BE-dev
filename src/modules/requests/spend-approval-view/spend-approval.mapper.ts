@@ -78,7 +78,7 @@ export function approvalSummaryOf(row: OpenSpendRow, lookups: QueueLookups): App
 
   return {
     requestId: row.requestId,
-    routing: { mode: request.routingMode, oneStepReason: request.oneStepReason as import('../access-request/routing.policy').OneStepReason | null },
+    routing: { mode: request.routingMode ?? 'VIA_HEAD', oneStepReason: (request.oneStepReason ?? null) as import('../access-request/routing.policy').OneStepReason | null },
     stepId: row.id,
     stepKind: 'SPEND_APPROVAL',
     openedAt: row.createdAt.toISOString(),

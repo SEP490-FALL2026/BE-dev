@@ -1,12 +1,37 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { GroupLineQueryService } from '../../../src/modules/requests/group-line-decisions/group-line-query.service';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 const PERSON = '7a1d2c3e-4b5f-4a6b-8c7d-9e0f1a2b3c4d';
 const URL = `/api/v1/access-requests/${ID}/lines/${PERSON}/departure-closure`;
+
+describe('BR-MF1-02 the line of a one-step group (HTTP contract)', () => {
+  let app: INestApplication<App>;
+  const employee = { employeeId: PERSON, employeeCode: 'E-1', fullName: 'An' };
+  const item = {
+    employee, position: 1, state: 'NEED_CONFIRMED',
+    needStep: { id: ID, state: 'NOT_REQUIRED', assignee: null },
+    expectedEndDate: null, needDecision: null, spendDecision: null, cost: null, share: null,
+    endedAt: null, endedBy: null, endReason: null, cancelCause: null,
+  };
+  const page = { items: [item], pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 } };
+  beforeAll(async () => {
+    app = await createHttpContractApp({ overrides: [{ token: GroupLineQueryService, useValue: {
+      page: jest.fn().mockResolvedValue(page),
+    } }] });
+  });
+  afterAll(async () => { await app?.close(); });
+
+  it('BR-MF1-02 accepts NOT_REQUIRED without an assignee or a need decision in the response', async () => {
+    const response = await request(app.getHttpServer()).get(`/api/v1/access-requests/${ID}/lines`)
+      .set('Authorization', bearer(principal(['EMPLOYEE']))).expect(200);
+    expect(bodyOf(response).data).toEqual(page);
+  });
+});
 
 describe('removing a person who left from a request for a group (e2e, no database)', () => {
   let app: INestApplication<App>;

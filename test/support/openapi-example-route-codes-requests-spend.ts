@@ -91,6 +91,7 @@ export const ROUTE_ERROR_CODES_REQUESTS_SPEND: Readonly<
       'SPEND.NOT_CHECKABLE',
       'SPEND.NO_SPEND_STEP',
       'SPEND.RECHECKED_RETURNED_TO_HEAD',
+      'SPEND.RECHECKED_RETURNED_TO_REQUESTER',
     ],
   },
   spendApprovalGet: {
