@@ -1,4 +1,4 @@
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v4/installation';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -7,7 +7,7 @@ import request from 'supertest';
 import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
 import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
 import type { FetchLike } from '../../../src/cli/seed/demo-api-client';
-import { SHARED_DEMO_V3 } from '../../../src/cli/seed/fixture/shared-demo-v3';
+import { SHARED_DEMO_V4 } from '../../../src/cli/seed/fixture/shared-demo-v4';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
 
@@ -21,12 +21,12 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
   let ctx: HttpTestApp;
   let demo: INestApplicationContext;
   let baseUrl: string;
-  const demoAccounts = SHARED_DEMO_V3.people.filter((person) => person.account !== null).length;
+  const demoAccounts = SHARED_DEMO_V4.people.filter((person) => person.account !== null).length;
   const secrets = { superAdminPassword: SEED_PASSWORD, demoAccountPassword: 'a demo password for the tests' };
 
   const args = (mode: 'plan' | 'apply', extra: Partial<SeedCommandArguments> = {}): SeedCommandArguments => ({
     mode,
-    fixture: 'shared-demo-v3',
+    fixture: 'shared-demo-v4',
     apiUrl: baseUrl,
     operator: 'TEST-DEMO-1',
     environment: 'LOCAL_TEST',
@@ -65,7 +65,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
   /** Sessions holding the apply lock of the fixture: an apply that ended, however it ended, leaves none. */
   async function heldAdvisoryLocks(): Promise<number> {
     const { rows } = await ctx.sql.query<{ n: string }>(
-      `WITH k AS (SELECT hashtextextended('seed:shared-demo-v3:apply', 0) AS v)
+      `WITH k AS (SELECT hashtextextended('seed:shared-demo-v4:apply', 0) AS v)
        SELECT count(*) AS n FROM pg_locks, k
         WHERE locktype = 'advisory' AND granted AND objsubid = 1
           AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
@@ -134,7 +134,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
 
   it('refuses a second apply while another holds the lock of the fixture, writing nothing and leaving no lock', async () => {
     const before = await businessRows();
-    const other = await demo.get(DemoAccountsApi).holdApplyLock('shared-demo-v3');
+    const other = await demo.get(DemoAccountsApi).holdApplyLock('shared-demo-v4');
     expect(other).not.toBeNull();
     try {
       expect(await heldAdvisoryLocks()).toBe(1);
@@ -250,11 +250,11 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     const rows = await ctx.sql.query<{ code: string; role: string }>(
       `SELECT e.employee_code AS code, g.role FROM employees e JOIN app_users u ON u.employee_id = e.id JOIN role_grants g ON g.app_user_id = u.id AND g.revoked_at IS NULL WHERE e.employee_code LIKE 'NV-%' ORDER BY e.employee_code`,
     );
-    const wanted = SHARED_DEMO_V3.people
+    const wanted = SHARED_DEMO_V4.people
       .filter((person) => person.account)
       .map((person) => ({
         code: person.code,
-        role: person.code === SHARED_DEMO_V3.approvalRoles.SPENDING_APPROVER ? 'SPENDING_APPROVER' : person.account,
+        role: person.code === SHARED_DEMO_V4.approvalRoles.SPENDING_APPROVER ? 'SPENDING_APPROVER' : person.account,
       }))
       .concat([{ code: 'NV-SA', role: 'SUPER_ADMIN' as const }])
       .sort((a, b) => a.code.localeCompare(b.code));
@@ -284,7 +284,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     ).toBe(true);
     const audit = await ctx.sql.query<{ n: string }>(
       `SELECT count(*) AS n FROM audit_events WHERE action = 'DEMO_DATASET.ACCOUNT_CREATED' AND operator_reference = $1`,
-      ['DEMO_DATASET:shared-demo-v3:TEST-DEMO-1'],
+      ['DEMO_DATASET:shared-demo-v4:TEST-DEMO-1'],
     );
     expect(Number(audit.rows[0].n)).toBe(demoAccounts);
     const doubled = await ctx.sql.query(

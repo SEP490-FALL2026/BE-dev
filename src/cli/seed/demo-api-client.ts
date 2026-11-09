@@ -152,16 +152,47 @@ export class DemoApiClient {
   }
 
   /** The `data` of a 2xx answer, as the account of `email` (signed in before). Throws DemoApiError otherwise. */
-  async call<T>(email: string, method: string, path: string, body?: unknown): Promise<T> {
+  async call<T>(
+    email: string,
+    method: string,
+    path: string,
+    body?: unknown,
+    headers: Record<string, string> = {},
+  ): Promise<T> {
     const session = this.sessions.get(email);
     if (!session) throw new Error(`No session for the account of this step (${method} ${path})`);
     try {
-      return await this.send<T>(method, path, body, session.accessToken);
+      return await this.send<T>(method, path, body, session.accessToken, headers);
     } catch (error) {
       // An access token lives minutes; a long run outlives it. Sign in again once, then let any error through.
       if (!(error instanceof DemoApiError) || error.status !== 401) throw error;
       await this.login(session.email, session.password);
-      return this.send<T>(method, path, body, this.sessions.get(email)?.accessToken ?? '');
+      return this.send<T>(method, path, body, this.sessions.get(email)?.accessToken ?? '', headers);
+    }
+  }
+
+  /** Uploads one file with the text fields beside it (`multipart/form-data`), as the account of `email`. */
+  async upload<T>(
+    email: string,
+    path: string,
+    file: { name: string; content: string; type: string },
+    fields: Record<string, string> = {},
+  ): Promise<T> {
+    const form = (): FormData => {
+      const data = new FormData();
+      for (const [name, value] of Object.entries(fields)) data.append(name, value);
+      data.append('file', new Blob([file.content], { type: file.type }), file.name);
+
+      return data;
+    };
+    const session = this.sessions.get(email);
+    if (!session) throw new Error(`No session for the account of this step (POST ${path})`);
+    try {
+      return await this.send<T>('POST', path, form(), session.accessToken);
+    } catch (error) {
+      if (!(error instanceof DemoApiError) || error.status !== 401) throw error;
+      await this.login(session.email, session.password);
+      return this.send<T>('POST', path, form(), this.sessions.get(email)?.accessToken ?? '');
     }
   }
 
@@ -181,9 +212,15 @@ export class DemoApiClient {
     this.sessions.set(email, { email, password, accessToken: data.accessToken, refreshToken: data.refreshToken });
   }
 
-  private async send<T>(method: string, path: string, body?: unknown, token?: string): Promise<T> {
+  private async send<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    token?: string,
+    headers: Record<string, string> = {},
+  ): Promise<T> {
     for (let attempt = 0; ; attempt++) {
-      const response = await this.fetchOnce(method, path, body, token);
+      const response = await this.fetchOnce(method, path, body, token, headers);
       if (retryable(method, response.status) && attempt < this.retries) {
         await this.sleep(waitOf(response, attempt));
         continue;
@@ -192,16 +229,23 @@ export class DemoApiClient {
     }
   }
 
-  private async fetchOnce(method: string, path: string, body: unknown, token?: string): Promise<Response> {
-    const headers: Record<string, string> = { accept: 'application/json' };
-    if (body !== undefined) headers['content-type'] = 'application/json';
+  private async fetchOnce(
+    method: string,
+    path: string,
+    body: unknown,
+    token?: string,
+    extra: Record<string, string> = {},
+  ): Promise<Response> {
+    const headers: Record<string, string> = { accept: 'application/json', ...extra };
+    const isForm = body instanceof FormData;
+    if (body !== undefined && !isForm) headers['content-type'] = 'application/json';
     if (token) headers.authorization = `Bearer ${token}`;
     const startedAt = this.now();
     try {
       return await this.fetchImpl(`${this.baseUrl}${path}`, {
         method,
         headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch (error) {

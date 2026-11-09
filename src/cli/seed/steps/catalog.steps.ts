@@ -1,3 +1,4 @@
+import { addMonths, dayOffset } from '../demo-dates';
 import { as, listAll, summarize, yearOf } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoApplication, DemoPlan, DemoSubscription } from '../fixture/demo-fixture.types';
@@ -8,21 +9,13 @@ interface ApplicationRow {
   id: string;
   name: string;
   vendor: { id: string; name: string } | null;
-  businessOwner: { employeeCode: string } | null;
 }
 
 /** The IT Admin the dataset writes the catalog as: the one in charge of the IT department. */
-function catalogAdmin(ctx: DemoRunContext): string {
-  const it = ctx.fixture.departments.find((department) => department.code.endsWith('-ITO'));
+export function catalogAdmin(ctx: DemoRunContext): string {
+  const it = ctx.fixture.departments.find((department) => department.code === 'ITO');
 
   return it?.itAdmin ?? ctx.fixture.people.find((person) => person.account === 'IT_ADMIN')?.code ?? '';
-}
-
-/** Who answers for a subscription: the IT Admin in charge of its owner department, else the one the catalog is written as. */
-function responsibleOf(ctx: DemoRunContext, subscription: DemoSubscription): string {
-  const owner = ctx.fixture.departments.find((department) => department.code === subscription.ownerDepartment);
-
-  return owner?.itAdmin ?? catalogAdmin(ctx);
 }
 
 async function applications(ctx: DemoRunContext): Promise<StepOutcome> {
@@ -53,10 +46,7 @@ async function oneApplication(
   if (found) {
     ctx.ids.applications.set(application.key, found.id);
     if (found.vendor) ctx.ids.vendors.set(application.key, found.vendor.id);
-    // An application of that name whose Business Owner is not the demo person is somebody's real one: never reused.
-    return found.businessOwner?.employeeCode === application.businessOwner
-      ? { status: 'present', label }
-      : { status: 'conflict', label: `${label} đã có, không thuộc dataset` };
+    return { status: 'present', label };
   }
   if (ctx.mode === 'plan') return { status: 'planned', label };
   const created = await ctx.api.call<ApplicationRow>(admin, 'POST', '/applications', {
@@ -64,7 +54,6 @@ async function oneApplication(
     kind: application.kind,
     ...(application.vendorName ? { vendorName: application.vendorName } : {}),
     dataSensitivity: application.dataSensitivity,
-    businessOwnerEmployeeId: ctx.ids.employees.get(application.businessOwner),
     communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
   });
   ctx.ids.applications.set(application.key, created.id);
@@ -123,6 +112,62 @@ async function plans(ctx: DemoRunContext): Promise<StepOutcome> {
   return summarize(results);
 }
 
+interface SubscriptionRow {
+  id: string;
+  status: string;
+}
+
+/** Seats the baseline files put in the subscription, counted from the fixture. */
+export function baselineSeatsOf(ctx: DemoRunContext, subscriptionKey: string): number {
+  return ctx.fixture.seats.filter((seat) => seat.subscription === subscriptionKey).length;
+}
+
+/** What is bought: the baseline seats and the free ones, or the number the fixture names for a plan with no baseline file. */
+export function purchasedQuantityOf(ctx: DemoRunContext, subscription: DemoSubscription): number {
+  return subscription.quantity ?? baselineSeatsOf(ctx, subscription.key) + subscription.freeAfterBaseline;
+}
+
+/** The terms of a subscription (everything but which plan and for whom), as the API takes them on creation and on update of a draft. */
+export function subscriptionTerms(ctx: DemoRunContext, subscription: DemoSubscription): Record<string, unknown> {
+  const base = {
+    purchasedQuantity: purchasedQuantityOf(ctx, subscription),
+    unitPrice: subscription.unitPrice,
+    responsibleItAdminEmployeeId: ctx.ids.employees.get(subscription.responsible),
+  };
+  // A key is bought once, on a day in the past (the purchase date is the start date); it has no term and no end.
+  if (subscription.kind === 'PERPETUAL') return { ...base, startDate: dayOffset(ctx.today, -200) };
+  const { year } = yearOf(ctx);
+  // The annual one renews on a day from today and runs the 12 months before it; the monthly ones run the calendar year, a month at a time.
+  const renewal = subscription.renewalInDays === undefined ? null : dayOffset(ctx.today, subscription.renewalInDays);
+
+  return {
+    ...base,
+    billingCycle: subscription.billingCycle,
+    commitmentTermMonths: subscription.termMonths,
+    startDate: renewal ? addMonths(renewal, -12) : `${year}-01-01`,
+    endDate: renewal ? dayOffset(renewal, -1) : `${year}-12-31`,
+    ...(renewal ? { renewalDate: renewal } : {}),
+    noticePeriodDays: subscription.noticePeriodDays ?? 30,
+    autoRenew: true,
+    allowsMidTermReduction: false,
+  };
+}
+
+export function subscriptionBody(
+  ctx: DemoRunContext,
+  subscription: DemoSubscription,
+  planId: string,
+): Record<string, unknown> {
+  return {
+    planId,
+    kind: subscription.kind,
+    ...(subscription.ownerDepartment
+      ? { ownerDepartmentId: ctx.ids.departments.get(subscription.ownerDepartment) }
+      : {}),
+    ...subscriptionTerms(ctx, subscription),
+  };
+}
+
 async function subscriptions(ctx: DemoRunContext): Promise<StepOutcome> {
   const admin = await as(ctx, catalogAdmin(ctx));
   const results: Result[] = [];
@@ -133,86 +178,32 @@ async function subscriptions(ctx: DemoRunContext): Promise<StepOutcome> {
   return summarize(results);
 }
 
-interface SubscriptionRow {
-  id: string;
-  ownerDepartmentId: string;
-  status: string;
-  purchasedQuantity?: number | null;
-  unitPrice?: { amount: string; currency: string } | null;
-  billingCycle?: string | null;
-  startDate?: string | null;
-  endDate?: string | null;
-  noticePeriodDays?: number | null;
-}
-
-/** What of the fixture's subscription the existing one of the same plan and department does not match. */
-function subscriptionDifferences(ctx: DemoRunContext, subscription: DemoSubscription, row: SubscriptionRow): string[] {
-  const { year } = yearOf(ctx);
-  const wanted: [string, unknown, unknown][] = [
-    ['purchasedQuantity', row.purchasedQuantity, subscription.quantity],
-    ['unitPrice', row.unitPrice?.amount, subscription.unitPrice],
-    ['currency', row.unitPrice?.currency, ctx.fixture.currency],
-    ['billingCycle', row.billingCycle, subscription.billingCycle],
-    ['startDate', row.startDate, `${year}-01-01`],
-    ['endDate', row.endDate, `${year}-12-31`],
-    ['noticePeriodDays', row.noticePeriodDays, subscription.noticePeriodDays],
-  ];
-
-  return wanted.filter(([, actual, expected]) => actual !== expected).map(([name]) => name);
-}
-
+/**
+ * One subscription for a (application, plan): found by its plan, whatever its period and quantity became since (the demo changes them),
+ * so a rerun never makes a second one (the stock of the pool is one, `QĐ-103d`).
+ */
 async function oneSubscription(ctx: DemoRunContext, admin: string, subscription: DemoSubscription): Promise<Result> {
   const label = subscription.key;
   const planId = ctx.ids.plans.get(subscription.plan) ?? '';
-  const departmentId = ctx.ids.departments.get(subscription.ownerDepartment) ?? '';
   const rows = await listAll<SubscriptionRow>(ctx, admin, `/subscriptions?planId=${planId}`);
-  let found = rows.find((row) => row.ownerDepartmentId === departmentId);
-  const differences = found ? subscriptionDifferences(ctx, subscription, found) : [];
-  if (found && differences.length) {
-    ctx.ids.subscriptions.set(subscription.key, found.id);
-    return { status: 'conflict', label: `${label} đã có với ${differences.join(', ')} khác fixture` };
-  }
+  let found = rows[0];
   if (!found && ctx.mode === 'plan') return { status: 'planned', label };
   if (!found)
     found = await ctx.api.call<SubscriptionRow>(
       admin,
       'POST',
       '/subscriptions',
-      subscriptionBody(ctx, subscription, planId, departmentId),
+      subscriptionBody(ctx, subscription, planId),
     );
   ctx.ids.subscriptions.set(subscription.key, found.id);
-  const created = !rows.some((row) => row.id === found.id);
+  const created = rows.length === 0;
   if (found.status === 'ACTIVE') return { status: created ? 'done' : 'present', label };
   if (ctx.mode === 'plan') return { status: 'planned', label: `${label} (hoàn tất bản nháp)` };
+  // A draft an earlier run left is brought to the fixture's terms before it is completed.
+  await ctx.api.call(admin, 'PATCH', `/subscriptions/${found.id}`, subscriptionTerms(ctx, subscription));
   await ctx.api.call(admin, 'POST', `/subscriptions/${found.id}/completions`);
 
   return { status: 'done', label };
-}
-
-export function subscriptionBody(
-  ctx: DemoRunContext,
-  subscription: DemoSubscription,
-  planId: string,
-  ownerDepartmentId: string,
-): Record<string, unknown> {
-  const { year } = yearOf(ctx);
-
-  return {
-    planId,
-    ownerDepartmentId,
-    kind: 'TERM',
-    purchasedQuantity: subscription.quantity,
-    unitPrice: { amount: subscription.unitPrice, currency: ctx.fixture.currency },
-    billingCycle: subscription.billingCycle,
-    // A month for a subscription paid by the month, a year otherwise; the IT Admin of the owner department answers for it (QĐ-103e).
-    commitmentTermMonths: subscription.billingCycle === 'MONTHLY' ? 1 : 12,
-    responsibleItAdminEmployeeId: ctx.ids.employees.get(responsibleOf(ctx, subscription)),
-    startDate: `${year}-01-01`,
-    endDate: `${year}-12-31`,
-    noticePeriodDays: subscription.noticePeriodDays,
-    autoRenew: true,
-    allowsMidTermReduction: false,
-  };
 }
 
 export const CATALOG_STEPS: readonly DemoStep[] = [
@@ -220,8 +211,8 @@ export const CATALOG_STEPS: readonly DemoStep[] = [
   { key: 'catalog.plans', title: 'Gói (IT Admin)', needs: ['catalog.applications'], run: plans },
   {
     key: 'catalog.subscriptions',
-    title: 'Thuê bao theo phòng (IT Admin)',
-    needs: ['catalog.plans', 'finance.cost-centers'],
+    title: 'Một thuê bao cho mỗi gói: kho dùng chung (IT Admin)',
+    needs: ['catalog.plans', 'finance.exchange-rates'],
     run: subscriptions,
   },
 ];

@@ -1,6 +1,6 @@
 import { InstallationInspectionApi } from '../../modules/installation/public/installation-inspection.api';
 import { InstallationApi } from '../../modules/installation/public/installation.api';
-import { INSTALLATION, installationWith } from './fixture/shared-demo-v3/installation';
+import { INSTALLATION, installationWith } from './fixture/shared-demo-v4/installation';
 import type { SeedCommandArguments } from './seed.arguments';
 import type { DemoSecrets } from './seed-secrets';
 import { DemoAccountsApi } from '../../modules/installation/public/demo-accounts.api';

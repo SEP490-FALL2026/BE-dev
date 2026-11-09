@@ -1,4 +1,4 @@
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v4/installation';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -24,7 +24,7 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
     runSeed({
       args: {
         mode,
-        fixture: 'shared-demo-v3',
+        fixture: 'shared-demo-v4',
         apiUrl: baseUrl,
         operator: 'TEST-CALENDAR',
         environment: 'LOCAL_TEST',

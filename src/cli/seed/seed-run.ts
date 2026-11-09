@@ -1,4 +1,4 @@
-import { INSTALLATION } from './fixture/shared-demo-v3/installation';
+import { INSTALLATION } from './fixture/shared-demo-v4/installation';
 import { seedSecretsProblem } from './seed-secrets';
 import type { DemoAccountsApi } from '../../modules/installation/public/demo-accounts.api';
 import type { SeedCommandArguments } from './seed.arguments';
