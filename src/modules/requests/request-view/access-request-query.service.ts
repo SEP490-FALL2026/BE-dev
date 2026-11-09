@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
@@ -10,7 +9,8 @@ import type { BlockReason } from '../spend/budget-check.policy';
 import type { SpendStage } from '../access-request/access-request.types';
 import { SpendStatusService, type SpendStatusView } from '../spend/spend-status.service';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
-import { canViewRequest, viewFactsOf, hasSpendStep } from '../access-request/access-request.policy';
+import { viewFactsOf, hasSpendStep } from '../access-request/access-request.policy';
+import { RequestReadAccessService } from './request-read-access.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, ApprovalRecordRecord, NeedStepRecord } from '../access-request/access-request.types';
 import type { ReadableCancelCause } from '../access-request/group-request.types';
@@ -135,7 +135,7 @@ export interface CancellationView {
   note: string | null;
 }
 
-/** Reading a request (`US-05-03` AC-12: who holds the step and why). Only the people with a part in it see it. */
+/** Reading a request (`US-05-03` AC-12: who holds the step and why). Only the people `canReadRequest` names see it. */
 @Injectable()
 export class AccessRequestQueryService {
   constructor(
@@ -145,19 +145,26 @@ export class AccessRequestQueryService {
     private readonly pricing: PricingViewService,
     private readonly assessments: AssessmentReadRepo,
     private readonly spendStatus: SpendStatusService,
-    private readonly budgets: BudgetsApi,
+    private readonly readAccess: RequestReadAccessService,
   ) {}
 
   async get(actor: AuthenticatedPrincipal, id: string): Promise<AccessRequestView> {
     const record = await this.repo.findById(id);
-    // Finance reads the request a commitment was made for, to follow the commitment back to it (`US-06-09` AC-2).
-    const visible =
-      record !== null &&
-      (canViewRequest(actor, viewFactsOf(record)) ||
-        (actor.roles.includes('FINANCE') && (await this.budgets.requestHoldsCommitment(record.id))));
-    if (!visible) throw new AccessRequestNotFoundError();
+    // Whoever reads the history of the request reads its detail too: the head of its department, the spending approver once a
+    // spend step was opened, Finance once its spend was approved (`US-06-09` AC-2). Nobody else learns that it exists.
+    const access = record && (await this.readAccess.accessOf(actor, this.subjectOf(record)));
+    if (!record || !access?.read) throw new AccessRequestNotFoundError();
 
     return this.view(record);
+  }
+
+  private subjectOf(record: AccessRequestRecord) {
+    return {
+      ...viewFactsOf(record),
+      id: record.id,
+      isGroup: record.type === 'GROUP_GRANT',
+      departmentId: record.departmentId,
+    };
   }
 
   /** The record with its names, read in the calls of the facades of the other modules (one read each, not one per row). */

@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `9c7f386`, BE `bc10bd1c`.
 - Phụ trách: chat code `SEP-Start 75: coder mainflow`. Thiết kế ban đầu bởi: AI chat review (W8, 09/11/2026).
 - Owner review: chưa review. Peer review: chat review (R2).
-- Triển khai: `not-started`. PR: chưa có.
+- Triển khai: `implemented, test chưa chạy` (nhánh `feat/request-history`). PR: chưa có.
 - Giao code: **hai lượt** — Phase 1 (Task 1–3, Checkpoint A: quyền đọc + lọc dòng người thụ hưởng + `me` + danh sách theo vai), Phase 2
   (Task 4–5, Checkpoint B: route cờ Super Admin + dòng thời gian + docs). Ước ~35 file. Gói **W8**, lượt 1–2 của đợt.
 
@@ -125,7 +125,22 @@ Kiểm tra nhanh tracker §4.5; `openapi:export` diff chỉ thêm `accessRequest
 
 ## Lệch so với thiết kế
 
-(chat code ghi khi implement)
+Ghi khi implement trên BE `e962019e` (10/11/2026, một lượt, không chạy test):
+
+- `flags[]` trên dòng danh sách thay bằng `reserveUsed: boolean`: cờ `MANY_PAID_SOFTWARE` (GH-3) không có trong code, `ONE_STEP` đã là
+  `routing.mode` ⟹ không còn mảng lồng, không cần mục `NESTED_ARRAYS`/sự kiện registry. Query `flag` giữ (`ONE_STEP`, `RESERVE_USED`).
+- `involvement` của dòng `me`: `SENT` (người gọi đã gửi, kể cả gửi cho mình) | `FOR_ME`; bỏ `BOTH` để gọi mặc định vẫn là `SENT`.
+- `routingReason` của route cờ dùng enum code hiện tại `REQUESTER_IS_HEAD | NO_DEPARTMENT_HEAD | HEAD_LEFT` (không có
+  `DEPARTMENT_WITHOUT_HEAD`). `grant` lấy từ tác vụ cấp đã hoàn tất (facade mới `LicensingOpenGrantsApi.listGrantCompletionsOfRequests`):
+  audit `ACCESS_REQUEST.GRANT_COMPLETED` có actor `SYSTEM`.
+- Dòng thời gian đọc cả sự kiện ghi trên `ACCESS_REQUEST_STEP` (quyết nhu cầu/chi ghi theo bước) qua `AuditApi.pageOfResources`;
+  không có `BATCH_SUBMITTED` (không có audit trình lô trên Request); `RETURNED_TO_REQUESTER` từ `ACCESS_REQUEST.SPEND_RETURNED_AT_DECISION`.
+  Không thêm `lastEventOfResources`.
+- Controller `meAccessRequestList` chuyển từ `my-requests/` sang `request-history/request-history-mine.controller.ts` để `my-requests`
+  thành L2 không controller (luật: capability có controller không bị import), thay vì tách `request-summary/`.
+- Index: `(department_id, submitted_at DESC, id DESC)`, `(submitted_at DESC, id DESC)` (danh sách không lọc `organization_id`), partial
+  `ONE_STEP + INTERNAL_FREE` (chỉ trong migration).
+- Cựu trưởng phòng (không còn vai `MANAGER`) nhận 403 `AUTHORIZATION.FORBIDDEN` từ guard, không phải `OUT_OF_SCOPE`.
 
 ## Verification and handoff
 

@@ -59,3 +59,35 @@ export interface AuditEventInput {
   operatorReference?: string | null;
   occurredAt?: Date;
 }
+
+/** A resource of the trail: its type and id, as the module that owns it recorded them. */
+export interface AuditResourceRef {
+  type: string;
+  id: string;
+}
+
+/**
+ * What the owner of a resource reads of the events of it, to show its own history: who acted, in which roles, what and when, and
+ * the `after` snapshot for the owner to pick its allow-listed keys from. Never the `before` snapshot, the correlation or the
+ * organization.
+ */
+export interface ResourceEventSlice {
+  id: string;
+  occurredAt: Date;
+  action: string;
+  actorKind: AuditActorKind;
+  actorAppUserId: string | null;
+  actorRoles: string[];
+  after: { [key: string]: AuditValue } | null;
+}
+
+/**
+ * How the events of a resource are read: the actions the owner allows, and, when given, only the events that name no other subject
+ * than `subject` under one of `keys` of `after` (an event that names none of the keys is kept).
+ */
+export interface ResourceEventQuery {
+  actions: readonly string[];
+  onlySubject: { keys: readonly string[]; subject: string } | null;
+  skip: number;
+  take: number;
+}

@@ -3,10 +3,10 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
-import { canViewRequest, viewFactsOf } from '../access-request/access-request.policy';
+import { viewFactsOf } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
-import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { PricingViewService } from '../request-view/pricing-view.service';
+import { RequestReadAccessService } from '../request-view/request-read-access.service';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 import type { GroupLineWire } from '../group-request/group-request.dto';
 import { PRICED_LINE_STATES, pricedPeople } from '../access-request/group-request.types';
@@ -17,7 +17,7 @@ import { RequestLineRepo } from '../group-request/request-line.repo';
 /**
  * What a reader sees of the people of a request for a group (`US-05-17` AC-4, AC-6, AC-9): each one with the state of their own, the
  * step that holds them, what was decided for them at each stage, and, once the spend is approved, the share of the commitment they
- * stand for. The sender, whoever holds a need step and an IT Admin see every line; a person the request is for sees only their own.
+ * stand for. Whoever reads the whole request (`canReadRequest`) sees every line; a person the request is for sees only their own.
  */
 @Injectable()
 export class GroupLineQueryService {
@@ -29,6 +29,7 @@ export class GroupLineQueryService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly money: PricingViewService,
     private readonly steps: SpendStepRepo,
+    private readonly readAccess: RequestReadAccessService,
   ) {}
 
   /** Throws AccessRequestNotFoundError for a request that is not for a group, or that the caller has no part in. */
@@ -39,14 +40,23 @@ export class GroupLineQueryService {
   ): Promise<Page<GroupLineWire>> {
     const request = await this.requests.findById(requestId);
     // The person who holds the spend step reads the people they decide too, with what each costs (`US-06-01` AC-15).
-    const spender = (await this.steps.findLatest(requestId, 'SPEND_APPROVAL'))?.assigneeEmployeeId === actor.employeeId;
-    if (!request || request.type !== 'GROUP_GRANT' || !(spender || canViewRequest(actor, viewFactsOf(request)))) {
-      throw new AccessRequestNotFoundError();
-    }
+    const spendStep = await this.steps.findLatest(requestId, 'SPEND_APPROVAL');
+    const spender = spendStep?.assigneeEmployeeId === actor.employeeId;
+    if (!request || request.type !== 'GROUP_GRANT') throw new AccessRequestNotFoundError();
+    const access = spender
+      ? { read: true as const, onlyLineOf: null }
+      : await this.readAccess.accessOf(actor, {
+          ...viewFactsOf(request),
+          id: request.id,
+          isGroup: true,
+          departmentId: request.departmentId,
+          spendStepOpened: spendStep !== null,
+        });
+    if (!access.read) throw new AccessRequestNotFoundError();
 
     const { items, total } = await this.lines.page(
       requestId,
-      spender || this.seesAll(actor, request) ? null : actor.employeeId,
+      access.onlyLineOf,
       (query.page - 1) * query.pageSize,
       query.pageSize,
     );
@@ -127,14 +137,5 @@ export class GroupLineQueryService {
     }
 
     return pageOf(wires, total, query.page, query.pageSize);
-  }
-
-  /** The sender, the people who hold a need step and an IT Admin see every line; the others of the request see their own. */
-  private seesAll(actor: AuthenticatedPrincipal, request: AccessRequestRecord): boolean {
-    return (
-      actor.employeeId === request.requesterEmployeeId ||
-      request.needSteps.some((step) => step.assigneeEmployeeId === actor.employeeId) ||
-      actor.roles.includes('IT_ADMIN')
-    );
   }
 }

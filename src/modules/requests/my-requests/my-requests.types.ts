@@ -23,9 +23,30 @@ export const MY_REQUEST_TYPES = [
   'GROUP_GRANT',
 ] as const satisfies readonly AccessRequestKind[];
 
-/** What the list is narrowed by; never by person: the person is the caller. */
+/** Which requests of the caller "my requests" lists: those they sent (the default), those they are one of the people for, or both. */
+export const MY_REQUEST_INVOLVEMENTS = ['SENT', 'FOR_ME', 'ALL'] as const;
+export type MyRequestInvolvement = (typeof MY_REQUEST_INVOLVEMENTS)[number];
+
+/**
+ * Whose requests a page is read from. The first three are the caller's own; `DEPARTMENT` is every request sent from one department;
+ * `OVERSIGHT` is what a role that watches the whole organization reads: every request, or those a spend step was opened on, or those
+ * whose spend was approved (the union of what the roles of the caller give).
+ */
+export type RequestScope =
+  | { kind: 'SENT_BY' | 'FOR' | 'SENT_BY_OR_FOR'; employeeId: string }
+  | { kind: 'DEPARTMENT'; departmentId: string }
+  | { kind: 'OVERSIGHT'; all: boolean; spendStepOpened: boolean; spendApproved: boolean };
+
+/** What a page is narrowed by within its scope; only the routes of the people who oversee requests name a person or a department. */
 export interface MyRequestFilter {
-  requesterEmployeeId: string;
+  scope: RequestScope;
+  /** Sent by or for this person. */
+  employeeId?: string;
+  departmentId?: string;
+  /** Requests sent through the one-step route. */
+  oneStep?: boolean;
+  /** Requests for which the head confirmed the reserve of the budget. */
+  reserveUsed?: boolean;
   /** Every state a row may have: a request that was sent, never a draft, narrowed by `view` and `state`. */
   states: readonly SentState[];
   type?: AccessRequestKind;
@@ -50,6 +71,8 @@ export interface MyRequestRow {
   type: AccessRequestKind;
   branch: AccessRequestBranchCode;
   state: SentState;
+  requesterEmployeeId: string;
+  departmentId: string;
   planId: string | null;
   termMonths: number | null;
   expectedEndDate: BusinessDate | null;
@@ -86,4 +109,10 @@ export interface OutcomeFacts {
   needRefusals: ReadonlyMap<string, string | null>;
   /** What the IT Admin wrote when they refused the software at the gate, by request. */
   assessmentRefusals: ReadonlyMap<string, string>;
+}
+
+/** The line of the caller in a request for a group: its state and why it ended without a grant, if it did. */
+export interface MyLine {
+  state: import('../access-request/group-request.types').LineState;
+  outcomeReason: string | null;
 }

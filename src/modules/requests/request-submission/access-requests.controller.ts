@@ -171,7 +171,7 @@ export class AccessRequestsController {
   @ApiSuccessResponse(AccessRequestOrDraftResponseDto, {
     message: 'ACCESS_REQUEST.FETCHED',
     description:
-      'The request with the person who holds its need step, the row of the routing table that named them (or why nobody holds it) and its fixed one-step or via-head routing. Only the sender, the person it is for, the person who holds the step and an IT Admin read it. The person who saved a draft reads it here too, as `draft` instead of `request`: a draft is not a request yet, so it has no price, step or Cost Center, and nobody else reads it (the id of a draft that is owned by somebody else answers as one that does not exist).',
+      'The request with the person who holds its need step, the row of the routing table that named them (or why nobody holds it) and its fixed one-step or via-head routing. It is read by the people who read it in their history: the sender, the person it is for, whoever holds or held a need step, the head today of the department it was sent from, an IT Admin, a spending approver once a spend step was opened on it and Finance once its spend was approved; nobody else, the Super Admin included, learns that it exists. The person who saved a draft reads it here too, as `draft` instead of `request`: a draft is not a request yet, so it has no price, step or Cost Center, and nobody else reads it (the id of a draft that is owned by somebody else answers as one that does not exist).',
   })
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

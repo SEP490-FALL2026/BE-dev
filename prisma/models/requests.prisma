@@ -256,6 +256,10 @@ model AccessRequest {
   @@index([state, submittedAt])
   @@index([planId])
   @@index([departmentId, routingMode, state], map: "access_requests_department_routing_state_idx")
+  // The history of a department and of the organization, newest sent first (qd103-request-history-by-role). The partial index of
+  // the free internal one-step requests the audit report reads is in the migration only.
+  @@index([departmentId, submittedAt(sort: Desc), id(sort: Desc)], map: "access_requests_department_submitted_idx")
+  @@index([submittedAt(sort: Desc), id(sort: Desc)], map: "access_requests_submitted_idx")
   @@map("access_requests")
 }
 

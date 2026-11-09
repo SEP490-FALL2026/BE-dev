@@ -163,7 +163,16 @@ import { ServiceAccountBoundaryService } from './service-account-request/service
 import { ServiceAccountRequestRepo } from './service-account-request/service-account-request.repo';
 import { ServiceAccountRequestService } from './service-account-request/service-account-request.service';
 import { ServiceAccountRequestsController } from './service-account-request/service-account-requests.controller';
-import { MyRequestsController } from './my-requests/my-requests.controller';
+import { MyRequestsController } from './request-history/request-history-mine.controller';
+import { AccessRequestEventsController } from './request-history/access-request-events.controller';
+import { RequestAuditFlagsController } from './request-history/request-audit-flags.controller';
+import { RequestAuditFlagsService } from './request-history/request-audit-flags.service';
+import { RequestEventsService } from './request-history/request-events.service';
+import { RequestHistoryController } from './request-history/request-history.controller';
+import { RequestHistoryRepo } from './request-history/request-history.repo';
+import { RequestHistoryService } from './request-history/request-history.service';
+import { RequestReadAccessService } from './request-view/request-read-access.service';
+import { RequestReadRepo } from './request-view/request-read.repo';
 import { MyRequestsFactsRepo } from './my-requests/my-requests-facts.repo';
 import { MyRequestsRepo } from './my-requests/my-requests.repo';
 import { MyRequestsService } from './my-requests/my-requests.service';
@@ -217,6 +226,9 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     GroupLinesController,
     GroupLineClosureController,
     MyRequestsController,
+    RequestHistoryController,
+    AccessRequestEventsController,
+    RequestAuditFlagsController,
   ],
   providers: [
     RequestFactsService,
@@ -350,6 +362,12 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     MyRequestsRepo,
     MyRequestsFactsRepo,
     MyRequestsService,
+    RequestHistoryRepo,
+    RequestHistoryService,
+    RequestEventsService,
+    RequestAuditFlagsService,
+    RequestReadRepo,
+    RequestReadAccessService,
     RequestsDashboardApi,
     RequestsAiSourceApi,
     // The pass of 01/01 and the sweeper that runs it every hour in the API process (ADR-0018).
