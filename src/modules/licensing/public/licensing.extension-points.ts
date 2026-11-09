@@ -154,6 +154,25 @@ export class SeatBaselineClosedListeners extends Listeners<SeatBaselineClosedEve
 }
 
 /**
+ * **Gói 9 (MF1-F):** Kiểm tra trạng thái đóng baseline cho các hạn chế (ví dụ chặn trùng `QĐ-104k`).
+ * Bind trong licensing.seat-baseline module; nếu không bind ⟹ coi như đã đóng (chặn tạo mới).
+ */
+export interface SeatBaselinePhaseHook {
+  /**
+   * Coi baseline của org đã đóng hay chưa. Nếu hook không bind ⟹ true (chặn).
+   */
+  isClosed(tx: DbTx, organizationId: string): Promise<boolean>;
+}
+
+/** Hook cho SeatBaselinePhase (bind từ licensing.seat-baseline). */
+@Injectable()
+export class SeatBaselinePhaseHook extends Hook<SeatBaselinePhaseHook> {
+  constructor() {
+    super('licensing.seat-baseline-phase');
+  }
+}
+
+/**
  * Who builds the snapshot of money a renewal is decided on (`US-11-02` AC-4, AC-5): the module that owns budgets and costs adds
  * one reader. With none added the decision is still taken, and the snapshot frozen with it says that no figure was connected
  * instead of showing a 0; with more than one the first is read.

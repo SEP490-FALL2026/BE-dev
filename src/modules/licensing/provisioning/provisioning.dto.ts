@@ -21,6 +21,10 @@ export const grantBodySchema = z.strictObject({
   responsibleEmployeeId: z.uuid().optional(),
   /** Only for a request for a group, which is granted one person at a time: the person of the request this grant is for. */
   beneficiaryEmployeeId: z.uuid().optional(),
+  /** Pkg 9 (MF1-F): Purchase additional seats when pool is exhausted (AC-2/3). */
+  purchase: z.object({
+    reason: z.string().min(1).max(500).optional(),
+  }).optional(),
 });
 export const completeBodySchema = z.strictObject({ evidence: z.string().max(EVIDENCE_MAX_LENGTH).default('') });
 export const failureBodySchema = z.strictObject({ reason: z.string().max(FAILURE_REASON_MAX_LENGTH).default('') });
@@ -143,6 +147,11 @@ const taskSummarySchema = z.strictObject({
   availableDecisions: z.array(z.enum(['RETRY', 'HAND_OFF', 'CLOSE_FAILED'])),
   closedAt: z.iso.datetime().nullable(),
   revocation: revocationSummarySchema.nullable(),
+  /** Pkg 9 (MF1-F): Purchase from pool when exhausted. */
+  purchase: z.strictObject({
+    kind: z.enum(['POOL_TOP_UP', 'KEY_PURCHASE']).optional(),
+    reason: z.string().optional(),
+  }).optional(),
   elapsedSeconds: z.number().int().nonnegative(),
 });
 const taskSchema = taskSummarySchema.extend({
@@ -169,6 +178,8 @@ const taskSchema = taskSummarySchema.extend({
   closedBy: z.uuid().nullable(),
   closeReason: z.string().nullable(),
   revocation: revocationDetailSchema.nullable(),
+  /** Pkg 9 (MF1-F): Cost avoided by granting from pool when exhausted (unitPrice * quantity). */
+  poolGrantAvoidedCosts: z.string().nullable(),
 });
 const pagination = z.strictObject({
   page: z.number().int().positive(),

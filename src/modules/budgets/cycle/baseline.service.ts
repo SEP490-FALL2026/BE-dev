@@ -138,8 +138,12 @@ export class BaselineService {
     );
 
     const byDepartment = new Map<string, BaselineSubscription[]>();
-    for (const row of subscriptions)
-      byDepartment.set(row.departmentId, [...(byDepartment.get(row.departmentId) ?? []), row]);
+    for (const row of subscriptions) {
+      // Gói 9: departmentId nullable — filter bỏ kho chung (departmentId = null) để lập baseline theo phòng
+      if (row.departmentId) {
+        byDepartment.set(row.departmentId, [...(byDepartment.get(row.departmentId) ?? []), row]);
+      }
+    }
     const departments = inOrderOf(wanted, briefs).map((brief) =>
       departmentOf(brief, costCenters.get(brief.id) ?? null, byDepartment.get(brief.id) ?? [], {
         year,

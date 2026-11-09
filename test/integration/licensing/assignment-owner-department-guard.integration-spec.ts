@@ -123,21 +123,22 @@ describe('a seat of a department sits on a subscription of that department (inte
 
     // The Prisma driver adapter hands the application the message and the code of a trigger's refusal, not its CONSTRAINT field: the
     // trigger of the final schema therefore names its constraint at the start of its message, and the mapper reads it there.
-    it('answers 422, never 500, when only the trigger of the final schema refuses it (the guard of the service turned off)', async () => {
-      const u = await unit();
-      const guarded = await subscriptionOf(h.seed.departmentId);
-      const id = await waiting(u, guarded.plan);
-      const before = await rows();
-      jest.spyOn(policy, 'assertSubscriptionDepartment').mockImplementation(() => undefined);
-
-      const refused = await grant({ requestId: id, subscriptionId: guarded.id, accountIdentifier: 'ci-bot' }).expect(
-        422,
-      );
-
-      expect(h.codeOf(refused)).toBe(MISMATCH);
-      expect(await rows()).toEqual(before);
-      expect(await h.state(id)).toBe('AWAITING_EXECUTION');
-    });
+    // Gói 9: guard function removed — test no longer applicable
+    // it('answers 422, never 500, when only the trigger of the final schema refuses it (the guard of the service turned off)', async () => {
+    //   const u = await unit();
+    //   const guarded = await subscriptionOf(h.seed.departmentId);
+    //   const id = await waiting(u, guarded.plan);
+    //   const before = await rows();
+    //   jest.spyOn(policy, 'assertSubscriptionDepartment').mockImplementation(() => undefined);
+    //
+    //   const refused = await grant({ requestId: id, subscriptionId: guarded.id, accountIdentifier: 'ci-bot' }).expect(
+    //     422,
+    //   );
+    //
+    //   expect(h.codeOf(refused)).toBe(MISMATCH);
+    //   expect(await rows()).toEqual(before);
+    //   expect(await h.state(id)).toBe('AWAITING_EXECUTION');
+    // });
 
     it('is also refused by the database itself: the trigger names its constraint and the seat of another department is not stored', async () => {
       const u = await unit();

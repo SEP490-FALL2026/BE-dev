@@ -36,8 +36,8 @@ export interface SubscriptionRecord {
   planId: string;
   planName: string;
   planPricingModel: PlanPricingModel | null;
-  /** The department that owns the purchase: always set, and never changed (`QĐ-89a`). */
-  ownerDepartmentId: string;
+  /** The department that owns the purchase; **Gói 9: nullable — kho dùng chung không gắn với phòng** (`QĐ-103d`). */
+  ownerDepartmentId: string | null;
   applicationId: string;
   applicationName: string;
   applicationKind: ApplicationKind;
@@ -71,8 +71,8 @@ export interface SubscriptionRecord {
 export interface NewSubscription {
   organizationId: string;
   planId: string;
-  /** Required in the type: the one writer of `subscriptions` never stores a subscription without its owner. */
-  ownerDepartmentId: string;
+  /** Gói 9: nullable — kho dùng chung không gắn với phòng; khi tạo BE tự chọn */
+  ownerDepartmentId: string | null;
   kind: SubscriptionKind;
   status: SubscriptionStatus;
   purchasedQuantity: number | null;
@@ -126,7 +126,7 @@ export interface SubscriptionView {
   id: string;
   planId: string;
   planName: string;
-  ownerDepartmentId: string;
+  ownerDepartmentId: string | null; // Gói 9: nullable kho dùng chung
   applicationId: string;
   applicationName: string;
   vendor: { id: string; name: string };

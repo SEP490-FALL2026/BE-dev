@@ -66,6 +66,7 @@ import {
   ResponsibleDeadlineHook,
   RevocationListeners,
   SeatBaselineClosedListeners,
+  SeatBaselinePhaseHook,
 } from './public/licensing.extension-points';
 import { LicensingApi } from './public/licensing.api';
 import { LicensingDashboardApi } from './public/licensing-dashboard.api';
@@ -109,6 +110,7 @@ import { SaasIssueSweeper } from './saas-issue/saas-issue.job';
 import { SaasIssueViewService } from './saas-issue/saas-issue-view.service';
 import { SaasIssuesController } from './saas-issue/saas-issues.controller';
 import { SeatBaselineController } from './seat-baseline/seat-baseline.controller';
+import { SeatBaselinePhaseListener } from './seat-baseline/seat-baseline-phase.listener';
 import { SeatBaselineRepo } from './seat-baseline/seat-baseline.repo';
 import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
 import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
@@ -183,6 +185,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     DepartmentToolsService,
     SeatBaselineRepo,
     SeatBaselineService,
+    SeatBaselinePhaseListener,
     SeatBaselineClosedListeners,
     ProvisioningTaskRepo,
     ProvisioningTaskFrame,
@@ -272,6 +275,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     },
     // The extension points licensing opens (public/licensing.extension-points.ts): requests binds the gate.
     GrantRequestGateHook,
+    SeatBaselinePhaseHook,
     LicensingApi,
     LicensingDashboardApi,
     LicensingHandoverApi,

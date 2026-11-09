@@ -89,10 +89,12 @@ export interface WorkspaceDuty {
   emergencyAccountDeclared: boolean;
 }
 
-/** An active subscription a department owns, as the baseline of the budget reads it (`FR-5.15`): what runs, at what price, for how long. */
+/** An active subscription a department owns, as the baseline of the budget reads it (`FR-5.15`): what runs, at what price, for how long.
+ * **Gói 9:** `departmentId` nullable — kho dùng chung được cấp cho bất kỳ phòng nào (không gắn với phòng sở hữu).
+ */
 export interface BaselineSubscription {
   subscriptionId: string;
-  departmentId: string;
+  departmentId: string | null; // Gói 9: nullable khi kho dùng chung
   planId: string;
   planName: string;
   applicationName: string;

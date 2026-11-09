@@ -59,10 +59,17 @@ export class ProvisioningTaskRepo {
       createdByAppUserId: string;
       /** The tries the task gets, from the retries the configuration allows now. */
       maxAttempts: number;
+      /** Pkg 9 (MF1-F): Purchase kind when buying seats from pool (POOL_TOP_UP for K2, KEY_PURCHASE for K4). */
+      purchaseKind?: 'POOL_TOP_UP' | 'KEY_PURCHASE';
+      /** Pkg 9 (MF1-F): Purchase reason when pool exhausted. */
+      purchaseReason?: string;
     },
   ): Promise<ProvisioningTaskRecord> {
     const row = await tx.provisioningTask.create({
-      data: { ...input, kind: 'GRANT' },
+      data: {
+        ...input,
+        kind: 'GRANT',
+      },
       include: WITH_ASSIGNMENT,
     });
 
@@ -102,10 +109,16 @@ export class ProvisioningTaskRepo {
     });
   }
 
-  async markCompleted(tx: DbTx, id: string, appUserId: string, evidence: string, now: Date): Promise<void> {
+  async markCompleted(tx: DbTx, id: string, appUserId: string, evidence: string, now: Date, avoidedCosts?: bigint): Promise<void> {
     await tx.provisioningTask.update({
       where: { id },
-      data: { status: 'COMPLETED', completedByAppUserId: appUserId, completedAt: now, evidence },
+      data: {
+        status: 'COMPLETED',
+        completedByAppUserId: appUserId,
+        completedAt: now,
+        evidence,
+        ...(avoidedCosts !== undefined && { poolGrantAvoidedCosts: avoidedCosts }),
+      },
     });
   }
 
@@ -375,6 +388,9 @@ export class ProvisioningTaskRepo {
               closeReason: null,
               accessEvidence: null,
               completionNote: null,
+              purchaseKind: null, // Gói 9: mua thêm tùy chọn
+              purchaseReason: null,
+              purchasedAt: null,
             }),
           ),
           total: await tx.provisioningTask.count({ where }),

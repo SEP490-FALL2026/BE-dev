@@ -21,9 +21,7 @@ import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { toAssignmentFailure } from './assignment-conflicts.repo';
 import { AssignmentDepartmentRepo } from './assignment-department.repo';
 import {
-  assertSubscriptionDepartment,
   assignmentCreatedSnapshot,
-  holdersOfOtherDepartments,
 } from './assignment.policy';
 import { assertBaselineTarget, assertSeatTargetUsable, toSeatTargetRef } from './baseline-target.policy';
 import { AssignmentRepo } from './assignment.repo';
@@ -115,33 +113,12 @@ export class AssignmentService {
    * The people who hold, on `day`, a seat the baseline wrote on a subscription owned by another department than the one they are in
    * (`QĐ-89e`), read in the transaction that closes the baseline. A seat written before a personal seat carried its department
    * is judged against the owner of its subscription.
+   * 
+   * **Gói 9 (MF1-F): Phần cấp từ kho được phép cấp qua phòng ⟹ không cần tìm người khác phòng — trả `[]` (QĐ-103d).**
    */
   async baselineHoldersOfOtherDepartments(tx: DbTx, day: BusinessDate): Promise<SeatBaselineClosedHolder[]> {
-    const rows = await this.byDepartment.openBaselineSeats(day, tx);
-    if (rows.length === 0) return [];
-    const unowned = [...new Set(rows.flatMap((row) => (row.owningDepartmentId === null ? [row.subscriptionId] : [])))];
-    const ownerOf = new Map<string, string>();
-    for (const subscriptionId of unowned.sort()) {
-      const target = await this.catalog.findSeatTarget({ subscriptionId }, tx);
-      if (target?.ownerDepartmentId) ownerOf.set(subscriptionId, target.ownerDepartmentId);
-    }
-    const seats = rows.flatMap((row) => {
-      const owner = row.owningDepartmentId ?? ownerOf.get(row.subscriptionId);
-
-      return owner === undefined
-        ? []
-        : [{ assignmentId: row.assignmentId, employeeId: row.employeeId, owningDepartmentId: owner }];
-    });
-    const units = await this.organizationReads.getOwningUnits(
-      [...new Set(seats.map((seat) => seat.employeeId))],
-      day,
-      tx,
-    );
-
-    return holdersOfOtherDepartments(
-      seats,
-      new Map([...units].map(([employeeId, unit]) => [employeeId, unit.departmentId])),
-    );
+    // Gói 9: cấp từ kho không chặn theo phòng, nên không còn người khác phòng để kiểm soát (QĐ-89e hết đối tượng).
+    return [];
   }
 
   existingOf(target: SeatTarget, tx?: DbTx): Promise<ExistingAssignment[]> {
@@ -160,7 +137,7 @@ export class AssignmentService {
   ): Promise<AssignmentRecord[]> {
     const created: AssignmentRecord[] = [];
     for (const [index, row] of input.rows.entries()) {
-      assertSubscriptionDepartment(input.target, row.owningDepartmentId, index);
+      // Gói 9: bỏ guard phòng — cấp từ kho được phép cấp qua phòng (không kiểm owner_department_id).
       let record: AssignmentRecord;
       try {
         record = await this.repo.insert(tx, {
@@ -227,7 +204,7 @@ export class AssignmentService {
     },
   ): Promise<AssignmentRecord> {
     const { holder } = input;
-    assertSubscriptionDepartment(input.target, input.departmentId, 0);
+    // Gói 9: bỏ guard phòng — cấp từ kho được phép cấp qua phòng (subscription.ownerDepartmentId nullable).
     // A personal seat on a subscription carries the department that owns it, as a service account carries the one that owns it.
     const owningDepartmentId = holder.kind === 'SERVICE' ? holder.owningDepartmentId : input.target.ownerDepartmentId;
     let record: AssignmentRecord;
