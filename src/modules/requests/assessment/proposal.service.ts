@@ -16,6 +16,7 @@ import { RequestSenderService } from '../request-intake/request-sender.service';
 import { AssessmentRepo } from './assessment.repo';
 import { RequestFactsService } from '../access-request/request-facts.service';
 import type { ProposalBodyDto } from './assessment.dto';
+import { RequestLimitsService } from '../request-limits/request-limits.service';
 
 /** Throws AccessRequestEndDateOutOfRangeError and AccessRequestTermRequiredError (`US-05-23` AC-9, `FR-2.8`). */
 function assertTermAllowed(assessed: { endDateOutOfRange: boolean; maxEndDate: string; termRequired: boolean }): void {
@@ -40,15 +41,18 @@ export class ProposalService {
     private readonly sender: RequestSenderService,
     private readonly assessment: RequestFactsService,
     private readonly audit: AuditApi,
+    private readonly limits: RequestLimitsService,
   ) {}
 
   /** Throws AccessRequestSuperAdminCannotRequestError, AccessRequestNoDepartmentError and FinanceSetupIncompleteError. */
   async submit(actor: AuthenticatedPrincipal, body: ProposalBodyDto): Promise<AccessRequestRecord> {
     if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const settings = await this.assessment.settings();
+    const limitSettings = await this.limits.settings();
 
     return this.runner.run(async (tx) => {
       const employee = await this.sender.lockEligible(tx, actor);
+      await this.limits.lock(tx, [actor.employeeId]);
 
       const now = new Date();
       const expectedEndDate = body.expectedEndDate ?? null;
@@ -60,6 +64,15 @@ export class ProposalService {
         lockDepartment: true,
       });
       assertTermAllowed(assessed);
+      // A proposal names no plan: GH-1 has nothing to match, GH-2 counts it, and GH-3 flags it (`BR-MF1-01`).
+      const manyPaidSoftware = await this.limits.requireForOne(tx, {
+        employeeId: actor.employeeId,
+        planId: null,
+        applicationId: null,
+        today: assessed.today,
+        settings: limitSettings,
+        reason: body.manyPaidSoftwareReason,
+      });
       const { unit, policy, pricing, routing } = assessed;
       const { decision, departmentHeadEmployeeId } = routing;
       const assigned = decision.outcome === 'ASSIGNED';
@@ -77,6 +90,7 @@ export class ProposalService {
         businessReason: body.purpose,
         termMonths: null,
         expectedEndDate: expectedEndDate,
+        manyPaidSoftware,
         pricing,
         policy,
         createdByAppUserId: actor.appUserId,

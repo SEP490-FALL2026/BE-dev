@@ -16,6 +16,11 @@ export const submitBodySchema = z.strictObject({
   planId: z.uuid(),
   businessReason: z.string().trim().min(1).max(REASON_MAX_LENGTH),
   expectedEndDate: businessDate.optional(),
+  /**
+   * GH-3 (`BR-MF1-01g`): why the person asks for one more paid application when they already use as many as the threshold. Required
+   * only then (422 `ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED`); ignored and not stored otherwise.
+   */
+  manyPaidSoftwareReason: z.string().trim().min(1).max(REASON_MAX_LENGTH).optional(),
 });
 /**
  * The decision of the need step: a refusal gives its reason (`BR-07.5`), and nothing else is accepted: there is no signature or certificate to attach
@@ -174,6 +179,10 @@ export const requestSchema = z.strictObject({
       }),
     })
     .nullable(),
+  /** GH-3 (`BR-MF1-01g`): the person uses many paid applications, how many and why they ask for more; null when not flagged. */
+  flags: z.strictObject({
+    manyPaidSoftware: z.strictObject({ count: z.number().int().nonnegative(), reason: z.string() }).nullable(),
+  }),
   /**
    * What a request for the renewal of a right adds: the seat it renews, the end it had, the end it asks for, the months the right
    * would run on without a break and, once approved, the record that follows the old one. Null for any other request.

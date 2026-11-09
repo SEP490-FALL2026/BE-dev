@@ -114,6 +114,19 @@ export class LicensingApi {
   }
 
   /**
+   * The paid applications each of these people uses on `onDate` or will, as ids of applications (GH-3, `BR-MF1-01g`): a personal seat
+   * not failed, cancelled or ended, of an application that is not internal and a plan that is not `K5`; two plans of one application
+   * count once. One statement; the people with none are absent.
+   */
+  listPaidApplicationsOf(
+    employeeIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, Set<string>>> {
+    return this.revocationView.paidApplicationsOf(employeeIds, onDate, tx);
+  }
+
+  /**
    * Which of these seats have a revocation under way or done that a source asked for with this reference (the record of its own
    * decision, for example the review a head made), whatever else asked for it too: what tells a source whether the seat it decided
    * about is already being taken back. A revocation that was cancelled or closed as failed does not count. One statement.

@@ -109,6 +109,8 @@ export class RenewalRequestService {
         businessReason: body.businessReason,
         // The term asked for runs from today, the day before the same day `termMonths` later (`QĐ-104a`).
         expectedEndDate: effectiveEndOf({ start: input.today, months: termMonths }),
+        // A late ask is a request for new access: GH-1/GH-2/GH-3 judge it as any other (BR-MF1-01).
+        manyPaidSoftwareReason: body.manyPaidSoftwareReason,
       },
       input.settings,
       { toleratedSeatId: facts.assignmentId },

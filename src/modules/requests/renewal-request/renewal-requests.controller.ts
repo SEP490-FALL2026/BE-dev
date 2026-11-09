@@ -34,7 +34,7 @@ const SUBMIT_ERRORS = [
   {
     status: HttpStatus.CONFLICT,
     description:
-      'The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). Nothing is written.',
+      'The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). After the end the ask is a request for new access, so GH-1/GH-2 judge it too (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, ACCESS_REQUEST.OPEN_LIMIT_REACHED). Nothing is written.',
     examples: [
       RENEWAL_ERROR_EXAMPLES.ASSIGNMENT_NOT_RENEWABLE,
       RENEWAL_ERROR_EXAMPLES.ALREADY_REQUESTED,
@@ -42,13 +42,19 @@ const SUBMIT_ERRORS = [
       RENEWAL_ERROR_EXAMPLES.ALREADY_HOLDS_ACCESS,
       RENEWAL_ERROR_EXAMPLES.NO_DEPARTMENT,
       RENEWAL_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+      RENEWAL_ERROR_EXAMPLES.OPEN_REQUEST_EXISTS,
+      RENEWAL_ERROR_EXAMPLES.OPEN_LIMIT_REACHED,
     ],
   },
   {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The form is incomplete or invalid (VALIDATION_ERROR): the seat, the months more (1 to 12) and the reason are required, and nothing else is taken. The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.',
-    examples: [VALIDATION_EXAMPLE, RENEWAL_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE],
+      'The form is incomplete or invalid (VALIDATION_ERROR): the seat, the months more (1 to 12) and the reason are required, and nothing else is taken. The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end, a holder who uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED). Nothing is written.',
+    examples: [
+      VALIDATION_EXAMPLE,
+      RENEWAL_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE,
+      RENEWAL_ERROR_EXAMPLES.MANY_PAID_SOFTWARE_REASON_REQUIRED,
+    ],
   },
 ] as const;
 

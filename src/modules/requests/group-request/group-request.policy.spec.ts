@@ -138,6 +138,21 @@ describe('what each person named must have (US-05-17 AC-2, AC-8, AC-12, AC-15)',
     ]);
   });
 
+  it('BR-MF1-01h QĐ-106g: lists GH-2 and a missing GH-3 reason with the other refused lines, after GH-1', () => {
+    const refused = check([
+      person({ employeeId: 'a', openLimitReached: true }),
+      person({ employeeId: 'b', manyPaidSoftwareReasonMissing: true }),
+      person({ employeeId: 'c', hasOpenRequest: true, openLimitReached: true }),
+      person({ employeeId: 'd' }),
+    ]);
+
+    expect(refused).toEqual([
+      { employeeId: 'a', reason: 'OPEN_LIMIT_REACHED' },
+      { employeeId: 'b', reason: 'MANY_PAID_SOFTWARE_REASON_REQUIRED' },
+      { employeeId: 'c', reason: 'HAS_OPEN_REQUEST' },
+    ]);
+  });
+
   it('BR-MF1-02: rejects the current head in a group before contact checks', () => {
     const own = person({ isDepartmentHead: true, workEmail: null, employmentType: 'INTERN' });
 

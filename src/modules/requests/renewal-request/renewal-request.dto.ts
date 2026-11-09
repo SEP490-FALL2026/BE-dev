@@ -15,6 +15,11 @@ export const renewalSubmitSchema = z.strictObject({
   /** How many months more the holder wants; the new end day is worked out from the day the right ends (`QĐ-98`). */
   extensionMonths: z.number().int().min(1).max(12),
   businessReason: reason,
+  /**
+   * GH-3 (`BR-MF1-01g`): used only when the right has already ended and the ask becomes a request for new access, and the holder
+   * then uses as many paid applications as the threshold; ignored otherwise.
+   */
+  manyPaidSoftwareReason: reason.optional(),
 });
 
 export class RenewalBodyDto extends createZodDto(renewalSubmitSchema) {}

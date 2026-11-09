@@ -170,17 +170,18 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 
 **Tìm X ở đâu**
 
-| Cần tìm                                             | Ở đâu                                                                                                    |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Request được đọc ra thế nào (`AccessRequestView`)   | `request-view/access-request-query.service.ts`                                                           |
-| Request được gửi thế nào                            | `request-intake/access-request.service.ts` (cá nhân), `group-request-submission/` (nhóm)                 |
-| Bước nhu cầu: quyết định, ghế tương tự, rút         | `need-decision/`, `withdraw/` (controller cạnh service)                                                  |
-| Kiểm tra ngân sách của một request                  | `spend/budget-check.service.ts`                                                                          |
-| Khoản cam kết tự tạo ngày 01/01 (job, luật số tiền) | `year-start-commitments/` (`*.service.ts` điều phối, `*-batch.service.ts` một lô, `*.policy.ts` số tiền) |
-| Ai giữ một bước, chuyển bước                        | `access-request/routing.policy.ts`, `step-routing/`, `reassignment/`                                     |
-| Kết thúc request và phát `requests.outcome`         | `outcome/request-outcome.service.ts`, `request-end/request-end.service.ts`                               |
-| Lý do từ chối của spend, hủy, ủy quyền              | `spend/spend.errors.ts`, `access-request/access-request.types.ts` (kiểu lý do)                           |
-| Route của một use case                              | `docs/generated/routes.md` (sinh từ code)                                                                |
+| Cần tìm                                             | Ở đâu                                                                                                     |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Request được đọc ra thế nào (`AccessRequestView`)   | `request-view/access-request-query.service.ts`                                                            |
+| Request được gửi thế nào                            | `request-intake/access-request.service.ts` (cá nhân), `group-request-submission/` (nhóm)                  |
+| Bước nhu cầu: quyết định, ghế tương tự, rút         | `need-decision/`, `withdraw/` (controller cạnh service)                                                   |
+| Kiểm tra ngân sách của một request                  | `spend/budget-check.service.ts`                                                                           |
+| Giới hạn GH-1/GH-2/GH-3 theo người thụ hưởng        | `request-limits/` (policy thuần, repo đếm + khóa tư vấn theo người, service gọi từ mọi đường gửi cấp mới) |
+| Khoản cam kết tự tạo ngày 01/01 (job, luật số tiền) | `year-start-commitments/` (`*.service.ts` điều phối, `*-batch.service.ts` một lô, `*.policy.ts` số tiền)  |
+| Ai giữ một bước, chuyển bước                        | `access-request/routing.policy.ts`, `step-routing/`, `reassignment/`                                      |
+| Kết thúc request và phát `requests.outcome`         | `outcome/request-outcome.service.ts`, `request-end/request-end.service.ts`                                |
+| Lý do từ chối của spend, hủy, ủy quyền              | `spend/spend.errors.ts`, `access-request/access-request.types.ts` (kiểu lý do)                            |
+| Route của một use case                              | `docs/generated/routes.md` (sinh từ code)                                                                 |
 
 ## Bất biến quan trọng
 

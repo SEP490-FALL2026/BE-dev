@@ -32,6 +32,8 @@ export const proposalBodySchema = z.strictObject({
   expectedUsers: z.number().int().min(1).max(1_000_000),
   /** The day the right ends; optional, at most a year from today, and required for a contractor, a freelancer or an intern. */
   expectedEndDate: businessDate.optional(),
+  /** GH-3 (`BR-MF1-01g`): required when the person already uses as many paid applications as the threshold; ignored otherwise. */
+  manyPaidSoftwareReason: text(REASON_MAX_LENGTH).optional(),
 });
 
 const moneyInput = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });

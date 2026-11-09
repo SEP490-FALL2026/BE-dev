@@ -44,6 +44,8 @@ import { ProposalService } from './assessment/proposal.service';
 import { ProposalsController } from './proposal-review/proposals.controller';
 import { AccessRequestQueryService } from './request-view/access-request-query.service';
 import { AccessRequestService } from './request-intake/access-request.service';
+import { RequestLimitsRepo } from './request-limits/request-limits.repo';
+import { RequestLimitsService } from './request-limits/request-limits.service';
 import { RequestSenderService } from './request-intake/request-sender.service';
 import { AccessRequestsController } from './request-submission/access-requests.controller';
 import { NeedDecisionController } from './need-decision/need-decision.controller';
@@ -223,6 +225,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     PricingViewService,
     RequestPreviewService,
     AccessRequestService,
+    RequestLimitsRepo,
+    RequestLimitsService,
     RequestResubmissionService,
     RequestSenderService,
     RequestDraftService,

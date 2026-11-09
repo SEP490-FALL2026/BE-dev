@@ -5,9 +5,7 @@ import type { DbTx } from '../../../../infrastructure/database/transaction-runne
 import type { AccessRequestKind, AccessRequestState } from '../access-request.types';
 import { NOT_OPEN_FOR_LEAVER } from '../access-request.types';
 import { currentStateOf } from '../access-request.policy';
-
-/** The states of the person of a request for a group whose request is still open for them. */
-const OPEN_LINE_STATES = ['AWAITING_NEED', 'NEED_CONFIRMED', 'APPROVED', 'EXECUTING'] as const;
+import { OPEN_LINE_STATES } from '../group-request.types';
 
 export interface OpenRequestRow {
   id: string;

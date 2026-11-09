@@ -59,6 +59,9 @@ const SUBMITTED_MESSAGE: Readonly<Record<DraftKind, string>> = {
   SERVICE_ACCOUNT: 'ACCESS_REQUEST.SERVICE_ACCOUNT_SUBMITTED',
 };
 
+/** GH-1 and GH-2 of the person a draft is sent for (`BR-MF1-01`). */
+const GH_CONFLICT_EXAMPLES = [EXAMPLES.OPEN_REQUEST_EXISTS, EXAMPLES.OPEN_LIMIT_REACHED];
+
 /**
  * The drafts of paid requests: what a person saves when their department has no Cost Center yet and a paid request
  * cannot be sent. A draft is the sender's alone: it is listed, sent and deleted only by them, and it is never a request until it is
@@ -155,24 +158,26 @@ export class RequestDraftsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). The refusals particular to a group or a service account are those of their own operations.',
+        'The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId) or already has as many open as they may (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.openRequestIds; GH-1/GH-2, BR-MF1-01). The refusals particular to a group or a service account are those of their own operations.',
       examples: [
         EXAMPLES.NOT_DRAFT,
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
         EXAMPLES.APPLICATION_RETIRED,
         EXAMPLES.NO_DEPARTMENT,
         EXAMPLES.ALREADY_HOLDS_ACCESS,
+        ...GH_CONFLICT_EXAMPLES,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with an end date that no longer fits, before today or more than a year from today: ACCESS_REQUEST.END_DATE_OUT_OF_RANGE (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxEndDate }, or without the end date a contractor, freelancer or intern needs: ACCESS_REQUEST.TERM_REQUIRED. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. Nothing changes: the draft stays, to be saved again with a shorter term.',
+        'The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with an end date that no longer fits, before today or more than a year from today: ACCESS_REQUEST.END_DATE_OUT_OF_RANGE (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxEndDate }, or without the end date a contractor, freelancer or intern needs: ACCESS_REQUEST.TERM_REQUIRED. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. A person who already uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED, details.count and details.threshold; GH-3). Nothing changes: the draft stays, to be saved again with a shorter term.',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.REQUEST_PARTY_INELIGIBLE,
         EXAMPLES.END_DATE_OUT_OF_RANGE,
         EXAMPLES.TERM_REQUIRED,
+        EXAMPLES.MANY_PAID_SOFTWARE_REASON_REQUIRED,
         GROUP_REQUEST_ERROR_EXAMPLES.TERM_BEYOND_LIMIT,
         GROUP_REQUEST_ERROR_EXAMPLES.TOO_FEW_LINES,
       ],

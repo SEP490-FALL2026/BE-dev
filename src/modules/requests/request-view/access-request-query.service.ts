@@ -95,6 +95,11 @@ export interface AccessRequestView extends Omit<
   renewal: RenewalView | null;
   /** What a request for a service account adds; null for any other request. */
   serviceAccount: ServiceAccountView | null;
+  /**
+   * What the head and the spending approver are shown of the request (`BR-MF1-01g`): GH-3, the person uses many paid applications,
+   * with how many and why they ask for more; null when it is not flagged. A request for a group carries it on its lines.
+   */
+  flags: { manyPaidSoftware: { count: number; reason: string } | null };
 }
 
 export interface RenewalView {
@@ -258,6 +263,7 @@ export class AccessRequestQueryService {
               note: record.cancellation.note,
             },
       serviceAccount: this.serviceAccountOf(record.serviceAccount, person),
+      flags: { manyPaidSoftware: record.manyPaidSoftware ?? null },
       renewal: this.renewalOf(record.renewal),
       needStep: {
         ...step,

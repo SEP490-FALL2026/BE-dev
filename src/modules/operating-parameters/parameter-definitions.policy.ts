@@ -110,6 +110,42 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'FR-8.2, QĐ-82e',
   },
   {
+    key: 'REQUEST_OPEN_NEW_LIMIT',
+    label: 'Số Request cấp mới đang mở tối đa của một người',
+    group: 'WORKFLOW',
+    shape: { kind: 'int', min: 1, max: 20 },
+    default: 3,
+    unit: 'requests',
+    unitLabel: 'Request',
+    description:
+      'GH-2: a person who already is the beneficiary of this many requests for new access still open cannot be named in another one.',
+    source: 'BR-MF1-01f, QĐ-103c, QĐ-104b',
+  },
+  {
+    key: 'PAID_SOFTWARE_FLAG_THRESHOLD',
+    label: 'Ngưỡng số phần mềm trả phí cần lý do khi xin thêm',
+    group: 'WORKFLOW',
+    shape: { kind: 'int', min: 1, max: 100 },
+    default: 10,
+    unit: 'applications',
+    unitLabel: 'phần mềm',
+    description:
+      'GH-3: a person who already uses this many paid applications may still ask for another one, with a reason, and the request is flagged.',
+    source: 'BR-MF1-01g, QĐ-103c',
+  },
+  {
+    key: 'RENEWAL_WINDOW_DAYS',
+    label: 'Cửa sổ gửi Request tiếp tục trước ngày kết thúc',
+    group: 'WORKFLOW',
+    shape: { kind: 'int', min: 1, max: 90 },
+    default: 30,
+    unit: 'days',
+    unitLabel: 'ngày',
+    description:
+      'How many days before the approved end of a right with an end date its holder may ask to go on using it; a window already open keeps the value it opened with.',
+    source: 'BR-MF1-08a, QĐ-108b',
+  },
+  {
     key: 'FORECAST_ERROR_THRESHOLD_PERCENT',
     label: 'Ngưỡng sai số dự báo chi phí',
     group: 'BUDGET',

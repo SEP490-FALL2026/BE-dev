@@ -106,6 +106,8 @@ export interface NewAccessRequest {
   createdByAppUserId: string;
   now: Date;
   needStep: NewNeedStep;
+  /** GH-3 of the person, fixed when it is sent; absent or null when the request is not flagged. */
+  manyPaidSoftware?: ManyPaidSoftwareFlag | null;
   /**
    * The draft this request is made from: the row of the draft becomes the request, so it is the same request from the
    * day it was saved. Absent for a request written new. The caller holds the lock of the draft (`RequestDraftRepo.lock`).
@@ -177,8 +179,16 @@ export interface CancellationRecord {
   note: string | null;
 }
 
+/** GH-3 (`BR-MF1-01g`): the beneficiary used this many paid applications when the request was sent, and why they asked for more. */
+export interface ManyPaidSoftwareFlag {
+  count: number;
+  reason: string;
+}
+
 export interface AccessRequestRecord {
   routing?: import('./routing.policy').RequestRouting;
+  /** GH-3 of the person of a request of one person; null (or absent on a record made in a test) when it is not flagged. */
+  manyPaidSoftware?: ManyPaidSoftwareFlag | null;
   oneStepBlockedReason?: 'PRICE_MISSING' | 'RATE_MISSING' | null;
   id: string;
   organizationId: string;
