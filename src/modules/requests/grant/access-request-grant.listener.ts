@@ -49,6 +49,18 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
     await this.renewals.apply(tx, actor, request, now);
   }
 
+  /**
+   * The IT Admin closed the task that extends a right as failed (`BR-MF1-08d`): the renewal fails as a grant that failed does, what was held
+   * for it goes back and the right keeps its old end. A request that is not a renewal waiting for it changes nothing.
+   */
+  async reportExtensionFailed(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void> {
+    const request = await this.repo.lockById(tx, requestId);
+    if (!request || request.type !== 'RENEWAL' || request.state !== 'AWAITING_EXECUTION') return;
+
+    await this.renewals.extensionFailed(tx, actor, request, now);
+    await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
+  }
+
   onModuleInit(): void {
     this.hook.bind(this);
   }

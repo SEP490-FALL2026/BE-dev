@@ -84,7 +84,7 @@ export class ProvisioningDecisionService {
   /**
    * Closes the failed task for good, with the reason. A grant becomes a failed assignment and its seat is free again; the
    * request, its commitment and the notice to the requester are for the modules that own them, which read the audit
-   * event. Throws ProvisioningReasonRequiredError and the errors of `retry`.
+   * event. An extension (`EXTEND`) ends its renewal as failed and leaves the right as it was, with its old end. Throws ProvisioningReasonRequiredError and the errors of `retry`.
    */
   async closeFailed(actor: AuthenticatedPrincipal, id: string, input: { reason: string }): Promise<TaskView> {
     const reason = cleanFailureReason(input.reason);
@@ -102,6 +102,11 @@ export class ProvisioningDecisionService {
             requestId: locked.requestId,
             now,
           });
+        }
+        // An extension that will not be done: the renewal it answers for fails and the right it would extend keeps its end
+        // (`BR-MF1-08d`); the assignment is the right itself, so it is neither failed nor freed here.
+        if (locked.kind === 'EXTEND' && locked.requestId !== null) {
+          await this.gate.get().reportExtensionFailed(tx, actor, locked.requestId, now);
         }
         await this.repo.markClosedFailed(tx, locked.id, actor.appUserId, reason, now);
         if (locked.kind === 'REVOKE') {

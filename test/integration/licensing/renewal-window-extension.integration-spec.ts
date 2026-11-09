@@ -176,6 +176,34 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
       expect((await extensionTaskOf(request.id))[0].status).toBe('COMPLETED');
     });
 
+    it('an extension task closed as failed ends the renewal as FAILED, writes no record that follows and leaves the right its old end', async () => {
+      const { unit, assignmentId, end } = await holder(10);
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, h.inDays(100)));
+      await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
+      const [task] = await extensionTaskOf(request.id);
+
+      await h.claim(task.id).expect(200);
+      await h.fail(task.id, { reason: 'The vendor refused the extension' }).expect(200);
+      await h.closeFailed(task.id, { reason: 'The vendor will not extend it' }).expect(200);
+
+      const ended = h.dataOf<{ request: RenewalWire }>(await h.fetch(request.id, unit.member.account).expect(200));
+      expect(ended.request.state).toBe('FAILED');
+      expect((await extensionTaskOf(request.id))[0].status).toBe('CLOSED_FAILED');
+      expect(await h.successorsOf(assignmentId)).toEqual([]);
+      // The right is neither failed nor freed: it keeps the end it had, and is no longer held past it for a renewal.
+      expect(await h.seatRow(assignmentId)).toMatchObject({ valid_until: null, expected_end_date: end });
+      expect(await h.ctx.app.get(LicensingRenewalApi).hasPendingRenewal(assignmentId)).toBe(false);
+      const events = (
+        await h.ctx.sql.query<{ after: { problem: string; to: string } }>(
+          `SELECT after FROM audit_events WHERE resource_id = $1 AND action = 'ACCESS_REQUEST.RENEWAL_NOT_APPLIED'`,
+          [request.id],
+        )
+      ).rows;
+      expect(events.map((event) => event.after)).toEqual([
+        expect.objectContaining({ problem: 'EXTENSION_CLOSED_FAILED', to: 'FAILED' }),
+      ]);
+    });
+
     it('RV-03: a renewal approved and not extended yet counts on 01/01 as approved and not granted, to its new end', async () => {
       const { unit, assignmentId } = await holder(10);
       const newEnd = h.inDays(100);

@@ -106,6 +106,40 @@ export class RenewalApplyService {
   }
 
   /**
+   * The IT Admin closed the task of the extension as failed (`BR-MF1-08d`): the request fails as a request whose grant failed does, what was
+   * held for it goes back (`GRANT_FAILED`, `US-06-06` AC-3) and the right is left with the end it had, so it runs out on that day.
+   */
+  async extensionFailed(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+    now: Date,
+  ): Promise<void> {
+    const detail = request.renewal;
+    if (detail === null) throw new Error(`The request ${request.id} is not a request for a renewal.`);
+
+    await this.requests.setState(tx, request.id, 'FAILED');
+    await this.budgets.releaseForRequest(tx, { requestId: request.id, reason: 'GRANT_FAILED', now });
+    await this.audit.record(
+      tx,
+      accessRequestAuditEvent(
+        actor,
+        request.organizationId,
+        'ACCESS_REQUEST.RENEWAL_NOT_APPLIED',
+        'ACCESS_REQUEST',
+        request.id,
+        {
+          requestId: request.id,
+          assignmentId: detail.assignmentId,
+          problem: 'EXTENSION_CLOSED_FAILED',
+          from: 'AWAITING_EXECUTION',
+          to: 'FAILED',
+        },
+      ),
+    );
+  }
+
+  /**
    * The seat can no longer be renewed: the request fails and what was held for it goes back. Only a refusal that is a fact about the seat
    * is told apart; it is raised before anything is written, so the transaction is whole. Any other error is not a refusal and goes on.
    */

@@ -7,7 +7,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { PendingRenewal } from './licensing-renewal.types';
 import type { RenewalFinancialReader, RenewalUsageReader } from './licensing-subscription-renewal.types';
-import type { SeatBaselineClosedHolder } from './licensing-seat-baseline.types';
+import type { SeatBaselineClosedHolder } from './licensing.types';
 import type { PendingFileQuery, PendingPersonnelFile } from './licensing-service-account.types';
 import type {
   GrantOutcome,
@@ -50,6 +50,12 @@ export interface GrantRequestGate {
    * Admin who completed it.
    */
   reportExtended(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void>;
+  /**
+   * Inside the transaction in which the IT Admin closes the failed task of an extension (`BR-MF1-08d`): the extension will not be done, so
+   * the renewal the task answers for fails as a failed grant does (what was held goes back) and the right keeps the end it had. A request
+   * that is not a renewal waiting for the task changes nothing. `actor` is the IT Admin who closed it.
+   */
+  reportExtensionFailed(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void>;
   /** Whether the request waits for the IT Admin to close the task of its grant as cancelled: nothing else is decided on it. */
   isWithdrawing(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean>;
   /**
