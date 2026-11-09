@@ -119,7 +119,8 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
         route: 'SPEND_APPROVAL',
         primaryCode: 'BUDGET_OK',
         yearCount: 1,
-        bindingTotal: { amount: '375000', currency: 'VND' },
+        // The price of the month (375 000) for the months left of the year, the month of today counted whole (BR-MF1-06).
+        bindingTotal: { amount: String(375_000 * (12 - Number(call().today().slice(5, 7)) + 1)), currency: 'VND' },
       });
       expect(
         (await world.facts.one<{ state: string }>(`SELECT state::text FROM access_requests WHERE id = $1`, [id])).state,
@@ -174,7 +175,7 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
   });
 
   describe('F4-01b dataset có ngân sách năm nay và năm sau @MF4 @D1', () => {
-    it('Request 12 tháng của phòng Kỹ thuật đi thẳng tới duyệt chi, giữ chỗ cả hai năm #14 @B1', async () => {
+    it('Request 12 tháng của phòng Kỹ thuật đi thẳng tới duyệt chi, giữ chỗ một khoản cho năm của số tiền (QĐ-109) #14 @B1', async () => {
       const chatgpt = await call().planId('ChatGPT Plus');
       const id = await call().submitRequest('NV-DEV2', chatgpt, { termMonths: 12 });
       expect((await call().approveNeed('NV-ENGH', id)).status).toBe(200);
@@ -187,7 +188,8 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
       expect(
         (await call().post('NV-CEO', `/access-requests/${id}/spend-approval`, { decision: 'APPROVE' })).status,
       ).toBe(200);
-      expect(await world.facts.count('budget_commitments', 'request_id = $1', [id])).toBe(2);
+      // Rewritten from "giữ chỗ cả hai năm": một Request có một số tiền cho một năm, không có lịch trả nhiều năm.
+      expect(await world.facts.count('budget_commitments', 'request_id = $1', [id])).toBe(1);
     });
   });
 
