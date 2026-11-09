@@ -1,6 +1,7 @@
 import {
   baselineLinesOf,
   baselineVersionRefusal,
+  cancelledCost,
   estimatedCost,
   monthlyUnitPrice,
   monthsRunning,
@@ -227,10 +228,10 @@ describe('the departments a read lists', () => {
 describe('the lines of a version built from the baseline (C4-14, QĐ-109c)', () => {
   const entry = (patch: Partial<Parameters<typeof baselineLinesOf>[0][number]> = {}) => ({
     planId: 'plan-1',
-    description: 'Renew Figma Pro',
+    label: 'Figma Pro',
     seats: 5,
     costMinor: 100n as bigint | null,
-    terminated: false,
+    cancelledMinor: null as bigint | null,
     ...patch,
   });
 
@@ -244,10 +245,11 @@ describe('the lines of a version built from the baseline (C4-14, QĐ-109c)', () 
     expect(lines.map((line) => [line.planId, line.lineType, line.amountMinor, line.priorityRank])).toEqual([
       ['plan-1', 'RENEW', 100n, 1],
     ]);
+    expect(lines[0].description).toBe('Renew Figma Pro');
   });
 
-  it('is a Cancel line, after the Renew lines, for a subscription the company ordered to end', () => {
-    const lines = baselineLinesOf([entry({ planId: 'plan-9', terminated: true, costMinor: 30n }), entry()]);
+  it('is a Cancel line, after the Renew lines, for what ending a subscription saves', () => {
+    const lines = baselineLinesOf([entry({ planId: 'plan-9', costMinor: 0n, cancelledMinor: 30n }), entry()]);
 
     expect(lines.map((line) => [line.planId, line.lineType, line.priorityRank])).toEqual([
       ['plan-1', 'RENEW', 1],
@@ -260,5 +262,64 @@ describe('the lines of a version built from the baseline (C4-14, QĐ-109c)', () 
 
     expect(lines).toHaveLength(1);
     expect([lines[0].amountMinor, lines[0].seats]).toEqual([100n, 5]);
+  });
+});
+
+describe('G5-01 a subscription ordered to end (FR-5.15, QĐ-109c)', () => {
+  const slack = {
+    startDate: '2026-04-01',
+    endDate: '2027-03-31',
+    renewalDate: null,
+    hasSuccessor: false,
+    unitPriceReportingMinor: 100n,
+    billingCycle: 'MONTHLY',
+  } as const;
+
+  it('saves the months of the year after the month it stops, and the whole year when it stops before the year', () => {
+    expect(cancelledCost(2027, 10, slack)).toBe(10n * 100n * 9n);
+    expect(cancelledCost(2027, 10, { ...slack, endDate: '2026-12-31' })).toBe(10n * 100n * 12n);
+    expect(cancelledCost(2027, 10, { ...slack, endDate: '2027-12-31' })).toBe(0n);
+    expect(cancelledCost(2027, 10, { ...slack, endDate: '2028-03-31' })).toBe(0n);
+    expect(cancelledCost(2027, 10, { ...slack, endDate: null })).toBe(0n);
+    expect(cancelledCost(2027, 10, { ...slack, hasSuccessor: true })).toBe(0n);
+    expect(cancelledCost(2027, 10, { ...slack, unitPriceReportingMinor: null })).toBeNull();
+  });
+
+  it('keeps the months that still run in the counted Renew line: the base equals the baseline, the Cancel line is only the saving', () => {
+    const running = subscriptionCost(2027, '2026-12-01', 10, slack, true).costMinor;
+    const lines = baselineLinesOf([
+      {
+        planId: 'slack',
+        label: 'Slack Pro',
+        seats: 10,
+        costMinor: running,
+        cancelledMinor: cancelledCost(2027, 10, slack),
+      },
+    ]);
+
+    expect(running).toBe(10n * 100n * 3n);
+    expect(lines.map((line) => [line.lineType, line.amountMinor, line.description])).toEqual([
+      ['RENEW', 3000n, 'Renew Slack Pro'],
+      ['CANCEL', 9000n, 'Cancel Slack Pro'],
+    ]);
+    const counted = lines
+      .filter((line) => line.lineType !== 'CANCEL')
+      .reduce((sum, line) => sum + line.amountMinor, 0n);
+    expect(counted).toBe(running);
+  });
+
+  it('still shows a Cancel line for one that stops before the year, with nothing counted', () => {
+    const ended = { ...slack, endDate: '2026-12-31' } as const;
+    const lines = baselineLinesOf([
+      {
+        planId: 'slack',
+        label: 'Slack Pro',
+        seats: 10,
+        costMinor: subscriptionCost(2027, '2026-12-01', 10, ended, true).costMinor,
+        cancelledMinor: cancelledCost(2027, 10, ended),
+      },
+    ]);
+
+    expect(lines.map((line) => [line.lineType, line.amountMinor])).toEqual([['CANCEL', 12000n]]);
   });
 });

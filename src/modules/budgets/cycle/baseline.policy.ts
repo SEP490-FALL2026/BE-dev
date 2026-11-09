@@ -150,6 +150,27 @@ export function inOrderOf<T extends { id: string }>(ids: readonly string[], rows
   return [...rows].sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
 }
 
+/**
+ * What ending a subscription saves in `year` (`FR-5.15`, `QĐ-109c`): the months of the year after the month it stops, at the seats it
+ * holds and the monthly price of a seat. One that ends before the year saves the whole year, one with no end or that runs past the
+ * year saves nothing, and one a later period follows saves nothing (that period carries the year). None when a figure is unknown.
+ */
+export function cancelledCost(
+  year: number,
+  seatsHeld: number,
+  subscription: Pick<RenewalFacts, 'endDate' | 'renewalDate' | 'hasSuccessor'> & {
+    unitPriceReportingMinor: bigint | null;
+    billingCycle: string | null;
+  },
+): bigint | null {
+  const monthlyMinor = monthlyUnitPrice(subscription.unitPriceReportingMinor, subscription.billingCycle);
+  const end = endOf(subscription);
+  if (subscription.hasSuccessor === true || end === null || end > `${year}-12-31`) return 0n;
+  const monthsSaved = end < `${year}-01-01` ? 12 : 12 - Number(end.slice(5, 7));
+
+  return estimatedCost(seatsHeld, monthlyMinor, monthsSaved);
+}
+
 /** A line of a first version built from the baseline (`QĐ-100h`): what it estimates for one plan, and what kind of line it is. */
 export interface BaselineLine {
   description: string;
@@ -162,34 +183,41 @@ export interface BaselineLine {
 }
 
 /**
- * The lines of a version built from the baseline (`C4-14`, `QĐ-109c`): a subscription that runs on is a `RENEW` line and one the company
- * ordered to end is a `CANCEL` line (its amount is shown and never added to the base). The periods of one plan of one kind are one line,
- * so that a period and the one that follows it do not show twice: the amounts add up and the seats are the same people, counted once (the
- * most of them). One at an unknown or empty cost gives none. Ranks follow the order, from 1.
+ * The lines of a version built from the baseline (`C4-14`, `QĐ-109c`): what a subscription still costs in the year is a `RENEW` line,
+ * added to the base like the baseline adds it, the months that run before an ordered end included; what ending it saves is a `CANCEL`
+ * line (shown, never added). The periods of one plan of one kind are one line, so that a period and the one that follows it do not
+ * show twice: the amounts add up and the seats are the same people, counted once (the most of them). An unknown or empty amount gives
+ * no line. Ranks follow the order, from 1.
  */
 export function baselineLinesOf(
   entries: readonly {
     planId: string;
-    description: string;
+    /** The application and the plan, as the description names them. */
+    label: string;
     seats: number | null;
+    /** What it costs in the year, as the baseline counts it. */
     costMinor: bigint | null;
-    terminated: boolean;
+    /** What ending it saves in the year (`cancelledCost`); zero or none when it runs on. */
+    cancelledMinor: bigint | null;
   }[],
 ): BaselineLine[] {
   const merged = new Map<string, Omit<BaselineLine, 'priorityRank'>>();
-  for (const entry of entries) {
-    if (entry.costMinor === null || entry.costMinor <= 0n) continue;
-    const lineType: LineType = entry.terminated ? 'CANCEL' : 'RENEW';
+  const add = (entry: (typeof entries)[number], lineType: LineType, amountMinor: bigint | null): void => {
+    if (amountMinor === null || amountMinor <= 0n) return;
     const key = `${lineType}:${entry.planId}`;
     const known = merged.get(key);
     merged.set(key, {
-      description: known?.description ?? entry.description,
+      description: known?.description ?? `${lineType === 'CANCEL' ? 'Cancel' : 'Renew'} ${entry.label}`.slice(0, 200),
       planId: entry.planId,
       seats: known === undefined ? entry.seats : Math.max(known.seats ?? 0, entry.seats ?? 0),
-      amountMinor: (known?.amountMinor ?? 0n) + entry.costMinor,
+      amountMinor: (known?.amountMinor ?? 0n) + amountMinor,
       lineType,
       zbb: null,
     });
+  };
+  for (const entry of entries) {
+    add(entry, 'RENEW', entry.costMinor);
+    add(entry, 'CANCEL', entry.cancelledMinor);
   }
   const lines = [...merged.values()];
   const ordered = [

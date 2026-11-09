@@ -28,8 +28,7 @@ export interface VersionWire {
   costCenter: { id: string; code: string };
   year: number;
   number: number;
-  kind: 'INITIAL' | 'REVISION';
-  state: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED';
+  state: 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'EXPIRED';
   proposalId: string | null;
   basedOnVersionId: string | null;
   rejectedPredecessorId: string | null;

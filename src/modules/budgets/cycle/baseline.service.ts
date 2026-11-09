@@ -20,6 +20,7 @@ import {
   listedDepartments,
   SOFTWARE_LISTED_MAX,
   baselineVersionRefusal,
+  cancelledCost,
   shouldSuggestRenewal,
   subscriptionCost,
 } from './baseline.policy';
@@ -214,8 +215,9 @@ export class BaselineService {
   }
 
   /**
-   * The lines of a first version built from the baseline (`QĐ-100h`, `C4-14`): one `Renew` line for each plan the department runs in the
-   * year at a known price, as the baseline estimates it, and a `Cancel` line (shown, not added) for each that was ordered to end.
+   * The lines of a first version built from the baseline (`QĐ-100h`, `C4-14`): one `Renew` line for what each plan the department runs
+   * costs in the year at a known price, as the baseline estimates it (the months before an ordered end included), and a `Cancel` line
+   * (shown, not added) for what ending one that was ordered to end saves.
    * Throws nothing; a department that runs nothing gives none.
    */
   async renewalLinesOf(departmentId: string, year: number, today: BusinessDate, tx?: DbTx): Promise<BaselineLine[]> {
@@ -231,10 +233,10 @@ export class BaselineService {
 
         return {
           planId: subscription.planId,
-          description: `Renew ${subscription.applicationName} ${subscription.planName}`.slice(0, 200),
+          label: `${subscription.applicationName} ${subscription.planName}`,
           seats: held,
           costMinor: subscriptionCost(year, today, held, subscription, terminated).costMinor,
-          terminated,
+          cancelledMinor: terminated ? cancelledCost(year, held, subscription) : null,
         };
       }),
     );

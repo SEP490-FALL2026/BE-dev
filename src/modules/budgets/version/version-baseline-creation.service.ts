@@ -13,7 +13,8 @@ import { VersionTrail } from './version-trail.service';
 
 /**
  * The first version of a department that nobody heads at the deadline, built by Finance from the baseline (`QĐ-100h`, `R-I05`): the
- * lines are the `Renew` lines the baseline gives, the base is their sum and the reserve its default share; the version says where it
+ * lines are the ones the baseline gives (`Renew` for what runs, `Cancel` for what an ordered end saves), the base is the sum of the
+ * counted ones (what the baseline estimates) and the reserve its default share; the version says where it
  * came from (`BASELINE_NO_HEAD`) in every answer, and goes on like any other once a head is named.
  */
 @Injectable()

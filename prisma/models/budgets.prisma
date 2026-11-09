@@ -116,7 +116,7 @@ model BudgetProposalLine {
   repeatCycle         BudgetRepeatCycle? @map("repeat_cycle")
   quoteValidUntil     DateTime?          @map("quote_valid_until") @db.Date
   note                String?
-  lineType            BudgetLineType     @default(NEW) @map("line_type")
+  lineType            BudgetLineType     @map("line_type")
   zbb                 Json?
   priorityRank        Int                @map("priority_rank")
   overCeilingMinor    BigInt?            @map("over_ceiling_minor")
@@ -219,7 +219,7 @@ model BudgetVersionLine {
   financeComment      String?            @map("finance_comment")
   // Why Finance changed what the proposal said; required when it differs from the line it adjusts.
   adjustmentReason    String?            @map("adjustment_reason")
-  lineType            BudgetLineType     @default(NEW) @map("line_type")
+  lineType            BudgetLineType     @map("line_type")
   zbb                 Json?
   priorityRank        Int?               @map("priority_rank")
 

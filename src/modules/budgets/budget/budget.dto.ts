@@ -258,6 +258,8 @@ const proposalSummarySchema = z.strictObject({
   total: moneyView,
   submittedAt: z.iso.datetime(),
 });
+/** Where a version stands (`QĐ-97b`: a version is never replaced, so `SUPERSEDED` is not one; the database refuses it). */
+const versionState = z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'EXPIRED']);
 const proposalLineSchema = z.strictObject({
   position: z.number().int().positive(),
   description: z.string(),
@@ -276,8 +278,7 @@ const versionSchema = z.strictObject({
   costCenter: costCenterRef,
   year: z.number().int(),
   number: z.number().int().positive(),
-  kind: z.enum(['INITIAL', 'REVISION']),
-  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
+  state: versionState,
   proposalId: z.uuid().nullable(),
   /** The refused version this one follows when it is made again from the same proposal; set by the system. */
   rejectedPredecessorId: z.uuid().nullable(),
@@ -322,8 +323,7 @@ const versionSummarySchema = z.strictObject({
   costCenter: costCenterRef,
   year: z.number().int(),
   number: z.number().int().positive(),
-  kind: z.enum(['INITIAL', 'REVISION']),
-  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
+  state: versionState,
   total: moneyView,
   createdAt: z.iso.datetime(),
   sentAt: z.iso.datetime().nullable(),
@@ -397,7 +397,7 @@ export const mineVersionSummarySchema = z.strictObject({
   id: z.uuid(),
   year,
   number: z.number().int().positive(),
-  state: z.enum(['SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
+  state: z.enum(['SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'EXPIRED']),
   sentAt: z.iso.datetime(),
 });
 const importSchema = z.strictObject({

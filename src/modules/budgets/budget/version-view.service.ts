@@ -3,7 +3,7 @@ import { Page, pageOf } from '../../../core/application/pagination';
 
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCostCenterNotFoundError, BudgetVersionNotFoundError } from './budget.errors';
-import { defaultReserveOf, versionWaitingReason } from './budget.policy';
+import { defaultReserveOf, versionLineOverCeiling, versionWaitingReason, type VersionStateName } from './budget.policy';
 import { BudgetFactsService } from './budget-facts.service';
 import { DecisionRepo, type DecisionRecord } from './decision.repo';
 import { ProposalRepo } from './proposal.repo';
@@ -123,8 +123,7 @@ export class VersionViewService {
           costCenter,
           year: version.year,
           number: version.number,
-          kind: version.kind,
-          state: version.state,
+          state: wireStateOf(version.state),
           proposalId: version.proposalId,
           rejectedPredecessorId: version.rejectedPredecessorId,
           base: money(version.baseMinor),
@@ -173,7 +172,6 @@ const summaryOf = (version: VersionWire): VersionSummaryWire => ({
   costCenter: version.costCenter,
   year: version.year,
   number: version.number,
-  kind: version.kind,
   state: version.state,
   total: version.total,
   createdAt: version.createdAt,
@@ -185,7 +183,11 @@ const overCeilingOf = (
   flagged: ReadonlyMap<string, bigint>,
   money: (minor: bigint) => { amount: string; currency: string },
 ) => {
-  const over = flagged.get(`${line.proposalId}:${line.proposalPosition}`);
+  const over = versionLineOverCeiling(line, flagged.get(`${line.proposalId}:${line.proposalPosition}`) ?? null);
 
-  return over === undefined ? null : money(over);
+  return over === null ? null : money(over);
 };
+
+/** The database refuses `SUPERSEDED` (`budget_versions_no_superseded`), so a version read from it never stands there. */
+const wireStateOf = (state: VersionStateName): Exclude<VersionStateName, 'SUPERSEDED'> =>
+  state as Exclude<VersionStateName, 'SUPERSEDED'>;

@@ -188,34 +188,38 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
     });
   });
 
-  describe('a revision that an older release left (B-M2, QĐ-97b)', () => {
-    /** A version of the older kind: the revision is gone from the API, but the row may still be in a database. */
-    const asRevision = (versionId: string) =>
-      h.ctx.sql.query(
-        `UPDATE budget_versions SET kind = 'REVISION', reason = 'Left by an older release', based_on_version_id = id, proposal_id = NULL WHERE id = $1`,
-        [versionId],
-      );
+  // Rewritten for G5-03 (RV-15): a revision can no longer be in a database (20261109104000 refuses to run over one, and
+  // `budget_versions_initial_only` refuses a new one), so a version is never turned into one; it stays a first version that goes on.
+  describe('a revision (B-M2, QĐ-97b)', () => {
+    /** What an older release wrote: a version turned into a revision. */
+    const asRevision = async (versionId: string): Promise<string | null> => {
+      try {
+        await h.ctx.sql.query(
+          `UPDATE budget_versions SET kind = 'REVISION', reason = 'Left by an older release', based_on_version_id = id, proposal_id = NULL WHERE id = $1`,
+          [versionId],
+        );
 
-    it('is not sent: 409 BUDGET.VERSION_NOT_EDITABLE', async () => {
+        return null;
+      } catch (error) {
+        return (error as { code?: string }).code ?? 'unknown';
+      }
+    };
+
+    it('G5-03 cannot be written: the database refuses it, and the draft is still sent as a first version', async () => {
       const w = await waiting();
       const draft = await h.built(w.proposal.id);
-      await asRevision(draft.id);
 
-      const refused = await h.sendVersion(draft.id).expect(409);
-
-      expect(h.codeOf(refused)).toBe('BUDGET.VERSION_NOT_EDITABLE');
-      expect(await count(`budget_versions WHERE id = '${draft.id}' AND state = 'DRAFT'`)).toBe(1);
+      expect(await asRevision(draft.id)).toBe('23514');
+      expect(await count(`budget_versions WHERE id = '${draft.id}' AND kind = 'INITIAL'`)).toBe(1);
+      await h.sendVersion(draft.id).expect(200);
     });
 
-    it('is not decided: 409 BUDGET.VERSION_NOT_EDITABLE, and the version stays sent', async () => {
+    it('G5-03 cannot be written over a sent version either: it stays sent and is decided', async () => {
       const w = await waiting();
       const draft = await h.built(w.proposal.id);
       await h.sendVersion(draft.id).expect(200);
-      await asRevision(draft.id);
 
-      const refused = await h.decideVersion(draft.id, { decision: 'APPROVE' }, boss.account).expect(409);
-
-      expect(h.codeOf(refused)).toBe('BUDGET.VERSION_NOT_EDITABLE');
+      expect(await asRevision(draft.id)).toBe('23514');
       expect(await count(`budget_versions WHERE id = '${draft.id}' AND state = 'SENT'`)).toBe(1);
     });
   });

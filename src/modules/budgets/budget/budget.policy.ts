@@ -25,6 +25,16 @@ export const yearIsOpen = (year: number, today: BusinessDate): boolean => year >
  */
 export const isNotCounted = (line: { lineType: LineType }): boolean => line.lineType === 'CANCEL';
 
+/**
+ * The over-the-ceiling flag a version line shows (`AC-20`, `QĐ-109c`): the part of the proposal line it adjusts that carried the proposal
+ * over the published ceiling (the B3 flag), while the line is still that proposal line. A line Finance changed (it carries an
+ * `adjustmentReason`) or made a `CANCEL` (never added, never flagged) shows none: the flag was about what the head proposed.
+ */
+export const versionLineOverCeiling = (
+  line: { lineType: LineType; adjustmentReason: string | null },
+  proposalOverMinor: bigint | null,
+): bigint | null => (isNotCounted(line) || line.adjustmentReason !== null ? null : proposalOverMinor);
+
 /** The sum a proposal is worth: every line but the `CANCEL` ones (`QĐ-109c`). */
 export const countedTotalOf = (lines: readonly { lineType: LineType; amountMinor: bigint }[]): bigint =>
   lines.reduce((sum, line) => (isNotCounted(line) ? sum : sum + line.amountMinor), 0n);

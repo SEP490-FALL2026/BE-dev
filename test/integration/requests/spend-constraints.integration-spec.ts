@@ -480,16 +480,16 @@ describe('the check and the confirmation of the reserve (integration, PostgreSQL
     });
   });
 
-  describe('the threshold of a version (US-06-12 AC-3)', () => {
-    it('takes none or an amount, and refuses an amount of nothing', async () => {
+  describe('the threshold of a version (G5-03, RV-15: retired with the high-value lines)', () => {
+    it('keeps none, and refuses any amount written again', async () => {
       const version = await h.budgetFor(unit, { total: 1_000_000, year: 2029 });
 
       expect(
         await sqlState(`UPDATE budget_versions SET high_value_amount_minor = NULL WHERE id = $1`, [version.id]),
       ).toBeNull();
-      expect(
-        await sqlState(`UPDATE budget_versions SET high_value_amount_minor = 1 WHERE id = $1`, [version.id]),
-      ).toBeNull();
+      expect(await sqlState(`UPDATE budget_versions SET high_value_amount_minor = 1 WHERE id = $1`, [version.id])).toBe(
+        CHECK,
+      );
       expect(await sqlState(`UPDATE budget_versions SET high_value_amount_minor = 0 WHERE id = $1`, [version.id])).toBe(
         CHECK,
       );
