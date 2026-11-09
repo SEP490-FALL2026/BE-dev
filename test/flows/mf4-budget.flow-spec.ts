@@ -40,8 +40,21 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
     const response = await call().post(headCode, '/budget-proposals', {
       year,
       lines: [
-        { description: 'Figma cho nhóm thiết kế', planId: figma, seats: 3, amount: { amount: '13500000' } },
-        { description: 'Công cụ khác', amount: { amount: '16500000' }, note: 'Chưa chọn nhà cung cấp' },
+        {
+          description: 'Figma cho nhóm thiết kế',
+          planId: figma,
+          seats: 3,
+          amount: { amount: '13500000' },
+          lineType: 'RENEW',
+          priorityRank: 1,
+        },
+        {
+          description: 'Công cụ khác',
+          amount: { amount: '16500000' },
+          note: 'Chưa chọn nhà cung cấp',
+          lineType: 'RENEW',
+          priorityRank: 2,
+        },
       ],
       attachmentIds,
     });
@@ -138,14 +151,21 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
         .id;
       const valid = {
         year,
-        lines: [{ description: 'Công cụ khác', amount: { amount: '1000000' } }],
+        lines: [{ description: 'Công cụ khác', amount: { amount: '1000000' }, lineType: 'RENEW', priorityRank: 1 }],
         attachmentIds: [],
       };
 
       const withCostCenter = await call().post('NV-FINH', '/budget-proposals', { ...valid, costCenterId: costCenter });
       const withCurrency = await call().post('NV-FINH', '/budget-proposals', {
         ...valid,
-        lines: [{ description: 'Công cụ khác', amount: { amount: '1000000', currency: 'VND' } }],
+        lines: [
+          {
+            description: 'Công cụ khác',
+            amount: { amount: '1000000', currency: 'VND' },
+            lineType: 'RENEW',
+            priorityRank: 1,
+          },
+        ],
       });
       const baseWithCurrency = await call().post('NV-FIN1', '/budget-versions', {
         proposalId: '5b1b4f7e-0a52-4b0e-9f5b-9f3c1a2d7e10',

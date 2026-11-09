@@ -108,11 +108,20 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
               seats: 2,
               amount: { amount: '1000000' },
               windowFrom: call().today(),
+              lineType: 'RENEW',
+              priorityRank: 1,
             },
           ],
         }),
       );
-      const proposalLine = { description: 'Figma', planId: figma, seats: 2, amount: { amount: '1000000' } };
+      const proposalLine = {
+        description: 'Figma',
+        planId: figma,
+        seats: 2,
+        amount: { amount: '1000000' },
+        lineType: 'RENEW',
+        priorityRank: 1,
+      };
       const year = Number(call().today().slice(0, 4));
       const proposals = await count('budget_proposals');
       expect((await call().post('NV-DESH', '/budget-proposals', { year, lines: [proposalLine] })).status).toBe(201);
