@@ -40,20 +40,60 @@ export class SpendRoutingService {
     private readonly audit: AuditApi,
   ) {}
 
+  /** Starts only the one-step route; VIA_HEAD keeps its normal need/batch path. */
+  async start(tx: DbTx, actor: AuthenticatedPrincipal | null, requestId: string, now: Date): Promise<void> {
+    const request = await this.requests.findById(requestId, tx);
+    if (!request || request.routing?.mode !== 'ONE_STEP') return;
+    if (request.branch === 'PAID_IN_CATALOG') {
+      await this.route(tx, actor, request, 'SUBMISSION', now);
+      return;
+    }
+    const state = request.branch === 'NEW_SOFTWARE' ? 'AWAITING_IT_ASSESSMENT' : 'AWAITING_EXECUTION';
+    await this.requests.setState(tx, request.id, state);
+    if (request.branch === 'NEW_SOFTWARE') {
+      const assignee = await this.targets.assessmentTarget(tx, request.requesterEmployeeId, now);
+      await this.requests.addAssessmentStep(tx, request.id, assignee, request.policy.slaWorkingDays, now);
+      await this.audit.record(tx, accessRequestAuditEvent(actor, request.organizationId, 'ACCESS_REQUEST.ASSESSMENT_REQUESTED', 'ACCESS_REQUEST', request.id, { requestId: request.id, itAdminEmployeeId: assignee }));
+    }
+    if (request.branch === 'INTERNAL_FREE') {
+      await this.audit.record(tx, accessRequestAuditEvent(actor, request.organizationId, 'ACCESS_REQUEST.NO_NEED_APPROVER', 'ACCESS_REQUEST', request.id, { requestId: request.id, routingMode: 'ONE_STEP', oneStepReason: request.routing.oneStepReason }));
+    }
+  }
+
+  async finishConversion(tx: DbTx, request: AccessRequestRecord, now: Date): Promise<void> {
+    if (await this.steps.findOpen(request.id, 'SPEND_APPROVAL', tx)) return;
+    if (request.branch === 'INTERNAL_FREE') {
+      await this.start(tx, null, request.id, now);
+    } else if (request.branch === 'NEW_SOFTWARE' && !request.needDecision && request.pricing.status === 'MISSING') {
+      await this.start(tx, null, request.id, now);
+    } else {
+      await this.route(tx, null, request, 'SUBMISSION', now);
+    }
+  }
+
   /** Makes a check and moves the request where it says. The request must have no spend step open. */
   async route(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: AuthenticatedPrincipal | null,
     request: AccessRequestRecord,
     trigger: CheckTrigger,
     now: Date,
   ): Promise<RoutingOutcome> {
     const outcome = await this.checks.run(tx, request, trigger, actor, now);
-    if (outcome.status === 'NOT_CHECKABLE') return outcome;
+    if (outcome.status === 'NOT_CHECKABLE') {
+      if (request.routing?.mode === 'ONE_STEP') {
+        await this.requests.setOneStepBlockedReason(tx, request.id, outcome.reason);
+        await this.requests.setState(tx, request.id, 'AWAITING_REQUESTER_REVISION');
+        await this.audit.record(tx, accessRequestAuditEvent(actor, request.organizationId, 'ACCESS_REQUEST.ONE_STEP_PRICE_MISSING', 'ACCESS_REQUEST', request.id, { requestId: request.id, reason: outcome.reason }));
+      }
+      return outcome;
+    }
 
+    if (request.routing?.mode === 'ONE_STEP') await this.requests.setOneStepBlockedReason(tx, request.id, null);
     const { check } = outcome;
-    const opened = check.outcome === 'WITHIN_BASE' ? await this.openSpend(tx, request, now) : null;
-    const state = opened?.state ?? 'AWAITING_SPEND_SUBMISSION';
+    const oneStep = request.routing?.mode === 'ONE_STEP';
+    const opened = check.outcome === 'WITHIN_BASE' || (oneStep && check.outcome === 'USES_RESERVE') ? await this.openSpend(tx, request, now) : null;
+    const state = opened?.state ?? (oneStep ? 'AWAITING_REQUESTER_REVISION' : 'AWAITING_SPEND_SUBMISSION');
 
     await this.requests.setState(tx, request.id, state);
     await this.recordChecked(tx, actor, request, check, state, opened !== null);
@@ -64,7 +104,7 @@ export class SpendRoutingService {
   /** The audit event of a check and where it sent the request; the notices of the head and the requester are projected from it. */
   async recordChecked(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: AuthenticatedPrincipal | null,
     request: AccessRequestRecord,
     check: CheckRecord,
     state: AccessRequestState,
@@ -80,6 +120,7 @@ export class SpendRoutingService {
         request.id,
         {
           requestId: request.id,
+          routingMode: request.routing?.mode ?? 'VIA_HEAD',
           checkId: check.id,
           number: check.number,
           trigger: check.trigger,
@@ -114,7 +155,7 @@ export class SpendRoutingService {
    * nothing was decided and nothing was made for the approver.
    */
   async backToSubmission(tx: DbTx, request: AccessRequestRecord): Promise<void> {
-    await this.requests.setState(tx, request.id, 'AWAITING_SPEND_SUBMISSION');
+    await this.requests.setState(tx, request.id, request.routing?.mode === 'ONE_STEP' ? 'AWAITING_REQUESTER_REVISION' : 'AWAITING_SPEND_SUBMISSION');
   }
 
   /**
@@ -133,18 +174,17 @@ export class SpendRoutingService {
       await this.targets.usableSpendingApproverEmployeeId(tx, { forShare: true }),
     );
     const assignee = assignment.outcome === 'ASSIGNED' ? assignment.assigneeEmployeeId : null;
-    const samePerson = assignee !== null && request.needSteps.some((step) => step.assigneeEmployeeId === assignee);
     const step = await this.steps.open(tx, {
       requestId: request.id,
       kind: 'SPEND_APPROVAL',
       assigneeEmployeeId: assignee,
       waitingReason: assignment.outcome === 'WAITING' ? assignment.reason : null,
-      samePersonAsSpend: samePerson,
+      samePersonAsSpend: false,
       slaWorkingDays: request.policy.slaWorkingDays,
       now,
     });
     // One person holding the need step and the spend step is flagged on both (`US-05-03` AC-9).
-    if (samePerson) await this.steps.flagSamePerson(tx, request.id, assignee);
+
 
     return { state: assignment.outcome === 'ASSIGNED' ? 'AWAITING_SPEND_DECISION' : 'WAITING_CONTROLLED', step };
   }

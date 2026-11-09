@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpStatus, Param, Post } from '@nestjs/common';
+import { RequestResubmissionService } from '../request-intake/request-resubmission.service';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -46,6 +47,7 @@ const NOT_FOUND = {
 export class AccessRequestsController {
   constructor(
     private readonly requests: AccessRequestService,
+    private readonly resubmissions: RequestResubmissionService,
     private readonly previews: RequestPreviewService,
     private readonly queries: AccessRequestQueryService,
     private readonly drafts: RequestDraftService,
@@ -126,6 +128,21 @@ export class AccessRequestsController {
     } catch (error) {
       throw toAccessRequestApiException(error);
     }
+  }
+
+  @Post(':id/resubmission')
+  @HttpCode(HttpStatus.OK)
+  @AuthenticatedOnly()
+  @ApiOperation({ operationId: 'accessRequestResubmit', summary: 'Send a revised one-step request again' })
+  @ApiSuccessResponse(AccessRequestResponseDto, { message: 'ACCESS_REQUEST.RESUBMITTED', description: 'The request is checked again and either waits for its requester or goes to the spending approver.' })
+  @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND,
+    { status: HttpStatus.FORBIDDEN, description: 'Only the requester sends the request again (ACCESS_REQUEST.NOT_REQUESTER).', examples: [EXAMPLES.NOT_REQUESTER] },
+    { status: HttpStatus.CONFLICT, description: 'The request is not waiting for revision (ACCESS_REQUEST.NOT_AWAITING_REVISION).', examples: [EXAMPLES.NOT_AWAITING_REVISION] },
+    { status: HttpStatus.UNPROCESSABLE_ENTITY, description: 'The id is invalid (VALIDATION_ERROR).', examples: [VALIDATION_EXAMPLE] })
+  async resubmit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RequestIdParamDto) {
+    try {
+      return { request: toWire(await this.queries.view(await this.resubmissions.resubmit(actor, params.id))) };
+    } catch (error) { throw toAccessRequestApiException(error); }
   }
 
   @Get(':id')

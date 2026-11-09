@@ -130,7 +130,7 @@ export class SpendApprovalsController {
   ) {
     try {
       const result = await this.decisions.decide(actor, params.id, body);
-      if (result.status === 'BOUNCED') throw toRecheckedApiException(result.reasons);
+      if (result.status === 'BOUNCED') throw toRecheckedApiException(result.reasons, result.to, result.overBy);
 
       return { spendApproval: await this.views.detail(actor, params.id) };
     } catch (error) {

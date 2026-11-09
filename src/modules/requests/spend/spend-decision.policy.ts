@@ -65,8 +65,8 @@ export function judgeApproval(
  */
 export function spendDecisionRecordOf(
   of: {
-    request: { id: string };
-    step: { id: string; samePersonAsSpend: boolean };
+    request: { id: string; routing?: { mode: string } };
+    step: { id: string; samePersonAsSpend?: boolean };
   },
   decided: {
     decision: 'APPROVED' | 'REJECTED';
@@ -93,11 +93,11 @@ export function spendDecisionRecordOf(
     detail: {
       requestId: of.request.id,
       checkId: decided.checkId,
+      oneStep: of.request.routing?.mode === 'ONE_STEP',
       decision: decided.decision,
       deciderRole,
       usesReserve: decided.usesReserve,
       reserveReason: decided.reserveReason,
-      samePersonAsSpend: of.step.samePersonAsSpend,
       requestState,
     },
   };

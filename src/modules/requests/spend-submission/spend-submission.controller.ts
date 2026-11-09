@@ -230,7 +230,7 @@ export class SpendSubmissionController {
   }
 
   @Post('access-requests/:id/supplements')
-  @RequireRoles('MANAGER')
+  @AuthenticatedOnly()
   @ApiOperation({
     operationId: 'accessRequestSupplementAdd',
     summary: 'Shorten the term or leave people out in a supplementary file',

@@ -36,7 +36,7 @@ export const groupBodySchema = z.strictObject({
 });
 
 const LINE_REASONS = [
-  'SPENDING_APPROVER',
+  'HEAD_IN_GROUP', 'SPENDING_APPROVER',
   'OUTSIDE_DEPARTMENT',
   'NOT_ACTIVE',
   'EMAIL_REQUIRED',
@@ -93,7 +93,7 @@ const lineDecisionSchema = z.strictObject({
   reason: z.string().nullable(),
   decidedBy: employeeRef,
   /** `FALLBACK_APPROVER` and `CONFLICT_SUBSTITUTE` are historical: a decision of before `QĐ-93`; none is written now. */
-  deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER', 'FALLBACK_APPROVER', 'CONFLICT_SUBSTITUTE']),
+  deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER']),
   decidedAt: z.iso.datetime(),
 });
 
@@ -105,7 +105,7 @@ const lineSchema = z.strictObject({
   /** The need step that holds this person: the head's for the others, a step of its own for the head. */
   needStep: z.strictObject({
     id: z.uuid(),
-    state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED']),
+    state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED', 'NOT_REQUIRED']),
     assignee: employeeRef.nullable(),
   }),
   /** The day the access of this person ends, when they are not staff. */

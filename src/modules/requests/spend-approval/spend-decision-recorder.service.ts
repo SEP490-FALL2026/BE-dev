@@ -18,7 +18,7 @@ export type SpendDecisionResult =
    * The request was checked again as the approver decided and it is not for them now: it is blocked, or uses a reserve nobody confirmed. It
    * went back to its head and nothing was decided (`US-06-01` AC-18, `BR-MF1-07c`).
    */
-  | { status: 'BOUNCED'; to: 'HEAD'; reasons: ReturnReason[] };
+  | { status: 'BOUNCED'; to: 'HEAD' | 'REQUESTER'; reasons: ReturnReason[]; overBy?: string | null };
 
 /** What a decision of the spend step is written with (`US-06-01` AC-2, AC-5): the record, the hold of an approval, the audit and what follows. */
 export interface SpendDecided {

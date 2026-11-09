@@ -116,6 +116,7 @@ const budgetSnapshotSchema = z.strictObject({
 
 /** A request waiting for the approver: what it is, what it costs, and the first code of its check. */
 const approvalSummarySchema = z.strictObject({
+  routing: z.strictObject({ mode: z.enum(['VIA_HEAD', 'ONE_STEP']), oneStepReason: z.enum(['REQUESTER_IS_HEAD', 'NO_DEPARTMENT_HEAD', 'HEAD_LEFT']).nullable() }),
   requestId: z.uuid(),
   stepId: z.uuid(),
   /** The kind of step the row is, the same key the list of the need steps carries, so a client can put the two lists in one. */
@@ -137,7 +138,6 @@ const approvalSummarySchema = z.strictObject({
   /** What the check the step was opened on said: within the base, or it uses the reserve (the head confirmed it). Null for an old step. */
   outcome: budgetOutcomeSchema.nullable(),
   /** The same person holds the need step and this one. */
-  samePersonAsSpend: z.boolean(),
   /** The batch it was last sent in, when it was sent in one. */
   batchId: z.uuid().nullable(),
 });
@@ -159,6 +159,7 @@ const assessmentSchema = z.strictObject({
 
 /** What the spending approver sees of the request they decide, apart from the check, its years and the review of Finance. */
 const approvalDetailSchema = z.strictObject({
+  routing: z.strictObject({ mode: z.enum(['VIA_HEAD', 'ONE_STEP']), oneStepReason: z.enum(['REQUESTER_IS_HEAD', 'NO_DEPARTMENT_HEAD', 'HEAD_LEFT']).nullable() }),
   requestId: z.uuid(),
   step: z.strictObject({
     id: z.uuid(),
@@ -168,7 +169,6 @@ const approvalDetailSchema = z.strictObject({
     openedAt: z.iso.datetime(),
     decidedAt: z.iso.datetime().nullable(),
     slaWorkingDays: z.number().int().positive(),
-    samePersonAsSpend: z.boolean(),
   }),
   request: z.strictObject({
     state: z.string(),

@@ -17,7 +17,7 @@ export interface LineDeciderFacts {
   stepEmployeeIds: readonly string[];
   /** Who holds the step; null while it waits for somebody. */
   assigneeEmployeeId: string | null;
-  stepState: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
+  stepState: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED' | 'NOT_REQUIRED';
   /** Whether the decision approves at least one line. */
   approves: boolean;
 }
@@ -150,8 +150,8 @@ export function lineSpendDecidedDetail(
 
 /** What the audit entry of the whole spend decision says: what was checked, the reserve it used, who was approved and who refused. */
 export function groupSpendDecidedDetail(
-  request: { id: string },
-  step: { id: string; samePersonAsSpend: boolean },
+  request: { id: string; routing?: { mode: string } },
+  step: { id: string; samePersonAsSpend?: boolean },
   decided: {
     verdicts: readonly LineVerdict[];
     checkId: string | null;
@@ -164,11 +164,11 @@ export function groupSpendDecidedDetail(
   return {
     requestId: request.id,
     checkId: decided.checkId,
+    oneStep: request.routing?.mode === 'ONE_STEP',
     decision: decided.decision,
     deciderRole: decided.deciderRole,
     usesReserve: decided.usesReserve,
     reserveReason: decided.reserveReason,
-    samePersonAsSpend: step.samePersonAsSpend,
     requestState: decided.decision === 'APPROVED' ? 'AWAITING_EXECUTION' : 'REJECTED',
     lineCount: decided.verdicts.length,
     approvedEmployeeIds: decided.verdicts.filter((v) => v.decision === 'APPROVE').map((v) => v.employeeId),

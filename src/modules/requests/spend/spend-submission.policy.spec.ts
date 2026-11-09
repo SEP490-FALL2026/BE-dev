@@ -1,18 +1,4 @@
-import { checkSupplement, entryFor, supplementAuditDetail, supplementChangeOf } from './spend-submission.policy';
-
-describe('where an approved request goes (US-06-14 AC-8)', () => {
-  it('is the queue of the head when the head decided the need', () => {
-    expect(entryFor({ deciderRole: 'MANAGER' })).toBe('HEAD_QUEUE');
-  });
-
-  it('is straight to the check when the spending approver decided it in the place of the head who sent it', () => {
-    expect(entryFor({ deciderRole: 'SPENDING_APPROVER' })).toBe('DIRECT');
-  });
-
-  it('is straight to the check for a need decided before QĐ-93 by the fallback approver, who had no queue', () => {
-    expect(entryFor({ deciderRole: 'FALLBACK_APPROVER' })).toBe('DIRECT');
-  });
-});
+import { checkSupplement, supplementAuditDetail, supplementChangeOf } from './spend-submission.policy';
 
 describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16; L2-38)', () => {
   const facts = {

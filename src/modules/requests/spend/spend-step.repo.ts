@@ -87,7 +87,7 @@ export class SpendStepRepo {
         assigneeEmployeeId: input.assigneeEmployeeId,
         routingRow: NOT_ROUTED,
         waitingReason: held ? null : input.waitingReason,
-        samePersonAsSpend: input.samePersonAsSpend ?? false,
+        samePersonAsSpend: false,
         slaWorkingDays: input.slaWorkingDays,
         createdAt: input.now,
         assignedAt: held ? input.now : null,
@@ -168,17 +168,6 @@ export class SpendStepRepo {
          AND NOT EXISTS (SELECT 1 FROM access_request_lines l WHERE l.need_step_id = s.id AND l.state = 'AWAITING_NEED')`;
   }
 
-  /**
-   * Flags the need steps held by the same person as the spend step (`US-05-03` AC-9): a request has one, and a request for a group
-   * has two, which different people hold, so only the step this person holds is flagged (`US-06-14` AC-6).
-   */
-  async flagSamePerson(tx: DbTx, requestId: string, employeeId: string): Promise<void> {
-    await tx.accessRequestStep.updateMany({
-      where: { requestId, kind: 'NEED', assigneeEmployeeId: employeeId },
-      data: { samePersonAsSpend: true },
-    });
-  }
-
   /** The spend steps given to a person that are open (`PENDING`), oldest first, with what the queue of the approver shows. */
   async pageOpenSpendOf(employeeId: string, skip: number, take: number) {
     const where = openSpendWhere(employeeId);
@@ -199,6 +188,8 @@ export class SpendStepRepo {
               planId: true,
               costCenterId: true,
               requesterEmployeeId: true,
+              routingMode: true,
+              oneStepReason: true,
               amountMinor: true,
               amountCurrency: true,
               offPlan: true,

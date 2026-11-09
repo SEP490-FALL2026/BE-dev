@@ -6,7 +6,6 @@ import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { RepricingService } from '../repricing/repricing.service';
 import { RequestFactsService } from '../access-request/request-facts.service';
-import { SpendEntryService } from '../spend/spend-entry.service';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 import { summarizeGroup, type GroupStage } from './group-resolution.policy';
 import { pricedPeople } from '../access-request/group-request.types';
@@ -41,7 +40,6 @@ export class GroupResolutionService {
     private readonly repricing: RepricingService,
     private readonly assessment: RequestFactsService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly entry: SpendEntryService,
     private readonly steps: SpendStepRepo,
     private readonly ending: GroupResolutionEnding,
   ) {}
@@ -111,14 +109,8 @@ export class GroupResolutionService {
     actor: AuthenticatedPrincipal | null,
     request: AccessRequestRecord,
   ): Promise<void> {
-    const confirmed = request.lines.filter((line) => line.state === 'NEED_CONFIRMED');
     await this.requests.setState(tx, request.id, 'AWAITING_SPEND_SUBMISSION');
-    if (actor === null) return;
 
-    // The way in to the spend is the one of whoever decided the people that remain: the step of the first of them.
-    const stepOf = request.needSteps.find((step) => step.id === confirmed[0]?.needStepId);
-    const fresh = await this.reread(tx, request.id);
-    await this.entry.enter(tx, actor, { ...fresh, needDecision: stepOf?.decision ?? fresh.needDecision });
   }
 
   private async reread(tx: DbTx, requestId: string): Promise<AccessRequestRecord> {

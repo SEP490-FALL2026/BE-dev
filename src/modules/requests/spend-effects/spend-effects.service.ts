@@ -86,7 +86,7 @@ export class SpendEffectsService {
     by: { now: Date; reasons: readonly ReturnReason[]; check: CheckRecord | null },
   ): Promise<void> {
     await this.steps.end(tx, step, 'CLOSED', null, by.now);
-    await this.requests.setState(tx, request.id, 'AWAITING_SPEND_SUBMISSION');
+    await this.requests.setState(tx, request.id, request.routing?.mode === 'ONE_STEP' ? 'AWAITING_REQUESTER_REVISION' : 'AWAITING_SPEND_SUBMISSION');
     await this.audit.record(
       tx,
       accessRequestAuditEvent(

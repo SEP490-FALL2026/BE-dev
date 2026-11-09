@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { SpendEntryService } from '../spend/spend-entry.service';
 import {
   AccessRequestNoDepartmentError,
   AccessRequestNotDraftError,
@@ -66,7 +65,6 @@ export class GroupRequestService {
     private readonly assessment: RequestFactsService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly requests: AccessRequestRepo,
-    private readonly entry: SpendEntryService,
     private readonly drafts: RequestDraftRepo,
     private readonly writer: GroupRequestWriter,
   ) {}
@@ -140,7 +138,6 @@ export class GroupRequestService {
         body,
         draftId: options.draftId ?? null,
       });
-      if (request.state === 'AWAITING_SPEND_SUBMISSION') await this.entry.enter(tx, actor, request);
 
       const final = await this.requests.findById(request.id, tx);
       if (!final) throw new Error(`The request ${request.id} was not found after it was written.`);

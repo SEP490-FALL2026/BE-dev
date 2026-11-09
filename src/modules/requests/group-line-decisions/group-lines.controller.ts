@@ -166,7 +166,7 @@ export class GroupLinesController {
   ) {
     try {
       const result = await this.spends.decide(actor, params.id, body);
-      if (result.status === 'BOUNCED') throw toRecheckedApiException(result.reasons);
+      if (result.status === 'BOUNCED') throw toRecheckedApiException(result.reasons, result.to, result.overBy);
 
       return { spendApproval: await this.approvals.detail(actor, params.id) };
     } catch (error) {

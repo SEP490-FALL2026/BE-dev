@@ -39,11 +39,12 @@ export class GroupCandidateService {
     if (!unit) throw new AccessRequestNoDepartmentError();
 
     const ids = (await this.organizationReads.getDepartmentMemberIds(unit.departmentId, today)) ?? [];
+    const head = (await this.organizationReads.getDepartmentHeads([unit.departmentId], today)).get(unit.departmentId)?.employeeId;
     const term = query.q?.trim().toLowerCase();
     // Whoever can never be named is left out before the page is cut, so the total is right (`D-S21`).
     const never = await this.requestParties.ineligibleAmong(ids);
     const named = (await this.organizationReads.getEmployees(ids))
-      .filter((person) => !never.has(person.id))
+      .filter((person) => !never.has(person.id) && person.id !== head)
       .flatMap((person) =>
         person.status === 'ACTIVE' && person.workEmail !== null && person.workEmail.trim() !== ''
           ? [{ employeeId: person.id, fullName: person.fullName, workEmail: person.workEmail }]

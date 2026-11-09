@@ -112,7 +112,6 @@ describe('what the decision of the spend step is recorded as (US-06-01 AC-2, AC-
         deciderRole: 'SPENDING_APPROVER',
         usesReserve: true,
         reserveReason: 'Cần gấp cho dự án',
-        samePersonAsSpend: false,
         requestState: 'AWAITING_EXECUTION',
       },
     });

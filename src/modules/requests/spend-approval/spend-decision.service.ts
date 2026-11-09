@@ -115,11 +115,11 @@ export class SpendDecisionService {
     if (outcome.status === 'NOT_CHECKABLE') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
 
     const confirmation = await this.confirmations.ofStep(step.id, tx);
-    const verdict = judgeApproval(outcome.check, confirmation !== null);
+    const verdict = judgeApproval(outcome.check, request.routing?.mode === 'ONE_STEP' || confirmation !== null);
     if (verdict.kind === 'RETURNED') {
       await this.effects.sendBack(tx, actor, request, step, { now, reasons: verdict.reasons, check: outcome.check });
 
-      return { status: 'BOUNCED', to: 'HEAD', reasons: verdict.reasons };
+      return { status: 'BOUNCED', to: request.routing?.mode === 'ONE_STEP' ? 'REQUESTER' : 'HEAD', reasons: verdict.reasons, overBy: outcome.check.overByMinor?.toString() ?? null };
     }
 
     return this.recorder.record(tx, actor, of, {

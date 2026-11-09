@@ -81,7 +81,7 @@ export class GroupLineQueryService {
             decision: record.decision,
             reason: record.reason,
             decidedBy: person(record.decidedByEmployeeId),
-            deciderRole: record.deciderRole,
+            deciderRole: record.deciderRole === 'MANAGER' ? 'MANAGER' as const : 'SPENDING_APPROVER' as const,
             decidedAt: record.decidedAt.toISOString(),
           };
 

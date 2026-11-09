@@ -192,7 +192,6 @@ describe('what the audit says of a spend decision taken on the people of a group
       deciderRole: 'SPENDING_APPROVER',
       usesReserve: true,
       reserveReason: 'Cần gấp',
-      samePersonAsSpend: false,
       requestState: 'AWAITING_EXECUTION',
       lineCount: 2,
       approvedEmployeeIds: ['p1'],

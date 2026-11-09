@@ -95,6 +95,7 @@ export class GroupSubmissionFactsService {
     const { today, unit, target, routing } = assessed;
     const headEmployeeId = routing.departmentHeadEmployeeId;
     const senderIsHead = headEmployeeId === input.senderEmployeeId;
+    if (senderIsHead && !assessed.policy.chain.includes('NEED')) assessed.policy = { ...assessed.policy, chain: ['NEED', ...assessed.policy.chain] };
 
     const planRefusal = checkGroupPlan(target);
     const requested = input.lines.map((line) => line.employeeId);
@@ -128,7 +129,7 @@ export class GroupSubmissionFactsService {
         hireDate: person?.hireDate ?? today,
         holdsAccess: person ? await this.holds(line.employeeId, input.planId) : false,
         hasOpenRequest: open.has(line.employeeId),
-        isHeadOwnLine: senderIsHead && line.employeeId === input.senderEmployeeId,
+        isDepartmentHead: headEmployeeId !== null && line.employeeId === headEmployeeId,
         termRequired: input.expectedEndDate === null && (person?.employmentType ?? 'STAFF') !== 'STAFF',
         spendingApprover: party.get(line.employeeId) === 'SPENDING_APPROVER',
       });
