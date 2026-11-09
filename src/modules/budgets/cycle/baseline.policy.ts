@@ -41,26 +41,32 @@ export function estimatedCost(seats: number | null, monthlyMinor: bigint | null,
 export interface RenewalFacts {
   startDate: BusinessDate | null;
   endDate: BusinessDate | null;
-  /** The day it renews by itself, when it does: a subscription with no end date that renews is as good as running. */
+  /** The day it renews by itself, when it does: it stands for the end of a subscription that has no end date. */
   renewalDate?: BusinessDate | null;
+  /** A later period of the same purchase was recorded: the year to come is that one's, not this one's (`F-105`). */
+  hasSuccessor?: boolean;
 }
 
+/** The day a subscription stops: its end date, or, when it has none, the day it renews by itself (one reading for the months and for the renewal). */
+export const endOf = (subscription: Pick<RenewalFacts, 'endDate' | 'renewalDate'>): BusinessDate | null =>
+  subscription.endDate ?? subscription.renewalDate ?? null;
+
 /**
- * Whether the subscription will be renewed for the year to come (`Q-162`, TẠM CHỌN): it runs today (it has started, and its end, or its
- * renewal day, is not behind us) and nobody has ordered it to end. A date that falls on 31 December, in January of the year after or
- * nowhere at all makes no difference: what runs and is not stopped goes on at the price of today.
+ * Whether the subscription will be renewed for the year to come (`Q-162`, TẠM CHỌN): it runs today (it has started, and the day it stops
+ * is not behind us, the day itself included), nobody has ordered it to end, and no later period of it was recorded (that one carries the
+ * year to come). A date on 31 December, in January of the year after or none at all makes no difference.
  */
 export function willRenew(today: BusinessDate, subscription: RenewalFacts, terminated: boolean): boolean {
-  if (terminated) return false;
+  if (terminated || subscription.hasSuccessor === true) return false;
   const started = subscription.startDate === null || subscription.startDate <= today;
-  const end = subscription.renewalDate ?? subscription.endDate;
+  const end = endOf(subscription);
 
   return started && (end === null || end >= today);
 }
 
 /**
  * Whether the budget of `year` should propose to renew a subscription (a `Renew` line, `FR-5.15`): it will be renewed (`willRenew`), or
- * it has not started and ends within the year. A subscription that was ordered to end is never proposed.
+ * it has not started and stops within the year. One that was ordered to end, or whose next period was recorded, is never proposed.
  */
 export function shouldSuggestRenewal(
   year: number,
@@ -68,19 +74,18 @@ export function shouldSuggestRenewal(
   subscription: RenewalFacts,
   terminated: boolean,
 ): boolean {
-  if (terminated) return false;
-  const { endDate } = subscription;
+  if (terminated || subscription.hasSuccessor === true) return false;
+  const end = endOf(subscription);
 
   return (
-    willRenew(today, subscription, terminated) ||
-    (endDate !== null && endDate >= `${year}-01-01` && endDate <= `${year}-12-31`)
+    willRenew(today, subscription, terminated) || (end !== null && end >= `${year}-01-01` && end <= `${year}-12-31`)
   );
 }
 
 /**
  * What one subscription is estimated to cost over a year at the prices of today (`R-I03`): the seats it HOLDS (what is assigned; the
  * seats bought and idle are the shared pool's, `QĐ-103k`), the monthly price of a seat and the months it runs; a subscription that will
- * be renewed counts for the twelve months of the year (`Q-162`), one that was ordered to end only for the months it still runs.
+ * be renewed counts for the twelve months of the year (`Q-162`), any other only for the months it runs, to the day it stops.
  */
 export function subscriptionCost(
   year: number,
@@ -92,7 +97,7 @@ export function subscriptionCost(
   const monthlyMinor = monthlyUnitPrice(subscription.unitPriceReportingMinor, subscription.billingCycle);
   const months = willRenew(today, subscription, terminated)
     ? 12
-    : monthsRunning(year, subscription.startDate, subscription.endDate);
+    : monthsRunning(year, subscription.startDate, endOf(subscription));
 
   return { monthlyMinor, months, costMinor: estimatedCost(seatsHeld, monthlyMinor, months) };
 }

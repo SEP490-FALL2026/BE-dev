@@ -58,8 +58,11 @@ export function departmentOf(
     } = subscriptionCost(year, today, held, subscription, terminated);
     total += cost ?? 0n;
     unknown ||= cost === null;
-    purchased += subscription.purchasedQuantity ?? 0;
-    assigned += held;
+    // The seats of a period that a later one follows are the later one's too (the same people): they are counted once.
+    if (!subscription.hasSuccessor) {
+      purchased += subscription.purchasedQuantity ?? 0;
+      assigned += held;
+    }
     if (software.length >= SOFTWARE_LISTED_MAX) continue;
     software.push({
       subscriptionId: subscription.subscriptionId,

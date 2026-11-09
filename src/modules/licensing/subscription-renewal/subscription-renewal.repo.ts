@@ -152,11 +152,19 @@ export class SubscriptionRenewalRepo {
     return new Map(rows.map((row) => [row.subscriptionId, toRecord(row)]));
   }
 
-  /** Which of these periods the company decided to end (a live case decided `CANCEL`): one statement, only the ids. */
+  /**
+   * Which of these periods the company has decided to end and whose decision still stands (`Q-162`): a case decided `CANCEL` that waits for
+   * its outcome, or whose outcome is the one decided. A cancellation the vendor refused, or that ended another way, ends nothing. One
+   * statement, only the ids.
+   */
   async endingAmong(subscriptionIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
     if (subscriptionIds.length === 0) return new Set();
     const rows = await (tx ?? this.prisma).subscriptionRenewal.findMany({
-      where: { subscriptionId: { in: [...subscriptionIds] }, state: { not: 'STALE' }, decidedChoice: 'CANCEL' },
+      where: {
+        subscriptionId: { in: [...subscriptionIds] },
+        decidedChoice: 'CANCEL',
+        OR: [{ state: 'DECIDED' }, { state: 'OUTCOME_RECORDED', outcome: 'AS_DECIDED' }],
+      },
       select: { subscriptionId: true },
     });
 

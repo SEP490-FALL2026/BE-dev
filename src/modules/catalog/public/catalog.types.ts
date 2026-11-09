@@ -105,4 +105,6 @@ export interface BaselineSubscription {
   endDate: string | null;
   /** The day it renews by itself, when it does. */
   renewalDate: string | null;
+  /** A later period of this purchase was recorded (`renewedFromId` points here): the year to come is that period's. */
+  hasSuccessor: boolean;
 }

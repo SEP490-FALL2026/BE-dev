@@ -74,6 +74,12 @@ enum AccessRequestCancelCause {
   SPENDING_APPROVER_PARTY
 }
 
+// Pricing model of a plan: recurring (monthly/yearly), one-time (perpetual license).
+enum AccessRequestPriceKind {
+  RECURRING
+  ONE_TIME
+}
+
 // Whether the request has an amount: internal software has none; paid software is priced from its plan in the catalog, or
 // is missing its price and cannot be sent on to be decided as spend (FR-3.2, QĐ-82m C, QĐ-84e).
 enum AccessRequestPricingStatus {
@@ -151,7 +157,10 @@ model AccessRequest {
   // Null only while the request is a DRAFT (a paid request of a department that has no Cost Center yet; spec L.1).
   costCenterId          String?                    @map("cost_center_id") @db.Uuid
   businessReason        String                     @map("business_reason")
-  termMonths            Int                        @map("term_months")
+  termMonths            Int?                       @map("term_months") // nullable: NULL = no time limit; NEW cols `amountMonths`, `priceKind` take over
+  amountMonths          Int?                       @map("amount_months") // months of the year for recurring pricing (0–12)
+  priceKind             AccessRequestPriceKind?   @map("price_kind") // RECURRING or ONE_TIME
+  grantedOn             DateTime?                  @map("granted_on") @db.Date // day task completed (BR-MF1-06a)
   // Context only: it changes neither the Cost Center nor the chain (US-05-02 AC-7).
   // Retired in QD-93h phase 1; dropped in phase 2.
   pricingStatus         AccessRequestPricingStatus @default(NOT_APPLICABLE) @map("pricing_status")
@@ -713,18 +722,20 @@ model RequestSupplement {
   reason                String
   changedByEmployeeId   String   @map("changed_by_employee_id") @db.Uuid
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  beforeExpectedSpendOn DateTime @map("before_expected_spend_on") @db.Date
-  afterExpectedSpendOn  DateTime @map("after_expected_spend_on") @db.Date
-  beforeBudgetYear      Int      @map("before_budget_year")
-  afterBudgetYear       Int      @map("after_budget_year")
-  beforeAmountMinor     BigInt   @map("before_amount_minor")
-  afterAmountMinor      BigInt   @map("after_amount_minor")
-  currency              String   @db.Char(3)
+  beforeExpectedSpendOn DateTime?  @map("before_expected_spend_on") @db.Date
+  afterExpectedSpendOn  DateTime?  @map("after_expected_spend_on") @db.Date
+  beforeBudgetYear      Int?       @map("before_budget_year")
+  afterBudgetYear       Int?       @map("after_budget_year")
+  beforeAmountMinor     BigInt?    @map("before_amount_minor")
+  afterAmountMinor      BigInt?    @map("after_amount_minor")
+  beforeExpectedEndDate DateTime?  @map("before_expected_end_date") @db.Date
+  afterExpectedEndDate  DateTime?  @map("after_expected_end_date") @db.Date
+  currency              String?    @db.Char(3)
 
   organization   Organization            @relation(fields: [organizationId], references: [id])
   request        AccessRequest           @relation(fields: [requestId], references: [id], onDelete: Restrict)
   changedBy      Employee                @relation("RequestSupplementAuthor", fields: [changedByEmployeeId], references: [id], onDelete: Restrict)
-  currencyRecord Currency                @relation("RequestSupplementCurrency", fields: [currency], references: [code], onDelete: Restrict)
+  currencyRecord Currency?               @relation("RequestSupplementCurrency", fields: [currency], references: [code], onDelete: Restrict)
   drops          RequestSupplementDrop[]
 
   @@unique([requestId, number])

@@ -99,7 +99,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_DEPARTMENT_CEILING_PUBLISHED: ['cycleId', 'year', 'departmentId'],
   // The deadlines of the cycle: the year, the day, and how many departments or versions (a count, never a figure of money).
   BUDGET_PROPOSAL_DEADLINE_REMINDER: ['cycleId', 'year', 'costCenterId', 'submissionDeadline'],
-  BUDGET_NO_HEAD_AT_DEADLINE: ['cycleId', 'year', 'departmentCount', 'submissionDeadline'],
+  BUDGET_NO_HEAD_AT_DEADLINE: ['cycleId', 'year', 'departmentId', 'submissionDeadline'],
   BUDGET_SUBMISSION_DEADLINE_PASSED: ['cycleId', 'year', 'departmentCount', 'submissionDeadline'],
   BUDGET_DECISION_DEADLINE_REMINDER: ['cycleId', 'year', 'versionCount', 'decisionDeadline'],
   BUDGET_COST_CENTER_SETUP_DUE: ['cycleId', 'year', 'departmentId'],

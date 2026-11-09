@@ -14,6 +14,7 @@ const subscription = (index: number): BaselineSubscription => ({
   startDate: '2026-01-01',
   endDate: null,
   renewalDate: null,
+  hasSuccessor: false,
 });
 
 describe('one department of the baseline', () => {

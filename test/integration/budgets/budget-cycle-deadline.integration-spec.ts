@@ -61,7 +61,7 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
       await setDeadlines(lateDay(), addDays(h.today(), 20));
     });
 
-    it('tells the head who has not proposed, and not the one who has; tells Finance and the Super Admin which departments nobody heads', async () => {
+    it('BR-MF4-03: tells the head who has not proposed, and not the one who has; tells Finance and the Super Admin each headless department by its id (C4-03)', async () => {
       const silent = await h.departmentWithHead(`P-DLS${(counter += 1)}`);
       const done = await h.departmentWithHead(`P-DLD${(counter += 1)}`);
       const headless = await bare();
@@ -80,10 +80,10 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
       expect(noHead.map((notice) => notice.recipient_employee_id).sort()).toEqual(
         [h.finance.employeeId, await superAdminId()].sort(),
       );
-      expect(Number(noHead[0].params.departmentCount)).toBeGreaterThanOrEqual(1);
+      // C4-03: Each notice carries the headless department's id, not a count
+      expect(toDepartment(noHead, headless.id).map((notice) => notice.params.departmentId)).toContain(headless.id);
       const passed = await noticesOf('BUDGET_SUBMISSION_DEADLINE_PASSED');
       expect(passed.map((notice) => notice.recipient_employee_id)).toEqual([h.finance.employeeId]);
-      expect(Number(passed[0].params.departmentCount)).toBeGreaterThanOrEqual(2);
     });
 
     it('writes nothing the second time, and tells again for a deadline that Finance moved', async () => {
@@ -98,18 +98,18 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
       expect((await service().run()).notices).toBeGreaterThan(0);
     });
 
-    it('does not count as headless, nor tell, a department whose head starts on a later day: somebody is named', async () => {
+    it('BR-MF4-03: does not count as headless, nor tell, a department whose head starts on a later day: somebody is named (C4-03)', async () => {
       const department = await bare();
       const person = await h.staff(department, `DLF${counter}`, 'MANAGER');
-      const countOn = async (day: string) =>
-        Number(
-          (await noticesOf('BUDGET_NO_HEAD_AT_DEADLINE')).find((notice) => notice.params.submissionDeadline === day)
-            ?.params.departmentCount ?? 0,
-        );
+      const noHeadOn = async (day: string) =>
+        toDepartment(
+          await noticesOf('BUDGET_NO_HEAD_AT_DEADLINE'),
+          department.id
+        ).filter((notice) => notice.params.submissionDeadline === day);
       const firstDay = lateDay();
       await setDeadlines(firstDay, addDays(h.today(), 20));
       await service().run();
-      const before = await countOn(firstDay);
+      const before = noHeadOn(firstDay);
       await h.ctx.sql.query(
         `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
          VALUES (gen_random_uuid(), $1, $2, $3, $4::date)`,
@@ -120,8 +120,8 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
 
       await service().run();
 
-      expect(before).toBeGreaterThanOrEqual(1);
-      expect(await countOn(secondDay)).toBe(before - 1);
+      expect(await before).toHaveLength(1);
+      expect(await noHeadOn(secondDay)).toHaveLength(0);
       const reminders = await noticesOf('BUDGET_PROPOSAL_DEADLINE_REMINDER');
       expect(reminders.filter((notice) => notice.params.costCenterId === department.unitId)).toHaveLength(0);
     });

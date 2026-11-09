@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
+import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import type { InAppNotificationCode, InAppParamValue } from '../../notifications/public/notifications.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -37,6 +38,8 @@ interface Pass {
  */
 @Injectable()
 export class CycleDeadlineService {
+  private readonly logger = new Logger(CycleDeadlineService.name);
+
   constructor(
     private readonly runner: TransactionRunner,
     private readonly facts: BudgetFactsService,
@@ -53,7 +56,17 @@ export class CycleDeadlineService {
     const organizationId = await this.facts.organizationId();
     const cycles = await this.cycles.upcomingOf(organizationId, Number(today.slice(0, 4)));
     let notices = 0;
-    for (const cycle of cycles) notices += await this.runner.run((tx) => this.remind(tx, cycle, today));
+    for (const cycle of cycles) {
+      // A cycle that fails does not stop the ones after it: each has a transaction of its own and is told again in the next pass.
+      try {
+        notices += await this.runner.run((tx) => this.remind(tx, cycle, today));
+      } catch (error) {
+        this.logger.error(
+          `Budget deadlines of cycle ${cycle.id} (${cycle.year}) failed: ${describeForOperator(error)}`,
+          traceForOperator(error),
+        );
+      }
+    }
 
     return { notices };
   }
@@ -94,10 +107,14 @@ export class CycleDeadlineService {
     const proposed = await this.proposals.proposedCostCenters([...pass.costCenters.values()], cycle.year, tx);
     const missing = pass.departmentIds.filter((id) => !proposed.has(pass.costCenters.get(id) ?? ''));
     const noHead: string[] = [];
+    // The heads of all the departments in one read; only a department with none asks who is to head it (a successor).
+    const heads = await this.organizationReads.getDepartmentHeads(missing, today, tx);
     for (const departmentId of missing) {
-      const head = await this.facts.currentHeadOf(departmentId, today, tx);
       const costCenterId = pass.costCenters.get(departmentId);
-      if (head !== null && costCenterId !== undefined) {
+      const head =
+        heads.get(departmentId)?.employeeId ??
+        (await this.organizationReads.getUpcomingHeadOf(departmentId, today, tx));
+      if (head !== null && head !== undefined && costCenterId !== undefined) {
         await this.send(
           pass,
           head,
@@ -108,7 +125,7 @@ export class CycleDeadlineService {
             submissionDeadline: cycle.submissionDeadline,
           },
         );
-      } else if (head === null && !(await this.organizationReads.hasHeadStartingAfter(departmentId, today, tx))) {
+      } else if (!head && !(await this.organizationReads.hasHeadStartingAfter(departmentId, today, tx))) {
         noHead.push(departmentId);
       }
     }
@@ -118,10 +135,13 @@ export class CycleDeadlineService {
         departmentCount: missing.length,
         submissionDeadline: day,
       });
-    if (noHead.length === 0) return;
-    const params = { departmentCount: noHead.length, submissionDeadline: day };
-    await this.send(pass, pass.finance, 'BUDGET_NO_HEAD_AT_DEADLINE', day, params);
-    await this.send(pass, await this.facts.superAdminEmployeeId(tx), 'BUDGET_NO_HEAD_AT_DEADLINE', day, params);
+    // Finance and the Super Admin are told which departments nobody heads, one notice for each (the department is what Finance builds from).
+    const superAdmin = await this.facts.superAdminEmployeeId(tx);
+    for (const departmentId of noHead) {
+      const params = { departmentId, submissionDeadline: day };
+      await this.send(pass, pass.finance, 'BUDGET_NO_HEAD_AT_DEADLINE', `${day}:${departmentId}`, params);
+      await this.send(pass, superAdmin, 'BUDGET_NO_HEAD_AT_DEADLINE', `${day}:${departmentId}`, params);
+    }
   }
 
   /** The deadline of the decisions has passed: the spending approver and Finance are told of the versions still waiting. */

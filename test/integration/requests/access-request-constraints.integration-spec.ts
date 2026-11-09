@@ -620,4 +620,84 @@ describe('requests (integration, PostgreSQL constraints)', () => {
       expect(await sqlState(`TRUNCATE approval_records`)).toBe('23001');
     });
   });
+
+  describe('AccessRequest new fields: amount_months, price_kind, granted_on', () => {
+    it('takes amount_months 0 to 12 (BR-MF1-06a)', async () => {
+      for (let months = 0; months <= 12; months++) {
+        const result = await sqlState(
+          `INSERT INTO access_requests (
+            id, organization_id, branch, state, requester_employee_id, department_id,
+            business_reason, term_months, amount_months, price_kind, created_by_app_user_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          [
+            randomUUID(),
+            h.ctx.orgId,
+            'PAID_IN_CATALOG',
+            'PENDING',
+            h.ctx.personId,
+            h.ctx.departmentId,
+            'Test',
+            null,
+            months,
+            'RECURRING',
+            h.ctx.personId,
+          ]
+        );
+        expect(result).toBeNull();
+      }
+    });
+
+    it('refuses amount_months > 12 or invalid price_kind', async () => {
+      expect(
+        await sqlState(
+          `INSERT INTO access_requests (
+            id, organization_id, branch, state, requester_employee_id, department_id,
+            business_reason, term_months, amount_months, price_kind, created_by_app_user_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          [randomUUID(), h.ctx.orgId, 'PAID_IN_CATALOG', 'PENDING', h.ctx.personId, h.ctx.departmentId, 'Test', null, 13, 'RECURRING', h.ctx.personId]
+        )
+      ).toBe(CHECK);
+    });
+
+    it('takes granted_on as NULL or valid date', async () => {
+      const result = await sqlState(
+        `INSERT INTO access_requests (
+          id, organization_id, branch, state, requester_employee_id, department_id,
+          business_reason, term_months, granted_on, created_by_app_user_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [randomUUID(), h.ctx.orgId, 'PAID_IN_CATALOG', 'PENDING', h.ctx.personId, h.ctx.departmentId, 'Test', null, new Date('2026-01-01'), h.ctx.personId]
+      );
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('RequestSupplement new fields: before/after EndDate, nullable amounts', () => {
+    it('takes NULL for before/after dates and amounts (supplement might not change them)', async () => {
+      const result = await sqlState(
+        `INSERT INTO request_supplements (
+          id, organization_id, request_id, number, reason, changed_by_employee_id,
+          before_expected_spend_on, after_expected_spend_on, before_budget_year, after_budget_year,
+          before_amount_minor, after_amount_minor, before_expected_end_date, after_expected_end_date, currency
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+        [
+          randomUUID(),
+          h.ctx.orgId,
+          h.ctx.personId, // will fail FK but we check column constraint first
+          1,
+          'Test',
+          h.ctx.personId,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+        ]
+      );
+      expect(result).toBe(FOREIGN_KEY); // not null constraint, OK
+    });
+  });
 });

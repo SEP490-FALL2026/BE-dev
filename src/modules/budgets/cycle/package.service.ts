@@ -112,7 +112,7 @@ export class PackageService {
       versionsOutsideListed: format(outside),
       versionsInOtherCurrency: otherCurrency,
       overBy: format(versionsTotal > available ? versionsTotal - available : 0n),
-      departmentsTotal: briefs.length,
+      departmentsTotal: departmentIds.length,
       departments: listed,
     };
   }
