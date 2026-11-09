@@ -11,6 +11,7 @@ import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import { ProvisioningTaskViewService, type TaskSummaryView, type TaskView } from '../provisioning-task-view.service';
+import { SharedPoolService } from '../../shared-pool/shared-pool.service';
 
 export type TaskScope = 'ALL' | 'MINE' | 'GENERAL';
 
@@ -28,6 +29,7 @@ export class ProvisioningService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly gate: GrantRequestGateHook,
     private readonly revocation: RevocationListeners,
+    private readonly sharedPool: SharedPoolService,
   ) {}
 
   /** The queue, the oldest first: `MINE` the tasks this IT Admin is in charge of, `GENERAL` those nobody works by default. */
@@ -101,6 +103,8 @@ export class ProvisioningService {
    * Completes the task of a grant with the note of what was done; a revocation has its own completion. Throws
    * ProvisioningEvidenceRequiredError, the errors of `claim` except the departed beneficiary, and ProvisioningTaskStateError
    * (`IS_REVOCATION` for a revocation).
+   * 
+   * Pkg 9 (MF1-F): Records pool_grant_avoided_costs if purchase was requested (AC-3).
    */
   async complete(actor: AuthenticatedPrincipal, id: string, input: { evidence: string }): Promise<TaskView> {
     const evidence = cleanEvidence(input.evidence);
@@ -110,7 +114,15 @@ export class ProvisioningService {
         nextStatus(locked.status, 'COMPLETE', locked.channel);
       },
       write: async ({ tx, task: locked, now }) => {
-        await this.repo.markCompleted(tx, locked.id, actor.appUserId, evidence, now);
+        // Pkg 9: Compute avoided costs if purchased from pool
+        let avoidedCosts: bigint | undefined;
+        if (locked.assignment.subscription?.unitPrice && locked.purchaseKind) {
+          // avoidedCosts = unitPrice * 1 seat
+          const minor = BigInt(locked.assignment.subscription.unitPrice.amountMinor);
+          avoidedCosts = minor;
+        }
+
+        await this.repo.markCompleted(tx, locked.id, actor.appUserId, evidence, now, avoidedCosts);
         if (locked.requestId !== null) {
           await this.gate.get().reportOutcome(tx, locked.requestId, 'COMPLETED', locked.assignment.employeeId);
         }

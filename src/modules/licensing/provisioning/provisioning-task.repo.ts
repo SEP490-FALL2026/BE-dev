@@ -102,10 +102,16 @@ export class ProvisioningTaskRepo {
     });
   }
 
-  async markCompleted(tx: DbTx, id: string, appUserId: string, evidence: string, now: Date): Promise<void> {
+  async markCompleted(tx: DbTx, id: string, appUserId: string, evidence: string, now: Date, avoidedCosts?: bigint): Promise<void> {
     await tx.provisioningTask.update({
       where: { id },
-      data: { status: 'COMPLETED', completedByAppUserId: appUserId, completedAt: now, evidence },
+      data: {
+        status: 'COMPLETED',
+        completedByAppUserId: appUserId,
+        completedAt: now,
+        evidence,
+        ...(avoidedCosts !== undefined && { poolGrantAvoidedCosts: avoidedCosts }),
+      },
     });
   }
 

@@ -21,6 +21,10 @@ export const grantBodySchema = z.strictObject({
   responsibleEmployeeId: z.uuid().optional(),
   /** Only for a request for a group, which is granted one person at a time: the person of the request this grant is for. */
   beneficiaryEmployeeId: z.uuid().optional(),
+  /** Pkg 9 (MF1-F): Purchase additional seats when pool is exhausted (AC-2/3). */
+  purchase: z.object({
+    reason: z.string().min(1).max(500).optional(),
+  }).optional(),
 });
 export const completeBodySchema = z.strictObject({ evidence: z.string().max(EVIDENCE_MAX_LENGTH).default('') });
 export const failureBodySchema = z.strictObject({ reason: z.string().max(FAILURE_REASON_MAX_LENGTH).default('') });
