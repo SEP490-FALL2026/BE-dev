@@ -89,6 +89,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'LicensingModule: LicensingRenewalApi',
   'LicensingModule: LicensingHandoverApi',
   'LicensingModule: LicensingGhostSeatApi',
+  // qd103-vendor-usage-import: the seats and holders the usage import matches identities against, and the one door to the usage evidence the rules of wasted seats read.
+  'LicensingModule: LicensingUsageApi',
+  'UsageModule: UsageEvidenceApi',
   'LicensingModule: LicensingOpenGrantsApi',
   'OptimizationModule: OptimizationApi',
   'LicensingModule: LicensingServiceAccountApi',
