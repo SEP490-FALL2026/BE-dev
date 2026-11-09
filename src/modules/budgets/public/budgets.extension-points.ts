@@ -19,16 +19,6 @@ export interface BudgetRefusalEvent extends BudgetVersionEvent {
   decision: 'REJECTED' | 'CHANGES_REQUESTED';
 }
 
-/** A purchase window of a plan line moved in place; `versionIds` are all the versions of that Cost Center and year. */
-export interface PlanLineMovedEvent {
-  costCenterId: string;
-  year: number;
-  position: number;
-  /** Why Finance moved it, as written on the history of the line. */
-  reason: string;
-  versionIds: readonly string[];
-}
-
 /**
  * What another context does when a budget changes, one method for each kind of change. It runs in the transaction of the change,
  * so a request is never left waiting on a budget that has already moved, and a failure undoes the change as well. The listener
@@ -52,7 +42,6 @@ export interface BudgetChangeListener {
    * A version that was current stays as the reference budget of the year and is not told here.
    */
   versionExpired(tx: DbTx, event: BudgetVersionEvent): Promise<void>;
-  planLineMoved(tx: DbTx, actor: AuthenticatedPrincipal, event: PlanLineMovedEvent): Promise<void>;
 }
 
 /**
@@ -63,8 +52,7 @@ export type BudgetChange =
   | { kind: 'LOCK_WAITING'; scope: { costCenterId: string; year: number } }
   | { kind: 'VERSION_APPROVED'; actor: AuthenticatedPrincipal; event: BudgetVersionEvent }
   | { kind: 'VERSION_REFUSED'; actor: AuthenticatedPrincipal; event: BudgetRefusalEvent }
-  | { kind: 'VERSION_EXPIRED'; event: BudgetVersionEvent }
-  | { kind: 'PLAN_LINE_MOVED'; actor: AuthenticatedPrincipal; event: PlanLineMovedEvent };
+  | { kind: 'VERSION_EXPIRED'; event: BudgetVersionEvent };
 
 /**
  * The contexts told when a budget changes, in the transaction of the change and in the order they were added; one that throws
@@ -89,8 +77,6 @@ export function budgetChangeHandler(listener: BudgetChangeListener): (tx: DbTx, 
         return listener.versionRefused(tx, change.actor, change.event);
       case 'VERSION_EXPIRED':
         return listener.versionExpired(tx, change.event);
-      case 'PLAN_LINE_MOVED':
-        return listener.planLineMoved(tx, change.actor, change.event);
     }
   };
 }
