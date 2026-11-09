@@ -83867,6 +83867,245 @@
         "security": [{ "bearer": [] }],
         "summary": "List the runs of the rules of wasted seats",
         "tags": ["ghost-seats"]
+      },
+      "post": {
+        "operationId": "ghostSeatRuleRunCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RuleRunCreateBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Runs G1/G2 and G3/G4 (or the set named) now, whatever period the schedule already ran, and answers each run with what it made, changed, closed and left out by gate. Running again makes no recommendation twice: an open one is updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/RuleRunCreateResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_RULE_RUN.COMPLETED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin or the Super Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A run of the same set of rules (scheduled or by hand) is under way (GHOST_SEAT.RULE_RUN_BUSY); a set run before it in the same call is named in the details.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "GHOST_SEAT.RULE_RUN_BUSY": {
+                    "summary": "A run of these rules is under way; ask again when it has ended.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.RULE_RUN_BUSY",
+                        "message": "A run of these rules is under way; ask again when it has ended.",
+                        "details": { "ruleSet": "G1_G2", "completedRunIds": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Run the rules of wasted seats now",
+        "tags": ["ghost-seats"]
       }
     },
     "/api/v1/ghost-seat-rule-runs/{id}/skips": {
@@ -112955,6 +113194,114 @@
               }
             },
             "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "RuleRunCreateBodyDto": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "description": "G1G2 (internal data), G3G4 (usage) or both; both when left out.",
+            "minItems": 1,
+            "maxItems": 2,
+            "type": "array",
+            "items": { "type": "string", "enum": ["G1G2", "G3G4"] }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleRunCreateResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "runs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "ruleSet": { "type": "string", "enum": ["G1_G2", "G3_G4"] },
+                    "periodKey": { "type": "string" },
+                    "status": { "type": "string", "enum": ["RUNNING", "COMPLETED", "FAILED"] },
+                    "attempt": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0
+                    },
+                    "startedAt": { "type": "string", "format": "date-time" },
+                    "finishedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "createdCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "updatedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "closedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "skippedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "failedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "skippedByGate": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "gate": {
+                            "type": "string",
+                            "enum": [
+                              "PER_SEAT",
+                              "INTERNAL_SOFTWARE",
+                              "OPEN_RECOMMENDATION",
+                              "SERVICE_ACCOUNT",
+                              "LEAVE_OR_HANDOVER",
+                              "NOT_USABLE",
+                              "NEW_ASSIGNMENT",
+                              "COVERAGE",
+                              "STALE_SOURCE",
+                              "EXEMPT",
+                              "TIME_BOUND_ENDING",
+                              "REVOCATION_IN_PROGRESS",
+                              "NO_DATA",
+                              "UNMATCHED_IDENTITY",
+                              "INSUFFICIENT_EVIDENCE"
+                            ]
+                          },
+                          "count": {
+                            "type": "integer",
+                            "exclusiveMinimum": true,
+                            "maximum": 9007199254740991,
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["gate", "count"],
+                        "additionalProperties": false
+                      },
+                      "description": "How many subjects the run left out, by the gate that left each out."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "ruleSet",
+                    "periodKey",
+                    "status",
+                    "attempt",
+                    "startedAt",
+                    "finishedAt",
+                    "createdCount",
+                    "updatedCount",
+                    "closedCount",
+                    "skippedCount",
+                    "failedCount",
+                    "skippedByGate"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["runs"],
             "additionalProperties": false,
             "nullable": true
           }

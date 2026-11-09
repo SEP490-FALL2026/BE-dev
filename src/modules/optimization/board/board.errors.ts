@@ -37,3 +37,14 @@ export class GhostSeatNotDeciderError extends Error {
     this.name = 'GhostSeatNotDeciderError';
   }
 }
+
+/** A run of the rules asked for by hand finds another run of the same set under way (scheduled or by hand): it is asked again later. */
+export class GhostSeatRuleRunBusyError extends Error {
+  constructor(
+    readonly ruleSet: 'G1_G2' | 'G3_G4',
+    readonly completedRunIds: readonly string[] = [],
+  ) {
+    super('A run of these rules is under way; ask again when it has ended.');
+    this.name = 'GhostSeatRuleRunBusyError';
+  }
+}

@@ -8,7 +8,7 @@ import { GhostSeatSeatStateRepo } from '../ghost-seat/ghost-seat-seat-state.repo
 import type { RulePass } from '../internal-rules/internal-rules.types';
 import type { RuleRunRecord } from '../rule-run/rule-run.repo';
 import { periodKeyOf, scheduleOf } from '../rule-run/rule-run.policy';
-import { RuleRunService } from '../rule-run/rule-run.service';
+import { RuleRunService, type RunTally } from '../rule-run/rule-run.service';
 import { UsageRulesContextService } from './usage-rules-context.service';
 import { UsageRulesSeatService } from './usage-rules-seat.service';
 import type { UsageApplicationContext, UsageRunContext } from './usage-rules.types';
@@ -39,15 +39,27 @@ export class UsageRulesService {
   ) {}
 
   /** The run of the period `now` falls in, or null when there is nothing to run (no organization yet, or the period is taken). */
-  async run(now: Date = new Date()): Promise<RuleRunRecord | null> {
+  run(now: Date = new Date()): Promise<RuleRunRecord | null> {
+    return this.start(now, 'SCHEDULE');
+  }
+
+  /**
+   * A run asked for by hand (`POST /ghost-seat-rule-runs`): the same rules, now, whatever week the schedule already ran. Null when
+   * there is no organization yet or another run of `G3`/`G4` is under way.
+   */
+  runNow(now: Date = new Date()): Promise<RuleRunRecord | null> {
+    return this.start(now, 'BY_HAND');
+  }
+
+  private async start(now: Date, mode: 'SCHEDULE' | 'BY_HAND'): Promise<RuleRunRecord | null> {
     const organization = await this.organizationReads.getOrganization();
     if (!organization) return null;
     const today = await this.organizationReads.businessToday(now);
+    const work = (tally: RunTally): Promise<void> => this.pass({ organizationId: organization.id, today, now, tally });
+    if (mode === 'BY_HAND') return this.runs.executeNow(organization.id, 'G3_G4', now, work);
     const schedule = scheduleOf(await this.parameters.getValue(USAGE_RULE_SCHEDULE_PARAMETER));
 
-    return this.runs.execute(organization.id, 'G3_G4', periodKeyOf(schedule, today), now, async (tally) => {
-      await this.pass({ organizationId: organization.id, today, now, tally });
-    });
+    return this.runs.execute(organization.id, 'G3_G4', periodKeyOf(schedule, today), now, work);
   }
 
   private async pass(pass: RulePass): Promise<void> {

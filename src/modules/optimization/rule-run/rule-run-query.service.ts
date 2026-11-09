@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RuleRunRepo, type RuleRunRecord, type RuleSkipRecord } from './rule-run.repo';
+import { RuleRunRepo, type RuleRunRecord, type RuleSkipRecord, type SkipGate } from './rule-run.repo';
 
 /** The runs of the rules, newest first, and why each left subjects out (`FR-4.12b`): both are pages. */
 @Injectable()
@@ -22,5 +22,10 @@ export class RuleRunQueryService {
     if (!(await this.runs.find(runId, organizationId))) return null;
 
     return this.runs.skipsPage(runId, page);
+  }
+
+  /** How many subjects a run left out, by gate. */
+  skipCountsOf(runId: string): Promise<Partial<Record<SkipGate, number>>> {
+    return this.runs.skipCountsByGate(runId);
   }
 }

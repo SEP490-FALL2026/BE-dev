@@ -67,6 +67,16 @@ export const kpi5QuerySchema = z.strictObject({ from: businessDate, to: business
 
 export const ruleRunListQuerySchema = z.strictObject(pageQuery);
 export const ruleRunIdParamSchema = z.strictObject({ id: z.uuid() });
+/** The sets of rules a run by hand runs; both when none is named. */
+export const RULE_RUN_REQUEST_SETS = ['G1G2', 'G3G4'] as const;
+export const ruleRunCreateBodySchema = z.strictObject({
+  rules: z
+    .array(z.enum(RULE_RUN_REQUEST_SETS))
+    .min(1)
+    .max(2)
+    .optional()
+    .meta({ description: 'G1G2 (internal data), G3G4 (usage) or both; both when left out.' }),
+});
 
 /** A row of the table of the IT Admin: what identifies it, what filters it and what can be done on it. */
 const potentialSavingSchema = z.strictObject({
@@ -231,12 +241,20 @@ const ruleRunSchema = z.strictObject({
   failedCount: z.number().int().nonnegative(),
 });
 
+/** A run asked for by hand: the run as the list shows it, and how many subjects it left out by gate. */
+const ruleRunResultSchema = ruleRunSchema.extend({
+  skippedByGate: z
+    .array(z.strictObject({ gate: z.enum(SKIP_GATES), count: z.number().int().positive() }))
+    .meta({ description: 'How many subjects the run left out, by the gate that left each out.' }),
+});
+
 export class RecommendationIdParamDto extends createZodDto(recommendationIdParamSchema) {}
 export class RecommendationListQueryDto extends createZodDto(recommendationListQuerySchema) {}
 export class SeatStateListQueryDto extends createZodDto(seatStateListQuerySchema) {}
 export class Kpi5QueryDto extends createZodDto(kpi5QuerySchema) {}
 export class RuleRunIdParamDto extends createZodDto(ruleRunIdParamSchema) {}
 export class RuleRunListQueryDto extends createZodDto(ruleRunListQuerySchema) {}
+export class RuleRunCreateBodyDto extends createZodDto(ruleRunCreateBodySchema) {}
 export class RecommendationPageResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ items: z.array(recommendationSummarySchema), pagination })),
 ) {}
@@ -250,6 +268,9 @@ export class OptimizationSummaryResponseDto extends createZodDto(successEnvelope
 export class Kpi5ResponseDto extends createZodDto(successEnvelopeSchema(kpi5Schema)) {}
 export class RuleRunPageResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ items: z.array(ruleRunSchema), pagination })),
+) {}
+export class RuleRunCreateResponseDto extends createZodDto(
+  successEnvelopeSchema(z.strictObject({ runs: z.array(ruleRunResultSchema) })),
 ) {}
 export class RuleSkipPageResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ items: z.array(skipSchema), pagination })),

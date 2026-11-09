@@ -366,6 +366,7 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/ghost-seat-recommendations/{id}` | [optimization/board/board.controller.ts](../../src/modules/optimization/board/board.controller.ts) → `get` | [BoardQueryService](../../src/modules/optimization/board/board-query.service.ts) |
 | POST | `/ghost-seat-recommendations/{id}/reclaim` | [optimization/board/board.controller.ts](../../src/modules/optimization/board/board.controller.ts) → `reclaim` | [BoardReclaimService](../../src/modules/optimization/board/board-reclaim.service.ts) |
 | GET | `/ghost-seat-rule-runs` | [optimization/board/board.controller.ts](../../src/modules/optimization/board/board.controller.ts) → `runs` | [BoardQueryService](../../src/modules/optimization/board/board-query.service.ts) |
+| POST | `/ghost-seat-rule-runs` | [optimization/board/board.controller.ts](../../src/modules/optimization/board/board.controller.ts) → `runNow` | [BoardRuleRunService](../../src/modules/optimization/board/board-rule-run.service.ts) |
 | GET | `/ghost-seat-rule-runs/{id}/skips` | [optimization/board/board.controller.ts](../../src/modules/optimization/board/board.controller.ts) → `skips` | [BoardQueryService](../../src/modules/optimization/board/board-query.service.ts) |
 | GET | `/ghost-seat-kpi5` | [optimization/board/board.controller.ts](../../src/modules/optimization/board/board.controller.ts) → `kpi5` | [BoardKpiService](../../src/modules/optimization/board/board-kpi.service.ts) |
 | GET | `/ghost-seat-queue` | [optimization/decision/decision.controller.ts](../../src/modules/optimization/decision/decision.controller.ts) → `list` | [DecisionQueueService](../../src/modules/optimization/decision/decision-queue.service.ts) |
@@ -381,4 +382,4 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/dashboards/it-admin` | [dashboards/it-admin/it-admin-dashboard.controller.ts](../../src/modules/dashboards/it-admin/it-admin-dashboard.controller.ts) → `get` | [ItAdminDashboardService](../../src/modules/dashboards/it-admin/it-admin-dashboard.service.ts) |
 | GET | `/dashboards/super-admin` | [dashboards/super-admin/super-admin-dashboard.controller.ts](../../src/modules/dashboards/super-admin/super-admin-dashboard.controller.ts) → `get` | [SuperAdminDashboardService](../../src/modules/dashboards/super-admin/super-admin-dashboard.service.ts) |
 
-375 operations.
+376 operations.

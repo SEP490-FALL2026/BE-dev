@@ -13,6 +13,7 @@ import {
   GhostSeatNotFoundError,
   GhostSeatNotReclaimableError,
   GhostSeatPeriodInvalidError,
+  GhostSeatRuleRunBusyError,
   GhostSeatSeatNotRevocableError,
 } from './board.errors';
 
@@ -50,6 +51,13 @@ export function toGhostSeatApiException(error: unknown): unknown {
   ) {
     return toGhostSeatApiException(new GhostSeatSeatNotRevocableError('SEAT_NOT_OPEN'));
   }
+  if (error instanceof GhostSeatRuleRunBusyError) {
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'GHOST_SEAT.RULE_RUN_BUSY',
+      message: error.message,
+      details: { ruleSet: error.ruleSet, completedRunIds: [...error.completedRunIds] },
+    });
+  }
   if (error instanceof GhostSeatPeriodInvalidError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'GHOST_SEAT.PERIOD_INVALID', error.message);
   }
@@ -65,4 +73,5 @@ export const GHOST_SEAT_ERROR_EXAMPLES = {
   NOT_DECIDER: example(new GhostSeatNotDeciderError()),
   SEAT_NOT_REVOCABLE: example(new GhostSeatSeatNotRevocableError('ASSIGNMENT_IS_SERVICE_ACCOUNT')),
   PERIOD_INVALID: example(new GhostSeatPeriodInvalidError()),
+  RULE_RUN_BUSY: example(new GhostSeatRuleRunBusyError('G1_G2')),
 } as const;
