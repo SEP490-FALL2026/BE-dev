@@ -38,8 +38,9 @@ dashboards; gốc `src/app/app.module.ts`.
   - `LicensingRenewalApi` ([public/licensing-renewal.api.ts](public/licensing-renewal.api.ts)) — trả ghế và gia hạn
     (US-05-14): `getAssignmentFacts`, `renewAssignment`, `hasPendingRenewal`.
   - `LicensingOpenGrantsApi` ([public/licensing-open-grants.api.ts](public/licensing-open-grants.api.ts)) —
-    `listOpenGrantTasksOfBeneficiary`, `listHeldSeatsOfRequests` (the seats the grants of requests made that are still held on a day; what the
-    commitment of 01/01 counts, `BR-MF1-09e`).
+    `listOpenGrantTasksOfBeneficiary`, `listHeldSeatsOfRequests` (seat của Request còn giữ ngày `on`, đi theo chuỗi `predecessor_id` — `HANDOVER`,
+    gia hạn quyền, `RENEWAL_CARRY` — tới bản ghi đang chạy, từ grant của Request hoặc bản ghi Request nêu; trả phòng sở hữu hiện tại và các bản
+    ghi sau gốc; là thứ khoản 01/01 đếm, `BR-MF1-09e`).
   - `LicensingServiceAccountApi` ([public/licensing-service-account.api.ts](public/licensing-service-account.api.ts)) —
     `listServiceAccountDuties`, `remindServiceAccountDuties` (nhắc IT Admin phụ trách phòng sở hữu vào hộp thông báo, gọi từ
     hook hồ sơ của personnel).

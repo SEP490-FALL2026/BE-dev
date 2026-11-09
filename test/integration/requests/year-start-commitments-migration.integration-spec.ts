@@ -33,7 +33,7 @@ async function sqlState(sql: Client, text: string, values: unknown[] = []): Prom
  */
 describe('the migration of the commitments of 01/01 over an organization that already has commitments (integration, real PostgreSQL)', () => {
   it(
-    'BR-MF1-09e: keeps what was committed as the commitment of an approval, marks the year of the deployment done for the organization, and refuses what the pass must never write',
+    'BR-MF1-09e: keeps what was committed as the commitment of an approval, marks the year before the deployment done for the organization, and refuses what the pass must never write',
     async () => {
       const database = await provisionDisposableDatabase();
       const sql = new Client({ connectionString: database.url });
@@ -87,16 +87,23 @@ describe('the migration of the commitments of 01/01 over an organization that al
           [requestId],
         );
         expect(commitments.rows).toEqual([{ origin: 'APPROVAL', seat_monthly_minor: null, amount_minor: '20000' }]);
-        // The year of the deployment (in the calendar of the organization) is marked done with nothing made; no other year is.
-        const marks = await sql.query<{ year: number; done: boolean; created_count: number; expected: number }>(
-          `SELECT year, completed_at IS NOT NULL AS done, created_count,
-                EXTRACT(YEAR FROM (now() AT TIME ZONE 'Asia/Ho_Chi_Minh'))::int AS expected
+        // The year before the deployment (in the calendar of the organization) is marked done with nothing made; no other year is. The year of
+        // the deployment is not: its pass is the first, even when the deployment is after midnight of 01/01.
+        const marks = await sql.query<{
+          year: number;
+          done: boolean;
+          created_count: number;
+          resume_after_id: string | null;
+          deployed: number;
+        }>(
+          `SELECT year, completed_at IS NOT NULL AS done, created_count, resume_after_id,
+                EXTRACT(YEAR FROM (now() AT TIME ZONE 'Asia/Ho_Chi_Minh'))::int AS deployed
            FROM year_start_commitment_runs WHERE organization_id = $1`,
           [organizationId],
         );
         expect(marks.rows).toHaveLength(1);
-        expect(marks.rows[0]).toMatchObject({ done: true, created_count: 0 });
-        expect(marks.rows[0].year).toBe(marks.rows[0].expected);
+        expect(marks.rows[0]).toMatchObject({ done: true, created_count: 0, resume_after_id: null });
+        expect(marks.rows[0].year).toBe(marks.rows[0].deployed - 1);
 
         // The rules of the new columns are the ones the database keeps.
         const hold = (year: number, extra: string, values: unknown[]) =>

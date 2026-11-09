@@ -39,6 +39,7 @@ export interface YearStartHoldInput {
   items: readonly {
     requestId: string;
     costCenterId: string;
+    /** The reporting currency: the amounts are converted by the caller, as for the commitment of an approval. */
     currency: string;
     /** The cost of the year, above nothing. */
     amountMinor: bigint;
@@ -47,10 +48,14 @@ export interface YearStartHoldInput {
   }[];
 }
 
-/** What the pass held: the commitments it made, and the requests that already held one for the year (left as they were). */
+/**
+ * What the pass held: the commitments it made, the requests that already held one for the year (left as they were), and those it refused
+ * because the approved budget of the year is in another currency than theirs (nothing of two currencies is added together).
+ */
 export interface YearStartHoldResult {
   created: { requestId: string; commitmentId: string; costCenterId: string; attachedVersionId: string | null }[];
   alreadyHeld: string[];
+  refused: { requestId: string; reason: 'CURRENCY_MISMATCH' }[];
 }
 
 /** A commitment as it was made: attached to the current budget of its year, or waiting for one. */

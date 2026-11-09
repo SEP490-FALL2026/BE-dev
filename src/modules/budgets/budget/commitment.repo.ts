@@ -153,6 +153,7 @@ export class CommitmentRepo {
    * Holds the commitment of 01/01 of one request for the year (`FR-5.8`(6)): attached to the approved version of the Cost Center and year when there
    * is one, waiting for a budget with the reason *no budget* when there is not (`FR-5.8a`, the one exception), never backed by a check. The
    * lock of the Cost Center and year comes first, as in `hold`, so a version approved at the same moment either attaches it or is read here.
+   * Null, with nothing written, when the approved version is in another currency than the amount: the totals of a budget never add two.
    */
   async holdYearStart(
     tx: DbTx,
@@ -166,12 +167,13 @@ export class CommitmentRepo {
       seatMonthlyMinor: bigint;
       now: Date;
     },
-  ): Promise<HeldCommitment & { costCenterId: string }> {
+  ): Promise<(HeldCommitment & { costCenterId: string }) | null> {
     await this.yearLock.lock(tx, input.costCenterId, [input.year]);
     const current = await tx.budgetVersion.findFirst({
       where: { costCenterId: input.costCenterId, year: input.year, state: 'APPROVED' },
-      select: { id: true },
+      select: { id: true, currency: true },
     });
+    if (current && current.currency !== input.currency) return null;
     const created = await tx.budgetCommitment.create({
       data: {
         organizationId: input.organizationId,

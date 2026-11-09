@@ -36,6 +36,7 @@ export class SubscriptionFactsService {
   async priceOfPlan(
     planId: string,
     tx?: DbTx,
+    on?: BusinessDate,
   ): Promise<{
     kind: 'RECURRING' | 'ONE_TIME';
     unitPrice: Money;
@@ -45,7 +46,7 @@ export class SubscriptionFactsService {
     /** The subscription may be cut before its term ends (`QĐ-96f`): a request on it runs to the end of the fiscal year at most. */
     allowsMidTermReduction: boolean;
   } | null> {
-    const priced = await this.subscriptions.findPricedOfPlan(planId, tx);
+    const priced = await this.subscriptions.findPricedOfPlan(planId, tx, on);
 
     return (
       priced && {

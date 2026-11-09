@@ -1,5 +1,5 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
-import type { Money } from '../../../core/money/money';
+import { MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
 import { monthlyPriceOf, requestAmountOf, type BillingCycleCode } from '../access-request/pricing.policy';
 
 /**
@@ -16,10 +16,15 @@ export const YEAR_START_REQUEST_STATES = ['AWAITING_EXECUTION', 'EXECUTING', 'CO
 /** The kinds of provisioning that cost the company every month a seat is held; a one-time key (`K4`) or free software never does. */
 export const YEAR_START_PLAN_KINDS: readonly string[] = ['K1', 'K2'];
 
-/** When a seat is expected to end: the day the request names, and the day the period of the seat closes (exclusive, `valid_until`). */
+/**
+ * When a seat is expected to end: the day the request names, and the day the period of the seat closes (exclusive, `valid_until`); and the
+ * department that bears its cost now (the owning department of the record of the seat that runs, null when the record names none or the seat
+ * is not granted yet: the department of the request then).
+ */
 export interface YearStartSeat {
   expectedEndDate: BusinessDate | null;
   validUntil: BusinessDate | null;
+  departmentId: string | null;
 }
 
 /** What a plan is bought at, as the catalog says it. */
@@ -35,11 +40,17 @@ export type YearStartSkipReason =
   /** Nothing of the request is left to commit on 01/01: every seat is over, or none was ever made. */
   | 'NO_SEAT'
   /** The department that bears the cost has no Cost Center in use. */
-  | 'NO_COST_CENTER';
+  | 'NO_COST_CENTER'
+  /** The amount is more than a money value may hold, in the currency of the price or in the reporting currency. */
+  | 'AMOUNT_TOO_LARGE'
+  /** The price is in another currency than the reporting one and no rate was entered for 01/01 nor for the day of the pass. */
+  | 'NO_RATE'
+  /** The approved budget of the year is in another currency than the reporting one: nothing of two currencies is added together. */
+  | 'CURRENCY_MISMATCH';
 
 export type YearStartAmount =
   | { status: 'PRICED'; amountMinor: bigint; seatMonthlyMinor: bigint; currency: string }
-  | { status: 'SKIPPED'; reason: Extract<YearStartSkipReason, 'NO_PRICE' | 'NO_SEAT'> };
+  | { status: 'SKIPPED'; reason: Extract<YearStartSkipReason, 'NO_PRICE' | 'NO_SEAT' | 'AMOUNT_TOO_LARGE'> };
 
 /** The last day a seat is counted: the earlier of the expected end and the day before its period closes; null when it has no end. */
 export function lastDayOfSeat(seat: YearStartSeat): BusinessDate | null {
@@ -90,9 +101,13 @@ export function yearStartAmountOf(input: {
       checkDate: yearStart,
       endDate,
     });
-    if (priced.status === 'MISSING') return { status: 'SKIPPED', reason: 'NO_PRICE' };
+    if (priced.status === 'MISSING') {
+      return { status: 'SKIPPED', reason: priced.reason === 'AMOUNT_TOO_LARGE' ? 'AMOUNT_TOO_LARGE' : 'NO_PRICE' };
+    }
     total += priced.amount.amountMinor;
   }
+  // Each end date is within the range, the seats of all of them together may not be.
+  if (total > MAX_AMOUNT_MINOR) return { status: 'SKIPPED', reason: 'AMOUNT_TOO_LARGE' };
 
   return {
     status: 'PRICED',
@@ -104,10 +119,31 @@ export function yearStartAmountOf(input: {
 
 export type YearStartJudgement =
   | { status: 'COMMIT'; amountMinor: bigint; seatMonthlyMinor: bigint; currency: string; costCenterId: string }
-  /** Nothing is committed and the system says why in the Audit Trail: the price or the Cost Center is missing. */
-  | { status: 'LEFT_OUT'; reason: Extract<YearStartSkipReason, 'NO_PRICE' | 'NO_COST_CENTER'> }
+  /** Nothing is committed and the system says why in the Audit Trail: the price or the Cost Center is missing, or the amount is too large. */
+  | { status: 'LEFT_OUT'; reason: Extract<YearStartSkipReason, 'NO_PRICE' | 'NO_COST_CENTER' | 'AMOUNT_TOO_LARGE'> }
   /** Nothing is left to commit: every seat is over. No event. */
   | { status: 'NOTHING' };
+
+/**
+ * The department that bears the cost of a request on 01/01: the one its seats that count are borne by now (a service account handed over to
+ * another department is charged to that one), else the department of the request — also when its seats are borne by more than one, since
+ * a request holds one commitment for a year.
+ */
+export function bearingDepartmentOf(input: {
+  year: number;
+  seats: readonly YearStartSeat[];
+  requestDepartmentId: string;
+}): string {
+  const yearStart: BusinessDate = `${input.year}-01-01`;
+  const departments = new Set(
+    input.seats
+      .filter((seat) => seatCountsOn(seat, yearStart))
+      .map((seat) => seat.departmentId ?? input.requestDepartmentId),
+  );
+  const [only] = departments;
+
+  return departments.size === 1 && only !== undefined ? only : input.requestDepartmentId;
+}
 
 /** What the pass does with one request: commits its amount in the Cost Center of its department, leaves it out for want of a price or a Cost Center, or has nothing to commit. */
 export function judgeYearStart(input: {

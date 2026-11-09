@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { budgetYearLockKey } from '../../../src/modules/budgets/public/budget-year-lock-key.policy';
 import { YearStartCommitmentsService } from '../../../src/modules/requests/year-start-commitments/year-start-commitments.service';
 import { GroupHarness } from '../../support/group-harness';
@@ -27,6 +28,7 @@ interface CommitmentRow {
   snapshot_check_id: string | null;
   seat_monthly_minor: string | null;
   cost_center_id: string;
+  currency: string;
 }
 
 /**
@@ -51,7 +53,7 @@ describe('the commitments of 01/01 over PostgreSQL (BR-MF1-09e, FR-5.8a, QĐ-109
   });
 
   beforeEach(async () => {
-    // What the migration does for the year of the deployment, and nothing for the year that begins: the pass of this suite is the first of it.
+    // The year of the suite is done (as it is once its pass ran), and nothing is for the year that begins: the pass of this suite is the first of it.
     await h.ctx.sql.query(
       `INSERT INTO year_start_commitment_runs (organization_id, year, started_at, completed_at)
        SELECT id, $1, now(), now() FROM organizations ON CONFLICT DO NOTHING`,
@@ -102,11 +104,58 @@ describe('the commitments of 01/01 over PostgreSQL (BR-MF1-09e, FR-5.8a, QĐ-109
 
     return task.id;
   };
+  /**
+   * The record of the seat the request was granted passes to another person from tomorrow, as a handover of a service account writes it:
+   * the old record ends, the next one follows it (`predecessor_id`) and is owned by `departmentId` (the same department when null).
+   */
+  const handedOver = async (requestId: string, departmentId: string | null): Promise<string> => {
+    const old = (
+      await h.ctx.sql.query<{ id: string }>(
+        `SELECT assignment_id AS id FROM provisioning_tasks WHERE request_id = $1 AND kind = 'GRANT'`,
+        [requestId],
+      )
+    ).rows[0].id;
+    const next = randomUUID();
+    await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = valid_from + 1 WHERE id = $1`, [old]);
+    await h.ctx.sql.query(
+      `INSERT INTO license_assignments
+       SELECT (jsonb_populate_record(NULL::license_assignments, to_jsonb(a) || jsonb_build_object(
+                 'id', $2::uuid, 'source', 'HANDOVER', 'predecessor_id', a.id, 'valid_from', a.valid_until, 'valid_until', NULL,
+                 'granted_on', NULL, 'owning_department_id', COALESCE($3::uuid, a.owning_department_id), 'created_at', now()))).*
+         FROM license_assignments a WHERE a.id = $1`,
+      [old, next, departmentId],
+    );
+
+    return next;
+  };
+  /** The subscription's period ends on `endsOn` and a period that renews it begins on `nextFrom` at another price. */
+  const renewedFrom = async (
+    subscriptionId: string,
+    period: { endsOn: string; nextFrom: string; unitPrice: bigint },
+  ): Promise<void> => {
+    await h.ctx.sql.query(`UPDATE subscriptions SET end_date = $2 WHERE id = $1`, [subscriptionId, period.endsOn]);
+    await h.ctx.sql.query(
+      `INSERT INTO subscriptions
+       SELECT (jsonb_populate_record(NULL::subscriptions, to_jsonb(s) || jsonb_build_object(
+                 'id', gen_random_uuid(), 'renewed_from_id', s.id, 'start_date', $2::date, 'end_date', NULL,
+                 'unit_price_minor', $3::bigint, 'is_primary_for_plan', false, 'created_at', now(), 'updated_at', now()))).*
+         FROM subscriptions s WHERE s.id = $1`,
+      [subscriptionId, period.nextFrom, period.unitPrice.toString()],
+    );
+  };
+  /** A rate of a currency on a day, in the reporting currency, entered once. */
+  const rateOn = async (currency: string, day: string, rate: string): Promise<void> => {
+    await h.ctx.sql.query(
+      `INSERT INTO exchange_rates (id, organization_id, currency, rate_date, rate) VALUES (gen_random_uuid(), $1, $2, $3, $4)
+       ON CONFLICT (organization_id, currency, rate_date) DO NOTHING`,
+      [h.seed.organizationId, currency, day, rate],
+    );
+  };
   const rows = async (requestId: string, year = h.next) =>
     (
       await h.ctx.sql.query<CommitmentRow>(
         `SELECT year, amount_minor::text, origin::text, state::text, attached_version_id, unattached_reason, snapshot_check_id,
-                seat_monthly_minor::text, cost_center_id
+                seat_monthly_minor::text, cost_center_id, currency
            FROM budget_commitments WHERE request_id = $1 AND year = $2`,
         [requestId, year],
       )
@@ -151,6 +200,7 @@ describe('the commitments of 01/01 over PostgreSQL (BR-MF1-09e, FR-5.8a, QĐ-109
           snapshot_check_id: null,
           seat_monthly_minor: String(MONTH),
           cost_center_id: u.department.unitId,
+          currency: h.reporting,
         },
       ]);
       // The commitment of this year, made by the approval, stays where it is: the year of the old stays with the old (BR-MF1-09e).
@@ -265,12 +315,35 @@ describe('the commitments of 01/01 over PostgreSQL (BR-MF1-09e, FR-5.8a, QĐ-109
       expect(await rows(keyRequest)).toEqual([]);
     });
 
-    it('BR-MF1-09e: a pass that runs late still counts the months of the year from 01/01 and the price of the main subscription', async () => {
-      const id = await approved(await unit());
+    it('BR-MF1-09e: a pass that runs late counts the months of the year from 01/01 at the price of 01/01, not the price of the day it runs', async () => {
+      const subscription = await h.subscription(100);
+      const id = await approved(await unit(), await h.planOf(subscription));
+      // The period of the subscription ends on 28/02; the one that renews it from 01/03 costs twice as much.
+      await renewedFrom(subscription, {
+        endsOn: `${h.next}-02-28`,
+        nextFrom: `${h.next}-03-01`,
+        unitPrice: 2n * MONTH,
+      });
 
-      await passOn(`${h.next}-02-05`);
+      await passOn(`${h.next}-03-05`);
 
-      expect((await rows(id)).map((row) => row.amount_minor)).toEqual([String(12n * MONTH)]);
+      expect((await rows(id)).map((row) => [row.amount_minor, row.seat_monthly_minor])).toEqual([
+        [String(12n * MONTH), String(MONTH)],
+      ]);
+    });
+
+    it('BR-MF1-09e: a period that renews the subscription from 01/01 prices the year: its price is the one of 01/01', async () => {
+      const subscription = await h.subscription(100);
+      const id = await approved(await unit(), await h.planOf(subscription));
+      await renewedFrom(subscription, {
+        endsOn: `${h.year}-12-31`,
+        nextFrom: `${h.next}-01-01`,
+        unitPrice: 2n * MONTH,
+      });
+
+      await passOn();
+
+      expect((await rows(id)).map((row) => row.amount_minor)).toEqual([String(24n * MONTH)]);
     });
 
     it('BR-MF1-09e: the day is the one of the time zone of the organization: it begins at its midnight, not at the one of UTC', async () => {
@@ -287,6 +360,66 @@ describe('the commitments of 01/01 over PostgreSQL (BR-MF1-09e, FR-5.8a, QĐ-109
       const after = await service().run(new Date(Date.UTC(h.next - 1, 11, 31, 17, 0)));
       expect(after).toMatchObject({ status: 'COMPLETED', year: h.next });
       expect(await rows(id)).toHaveLength(1);
+    });
+  });
+
+  describe('the seat that runs on 01/01 and the department that bears it (BR-MF1-09e)', () => {
+    it('BR-MF1-09e: a seat handed over to a person of another department is followed to the record that runs, and charged to that department', async () => {
+      const u = await unit();
+      const other = await unit();
+      const id = await approved(u);
+      await granted(id);
+      await handedOver(id, other.department.id);
+
+      await passOn();
+
+      expect(await rows(id)).toEqual([
+        expect.objectContaining({ amount_minor: String(12n * MONTH), cost_center_id: other.department.unitId }),
+      ]);
+    });
+
+    it('BR-MF1-09e: a chain whose last record ended before 01/01 holds nothing', async () => {
+      const id = await approved(await unit());
+      await granted(id);
+      const next = await handedOver(id, null);
+      await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = valid_from + 1 WHERE id = $1`, [next]);
+
+      await passOn();
+
+      expect(await rows(id)).toEqual([]);
+    });
+  });
+
+  describe('the reporting currency (FR-5.8(6))', () => {
+    it('FR-5.8(6): a plan priced in USD is held in the reporting currency at the rate of 01/01, the price of a month as well', async () => {
+      const subscription = await h.subscription(100);
+      const id = await approved(await unit(), await h.planOf(subscription));
+      // 20 USD a month; 25 000 VND for one dollar on 01/01.
+      await h.ctx.sql.query(
+        `UPDATE subscriptions SET unit_price_minor = 2000, unit_price_currency = 'USD' WHERE id = $1`,
+        [subscription],
+      );
+      await rateOn('USD', `${h.next}-01-01`, '25000');
+
+      await passOn();
+
+      expect((await rows(id)).map((row) => [row.currency, row.amount_minor, row.seat_monthly_minor])).toEqual([
+        [h.reporting, String(12n * 500_000n), String(500_000n)],
+      ]);
+    });
+
+    it('FR-5.8(6): a price that no rate converts is left out with the reason NO_RATE, never held in its own currency', async () => {
+      const subscription = await h.subscription(100);
+      const id = await approved(await unit(), await h.planOf(subscription));
+      await h.ctx.sql.query(
+        `UPDATE subscriptions SET unit_price_minor = 2000, unit_price_currency = 'AUD' WHERE id = $1`,
+        [subscription],
+      );
+
+      await passOn();
+
+      expect(await rows(id)).toEqual([]);
+      expect((await events('BUDGET_COMMITMENT.YEAR_START_SKIPPED', id))[0].after).toMatchObject({ reason: 'NO_RATE' });
     });
   });
 
@@ -339,14 +472,37 @@ describe('the commitments of 01/01 over PostgreSQL (BR-MF1-09e, FR-5.8a, QĐ-109
       expect(await rows(id)).toHaveLength(1);
     });
 
-    it('BR-MF1-09e: an organization that never had a pass makes nothing backwards: the first pass only marks its year', async () => {
+    it('BR-MF1-09e: an organization with no mark that approved requests before the year began is not new: its first pass makes their commitments', async () => {
       const id = await approved(await unit());
       await h.ctx.sql.query(`DELETE FROM year_start_commitment_runs`);
 
-      expect(await passOn()).toEqual({ status: 'BASELINE', year: h.next });
+      expect(await passOn()).toMatchObject({ status: 'COMPLETED', year: h.next });
 
-      expect(await rows(id)).toEqual([]);
-      expect(await runRow()).toMatchObject({ completed: true, created_count: 0 });
+      expect(await rows(id)).toHaveLength(1);
+      expect(await runRow()).toMatchObject({ completed: true });
+    });
+
+    it('BR-MF1-09e: a pass that failed half way goes on after the last request it went through, and counts the commitments of both passes', async () => {
+      const first = await approved(await unit());
+      const second = await approved(await unit());
+      const [before, after] = [first, second].sort();
+      // The pass that failed went through `before` and made its commitment, then stopped.
+      await h.ctx.sql.query(
+        `INSERT INTO year_start_commitment_runs (organization_id, year, started_at, created_count, resume_after_id)
+         SELECT id, $1, now(), 1, $2 FROM organizations`,
+        [h.next, before],
+      );
+      const told = (await events('BUDGET_COMMITMENT.YEAR_START_SKIPPED')).length;
+
+      expect(await passOn()).toMatchObject({ status: 'COMPLETED', year: h.next });
+
+      // `before` is not read again: the failed pass is the one that judged it.
+      expect(await rows(before)).toEqual([]);
+      expect(await rows(after)).toHaveLength(1);
+      expect(await runRow()).toMatchObject({ completed: true, run_count: 2 });
+      expect(
+        (await events('BUDGET_COMMITMENT.YEAR_START_SKIPPED')).slice(told).map((event) => event.after.requestId),
+      ).not.toContain(before);
     });
 
     it('BR-MF1-09e: two instances that run at once make one commitment for each request, and one of them reports', async () => {

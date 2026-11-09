@@ -24,6 +24,8 @@ CREATE TABLE "year_start_commitment_runs" (
     "run_count" INTEGER NOT NULL DEFAULT 1,
     "created_count" INTEGER NOT NULL DEFAULT 0,
     "skipped_count" INTEGER NOT NULL DEFAULT 0,
+    -- The last request (in order of id) the pass went through: a pass that failed half way goes on after it, not from the start.
+    "resume_after_id" UUID,
 
     CONSTRAINT "year_start_commitment_runs_pkey" PRIMARY KEY ("organization_id", "year"),
     CONSTRAINT "year_start_commitment_runs_counts_check" CHECK ("run_count" >= 1 AND "created_count" >= 0 AND "skipped_count" >= 0)
@@ -33,9 +35,11 @@ ALTER TABLE "year_start_commitment_runs"
     ADD CONSTRAINT "year_start_commitment_runs_organization_id_fkey"
     FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- 3. Nothing is made backwards: the year of the deployment is marked done for every organization that exists, so the first pass of the system
--- is the one of the next 01/01. (An organization made later has no mark of an earlier year, and its first pass only marks its own year.)
+-- 3. The year before the deployment is marked done for every organization that exists, so the first pass of the system is the one of the
+-- year of the deployment, made by the first sweep after it: a deployment after midnight of 01/01 must not leave the year that runs without
+-- its commitments (a request that holds one for the year already, as one approved in it does, is left as it is). An organization made later
+-- has no mark; its first pass makes the commitments of the year only if it had requests before the year began.
 INSERT INTO "year_start_commitment_runs"
     ("organization_id", "year", "started_at", "completed_at", "run_count", "created_count", "skipped_count")
-SELECT "id", EXTRACT(YEAR FROM (now() AT TIME ZONE "time_zone"))::int, now(), now(), 1, 0, 0
+SELECT "id", EXTRACT(YEAR FROM (now() AT TIME ZONE "time_zone"))::int - 1, now(), now(), 1, 0, 0
   FROM "organizations";

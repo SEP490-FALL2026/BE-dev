@@ -1106,16 +1106,19 @@ model CongestionIncident {
 // One pass of 01/01 for an organization and a year (`FR-5.8`(6), `QĐ-109a`): the mark that says the commitments of the new year were made, so that
 // a second pass the same year changes nothing. The row is made when a pass begins and completed when it has been through every request;
 // a pass that failed half way leaves it open and the next one goes on (a commitment is never made twice: the request and the year are unique).
-// The migration marks the year of the deployment as done for the organizations that exist, so nothing is made backwards.
+// The migration marks the year before the deployment as done for the organizations that exist, so the first pass is the one of the year
+// of the deployment. Each step of a pass takes the advisory lock of the organization and the year (`pg_try_advisory_xact_lock`).
 model YearStartCommitmentRun {
   organizationId String    @map("organization_id") @db.Uuid
   year           Int
   startedAt      DateTime  @map("started_at") @db.Timestamptz(3)
   completedAt    DateTime? @map("completed_at") @db.Timestamptz(3)
-  // How many passes were made for the year (more than one after a failure), and what the one that completed it made and left.
+  // How many passes were made for the year (more than one after a failure), and what all of them made and left, batch by batch.
   runCount       Int       @default(1) @map("run_count")
   createdCount   Int       @default(0) @map("created_count")
   skippedCount   Int       @default(0) @map("skipped_count")
+  // The last request (in order of id) a batch went through: a pass that failed half way goes on after it.
+  resumeAfterId  String?   @map("resume_after_id") @db.Uuid
 
   organization Organization @relation(fields: [organizationId], references: [id])
 

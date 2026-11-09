@@ -36,7 +36,8 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
   `budget_information_requests`.
 - Trạng thái/SLA: `controlled_wait_alerts`, `step_sla_reminders`, `step_sla_reminder_recipients`,
   `congestion_incidents`, `request_status_cursor` (`prisma/models/requests.prisma`).
-- Khoản cam kết 01/01: `year_start_commitment_runs` (dấu chạy của tổ chức và năm; migration đánh dấu năm triển khai đã xong, không hồi tố).
+- Khoản cam kết 01/01: `year_start_commitment_runs` (dấu chạy của tổ chức và năm, `resume_after_id` = Request cuối lô đã xử lý, số đếm cộng dồn
+  theo lô; migration đánh dấu năm trước năm triển khai đã xong, nên lượt đầu là của năm triển khai, kể cả triển khai sau 01/01).
 
 ## Extension point
 
@@ -199,9 +200,15 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   rồi khóa năm ngân sách (`budgets/budget/budget-year-lock.repo.ts`).
 - Khoản 01/01 (`year-start-commitments/`, `BudgetsApi.holdYearStart`): `YearStartCommitmentsSweeper` mỗi giờ trong tiến trình API (ADR-0018); lượt đầu
   của năm sau 00:00 giờ tổ chức giữ cho mỗi Request trả phí `K1`/`K2` đang chạy hoặc đã duyệt chi chưa cấp một khoản của năm mới (giá tháng của
-  gói × số tháng của năm, mỗi seat), rồi ghi dấu `year_start_commitment_runs`; lượt sau trong năm không đọc gì. Mỗi lô ≤ 100 Request một
-  transaction: khóa hàng Request `FOR UPDATE` theo id, đọc grant (không khóa), rồi khóa năm của Cost Center theo id — cùng thứ tự với mọi ghi ngân sách.
-  Chạy tay: `YearStartCommitmentsService.run(now)`. Chỉ Request có khoản; quyền không có Request thì không (QĐ-109a).
+  gói hiệu lực ngày 01/01 × số tháng của năm, mỗi seat, quy về tiền tệ báo cáo bằng `FinanceApi.snapshotMoney` tỷ giá 01/01, không có thì tỷ giá
+  ngày chạy, không có nữa ⟹ bỏ qua `NO_RATE`), rồi ghi dấu `year_start_commitment_runs`; lượt sau trong năm không đọc gì. Seat đi theo chuỗi
+  `predecessor_id` tới bản ghi đang chạy; Cost Center của phòng sở hữu bản ghi đó (tài khoản dịch vụ bàn giao sang phòng khác ⟹ phòng mới). Request
+  gia hạn (`RENEWAL`) giữ khoản của bản ghi kế tiếp nó tạo; Request cấp ban đầu không giữ phần đã được gia hạn. Mỗi bước (mở, mỗi lô) một
+  transaction, trước hết `pg_try_advisory_xact_lock` theo (tổ chức, năm) — instance khác đang giữ thì bỏ lượt (`BUSY`); trong lô: khóa hàng Request
+  `FOR UPDATE` theo id, đọc grant (không khóa), tổ chức `FOR SHARE` khi quy đổi, rồi khóa năm của Cost Center theo id — cùng thứ tự với mọi ghi ngân
+  sách. Lượt lỗi giữa chừng: lượt sau đi tiếp sau `resume_after_id`, không ghi lại audit bỏ qua. Tổ chức chưa có dấu: lượt đầu chỉ đánh dấu khi chưa
+  có Request gửi trước năm đó; có dấu cũ nhưng thiếu năm trước ⟹ log cảnh báo. Chạy tay: `YearStartCommitmentsService.run(now)`. Chỉ Request có
+  khoản; quyền không có Request thì không (QĐ-109a).
 - Mọi kết thúc request phát `requests.outcome` trong cùng transaction; listener ném lỗi thì kết thúc bị hoàn tác.
 - Sweep chuyển bước: mỗi request một transaction, khóa theo id, chỉ ghi khi bảng định tuyến chỉ ra người khác người
   đang giữ; sweep SLA chỉ ghi nhắc, thông báo và audit, không đổi bước hay request (`public/*-sweep.api.ts`).

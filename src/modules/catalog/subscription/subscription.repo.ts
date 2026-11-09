@@ -53,6 +53,23 @@ const livePricedOf = (): Prisma.SubscriptionWhereInput => ({
 
 /** A K4 plan always carries its purchase price, paid once (`QĐ-106d`, review G23-04), whatever kind of subscription records it. */
 const PLAN_KIND = { plan: { select: { provisioningType: true } } } as const;
+
+/** The priced subscriptions of a plan whose period runs on `on`: begun by it, not ended before it, not continued by a period begun by it. */
+const pricedOn = (on: BusinessDate): Prisma.SubscriptionWhereInput => {
+  const day = toDateColumn(on);
+
+  return {
+    status: 'ACTIVE',
+    unitPriceMinor: { not: null },
+    unitPriceCurrency: { not: null },
+    AND: [
+      { OR: [{ billingCycle: { not: null } }, { kind: 'PERPETUAL' }] },
+      { OR: [{ startDate: null }, { startDate: { lte: day } }] },
+      { OR: [{ endDate: null }, { endDate: { gte: day } }] },
+      { OR: [{ renewedBy: { is: null } }, { renewedBy: { is: { startDate: { gt: day } } } }] },
+    ],
+  };
+};
 const PRICE_FIELDS = {
   kind: true,
   unitPriceMinor: true,
@@ -349,11 +366,15 @@ export class SubscriptionRepo {
 
   /**
    * The price a plan is bought at: the unit price and billing cycle of the main subscription of the plan, the newest active one with
-   * a price. The shared pool is the plan's, not a department's, so no department is asked (`BR-MF1-07`, S1-02).
+   * a price. The shared pool is the plan's, not a department's, so no department is asked (`BR-MF1-07`, S1-02). With `on`, the main one
+   * among the periods that run on that day first: begun by it (or with no start), not ended before it, and not continued by a later
+   * period that has begun by it, so a price recorded for a period that begins later is not used before its day. When no period
+   * runs on the day (the period ended and its renewal is not recorded yet), the newest priced one as without `on`.
    */
   async findPricedOfPlan(
     planId: string,
     tx?: DbTx,
+    on?: BusinessDate,
   ): Promise<{
     subscriptionKind: 'TERM' | 'PERPETUAL';
     unitPriceMinor: bigint;
@@ -363,11 +384,17 @@ export class SubscriptionRepo {
     billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
     allowsMidTermReduction: boolean;
   } | null> {
-    const rows = await (tx ?? this.prisma).subscription.findMany({
-      where: { planId, ...livePricedOf() },
-      select: { id: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND },
-    });
-    const row = pickPriceSource(rows.map(withPriceSource));
+    const db = tx ?? this.prisma;
+    const select = { id: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND } as const;
+    let row =
+      on === undefined
+        ? null
+        : pickPriceSource(
+            (await db.subscription.findMany({ where: { planId, ...pricedOn(on) }, select })).map(withPriceSource),
+          );
+    row ??= pickPriceSource(
+      (await db.subscription.findMany({ where: { planId, ...livePricedOf() }, select })).map(withPriceSource),
+    );
     if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null) return null;
 
     return {
