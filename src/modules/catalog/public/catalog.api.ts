@@ -101,10 +101,12 @@ export class CatalogApi {
 
   /**
    * What a plan is bought at (kind, unit price and billing cycle), from the main subscription of the plan: the newest priced
-   * active one; null when it has none. It is the plan's price whatever department asks (S1-02).
+   * active one; null when it has none. It is the plan's price whatever department asks (S1-02). With `on`, the price of that day:
+   * the main one among the periods that run on it (begun, not ended, not yet continued by a later period that has begun), and
+   * the newest priced one as above only when no period runs on it.
    */
-  getPlanPrice(planId: string, tx?: DbTx) {
-    return this.subscriptions.priceOfPlan(planId, tx);
+  getPlanPrice(planId: string, tx?: DbTx, on?: BusinessDate) {
+    return this.subscriptions.priceOfPlan(planId, tx, on);
   }
 
   /** The subscriptions of the plan a seat can be taken from today: the shared pool of the plan (`QĐ-103d`). */

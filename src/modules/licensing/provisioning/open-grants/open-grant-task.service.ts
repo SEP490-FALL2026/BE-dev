@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { BusinessDate } from '../../../../core/business-date';
-import type { GrantedSeatOfRequest, OpenGrantTask } from '../../public/licensing-open-grants.types';
+import type {
+  GrantedSeatOfRequest,
+  OpenGrantTask,
+  SeatRootsOfRequests,
+} from '../../public/licensing-open-grants.types';
 import { OpenGrantTaskRepo } from './open-grant-task.repo';
 
 /**
@@ -56,8 +60,8 @@ export class OpenGrantTaskService {
     };
   }
 
-  /** The seats the grants of these requests made that are still held on `onDate` (`BR-MF1-09e`): what the commitment of 01/01 counts. */
-  heldSeatsOfRequests(requestIds: readonly string[], onDate: BusinessDate, tx?: DbTx): Promise<GrantedSeatOfRequest[]> {
-    return this.repo.heldSeatsOfRequests(requestIds, onDate, tx);
+  /** The seats of these requests still held on `onDate`, along their chains (`BR-MF1-09e`): what the commitment of 01/01 counts. */
+  heldSeatsOfRequests(roots: SeatRootsOfRequests, onDate: BusinessDate, tx?: DbTx): Promise<GrantedSeatOfRequest[]> {
+    return this.repo.heldSeatsOfRequests(roots, onDate, tx);
   }
 }

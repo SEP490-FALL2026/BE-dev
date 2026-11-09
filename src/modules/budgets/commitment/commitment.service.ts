@@ -219,7 +219,8 @@ export class CommitmentService {
   /**
    * The commitments of 01/01 (`FR-5.8`(6), `QĐ-109a`): one for each request that does not hold one for the year, in the transaction of the pass, which
    * holds the rows of the requests. Cost Centers are taken in order of id, so two passes never wait for each other's years in a circle. The audit
-   * of each is written by the system; a request that already holds one for the year is left as it was and told back.
+   * of each is written by the system; a request that already holds one for the year is left as it was and told back, and one whose amount is
+   * not in the currency of the approved budget of the year is refused and told back (never written).
    */
   async holdYearStart(tx: DbTx, input: YearStartHoldInput): Promise<YearStartHoldResult> {
     for (const item of input.items) {
@@ -230,7 +231,7 @@ export class CommitmentService {
       input.items.map((item) => item.requestId),
       input.year,
     );
-    const result: YearStartHoldResult = { created: [], alreadyHeld: [] };
+    const result: YearStartHoldResult = { created: [], alreadyHeld: [], refused: [] };
     const ordered = [...input.items].sort(
       (a, b) => a.costCenterId.localeCompare(b.costCenterId) || a.requestId.localeCompare(b.requestId),
     );
@@ -249,6 +250,10 @@ export class CommitmentService {
         seatMonthlyMinor: item.seatMonthlyMinor,
         now: input.now,
       });
+      if (held === null) {
+        result.refused.push({ requestId: item.requestId, reason: 'CURRENCY_MISMATCH' });
+        continue;
+      }
       result.created.push({
         requestId: item.requestId,
         commitmentId: held.id,

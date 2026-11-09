@@ -1,4 +1,5 @@
 import {
+  bearingDepartmentOf,
   judgeYearStart,
   lastDayOfSeat,
   seatCountsOn,
@@ -15,6 +16,7 @@ const MONTHLY: YearStartPrice = {
 const seat = (patch: Partial<YearStartSeat> = {}): YearStartSeat => ({
   expectedEndDate: null,
   validUntil: null,
+  departmentId: null,
   ...patch,
 });
 const amount = (seats: readonly YearStartSeat[], price: YearStartPrice | null = MONTHLY) =>
@@ -108,6 +110,41 @@ describe('BR-MF1-09: the commitment made on 01/01 for a right that goes on', () 
         reason: 'NO_PRICE',
       });
     });
+
+    it('BR-MF1-09e: an amount larger than a money value may hold is told as such, not as a missing price', () => {
+      const huge: YearStartPrice = { ...MONTHLY, unitPrice: { amountMinor: 10n ** 15n, currency: 'VND' } };
+      expect(amount([seat()], huge)).toEqual({ status: 'SKIPPED', reason: 'AMOUNT_TOO_LARGE' });
+      // Each end date is within the range, the two together are not.
+      const large: YearStartPrice = { ...MONTHLY, unitPrice: { amountMinor: 5n * 10n ** 13n, currency: 'VND' } };
+      expect(amount([seat(), seat({ expectedEndDate: '2027-11-30' })], large)).toEqual({
+        status: 'SKIPPED',
+        reason: 'AMOUNT_TOO_LARGE',
+      });
+    });
+  });
+});
+
+describe('BR-MF1-09e: the department that bears the cost of a request on 01/01', () => {
+  const bearing = (seats: readonly YearStartSeat[]) =>
+    bearingDepartmentOf({ year: 2027, seats, requestDepartmentId: 'dep-request' });
+
+  it('BR-MF1-09e: a seat handed over to another department is borne by that department, not by the one of the request', () => {
+    expect(bearing([seat({ departmentId: 'dep-new' })])).toBe('dep-new');
+  });
+
+  it('BR-MF1-09e: a seat not granted yet, or one whose record names no department, is borne by the department of the request', () => {
+    expect(bearing([seat()])).toBe('dep-request');
+    expect(bearing([])).toBe('dep-request');
+  });
+
+  it('BR-MF1-09e: seats borne by more than one department leave the commitment, which is one, with the department of the request', () => {
+    expect(bearing([seat({ departmentId: 'dep-a' }), seat({ departmentId: 'dep-b' })])).toBe('dep-request');
+  });
+
+  it('BR-MF1-09e: a seat that is over on 01/01 bears nothing', () => {
+    expect(
+      bearing([seat({ departmentId: 'dep-old', expectedEndDate: '2026-12-31' }), seat({ departmentId: 'dep-new' })]),
+    ).toBe('dep-new');
   });
 });
 
@@ -134,5 +171,12 @@ describe('BR-MF1-09e: what the pass does with one request', () => {
     expect(judge({ seats: [seat({ expectedEndDate: '2026-12-31' })] })).toEqual({ status: 'NOTHING' });
     // No seat is judged before the Cost Center: a request that is over is never reported as missing one.
     expect(judge({ seats: [], costCenterId: null })).toEqual({ status: 'NOTHING' });
+  });
+
+  it('BR-MF1-09e: an amount too large is left out with that reason', () => {
+    expect(judge({ price: { ...MONTHLY, unitPrice: { amountMinor: 10n ** 15n, currency: 'VND' } } })).toEqual({
+      status: 'LEFT_OUT',
+      reason: 'AMOUNT_TOO_LARGE',
+    });
   });
 });

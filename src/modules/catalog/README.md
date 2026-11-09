@@ -14,7 +14,8 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
     plan.
   - `getPlanPrice(planId, tx?)` — giá của plan từ thuê bao chính (`pickPriceSource`: cờ `is_primary_for_plan`, không có thì giá tháng quy đổi cao nhất,
     hòa thì `start_date` cũ hơn rồi `id`), không theo phòng (S1-02, `BR-MF1-07`); trả `{ kind: RECURRING | ONE_TIME, unitPrice, billingCycle }`, thuê bao
-    `PERPETUAL` có giá ⟹ `ONE_TIME` (khóa `K4`).
+    `PERPETUAL` có giá ⟹ `ONE_TIME` (khóa `K4`). `getPlanPrice(planId, tx, on)` — giá hiệu lực ngày `on`: ưu tiên kỳ thuê bao chạy ngày đó (đã bắt
+    đầu, chưa kết thúc, chưa có kỳ kế tiếp bắt đầu trước/đúng ngày đó); không kỳ nào chạy ngày đó thì như không có `on` (khoản 01/01, `BR-MF1-09e`).
   - `getGrantableSubscriptions(planId, today, tx?)` / `getGrantableSubscriptionsOfPlans` (nhiều plan, một lần đọc) — thuê bao `ACTIVE` chưa có kỳ kế tiếp, còn hiệu lực hôm
     nay (bản `DRAFT` không cấp được), thứ tự: thuê bao chính trước, rồi giá tháng cao nhất (`orderBySourcePreference`); `getSubscriptionPrice`.
   - `addPoolSeat(tx, actor, subscriptionId)` — +1 `purchased_quantity` của thuê bao `ACTIVE` đang bị bên gọi khóa (`lockSeatTarget`), gói năm tăng giữa

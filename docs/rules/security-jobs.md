@@ -136,10 +136,14 @@
   a request holds one commitment a year (unique key and a check under the row lock), the rows of the requests are locked `FOR UPDATE` in order of id
   before the lock of the Cost Center and year (the order of the budgets), the batches (at most 100 requests) are separate transactions, and the pass
   that completes the mark writes the audit event `BUDGET_COMMITMENT.YEAR_START_RUN` once (`BUDGET_COMMITMENT.CREATED` for each commitment and
-  `BUDGET_COMMITMENT.YEAR_START_SKIPPED` with `NO_PRICE` or `NO_COST_CENTER` for a request left out, all by the `SYSTEM`). A year with no approved budget
-  makes the commitment waiting for one (`NO_BUDGET`), attached when a version is approved; the migration marks the year of the deployment done and an
-  organization with no earlier mark only marks its first year, so nothing is made backwards; a failed pass only logs and is tried again at the next
-  hour. Run one by hand with `YearStartCommitmentsService.run(now)`; after 01/01 check `year_start_commitment_runs` has the year with `completed_at` and
+  `BUDGET_COMMITMENT.YEAR_START_SKIPPED` with `NO_PRICE`, `NO_COST_CENTER`, `AMOUNT_TOO_LARGE`, `NO_RATE` or `CURRENCY_MISMATCH` for a request left
+  out, all by the `SYSTEM`). The amount is the price of 01/01 converted into the reporting currency (rate of 01/01, else of the day of the pass). Each
+  step (opening, each batch) first takes `pg_try_advisory_xact_lock` of the organization and year; an instance that finds it taken leaves the pass to
+  the holder. Each batch records the last request it went through (`resume_after_id`) and adds its counts, so a pass after a failure goes on after it
+  and writes no event twice. A year with no approved budget makes the commitment waiting for one (`NO_BUDGET`), attached when a version is approved;
+  the migration marks the year before the deployment done, so the first sweep after the deployment makes the pass of the year of the deployment;
+  an organization with no mark only marks its first year when it sent no request before that year began; a gap in the marks is logged as a
+  warning; a failed pass only logs and is tried again at the next hour. Run one by hand with `YearStartCommitmentsService.run(now)`; after 01/01 check `year_start_commitment_runs` has the year with `completed_at` and
   `budget_commitments` has rows with `origin = 'YEAR_START'`.
   The record of a departure has no job of its own: `EMPLOYEE_LEFT` is told once in the transaction that sets the employee `TERMINATED` (the
   unique `(kind, subject_id)` of the announcements makes a second telling a no-op), and a person who has left is refused by the sign-in and
