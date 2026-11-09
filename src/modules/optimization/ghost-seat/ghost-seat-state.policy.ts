@@ -2,15 +2,39 @@ import type { GhostSeatCloseReason, GhostSeatGroup, GhostSeatState, GhostSeatTie
 
 /**
  * How a recommendation moves (the states of `FR-4.12`): it is made `OPEN`; a reclaim decided on it (by the IT Admin for `G2`, by the
- * head for `G3`/`G4`) makes it `RECLAIM_DECIDED`, and a reclaim closed as failed puts it back; a head who pauses a `G3`/`G4` makes it
- * `PAUSED`; anything closes with a reason and a closed one never moves again.
+ * head for `G3`/`G4`) makes it `RECLAIM_DECIDED`, and a reclaim closed as failed puts it back; a transfer of the holder of a `G3`/`G4` makes it
+ * `PAUSED`; a head's queue is `AWAITING_DECISION` (or `WAITING_FOR_HEAD` while the department has no head); anything closes with a reason and a closed one never moves again.
  */
 const MOVES: Readonly<Record<GhostSeatState, readonly GhostSeatState[]>> = {
-  OPEN: ['PAUSED', 'RECLAIM_DECIDED', 'CLOSED'],
-  PAUSED: ['OPEN', 'RECLAIM_DECIDED', 'CLOSED'],
-  RECLAIM_DECIDED: ['OPEN', 'CLOSED'],
+  OPEN: ['PAUSED', 'AWAITING_DECISION', 'WAITING_FOR_HEAD', 'RECLAIM_DECIDED', 'CLOSED'],
+  AWAITING_DECISION: ['PAUSED', 'WAITING_FOR_HEAD', 'RECLAIM_DECIDED', 'CLOSED'],
+  WAITING_FOR_HEAD: ['PAUSED', 'AWAITING_DECISION', 'RETURNED_TO_HEAD', 'CLOSED'],
+  RETURNED_TO_HEAD: ['PAUSED', 'WAITING_FOR_HEAD', 'RECLAIM_DECIDED', 'CLOSED'],
+  PAUSED: ['OPEN', 'AWAITING_DECISION', 'WAITING_FOR_HEAD', 'RETURNED_TO_HEAD', 'RECLAIM_DECIDED', 'CLOSED'],
+  RECLAIM_DECIDED: ['OPEN', 'RETURNED_TO_HEAD', 'WAITING_FOR_HEAD', 'CLOSED'],
   CLOSED: [],
 };
+
+/**
+ * The states in which no head has decided yet (`FR-4.12`): the rules of `G3`/`G4` that deny a recommendation (activity after it,
+ * a right about to end) read these; the states that wait for a head or were returned to one are among them.
+ */
+export const UNDECIDED_STATES: readonly GhostSeatState[] = [
+  'OPEN',
+  'AWAITING_DECISION',
+  'WAITING_FOR_HEAD',
+  'RETURNED_TO_HEAD',
+  'PAUSED',
+];
+
+/** The undecided states a transfer of the holder pauses (a paused one is already paused). */
+export const PAUSABLE_STATES: readonly GhostSeatState[] = UNDECIDED_STATES.filter((state) => state !== 'PAUSED');
+
+/** The states in which a head may decide (`US-10-06` AC-8): the queue of the head and a reclaim the IT Admin returned. */
+export const DECIDABLE_STATES: readonly GhostSeatState[] = ['AWAITING_DECISION', 'RETURNED_TO_HEAD'];
+
+/** The states that sit in the department's queue and count on its dashboard (`US-12-15` dòng 20). */
+export const QUEUE_STATES = DECIDABLE_STATES;
 
 export function canMove(from: GhostSeatState, to: GhostSeatState): boolean {
   return MOVES[from].includes(to);

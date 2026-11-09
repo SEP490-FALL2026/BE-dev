@@ -1,4 +1,9 @@
-import type { GhostSeatRecord, GhostSeatCloseReason, GhostSeatG1Action } from '../ghost-seat/ghost-seat.types';
+import type {
+  GhostSeatRecord,
+  GhostSeatCloseReason,
+  GhostSeatG1Action,
+  GhostSeatState,
+} from '../ghost-seat/ghost-seat.types';
 import type { RuleSkipDetail } from '../rule-run/rule-run-skip-detail.json';
 import type { SkipGate } from '../rule-run/rule-run.repo';
 
@@ -91,7 +96,7 @@ export interface SeatFacts {
 export interface ChainRecommendation {
   id: string;
   group: 'G1' | 'G2' | 'G3' | 'G4';
-  state: 'OPEN' | 'PAUSED' | 'RECLAIM_DECIDED' | 'CLOSED';
+  state: GhostSeatState;
   revocationTaskId: string | null;
   holderLeftOn: string | null;
 }

@@ -156,6 +156,21 @@ describe('the alerts of the rights (a03-license-inbox-alerts, FR-5.14 lines 3, 1
         code: 'GHOST_SEAT_G2_DETECTED',
         params: { recommendationId: ID, employeeId: ID, applicationId: ID },
       }),
+      notice({ code: 'GHOST_SEAT_NEW', params: { recommendationId: ID, departmentId: ID, weekKey: '2026-W45' } }),
+      notice({
+        code: 'GHOST_SEAT_ACTION_TIER',
+        params: { recommendationId: ID, departmentId: ID, weekKey: '2026-W45' },
+      }),
+      notice({
+        code: 'GHOST_SEAT_DECISION_OVERDUE',
+        params: { recommendationId: ID, employeeId: ID, applicationId: ID, decisionDueOn: '2026-11-06' },
+      }),
+      notice({ code: 'GHOST_SEAT_WAITING_FOR_HEAD', params: { recommendationId: ID, departmentId: ID } }),
+      notice({ code: 'GHOST_SEAT_RETURNED', params: { recommendationId: ID, employeeId: ID, applicationId: ID } }),
+      notice({
+        code: 'GHOST_SEAT_EXEMPTION_ENDING',
+        params: { recommendationId: ID, employeeId: ID, applicationId: ID, exemptUntil: '2026-12-31' },
+      }),
       notice({
         code: 'REVOCATION_UPCOMING',
         params: { taskId: ID, planId: ID, applicationId: ID, source: 'GHOST_SEAT', notBefore: '2026-11-08' },

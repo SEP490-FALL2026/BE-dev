@@ -120,6 +120,13 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   ],
   LEAVER_K1_ACCESS_RUNS_ON: ['taskId', 'assignmentId', 'employeeId', 'planId', 'accessUntil'],
   GHOST_SEAT_G2_DETECTED: ['recommendationId', 'employeeId', 'applicationId'],
+  // Ids and a day only (the interface turns ids into names): the week key makes the notice one a week for each recipient.
+  GHOST_SEAT_NEW: ['recommendationId', 'departmentId', 'weekKey'],
+  GHOST_SEAT_ACTION_TIER: ['recommendationId', 'departmentId', 'weekKey'],
+  GHOST_SEAT_DECISION_OVERDUE: ['recommendationId', 'employeeId', 'applicationId', 'decisionDueOn'],
+  GHOST_SEAT_WAITING_FOR_HEAD: ['recommendationId', 'departmentId'],
+  GHOST_SEAT_RETURNED: ['recommendationId', 'employeeId', 'applicationId'],
+  GHOST_SEAT_EXEMPTION_ENDING: ['recommendationId', 'employeeId', 'applicationId', 'exemptUntil'],
   REVOCATION_UPCOMING: ['taskId', 'planId', 'applicationId', 'source', 'notBefore'],
   REVOCATION_CANCELLED: ['planId', 'applicationId', 'source'],
   // The renewal of a subscription: ids, the milestone and where it comes from, the choice and when it is carried out. The

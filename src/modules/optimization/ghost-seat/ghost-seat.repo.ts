@@ -4,6 +4,7 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { ghostSeatEvidenceJson } from './ghost-seat-evidence.json';
+import { QUEUE_STATES } from './ghost-seat-state.policy';
 import type {
   GhostSeatCloseReason,
   GhostSeatGroup,
@@ -23,6 +24,14 @@ export interface GhostSeatPatch {
   closedAt?: Date;
   closedByAppUserId?: string | null;
   supersededById?: string;
+  deciderDepartmentId?: string | null;
+  routedAt?: Date | null;
+  decisionDueOn?: BusinessDate | null;
+  overdueNoticedAt?: Date | null;
+  returnCount?: number;
+  revocationNotBefore?: BusinessDate | null;
+  pausedAt?: Date | null;
+  pauseTransferId?: string | null;
 }
 
 export interface GhostSeatFilter {
@@ -61,7 +70,29 @@ const toRecord = (row: Row): GhostSeatRecord => ({
   closedAt: row.closedAt,
   closedByAppUserId: row.closedByAppUserId,
   supersededById: row.supersededById,
+  deciderDepartmentId: row.deciderDepartmentId,
+  routedAt: row.routedAt,
+  decisionDueOn: row.decisionDueOn ? fromDateColumn(row.decisionDueOn) : null,
+  overdueNoticedAt: row.overdueNoticedAt,
+  returnCount: row.returnCount,
+  revocationNotBefore: row.revocationNotBefore ? fromDateColumn(row.revocationNotBefore) : null,
+  pausedAt: row.pausedAt,
+  pauseTransferId: row.pauseTransferId,
 });
+
+const DATE_COLUMNS: ReadonlySet<string> = new Set(['holderLeftOn', 'decisionDueOn', 'revocationNotBefore']);
+
+/** The columns a patch sets: every key it gives (not `undefined`), the business days turned into date columns. */
+function dataOf(patch: GhostSeatPatch): Prisma.GhostSeatRecommendationUncheckedUpdateInput {
+  const entries = Object.entries(patch)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]): [string, unknown] => [
+      key,
+      DATE_COLUMNS.has(key) && typeof value === 'string' ? toDateColumn(value) : value,
+    ]);
+
+  return Object.fromEntries(entries);
+}
 
 const whereOf = (organizationId: string, filter: GhostSeatFilter): Prisma.GhostSeatRecommendationWhereInput => ({
   organizationId,
@@ -114,6 +145,25 @@ export class GhostSeatRepo {
     return this.find(id, tx);
   }
 
+  /** The recommendation locked `FOR UPDATE SKIP LOCKED`, or null when it is gone or another transaction holds it: what a job does, so it never waits. */
+  async lockOrSkip(tx: DbTx, id: string): Promise<GhostSeatRecord | null> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "ghost_seat_recommendations" WHERE "id" = ${id}::uuid FOR UPDATE SKIP LOCKED`;
+
+    return locked.length === 0 ? null : this.find(id, tx);
+  }
+
+  /** Several recommendations locked `FOR UPDATE` in ascending id order (so two callers never wait for each other, `DA6-23`), by id. */
+  async lockMany(tx: DbTx, ids: readonly string[]): Promise<Map<string, GhostSeatRecord>> {
+    const sorted = [...new Set(ids)].sort();
+    if (sorted.length === 0) return new Map();
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "ghost_seat_recommendations" WHERE "id" = ANY(${sorted}::uuid[]) ORDER BY "id" FOR UPDATE`;
+    const rows = await tx.ghostSeatRecommendation.findMany({ where: { id: { in: locked.map((row) => row.id) } } });
+
+    return new Map(rows.map((row) => [row.id, toRecord(row)]));
+  }
+
   /**
    * The unclosed recommendations a revocation task is linked to, locked `FOR UPDATE SKIP LOCKED`: the listener runs inside the
    * transaction of licensing, which already holds the task, so it never waits for a recommendation another transaction holds (`DA6-23`).
@@ -129,6 +179,17 @@ export class GhostSeatRepo {
     return rows.map(toRecord);
   }
 
+  /** The recommendations with these ids, unlocked, by id order. */
+  async findMany(ids: readonly string[], tx?: DbTx): Promise<GhostSeatRecord[]> {
+    if (ids.length === 0) return [];
+    const rows = await (tx ?? this.prisma).ghostSeatRecommendation.findMany({
+      where: { id: { in: [...ids] } },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map(toRecord);
+  }
+
   async find(id: string, tx?: DbTx): Promise<GhostSeatRecord | null> {
     const row = await (tx ?? this.prisma).ghostSeatRecommendation.findUnique({ where: { id } });
 
@@ -138,17 +199,7 @@ export class GhostSeatRepo {
   async update(tx: DbTx, id: string, patch: GhostSeatPatch): Promise<GhostSeatRecord> {
     const row = await tx.ghostSeatRecommendation.update({
       where: { id },
-      data: {
-        ...(patch.state ? { state: patch.state } : {}),
-        ...(patch.closeReason ? { closeReason: patch.closeReason } : {}),
-        ...(patch.freeSeats !== undefined ? { freeSeats: patch.freeSeats } : {}),
-        ...(patch.revocationTaskId !== undefined ? { revocationTaskId: patch.revocationTaskId } : {}),
-        ...(patch.holderLeftOn ? { holderLeftOn: toDateColumn(patch.holderLeftOn) } : {}),
-        ...(patch.closedAt ? { closedAt: patch.closedAt } : {}),
-        ...(patch.closedByAppUserId !== undefined ? { closedByAppUserId: patch.closedByAppUserId } : {}),
-        ...(patch.supersededById ? { supersededById: patch.supersededById } : {}),
-        updatedAt: new Date(),
-      },
+      data: { ...dataOf(patch), updatedAt: new Date() },
     });
 
     return toRecord(row);
@@ -172,6 +223,45 @@ export class GhostSeatRepo {
     });
 
     return rows.map(toRecord);
+  }
+
+  /** The `G3`/`G4` recommendations in these states, oldest first: what the follow-up job walks. */
+  async ofStates(organizationId: string, states: readonly GhostSeatState[], tx?: DbTx): Promise<GhostSeatRecord[]> {
+    const rows = await (tx ?? this.prisma).ghostSeatRecommendation.findMany({
+      where: { organizationId, group: { in: ['G3', 'G4'] }, state: { in: [...states] } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map(toRecord);
+  }
+
+  /** The queue of a department's head: what waits for them or was returned to them, a person's rows together, oldest first. */
+  async queuePage(
+    organizationId: string,
+    departmentId: string,
+    page: { skip: number; take: number },
+    tx?: DbTx,
+  ): Promise<{ items: GhostSeatRecord[]; total: number }> {
+    const db = tx ?? this.prisma;
+    const where = this.queueWhere(organizationId, departmentId);
+    const rows = await db.ghostSeatRecommendation.findMany({
+      where,
+      orderBy: [{ employeeId: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      skip: page.skip,
+      take: page.take,
+    });
+    const total = await db.ghostSeatRecommendation.count({ where });
+
+    return { items: rows.map(toRecord), total };
+  }
+
+  /** How many recommendations wait in the queue of a department (what its head's dashboard counts). */
+  countQueue(organizationId: string, departmentId: string, tx?: DbTx): Promise<number> {
+    return (tx ?? this.prisma).ghostSeatRecommendation.count({ where: this.queueWhere(organizationId, departmentId) });
+  }
+
+  private queueWhere(organizationId: string, departmentId: string): Prisma.GhostSeatRecommendationWhereInput {
+    return { organizationId, deciderDepartmentId: departmentId, state: { in: [...QUEUE_STATES] } };
   }
 
   async page(

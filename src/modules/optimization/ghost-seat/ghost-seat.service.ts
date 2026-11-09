@@ -5,7 +5,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import type { AuditValue } from '../../audit/public/audit.types';
 import { ghostSeatAuditEvent, type GhostSeatActor } from '../optimization-audit-event.mapper';
-import { GhostSeatRepo } from './ghost-seat.repo';
+import { GhostSeatRepo, type GhostSeatPatch } from './ghost-seat.repo';
 import { canMove, settlementOf, type SettlementInput } from './ghost-seat-state.policy';
 import type { GhostSeatCloseReason, GhostSeatRecord, NewGhostSeat } from './ghost-seat.types';
 
@@ -133,6 +133,82 @@ export class GhostSeatService {
     }
 
     return 'KEPT';
+  }
+
+  /**
+   * A move of a recommendation that is not a close (routing to a head, waiting for one, a pause, a resume, a return): `to` must be a move
+   * the state policy allows, `action` is the audit code and `facts` what the event adds (the departments, the day). Returns the row as it is.
+   */
+  async transition(
+    tx: DbTx,
+    record: GhostSeatRecord,
+    to: GhostSeatRecord['state'],
+    patch: GhostSeatPatch,
+    action: string,
+    actor: GhostSeatActor,
+    facts: { [key: string]: AuditValue } = {},
+  ): Promise<GhostSeatRecord> {
+    if (!canMove(record.state, to)) return record;
+    const updated = await this.repo.update(tx, record.id, { ...patch, state: to });
+    await this.audit.record(
+      tx,
+      ghostSeatAuditEvent(actor, record.organizationId, action, record.id, snapshot(record), {
+        ...snapshot(updated),
+        deciderDepartmentId: updated.deciderDepartmentId,
+        decisionDueOn: updated.decisionDueOn,
+        ...facts,
+      }),
+    );
+
+    return updated;
+  }
+
+  /** An act on a recommendation that changes none of its columns (a decision to keep it): only the audit says it happened. */
+  async note(
+    tx: DbTx,
+    record: GhostSeatRecord,
+    action: string,
+    actor: GhostSeatActor,
+    facts: { [key: string]: AuditValue },
+  ): Promise<void> {
+    await this.audit.record(
+      tx,
+      ghostSeatAuditEvent(actor, record.organizationId, action, record.id, snapshot(record), {
+        ...snapshot(record),
+        ...facts,
+      }),
+    );
+  }
+
+  /**
+   * A reclaim the head decided (`G3`/`G4`) was closed as failed and the IT Admin opens it again: the recommendation stays `RECLAIM_DECIDED`
+   * and holds the new task (`Q-95`, `DA6-25`).
+   */
+  async relinkTask(tx: DbTx, record: GhostSeatRecord, taskId: string, actor: GhostSeatActor): Promise<void> {
+    const updated = await this.repo.update(tx, record.id, { revocationTaskId: taskId });
+    await this.audit.record(
+      tx,
+      ghostSeatAuditEvent(
+        actor,
+        record.organizationId,
+        'GHOST_SEAT.REOPENED',
+        record.id,
+        snapshot(record),
+        snapshot(updated),
+      ),
+    );
+  }
+
+  /** The head and the IT Admin were told the decision is past due: said once for a recommendation, until a return makes the day new. */
+  async markOverdueNoticed(tx: DbTx, record: GhostSeatRecord, at: Date, actor: GhostSeatActor): Promise<void> {
+    const updated = await this.repo.update(tx, record.id, { overdueNoticedAt: at });
+    await this.audit.record(
+      tx,
+      ghostSeatAuditEvent(actor, record.organizationId, 'GHOST_SEAT.OVERDUE_NOTICED', record.id, snapshot(record), {
+        ...snapshot(updated),
+        decisionDueOn: updated.decisionDueOn,
+      }),
+    );
   }
 
   /** The reclaim of a `G2` was opened (by the IT Admin) or found under way (by a run): the recommendation holds the task. */

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -7,7 +8,7 @@ import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
 import { TransferRefusedError } from './transfer.errors';
 import type { TransferChangeWire, TransferDetailWire, TransferRecordedWire, TransferSummaryWire } from './transfer.dto';
 import { toChange, toDetail, toRecorded, toSummary, type TransferNames } from './transfer.mapper';
-import { TransferRepo } from './transfer.repo';
+import { TransferRepo, type TransferFactRow } from './transfer.repo';
 import type { TransferListFilter, TransferRecord, TransferWarning } from './transfer.types';
 
 export interface Paged<T> {
@@ -38,6 +39,16 @@ export class TransferQueryService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
   ) {}
+
+  /** The transfers of these people that have taken effect on `onDate` and are not closed (`getTransfersInOverlap`). */
+  overlapOf(employeeIds: readonly string[], onDate: BusinessDate): Promise<TransferFactRow[]> {
+    return this.transfers.inOverlap(employeeIds, onDate);
+  }
+
+  /** The transfers with these ids, whatever their state (`getTransfersByIds`). */
+  factsOf(transferIds: readonly string[]): Promise<TransferFactRow[]> {
+    return this.transfers.factsOf(transferIds);
+  }
 
   /** One page of summaries; the names of the page are read in one statement each, whatever the page size. */
   async list(actor: AuthenticatedPrincipal, filter: TransferListFilter): Promise<Paged<TransferSummaryWire>> {

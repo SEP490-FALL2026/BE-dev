@@ -8,7 +8,15 @@ export type GhostSeatGroup = (typeof GHOST_SEAT_GROUPS)[number];
 export const GHOST_SEAT_TIERS = ['MONITOR', 'REVIEW', 'ACTION'] as const;
 export type GhostSeatTier = (typeof GHOST_SEAT_TIERS)[number];
 
-export const GHOST_SEAT_STATES = ['OPEN', 'PAUSED', 'RECLAIM_DECIDED', 'CLOSED'] as const;
+export const GHOST_SEAT_STATES = [
+  'OPEN',
+  'PAUSED',
+  'RECLAIM_DECIDED',
+  'CLOSED',
+  'AWAITING_DECISION',
+  'WAITING_FOR_HEAD',
+  'RETURNED_TO_HEAD',
+] as const;
 export type GhostSeatState = (typeof GHOST_SEAT_STATES)[number];
 
 export const GHOST_SEAT_CLOSE_REASONS = [
@@ -20,6 +28,8 @@ export const GHOST_SEAT_CLOSE_REASONS = [
   'KEPT',
   'NEGATED',
   'TRANSFER_SEAT_REVOKED',
+  'EXEMPTED',
+  'LEFT_TO_EXPIRE',
 ] as const;
 export type GhostSeatCloseReason = (typeof GHOST_SEAT_CLOSE_REASONS)[number];
 
@@ -54,6 +64,18 @@ export interface GhostSeatRecord {
   closedAt: Date | null;
   closedByAppUserId: string | null;
   supersededById: string | null;
+  /** The department whose head decides (`AWAITING_DECISION`, `RETURNED_TO_HEAD`); kept after the decision as the trace of who was asked. */
+  deciderDepartmentId: string | null;
+  routedAt: Date | null;
+  /** The day the head's decision is due: working days from the day the recommendation entered the queue, never reset. */
+  decisionDueOn: BusinessDate | null;
+  overdueNoticedAt: Date | null;
+  /** How many times the IT Admin returned the reclaim to the head: at most one (`OI-02`). */
+  returnCount: number;
+  /** The first day the revocation of a reclaim the head decided can be taken (the end of the grace). */
+  revocationNotBefore: BusinessDate | null;
+  pausedAt: Date | null;
+  pauseTransferId: string | null;
 }
 
 /** What a run writes when it makes a recommendation. */

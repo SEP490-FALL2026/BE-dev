@@ -1,4 +1,8 @@
 import {
+  DECIDABLE_STATES,
+  PAUSABLE_STATES,
+  QUEUE_STATES,
+  UNDECIDED_STATES,
   canMove,
   closeReasonOfEndedSeat,
   countsInKpi5,
@@ -17,8 +21,43 @@ describe('ghost seat state policy', () => {
   });
 
   it('never moves a closed recommendation', () => {
-    for (const to of ['OPEN', 'PAUSED', 'RECLAIM_DECIDED', 'CLOSED'] as const)
+    for (const to of [
+      'OPEN',
+      'PAUSED',
+      'RECLAIM_DECIDED',
+      'CLOSED',
+      'AWAITING_DECISION',
+      'WAITING_FOR_HEAD',
+      'RETURNED_TO_HEAD',
+    ] as const)
       expect(canMove('CLOSED', to)).toBe(false);
+  });
+
+  it('US-10-06: a head’s queue moves OPEN to AWAITING_DECISION (or WAITING_FOR_HEAD), a decision reclaims or closes it, and a return sends the reclaim back to the head', () => {
+    expect(canMove('OPEN', 'AWAITING_DECISION')).toBe(true);
+    expect(canMove('OPEN', 'WAITING_FOR_HEAD')).toBe(true);
+    expect(canMove('AWAITING_DECISION', 'WAITING_FOR_HEAD')).toBe(true);
+    expect(canMove('WAITING_FOR_HEAD', 'AWAITING_DECISION')).toBe(true);
+    expect(canMove('WAITING_FOR_HEAD', 'RETURNED_TO_HEAD')).toBe(true);
+    expect(canMove('AWAITING_DECISION', 'RECLAIM_DECIDED')).toBe(true);
+    expect(canMove('RETURNED_TO_HEAD', 'RECLAIM_DECIDED')).toBe(true);
+    expect(canMove('RECLAIM_DECIDED', 'RETURNED_TO_HEAD')).toBe(true);
+    expect(canMove('RECLAIM_DECIDED', 'WAITING_FOR_HEAD')).toBe(true);
+    expect(canMove('PAUSED', 'RETURNED_TO_HEAD')).toBe(true);
+    expect(canMove('RECLAIM_DECIDED', 'AWAITING_DECISION')).toBe(false);
+    expect(canMove('RECLAIM_DECIDED', 'PAUSED')).toBe(false);
+  });
+
+  it('Q-89, QĐ-90c: a reclaim the head decided is not undecided, so a transfer does not pause it; every undecided state can be paused but PAUSED itself', () => {
+    expect(UNDECIDED_STATES).toEqual(['OPEN', 'AWAITING_DECISION', 'WAITING_FOR_HEAD', 'RETURNED_TO_HEAD', 'PAUSED']);
+    expect(PAUSABLE_STATES).toEqual(['OPEN', 'AWAITING_DECISION', 'WAITING_FOR_HEAD', 'RETURNED_TO_HEAD']);
+    expect(UNDECIDED_STATES).not.toContain('RECLAIM_DECIDED');
+    for (const from of PAUSABLE_STATES) expect(canMove(from, 'PAUSED')).toBe(true);
+  });
+
+  it('US-12-15 dòng 20: the head decides, and the dashboard counts, only what awaits them or was returned to them', () => {
+    expect(DECIDABLE_STATES).toEqual(['AWAITING_DECISION', 'RETURNED_TO_HEAD']);
+    expect(QUEUE_STATES).toEqual(DECIDABLE_STATES);
   });
 
   it('BR-MF5-01: only an open G2 can be reclaimed by the IT Admin (G1, a decided G2 and a closed one cannot)', () => {

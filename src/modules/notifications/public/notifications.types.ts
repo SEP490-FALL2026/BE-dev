@@ -122,6 +122,14 @@ export const IN_APP_NOTIFICATION_CODES = [
   'LEAVER_K1_ACCESS_RUNS_ON',
   // A seat still held by a person who left (`G2`, `US-10-01` AC-2): told once to the IT Admin in charge.
   'GHOST_SEAT_G2_DETECTED',
+  // The queue of the head of the department (`qd103-ghost-seat-manager-decision`, `FR-4.12`): new recommendations (one a week), the same told to
+  // the IT Admin in charge for the action tier, a decision past due, a department with no head, a reclaim the IT Admin returned, an exemption ending.
+  'GHOST_SEAT_NEW',
+  'GHOST_SEAT_ACTION_TIER',
+  'GHOST_SEAT_DECISION_OVERDUE',
+  'GHOST_SEAT_WAITING_FOR_HEAD',
+  'GHOST_SEAT_RETURNED',
+  'GHOST_SEAT_EXEMPTION_ENDING',
   // The revocation of a seat that is coming, told to the person who holds it, and one that no longer applies (`BR-MF5-04`, `US-10-06` AC-2).
   'REVOCATION_UPCOMING',
   'REVOCATION_CANCELLED',

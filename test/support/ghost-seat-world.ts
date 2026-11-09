@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import type { ApiAccount } from './api-accounts';
+import { DecisionFollowUpService } from '../../src/modules/optimization/decision/decision-follow-up.service';
 import { InternalRulesService } from '../../src/modules/optimization/internal-rules/internal-rules.service';
 import type { RuleRunRecord } from '../../src/modules/optimization/rule-run/rule-run.repo';
 import { RevocationHarness } from './revocation-harness';
@@ -21,6 +23,14 @@ export interface GhostRow {
   holder_left_on: string | null;
   superseded_by_id: string | null;
   evidence: Record<string, unknown>;
+  decider_department_id: string | null;
+  routed_at: string | null;
+  decision_due_on: string | null;
+  overdue_noticed_at: string | null;
+  return_count: number;
+  revocation_not_before: string | null;
+  paused_at: string | null;
+  pause_transfer_id: string | null;
 }
 
 /**
@@ -115,7 +125,9 @@ export class GhostSeatWorld extends RevocationHarness {
       await this.ctx.sql.query<GhostRow>(
         `SELECT id, "group", state, close_reason, tier, subscription_id, assignment_id, seat_chain_id, employee_id, department_id,
                 free_seats, counts_toward_vacant_cost, revocation_task_id, to_char(holder_left_on, 'YYYY-MM-DD') AS holder_left_on,
-                superseded_by_id, evidence
+                superseded_by_id, evidence, decider_department_id, routed_at, to_char(decision_due_on, 'YYYY-MM-DD') AS decision_due_on,
+                overdue_noticed_at, return_count, to_char(revocation_not_before, 'YYYY-MM-DD') AS revocation_not_before, paused_at,
+                pause_transfer_id
            FROM ghost_seat_recommendations WHERE ${where} ORDER BY created_at, id`,
         values,
       )
@@ -161,13 +173,22 @@ export class GhostSeatWorld extends RevocationHarness {
    */
   async seedRecommendation(input: {
     group: 'G1' | 'G2' | 'G3' | 'G4';
-    state: 'OPEN' | 'PAUSED' | 'RECLAIM_DECIDED' | 'CLOSED';
+    state:
+      'OPEN' | 'PAUSED' | 'RECLAIM_DECIDED' | 'CLOSED' | 'AWAITING_DECISION' | 'WAITING_FOR_HEAD' | 'RETURNED_TO_HEAD';
     tier?: 'MONITOR' | 'REVIEW' | 'ACTION' | null;
     assignmentId: string;
     closeReason?: string;
     createdAt?: Date;
     revocationTaskId?: string;
     supersededById?: string;
+    /** The routing the manager-decision item writes (the CHECKs want a due day and a department for the queue states). */
+    deciderDepartmentId?: string;
+    routedAt?: Date;
+    decisionDueOn?: string;
+    returnCount?: number;
+    revocationNotBefore?: string;
+    pausedAt?: Date;
+    pauseTransferId?: string;
   }): Promise<string> {
     const { rows: seat } = await this.ctx.sql.query<{
       employee_id: string;
@@ -183,9 +204,10 @@ export class GhostSeatWorld extends RevocationHarness {
     const id = randomUUID();
     await this.ctx.sql.query(
       `INSERT INTO ghost_seat_recommendations (id, organization_id, "group", state, close_reason, tier, application_id, plan_id,
-         subscription_id, assignment_id, seat_chain_id, employee_id, evidence, created_run_id, created_at, closed_at, revocation_task_id, superseded_by_id)
+         subscription_id, assignment_id, seat_chain_id, employee_id, evidence, created_run_id, created_at, closed_at, revocation_task_id, superseded_by_id,
+         decider_department_id, routed_at, decision_due_on, return_count, revocation_not_before, paused_at, pause_transfer_id)
        VALUES ($1, $2, $3::"GhostSeatGroup", $4::"GhostSeatState", $5::"GhostSeatCloseReason", $6::"GhostSeatTier", $7, $8, $9, $10, $10,
-         $11, $16::jsonb, $12, COALESCE($13::timestamptz, now()), $14, $15, $17)`,
+         $11, $16::jsonb, $12, COALESCE($13::timestamptz, now()), $14, $15, $17, $18, $19, $20::date, $21, $22::date, $23, $24)`,
       [
         id,
         this.seed.organizationId,
@@ -215,10 +237,122 @@ export class GhostSeatWorld extends RevocationHarness {
             : { group: input.group },
         ),
         input.supersededById ?? null,
+        input.deciderDepartmentId ?? null,
+        input.routedAt ?? null,
+        input.decisionDueOn ?? null,
+        input.returnCount ?? 0,
+        input.revocationNotBefore ?? null,
+        input.pausedAt ?? null,
+        input.pauseTransferId ?? null,
       ],
     );
 
     return id;
+  }
+
+  /**
+   * A department with a head who can sign in (a MANAGER account, placed in it) from the start of the year, owned by the IT Admin of the
+   * world; `personIn` and `seatOf` put holders in it. `headEmployeeId` is the person who heads it.
+   */
+  async headedDepartment(code: string): Promise<{ departmentId: string; headEmployeeId: string; head: ApiAccount }> {
+    const department = await this.department(code, this.worldItAdmin.employeeId);
+    const headEmployeeId = await this.personIn(`${code}-HEAD`, department.id);
+    const head = await this.account(`${code}-HEAD`, headEmployeeId, 'MANAGER');
+    await this.ctx.sql.query(
+      `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+       VALUES (gen_random_uuid(), $1, $2, $3, '2026-01-05')`,
+      [this.seed.organizationId, department.id, headEmployeeId],
+    );
+
+    return { departmentId: department.id, headEmployeeId, head };
+  }
+
+  /** A person placed in a department from the start of the year (a placement never changes, so the person is made there). */
+  async personIn(code: string, departmentId: string): Promise<string> {
+    const { rows } = await this.ctx.sql.query<{ id: string }>(
+      `WITH made AS (
+         INSERT INTO employees (id, organization_id, employee_code, full_name, work_email, normalized_work_email,
+           employment_type, hire_date, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $2, lower($2) || '@acme.vn', lower($2) || '@acme.vn', 'STAFF', '2020-01-01', now())
+         RETURNING id
+       ), placed AS (
+         INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+         SELECT gen_random_uuid(), $1, id, $3, '2026-01-05' FROM made
+       )
+       SELECT id FROM made`,
+      [this.seed.organizationId, code, departmentId],
+    );
+
+    return rows[0].id;
+  }
+
+  /** A seat of an existing person on a subscription of the world, owned by the department of the subscription; returns the assignment. */
+  async seatOf(employeeId: string, subscriptionId: string): Promise<string> {
+    const { rows } = await this.ctx.sql.query<{ id: string }>(
+      `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
+         normalized_account_identifier, valid_from, valid_from_basis, owning_department_id, created_by_app_user_id)
+       SELECT gen_random_uuid(), s.organization_id, 'PERSONAL', 'REQUEST', s.plan_id, s.id, e.id, e.work_email, e.work_email,
+              '2026-01-05', 'RECORDED', s.owner_department_id, $3::uuid
+         FROM subscriptions s JOIN employees e ON e.id = $2 WHERE s.id = $1
+       RETURNING id`,
+      [subscriptionId, employeeId, randomUUID()],
+    );
+
+    return rows[0].id;
+  }
+
+  /** A new person placed in `departmentId` with a seat on a new subscription of the world: the holder of a recommendation. */
+  async seatIn(code: string, departmentId: string): Promise<{ employeeId: string; assignmentId: string }> {
+    const employeeId = await this.personIn(code, departmentId);
+
+    return { employeeId, assignmentId: await this.seatOf(employeeId, await this.worldSubscription(30, 'K2')) };
+  }
+
+  /** The head of a department is gone from `day` (the period ends): the department has nobody to decide. */
+  async endHead(departmentId: string, day = '2026-01-06'): Promise<void> {
+    await this.ctx.sql.query(
+      `UPDATE department_head_periods SET valid_to = $2::date WHERE department_id = $1 AND valid_to IS NULL`,
+      [departmentId, day],
+    );
+  }
+
+  /**
+   * A transfer of a person: by default one that has taken effect (`EFFECTIVE`, from `effectiveOn`) and is not closed, the one that pauses a
+   * recommendation; `CANCELLED` is one that never took effect.
+   */
+  async transferOf(
+    employeeId: string,
+    fromDepartmentId: string,
+    toDepartmentId: string,
+    effectiveOn: string,
+    status: 'EFFECTIVE' | 'CANCELLED' | 'PENDING' = 'EFFECTIVE',
+  ) {
+    const id = randomUUID();
+    await this.ctx.sql.query(
+      `INSERT INTO department_transfers (id, organization_id, employee_id, from_department_id, to_department_id, effective_on, status,
+         effective_at, cancelled_at, cancelled_by_app_user_id, cancelled_reason, closes_placement_id, opens_placement_id, grounds_type,
+         grounds_reference, grounds_issuer, grounds_issued_on, recorded_by_app_user_id)
+       VALUES ($1, $2, $3, $4, $5, $6::date, $7::"DepartmentTransferStatus",
+         CASE WHEN $7 = 'EFFECTIVE' THEN now() END, CASE WHEN $7 = 'CANCELLED' THEN now() END,
+         CASE WHEN $7 = 'CANCELLED' THEN gen_random_uuid() END, CASE WHEN $7 = 'CANCELLED' THEN 'nhầm' END,
+         gen_random_uuid(), gen_random_uuid(), 'DECISION', 'D-1', 'HR', $6::date, gen_random_uuid())`,
+      [id, this.seed.organizationId, employeeId, fromDepartmentId, toDepartmentId, effectiveOn, status],
+    );
+
+    return id;
+  }
+
+  /** The IT Admin closed the transfer (the service accounts are settled): it no longer pauses anything. */
+  async closeTransfer(transferId: string): Promise<void> {
+    await this.ctx.sql.query(
+      `UPDATE department_transfers SET closed_at = now(), closed_by_app_user_id = gen_random_uuid() WHERE id = $1`,
+      [transferId],
+    );
+  }
+
+  /** The follow-up of the queue of the heads for `day` (a new day unless given): pause, resume, route, watch the heads. */
+  followUp(day: Date = this.nextDay()) {
+    return this.ctx.app.get(DecisionFollowUpService).run(day);
   }
 
   /** A run row to hang seeded recommendations on (made once, with a period no rule asks for). */
