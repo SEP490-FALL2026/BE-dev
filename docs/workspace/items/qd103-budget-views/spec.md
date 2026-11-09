@@ -54,8 +54,8 @@ Dashboard Finance riêng (W5); khoản cam kết 01/01 (W4) — view đọc từ
 
 ## Ownership: module, data, API
 
-- `budgets/public/budgets.extension-points.ts`: `PendingSpendContributions` (`Contributions<PendingSpendReader>`), reader
-  `(tx, pairs: { costCenterId; year }[]) => Promise<Map<key, bigint>>`; `requests` đăng ký trong
+- `budgets/public/budgets.extension-points.ts`: `PendingSpendContributions` (`Contributions<PendingSpendContribution>`), reader
+  `pendingMany(pairs: { costCenterId; year }[], tx?) => Promise<Map<key, bigint>>`; `requests` đăng ký trong
   `requests/spend/pending-spend.listener.ts` bằng hàm lô mới của `budget-check.repo.ts` (cùng định nghĩa với `pendingFor`).
   Không có đóng góp (graph không có `requests`) ⟹ 0.
 - `budgetMine` (trưởng phòng của Cost Center cho năm): giữ `status` (`ACTIVE` | `NO_ACTIVE_BUDGET` — không thêm `noBudget`),
@@ -96,8 +96,8 @@ pendingSpend`; được phép âm (`FR-5.8a`). Cùng nguồn số với `request
 
 ## Definition of Done
 
-- [ ] Test matrix xanh; OpenAPI response 3 operation cập nhật; `pnpm arch:check`, `pnpm test:gates` xanh với extension point mới.
-- [ ] Kiểm tra nhanh tracker §4.5; `pnpm check`, full suite **chưa chạy**.
+- [x] Test matrix xanh; OpenAPI response 3 operation cập nhật; `pnpm arch:check`, `pnpm test:gates` xanh với extension point mới.
+- [x] Kiểm tra nhanh tracker §4.5; `pnpm check`, full suite **chưa chạy**.
 
 ## Changes and acceptance
 
@@ -105,3 +105,7 @@ pendingSpend`; được phép âm (`FR-5.8a`). Cùng nguồn số với `request
 08/11/2026: sửa theo audit thiết kế W2 (DA2-26…29, 31): còn lại trừ _Request đang chờ duyệt chi_ qua `PendingSpendContributions`
 do `requests` đăng ký, mốc _điều chỉnh kỳ trước_ = 00:00 01/01 năm sau (một công thức, áp cả `NO_BUDGET`), Trần phòng kèm ba
 thành phần, dùng `status` sẵn có thay `noBudget`, phụ thuộc `department-effective-year`, thêm test quyền/âm/null, Verify đúng file.
+
+09/11/2026: triển khai gói 6 MF4-C trên `feat/mf4-g6` (code phase 1 `904cd721`), áp SPEC review §4b RV-10/RV-21.
+Định nghĩa pending vẫn ở requests, scalar và batch dùng chung SQL. Các view cùng nguồn số; baseline ghi rõ ownership basis.
+Unit/HTTP/integration/gates trong phạm vi đã xanh; bằng chứng và TẠM CHỌN ở [plan](plan.md). Chưa có Owner acceptance.

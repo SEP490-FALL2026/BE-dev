@@ -163,6 +163,7 @@ export class BaselineService {
 
     return {
       year,
+      basis: 'OWNER_DEPARTMENT',
       currency: cycle.currency,
       computedAt: new Date().toISOString(),
       kpi3: null,

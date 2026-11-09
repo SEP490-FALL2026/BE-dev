@@ -14,6 +14,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 export interface PendingSpendContribution {
   /** What the requests of the Cost Center that wait to be decided cost in the year; `exceptRequestId` is one that does not count. */
   pendingOf(costCenterId: string, year: number, exceptRequestId: string | null, tx?: DbTx): Promise<bigint>;
+  pendingMany(pairs: readonly { costCenterId: string; year: number }[], tx?: DbTx): Promise<Map<string, bigint>>;
 }
 
 /**
@@ -32,6 +33,18 @@ export class PendingSpendContributions extends Contributions<PendingSpendContrib
     for (const contribution of this.all()) sum += await contribution.pendingOf(costCenterId, year, null, tx);
 
     return sum;
+  }
+
+  /** Batched answers keyed by `costCenterId:year`; no contributors means zero for every pair. */
+  async totals(pairs: readonly { costCenterId: string; year: number }[], tx?: DbTx): Promise<Map<string, bigint>> {
+    const totals = new Map<string, bigint>();
+    if (pairs.length === 0) return totals;
+    for (const contribution of this.all()) {
+      for (const [key, amount] of await contribution.pendingMany(pairs, tx)) {
+        totals.set(key, (totals.get(key) ?? 0n) + amount);
+      }
+    }
+    return totals;
   }
 }
 

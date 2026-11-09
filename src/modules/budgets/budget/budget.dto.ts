@@ -344,12 +344,29 @@ const versionLineSchema = z.strictObject({
   /** The part of the proposal line this adjusts that carried the proposal over the published ceiling (B3 flag); null when it was not flagged or the line is Finance's own. */
   overCeiling: moneyView.nullable(),
 });
-/** What a head of department sees of the budget of the department: the lines of the current budget, never what is left. */
+const budgetNumbersSchema = {
+  base: moneyView.nullable(),
+  reserve: moneyView.nullable(),
+  total: moneyView.nullable(),
+  committed: moneyView,
+  spent: moneyView,
+  pendingSpend: moneyView,
+  remainingBase: moneyView.nullable(),
+  remainingWithReserve: moneyView.nullable(),
+  overBudget: z.boolean(),
+};
+/** The head reads their own figures and the published department ceiling, without company totals. */
 const mineSchema = z.strictObject({
   costCenter: costCenterRef,
   year: z.number().int(),
   status: z.enum(['ACTIVE', 'NO_ACTIVE_BUDGET']),
-  total: moneyView.nullable(),
+  ...budgetNumbersSchema,
+  departmentCeiling: z
+    .strictObject({ total: moneyView, signedCommitments: moneyView, plannedSeats: moneyView, priority: moneyView })
+    .nullable(),
+  cycle: z
+    .strictObject({ submissionDeadline: z.iso.date(), decisionDeadline: z.iso.date(), published: z.boolean() })
+    .nullable(),
   version: z.strictObject({ id: z.uuid(), number: z.number().int().positive() }).nullable(),
   /** The refusal of the spending approver when the latest version of the year was refused: the head reads why. */
   latestRefusal: z.strictObject({ reason: z.string(), at: z.iso.datetime() }).nullable(),
@@ -358,20 +375,15 @@ const mineSchema = z.strictObject({
 const tableRowSchema = z.strictObject({
   costCenter: costCenterRef,
   year: z.number().int(),
-  versionId: z.uuid(),
-  number: z.number().int().positive(),
-  /** The base of the current version, before the reserve. */
-  base: moneyView,
-  /** The reserve of the current version, kept apart from the base. */
-  reserve: moneyView,
-  total: moneyView,
-  /** What is held against the budget by the commitments attached to it. */
-  committed: moneyView,
-  /** What has become an expense, which a commitment is not any more (`FR-5.8`). */
-  spent: moneyView,
-  /** The budget less what is held and what is spent; negative when more was committed than the budget allows (`US-06-07` AC-3). */
-  remaining: moneyView,
+  status: z.enum(['ACTIVE', 'NO_BUDGET']),
+  versionId: z.uuid().nullable(),
+  number: z.number().int().positive().nullable(),
+  ...budgetNumbersSchema,
+  remaining: moneyView.nullable(),
   overCommitted: z.boolean(),
+  priorPeriodAdjustment: moneyView.meta({
+    description: 'Invoices of the commitment year recorded on or after local midnight on 1 January of the next year.',
+  }),
 });
 const summaryTotalSchema = z.strictObject({
   currency: z.string(),
@@ -381,6 +393,9 @@ const summaryTotalSchema = z.strictObject({
   committed: moneyView,
   spent: moneyView,
   remaining: moneyView,
+  pendingSpend: moneyView,
+  remainingBase: moneyView,
+  remainingWithReserve: moneyView,
   costCenterCount: z.number().int().nonnegative(),
   /** The Cost Centers whose budget is less than what is held and spent against it. */
   overBudgetCount: z.number().int().nonnegative(),
@@ -388,6 +403,8 @@ const summaryTotalSchema = z.strictObject({
 /** The company-wide figures of a year, added up for each currency: Cost Centers of two currencies are never added together. */
 const budgetSummarySchema = z.strictObject({
   year: z.number().int(),
+  annualCeiling: moneyView.nullable(),
+  sharedPoolReserve: moneyView.nullable(),
   /** Keyed by currency code, empty when no Cost Center has a current budget for the year. */
   totals: z.record(z.string(), summaryTotalSchema),
   /** When the last invoice was recorded, which is when the spent figure was last brought up to date; null when none was. */

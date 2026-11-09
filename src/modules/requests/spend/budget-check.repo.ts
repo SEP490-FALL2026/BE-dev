@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '../../../generated/prisma/client';
+import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { budgetYearLockKey } from '../../budgets/public/budget-year-lock-key.policy';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -189,15 +189,26 @@ export class BudgetCheckRepo {
    * again at its decision (`QĐ-109e`). `exceptRequestId` is the request that is being checked: it does not wait on itself.
    */
   async pendingFor(costCenterId: string, year: number, exceptRequestId: string | null, tx?: DbTx): Promise<bigint> {
-    const rows = await (tx ?? this.prisma).$queryRaw<{ total: bigint | null }[]>`
-      SELECT SUM(y.cost_minor)::bigint AS total
+    return (await this.pendingMany([{ costCenterId, year }], tx, exceptRequestId)).get(`${costCenterId}:${year}`) ?? 0n;
+  }
+
+  /** The same definition as a single check, grouped for every requested Cost Center and year in one statement. */
+  async pendingMany(
+    pairs: readonly { costCenterId: string; year: number }[],
+    tx?: DbTx,
+    exceptRequestId: string | null = null,
+  ): Promise<Map<string, bigint>> {
+    if (pairs.length === 0) return new Map();
+    const wanted = Prisma.join(pairs.map((pair) => Prisma.sql`(${pair.costCenterId}::uuid, ${pair.year}::int)`));
+    const rows = await (tx ?? this.prisma).$queryRaw<{ cost_center_id: string; year: number; total: bigint }[]>`
+      SELECT COALESCE(latest.cost_center_id, r.cost_center_id) AS cost_center_id, y.year, SUM(y.cost_minor)::bigint AS total
         FROM access_requests r
         JOIN LATERAL (
           SELECT c.id, c.outcome, c.ran_at, c.cost_center_id
             FROM request_budget_checks c WHERE c.request_id = r.id ORDER BY c.number DESC LIMIT 1
         ) latest ON true
-        JOIN request_budget_check_years y ON y.check_id = latest.id AND y.year = ${year}
-       WHERE COALESCE(latest.cost_center_id, r.cost_center_id) = ${costCenterId}::uuid
+        JOIN request_budget_check_years y ON y.check_id = latest.id
+       WHERE (COALESCE(latest.cost_center_id, r.cost_center_id), y.year) IN (${wanted})
          AND (${exceptRequestId}::uuid IS NULL OR r.id <> ${exceptRequestId}::uuid)
          -- A check made before the three outcomes has none; with a spend step still open it waits all the same (review G23-08).
          AND (latest.outcome IN ('WITHIN_BASE', 'USES_RESERVE') OR latest.outcome IS NULL)
@@ -208,9 +219,10 @@ export class BudgetCheckRepo {
            )
            OR (r.state = 'AWAITING_SPEND_SUBMISSION' AND latest.outcome = 'USES_RESERVE'
                AND NOT EXISTS (SELECT 1 FROM request_supplements p WHERE p.request_id = r.id AND p.created_at > latest.ran_at))
-         )`;
+         )
+       GROUP BY COALESCE(latest.cost_center_id, r.cost_center_id), y.year`;
 
-    return rows[0]?.total ?? 0n;
+    return new Map(rows.map((row) => [`${row.cost_center_id}:${row.year}`, row.total]));
   }
 
   /** One page of the years of a check, oldest year first. */
