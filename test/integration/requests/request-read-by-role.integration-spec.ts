@@ -139,7 +139,8 @@ describe('the detail of a request by role (integration, real PostgreSQL)', () =>
 
     it('opens no action: Finance still cannot decide the spend and the head still cannot withdraw for the sender', async () => {
       const spend = await h.decideSpend(waiting, { decision: 'APPROVE' }, h.finance);
-      expect([403, 404, 409]).toContain(spend.status);
+      // The request has no spend step yet: there is nothing to decide, whoever asks (Finance never holds one, QĐ-97c).
+      expect([spend.status, h.codeOf(spend)]).toEqual([409, 'SPEND.NO_SPEND_STEP']);
       const withdrawal = await h.withdrawRequest(waiting, { reason: 'x' }, other.head.account);
       expect([403, 404]).toContain(withdrawal.status);
     });

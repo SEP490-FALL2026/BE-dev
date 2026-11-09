@@ -228,7 +228,7 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
 
       // Nobody holds a need step: the approver has no need decision to make on it.
       const need = await post(`/access-requests/${r9.id}/need-decision`, h.boss.account, { decision: 'APPROVE' });
-      expect([404, 409]).toContain(need.status);
+      expect([need.status, h.codeOf(need)]).toEqual([404, 'ACCESS_REQUEST.NOT_FOUND']);
       const sent = h.dataOf<{ request: AccessRequestWire }>(
         await get(`/access-requests/${r9.id}`, u.head.account).expect(200),
       );

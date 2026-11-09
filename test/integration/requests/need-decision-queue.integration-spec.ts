@@ -219,7 +219,7 @@ describe('the queue of the need steps of the person who holds them (integration,
         .set(h.as(h.boss.account))
         .send({ decision: 'APPROVE' });
       // There is no need step to decide: the route has none for the approver to reach.
-      expect([403, 404, 409]).toContain(refused.status);
+      expect([refused.status, h.codeOf(refused)]).toEqual([404, 'ACCESS_REQUEST.NOT_FOUND']);
     });
   });
 

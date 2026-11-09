@@ -150,7 +150,9 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
       expect(h.codeOf(await h.decide(sent.id, approve, head.account).expect(403))).toBe('ACCESS_REQUEST.OWN_REQUEST');
       expect(sent.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' });
       expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
-      expect([403, 404, 409]).toContain((await h.decide(sent.id, approve, boss.account)).status);
+      // Nobody holds the step: the approver is not its assignee, so the request is not theirs to decide (NOT_THE_ASSIGNEE answers 404).
+      const byApprover = await h.decide(sent.id, approve, boss.account);
+      expect([byApprover.status, h.codeOf(byApprover)]).toEqual([404, 'ACCESS_REQUEST.NOT_FOUND']);
       expect(
         (await h.ctx.sql.query<{ state: string }>(`SELECT state FROM access_requests WHERE id = $1`, [sent.id])).rows[0]
           .state,
@@ -162,9 +164,11 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
 
       expect(sent.state).toBe('AWAITING_EXECUTION');
       expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
-      for (const account of [h.it1, waiter.account]) {
-        expect([403, 404, 409]).toContain((await h.decide(sent.id, approve, account)).status);
-      }
+      const byIt = await h.decide(sent.id, approve, h.it1);
+      // The IT Admin reads the request (by role), so is told it is not theirs to decide rather than that it is not there.
+      expect([byIt.status, h.codeOf(byIt)]).toEqual([403, 'ACCESS_REQUEST.NOT_THE_ASSIGNEE']);
+      const byRequester = await h.decide(sent.id, approve, waiter.account);
+      expect([byRequester.status, h.codeOf(byRequester)]).toEqual([403, 'ACCESS_REQUEST.OWN_REQUEST']);
       expect(
         (await h.ctx.sql.query<{ state: string }>(`SELECT state FROM access_requests WHERE id = $1`, [sent.id])).rows[0]
           .state,
