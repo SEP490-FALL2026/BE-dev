@@ -188,6 +188,7 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       'currencyList',
       'deviceSessionGet',
       'employeeDashboardGet',
+      'ghostSeatOptimizationSummaryGet',
       'healthGetLiveness',
       'healthGetReadiness',
       'itAdminDashboardGet',
@@ -266,7 +267,8 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
         })
         .map((operation) => operation.key);
 
-      expect(operations).toHaveLength(344);
+      // 344 at gói 7; 375 with MF-5 (ghost seats, usage), 381 with K4 withdrawal, the run by hand of G1–G4 and the four routes of the history.
+      expect(operations).toHaveLength(381);
       expect(missing).toEqual([]);
     });
 

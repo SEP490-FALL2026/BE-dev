@@ -331,6 +331,8 @@ describe('BR-MF1-02: one-step migration keeps history and marks old requests wit
       group = await awaitingGroup(seed);
       history = (await sql.query(`SELECT * FROM approval_records ORDER BY id`)).rows;
       expect((await deployMigrations(database, { through: RULES })).code).toBe(0);
+      // The application of today reads the columns of the later migrations too (GH-1/2/3 on access_requests): it starts on the full schema.
+      expect((await deployMigrations(database)).code).toBe(0);
       runtime = await createHttpTestApp({ database });
     }, DEPLOY_TIMEOUT_MS * 2);
 

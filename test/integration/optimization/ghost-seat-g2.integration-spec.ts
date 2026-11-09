@@ -10,7 +10,7 @@ const leaverOn = async (subscription: string, code: string, grantedOn?: string) 
     `SELECT employee_id FROM license_assignments WHERE id = $1`,
     [assignmentId],
   );
-  await w.ctx.sql.query(`UPDATE license_assignments SET owning_department_id = $2 WHERE id = $1`, [
+  await w.asFixture(`UPDATE license_assignments SET owning_department_id = $2 WHERE id = $1`, [
     assignmentId,
     w.worldDepartment,
   ]);
@@ -63,10 +63,10 @@ describe('G2: the seat of a person who left (integration, real PostgreSQL)', () 
 
   it('M5-04, BRD MF-5, US-10-01 AC-2: a seat of the shared pool (no owning department) answers to where its holder last worked, and its IT Admin is told', async () => {
     const assignmentId = await w.seat({ subscriptionId: k2 }, 'E-G2-M504');
-    const { rows } = await w.ctx.sql.query<{ employee_id: string }>(
+    const { rows } = (await w.asFixture(
       `UPDATE license_assignments SET owning_department_id = NULL WHERE id = $1 RETURNING employee_id`,
       [assignmentId],
-    );
+    )) as { rows: { employee_id: string }[] };
     await w.leave(rows[0].employee_id);
 
     const run = await w.runRules();

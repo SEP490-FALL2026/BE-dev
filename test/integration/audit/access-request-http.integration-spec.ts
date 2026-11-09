@@ -82,24 +82,19 @@ describe('requests over HTTP: sending and routing the need step (integration, re
       expect(sent.needStep.assignee?.employeeId).not.toBe(engineeringHead.employeeId);
     });
 
-    it('row 2: a head who sends for themselves is not given their own step; the spending approver is (AC-2)', async () => {
+    it('row 2, MF1-D: a head who sends for themselves is not given their own step; the request goes one step (BR-MF1-02)', async () => {
       const sent = await h.sent(head, paidPlan);
 
-      expect(sent.needStep).toMatchObject({ routingRow: 2, assignee: { employeeId: boss.employeeId } });
-      expect(sent.needStep.assignee?.employeeId).not.toBe(head.employeeId);
+      expect(sent.needStep).toMatchObject({ routingRow: 2, state: 'NOT_REQUIRED', assignee: null });
+      expect(sent.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' });
     });
 
-    it('row 4: a department that has no head gives the step to nobody: the request waits for a head (AC-4)', async () => {
+    it('row 4, MF1-D: a department that has no head gives the step to nobody: the request goes one step to the IT Admin (BR-MF1-02)', async () => {
       const sent = await h.sent(clerk, internalPlan);
 
-      expect(sent.state).toBe('WAITING_CONTROLLED');
-      expect(sent.needStep).toMatchObject({
-        state: 'WAITING',
-        routingRow: 4,
-        assignee: null,
-        assignedAt: null,
-        waitingReason: 'NO_DEPARTMENT_HEAD',
-      });
+      expect(sent.state).toBe('AWAITING_EXECUTION');
+      expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', routingRow: 4, assignee: null, assignedAt: null });
+      expect(sent.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' });
     });
 
     it('row 4 again: whoever sends from a department with no head waits for a head, and nobody takes the step in its place (AC-5)', async () => {
@@ -107,8 +102,9 @@ describe('requests over HTTP: sending and routing the need step (integration, re
 
       const sent = await h.sent(second, internalPlan);
 
-      expect(sent.needStep).toMatchObject({ state: 'WAITING', routingRow: 4, assignee: null });
-      expect(sent.needStep.waitingReason).toBe('NO_DEPARTMENT_HEAD');
+      // MF1-D: nobody takes the step in place of the missing head; the request goes one step.
+      expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', routingRow: 4, assignee: null });
+      expect(sent.routing.mode).toBe('ONE_STEP');
     });
 
     it('row 2 with no spending approver: the request waits and is handed to nobody else (AC-13, QĐ-66k)', async () => {
@@ -116,8 +112,9 @@ describe('requests over HTTP: sending and routing the need step (integration, re
       try {
         const sent = await h.sent(head, paidPlan);
 
-        expect(sent.state).toBe('WAITING_CONTROLLED');
-        expect(sent.needStep).toMatchObject({ assignee: null, waitingReason: 'NO_SPENDING_APPROVER' });
+        // MF1-D: no need step is handed to anybody; a one-step request that its check does not let through goes back to its sender.
+        expect(sent.state).toBe('AWAITING_REQUESTER_REVISION');
+        expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
       } finally {
         await h.setRole('SPENDING_APPROVER', boss);
       }
@@ -132,8 +129,9 @@ describe('requests over HTTP: sending and routing the need step (integration, re
 
       const sent = await h.sent(colleague, internalPlan);
 
-      expect(sent.needStep).toMatchObject({ state: 'WAITING', routingRow: 4, assignee: null });
-      expect(sent.needStep.waitingReason).toBe('NO_DEPARTMENT_HEAD');
+      // MF1-D: a head who left is no head; the request goes one step and nobody holds a need step.
+      expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', routingRow: 4, assignee: null });
+      expect(sent.routing.mode).toBe('ONE_STEP');
     });
 
     it('never gives the step to someone who only administers, and one person holds it (AC-10, AC-11)', async () => {
@@ -160,12 +158,12 @@ describe('requests over HTTP: sending and routing the need step (integration, re
     });
 
     it('flags the same person holding the need step and the spend step only when there is a spend step (AC-9)', async () => {
-      // A head's request goes to the spending approver for the need (row 2), who also holds the spend step.
+      // MF1-D: a head's own request has no need step anybody holds (row 2, one step), so nobody holds both steps of it.
       const paid = await h.sent(head, paidPlan);
       const internal = await h.sent(head, internalPlan);
 
-      expect(paid.needStep).toMatchObject({ assignee: { employeeId: boss.employeeId }, samePersonAsSpend: true });
-      expect(internal.needStep).toMatchObject({ assignee: { employeeId: boss.employeeId }, samePersonAsSpend: false });
+      expect(paid.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null, samePersonAsSpend: false });
+      expect(internal.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null, samePersonAsSpend: false });
     });
 
     it('keeps the SLA of a request sent before the parameter changed, and gives a later request the new one (AC-3)', async () => {
@@ -322,12 +320,8 @@ describe('requests over HTTP: sending and routing the need step (integration, re
 
       const [routed] = await h.auditEvents('ACCESS_REQUEST_STEP', sent.needStep.id);
 
-      expect(routed.after).toMatchObject({
-        outcome: 'WAITING',
-        routingRow: 4,
-        assigneeEmployeeId: null,
-        waitingReason: 'NO_DEPARTMENT_HEAD',
-      });
+      // MF1-D: a department with no head routes the request one step: the step is not required and nobody is given it.
+      expect(routed.after).toMatchObject({ outcome: 'NOT_REQUIRED', routingRow: 4, assigneeEmployeeId: null });
     });
   });
 

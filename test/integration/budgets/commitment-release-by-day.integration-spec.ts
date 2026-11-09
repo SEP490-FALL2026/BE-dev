@@ -94,7 +94,7 @@ describe('the money held for a seat goes back by the day (RV-07, M-06, M-10; int
     await h.complete(task.id, { evidence: 'Added to the workspace' }).expect(200);
     const row = (
       await h.ctx.sql.query<{ assignment_id: string; effective_from: string }>(
-        `SELECT t.assignment_id, to_char(a.effective_from, 'YYYY-MM-DD') AS effective_from
+        `SELECT t.assignment_id, to_char(coalesce(a.granted_on, a.valid_from), 'YYYY-MM-DD') AS effective_from
            FROM provisioning_tasks t JOIN license_assignments a ON a.id = t.assignment_id WHERE t.id = $1`,
         [task.id],
       )

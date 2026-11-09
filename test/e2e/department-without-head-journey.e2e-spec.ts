@@ -67,7 +67,8 @@ describe('BR-MF1-02 a headless department follows the one-step journey (e2e)', (
   });
 
   it('BR-MF1-02 only the spending approver decides, with exactly one approval record', async () => {
-    await w.decideSpend(requestId, { decision: 'APPROVE' }, newHead.account).expect(404);
+    // P1-09/P1-10: the head of today reads the requests of the department, so a decision they do not hold is refused, 403, not hidden.
+    await w.decideSpend(requestId, { decision: 'APPROVE' }, newHead.account).expect(403);
     expect((await requestOf()).state).toBe('AWAITING_SPEND_DECISION');
     await w.decideSpend(requestId, { decision: 'APPROVE' }, w.boss.account).expect(200);
     expect((await requestOf()).state).toBe('AWAITING_EXECUTION');

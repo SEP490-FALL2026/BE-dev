@@ -99,12 +99,25 @@ export class GhostSeatWorld extends RevocationHarness {
       `SELECT employee_id FROM license_assignments WHERE id = $1`,
       [assignmentId],
     );
-    await this.ctx.sql.query(
+    await this.asFixture(
       `UPDATE license_assignments SET owning_department_id = $2 WHERE id = $1 AND owning_department_id IS NULL`,
       [assignmentId, this.worldDepartment],
     );
 
     return { employeeId: rows[0].employee_id, assignmentId };
+  }
+
+  /**
+   * A write of a fixture on `license_assignments` the immutability trigger refuses (the department that owns a seat is fixed when it is made):
+   * the trigger is lifted for this one statement, so a seat can be set up as owned by a department, or by none (a seat of the shared pool).
+   */
+  async asFixture(sql: string, values: unknown[]): Promise<{ rows: Record<string, unknown>[] }> {
+    await this.ctx.sql.query(`ALTER TABLE license_assignments DISABLE TRIGGER license_assignments_immutable`);
+    try {
+      return await this.ctx.sql.query(sql, values);
+    } finally {
+      await this.ctx.sql.query(`ALTER TABLE license_assignments ENABLE TRIGGER license_assignments_immutable`);
+    }
   }
 
   /** The person has left (`EmployeeStatus.TERMINATED`), the way the record of a departure leaves it. */

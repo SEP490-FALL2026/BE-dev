@@ -29,4 +29,6 @@ export const ROUTE_ERROR_CODES_OPTIMIZATION: Readonly<
     '422': ['GHOST_SEAT.THRESHOLD_ORDER', 'GHOST_SEAT.APPLICATION_INTERNAL'],
   },
   ghostSeatThresholdDelete: { '404': ['GHOST_SEAT.APPLICATION_NOT_FOUND'] },
+  // `board-rule-run.service.ts`: another run of the same rules holds the advisory lock (FIX-MF5RUN).
+  ghostSeatRuleRunCreate: { '409': ['GHOST_SEAT.RULE_RUN_BUSY'] },
 };
