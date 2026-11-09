@@ -4,7 +4,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { ProposalState } from './budget.policy';
 import { proposalLineZbbJson } from './budget-line-zbb.json';
-import type { LineType, ZbbExplanation } from './budget-line.types';
+import type { LineType, ZbbExplanation } from './budget-line-zbb.json';
 
 export interface ProposalLineRecord {
   position: number;

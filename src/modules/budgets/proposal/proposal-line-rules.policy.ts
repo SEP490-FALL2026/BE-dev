@@ -1,4 +1,6 @@
-import type { LineType, ZbbExplanation } from '../budget/budget-line.types';
+import type { LineType, ZbbExplanation } from '../budget/budget-line-zbb.json';
+
+import { isNotCounted } from '../budget/budget.policy';
 
 export type { LineType, ZbbExplanation };
 
@@ -45,16 +47,6 @@ export interface ZbbContext {
 
 /** The kinds of line that carry on or change what runs now: the only ones `KPI-3` is asked of (`QĐ-109d`). */
 const RUNNING_KINDS: ReadonlySet<LineType> = new Set<LineType>(['RENEW', 'CHANGE']);
-
-/**
- * Whether a line is a saving that is shown and not counted: a `CANCEL` line gives up spend, so its amount is never added to the total of
- * the proposal, the package or the ceiling check (`QĐ-109c`, C4-16).
- */
-export const isNotCounted = (line: Pick<RuledLine, 'lineType'>): boolean => line.lineType === 'CANCEL';
-
-/** The sum a proposal is worth: every line but the `CANCEL` ones (`QĐ-109c`). */
-export const countedTotalOf = (lines: readonly Pick<RuledLine, 'lineType' | 'amountMinor'>[]): bigint =>
-  lines.reduce((sum, line) => (isNotCounted(line) ? sum : sum + line.amountMinor), 0n);
 
 /**
  * Whether the unit price a line asks for is over the monthly price of the plan now by more than the threshold: seats and a monthly price

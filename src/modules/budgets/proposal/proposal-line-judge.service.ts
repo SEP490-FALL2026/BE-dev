@@ -71,10 +71,8 @@ export class ProposalLineJudge {
   }
 
   private async zbbContext(tx: DbTx, lines: readonly RuledLine[], currency: string, now: Date): Promise<ZbbContext> {
-    const [kpi3Below, priceIncrease] = await Promise.all([
-      this.parameters.getValueAt('BUDGET_ZBB_KPI3_BELOW_PERCENT', now, tx),
-      this.parameters.getValueAt('BUDGET_ZBB_PRICE_INCREASE_PERCENT', now, tx),
-    ]);
+    const kpi3Below = await this.parameters.getValueAt('BUDGET_ZBB_KPI3_BELOW_PERCENT', now, tx);
+    const priceIncrease = await this.parameters.getValueAt('BUDGET_ZBB_PRICE_INCREASE_PERCENT', now, tx);
 
     return {
       // TẠM CHỌN: usage is not collected yet (W6), so no plan has a KPI-3 figure and the rule waits for one.

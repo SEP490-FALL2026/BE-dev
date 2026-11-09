@@ -12,7 +12,7 @@ import { VersionAccessService } from './version-access.service';
 import { VersionHistoryService } from './version-history.service';
 import { VersionLineRepo, type VersionLineRecord } from '../budget/version-line.repo';
 import type { ImportWire } from '../budget/budget.dto';
-import { LINE_TYPES, type LineType } from '../budget/budget-line.types';
+import { LINE_TYPES, type LineType } from '../budget/budget-line-zbb.json';
 
 const REQUIRED = ['cost_center_code', 'description', 'amount'] as const;
 /** Columns of the file before `QĐ-101n`: a file that still has one is refused as a whole. */

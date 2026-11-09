@@ -2,7 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { LINE_DESCRIPTION_MAX, REASON_MAX } from './budget.policy';
-import { LINE_TYPES } from './budget-line.types';
+import { LINE_TYPES } from './budget-line-zbb.json';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 /** An amount a person gives: always in the reporting currency, which the system knows (`QĐ-98`). */

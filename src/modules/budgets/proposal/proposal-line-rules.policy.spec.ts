@@ -1,5 +1,4 @@
 import {
-  countedTotalOf,
   duplicateRankPositions,
   overCeilingNoteMissing,
   overCeilingParts,
@@ -7,6 +6,7 @@ import {
   zbbMissingPositions,
   type RuledLine,
 } from './proposal-line-rules.policy';
+import { countedTotalOf } from '../budget/budget.policy';
 
 const zbb = { purpose: 'p', alternatives: 'a', consequenceIfNot: 'c', usageIndicator: 'u' };
 const line = (position: number, patch: Partial<RuledLine> = {}): RuledLine => ({

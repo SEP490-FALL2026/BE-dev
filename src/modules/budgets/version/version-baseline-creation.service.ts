@@ -2,14 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCurrentExistsError, BudgetVersionInFlightError, BudgetYearEndedError } from '../budget/budget.errors';
-import { copiedLineOf, defaultReserveOf, yearHasEnded } from '../budget/budget.policy';
+import { copiedLineOf, countedTotalOf, defaultReserveOf, yearHasEnded } from '../budget/budget.policy';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { VersionRepo } from '../budget/version.repo';
 import { VersionViewService } from '../budget/version-view.service';
 import type { VersionWire } from '../budget/budget.dto';
 import { BaselineService } from '../cycle/baseline.service';
-import { countedTotalOf } from '../proposal/proposal-line-rules.policy';
 import { VersionTrail } from './version-trail.service';
 
 /**

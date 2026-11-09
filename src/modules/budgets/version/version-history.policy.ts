@@ -4,7 +4,7 @@
  * `YYYY-MM-DD`, a number as its digits), and the order a reader sees them in. The record is written in the transaction of the
  * edit by `VersionHistoryService`; nothing here reads a database.
  */
-import type { LineType, ZbbExplanation } from '../budget/budget-line.types';
+import type { LineType, ZbbExplanation } from '../budget/budget-line-zbb.json';
 
 /** The most fields one entry of the history shows: the widest edit is a line, which has eleven. */
 export const HISTORY_CHANGES_MAX = 16;

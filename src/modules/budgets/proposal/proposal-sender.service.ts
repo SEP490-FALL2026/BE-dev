@@ -9,11 +9,10 @@ import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { ProposalRepo, type ProposalRecord } from '../budget/proposal.repo';
 import { VersionRepo } from '../budget/version.repo';
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
-import { proposalIsSucceedable, yearIsOpen } from '../budget/budget.policy';
+import { countedTotalOf, proposalIsSucceedable, yearIsOpen } from '../budget/budget.policy';
 import { BudgetProposalNotFoundError, BudgetProposalOpenError, BudgetYearEndedError } from '../budget/budget.errors';
 import type { CycleRecord } from '../cycle/cycle.repo';
 import { ProposalLineJudge, type ProposalLineDraft } from './proposal-line-judge.service';
-import { countedTotalOf } from './proposal-line-rules.policy';
 
 type LineBody = BudgetProposalBodyDto['lines'][number];
 

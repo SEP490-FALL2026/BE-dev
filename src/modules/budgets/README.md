@@ -24,7 +24,7 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
 ## Bảng sở hữu
 
 - `budget_proposals`, `budget_proposal_lines`, `budget_versions`, `budget_version_lines`,
-  `budget_version_line_changes`, `budget_version_decisions`, `budget_version_history`, `budget_commitments`,
+  `budget_version_line_changes` (còn trong DB, không còn code ghi), `budget_version_decisions`, `budget_version_history`, `budget_commitments`,
   `budget_commitment_releases`, `invoices`, `budget_attachments` (`prisma/models/budgets.prisma`). Kiểm ngân sách của request
   (`request_budget_checks`…) thuộc `requests`.
 
@@ -55,14 +55,35 @@ Một lõi `budget/` và sáu capability cùng cấp với nó. Lõi giữ repo,
 import lõi (`pnpm arch:capabilities --module budgets`).
 
 - `proposal/` — đề xuất của trưởng phòng: gửi, rút, Finance trả lời, gửi lại (US-06-10);
-  `budget-proposals.controller.ts`; `ProposalService`, `ProposalViewService`, `ProposalSender`.
+  `budget-proposals.controller.ts`; `ProposalService`, `ProposalViewService`, `ProposalSender`. **Dòng `BM-10`** (SPEC MF4-B, `QĐ-101n`,
+  `QĐ-94l`, `QĐ-109c/d`): mỗi dòng có `lineType` (`RENEW`/`CHANGE`/`NEW`/`CANCEL`), `priorityRank` thật do client gửi (duy nhất trong đề xuất,
+  ≥ 1; trùng ⟹ 422 `BUDGET.PRIORITY_RANK_INVALID`, `details.positions`), `zbb { purpose, alternatives, consequenceIfNot, usageIndicator }` (mỗi
+  chuỗi 1–1000) và `overCeiling` do **server** tính lúc nộp. Luật thuần ở `proposal/proposal-line-rules.policy.ts`
+  (`duplicateRankPositions`, `zbbMissingPositions`, `overCeilingParts`, `overCeilingNoteMissing`, `countedTotalOf`); `ProposalLineJudge`
+  gom đầu vào thật cho luật (tham số `BUDGET_ZBB_*` của Finance, giá tháng hiện hành của gói `M-17`, Trần đã phát hành). `zbb` bắt buộc ở dòng
+  `NEW` (422 `BUDGET.ZBB_REQUIRED`), ở dòng `RENEW`/`CHANGE` có `KPI-3` của **gói của dòng** dưới ngưỡng (`QĐ-109d`; `KPI-3` chưa có nguồn
+  nên `kpi3ByPlan` rỗng, W6), và ở dòng không phải `CANCEL` có đơn giá tăng quá ngưỡng so với giá tháng quy đổi của gói (chỉ gói định kỳ,
+  cùng đồng tiền báo cáo). Cờ vượt (`overCeiling` = phần vượt) tính theo **Trần đã phát hành** `published_total_minor` (S4-01), cộng dồn theo
+  hạng; dòng có cờ thiếu `note` ⟹ 422 `BUDGET.OVER_CEILING_NOTE_REQUIRED`; phòng chưa có Trần đã phát hành ⟹ không cờ; không bao giờ chặn
+  vì vượt. Dòng `CANCEL` chỉ hiển thị số tiền: **không** cộng vào tổng đề xuất, tổng gói B4 hay cờ vượt (`QĐ-109c`). Phòng chưa có Cost
+  Center không có nháp `BM-10` ở BE (C4-12, TẠM CHỌN: FE giữ nháp cục bộ).
 - `version/` — version: tạo, sửa dòng, import file dòng, gửi duyệt, quyết định, lịch sử (US-06-09, US-06-11);
   `budget-versions.controller.ts`, `budget-version-lines.controller.ts`; `VersionService`, `VersionLineService`,
   `VersionDecisionService`, `LineImportService`. `VersionDecisionService` điều phối `VersionDecisionJudge` (xAct) và
-  `VersionDecisionWriter` (ghi); các bước còn lại tách theo việc: `VersionCreationService`, `VersionRevisionService`,
-  `VersionWindowService`, `VersionFigures`, `VersionTrail`, `VersionLineMovedNotifier`, `VersionAccessService` (khóa và
-  kiểm lỗi). Quyết định, nhả cam kết và đổi dòng là hàm thuần trong `budget/budget.policy.ts`.
+  `VersionDecisionWriter` (ghi); các bước còn lại tách theo việc: `VersionCreationService`, `VersionBaselineCreationService`,
+  `VersionFigures`, `VersionTrail`, `VersionAccessService` (khóa và kiểm lỗi). Không còn phiên bản sửa đổi (`REVISION`), trạng thái
+  `SUPERSEDED` hay dời khoảng mua (`QĐ-97b`, `QĐ-104e`(1)); DB chặn `SUPERSEDED` bằng `budget_versions_no_superseded`. Dòng phiên bản mang
+  `lineType`, `zbb`, `priorityRank` sao từ dòng đề xuất (kèm `overCeiling` của dòng đề xuất nó điều chỉnh, để Người duyệt chi đọc ở B5);
+  Finance thêm dòng phải có `lineType` (hạng và `zbb` tùy chọn), sửa dòng giữ nguyên `zbb`/hạng khi không gửi (`null` để bỏ), đổi `lineType`
+  của dòng từ đề xuất cần `adjustmentReason`; file import có cột `line_type` (mỗi dòng thiếu/sai ⟹ báo `LINE_TYPE_INVALID` theo dòng) và
+  `priority_rank` tùy chọn. Phiên bản `BASELINE_NO_HEAD` dùng `lineType`: thuê bao chạy tiếp ⟹ `RENEW` (các kỳ cùng gói gộp một dòng), thuê bao
+  đã đặt chấm dứt ⟹ `CANCEL` (hiển thị, không cộng vào cơ sở) (C4-14, `baselineLinesOf`). Quyết định và nhả cam kết là hàm thuần trong
+  `budget/budget.policy.ts`.
 - `cycle/` — kỳ lập ngân sách của một năm (`QĐ-103i`, `US-06-15`): Finance mở kỳ (hạn nộp, hạn duyệt, Trần ngân sách phần mềm năm, ưu tiên), đổi Trần năm kèm lý do, chia Trần của phòng (ba thành phần, kèm diễn giải) cho mọi phòng đang hoạt động cùng Dự phòng kho dùng chung, rồi phát hành; Người duyệt chi và Finance đọc. Sáu operation: `budgetCycleOpen/List/Get/Update`, `budgetDepartmentCeilingsSet`, `budgetCyclePublish`. Bảng `budget_cycles`, `budget_department_ceilings`; `CycleService`, `CycleRepo`, `cycle.policy.ts` (`judgePublish`, `departmentsToTell`, `cycleAcceptsWork`). Năm đã qua chỉ đọc; sửa Trần năm hoặc chia lại **bỏ phát hành** (`published_at` NULL) nhưng giữ `first_published_at`, nên trưởng phòng vẫn nộp `BM-10` (điều kiện là `cycleAcceptsWork`, câu tạm chọn W2). Phát hành bị chặn vẫn ghi Audit Trail (mã + chênh lệch). **Nhắc hạn** (`R-I05`, `QĐ-108e`): `CycleDeadlineSweeper` (mỗi giờ, trong tiến trình API) gọi `CycleDeadlineService.run`; `deadlineDuties` (policy) nói hôm nay kỳ nợ gì: qua hạn nộp ⟹ trưởng phòng chưa nộp `BUDGET_PROPOSAL_DEADLINE_REMINDER`, Finance và Super Admin `BUDGET_NO_HEAD_AT_DEADLINE` (phòng không có trưởng phòng và cũng chưa có kế nhiệm), Finance `BUDGET_SUBMISSION_DEADLINE_PASSED`; qua hạn duyệt ⟹ Người duyệt chi và Finance `BUDGET_DECISION_DEADLINE_REMINDER`; trước hạn nộp ⟹ Finance `BUDGET_COST_CENTER_SETUP_DUE` một lần cho mỗi (kỳ, phòng) thiếu Cost Center. Khóa sự kiện chứa kỳ và ngày hạn: chạy lại không ghi thêm, dời hạn thì nhắc lại. `BudgetHeadChangeListener` báo trưởng phòng mới `BUDGET_BASELINE_VERSION_HEAD_ASSIGNED` khi phòng có phiên bản `BASELINE_NO_HEAD` còn dở. Thông báo `BUDGET_CYCLE_OPENED` (trưởng phòng; Người duyệt chi không nhận theo QT 4.1) và `BUDGET_DEPARTMENT_CEILING_PUBLISHED` (chỉ phòng đổi tổng). Tập phòng chia Trần: `OrganizationReadApi.getActiveDepartmentIds(year, tx)` (phòng đang hoạt động và hiệu lực trong năm đó). **Kiểm B4 khi gửi phiên bản** (`R-I06`, `QĐ-103i`): `VersionAccessService.requireWithinAnnualCeiling` cộng, với mỗi Cost Center của năm, phiên bản MỚI NHẤT (theo `number`) trong `SENT`/`CHANGES_REQUESTED`/`APPROVED` (Q-22; `DRAFT`, `REJECTED`, `EXPIRED` và bản đã tách không tính; DB chỉ cho bản tách ở `DRAFT`/`EXPIRED`), phiên bản đang gửi thay bản cùng Cost Center, và từ chối khi tổng (cơ sở + dự phòng) vượt `Trần năm − Dự phòng kho`: 409 `BUDGET.OVER_ANNUAL_CEILING`; kỳ chưa từng phát hành ⟹ 409 `CYCLE_NOT_PUBLISHED`; khác đồng tiền ⟹ 409 `CYCLE_CURRENCY_MISMATCH`. Thứ tự khóa thực tế của `send`: grant Người duyệt chi `FOR SHARE` → kỳ `FOR UPDATE` → đề xuất → phiên bản → năm. Vì kỳ khóa trước `lockEditable`, một phiên bản không gửi được (`APPROVED`, `REVISION`) của năm không có kỳ hoặc kỳ chưa phát hành nhận 409 `CYCLE_NOT_PUBLISHED` thay vì `VERSION_NOT_EDITABLE` (năm đã kết thúc vẫn báo `YEAR_ENDED`). Đổi `base` của bản nháp đòi `baseReason` (422 `BUDGET.BASE_REASON_REQUIRED`; "đổi" = khác giá trị đang có, `baseReason` gửi kèm mà không đổi số thì bị bỏ qua), lý do hiện ở lịch sử mỗi lần đổi số. **Trưởng phòng theo năm** (`QĐ-106k`, R-I05): `BudgetFactsService.headedUnitsFor/pickHeadedUnit/headedCostCenters` gồm phòng đang làm trưởng phòng và phòng chưa hiệu lực mà nhiệm kỳ của người đó bắt đầu đúng ngày hiệu lực; có hai đơn vị cho một năm thì `costCenterId` bắt buộc (422 `BUDGET.COST_CENTER_REQUIRED`). Các route B3 (`budgetProposalSubmit/Resubmit/Withdraw`, `budgetMine*`, đính kèm) dùng `RequireRolesOrGrants(['MANAGER'], ['MANAGER'])`: guard chỉ kiểm có grant, việc thật do service xét theo đơn vị; vai `MANAGER` của token KHÔNG mở rộng. Người nhận thông báo của phòng chưa hiệu lực là người sắp làm trưởng phòng (`currentHeadOf`). **Thứ tự khóa** của `budgets`: kỳ → proposal → version → năm; nộp/nộp lại đọc kỳ `FOR SHARE` ở `ProposalSender.requirePublishedCycle`; nộp lại đọc và kiểm sở hữu đề xuất không khóa, khóa kỳ trước, rồi mới khóa đề xuất (`ownedLocked`), nên không còn ngoại lệ thứ tự; mọi đường mới khóa kỳ `FOR UPDATE` phải đứng đầu thứ tự này. Diễn giải của Trần phòng **bắt buộc khi phát hành** (QT 4.3; thiếu ⟹ `BUDGET.CEILINGS_INCOMPLETE` với `details.explanationMissingDepartmentIds`); chỉ đổi diễn giải thì không bỏ phát hành, chỉ đổi số mới bỏ. **Vận hành dữ liệu cũ**: môi trường có đề xuất mà chưa có kỳ thì nộp `BM-10` bị 409 `BUDGET.CYCLE_NOT_PUBLISHED` tới khi Finance mở và phát hành kỳ năm hiện tại/năm sau (xem `docs/guides/seed.md` cho dữ liệu demo).
+- Gói tổng hợp B4 (`budgetCyclePackage`, `cycle/package.service.ts`): mỗi phòng trả thêm `publishedCeiling`, `headStatus`
+  (`HAS_HEAD`/`HEAD_TO_COME`/`NO_HEAD`), `baselineAllowed` + `baselineRefusal` (cùng `baselineVersionRefusal` với phiên bản `BASELINE`, C4-13) và
+  `proposal.lines[]` (`position`, `lineType`, `priorityRank`, `amount`, `overCeiling`) sắp theo hạng; `proposal.total` và `proposalsTotal` không cộng
+  dòng `CANCEL`. Chỉ phòng không có trưởng phòng hôm nay mới hỏi thêm "có người sắp làm trưởng phòng không" (song song).
 - `commitment/` — commitment của request, Finance xem (lọc `state`, kèm request, `invoiced`, `invoiceCount`, `hasDiscrepancy`) và nhả phần dư
   (US-06-06, US-06-07, US-12-01); `budget-commitments.controller.ts`; `CommitmentService`.
 - `invoice/` — Finance ghi và đọc hóa đơn của một commitment (US-12-02, `C-16`): `POST/GET /budget-commitments/{id}/invoices`;
