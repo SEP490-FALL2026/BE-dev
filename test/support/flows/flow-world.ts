@@ -77,9 +77,14 @@ export class FlowWorld {
         RETURN NEW;
       END;
       $$ LANGUAGE plpgsql`);
+    // A line that has ended is never changed (trigger of `access_request_lines`), and an ended one counts for no limit anyway.
+    const open: Record<string, string> = {
+      access_requests: '',
+      access_request_lines: ` AND state NOT IN ('NEED_REJECTED', 'SPEND_REJECTED', 'COMPLETED', 'FAILED', 'WITHDRAWN', 'DROPPED')`,
+    };
     for (const table of ['access_requests', 'access_request_lines']) {
       await this.ctx.sql.query(
-        `UPDATE ${table} SET limit_exemption = 'TRANSFER_OVERLAP' WHERE limit_exemption IS NULL`,
+        `UPDATE ${table} SET limit_exemption = 'TRANSFER_OVERLAP' WHERE limit_exemption IS NULL${open[table]}`,
       );
       await this.ctx.sql.query(`CREATE TRIGGER test_harness_exempt_from_request_limits BEFORE INSERT ON ${table}
         FOR EACH ROW EXECUTE FUNCTION test_harness_exempt_from_request_limits()`);
