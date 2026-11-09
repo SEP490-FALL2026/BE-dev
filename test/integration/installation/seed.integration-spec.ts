@@ -176,7 +176,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
       R6: 'AWAITING_EXECUTION',
       R7: 'AWAITING_SPEND_SUBMISSION',
       R8: 'AWAITING_IT_ASSESSMENT',
-      R9: 'AWAITING_FINANCE_REVIEW',
+      R9: 'AWAITING_SPEND_SUBMISSION',
       R10: 'COMPLETED',
       R11: 'COMPLETED',
     });

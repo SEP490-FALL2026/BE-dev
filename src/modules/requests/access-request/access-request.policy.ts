@@ -3,7 +3,6 @@
  * AC-3, AC-9). Paid or licensed software that is already in the catalog always has a spend step, whatever the seats left
  * on its subscription (`QĐ-82m` C); internal software with no fee never has one (`QĐ-50a`).
  */
-import type { AccessRequestState } from './access-request.types';
 
 /** The kinds of application the catalog holds (`QĐ-49a`). */
 export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
@@ -13,16 +12,18 @@ export const ACCESS_REQUEST_BRANCHES = ['INTERNAL_FREE', 'PAID_IN_CATALOG', 'NEW
 export type AccessRequestBranchCode = (typeof ACCESS_REQUEST_BRANCHES)[number];
 
 export const CHAIN_STEPS = ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'] as const;
-/** The states of a request as the database can hold them: the two that Finance's review and its wait for a budget had are retired (`QĐ-97c`). */
-export type StoredRequestState = AccessRequestState | 'AWAITING_FINANCE_REVIEW' | 'AWAITING_BUDGET';
-
 /**
  * The state a request is read as. The migration that retired the review of Finance put every request that waited for it back in the queue
  * of its head, and a CHECK refuses the two states from then on, so a row has them only in a database that was not migrated; it is read as
- * waiting in that queue rather than as a state nothing handles.
+ * waiting in that queue rather than as a state nothing handles. Generic over the states the database holds, so the two retired ones leave the
+ * type of what is read (`QĐ-97c`).
  */
-export function currentStateOf(state: StoredRequestState): AccessRequestState {
-  return state === 'AWAITING_FINANCE_REVIEW' || state === 'AWAITING_BUDGET' ? 'AWAITING_SPEND_SUBMISSION' : state;
+export function currentStateOf<S extends string>(
+  state: S,
+): Exclude<S, 'AWAITING_FINANCE_REVIEW' | 'AWAITING_BUDGET'> | 'AWAITING_SPEND_SUBMISSION' {
+  return (
+    state === 'AWAITING_FINANCE_REVIEW' || state === 'AWAITING_BUDGET' ? 'AWAITING_SPEND_SUBMISSION' : state
+  ) as Exclude<S, 'AWAITING_FINANCE_REVIEW' | 'AWAITING_BUDGET'> | 'AWAITING_SPEND_SUBMISSION';
 }
 
 /** A link of the chain of a request. `IT_EXECUTION` is the task of the IT Admin, not an approval step. */

@@ -113,6 +113,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   RequestBudgetCheck: 'requests',
   RequestBudgetCheckYear: 'requests',
   RequestFinanceReview: 'requests',
+  RequestReserveConfirmation: 'requests',
   SpendBatch: 'requests',
   SpendBatchItem: 'requests',
   RequestSupplement: 'requests',

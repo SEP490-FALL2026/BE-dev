@@ -60,8 +60,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'AuditModule: AuditApi',
   // G5 (ADR-0016): the budgets facade the check of a request reads the figures through, and registers its listener with.
   'BudgetsModule: BudgetsApi',
-  // The extension points the requests context binds (public/budgets.extension-points.ts): the change listeners and the release guard.
-  'BudgetsModule: BudgetChangeListeners',
+  // The extension points the requests context binds (public/budgets.extension-points.ts): what waits to be decided as spend, the release guard and the facts of a commitment request.
+  'BudgetsModule: PendingSpendContributions',
   'BudgetsModule: CommitmentReleaseGuardHook',
   'BudgetsModule: CommitmentRequestFactsHook',
   // G4 (ADR-0013): the catalog facade licensing reads the seat targets (subscription or internal plan) through.

@@ -102,7 +102,7 @@ const budgetSnapshotSchema = z.strictObject({
   /** Negative when more is held than base and reserve allow. */
   remainingWithReserve: money.nullable(),
   outcome: budgetOutcomeSchema,
-  blockedReasons: z.array(blockReasonSchema),
+  blockedReasons: z.array(blockReasonSchema).max(3),
   overBaseBy: money.nullable(),
   overBy: money.nullable(),
   /** The confirmation of the head that opened this step, when the request uses the reserve. */

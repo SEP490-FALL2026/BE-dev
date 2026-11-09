@@ -49,7 +49,7 @@ const checkSchema = z.strictObject({
    */
   outcome: z.enum(['WITHIN_BASE', 'USES_RESERVE', 'BLOCKED']),
   /** Every reason the request is blocked (the quote is no longer valid, no approved budget, over the reserve); empty unless blocked. */
-  blockedReasons: z.array(z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE'])),
+  blockedReasons: z.array(z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE'])).max(3),
   /** How much the cost is over what is left of the base; null when it is not over. */
   overBaseBy: money.nullable(),
   /** How much the cost is over what is left with the reserve; null unless blocked for being over it. */

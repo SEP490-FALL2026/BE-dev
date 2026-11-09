@@ -17,7 +17,7 @@ export const reserveReasonSchema = z
   .trim()
   .min(1)
   .max(500)
-  .regex(/^[^\r\n]*$/, { message: 'The reason is one line.' });
+  .refine((value) => !/[\r\n]/.test(value), { message: 'The reason is one line.' });
 
 export const submitBatchBodySchema = z.strictObject({
   requestIds: z
@@ -99,7 +99,7 @@ const queueItemSchema = z.strictObject({
    */
   budgetOutcome: budgetOutcomeSchema.nullable(),
   /** Why it is blocked, every reason; empty unless `budgetOutcome` is `BLOCKED`. */
-  blockedReasons: z.array(blockReasonSchema),
+  blockedReasons: z.array(blockReasonSchema).max(3),
   /** How much it is over the base (uses the reserve) or over the reserve (blocked for that), in the reporting currency; never what is left. */
   overBy: money.nullable(),
   /** The price is there: it can be sent on. */
@@ -141,7 +141,7 @@ const reserveConfirmationResultSchema = z.strictObject({
   result: z.enum(['SPEND_STEP_OPENED', 'BLOCKED']),
   /** What the check made for the confirmation says. */
   budgetOutcome: budgetOutcomeSchema,
-  blockedReasons: z.array(blockReasonSchema),
+  blockedReasons: z.array(blockReasonSchema).max(3),
   /** Whether the confirmation was kept: false when the check made again finds the request within the base, which needs none. */
   confirmationKept: z.boolean(),
 });

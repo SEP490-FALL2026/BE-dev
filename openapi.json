@@ -43925,664 +43925,6 @@
         "tags": ["access-requests"]
       }
     },
-    "/api/v1/finance-reviews": {
-      "get": {
-        "operationId": "financeReviewList",
-        "parameters": [
-          {
-            "name": "state",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "string", "enum": ["PENDING", "WAITING"] }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": true,
-              "default": 1,
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The reviews that are open, the oldest first: the request, its Cost Center and requester, what it costs, and the first code the check gave. The figures of each year are read from the check of the request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/ReviewListResponseDto" },
-                    { "properties": { "message": { "example": "FINANCE_REVIEW.LISTED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only Finance reviews (SPEND.NOT_FINANCE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "List the reviews waiting for Finance",
-        "tags": ["finance-reviews"]
-      }
-    },
-    "/api/v1/access-requests/{id}/finance-review": {
-      "get": {
-        "operationId": "financeReviewGet",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "The newest review of the request, open or ended, with the check it is about and, once ended, its outcome, opinion, direction, who and when. Read by Finance and by the person the spend step is given to.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/ReviewDetailResponseDto" },
-                    { "properties": { "message": { "example": "FINANCE_REVIEW.FETCHED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The request has no check or review for the caller to read (SPEND.REVIEW_NOT_FOUND), or does not exist (ACCESS_REQUEST.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "SPEND.REVIEW_NOT_FOUND": {
-                    "summary": "The review does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.REVIEW_NOT_FOUND",
-                        "message": "The review does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Get the review of Finance of a request",
-        "tags": ["finance-reviews"]
-      },
-      "post": {
-        "operationId": "financeReviewComplete",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewBodyDto" } } }
-        },
-        "responses": {
-          "200": {
-            "description": "Ends the open review in one of three ways: an opinion with the direction it advises (the spend step is then made for the approver), the request given back to its head with a reason, or a budget asked for with a reason. None approves or refuses the request. A request that waits for a version of the budget has no review open and Finance may still move it, in the same way, in one call: the request is given back to its head, or an opinion is given, which checks it again and makes the spend step (or sends it back to its head when its data is at fault); it never asks for a budget twice. The person who will decide the spend step of the request does not end its review.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/ReviewDetailResponseDto" },
-                    { "properties": { "message": { "example": "FINANCE_REVIEW.COMPLETED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only Finance ends a review (the guard), nobody else but the person who holds it (SPEND.NOT_FINANCE), and not the one who asked for the request or is given it (SPEND.OWN_REQUEST): nobody independent would review it.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SPEND.NOT_FINANCE": {
-                    "summary": "Only Finance reviews a request for the spending approver.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.NOT_FINANCE",
-                        "message": "Only Finance reviews a request for the spending approver.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SPEND.OWN_REQUEST": {
-                    "summary": "The review cannot end that way: OWN_REQUEST.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.OWN_REQUEST",
-                        "message": "The review cannot end that way: OWN_REQUEST.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The request has no check or review for the caller to read (SPEND.REVIEW_NOT_FOUND), or does not exist (ACCESS_REQUEST.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "ACCESS_REQUEST.NOT_FOUND": {
-                    "summary": "The request does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "ACCESS_REQUEST.NOT_FOUND",
-                        "message": "The request does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The request has no review open and does not wait for a version of the budget (SPEND.REVIEW_NOT_OPEN), it already waits for a budget (SPEND.ALREADY_AWAITING_BUDGET), the caller will decide its spend step (SPEND.REVIEWER_IS_APPROVER), no year has no budget or too little (SPEND.NO_BUDGET_TO_MAKE), or nobody heads the department to propose it, even when a version is current (SPEND.NO_HEAD_TO_PROPOSE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "SPEND.REVIEW_NOT_OPEN": {
-                    "summary": "The request has no review of Finance open.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.REVIEW_NOT_OPEN",
-                        "message": "The request has no review of Finance open.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SPEND.ALREADY_AWAITING_BUDGET": {
-                    "summary": "The review cannot end that way: ALREADY_AWAITING_BUDGET.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.ALREADY_AWAITING_BUDGET",
-                        "message": "The review cannot end that way: ALREADY_AWAITING_BUDGET.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SPEND.REVIEWER_IS_APPROVER": {
-                    "summary": "The review cannot end that way: REVIEWER_IS_APPROVER.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.REVIEWER_IS_APPROVER",
-                        "message": "The review cannot end that way: REVIEWER_IS_APPROVER.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SPEND.NO_BUDGET_TO_MAKE": {
-                    "summary": "The review cannot end that way: NO_BUDGET_TO_MAKE.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.NO_BUDGET_TO_MAKE",
-                        "message": "The review cannot end that way: NO_BUDGET_TO_MAKE.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SPEND.NO_HEAD_TO_PROPOSE": {
-                    "summary": "The review cannot end that way: NO_HEAD_TO_PROPOSE.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.NO_HEAD_TO_PROPOSE",
-                        "message": "The review cannot end that way: NO_HEAD_TO_PROPOSE.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The outcome lacks what it needs: an opinion needs its text and direction, the others need a reason (VALIDATION_ERROR). Nothing is written.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "End the review of a request",
-        "tags": ["finance-reviews"]
-      }
-    },
     "/api/v1/access-requests/{id}/budget-check": {
       "get": {
         "operationId": "budgetCheckGet",
@@ -44591,7 +43933,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The newest check: what set it going, where it sent the request, the codes of the data and of the plan line, the flag of a request outside the plan, and what binds the company in all. The figures of each year are listed apart.",
+            "description": "The newest check: what set it going, its outcome (within the base, uses the reserve, blocked), every reason it is blocked, how far over the base or the reserve the cost is, and what binds the company in all. The figures of the year (base, reserve, spent, held, waiting, what is left at the two levels) are listed apart. A check made before the three outcomes is read from its code.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44636,18 +43978,18 @@
             }
           },
           "404": {
-            "description": "The request has no check or review for the caller to read (SPEND.REVIEW_NOT_FOUND), or does not exist (ACCESS_REQUEST.NOT_FOUND).",
+            "description": "The request has no check for the caller to read (SPEND.REVIEW_NOT_FOUND), or does not exist (ACCESS_REQUEST.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "SPEND.REVIEW_NOT_FOUND": {
-                    "summary": "The review does not exist.",
+                    "summary": "The check does not exist.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SPEND.REVIEW_NOT_FOUND",
-                        "message": "The review does not exist.",
+                        "message": "The check does not exist.",
                         "requestId": "req_example"
                       }
                     }
@@ -44734,7 +44076,7 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Get the check of the budget of a request",
-        "tags": ["finance-reviews"]
+        "tags": ["budget-checks"]
       }
     },
     "/api/v1/access-requests/{id}/budget-check/years": {
@@ -44763,7 +44105,7 @@
         ],
         "responses": {
           "200": {
-            "description": "One row for each year the request has a binding payment in: its slice of the cost, the code of the year, and the budget, what is held, what is spent and what is left as the check read them. A year with no budget has no figures, which is not a budget of 0.",
+            "description": "One row for the year the request is checked in: its cost, the code of the year, and the base, the reserve, what is held, what is spent, what waits to be decided and what is left of the base and with the reserve, as the check read them (the spending approver reads them as they are now). A year with no approved version has no figures, which is not a budget of 0. The price is the quote of the proposal only: the plans have no end date of their price in the model, so PRICE_EXPIRED is about a quote that is no longer valid.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44808,18 +44150,18 @@
             }
           },
           "404": {
-            "description": "The request has no check or review for the caller to read (SPEND.REVIEW_NOT_FOUND), or does not exist (ACCESS_REQUEST.NOT_FOUND).",
+            "description": "The request has no check for the caller to read (SPEND.REVIEW_NOT_FOUND), or does not exist (ACCESS_REQUEST.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "SPEND.REVIEW_NOT_FOUND": {
-                    "summary": "The review does not exist.",
+                    "summary": "The check does not exist.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SPEND.REVIEW_NOT_FOUND",
-                        "message": "The review does not exist.",
+                        "message": "The check does not exist.",
                         "requestId": "req_example"
                       }
                     }
@@ -44906,7 +44248,7 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "List the years of the check of a request",
-        "tags": ["finance-reviews"]
+        "tags": ["budget-checks"]
       }
     },
     "/api/v1/spend-queue": {
@@ -44934,7 +44276,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The requests of the department of the head that cost money and whose need is approved, not yet sent on, with the reason for one that stopped or that Finance gave back. Each request also says since when it waits in the queue, how many working days that is, whether it has waited longer than the days the head may take (the days in force when it entered the queue) and how many reminders the head has had about it. Never a figure of the budget, what is left or a code of the check.",
+            "description": "The requests of the department of the head that cost money and whose need is approved, not yet sent on, each with where it stands (not sent, waiting for the head to confirm the reserve, or blocked with its reasons) and what a check made now says (budgetOutcome: WITHIN_BASE, USES_RESERVE, BLOCKED), so the head knows which of them needs a line of reason to be sent on, and how far over the base or the reserve a request is. Each also says since when it waits in the queue, how many working days that is, whether it has waited longer than the days the head may take and how many reminders the head has had about it. Never what is left of the budget.",
             "content": {
               "application/json": {
                 "schema": {
@@ -45101,12 +44443,12 @@
         },
         "responses": {
           "201": {
-            "description": "Sends the requests chosen, one or more, on in one batch. Each request is checked against the budget and given the step the check says (to the spending approver, or to Finance for a review first); one that has no line of the plan or \"outside the plan\", or whose data is at fault, stays in the queue with the reason and the others go on. The items of the batch say how each fared.",
+            "description": "Sends the requests chosen, one or more, on in one batch. The amount of each is worked out again for the month of the batch and each is checked against the budget (BR-MF1-06g): within the base it goes to the spending approver; if it uses the reserve it goes only when the head gives a line of reason for it in the same act (reserveConfirmations, 1 to 500 characters, only for a request of the batch, only used when its check says it uses the reserve; the answer says IGNORED for one that does not), and otherwise stays in the queue waiting for the confirmation (AWAITING_RESERVE_CONFIRMATION); blocked (over the reserve, no approved budget in the current Cost Center, a quote that is no longer valid) or with a price or a rate missing, it stays in the queue with the reason and the others go on. results says how each fared and what became of its confirmation.",
             "content": {
               "application/json": {
                 "schema": {
                   "allOf": [
-                    { "$ref": "#/components/schemas/BatchResponseDto" },
+                    { "$ref": "#/components/schemas/SubmitBatchResponseDto" },
                     { "properties": { "message": { "example": "SPEND_BATCH.SUBMITTED" } } }
                   ]
                 }
@@ -45294,7 +44636,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
+            "description": "The body is invalid (VALIDATION_ERROR: a reason that is empty, over 500 characters or on more than one line), or a confirmation names a request that is not in the batch (SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45307,6 +44649,18 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH": {
+                    "summary": "The request <request-id> to confirm is not in the batch.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH",
+                        "message": "The request <request-id> to confirm is not in the batch.",
+                        "details": { "requestId": "<request-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -45559,6 +44913,291 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "List the batches the heads sent on as spend",
+        "tags": ["spend-submission"]
+      }
+    },
+    "/api/v1/access-requests/{id}/reserve-confirmation": {
+      "post": {
+        "operationId": "spendReserveConfirm",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReserveConfirmationBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The head of the department confirms, with one line of reason (1 to 500 characters), a request in their queue whose check says it uses the reserve. The request is checked again for today: if it still uses the reserve, the spend step is opened for the spending approver with the confirmation kept on it and its SLA counted from now (result SPEND_STEP_OPENED, confirmationKept true); if it is within the base now, the step is opened with no confirmation (confirmationKept false); if it is blocked now, nothing is opened or kept and the answer says so (result BLOCKED, with the reasons). A confirmation stays when the head of the department changes. The head cannot confirm a request they asked for or are given.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ReserveConfirmationResponseDto" },
+                    { "properties": { "message": { "example": "SPEND.RESERVE_CONFIRMED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller does not head a department (SPEND.NOT_HEAD).\n\nThe head asked for the request or is given it (SPEND.RESERVE_CONFIRMER_IS_BENEFICIARY).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SPEND.NOT_HEAD": {
+                    "summary": "Only the head of a department sends its requests on to be decided as spend.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SPEND.NOT_HEAD",
+                        "message": "Only the head of a department sends its requests on to be decided as spend.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SPEND.RESERVE_CONFIRMER_IS_BENEFICIARY": {
+                    "summary": "The reserve cannot be confirmed: RESERVE_CONFIRMER_IS_BENEFICIARY.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SPEND.RESERVE_CONFIRMER_IS_BENEFICIARY",
+                        "message": "The reserve cannot be confirmed: RESERVE_CONFIRMER_IS_BENEFICIARY.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The request does not exist, or is not one of the department of the caller (ACCESS_REQUEST.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "ACCESS_REQUEST.NOT_FOUND": {
+                    "summary": "The request does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.NOT_FOUND",
+                        "message": "The request does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request does not wait for the confirmation of the reserve: its check is within the base or blocked, a spend step is open, it was withdrawn or is not in the queue, or another confirmation came first (SPEND.RESERVE_NOT_PENDING).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "SPEND.RESERVE_NOT_PENDING": {
+                    "summary": "The reserve cannot be confirmed: RESERVE_NOT_PENDING.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SPEND.RESERVE_NOT_PENDING",
+                        "message": "The reserve cannot be confirmed: RESERVE_NOT_PENDING.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Confirm that a request uses the reserve, with a line of reason",
         "tags": ["spend-submission"]
       }
     },
@@ -46446,7 +46085,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The spend steps given to the caller that are open, the oldest first: what each request is, what it costs, the first code of its check, whether one person holds both steps or nobody independent reviewed it, and the batch it was sent in. A request that waits for Finance has no step and is not here.",
+            "description": "The spend steps given to the caller that are open, the oldest first: what each request is, what it costs, the first code of its check, whether the same person holds the need step and this one, whether the head confirmed the reserve for it, and the batch it was sent in.",
             "content": {
               "application/json": {
                 "schema": {
@@ -46579,7 +46218,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The step and the request around it for the person it is given to: what the head confirmed, what it costs with the tax that is deducted and the part that is not, what the IT Admin concluded of software that was not in the catalog, and, once decided, what was decided. The check, its years and the opinion of Finance are read from their own routes.",
+            "description": "The step and the request around it for the person it is given to: what the head confirmed, what it costs with the tax that is deducted and the part that is not, what the IT Admin concluded of software that was not in the catalog, the budget snapshot as it is now (base, reserve, spent, committed, waiting to be decided, what is left of the base and with the reserve, and the outcome a check made now gives), and, once decided, what was decided. The check and its year are read from their own routes.",
             "content": {
               "application/json": {
                 "schema": {
@@ -46630,12 +46269,12 @@
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "SPEND.REVIEW_NOT_FOUND": {
-                    "summary": "The review does not exist.",
+                    "summary": "The check does not exist.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SPEND.REVIEW_NOT_FOUND",
-                        "message": "The review does not exist.",
+                        "message": "The check does not exist.",
                         "requestId": "req_example"
                       }
                     }
@@ -46735,7 +46374,7 @@
         },
         "responses": {
           "200": {
-            "description": "The person the step is given to approves it or refuses it with a reason. The request is checked again as it is decided and the decision is made on that check, which is kept with it. A request that has less money than it costs in a year of the budget, or none, cannot be approved. A request that turned out to be an exception since it was sent goes back to Finance, and one whose data is at fault goes back to its head; nothing is decided then.",
+            "description": "The person the step is given to approves it or refuses it with a reason. The request is checked again for the day of the decision and the decision is made on that check, which is kept with it. There is no override: a request that is blocked now (over the reserve, no approved budget in the current Cost Center, a quote that is no longer valid), or that uses the reserve with no confirmation of the head on this step, goes back to its head and is not decided; the requester and the head are told.",
             "content": {
               "application/json": {
                 "schema": {
@@ -46854,7 +46493,7 @@
             }
           },
           "409": {
-            "description": "The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).",
+            "description": "The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46870,17 +46509,6 @@
                       }
                     }
                   },
-                  "SPEND.REVIEWER_IS_APPROVER": {
-                    "summary": "The spend step cannot be decided: REVIEWER_IS_APPROVER.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.REVIEWER_IS_APPROVER",
-                        "message": "The spend step cannot be decided: REVIEWER_IS_APPROVER.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
                   "SPEND.NOT_CHECKABLE": {
                     "summary": "The spend step cannot be decided: NOT_CHECKABLE.",
                     "value": {
@@ -46892,25 +46520,14 @@
                       }
                     }
                   },
-                  "SPEND.RECHECKED_NEEDS_FINANCE_REVIEW": {
-                    "summary": "The request was checked again, is now an exception that Finance has not reviewed, and went back to Finance. Nothing was decided.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.RECHECKED_NEEDS_FINANCE_REVIEW",
-                        "message": "The request was checked again, is now an exception that Finance has not reviewed, and went back to Finance. Nothing was decided.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
                   "SPEND.RECHECKED_RETURNED_TO_HEAD": {
-                    "summary": "The request was checked again, its data is at fault, and it went back to its head. Nothing was decided.",
+                    "summary": "The request was checked again, is blocked or uses the reserve the head has not confirmed, and went back to its head. Nothing was decided.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SPEND.RECHECKED_RETURNED_TO_HEAD",
-                        "message": "The request was checked again, its data is at fault, and it went back to its head. Nothing was decided.",
-                        "details": { "reason": "STALE_COST_EVIDENCE" },
+                        "message": "The request was checked again, is blocked or uses the reserve the head has not confirmed, and went back to its head. Nothing was decided.",
+                        "details": { "reasons": ["OVER_RESERVE"] },
                         "requestId": "req_example"
                       }
                     }
@@ -46973,7 +46590,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR: a refusal without a reason), or a year of the budget has less money than the request costs, or none (SPEND.OVERRIDE_REQUIRED, with the years): it cannot be approved.",
+            "description": "The body is invalid (VALIDATION_ERROR: a refusal without a reason, or a field that is not of the body, such as the override that no longer exists).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46986,18 +46603,6 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SPEND.OVERRIDE_REQUIRED": {
-                    "summary": "The spend step cannot be decided: OVERRIDE_REQUIRED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.OVERRIDE_REQUIRED",
-                        "message": "The spend step cannot be decided: OVERRIDE_REQUIRED.",
-                        "details": { "years": [2026] },
                         "requestId": "req_example"
                       }
                     }
@@ -47077,7 +46682,7 @@
         },
         "responses": {
           "200": {
-            "description": "Approves or refuses the requests chosen of a batch the caller holds, one by one in the order given. Each is checked and decided on its own, with its own record. One that is not in the batch or is not the caller one, has no spend step, needs an override (never given in bulk) or went back when checked again is skipped with its reason and the others go on. A refusal gives one reason for all.",
+            "description": "Approves or refuses the requests chosen of a batch the caller holds, one by one in the order given. Each is checked and decided on its own, with its own record. One that is not in the batch or is not the caller one, has no spend step, or went back to its head when checked again (the requester and the head are told) is skipped with its reason and the others go on. A refusal gives one reason for all.",
             "content": {
               "application/json": {
                 "schema": {
@@ -47441,923 +47046,6 @@
         "security": [{ "bearer": [] }],
         "summary": "List the requests waiting for my need decision",
         "tags": ["need-decisions"]
-      }
-    },
-    "/api/v1/access-requests/{id}/budget-information-requests": {
-      "post": {
-        "operationId": "budgetInformationAsk",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AskBodyDto" } } }
-        },
-        "responses": {
-          "201": {
-            "description": "The person the spend step is given to asks Finance a question while the step is pending. Finance receives it; the step stays with the caller, its SLA keeps counting and the decision is not held back. One question is open for a step at a time.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/InformationResponseDto" },
-                    { "properties": { "message": { "example": "BUDGET_INFORMATION.ASKED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller does not hold the spend step (BUDGET_INFORMATION.NOT_THE_ASSIGNEE) or asked for or is given the access (BUDGET_INFORMATION.OWN_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET_INFORMATION.NOT_THE_ASSIGNEE": {
-                    "summary": "The question cannot be put or answered: NOT_THE_ASSIGNEE.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET_INFORMATION.NOT_THE_ASSIGNEE",
-                        "message": "The question cannot be put or answered: NOT_THE_ASSIGNEE.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET_INFORMATION.OWN_REQUEST": {
-                    "summary": "The question cannot be put or answered: OWN_REQUEST.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET_INFORMATION.OWN_REQUEST",
-                        "message": "The question cannot be put or answered: OWN_REQUEST.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The request does not exist (ACCESS_REQUEST.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "ACCESS_REQUEST.NOT_FOUND": {
-                    "summary": "The request does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "ACCESS_REQUEST.NOT_FOUND",
-                        "message": "The request does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The request has no spend step open (BUDGET_INFORMATION.NO_SPEND_STEP), the step is not pending (BUDGET_INFORMATION.STEP_NOT_PENDING) or a question is still open (BUDGET_INFORMATION.ALREADY_OPEN).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET_INFORMATION.NO_SPEND_STEP": {
-                    "summary": "The question cannot be put or answered: NO_SPEND_STEP.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET_INFORMATION.NO_SPEND_STEP",
-                        "message": "The question cannot be put or answered: NO_SPEND_STEP.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET_INFORMATION.ALREADY_OPEN": {
-                    "summary": "The question cannot be put or answered: ALREADY_OPEN.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET_INFORMATION.ALREADY_OPEN",
-                        "message": "The question cannot be put or answered: ALREADY_OPEN.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Ask Finance for information on the budget",
-        "tags": ["budget-information"]
-      },
-      "get": {
-        "operationId": "budgetInformationOfRequest",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": true,
-              "default": 1,
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "What the spending approver asked Finance about the request and what Finance answered, the oldest first. Read by Finance and by the person the spend step is given to; the others are answered as if there were none.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/InformationListResponseDto" },
-                    { "properties": { "message": { "example": "BUDGET_INFORMATION.LISTED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The caller has no part in the questions of the request (BUDGET_INFORMATION.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET_INFORMATION.NOT_FOUND": {
-                    "summary": "The question does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET_INFORMATION.NOT_FOUND",
-                        "message": "The question does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "List the questions put to Finance on a request",
-        "tags": ["budget-information"]
-      }
-    },
-    "/api/v1/budget-information-requests": {
-      "get": {
-        "operationId": "budgetInformationList",
-        "parameters": [
-          {
-            "name": "state",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "string", "enum": ["OPEN", "ANSWERED", "CLOSED"] }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": true,
-              "default": 1,
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The questions of the spending approvers, the oldest first, each with its request, who asked and when, and its answer. Narrowed by state; open ones are what Finance has to answer.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/InformationListResponseDto" },
-                    { "properties": { "message": { "example": "BUDGET_INFORMATION.LISTED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only Finance reads the questions.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "List the questions put to Finance",
-        "tags": ["budget-information"]
-      }
-    },
-    "/api/v1/budget-information-requests/{id}/answer": {
-      "post": {
-        "operationId": "budgetInformationAnswer",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AnswerBodyDto" } } }
-        },
-        "responses": {
-          "200": {
-            "description": "Finance answers with within the limit, over the limit or no budget yet, with a note. The answer is kept beside the snapshot of the request and changes neither it nor the step; it is kept even after the approver decided. Finance cannot answer a request it takes part in, or one it decides as the spending approver.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/InformationResponseDto" },
-                    { "properties": { "message": { "example": "BUDGET_INFORMATION.ANSWERED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller is not Finance, takes part in the request (BUDGET_INFORMATION.OWN_REQUEST) or decides it as the spending approver (BUDGET_INFORMATION.SOD_APPROVER).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET_INFORMATION.OWN_REQUEST": {
-                    "summary": "The question cannot be put or answered: OWN_REQUEST.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET_INFORMATION.OWN_REQUEST",
-                        "message": "The question cannot be put or answered: OWN_REQUEST.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET_INFORMATION.SOD_APPROVER": {
-                    "summary": "The question cannot be put or answered: SOD_APPROVER.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET_INFORMATION.SOD_APPROVER",
-                        "message": "The question cannot be put or answered: SOD_APPROVER.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The question does not exist (BUDGET_INFORMATION.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET_INFORMATION.NOT_FOUND": {
-                    "summary": "The question does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET_INFORMATION.NOT_FOUND",
-                        "message": "The question does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The question is answered or closed, not open (BUDGET_INFORMATION.NOT_OPEN).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET_INFORMATION.NOT_OPEN": {
-                    "summary": "The question cannot be put or answered: NOT_OPEN.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET_INFORMATION.NOT_OPEN",
-                        "message": "The question cannot be put or answered: NOT_OPEN.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Answer a question on the budget",
-        "tags": ["budget-information"]
       }
     },
     "/api/v1/grant-queue": {
@@ -53065,7 +51753,7 @@
             }
           },
           "409": {
-            "description": "The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).",
+            "description": "The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again on the people approved and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -53081,17 +51769,6 @@
                       }
                     }
                   },
-                  "SPEND.REVIEWER_IS_APPROVER": {
-                    "summary": "The spend step cannot be decided: REVIEWER_IS_APPROVER.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.REVIEWER_IS_APPROVER",
-                        "message": "The spend step cannot be decided: REVIEWER_IS_APPROVER.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
                   "SPEND.NOT_CHECKABLE": {
                     "summary": "The spend step cannot be decided: NOT_CHECKABLE.",
                     "value": {
@@ -53103,25 +51780,14 @@
                       }
                     }
                   },
-                  "SPEND.RECHECKED_NEEDS_FINANCE_REVIEW": {
-                    "summary": "The request was checked again, is now an exception that Finance has not reviewed, and went back to Finance. Nothing was decided.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.RECHECKED_NEEDS_FINANCE_REVIEW",
-                        "message": "The request was checked again, is now an exception that Finance has not reviewed, and went back to Finance. Nothing was decided.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
                   "SPEND.RECHECKED_RETURNED_TO_HEAD": {
-                    "summary": "The request was checked again, its data is at fault, and it went back to its head. Nothing was decided.",
+                    "summary": "The request was checked again, is blocked or uses the reserve the head has not confirmed, and went back to its head. Nothing was decided.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SPEND.RECHECKED_RETURNED_TO_HEAD",
-                        "message": "The request was checked again, its data is at fault, and it went back to its head. Nothing was decided.",
-                        "details": { "reason": "STALE_COST_EVIDENCE" },
+                        "message": "The request was checked again, is blocked or uses the reserve the head has not confirmed, and went back to its head. Nothing was decided.",
+                        "details": { "reasons": ["OVER_RESERVE"] },
                         "requestId": "req_example"
                       }
                     }
@@ -53173,7 +51839,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR: a refusal without its reason); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); a year of the budget has less money than the request costs, or none (SPEND.OVERRIDE_REQUIRED, with the years): it cannot be approved.",
+            "description": "The body is invalid (VALIDATION_ERROR: a refusal without its reason); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -53198,18 +51864,6 @@
                         "code": "GROUP_REQUEST.LINES_MISMATCH",
                         "message": "The decision must name every line of the step, once.",
                         "details": { "missing": ["<employee-id>"], "extra": [] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SPEND.OVERRIDE_REQUIRED": {
-                    "summary": "The spend step cannot be decided: OVERRIDE_REQUIRED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SPEND.OVERRIDE_REQUIRED",
-                        "message": "The spend step cannot be decided: OVERRIDE_REQUIRED.",
-                        "details": { "years": [2026] },
                         "requestId": "req_example"
                       }
                     }
@@ -53928,7 +52582,7 @@
             "name": "state",
             "required": false,
             "in": "query",
-            "description": "One or more states of a request, comma-separated and none twice (for example PENDING,AWAITING_BUDGET); a draft is not a state of a request. Narrows within view when both are given.",
+            "description": "One or more states of a request, comma-separated and none twice (for example PENDING,AWAITING_SPEND_DECISION); a draft is not a state of a request. Narrows within view when both are given.",
             "schema": { "maxLength": 400, "type": "string" }
           },
           {
@@ -91379,8 +90033,6 @@
                       "AWAITING_EXECUTION",
                       "AWAITING_IT_ASSESSMENT",
                       "AWAITING_SPEND_SUBMISSION",
-                      "AWAITING_FINANCE_REVIEW",
-                      "AWAITING_BUDGET",
                       "AWAITING_SPEND_DECISION",
                       "REJECTED",
                       "IT_REJECTED",
@@ -91557,23 +90209,27 @@
                         "type": "string",
                         "enum": [
                           "NOT_SUBMITTED",
+                          "RESERVE_CONFIRMATION",
                           "BLOCKED",
-                          "RETURNED_BY_FINANCE",
-                          "WAITING_FINANCE_REVIEW",
-                          "WAITING_BUDGET",
                           "WAITING_SPEND_DECISION",
                           "REFUSED"
                         ]
                       },
-                      "blockedReason": {
-                        "type": "string",
-                        "enum": ["STALE_COST_EVIDENCE", "CLOSED_OR_EXPIRED_BUDGET_PERIOD", null],
+                      "blockedReasons": {
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": { "type": "string", "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"] }
+                      },
+                      "overBy": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
                         "nullable": true
                       },
-                      "financeReturnReason": { "type": "string", "nullable": true },
                       "refusalReason": { "type": "string", "nullable": true }
                     },
-                    "required": ["stage", "blockedReason", "financeReturnReason", "refusalReason"],
+                    "required": ["stage", "blockedReasons", "overBy", "refusalReason"],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -91855,8 +90511,6 @@
                       "AWAITING_EXECUTION",
                       "AWAITING_IT_ASSESSMENT",
                       "AWAITING_SPEND_SUBMISSION",
-                      "AWAITING_FINANCE_REVIEW",
-                      "AWAITING_BUDGET",
                       "AWAITING_SPEND_DECISION",
                       "REJECTED",
                       "IT_REJECTED",
@@ -92033,23 +90687,27 @@
                         "type": "string",
                         "enum": [
                           "NOT_SUBMITTED",
+                          "RESERVE_CONFIRMATION",
                           "BLOCKED",
-                          "RETURNED_BY_FINANCE",
-                          "WAITING_FINANCE_REVIEW",
-                          "WAITING_BUDGET",
                           "WAITING_SPEND_DECISION",
                           "REFUSED"
                         ]
                       },
-                      "blockedReason": {
-                        "type": "string",
-                        "enum": ["STALE_COST_EVIDENCE", "CLOSED_OR_EXPIRED_BUDGET_PERIOD", null],
+                      "blockedReasons": {
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": { "type": "string", "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"] }
+                      },
+                      "overBy": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
                         "nullable": true
                       },
-                      "financeReturnReason": { "type": "string", "nullable": true },
                       "refusalReason": { "type": "string", "nullable": true }
                     },
-                    "required": ["stage", "blockedReason", "financeReturnReason", "refusalReason"],
+                    "required": ["stage", "blockedReasons", "overBy", "refusalReason"],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -92569,18 +91227,6 @@
                       "additionalProperties": false
                     }
                   },
-                  "possibleExtraSteps": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "kind": { "type": "string", "enum": ["FINANCE_REVIEW"] },
-                        "beforeStep": { "type": "string", "enum": ["SPEND_APPROVAL"] }
-                      },
-                      "required": ["kind", "beforeStep"],
-                      "additionalProperties": false
-                    }
-                  },
                   "totalExpectedWorkingDays": {
                     "type": "integer",
                     "exclusiveMinimum": true,
@@ -92605,7 +91251,6 @@
                   "costEstimate",
                   "spendSubmission",
                   "chain",
-                  "possibleExtraSteps",
                   "totalExpectedWorkingDays"
                 ],
                 "additionalProperties": false
@@ -92643,8 +91288,6 @@
                           "AWAITING_EXECUTION",
                           "AWAITING_IT_ASSESSMENT",
                           "AWAITING_SPEND_SUBMISSION",
-                          "AWAITING_FINANCE_REVIEW",
-                          "AWAITING_BUDGET",
                           "AWAITING_SPEND_DECISION",
                           "REJECTED",
                           "IT_REJECTED",
@@ -92821,23 +91464,30 @@
                             "type": "string",
                             "enum": [
                               "NOT_SUBMITTED",
+                              "RESERVE_CONFIRMATION",
                               "BLOCKED",
-                              "RETURNED_BY_FINANCE",
-                              "WAITING_FINANCE_REVIEW",
-                              "WAITING_BUDGET",
                               "WAITING_SPEND_DECISION",
                               "REFUSED"
                             ]
                           },
-                          "blockedReason": {
-                            "type": "string",
-                            "enum": ["STALE_COST_EVIDENCE", "CLOSED_OR_EXPIRED_BUDGET_PERIOD", null],
+                          "blockedReasons": {
+                            "maxItems": 3,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"]
+                            }
+                          },
+                          "overBy": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false,
                             "nullable": true
                           },
-                          "financeReturnReason": { "type": "string", "nullable": true },
                           "refusalReason": { "type": "string", "nullable": true }
                         },
-                        "required": ["stage", "blockedReason", "financeReturnReason", "refusalReason"],
+                        "required": ["stage", "blockedReasons", "overBy", "refusalReason"],
                         "additionalProperties": false,
                         "nullable": true
                       },
@@ -93694,269 +92344,6 @@
         "required": ["planId"],
         "additionalProperties": false
       },
-      "ReviewListResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "items": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "requestId": { "type": "string", "format": "uuid" },
-                    "stepId": { "type": "string", "format": "uuid" },
-                    "state": { "type": "string", "enum": ["PENDING", "WAITING"] },
-                    "waitingReason": { "type": "string", "enum": ["NO_FINANCE_REVIEWER", null], "nullable": true },
-                    "openedAt": { "type": "string", "format": "date-time" },
-                    "slaWorkingDays": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "maximum": 9007199254740991,
-                      "minimum": 0
-                    },
-                    "costCenter": {
-                      "type": "object",
-                      "properties": { "id": { "type": "string", "format": "uuid" }, "code": { "type": "string" } },
-                      "required": ["id", "code"],
-                      "additionalProperties": false
-                    },
-                    "requester": {
-                      "type": "object",
-                      "properties": {
-                        "employeeId": { "type": "string", "format": "uuid" },
-                        "employeeCode": { "type": "string" },
-                        "fullName": { "type": "string" }
-                      },
-                      "required": ["employeeId", "employeeCode", "fullName"],
-                      "additionalProperties": false
-                    },
-                    "amount": {
-                      "type": "object",
-                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                      "required": ["amount", "currency"],
-                      "additionalProperties": false,
-                      "nullable": true
-                    },
-                    "primaryCode": {
-                      "type": "string",
-                      "enum": [
-                        "BUDGET_OK",
-                        "HIGH_VALUE",
-                        "INSUFFICIENT_BUDGET",
-                        "NO_ACTIVE_BUDGET",
-                        "CLOSED_OR_EXPIRED_BUDGET_PERIOD",
-                        "STALE_COST_EVIDENCE",
-                        null
-                      ],
-                      "nullable": true
-                    }
-                  },
-                  "required": [
-                    "requestId",
-                    "stepId",
-                    "state",
-                    "waitingReason",
-                    "openedAt",
-                    "slaWorkingDays",
-                    "costCenter",
-                    "requester",
-                    "amount",
-                    "primaryCode"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "pagination": {
-                "type": "object",
-                "properties": {
-                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
-                  "pageSize": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                },
-                "required": ["page", "pageSize", "totalItems", "totalPages"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["items", "pagination"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "ReviewDetailResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "financeReview": {
-                "type": "object",
-                "properties": {
-                  "requestId": { "type": "string", "format": "uuid" },
-                  "step": {
-                    "type": "object",
-                    "properties": {
-                      "id": { "type": "string", "format": "uuid" },
-                      "state": { "type": "string", "enum": ["PENDING", "WAITING", "COMPLETED", "CLOSED"] },
-                      "waitingReason": { "type": "string", "enum": ["NO_FINANCE_REVIEWER", null], "nullable": true },
-                      "assignee": {
-                        "type": "object",
-                        "properties": {
-                          "employeeId": { "type": "string", "format": "uuid" },
-                          "employeeCode": { "type": "string" },
-                          "fullName": { "type": "string" }
-                        },
-                        "required": ["employeeId", "employeeCode", "fullName"],
-                        "additionalProperties": false,
-                        "nullable": true
-                      },
-                      "openedAt": { "type": "string", "format": "date-time" },
-                      "closedAt": { "type": "string", "format": "date-time", "nullable": true },
-                      "slaWorkingDays": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "maximum": 9007199254740991,
-                        "minimum": 0
-                      }
-                    },
-                    "required": ["id", "state", "waitingReason", "assignee", "openedAt", "closedAt", "slaWorkingDays"],
-                    "additionalProperties": false
-                  },
-                  "check": {
-                    "type": "object",
-                    "properties": {
-                      "id": { "type": "string", "format": "uuid" },
-                      "number": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "maximum": 9007199254740991,
-                        "minimum": 0
-                      },
-                      "trigger": {
-                        "type": "string",
-                        "enum": [
-                          "SUBMISSION",
-                          "PLAN_LINE_MOVED",
-                          "BUDGET_VERSION_APPROVED",
-                          "SPEND_DECISION",
-                          "FINANCE_OUTCOME_WHILE_WAITING"
-                        ]
-                      },
-                      "route": { "type": "string", "enum": ["BLOCKED", "FINANCE_REVIEW", "SPEND_APPROVAL"] },
-                      "primaryCode": {
-                        "type": "string",
-                        "enum": [
-                          "BUDGET_OK",
-                          "HIGH_VALUE",
-                          "INSUFFICIENT_BUDGET",
-                          "NO_ACTIVE_BUDGET",
-                          "CLOSED_OR_EXPIRED_BUDGET_PERIOD",
-                          "STALE_COST_EVIDENCE",
-                          null
-                        ],
-                        "nullable": true
-                      },
-                      "staleCostEvidence": { "type": "boolean" },
-                      "periodClosed": { "type": "boolean" },
-                      "noIndependentReview": { "type": "boolean" },
-                      "bindingTotal": {
-                        "type": "object",
-                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                        "required": ["amount", "currency"],
-                        "additionalProperties": false
-                      },
-                      "yearCount": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "maximum": 9007199254740991,
-                        "minimum": 0
-                      },
-                      "ranAt": { "type": "string", "format": "date-time" }
-                    },
-                    "required": [
-                      "id",
-                      "number",
-                      "trigger",
-                      "route",
-                      "primaryCode",
-                      "staleCostEvidence",
-                      "periodClosed",
-                      "noIndependentReview",
-                      "bindingTotal",
-                      "yearCount",
-                      "ranAt"
-                    ],
-                    "additionalProperties": false
-                  },
-                  "review": {
-                    "type": "object",
-                    "properties": {
-                      "outcome": {
-                        "type": "string",
-                        "enum": ["ASSESSED", "RETURNED_TO_HEAD", "BUDGET_REVISION_NEEDED", "LINE_UPDATED"]
-                      },
-                      "opinion": { "type": "string", "nullable": true },
-                      "direction": {
-                        "type": "string",
-                        "enum": ["RECOMMEND_APPROVE", "RECOMMEND_OVERRIDE", "RECOMMEND_REJECT", null],
-                        "nullable": true
-                      },
-                      "reason": { "type": "string", "nullable": true },
-                      "decidedBy": {
-                        "type": "object",
-                        "properties": {
-                          "employeeId": { "type": "string", "format": "uuid" },
-                          "employeeCode": { "type": "string" },
-                          "fullName": { "type": "string" }
-                        },
-                        "required": ["employeeId", "employeeCode", "fullName"],
-                        "additionalProperties": false
-                      },
-                      "decidedAt": { "type": "string", "format": "date-time" }
-                    },
-                    "required": ["outcome", "opinion", "direction", "reason", "decidedBy", "decidedAt"],
-                    "additionalProperties": false,
-                    "nullable": true
-                  }
-                },
-                "required": ["requestId", "step", "check", "review"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["financeReview"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "ReviewBodyDto": {
-        "type": "object",
-        "properties": {
-          "outcome": { "type": "string", "enum": ["ASSESSED", "RETURN_TO_HEAD", "NEEDS_BUDGET"] },
-          "opinion": { "type": "string", "minLength": 1, "maxLength": 2000 },
-          "direction": { "type": "string", "enum": ["RECOMMEND_APPROVE", "RECOMMEND_OVERRIDE", "RECOMMEND_REJECT"] },
-          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
-        },
-        "required": ["outcome"],
-        "description": "An assessment (outcome ASSESSED) gives its opinion and the direction it advises, and no reason. Every other outcome gives its reason, and no opinion and no direction.",
-        "additionalProperties": false
-      },
       "BudgetCheckResponseDto": {
         "type": "object",
         "properties": {
@@ -93974,13 +92361,34 @@
                     "type": "string",
                     "enum": [
                       "SUBMISSION",
+                      "SPEND_DECISION",
+                      "RESERVE_CONFIRMATION",
                       "PLAN_LINE_MOVED",
                       "BUDGET_VERSION_APPROVED",
-                      "SPEND_DECISION",
                       "FINANCE_OUTCOME_WHILE_WAITING"
                     ]
                   },
                   "route": { "type": "string", "enum": ["BLOCKED", "FINANCE_REVIEW", "SPEND_APPROVAL"] },
+                  "outcome": { "type": "string", "enum": ["WITHIN_BASE", "USES_RESERVE", "BLOCKED"] },
+                  "blockedReasons": {
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": { "type": "string", "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"] }
+                  },
+                  "overBaseBy": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "overBy": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "primaryCode": {
                     "type": "string",
                     "enum": [
@@ -93994,9 +92402,6 @@
                     ],
                     "nullable": true
                   },
-                  "staleCostEvidence": { "type": "boolean" },
-                  "periodClosed": { "type": "boolean" },
-                  "noIndependentReview": { "type": "boolean" },
                   "bindingTotal": {
                     "type": "object",
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -94016,10 +92421,11 @@
                   "number",
                   "trigger",
                   "route",
+                  "outcome",
+                  "blockedReasons",
+                  "overBaseBy",
+                  "overBy",
                   "primaryCode",
-                  "staleCostEvidence",
-                  "periodClosed",
-                  "noIndependentReview",
                   "bindingTotal",
                   "yearCount",
                   "ranAt"
@@ -94067,6 +92473,20 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
+                    "base": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "reserve": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
                     "held": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -94082,6 +92502,20 @@
                       "nullable": true
                     },
                     "remaining": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "remainingBase": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "remainingWithReserve": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
@@ -94107,9 +92541,13 @@
                     "cost",
                     "code",
                     "budget",
+                    "base",
+                    "reserve",
                     "held",
                     "spent",
                     "remaining",
+                    "remainingBase",
+                    "remainingWithReserve",
                     "shareBasisPoints",
                     "pending"
                   ],
@@ -94207,13 +92645,24 @@
                       "maximum": 9007199254740991,
                       "nullable": true
                     },
-                    "stage": { "type": "string", "enum": ["NOT_SUBMITTED", "BLOCKED", "RETURNED_BY_FINANCE"] },
-                    "blockedReason": {
+                    "stage": { "type": "string", "enum": ["NOT_SUBMITTED", "RESERVE_CONFIRMATION", "BLOCKED"] },
+                    "budgetOutcome": {
                       "type": "string",
-                      "enum": ["STALE_COST_EVIDENCE", "CLOSED_OR_EXPIRED_BUDGET_PERIOD", null],
+                      "enum": ["WITHIN_BASE", "USES_RESERVE", "BLOCKED", null],
                       "nullable": true
                     },
-                    "financeReturnReason": { "type": "string", "nullable": true },
+                    "blockedReasons": {
+                      "maxItems": 3,
+                      "type": "array",
+                      "items": { "type": "string", "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"] }
+                    },
+                    "overBy": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
                     "readyToSubmit": { "type": "boolean" },
                     "updatedAt": { "type": "string", "format": "date-time" },
                     "queuedAt": { "type": "string", "format": "date-time", "nullable": true },
@@ -94231,8 +92680,9 @@
                     "amount",
                     "budgetYear",
                     "stage",
-                    "blockedReason",
-                    "financeReturnReason",
+                    "budgetOutcome",
+                    "blockedReasons",
+                    "overBy",
                     "readyToSubmit",
                     "updatedAt",
                     "queuedAt",
@@ -94277,12 +92727,25 @@
             "type": "array",
             "items": { "type": "string", "format": "uuid" },
             "uniqueItems": true
+          },
+          "reserveConfirmations": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "requestId": { "type": "string", "format": "uuid" },
+                "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+              },
+              "required": ["requestId", "reason"],
+              "additionalProperties": false
+            }
           }
         },
         "required": ["requestIds"],
         "additionalProperties": false
       },
-      "BatchResponseDto": {
+      "SubmitBatchResponseDto": {
         "type": "object",
         "properties": {
           "success": { "type": "boolean", "enum": [true] },
@@ -94320,9 +92783,76 @@
                 },
                 "required": ["id", "department", "submittedBy", "submittedAt", "itemCount"],
                 "additionalProperties": false
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": { "type": "string", "format": "uuid" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["SENT_TO_APPROVER", "AWAITING_RESERVE_CONFIRMATION", "STOPPED"]
+                    },
+                    "stopReason": {
+                      "type": "string",
+                      "enum": [
+                        "PRICE_EXPIRED",
+                        "NO_APPROVED_BUDGET",
+                        "OVER_RESERVE",
+                        "PRICE_MISSING",
+                        "RATE_MISSING",
+                        null
+                      ],
+                      "nullable": true
+                    },
+                    "reserveConfirmation": { "type": "string", "enum": ["APPLIED", "IGNORED", "NOT_GIVEN"] }
+                  },
+                  "required": ["requestId", "outcome", "stopReason", "reserveConfirmation"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["batch"],
+            "required": ["batch", "results"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ReserveConfirmationBodyDto": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 500 } },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
+      "ReserveConfirmationResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "reserveConfirmation": {
+                "type": "object",
+                "properties": {
+                  "requestId": { "type": "string", "format": "uuid" },
+                  "result": { "type": "string", "enum": ["SPEND_STEP_OPENED", "BLOCKED"] },
+                  "budgetOutcome": { "type": "string", "enum": ["WITHIN_BASE", "USES_RESERVE", "BLOCKED"] },
+                  "blockedReasons": {
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": { "type": "string", "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"] }
+                  },
+                  "confirmationKept": { "type": "boolean" }
+                },
+                "required": ["requestId", "result", "budgetOutcome", "blockedReasons", "confirmationKept"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["reserveConfirmation"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -94409,6 +92939,54 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "BatchResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "batch": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "department": {
+                    "type": "object",
+                    "properties": { "id": { "type": "string", "format": "uuid" }, "code": { "type": "string" } },
+                    "required": ["id", "code"],
+                    "additionalProperties": false
+                  },
+                  "submittedBy": {
+                    "type": "object",
+                    "properties": {
+                      "employeeId": { "type": "string", "format": "uuid" },
+                      "employeeCode": { "type": "string" },
+                      "fullName": { "type": "string" }
+                    },
+                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "additionalProperties": false
+                  },
+                  "submittedAt": { "type": "string", "format": "date-time" },
+                  "itemCount": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  }
+                },
+                "required": ["id", "department", "submittedBy", "submittedAt", "itemCount"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["batch"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "BatchItemListResponseDto": {
         "type": "object",
         "properties": {
@@ -94429,14 +93007,20 @@
                       "maximum": 9007199254740991,
                       "minimum": 0
                     },
-                    "outcome": { "type": "string", "enum": ["SENT_TO_APPROVER", "SENT_TO_FINANCE", "STOPPED"] },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["SENT_TO_APPROVER", "AWAITING_RESERVE_CONFIRMATION", "STOPPED", "SENT_TO_FINANCE"]
+                    },
                     "stopReason": {
                       "type": "string",
                       "enum": [
-                        "STALE_COST_EVIDENCE",
-                        "CLOSED_OR_EXPIRED_BUDGET_PERIOD",
+                        "PRICE_EXPIRED",
+                        "NO_APPROVED_BUDGET",
+                        "OVER_RESERVE",
                         "PRICE_MISSING",
                         "RATE_MISSING",
+                        "STALE_COST_EVIDENCE",
+                        "CLOSED_OR_EXPIRED_BUDGET_PERIOD",
                         null
                       ],
                       "nullable": true
@@ -94461,8 +93045,6 @@
                         "AWAITING_EXECUTION",
                         "AWAITING_IT_ASSESSMENT",
                         "AWAITING_SPEND_SUBMISSION",
-                        "AWAITING_FINANCE_REVIEW",
-                        "AWAITING_BUDGET",
                         "AWAITING_SPEND_DECISION",
                         "REJECTED",
                         "IT_REJECTED",
@@ -94814,8 +93396,12 @@
                       ],
                       "nullable": true
                     },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["WITHIN_BASE", "USES_RESERVE", "BLOCKED", null],
+                      "nullable": true
+                    },
                     "samePersonAsSpend": { "type": "boolean" },
-                    "noIndependentReview": { "type": "boolean" },
                     "batchId": { "type": "string", "format": "uuid", "nullable": true }
                   },
                   "required": [
@@ -94833,8 +93419,8 @@
                     "costCenter",
                     "amount",
                     "primaryCode",
+                    "outcome",
                     "samePersonAsSpend",
-                    "noIndependentReview",
                     "batchId"
                   ],
                   "additionalProperties": false
@@ -94906,8 +93492,7 @@
                         "maximum": 9007199254740991,
                         "minimum": 0
                       },
-                      "samePersonAsSpend": { "type": "boolean" },
-                      "noIndependentReview": { "type": "boolean" }
+                      "samePersonAsSpend": { "type": "boolean" }
                     },
                     "required": [
                       "id",
@@ -94917,8 +93502,7 @@
                       "openedAt",
                       "decidedAt",
                       "slaWorkingDays",
-                      "samePersonAsSpend",
-                      "noIndependentReview"
+                      "samePersonAsSpend"
                     ],
                     "additionalProperties": false
                   },
@@ -95136,31 +93720,84 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
-                  "latestBudgetInformation": {
+                  "budgetSnapshot": {
                     "type": "object",
                     "properties": {
-                      "id": { "type": "string", "format": "uuid" },
-                      "requestId": { "type": "string", "format": "uuid" },
-                      "stepId": { "type": "string", "format": "uuid" },
-                      "question": { "type": "string" },
-                      "askedBy": {
+                      "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                      "base": {
                         "type": "object",
-                        "properties": {
-                          "employeeId": { "type": "string", "format": "uuid" },
-                          "employeeCode": { "type": "string" },
-                          "fullName": { "type": "string" }
-                        },
-                        "required": ["employeeId", "employeeCode", "fullName"],
-                        "additionalProperties": false
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
                       },
-                      "askedAt": { "type": "string", "format": "date-time" },
-                      "state": { "type": "string", "enum": ["OPEN", "ANSWERED", "CLOSED"] },
-                      "answer": {
+                      "reserve": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "spent": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "committed": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "pending": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "remainingBase": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "remainingWithReserve": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "outcome": { "type": "string", "enum": ["WITHIN_BASE", "USES_RESERVE", "BLOCKED"] },
+                      "blockedReasons": {
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": { "type": "string", "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"] }
+                      },
+                      "overBaseBy": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "overBy": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "reserveConfirmation": {
                         "type": "object",
                         "properties": {
-                          "value": { "type": "string", "enum": ["WITHIN_LIMIT", "OVER_LIMIT", "NO_BUDGET"] },
-                          "note": { "type": "string", "nullable": true },
-                          "answeredBy": {
+                          "reason": { "type": "string" },
+                          "confirmedBy": {
                             "type": "object",
                             "properties": {
                               "employeeId": { "type": "string", "format": "uuid" },
@@ -95170,32 +93807,39 @@
                             "required": ["employeeId", "employeeCode", "fullName"],
                             "additionalProperties": false
                           },
-                          "answeredAt": { "type": "string", "format": "date-time" },
-                          "responseSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                          "confirmedAt": { "type": "string", "format": "date-time" }
                         },
-                        "required": ["value", "note", "answeredBy", "answeredAt", "responseSeconds"],
+                        "required": ["reason", "confirmedBy", "confirmedAt"],
                         "additionalProperties": false,
                         "nullable": true
                       },
-                      "closedAt": { "type": "string", "format": "date-time", "nullable": true },
-                      "closeReason": {
-                        "type": "string",
-                        "enum": ["REQUEST_WITHDRAWN", "REQUEST_CANCELLED", "STEP_CLOSED", null],
-                        "nullable": true
-                      }
+                      "decisionSnapshotCheckId": { "type": "string", "format": "uuid", "nullable": true },
+                      "computedAt": { "type": "string", "format": "date-time" }
                     },
                     "required": [
-                      "id",
-                      "requestId",
-                      "stepId",
-                      "question",
-                      "askedBy",
-                      "askedAt",
-                      "state",
-                      "answer",
-                      "closedAt",
-                      "closeReason"
+                      "year",
+                      "base",
+                      "reserve",
+                      "spent",
+                      "committed",
+                      "pending",
+                      "remainingBase",
+                      "remainingWithReserve",
+                      "outcome",
+                      "blockedReasons",
+                      "overBaseBy",
+                      "overBy",
+                      "reserveConfirmation",
+                      "decisionSnapshotCheckId",
+                      "computedAt"
                     ],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "annualVendorAmount": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
                     "additionalProperties": false,
                     "nullable": true
                   }
@@ -95208,7 +93852,8 @@
                   "cost",
                   "assessment",
                   "decision",
-                  "latestBudgetInformation"
+                  "budgetSnapshot",
+                  "annualVendorAmount"
                 ],
                 "additionalProperties": false
               }
@@ -95270,12 +93915,9 @@
                         "GROUP_NEEDS_LINES",
                         "NOT_THE_ASSIGNEE",
                         "OWN_REQUEST",
-                        "REVIEWER_IS_APPROVER",
                         "STEP_NOT_PENDING",
                         "NO_SPEND_STEP",
-                        "OVERRIDE_REQUIRED",
                         "NOT_CHECKABLE",
-                        "RECHECKED_NEEDS_FINANCE_REVIEW",
                         "RECHECKED_RETURNED_TO_HEAD",
                         null
                       ],
@@ -95440,198 +94082,6 @@
           }
         },
         "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "AskBodyDto": {
-        "type": "object",
-        "properties": { "question": { "type": "string", "minLength": 1, "maxLength": 2000 } },
-        "required": ["question"],
-        "additionalProperties": false
-      },
-      "InformationResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "budgetInformation": {
-                "type": "object",
-                "properties": {
-                  "id": { "type": "string", "format": "uuid" },
-                  "requestId": { "type": "string", "format": "uuid" },
-                  "stepId": { "type": "string", "format": "uuid" },
-                  "question": { "type": "string" },
-                  "askedBy": {
-                    "type": "object",
-                    "properties": {
-                      "employeeId": { "type": "string", "format": "uuid" },
-                      "employeeCode": { "type": "string" },
-                      "fullName": { "type": "string" }
-                    },
-                    "required": ["employeeId", "employeeCode", "fullName"],
-                    "additionalProperties": false
-                  },
-                  "askedAt": { "type": "string", "format": "date-time" },
-                  "state": { "type": "string", "enum": ["OPEN", "ANSWERED", "CLOSED"] },
-                  "answer": {
-                    "type": "object",
-                    "properties": {
-                      "value": { "type": "string", "enum": ["WITHIN_LIMIT", "OVER_LIMIT", "NO_BUDGET"] },
-                      "note": { "type": "string", "nullable": true },
-                      "answeredBy": {
-                        "type": "object",
-                        "properties": {
-                          "employeeId": { "type": "string", "format": "uuid" },
-                          "employeeCode": { "type": "string" },
-                          "fullName": { "type": "string" }
-                        },
-                        "required": ["employeeId", "employeeCode", "fullName"],
-                        "additionalProperties": false
-                      },
-                      "answeredAt": { "type": "string", "format": "date-time" },
-                      "responseSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                    },
-                    "required": ["value", "note", "answeredBy", "answeredAt", "responseSeconds"],
-                    "additionalProperties": false,
-                    "nullable": true
-                  },
-                  "closedAt": { "type": "string", "format": "date-time", "nullable": true },
-                  "closeReason": {
-                    "type": "string",
-                    "enum": ["REQUEST_WITHDRAWN", "REQUEST_CANCELLED", "STEP_CLOSED", null],
-                    "nullable": true
-                  }
-                },
-                "required": [
-                  "id",
-                  "requestId",
-                  "stepId",
-                  "question",
-                  "askedBy",
-                  "askedAt",
-                  "state",
-                  "answer",
-                  "closedAt",
-                  "closeReason"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "required": ["budgetInformation"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "InformationListResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "items": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": { "type": "string", "format": "uuid" },
-                    "requestId": { "type": "string", "format": "uuid" },
-                    "stepId": { "type": "string", "format": "uuid" },
-                    "question": { "type": "string" },
-                    "askedBy": {
-                      "type": "object",
-                      "properties": {
-                        "employeeId": { "type": "string", "format": "uuid" },
-                        "employeeCode": { "type": "string" },
-                        "fullName": { "type": "string" }
-                      },
-                      "required": ["employeeId", "employeeCode", "fullName"],
-                      "additionalProperties": false
-                    },
-                    "askedAt": { "type": "string", "format": "date-time" },
-                    "state": { "type": "string", "enum": ["OPEN", "ANSWERED", "CLOSED"] },
-                    "answer": {
-                      "type": "object",
-                      "properties": {
-                        "value": { "type": "string", "enum": ["WITHIN_LIMIT", "OVER_LIMIT", "NO_BUDGET"] },
-                        "note": { "type": "string", "nullable": true },
-                        "answeredBy": {
-                          "type": "object",
-                          "properties": {
-                            "employeeId": { "type": "string", "format": "uuid" },
-                            "employeeCode": { "type": "string" },
-                            "fullName": { "type": "string" }
-                          },
-                          "required": ["employeeId", "employeeCode", "fullName"],
-                          "additionalProperties": false
-                        },
-                        "answeredAt": { "type": "string", "format": "date-time" },
-                        "responseSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                      },
-                      "required": ["value", "note", "answeredBy", "answeredAt", "responseSeconds"],
-                      "additionalProperties": false,
-                      "nullable": true
-                    },
-                    "closedAt": { "type": "string", "format": "date-time", "nullable": true },
-                    "closeReason": {
-                      "type": "string",
-                      "enum": ["REQUEST_WITHDRAWN", "REQUEST_CANCELLED", "STEP_CLOSED", null],
-                      "nullable": true
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "requestId",
-                    "stepId",
-                    "question",
-                    "askedBy",
-                    "askedAt",
-                    "state",
-                    "answer",
-                    "closedAt",
-                    "closeReason"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "pagination": {
-                "type": "object",
-                "properties": {
-                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
-                  "pageSize": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                },
-                "required": ["page", "pageSize", "totalItems", "totalPages"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["items", "pagination"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "AnswerBodyDto": {
-        "type": "object",
-        "properties": {
-          "answer": { "type": "string", "enum": ["WITHIN_LIMIT", "OVER_LIMIT", "NO_BUDGET"] },
-          "note": { "type": "string", "minLength": 1, "maxLength": 2000 }
-        },
-        "required": ["answer"],
         "additionalProperties": false
       },
       "GrantQueueResponseDto": {
@@ -96156,8 +94606,6 @@
                       "AWAITING_EXECUTION",
                       "AWAITING_IT_ASSESSMENT",
                       "AWAITING_SPEND_SUBMISSION",
-                      "AWAITING_FINANCE_REVIEW",
-                      "AWAITING_BUDGET",
                       "AWAITING_SPEND_DECISION",
                       "REJECTED",
                       "IT_REJECTED",
@@ -96334,23 +94782,27 @@
                         "type": "string",
                         "enum": [
                           "NOT_SUBMITTED",
+                          "RESERVE_CONFIRMATION",
                           "BLOCKED",
-                          "RETURNED_BY_FINANCE",
-                          "WAITING_FINANCE_REVIEW",
-                          "WAITING_BUDGET",
                           "WAITING_SPEND_DECISION",
                           "REFUSED"
                         ]
                       },
-                      "blockedReason": {
-                        "type": "string",
-                        "enum": ["STALE_COST_EVIDENCE", "CLOSED_OR_EXPIRED_BUDGET_PERIOD", null],
+                      "blockedReasons": {
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": { "type": "string", "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"] }
+                      },
+                      "overBy": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
                         "nullable": true
                       },
-                      "financeReturnReason": { "type": "string", "nullable": true },
                       "refusalReason": { "type": "string", "nullable": true }
                     },
-                    "required": ["stage", "blockedReason", "financeReturnReason", "refusalReason"],
+                    "required": ["stage", "blockedReasons", "overBy", "refusalReason"],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -96611,17 +95063,13 @@
                   "properties": {
                     "requestId": { "type": "string", "format": "uuid" },
                     "stepId": { "type": "string", "format": "uuid" },
-                    "stepKind": {
-                      "type": "string",
-                      "enum": ["NEED", "FINANCE_REVIEW", "SPEND_APPROVAL", "IT_ASSESSMENT"]
-                    },
+                    "stepKind": { "type": "string", "enum": ["NEED", "SPEND_APPROVAL", "IT_ASSESSMENT"] },
                     "waitingReason": {
                       "type": "string",
                       "enum": [
                         "NO_SPENDING_APPROVER",
                         "NO_DEPARTMENT_HEAD",
                         "SPENDING_APPROVER_IS_PARTY",
-                        "NO_FINANCE_REVIEWER",
                         "NO_IT_ADMIN_IN_CHARGE"
                       ]
                     },
@@ -96629,7 +95077,6 @@
                       "type": "string",
                       "enum": [
                         "CONFIGURE_SPENDING_APPROVER",
-                        "GRANT_FINANCE_ROLE",
                         "ASSIGN_DEPARTMENT_HEAD",
                         "NAME_IT_ADMIN_IN_CHARGE",
                         null
@@ -96753,17 +95200,6 @@
                         "additionalProperties": false,
                         "nullable": true
                       },
-                      "FINANCE_REVIEW": {
-                        "type": "object",
-                        "properties": {
-                          "startedAt": { "type": "string", "format": "date-time" },
-                          "endedAt": { "type": "string", "format": "date-time", "nullable": true },
-                          "seconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "nullable": true }
-                        },
-                        "required": ["startedAt", "endedAt", "seconds"],
-                        "additionalProperties": false,
-                        "nullable": true
-                      },
                       "SPEND_DECISION": {
                         "type": "object",
                         "properties": {
@@ -96787,7 +95223,7 @@
                         "nullable": true
                       }
                     },
-                    "required": ["NEED", "IT_ASSESSMENT", "QUEUE_WAIT", "FINANCE_REVIEW", "SPEND_DECISION", "GRANT"],
+                    "required": ["NEED", "IT_ASSESSMENT", "QUEUE_WAIT", "SPEND_DECISION", "GRANT"],
                     "additionalProperties": false
                   }
                 },
@@ -96896,10 +95332,7 @@
                   "properties": {
                     "requestId": { "type": "string", "format": "uuid" },
                     "stepId": { "type": "string", "format": "uuid" },
-                    "stepKind": {
-                      "type": "string",
-                      "enum": ["NEED", "IT_ASSESSMENT", "FINANCE_REVIEW", "SPEND_APPROVAL"]
-                    },
+                    "stepKind": { "type": "string", "enum": ["NEED", "IT_ASSESSMENT", "SPEND_APPROVAL"] },
                     "state": { "type": "string", "enum": ["PENDING", "WAITING"] },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "dueAt": { "type": "string", "format": "date-time" },
@@ -97256,8 +95689,6 @@
                       "AWAITING_EXECUTION",
                       "AWAITING_IT_ASSESSMENT",
                       "AWAITING_SPEND_SUBMISSION",
-                      "AWAITING_FINANCE_REVIEW",
-                      "AWAITING_BUDGET",
                       "AWAITING_SPEND_DECISION",
                       "REJECTED",
                       "IT_REJECTED",
@@ -97434,23 +95865,27 @@
                         "type": "string",
                         "enum": [
                           "NOT_SUBMITTED",
+                          "RESERVE_CONFIRMATION",
                           "BLOCKED",
-                          "RETURNED_BY_FINANCE",
-                          "WAITING_FINANCE_REVIEW",
-                          "WAITING_BUDGET",
                           "WAITING_SPEND_DECISION",
                           "REFUSED"
                         ]
                       },
-                      "blockedReason": {
-                        "type": "string",
-                        "enum": ["STALE_COST_EVIDENCE", "CLOSED_OR_EXPIRED_BUDGET_PERIOD", null],
+                      "blockedReasons": {
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": { "type": "string", "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE"] }
+                      },
+                      "overBy": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
                         "nullable": true
                       },
-                      "financeReturnReason": { "type": "string", "nullable": true },
                       "refusalReason": { "type": "string", "nullable": true }
                     },
-                    "required": ["stage", "blockedReason", "financeReturnReason", "refusalReason"],
+                    "required": ["stage", "blockedReasons", "overBy", "refusalReason"],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -98023,8 +96458,6 @@
                         "AWAITING_EXECUTION",
                         "AWAITING_IT_ASSESSMENT",
                         "AWAITING_SPEND_SUBMISSION",
-                        "AWAITING_FINANCE_REVIEW",
-                        "AWAITING_BUDGET",
                         "AWAITING_SPEND_DECISION",
                         "REJECTED",
                         "IT_REJECTED",
@@ -98107,10 +96540,8 @@
                           "type": "string",
                           "enum": [
                             "NOT_SUBMITTED",
+                            "RESERVE_CONFIRMATION",
                             "BLOCKED",
-                            "RETURNED_BY_FINANCE",
-                            "WAITING_FINANCE_REVIEW",
-                            "WAITING_BUDGET",
                             "WAITING_SPEND_DECISION",
                             "REFUSED"
                           ]

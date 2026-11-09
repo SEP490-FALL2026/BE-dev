@@ -103,11 +103,11 @@ flowchart BT
   personnel -->|4| operating_parameters
   personnel -->|88| organization
   personnel -->|6| requests
-  requests -->|56| audit
+  requests -->|54| audit
   requests -->|17| budgets
-  requests -->|24| catalog
+  requests -->|25| catalog
   requests -->|7| finance
-  requests -->|29| identity_access
+  requests -->|27| identity_access
   requests -->|40| licensing
   requests -->|7| notifications
   requests -->|9| operating_parameters

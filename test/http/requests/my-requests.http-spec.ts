@@ -78,14 +78,14 @@ describe('my requests route (e2e, no database)', () => {
 
   it('reads every narrowing and gives them to the service as they are', async () => {
     await get(
-      `${PATH}?view=open&state=PENDING,AWAITING_BUDGET&type=GROUP_GRANT&from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z&page=2&pageSize=5`,
+      `${PATH}?view=open&state=PENDING,AWAITING_SPEND_DECISION&type=GROUP_GRANT&from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z&page=2&pageSize=5`,
     ).expect(200);
 
     expect(list).toHaveBeenCalledWith(expect.anything(), {
       page: 2,
       pageSize: 5,
       view: 'open',
-      state: 'PENDING,AWAITING_BUDGET',
+      state: 'PENDING,AWAITING_SPEND_DECISION',
       type: 'GROUP_GRANT',
       from: '2026-10-01T00:00:00Z',
       to: '2026-11-01T00:00:00Z',
