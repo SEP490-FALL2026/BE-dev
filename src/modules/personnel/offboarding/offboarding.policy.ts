@@ -260,9 +260,9 @@ export function accountLockRefusal(facts: { blocked: boolean; locked: boolean })
   return facts.locked ? { code: 'ALREADY_RECORDED' } : null;
 }
 
-/** K1, K2 and K5 have a revocation; K3 and K4 do not (yet), so a task cannot be made for them. */
+/** K1, K2, K4 (the key goes back to the store) and K5 have a revocation; K3 does not, so a task cannot be made for it. */
 export const isRevocableType = (provisioningType: string): boolean =>
-  provisioningType === 'K1' || provisioningType === 'K2' || provisioningType === 'K5';
+  provisioningType === 'K1' || provisioningType === 'K2' || provisioningType === 'K4' || provisioningType === 'K5';
 
 /** What a revocation of the rights is taken from: the seats the person holds, and which of them can be taken away by a task. */
 export interface RightFacts {

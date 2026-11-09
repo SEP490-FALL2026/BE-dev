@@ -141,6 +141,7 @@ export type TaskStepCode =
   | 'RECORD_ACCESS_STATE'
   | 'REMOVE_FROM_WORKSPACE'
   | 'REVOKE_IN_INTERNAL_SOFTWARE'
+  | 'DEACTIVATE_KEY_ON_DEVICE'
   | 'CONFIRM_WITH_EVIDENCE';
 
 /** One step of the card of a task. A K2 step is done under the name of whoever does the work: no shared credential. */
@@ -259,7 +260,11 @@ export const REVOCATION_SOURCES = [
 export type RevocationSource = (typeof REVOCATION_SOURCES)[number];
 
 /** How a revocation was completed: the account removed (K2), already gone, the renewal cancelled (K1), revoked off the system (K5). */
-export type RevocationCompletion = 'ACCOUNT_REMOVED' | 'ALREADY_GONE' | 'RENEWAL_CANCELLED' | 'OFF_SYSTEM_REVOKED';
+export type RevocationCompletion =
+  'ACCOUNT_REMOVED' | 'ALREADY_GONE' | 'RENEWAL_CANCELLED' | 'OFF_SYSTEM_REVOKED' | 'KEY_DEACTIVATED';
+
+/** Where the key of a K4 seat goes when its revocation is completed: back to the store, or back and withdrawn from it at once. */
+export type KeyDisposition = 'RETURN_TO_STORE' | 'WITHDRAW';
 
 /** What is known of the access of a K1 seat once its renewal is cancelled: cut already, or running to the end of the paid period. */
 export type AccessState = 'CUT' | 'UNTIL_PAID_END';

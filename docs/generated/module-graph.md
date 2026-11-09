@@ -82,13 +82,13 @@ flowchart BT
   installation -->|2| finance
   installation -->|11| identity_access
   installation -->|8| organization
-  licensing -->|31| audit
-  licensing -->|54| catalog
+  licensing -->|32| audit
+  licensing -->|55| catalog
   licensing -->|2| finance
   licensing -->|8| identity_access
   licensing -->|7| notifications
   licensing -->|6| operating_parameters
-  licensing -->|56| organization
+  licensing -->|57| organization
   onboarding -->|2| catalog
   onboarding -->|2| data_import
   onboarding -->|2| identity_access
@@ -122,7 +122,7 @@ flowchart BT
   requests -->|28| catalog
   requests -->|9| finance
   requests -->|28| identity_access
-  requests -->|43| licensing
+  requests -->|44| licensing
   requests -->|7| notifications
   requests -->|10| operating_parameters
   requests -->|80| organization

@@ -284,6 +284,8 @@ enum CommitmentReleaseReason {
   REVOKED
   // A K2 right granted after its commitment began: what the days before the grant would have cost goes back (`M-10`).
   LATE_GRANT
+  // A K4 key was given from the pool: the price held is not spent (`QĐ-106d`).
+  GRANTED_FROM_POOL
 }
 
 // The electronic record of the decision of the spending approver on a version (US-06-11 AC-1): who, in which role, what,

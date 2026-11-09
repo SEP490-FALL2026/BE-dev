@@ -21,6 +21,7 @@ import {
   isTerminating,
   planAccessCut,
   planCompletion,
+  planKeyReturn,
   type CompletionInput,
 } from './revocation.policy';
 
@@ -55,12 +56,13 @@ describe('the source of a revocation (US-07-05 AC-3, AC-11)', () => {
 describe('which seat may be revoked (US-07-05 AC-8, US-03-04 AC-17)', () => {
   const personalOpen = { kind: 'PERSONAL', open: true, provisioningType: 'K2' } as const;
 
-  it.each(['K1', 'K2', 'K5'] as const)('lets an open personal seat of %s be revoked', (provisioningType) => {
+  // Rewritten for BR-MF1-09 / QĐ-103d: a K4 seat is revoked like any seat and its key goes back to the store; only K3 has no revocation.
+  it.each(['K1', 'K2', 'K4', 'K5'] as const)('lets an open personal seat of %s be revoked', (provisioningType) => {
     expect(problemOf(() => assertRevocable({ ...personalOpen, provisioningType }))).toBeNull();
   });
 
-  it.each(['K3', 'K4'] as const)('refuses a seat of %s, which has no revocation yet', (provisioningType) => {
-    expect(problemOf(() => assertRevocable({ ...personalOpen, provisioningType }))).toBe('TYPE_NOT_SUPPORTED');
+  it('refuses a seat of K3, which has no revocation', () => {
+    expect(problemOf(() => assertRevocable({ ...personalOpen, provisioningType: 'K3' }))).toBe('TYPE_NOT_SUPPORTED');
   });
 
   it('refuses a service account, whoever answers for it and whatever its kind', () => {
@@ -98,12 +100,12 @@ describe('which seat may be revoked (US-07-05 AC-8, US-03-04 AC-17)', () => {
 });
 
 describe('how a revocation is completed, by kind (US-07-05 AC-1, AC-4, AC-5, AC-8)', () => {
-  it('has one way for K1 and K5, two for K2, and none for K3 and K4', () => {
+  it('has one way for K1, K4 and K5, two for K2, and none for K3', () => {
     expect(completionsFor('K1')).toEqual(['RENEWAL_CANCELLED']);
     expect(completionsFor('K2')).toEqual(['ACCOUNT_REMOVED', 'ALREADY_GONE']);
+    expect(completionsFor('K4')).toEqual(['KEY_DEACTIVATED']);
     expect(completionsFor('K5')).toEqual(['OFF_SYSTEM_REVOKED']);
     expect(completionsFor('K3')).toEqual([]);
-    expect(completionsFor('K4')).toEqual([]);
   });
 
   it.each([
@@ -114,6 +116,7 @@ describe('how a revocation is completed, by kind (US-07-05 AC-1, AC-4, AC-5, AC-
     ['K1', 'ALREADY_GONE'],
     ['K3', 'ACCOUNT_REMOVED'],
     ['K4', 'OFF_SYSTEM_REVOKED'],
+    ['K2', 'KEY_DEACTIVATED'],
   ] as const)('refuses %s completed as %s', (type, completion) => {
     expect(problemOf(() => planCompletion({ completion, evidence: 'x' }, context(type)))).toBe(
       'COMPLETION_NOT_ALLOWED',
@@ -373,7 +376,10 @@ describe('the card of a revocation (US-07-05 AC-1, AC-5, AC-8)', () => {
       'CONFIRM_WITH_EVIDENCE',
     ]);
     expect(stepsFor('K3', 'a@x.vn', 'REVOKE')).toEqual([]);
-    expect(stepsFor('K4', 'a@x.vn', 'REVOKE')).toEqual([]);
+    expect(stepsFor('K4', 'a@x.vn', 'REVOKE').map((step) => step.code)).toEqual([
+      'DEACTIVATE_KEY_ON_DEVICE',
+      'CONFIRM_WITH_EVIDENCE',
+    ]);
   });
 
   it('says when each kind is done, and leaves the grant as it was', () => {
@@ -392,5 +398,62 @@ describe('US-10-07 AC-18: a revocation is not done before its day not before', (
     expect(() => assertNotBefore('2026-11-08', '2026-11-08')).not.toThrow();
     expect(() => assertNotBefore('2026-11-08', '2026-11-30')).not.toThrow();
     expect(() => assertNotBefore(null, '2026-11-01')).not.toThrow();
+  });
+});
+
+describe('BR-MF1-09: a K4 seat is revoked and its key goes back to the store (US-07-05 AC-6, AC-7, QĐ-103d, Q-10 B)', () => {
+  const k4 = (extra: Partial<CompletionInput> = {}): CompletionInput => ({
+    completion: 'KEY_DEACTIVATED',
+    evidence: 'Deactivated on the laptop',
+    ...extra,
+  });
+
+  it('ends the seat today with the evidence, like K2 and K5', () => {
+    expect(planCompletion(k4(), context('K4'))).toMatchObject({
+      completion: 'KEY_DEACTIVATED',
+      evidence: 'Deactivated on the laptop',
+      endOn: TODAY,
+    });
+  });
+
+  it('refuses a completion with no evidence', () => {
+    expect(() => planCompletion(k4({ evidence: '  ' }), context('K4'))).toThrow(ProvisioningEvidenceRequiredError);
+  });
+
+  it('puts the key back in the store when nothing else is said', () => {
+    expect(planKeyReturn(k4(), 'K4')).toEqual({ disposition: 'RETURN_TO_STORE', withdrawalReason: null });
+    expect(planKeyReturn(k4({ keyDisposition: 'RETURN_TO_STORE' }), 'K4')).toEqual({
+      disposition: 'RETURN_TO_STORE',
+      withdrawalReason: null,
+    });
+  });
+
+  it('withdraws the key from the store at once with a reason, trimmed', () => {
+    expect(planKeyReturn(k4({ keyDisposition: 'WITHDRAW', withdrawalReason: '  No transfer clause  ' }), 'K4')).toEqual(
+      {
+        disposition: 'WITHDRAW',
+        withdrawalReason: 'No transfer clause',
+      },
+    );
+  });
+
+  it('refuses a withdrawal with no reason, and a reason with no withdrawal', () => {
+    expect(problemOf(() => planKeyReturn(k4({ keyDisposition: 'WITHDRAW' }), 'K4'))).toBe('WITHDRAWAL_REASON_REQUIRED');
+    expect(problemOf(() => planKeyReturn(k4({ keyDisposition: 'WITHDRAW', withdrawalReason: ' ' }), 'K4'))).toBe(
+      'WITHDRAWAL_REASON_REQUIRED',
+    );
+    expect(problemOf(() => planKeyReturn(k4({ withdrawalReason: 'why' }), 'K4'))).toBe('COMPLETION_NOT_ALLOWED');
+  });
+
+  it.each(['K1', 'K2', 'K5'] as const)('has no key for %s and refuses the fields of one', (type) => {
+    expect(planKeyReturn({ completion: 'ACCOUNT_REMOVED', evidence: 'x' }, type)).toBeNull();
+    expect(
+      problemOf(() =>
+        planKeyReturn({ completion: 'ACCOUNT_REMOVED', evidence: 'x', keyDisposition: 'WITHDRAW' }, type),
+      ),
+    ).toBe('COMPLETION_NOT_ALLOWED');
+    expect(
+      problemOf(() => planKeyReturn({ completion: 'ACCOUNT_REMOVED', evidence: 'x', withdrawalReason: 'why' }, type)),
+    ).toBe('COMPLETION_NOT_ALLOWED');
   });
 });

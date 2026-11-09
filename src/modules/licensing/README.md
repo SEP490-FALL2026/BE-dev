@@ -113,7 +113,8 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   (`departmentId` null, `D-S18`): `requirementOf` bỏ nguồn `DEPARTURE`/`ABRUPT_DEPARTURE`, nên không có nghĩa vụ trưởng phòng ở
   `open` lẫn `openFromTask` và tác vụ thu hồi không bị giữ; nguồn khác (IT, trả về) giữ nguyên.
 - `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts`.
-- `license-key/` — kho key của mua đứt K4 (US-04-12); `license-keys.controller.ts`; `LicenseKeyService`.
+- `license-key/` — kho key của mua đứt K4 (US-04-12) và kho khóa dùng chung (`QĐ-103d`); `license-keys.controller.ts`; `LicenseKeyService`
+  (nhập, liệt kê, xem đầy đủ, rút khỏi kho `licenseKeyWithdraw`), `LicenseKeyAssignmentService` (gán khóa khi hoàn tất cấp K4, lấy lại khi thu hồi).
 - `my-software/` — "Phần mềm của tôi" (US-12-15 AC-2, US-16-01 AC-1): `my-software.controller.ts`
   (`GET /me/software-rights`, mọi tài khoản đã đăng nhập (`QĐ-95d`), chỉ quyền cá nhân của chính người gọi), `MySoftwareService`, `MySoftwareRepo`;
   trạng thái theo ngày nghiệp vụ ở `my-software.policy.ts`. Không đọc khóa K4, giá, Cost Center hay định danh tài khoản.
@@ -159,6 +160,13 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 - _Tránh được_ (`BR-MF1-09c`): hoàn tất tác vụ cấp K2/K4 không mua ⟹ `recordAvoided` một dòng (idempotent theo tác vụ), theo tiền báo cáo (giá đã quy
   đổi lúc ghi giá; K4 = giá mua của thuê bao `PERPETUAL`); `reportOutcome(..., facts)` báo `fromPool`,
   `provisioningType`, `grantedOn`, `assignmentId` cho `requests` (audit `GRANT_COMPLETED.after.fromPool`).
+- Kho khóa K4 (`BR-MF1-09`, `QĐ-103d`, `QĐ-103v`, Q-10 B): khóa chỉ có hai trạng thái `IN_STORE`/`ASSIGNED` (gắn đúng một Assignment cùng thuê bao); rút
+  khỏi kho là hành động có lý do (`withdrawn_*`), khóa vẫn `IN_STORE`, không đếm, không cấp, không xem đầy đủ, không hoàn tác (trigger `license_key_guard`).
+  `free` của gói K4 = min(seat Trống, khóa Trống chưa rút − tác vụ cấp K4 đang mở chưa gắn khóa) mỗi thuê bao. Hoàn tất cấp K4 bắt buộc `licenseKeyId`
+  (khóa mua thêm phải nhập trước); thu hồi K4 hoàn tất bằng `KEY_DEACTIVATED`, khóa về kho Trống hoặc về kho và rút ngay (`keyDisposition: WITHDRAW` + lý do).
+  Thứ tự khóa: cấp = task → thuê bao → khóa → Assignment; thu hồi = task → thuê bao → Assignment → khóa; rút = thuê bao → khóa (cùng khóa thuê bao trước
+  nên không vòng). `requests` giải phóng toàn bộ cam kết của Request K4 cấp từ kho (`GRANTED_FROM_POOL`); thu hồi K4 không đổi cam kết (giá một lần).
+  Chưa làm: gắn thiết bị công ty đã đăng ký (`deviceId`, `DeviceRegistryHook`).
 - `grantQueueList` (module `requests`) đọc `stock { kind, free, inRevocation }` qua `LicensingPoolStockApi.getStockOfPlans` (số lần đọc cố định, không N+1).
 - Thu hồi hoàn tất phát `RevocationTaskFacts.completed` (`grantRequestId` qua chuỗi `predecessor_id` — `assignment-chain.repo.ts`, `provisioningType`, `endedOn`,
   `paidThroughOn`, `sources`) để module cam kết giải phóng theo ngày (`public/seat-month-cost.policy.ts`: RV-07, M-10). Phần ghi vào cam kết thuộc `budgets`/`requests`, chưa nối.

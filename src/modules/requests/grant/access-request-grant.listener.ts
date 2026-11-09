@@ -8,6 +8,7 @@ import { GroupGrantService } from '../group-request/group-grant.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { grantAnswerFor } from './grant.policy';
+import { releasesAllOnPoolGrant } from './pool-grant-release.policy';
 import { RequestOutcomeService } from '../outcome/request-outcome.service';
 import { SeatReleaseService } from './seat-release.service';
 
@@ -97,6 +98,10 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
     // (US-06-06 AC-3). A grant that is only retrying is not reported here, so its commitment stays held (AC-7).
     if (outcome === 'FAILED') {
       await this.budgets.releaseForRequest(tx, { requestId: request.id, reason: 'GRANT_FAILED', now });
+    }
+    // A K4 key taken from the pool spends nothing: all that was held for its price goes back (`QĐ-106d`).
+    if (releasesAllOnPoolGrant(outcome, facts)) {
+      await this.budgets.releaseForRequest(tx, { requestId: request.id, reason: 'GRANTED_FROM_POOL', now });
     }
     // A K2 seat granted after its commitment began gives back the days before the grant, in the same transaction (`M-10`).
     if (outcome === 'COMPLETED' && facts) await this.seats.afterGrant(tx, request.id, facts, now);

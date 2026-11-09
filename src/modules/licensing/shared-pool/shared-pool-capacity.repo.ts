@@ -77,4 +77,41 @@ export class SharedPoolCapacityRepo {
 
     return result;
   }
+
+  /**
+   * For each subscription of a K4 plan, the keys free to give (`QĐ-103d`): the keys in the store and not withdrawn, less the grants of the
+   * subscription still open whose seat holds no key yet (each of them takes one when it is completed). Never below zero.
+   */
+  freeKeysOf(client: DbTx | PrismaService, subscriptionIds: readonly string[]): Promise<Map<string, number>> {
+    return this.readKeys(client, subscriptionIds);
+  }
+
+  /** The same without a transaction, for the queue of grants. */
+  freeKeysOfMany(subscriptionIds: readonly string[]): Promise<Map<string, number>> {
+    return this.readKeys(this.prisma, subscriptionIds);
+  }
+
+  private async readKeys(
+    client: DbTx | PrismaService,
+    subscriptionIds: readonly string[],
+  ): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+    if (subscriptionIds.length === 0) return result;
+    const rows = await client.$queryRaw<{ subscription_id: string; free: bigint }[]>`
+      SELECT s."id" AS subscription_id,
+             GREATEST(0,
+               (SELECT count(*) FROM "license_keys" k
+                 WHERE k."subscription_id" = s."id" AND k."status" = 'IN_STORE' AND k."withdrawn_at" IS NULL)
+               - (SELECT count(*) FROM "provisioning_tasks" t
+                    JOIN "license_assignments" a ON a."id" = t."assignment_id"
+                   WHERE a."subscription_id" = s."id"
+                     AND t."kind" = 'GRANT'
+                     AND t."status" NOT IN ('COMPLETED', 'CLOSED_FAILED', 'CANCELLED')
+                     AND NOT EXISTS (SELECT 1 FROM "license_keys" g WHERE g."assignment_id" = a."id"))
+             ) AS free
+        FROM unnest(${[...subscriptionIds]}::uuid[]) AS s("id")`;
+    for (const row of rows) result.set(row.subscription_id, Number(row.free));
+
+    return result;
+  }
 }

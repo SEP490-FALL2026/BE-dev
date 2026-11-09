@@ -142,6 +142,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/license-keys/imports',
   'GET /api/v1/license-keys',
   'POST /api/v1/license-keys/{id}/reveal',
+  'POST /api/v1/license-keys/{id}/withdrawal',
   'POST /api/v1/provisioning-tasks/{id}/claim',
   'POST /api/v1/provisioning-tasks/{id}/complete',
   'POST /api/v1/provisioning-tasks/{id}/report-failure',

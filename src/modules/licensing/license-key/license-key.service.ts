@@ -15,8 +15,9 @@ import {
 } from '../public/licensing.errors';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { LicenseKeyCipher } from './license-key-cipher.service';
-import { LicenseKeyApplicationRetiredError } from './license-key.errors';
+import { LicenseKeyApplicationRetiredError, LicenseKeyStateError } from './license-key.errors';
 import {
+  assertWithdrawable,
   capacityOf,
   judgeBatch,
   maskKey,
@@ -148,6 +149,7 @@ export class LicenseKeyService {
   async list(input: {
     subscriptionId: string;
     status?: LicenseKeyStatus;
+    withdrawn?: boolean;
     page: number;
     pageSize: number;
   }): Promise<Page<LicenseKeyListed> & { summary: VaultSummary }> {
@@ -155,6 +157,7 @@ export class LicenseKeyService {
     const { items, total, usable } = await this.repo.page({
       subscriptionId: input.subscriptionId,
       ...(input.status ? { status: input.status } : {}),
+      ...(input.withdrawn === undefined ? {} : { withdrawn: input.withdrawn }),
       skip: (input.page - 1) * input.pageSize,
       take: input.pageSize,
     });
@@ -167,8 +170,8 @@ export class LicenseKeyService {
 
   /**
    * Opens a key for the IT Admin. The event of the audit trail and the opening are one transaction: a key is never
-   * given without its trace. Throws LicenseKeyNotFoundError; a key that cannot be opened is a LicenseKeyDecryptionError
-   * whose message holds nothing of the key.
+   * given without its trace. A key withdrawn from the store is not opened any more (`QĐ-103v`). Throws LicenseKeyNotFoundError and
+   * LicenseKeyStateError (`WITHDRAWN`); a key that cannot be opened is a LicenseKeyDecryptionError whose message holds nothing of the key.
    */
   async reveal(actor: AuthenticatedPrincipal, id: string): Promise<{ id: string; value: string }> {
     const organization = await this.organizationReads.getOrganization();
@@ -177,6 +180,7 @@ export class LicenseKeyService {
     return this.runner.run(async (tx) => {
       const sealed = await this.repo.findSealed(tx, id);
       if (!sealed) throw new LicenseKeyNotFoundError();
+      if (sealed.withdrawnAt !== null) throw new LicenseKeyStateError('WITHDRAWN');
       await this.takeSlot(tx, actor);
       const value = this.cipher.decrypt(sealed.id, sealed.cipherKeyId, sealed.ciphertext);
       await this.audit.record(
@@ -184,12 +188,48 @@ export class LicenseKeyService {
         licensingAuditEvent(actor, organization.id, 'LICENSE_KEY.REVEALED', 'LicenseKey', sealed.id, null, {
           licenseKeyId: sealed.id,
           subscriptionId: sealed.subscriptionId,
-          // The key is not yet given to an assignment: the work of the company devices sets it.
-          assignmentId: null,
+          // The seat the key is given to, when it is assigned: the trace says whose key was opened.
+          assignmentId: sealed.assignmentId,
         }),
       );
 
       return { id: sealed.id, value };
+    });
+  }
+
+  /**
+   * Withdraws a free key from the store with its reason (`QĐ-103v`, Q-10 B): it stays in the vault, is no longer counted as usable and
+   * is never given out again. The purchase is locked first and the key after it, the order of an import, so a withdrawal and the grant
+   * that would give the same key are served one after the other. Throws LicenseKeyNotFoundError and LicenseKeyStateError (`ASSIGNED`,
+   * `ALREADY_WITHDRAWN`).
+   */
+  async withdraw(actor: AuthenticatedPrincipal, id: string, input: { reason: string }): Promise<LicenseKeyListed> {
+    const organization = await this.organizationReads.getOrganization();
+    if (!organization) throw new Error('A license key was withdrawn before installation');
+
+    return this.runner.run(async (tx) => {
+      const subscriptionId = await this.repo.subscriptionOf(tx, id);
+      if (subscriptionId === null) throw new LicenseKeyNotFoundError();
+      await this.catalog.lockSeatTarget(tx, { subscriptionId });
+      const key = await this.repo.lock(tx, id);
+      if (!key) throw new LicenseKeyNotFoundError();
+      assertWithdrawable(key);
+      const listed = await this.repo.withdraw(tx, id, {
+        at: new Date(),
+        byAppUserId: actor.appUserId,
+        reason: input.reason.trim(),
+      });
+      // The reason is the IT Admin's note, never the key: the trace names the key and its purchase.
+      await this.audit.record(
+        tx,
+        licensingAuditEvent(actor, organization.id, 'LICENSE_KEY.WITHDRAWN', 'LicenseKey', id, null, {
+          licenseKeyId: id,
+          subscriptionId,
+          reason: listed.withdrawalReason,
+        }),
+      );
+
+      return listed;
     });
   }
 

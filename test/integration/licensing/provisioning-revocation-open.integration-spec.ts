@@ -212,9 +212,11 @@ describe('opening the revocation of a seat, the one gate of every source (integr
   });
 
   describe('which seat may be revoked', () => {
-    it('refuses a seat of K4, which has no revocation yet, and writes nothing', async () => {
+    // Rewritten for BR-MF1-09 / QĐ-103d: K4 is revocable now (its key goes back to the store); K3 is the kind with no revocation.
+    it('refuses a seat of K3, which has no revocation, and writes nothing', async () => {
       const subscriptionId = await h.subscription(5, 'K4');
       const planId = await h.planOf(subscriptionId);
+      await h.ctx.sql.query(`UPDATE plans SET provisioning_type = 'K3', pricing_model = NULL WHERE id = $1`, [planId]);
       const assignmentId = randomUUID();
       const holder = await h.person(code());
       await h.ctx.sql.query(

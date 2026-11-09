@@ -17,9 +17,12 @@ import {
   ImportResponseDto,
   KeyIdParamDto,
   KeyPageResponseDto,
+  KeyResponseDto,
   ListKeysQueryDto,
   RevealResponseDto,
+  WithdrawalBodyDto,
 } from './license-key.dto';
+import type { LicenseKeyListed } from './license-key.repo';
 import { REVEAL_LIMITS } from './license-key-reveal-quota.repo';
 import { LICENSE_KEY_ERROR_EXAMPLES, toLicenseKeyApiException } from './license-key.http-errors';
 import { LicenseKeyService } from './license-key.service';
@@ -31,9 +34,17 @@ const IT_ONLY = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
+/** A key as the routes answer it: dates as ISO text. */
+const wireOf = (key: LicenseKeyListed) => ({
+  ...key,
+  importedAt: key.importedAt.toISOString(),
+  withdrawnAt: key.withdrawnAt?.toISOString() ?? null,
+});
+
 /**
- * The vault of the license keys of K4 purchases (`US-04-12`): import a batch, list the keys masked, reveal one. Only the
- * IT Admin; no other role sees a key or a trace of one, and no route deletes or exports keys.
+ * The vault of the license keys of K4 purchases (`US-04-12`) and the shared pool they form (`QĐ-103d`): import a batch, list the keys
+ * masked, reveal one, withdraw a free one from the store. Only the IT Admin; no other role sees a key or a trace of one, and no route
+ * deletes or exports keys.
  */
 @ApiTags('license-keys')
 @Controller({ path: 'license-keys', version: '1' })
@@ -85,7 +96,7 @@ export class LicenseKeysController {
   @ApiSuccessResponse(KeyPageResponseDto, {
     message: 'LICENSE_KEY.LISTED',
     description:
-      'The keys of the purchase, the oldest first, each with its last four characters only, and the capacity summary. warning is KEY_COUNT_DIFFERS when the keys are not as many as the seats bought and QUANTITY_UNKNOWN while the seats bought are not known.',
+      'The keys of the purchase, the oldest first, each with its last four characters only, the seat it is given to while ASSIGNED and its withdrawal, and the capacity summary. A key is IN_STORE or ASSIGNED; a withdrawn key stays IN_STORE with withdrawnAt and is found with withdrawn=true. usableKeys counts the keys assigned or in the store and not withdrawn. warning is KEY_COUNT_DIFFERS when the keys are not as many as the seats bought and QUANTITY_UNKNOWN while the seats bought are not known.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -106,7 +117,7 @@ export class LicenseKeysController {
       const page = await this.keys.list(query);
 
       return {
-        items: page.items.map((item) => ({ ...item, importedAt: item.importedAt.toISOString() })),
+        items: page.items.map(wireOf),
         pagination: page.pagination,
         summary: page.summary,
       };
@@ -122,7 +133,7 @@ export class LicenseKeysController {
   @ApiSuccessResponse(RevealResponseDto, {
     message: 'LICENSE_KEY.REVEALED',
     description:
-      'The key in full. Every call writes an event of the audit trail (who, when, which key) in the same transaction, and the answer is never cached.',
+      'The key in full. Every call writes an event of the audit trail (who, when, which key, the seat it is given to) in the same transaction, and the answer is never cached.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -131,6 +142,11 @@ export class LicenseKeysController {
       status: HttpStatus.NOT_FOUND,
       description: 'The key does not exist (LICENSE_KEY.NOT_FOUND).',
       examples: [LICENSE_KEY_ERROR_EXAMPLES.NOT_FOUND],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'The key was withdrawn from the store and is not opened any more (LICENSE_KEY.WITHDRAWN).',
+      examples: [LICENSE_KEY_ERROR_EXAMPLES.WITHDRAWN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -151,6 +167,49 @@ export class LicenseKeysController {
   async reveal(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: KeyIdParamDto) {
     try {
       return await this.keys.reveal(actor, params.id);
+    } catch (error) {
+      throw toLicenseKeyApiException(error);
+    }
+  }
+
+  @Post(':id/withdrawal')
+  @RequireRoles('IT_ADMIN')
+  @ApiOperation({
+    operationId: 'licenseKeyWithdraw',
+    summary: 'Withdraw a free license key from the store, with a reason',
+  })
+  @ApiSuccessResponse(KeyResponseDto, {
+    message: 'LICENSE_KEY.WITHDRAWN',
+    description:
+      'The key stays in the vault (status IN_STORE) with withdrawnAt and withdrawalReason: it is no longer counted as usable, never given to a seat again and cannot be revealed. A withdrawal cannot be undone. One event of the audit trail (LICENSE_KEY.WITHDRAWN) is written in the same transaction.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    IT_ONLY,
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The key does not exist (LICENSE_KEY.NOT_FOUND).',
+      examples: [LICENSE_KEY_ERROR_EXAMPLES.NOT_FOUND],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The key is assigned to a seat (LICENSE_KEY.ASSIGNED: revoke the seat, which puts the key back or withdraws it) or was withdrawn already (LICENSE_KEY.ALREADY_WITHDRAWN). Nothing is written.',
+      examples: [LICENSE_KEY_ERROR_EXAMPLES.ASSIGNED, LICENSE_KEY_ERROR_EXAMPLES.ALREADY_WITHDRAWN],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id or the reason is invalid: a reason of 1 to 500 characters is required (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
+  )
+  async withdraw(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: KeyIdParamDto,
+    @Body() body: WithdrawalBodyDto,
+  ) {
+    try {
+      return { key: wireOf(await this.keys.withdraw(actor, params.id, body)) };
     } catch (error) {
       throw toLicenseKeyApiException(error);
     }
