@@ -290,7 +290,10 @@ describe('the budget cycle: open, divide, publish (integration, real PostgreSQL)
     it('refuses with no cycle, with a cycle never published, and accepts once published even while it is changed afterwards', async () => {
       const u = await h.departmentWithHead(`P-Q02${(counter += 1)}`);
       const year = nextYear();
-      const send = () => h.submitProposal(h.proposalBody(u.department.unitId, h.twoLines(), year), u.head.account);
+      // The published ceiling here is a fraction of the two lines, so they carry the note a flagged line needs (QT 4.4, S4-01).
+      const noted = h.twoLines().map((line) => ({ ...line, note: 'Over the published ceiling of the test' }));
+      const send = (lines: object[] = noted) =>
+        h.submitProposal(h.proposalBody(u.department.unitId, lines, year), u.head.account);
 
       expect(h.codeOf(await send().expect(409))).toBe('BUDGET.CYCLE_NOT_PUBLISHED');
       await open(openBody(year, { annualCeiling: money(1_000_000) })).expect(201);
@@ -298,6 +301,8 @@ describe('the budget cycle: open, divide, publish (integration, real PostgreSQL)
       await put(year, await division(1, 0)).expect(200);
       await publish(year).expect(201);
 
+      // BR-MF4-04 / S4-01: the lines carry the proposal over the ceiling that was published, so the flagged line is asked its note.
+      expect(h.codeOf(await send(h.twoLines()).expect(422))).toBe('BUDGET.OVER_CEILING_NOTE_REQUIRED');
       const proposal = await send().expect(201);
       await patch(year, { annualCeiling: money(2_000_000), reason: 'Raised' }).expect(200);
       await h.withdraw(h.dataOf<{ proposal: { id: string } }>(proposal).proposal.id, u.head.account).expect(200);
@@ -329,7 +334,12 @@ describe('the budget cycle: open, divide, publish (integration, real PostgreSQL)
           )
           .items.map((item) => item.key);
 
-      expect(await keysOf(h.as(h.finance))).toEqual(['BUDGET_RESERVE_DEFAULT_PERCENT']);
+      // The two thresholds of the zero-based-budget explanation of BM-10 belong to Finance too (QĐ-94l, L1-19).
+      expect(await keysOf(h.as(h.finance))).toEqual([
+        'BUDGET_RESERVE_DEFAULT_PERCENT',
+        'BUDGET_ZBB_KPI3_BELOW_PERCENT',
+        'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
+      ]);
       expect(await keysOf(asToken(h.admin))).toEqual(
         expect.arrayContaining(['BUDGET_RESERVE_DEFAULT_PERCENT', 'FORECAST_ERROR_THRESHOLD_PERCENT']),
       );

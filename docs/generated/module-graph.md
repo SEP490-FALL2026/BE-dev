@@ -42,12 +42,12 @@ flowchart BT
   ai_assist -->|4| organization
   ai_assist -->|4| requests
   budgets -->|19| audit
-  budgets -->|4| catalog
+  budgets -->|5| catalog
   budgets -->|3| finance
   budgets -->|5| identity_access
   budgets -->|2| licensing
   budgets -->|5| notifications
-  budgets -->|3| operating_parameters
+  budgets -->|4| operating_parameters
   budgets -->|17| organization
   catalog -->|19| audit
   catalog -->|11| finance

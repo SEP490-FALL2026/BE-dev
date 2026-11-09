@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LINE_TYPES } from '../budget/budget-line-zbb.json';
 import { businessDate, responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
@@ -159,12 +160,57 @@ export const baselineSchema = z.strictObject({
   }),
 });
 
+const packageLineView = z.strictObject({
+  position: z.number().int().positive(),
+  lineType: z.enum(LINE_TYPES),
+  priorityRank: z.number().int().positive(),
+  amount: moneyView,
+  overCeiling: moneyView.nullable().meta({
+    description:
+      'The part of the line that carries the proposal over the published ceiling; null when it is not flagged.',
+  }),
+});
 const packageDepartmentView = z.strictObject({
   departmentId: z.uuid(),
   departmentCode: z.string(),
   departmentName: z.string(),
-  ceiling: moneyView.nullable(),
-  proposal: z.strictObject({ id: z.uuid(), total: moneyView, state: z.enum(['SUBMITTED', 'REVIEWED']) }).nullable(),
+  ceiling: moneyView
+    .nullable()
+    .meta({ description: 'The ceiling as it stands now, which Finance may still be editing.' }),
+  publishedCeiling: moneyView.nullable().meta({
+    description:
+      'The ceiling the head was told when the cycle was published; null before the first publication. The flags over the ceiling are judged against it (S4-01).',
+  }),
+  headStatus: z.enum(['HAS_HEAD', 'HEAD_TO_COME', 'NO_HEAD']).meta({
+    description:
+      'Whether somebody heads the department today, somebody is named to head it later, or nobody is (`QĐ-100h`).',
+  }),
+  baselineAllowed: z.boolean().meta({
+    description:
+      'Finance may build the first version of the department from the baseline now: the same check as the version of source BASELINE.',
+  }),
+  baselineRefusal: z
+    .enum([
+      'CYCLE_NOT_PUBLISHED',
+      'DEPARTMENT_NOT_IN_CYCLE',
+      'BEFORE_DEADLINE',
+      'HAS_HEAD',
+      'HAS_SUCCESSOR',
+      'HAS_PROPOSAL',
+    ])
+    .nullable()
+    .meta({ description: 'The first thing that stops it, or null when `baselineAllowed`.' }),
+  proposal: z
+    .strictObject({
+      id: z.uuid(),
+      total: moneyView.meta({ description: 'The lines counted: a CANCEL line is shown and not added (QĐ-109c).' }),
+      state: z.enum(['SUBMITTED', 'REVIEWED']),
+      lines: z.array(packageLineView).max(200).meta({
+        description:
+          'The lines of the proposal by priority rank, with the flag over the published ceiling and the part that goes over.',
+      }),
+    })
+    .nullable(),
   version: z
     .strictObject({
       id: z.uuid(),

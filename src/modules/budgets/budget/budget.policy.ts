@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
+import type { LineType, ZbbExplanation } from './budget-line-zbb.json';
 
 /**
  * The rules of budget proposals and versions (`US-06-09`, `US-06-10`), as pure decisions: what a line must say, which
@@ -17,6 +18,16 @@ export const LINE_DESCRIPTION_MAX = 200;
  * that has ended does not (`US-06-10` AC-9, `US-06-09` AC-11).
  */
 export const yearIsOpen = (year: number, today: BusinessDate): boolean => year >= fiscalYearOf(today);
+
+/**
+ * Whether a line is a saving that is shown and not counted: a `CANCEL` line gives up spend, so its amount is never added to the total of
+ * the proposal, the package or the ceiling check (`QĐ-109c`, C4-16).
+ */
+export const isNotCounted = (line: { lineType: LineType }): boolean => line.lineType === 'CANCEL';
+
+/** The sum a proposal is worth: every line but the `CANCEL` ones (`QĐ-109c`). */
+export const countedTotalOf = (lines: readonly { lineType: LineType; amountMinor: bigint }[]): bigint =>
+  lines.reduce((sum, line) => (isNotCounted(line) ? sum : sum + line.amountMinor), 0n);
 
 export const totalOf = (lines: readonly { amountMinor: bigint }[]): bigint =>
   lines.reduce((sum, line) => sum + line.amountMinor, 0n);
@@ -191,6 +202,7 @@ export interface LineFields {
   planId: string | null;
   seats: number | null;
   amountMinor: bigint;
+  lineType: LineType;
 }
 
 const ADJUSTABLE_FIELDS = [
@@ -198,6 +210,7 @@ const ADJUSTABLE_FIELDS = [
   'planId',
   'seats',
   'amountMinor',
+  'lineType',
 ] as const satisfies readonly (keyof LineFields)[];
 
 /** Whether the patch changes what the line of the proposal said: its words, its money, its window, its service or its cycle. */
@@ -212,6 +225,9 @@ export function copiedLineOf(
     planId: string | null;
     seats: number | null;
     amountMinor: bigint;
+    lineType: LineType;
+    zbb: ZbbExplanation | null;
+    priorityRank: number | null;
   },
   origin: { proposalId: string | null; proposalPosition: number | null },
 ) {
@@ -224,6 +240,9 @@ export function copiedLineOf(
     amountMinor: line.amountMinor,
     financeComment: null,
     adjustmentReason: null,
+    lineType: line.lineType,
+    zbb: line.zbb,
+    priorityRank: line.priorityRank,
   };
 }
 

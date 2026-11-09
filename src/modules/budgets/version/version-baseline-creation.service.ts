@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCurrentExistsError, BudgetVersionInFlightError, BudgetYearEndedError } from '../budget/budget.errors';
-import { copiedLineOf, defaultReserveOf, yearHasEnded } from '../budget/budget.policy';
+import { copiedLineOf, countedTotalOf, defaultReserveOf, yearHasEnded } from '../budget/budget.policy';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { VersionRepo } from '../budget/version.repo';
@@ -47,7 +47,8 @@ export class VersionBaselineCreationService {
       if (await this.versions.inFlight(input.costCenterId, input.year, tx)) throw new BudgetVersionInFlightError();
 
       const lines = await this.baselines.renewalLinesOf(allowed.departmentId, input.year, today, tx);
-      const baseMinor = lines.reduce((sum, line) => sum + line.amountMinor, 0n);
+      // A Cancel line is shown and not added to the base (QĐ-109c).
+      const baseMinor = countedTotalOf(lines);
       const organizationId = await this.facts.organizationId(tx);
       const id = await this.versions.insert(tx, {
         organizationId,

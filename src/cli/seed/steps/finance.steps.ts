@@ -171,11 +171,15 @@ function propose(
 ): Promise<unknown> {
   return ctx.api.call(to.headEmail, 'POST', '/budget-proposals', {
     year: to.year,
-    lines: plan.lines.map((line) => ({
+    // The order of the lines is their priority rank; a new purchase carries its explanation (QĐ-94l).
+    lines: plan.lines.map((line, index) => ({
       description: line.description,
       planId: ctx.ids.plans.get(line.plan),
       seats: line.seats,
       amount: money(line.amount),
+      lineType: line.lineType,
+      priorityRank: index + 1,
+      ...(line.zbb ? { zbb: line.zbb } : {}),
     })),
   });
 }

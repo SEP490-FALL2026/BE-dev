@@ -14,6 +14,8 @@ import { BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
 import {
+  baselineLinesOf,
+  type BaselineLine,
   inOrderOf,
   listedDepartments,
   SOFTWARE_LISTED_MAX,
@@ -212,35 +214,30 @@ export class BaselineService {
   }
 
   /**
-   * The lines of a first version built from the baseline (`QĐ-100h`): one `Renew` line for each active subscription of the department
-   * that runs in the year at a known price, as the baseline estimates it. Throws nothing; a department that runs nothing gives none.
+   * The lines of a first version built from the baseline (`QĐ-100h`, `C4-14`): one `Renew` line for each plan the department runs in the
+   * year at a known price, as the baseline estimates it, and a `Cancel` line (shown, not added) for each that was ordered to end.
+   * Throws nothing; a department that runs nothing gives none.
    */
-  async renewalLinesOf(
-    departmentId: string,
-    year: number,
-    today: BusinessDate,
-    tx?: DbTx,
-  ): Promise<{ description: string; planId: string; seats: number | null; amountMinor: bigint }[]> {
+  async renewalLinesOf(departmentId: string, year: number, today: BusinessDate, tx?: DbTx): Promise<BaselineLine[]> {
     const subscriptions = await this.catalog.getBaselineSubscriptions([departmentId], tx);
     const subscriptionIds = subscriptions.map((subscription) => subscription.subscriptionId);
     const seats = await this.licensing.countSeatsOfSubscriptions(subscriptionIds, today, tx);
     const ending = await this.licensing.getSubscriptionIdsToEnd(subscriptionIds, tx);
 
-    return subscriptions.flatMap((subscription) => {
-      const held = seats.get(subscription.subscriptionId) ?? 0;
-      const { costMinor } = subscriptionCost(year, today, held, subscription, ending.has(subscription.subscriptionId));
+    return baselineLinesOf(
+      subscriptions.map((subscription) => {
+        const held = seats.get(subscription.subscriptionId) ?? 0;
+        const terminated = ending.has(subscription.subscriptionId);
 
-      return costMinor === null || costMinor <= 0n
-        ? []
-        : [
-            {
-              description: `Renew ${subscription.applicationName} ${subscription.planName}`.slice(0, 200),
-              planId: subscription.planId,
-              seats: held,
-              amountMinor: costMinor,
-            },
-          ];
-    });
+        return {
+          planId: subscription.planId,
+          description: `Renew ${subscription.applicationName} ${subscription.planName}`.slice(0, 200),
+          seats: held,
+          costMinor: subscriptionCost(year, today, held, subscription, terminated).costMinor,
+          terminated,
+        };
+      }),
+    );
   }
 
   /** A head reads the baseline of their own department only, and names it. */

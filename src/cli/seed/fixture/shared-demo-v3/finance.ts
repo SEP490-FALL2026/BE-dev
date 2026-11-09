@@ -1,4 +1,12 @@
-import type { DemoFixture } from '../demo-fixture.types';
+import type { DemoBudgetLine, DemoFixture } from '../demo-fixture.types';
+
+/** The explanation a new purchase gives (`QĐ-94l`): four short answers. */
+const NEW_AI_SEATS: NonNullable<DemoBudgetLine['zbb']> = {
+  purpose: 'Rút ngắn thời gian soạn tài liệu và nghiên cứu cho nhóm.',
+  alternatives: 'Dùng công cụ miễn phí, chất lượng và quyền riêng tư chưa đáp ứng.',
+  consequenceIfNot: 'Nhóm tiếp tục soạn tay, chậm hơn khoảng một phần ba thời gian.',
+  usageIndicator: 'Số lượt dùng mỗi tuần của từng thành viên trong ba tháng đầu.',
+};
 
 export const FINANCE: Pick<DemoFixture, 'taxProfile' | 'cycle' | 'budgets' | 'proposals' | 'invoices'> = {
   taxProfile: {
@@ -18,21 +26,47 @@ export const FINANCE: Pick<DemoFixture, 'taxProfile' | 'cycle' | 'budgets' | 'pr
     {
       department: 'ENG',
       lines: [
-        { description: 'Jira Standard cho cả phòng', plan: 'jira-standard', seats: 20, amount: '48000000' },
-        { description: 'Figma Professional cho nhóm UI', plan: 'figma-professional', seats: 5, amount: '22500000' },
-        { description: 'ChatGPT Plus cho nhóm R&D', plan: 'chatgpt-plus', seats: 5, amount: '30000000' },
+        {
+          description: 'Jira Standard cho cả phòng',
+          plan: 'jira-standard',
+          seats: 20,
+          amount: '48000000',
+          lineType: 'RENEW',
+        },
+        {
+          description: 'Figma Professional cho nhóm UI',
+          plan: 'figma-professional',
+          seats: 5,
+          amount: '22500000',
+          lineType: 'RENEW',
+        },
+        {
+          description: 'ChatGPT Plus cho nhóm R&D',
+          plan: 'chatgpt-plus',
+          seats: 5,
+          amount: '30000000',
+          lineType: 'NEW',
+          zbb: NEW_AI_SEATS,
+        },
       ],
       base: '120000000',
     },
     {
       department: 'MKT',
       lines: [
-        { description: 'ChatGPT Plus cho nhóm nội dung', plan: 'chatgpt-plus', seats: 5, amount: '30000000' },
+        {
+          description: 'ChatGPT Plus cho nhóm nội dung',
+          plan: 'chatgpt-plus',
+          seats: 5,
+          amount: '30000000',
+          lineType: 'RENEW',
+        },
         {
           description: 'Figma Professional cho nhóm quảng cáo',
           plan: 'figma-professional',
           seats: 3,
           amount: '13500000',
+          lineType: 'RENEW',
         },
       ],
       base: '60000000',
@@ -40,12 +74,19 @@ export const FINANCE: Pick<DemoFixture, 'taxProfile' | 'cycle' | 'budgets' | 'pr
     {
       department: 'SAL',
       lines: [
-        { description: 'Jira Standard cho nhóm bán hàng', plan: 'jira-standard', seats: 10, amount: '24000000' },
+        {
+          description: 'Jira Standard cho nhóm bán hàng',
+          plan: 'jira-standard',
+          seats: 10,
+          amount: '24000000',
+          lineType: 'RENEW',
+        },
         {
           description: 'ChatGPT Plus cho nhóm chăm sóc khách hàng',
           plan: 'chatgpt-plus',
           seats: 5,
           amount: '30000000',
+          lineType: 'RENEW',
         },
       ],
       base: '70000000',
@@ -62,8 +103,16 @@ export const FINANCE: Pick<DemoFixture, 'taxProfile' | 'cycle' | 'budgets' | 'pr
           plan: 'jira-standard',
           seats: 5,
           amount: '12000000',
+          lineType: 'RENEW',
         },
-        { description: 'ChatGPT Plus cho nhóm hạ tầng', plan: 'chatgpt-plus', seats: 3, amount: '18000000' },
+        {
+          description: 'ChatGPT Plus cho nhóm hạ tầng',
+          plan: 'chatgpt-plus',
+          seats: 3,
+          amount: '18000000',
+          lineType: 'NEW',
+          zbb: NEW_AI_SEATS,
+        },
       ],
     },
   ],

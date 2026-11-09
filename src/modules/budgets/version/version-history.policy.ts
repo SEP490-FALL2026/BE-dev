@@ -4,6 +4,7 @@
  * `YYYY-MM-DD`, a number as its digits), and the order a reader sees them in. The record is written in the transaction of the
  * edit by `VersionHistoryService`; nothing here reads a database.
  */
+import type { LineType, ZbbExplanation } from '../budget/budget-line-zbb.json';
 
 /** The most fields one entry of the history shows: the widest edit is a line, which has eleven. */
 export const HISTORY_CHANGES_MAX = 16;
@@ -34,7 +35,13 @@ export interface LineFacts {
   amountMinor: bigint;
   financeComment: string | null;
   adjustmentReason: string | null;
+  lineType: LineType;
+  zbb: ZbbExplanation | null;
+  priorityRank: number | null;
 }
+
+/** The explanation of a line as the history keeps it: its compact JSON, or null. */
+const zbbText = (zbb: ZbbExplanation | null): string | null => (zbb === null ? null : JSON.stringify(zbb));
 
 /** The order a reader sees the fields in: the figures, then the line fields; any other name follows, alphabetically. */
 const FIELD_ORDER: readonly string[] = [
@@ -55,6 +62,9 @@ const FIELD_ORDER: readonly string[] = [
   'amount',
   'financeComment',
   'adjustmentReason',
+  'lineType',
+  'priorityRank',
+  'zbb',
   'fileName',
   'contentType',
   'sizeBytes',
@@ -122,6 +132,9 @@ export function lineChange(
     ['amount', money(before.amountMinor), money(after.amountMinor)],
     ['financeComment', before.financeComment, after.financeComment],
     ['adjustmentReason', before.adjustmentReason, after.adjustmentReason],
+    ['lineType', before.lineType, after.lineType],
+    ['priorityRank', text(before.priorityRank), text(after.priorityRank)],
+    ['zbb', zbbText(before.zbb), zbbText(after.zbb)],
   ]);
 }
 
@@ -139,6 +152,9 @@ export function lineSnapshot(
     amount: money(line.amountMinor),
     financeComment: line.financeComment,
     adjustmentReason: line.adjustmentReason,
+    lineType: line.lineType,
+    priorityRank: text(line.priorityRank),
+    zbb: zbbText(line.zbb),
   };
 }
 

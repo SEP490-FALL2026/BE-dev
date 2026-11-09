@@ -1,4 +1,5 @@
 import {
+  baselineLinesOf,
   baselineVersionRefusal,
   estimatedCost,
   monthlyUnitPrice,
@@ -220,5 +221,44 @@ describe('the departments a read lists', () => {
       { id: 'a' },
       { id: 'c' },
     ]);
+  });
+});
+
+describe('the lines of a version built from the baseline (C4-14, QĐ-109c)', () => {
+  const entry = (patch: Partial<Parameters<typeof baselineLinesOf>[0][number]> = {}) => ({
+    planId: 'plan-1',
+    description: 'Renew Figma Pro',
+    seats: 5,
+    costMinor: 100n as bigint | null,
+    terminated: false,
+    ...patch,
+  });
+
+  it('is a Renew line for a subscription that runs on, and none for one with an unknown or empty cost', () => {
+    const lines = baselineLinesOf([
+      entry(),
+      entry({ planId: 'plan-2', costMinor: null }),
+      entry({ planId: 'plan-3', costMinor: 0n }),
+    ]);
+
+    expect(lines.map((line) => [line.planId, line.lineType, line.amountMinor, line.priorityRank])).toEqual([
+      ['plan-1', 'RENEW', 100n, 1],
+    ]);
+  });
+
+  it('is a Cancel line, after the Renew lines, for a subscription the company ordered to end', () => {
+    const lines = baselineLinesOf([entry({ planId: 'plan-9', terminated: true, costMinor: 30n }), entry()]);
+
+    expect(lines.map((line) => [line.planId, line.lineType, line.priorityRank])).toEqual([
+      ['plan-1', 'RENEW', 1],
+      ['plan-9', 'CANCEL', 2],
+    ]);
+  });
+
+  it('joins a period and the one that follows it of the same plan: amounts add up, the same people are counted once', () => {
+    const lines = baselineLinesOf([entry({ seats: 4, costMinor: 30n }), entry({ seats: 5, costMinor: 70n })]);
+
+    expect(lines).toHaveLength(1);
+    expect([lines[0].amountMinor, lines[0].seats]).toEqual([100n, 5]);
   });
 });

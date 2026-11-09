@@ -5,6 +5,12 @@
 - Owner review: chưa review. Peer review: chat review (R2).
 - Triển khai: `in-progress` (09/11/2026: phần luật thuần và 2 tham số xong — `proposal-line-rules.policy`, `BUDGET_ZBB_*`; còn Task 1–5 gắn DB: migration, DTO/sender/phiên bản/gói, seed, gỡ `REVISION`/`SUPERSEDED`; chờ Docker để chạy integration). PR: chưa có.
 
+- 09/11/2026 (gói 5 MF4-B, nhánh `feat/mf4-g5`): Task 3–5 xong theo delta SPEC §4/§4b — cờ vượt theo Trần **đã phát hành** (S4-01), dòng `CANCEL`
+  không cộng tổng/cờ (`QĐ-109c`, sửa `overCeilingParts`), `KPI-3` chỉ `RENEW`/`CHANGE` theo `planId` của dòng (`QĐ-109d`, `kpi3ByPlan`, rỗng tới khi có
+  nguồn usage), vế giá so với giá tháng hiện hành của gói (`M-17`), `priorityRank` thật từ client, gói B4 trả `lines[]`/`headStatus`/`baselineAllowed`,
+  seed có `lineType`/`zbb`. Còn lại ở Task 2 (S4-04): các cột/bảng thừa (`window_*`, `repeat_cycle`, `quote_valid_until`, `high_value_*`, `kind`,
+  `based_on_version_id`, `reason`, `budget_version_line_changes`) chưa drop khỏi DB — không còn code ghi chúng.
+
 ## Before coding
 
 Đọc `src/modules/budgets/README.md`; grep nơi dùng `REVISION`, `SUPERSEDED`, `basedOnVersionId`, `windowFrom`, `repeatCycle`,

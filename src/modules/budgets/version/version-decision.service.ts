@@ -10,8 +10,8 @@ import { VersionDecisionWriter } from './version-decision-writer.service';
 /**
  * The decision of the spending approver on a version of a budget (`US-06-11`): approve it, refuse it with a reason, or send
  * it back to Finance with a reason. Only the approver decides, never a version they built or sent, and nobody changes a
- * figure here (`QĐ-82f`). Approving makes the version the current budget of its Cost Center and year, replaces the one
- * that was current, and attaches the commitments of that Cost Center and year that were waiting for a budget
+ * figure here (`QĐ-82f`). Approving makes the version the current budget of its Cost Center and year (there is no other current
+ * one to replace, `QĐ-97b`), and attaches the commitments of that Cost Center and year that were waiting for a budget
  * (`US-06-07`); a version that is not approved attaches nothing, and the year stays without a budget (`AC-6`). A refusal leaves
  * the proposal behind the version reviewed, so Finance can make another version from it, or the head can send a proposal that
  * follows it. The decision is written as a record that is never changed, in the transaction of the move, and nothing is

@@ -67,6 +67,9 @@ const YEAR_ENDED = {
 } as const;
 /** What sending the lines refuses after the request validation: a first proposal and one sent again alike. */
 const SEND_EXAMPLES = [
+  EXAMPLES.PRIORITY_RANK_INVALID,
+  EXAMPLES.ZBB_REQUIRED,
+  EXAMPLES.OVER_CEILING_NOTE_REQUIRED,
   EXAMPLES.PLAN_NOT_FOUND,
   EXAMPLES.YEAR_ENDED,
   EXAMPLES.CURRENCY_NOT_REPORTING,
@@ -117,7 +120,7 @@ export class BudgetProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is invalid (VALIDATION_ERROR), a line lacks its window, service period or repeat cycle, with the line and the fields in details.lines (BUDGET.PROPOSAL_INCOMPLETE), a window runs backwards (BUDGET.WINDOW_BACKWARDS), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND), the year has ended (BUDGET.YEAR_ENDED) an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING), or the head answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).',
+        'The form is invalid (VALIDATION_ERROR), two lines share a priority rank (BUDGET.PRIORITY_RANK_INVALID, details.positions), a line lacks its zero-based-budget explanation (BUDGET.ZBB_REQUIRED, details.positions), a line that carries the proposal over the published ceiling of the department has no note (BUDGET.OVER_CEILING_NOTE_REQUIRED, details.positions), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND), the year has ended (BUDGET.YEAR_ENDED) an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING), or the head answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).',
       examples: [VALIDATION_EXAMPLE, ...SEND_EXAMPLES, EXAMPLES.COST_CENTER_REQUIRED],
     },
   )

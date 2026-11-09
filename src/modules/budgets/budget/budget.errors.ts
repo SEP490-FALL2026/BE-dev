@@ -169,6 +169,26 @@ export class BudgetReasonRequiredError extends Error {
   }
 }
 
+/** The rule of the lines of `BM-10` that a proposal breaks (`QT 4.4`, `QT 4.5`): the code is `BUDGET.<rule>`. */
+export type ProposalLineRule = 'PRIORITY_RANK_INVALID' | 'ZBB_REQUIRED' | 'OVER_CEILING_NOTE_REQUIRED';
+
+/** Lines of a proposal share a priority rank, lack their zero-based-budget explanation, or go over the ceiling with no note: the positions say which. */
+export class BudgetProposalLinesInvalidError extends Error {
+  constructor(
+    readonly rule: ProposalLineRule,
+    readonly positions: readonly number[],
+  ) {
+    super(
+      rule === 'PRIORITY_RANK_INVALID'
+        ? 'Each line has its own priority rank.'
+        : rule === 'ZBB_REQUIRED'
+          ? 'These lines need the zero-based-budget explanation.'
+          : 'These lines carry the proposal over the ceiling of the department and need a note.',
+    );
+    this.name = 'BudgetProposalLinesInvalidError';
+  }
+}
+
 /** The person may not decide the version: they are not the spending approver, it is their own, or it was not sent (`US-06-11`). */
 export class BudgetDecisionRefusedError extends Error {
   constructor(readonly reason: 'NOT_SPENDING_APPROVER' | 'CONFLICT_OF_INTEREST' | 'OWN_VERSION' | 'NOT_SENT') {

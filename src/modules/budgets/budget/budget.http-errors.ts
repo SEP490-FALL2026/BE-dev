@@ -45,6 +45,7 @@ import {
   BudgetCycleCurrencyMismatchError,
   BudgetOverAnnualCeilingError,
   BudgetNotYourCostCenterError,
+  BudgetProposalLinesInvalidError,
   BudgetProposalNotFoundError,
   BudgetProposalOpenError,
   BudgetProposalStateError,
@@ -220,6 +221,11 @@ export function toBudgetApiException(error: unknown): unknown {
   if (error instanceof BudgetReasonRequiredError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `BUDGET.${error.what}_REASON_REQUIRED`, error.message);
   }
+  if (error instanceof BudgetProposalLinesInvalidError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `BUDGET.${error.rule}`, error.message, {
+      positions: error.positions,
+    });
+  }
   if (error instanceof BudgetImportFileInvalidError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.IMPORT_FILE_INVALID', error.message, {
       reason: error.reason,
@@ -344,6 +350,9 @@ export const BUDGET_ERROR_EXAMPLES = {
   QUARTERS_MISMATCH: example(new BudgetQuartersMismatchError()),
   RESERVE_REASON_REQUIRED: example(new BudgetReasonRequiredError('RESERVE')),
   ADJUSTMENT_REASON_REQUIRED: example(new BudgetReasonRequiredError('ADJUSTMENT')),
+  PRIORITY_RANK_INVALID: example(new BudgetProposalLinesInvalidError('PRIORITY_RANK_INVALID', [1, 2])),
+  ZBB_REQUIRED: example(new BudgetProposalLinesInvalidError('ZBB_REQUIRED', [1])),
+  OVER_CEILING_NOTE_REQUIRED: example(new BudgetProposalLinesInvalidError('OVER_CEILING_NOTE_REQUIRED', [2])),
   IMPORT_FILE_INVALID: example(new BudgetImportFileInvalidError('MISSING_COLUMNS', 'cost_center_code')),
   // Not shown yet: two writers at once answer the same code with the message given for the unique index above.
   PROPOSAL_ALREADY_OPEN: example(new BudgetProposalOpenError()),

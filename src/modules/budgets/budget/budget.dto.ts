@@ -2,6 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { LINE_DESCRIPTION_MAX, REASON_MAX } from './budget.policy';
+import { LINE_TYPES } from './budget-line-zbb.json';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 /** An amount a person gives: always in the reporting currency, which the system knows (`QĐ-98`). */
@@ -10,10 +11,29 @@ const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
 const year = z.number().int().min(2000).max(2200);
 export const LINES_MAX = 200;
 
+/** The kind of purchase of a line (`QĐ-101n`): carry on, change, buy new, or give up. */
+const lineType = z.enum(LINE_TYPES).meta({
+  description:
+    'RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL gives it up: a CANCEL amount is shown and never added to the total.',
+});
+/** The reduced zero-based-budget explanation of a line (`QĐ-94l`): four short answers of 1 to 1000 characters. */
+const zbbBody = z.strictObject({
+  purpose: text(REASON_MAX),
+  alternatives: text(REASON_MAX),
+  consequenceIfNot: text(REASON_MAX),
+  usageIndicator: text(REASON_MAX),
+});
+const zbbView = z.strictObject({
+  purpose: z.string(),
+  alternatives: z.string(),
+  consequenceIfNot: z.string(),
+  usageIndicator: z.string(),
+});
+const priorityRank = z.number().int().min(1).max(100000);
+
 /**
- * A line of a proposal or a version (`QĐ-82d`): what is bought, how much, where in the year it is bought, how long it
- * serves and how it repeats. The window, the service period and the cycle may be left out here so that a form that
- * lacks them is told which line and which fields (`US-06-10` AC-2), not simply refused.
+ * A line of a proposal or a version (`QĐ-82d`): what is bought (a plan or a description), the seats, the amount of the year, its kind and
+ * its place in the order of priority, and the zero-based-budget explanation when the rules ask for it (`QĐ-94l`).
  */
 const lineBodyShape = z.strictObject({
   planId: z.uuid().optional(),
@@ -21,14 +41,29 @@ const lineBodyShape = z.strictObject({
   seats: z.number().int().min(1).max(100000).optional(),
   amount: money,
   note: text(REASON_MAX).optional(),
+  lineType,
+  zbb: zbbBody.optional(),
+  /** Optional here: a proposal line requires it (`lineBody`), a line Finance adds may leave it out. */
+  priorityRank: priorityRank.optional(),
 });
+const planOrDescription = {
+  message: 'Give the plan or a description of the line.',
+  path: ['description'],
+};
+/** A line of a proposal: the head gives the rank, once in the proposal (`QT 4.4`). */
 const lineBody = lineBodyShape
-  .refine((line) => line.planId !== undefined || line.description !== undefined, {
-    message: 'Give the plan or a description of the line.',
-    path: ['description'],
-  })
+  .extend({ priorityRank })
+  .refine((line) => line.planId !== undefined || line.description !== undefined, planOrDescription)
   .meta({
-    description: 'A line is a plan or a description, the seats, the amount of the year and a note.',
+    description:
+      'A line is a plan or a description, the seats, the amount of the year, its kind, its priority rank and a note; the explanation (zbb) is required for NEW lines and where the rules ask.',
+  });
+/** A line Finance adds to a version: the kind is given; the rank and the explanation may be left out. */
+const financeLineBody = lineBodyShape
+  .refine((line) => line.planId !== undefined || line.description !== undefined, planOrDescription)
+  .meta({
+    description:
+      'A line Finance adds: a plan or a description, the seats, the amount of the year and its kind; the priority rank and the explanation are optional.',
   });
 
 export const proposalBodySchema = z.strictObject({
@@ -131,11 +166,15 @@ export const linePatchSchema = z
     amount: money,
     financeComment: text(REASON_MAX).nullable(),
     adjustmentReason: text(REASON_MAX).nullable(),
+    lineType,
+    /** `null` takes the explanation away; absent keeps it. */
+    zbb: zbbBody.nullable(),
+    priorityRank: priorityRank.nullable(),
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
   .meta({ minProperties: 1, description: 'Give at least one field.' });
-export const addLinesBodySchema = z.strictObject({ lines: z.array(lineBody).min(1).max(LINES_MAX) });
+export const addLinesBodySchema = z.strictObject({ lines: z.array(financeLineBody).min(1).max(LINES_MAX) });
 
 export const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -226,6 +265,11 @@ const proposalLineSchema = z.strictObject({
   seats: z.number().int().nullable(),
   amount: moneyView,
   note: z.string().nullable(),
+  lineType,
+  zbb: zbbView.nullable(),
+  priorityRank: z.number().int().positive(),
+  /** The part of the line that carries the proposal over the published ceiling of the department; null when the line is not flagged. */
+  overCeiling: moneyView.nullable(),
 });
 const versionSchema = z.strictObject({
   id: z.uuid(),
@@ -293,6 +337,12 @@ const versionLineSchema = z.strictObject({
   amount: moneyView,
   financeComment: z.string().nullable(),
   adjustmentReason: z.string().nullable(),
+  lineType,
+  zbb: zbbView.nullable(),
+  /** Copied from the proposal; null for a line Finance added with none. */
+  priorityRank: z.number().int().positive().nullable(),
+  /** The part of the proposal line this adjusts that carried the proposal over the published ceiling (B3 flag); null when it was not flagged or the line is Finance's own. */
+  overCeiling: moneyView.nullable(),
 });
 /** What a head of department sees of the budget of the department: the lines of the current budget, never what is left. */
 const mineSchema = z.strictObject({

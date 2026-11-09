@@ -140,4 +140,8 @@ const toLineWire = (
   seats: line.seats,
   amount: money(line.amountMinor),
   note: line.note,
+  lineType: line.lineType,
+  zbb: line.zbb,
+  priorityRank: line.priorityRank,
+  overCeiling: line.overCeilingMinor === null ? null : money(line.overCeilingMinor),
 });

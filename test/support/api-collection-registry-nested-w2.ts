@@ -43,4 +43,17 @@ export const NESTED_ARRAYS_W2: readonly NestedArrayEntry[] = [
       'the departments of the year, cut to the most a division of the ceiling names; departmentsTotal says how many there are',
     removeWhen: 'Review when DEPARTMENTS_LISTED_MAX changes or the answer is paged.',
   },
+  {
+    key: 'budgetCyclePackage#departments.proposal.lines',
+    classification: 'bounded',
+    findings: [],
+    owner: 'qd103-budget-proposal-lines-cleanup',
+    businessMaximum: {
+      maxItems: 200,
+      source:
+        'LINES_MAX in budget.dto.ts, the maxItems of the schema in cycle.dto.ts: a proposal is sent with at most this many lines, and the package lists all of them',
+    },
+    rationale: 'the lines of the open proposal of one department, as many as the form takes (LINES_MAX)',
+    removeWhen: 'Review when LINES_MAX changes or the answer is paged.',
+  },
 ];

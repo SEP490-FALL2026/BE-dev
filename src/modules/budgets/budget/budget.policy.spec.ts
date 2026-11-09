@@ -255,6 +255,7 @@ describe('whether an adjustment changes what the line of the proposal said (US-0
     planId: 'plan-1' as string | null,
     seats: 10 as number | null,
     amountMinor: 1_000n,
+    lineType: 'RENEW' as const,
   };
 
   it('changes nothing when the patch gives nothing, or gives what the line already says', () => {
@@ -269,6 +270,7 @@ describe('whether an adjustment changes what the line of the proposal said (US-0
     ['its plan, cleared', { planId: null }],
     ['its seats', { seats: 12 }],
     ['its money', { amountMinor: 1_100n }],
+    ['its kind', { lineType: 'CHANGE' as const }],
   ])('changes the line when the patch changes %s', (_label, patch) => {
     expect(patchChangesLine(line, patch)).toBe(true);
   });
@@ -282,6 +284,9 @@ describe('what a version copies from the line before it, and whether an edit kee
     amountMinor: 1_000n,
     financeComment: 'đã có',
     adjustmentReason: 'đổi giá',
+    lineType: 'CHANGE' as const,
+    zbb: null,
+    priorityRank: 2,
   };
 
   it('copies the line with where it came from, and starts it without a comment of Finance or a reason to adjust it', () => {
@@ -294,6 +299,9 @@ describe('what a version copies from the line before it, and whether an edit kee
       amountMinor: 1_000n,
       financeComment: null,
       adjustmentReason: null,
+      lineType: 'CHANGE',
+      zbb: null,
+      priorityRank: 2,
     });
   });
 

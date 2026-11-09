@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { BaselineVersionRefusal } from '../budget/budget.errors';
+import type { LineType } from '../budget/budget-line-zbb.json';
 
 /**
  * The monthly price of one seat from the unit price in the reporting currency and the cycle it is paid in (`R-I03`): a year's price
@@ -147,4 +148,54 @@ export function inOrderOf<T extends { id: string }>(ids: readonly string[], rows
   const position = new Map(ids.map((id, index) => [id, index]));
 
   return [...rows].sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
+}
+
+/** A line of a first version built from the baseline (`QĐ-100h`): what it estimates for one plan, and what kind of line it is. */
+export interface BaselineLine {
+  description: string;
+  planId: string;
+  seats: number | null;
+  amountMinor: bigint;
+  lineType: LineType;
+  zbb: null;
+  priorityRank: number;
+}
+
+/**
+ * The lines of a version built from the baseline (`C4-14`, `QĐ-109c`): a subscription that runs on is a `RENEW` line and one the company
+ * ordered to end is a `CANCEL` line (its amount is shown and never added to the base). The periods of one plan of one kind are one line,
+ * so that a period and the one that follows it do not show twice: the amounts add up and the seats are the same people, counted once (the
+ * most of them). One at an unknown or empty cost gives none. Ranks follow the order, from 1.
+ */
+export function baselineLinesOf(
+  entries: readonly {
+    planId: string;
+    description: string;
+    seats: number | null;
+    costMinor: bigint | null;
+    terminated: boolean;
+  }[],
+): BaselineLine[] {
+  const merged = new Map<string, Omit<BaselineLine, 'priorityRank'>>();
+  for (const entry of entries) {
+    if (entry.costMinor === null || entry.costMinor <= 0n) continue;
+    const lineType: LineType = entry.terminated ? 'CANCEL' : 'RENEW';
+    const key = `${lineType}:${entry.planId}`;
+    const known = merged.get(key);
+    merged.set(key, {
+      description: known?.description ?? entry.description,
+      planId: entry.planId,
+      seats: known === undefined ? entry.seats : Math.max(known.seats ?? 0, entry.seats ?? 0),
+      amountMinor: (known?.amountMinor ?? 0n) + entry.costMinor,
+      lineType,
+      zbb: null,
+    });
+  }
+  const lines = [...merged.values()];
+  const ordered = [
+    ...lines.filter((line) => line.lineType !== 'CANCEL'),
+    ...lines.filter((line) => line.lineType === 'CANCEL'),
+  ];
+
+  return ordered.map((line, index) => ({ ...line, priorityRank: index + 1 }));
 }
