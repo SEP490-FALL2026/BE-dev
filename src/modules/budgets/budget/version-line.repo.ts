@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { versionLineZbbJson } from './budget-line-zbb.json';
+import type { LineType, ZbbExplanation } from './budget-line.types';
 
 export interface VersionLineRecord {
   position: number;
@@ -13,6 +15,10 @@ export interface VersionLineRecord {
   amountMinor: bigint;
   financeComment: string | null;
   adjustmentReason: string | null;
+  lineType: LineType;
+  zbb: ZbbExplanation | null;
+  /** Copied from the proposal line; null for a line Finance added with none. */
+  priorityRank: number | null;
 }
 
 export interface LinePatch {
@@ -22,6 +28,9 @@ export interface LinePatch {
   amountMinor?: bigint;
   financeComment?: string | null;
   adjustmentReason?: string | null;
+  lineType?: LineType;
+  zbb?: ZbbExplanation | null;
+  priorityRank?: number | null;
 }
 
 type LineRow = Prisma.BudgetVersionLineGetPayload<object>;
@@ -36,6 +45,9 @@ const toLine = (row: LineRow): VersionLineRecord => ({
   amountMinor: row.amountMinor,
   financeComment: row.financeComment,
   adjustmentReason: row.adjustmentReason,
+  lineType: row.lineType,
+  zbb: versionLineZbbJson.decode(row.zbb),
+  priorityRank: row.priorityRank,
 });
 
 export const lineData = (line: Omit<VersionLineRecord, 'position'>) => ({
@@ -47,6 +59,9 @@ export const lineData = (line: Omit<VersionLineRecord, 'position'>) => ({
   amountMinor: line.amountMinor,
   financeComment: line.financeComment,
   adjustmentReason: line.adjustmentReason,
+  lineType: line.lineType,
+  zbb: versionLineZbbJson.encode(line.zbb),
+  priorityRank: line.priorityRank,
 });
 
 /** The one writer of `budget_version_lines` and the history of their windows, and their reads. */
@@ -94,6 +109,9 @@ export class VersionLineRepo {
         ...(patch.amountMinor !== undefined ? { amountMinor: patch.amountMinor } : {}),
         ...(patch.financeComment !== undefined ? { financeComment: patch.financeComment } : {}),
         ...(patch.adjustmentReason !== undefined ? { adjustmentReason: patch.adjustmentReason } : {}),
+        ...(patch.lineType !== undefined ? { lineType: patch.lineType } : {}),
+        ...(patch.zbb !== undefined ? { zbb: versionLineZbbJson.encode(patch.zbb) } : {}),
+        ...(patch.priorityRank !== undefined ? { priorityRank: patch.priorityRank } : {}),
       },
     });
   }

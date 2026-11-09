@@ -34,6 +34,9 @@ const line: LineFacts = {
   amountMinor: 50_000_000n,
   financeComment: null,
   adjustmentReason: null,
+  lineType: 'RENEW',
+  zbb: null,
+  priorityRank: 1,
 };
 
 describe('the figures an edit of a version changed (F66, spec J.4)', () => {
@@ -106,11 +109,14 @@ describe('the fields an edit of a line changed', () => {
       amountMinor: 1n,
       financeComment: 'c',
       adjustmentReason: 'r',
+      lineType: 'CANCEL',
+      zbb: { purpose: 'p', alternatives: 'a', consequenceIfNot: 'c', usageIndicator: 'u' },
+      priorityRank: 2,
     };
     const change = lineChange(line, everything, money);
 
     expect(Object.keys(change?.after ?? {}).length).toBeLessThanOrEqual(HISTORY_CHANGES_MAX);
-    expect(Object.keys(change?.after ?? {})).toHaveLength(6);
+    expect(Object.keys(change?.after ?? {})).toHaveLength(9);
   });
 });
 

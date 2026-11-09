@@ -292,7 +292,7 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(VersionResponseDto, {
     message: 'BUDGET_VERSION.DECIDED',
     description:
-      'The spending approver approves a version that was sent (it becomes the current budget of its Cost Center and year, replaces the one that was current, and takes the commitments that waited for a budget), refuses it with a reason, or sends it back to Finance with a reason. The decision is written as a record that is never changed. No figure is changed here.',
+      'The spending approver approves a version that was sent (it becomes the current budget of its Cost Center and year, which has no other current version, and takes the commitments that waited for a budget), refuses it with a reason, or sends it back to Finance with a reason. The decision is written as a record that is never changed. No figure is changed here.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

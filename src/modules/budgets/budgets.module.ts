@@ -46,6 +46,7 @@ import { DecisionRepo } from './budget/decision.repo';
 import { LineImportService } from './version/line-import.service';
 import { ProposalRepo } from './budget/proposal.repo';
 import { ProposalService } from './proposal/proposal.service';
+import { ProposalLineJudge } from './proposal/proposal-line-judge.service';
 import { ProposalSender } from './proposal/proposal-sender.service';
 import { ProposalAttachmentBinder } from './attachment/proposal-attachment-binder.service';
 import { ProposalViewService } from './proposal/proposal-view.service';
@@ -125,6 +126,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetNotifierService,
     ProposalViewService,
     ProposalService,
+    ProposalLineJudge,
     ProposalSender,
     ProposalAttachmentBinder,
     VersionViewService,

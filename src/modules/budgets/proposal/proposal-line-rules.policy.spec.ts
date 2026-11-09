@@ -1,4 +1,5 @@
 import {
+  countedTotalOf,
   duplicateRankPositions,
   overCeilingNoteMissing,
   overCeilingParts,
@@ -20,7 +21,7 @@ const line = (position: number, patch: Partial<RuledLine> = {}): RuledLine => ({
   ...patch,
 });
 const context = {
-  kpi3: null as number | null,
+  kpi3ByPlan: new Map<string, number>(),
   kpi3BelowPercent: 70,
   priceIncreasePercent: 10,
   monthlyPriceByPlan: new Map([['plan', 100n]]),
@@ -47,12 +48,25 @@ describe('when a zero-based-budget explanation is required (QĐ-94l)', () => {
     expect(zbbMissingPositions([line(1, { lineType: 'NEW', zbb })], context)).toEqual([]);
   });
 
-  it('requires it of every kind of line, CANCEL included, when usage is known and below the threshold; not when it is unknown or at it', () => {
-    const lines = [line(1), line(2, { lineType: 'CANCEL' }), line(3, { lineType: 'CHANGE' })];
+  it('BR-MF4-02: requires it of a RENEW or CHANGE line whose plan has a usage below the threshold; not when it is unknown or at it', () => {
+    const lines = [line(1, { planId: 'plan' }), line(2, { lineType: 'CHANGE', planId: 'plan' })];
+    const usage = (percent: number) => ({ ...context, kpi3ByPlan: new Map([['plan', percent]]) });
 
-    expect(zbbMissingPositions(lines, { ...context, kpi3: 65 })).toEqual([1, 2, 3]);
-    expect(zbbMissingPositions(lines, { ...context, kpi3: 70 })).toEqual([]);
-    expect(zbbMissingPositions(lines, { ...context, kpi3: null })).toEqual([]);
+    expect(zbbMissingPositions(lines, usage(65))).toEqual([1, 2]);
+    expect(zbbMissingPositions(lines, usage(70))).toEqual([]);
+    expect(zbbMissingPositions(lines, context)).toEqual([]);
+  });
+
+  it('QĐ-109d: a NEW or CANCEL line is never asked for KPI-3 (a NEW line is asked anyway), and usage is the one of the plan of the line', () => {
+    const low = { ...context, kpi3ByPlan: new Map([['plan', 40]]) };
+    const lines = [
+      line(1, { lineType: 'NEW', zbb, planId: 'plan' }),
+      line(2, { lineType: 'CANCEL', planId: 'plan' }),
+      line(3, { planId: 'other' }),
+      line(4, { planId: null }),
+    ];
+
+    expect(zbbMissingPositions(lines, low)).toEqual([]);
   });
 
   describe('a unit price that rises over the threshold', () => {
@@ -65,12 +79,24 @@ describe('when a zero-based-budget explanation is required (QĐ-94l)', () => {
       expect(zbbMissingPositions([at(13_200n)], context)).toEqual([]);
     });
 
+    it('is not asked of a CANCEL line', () => {
+      expect(zbbMissingPositions([at(13_320n, { lineType: 'CANCEL' })], context)).toEqual([]);
+    });
+
     it('is not judged without seats, with zero seats, without a plan, or when the plan has no monthly price (a one-time purchase)', () => {
       expect(priceRisesTooMuch(at(99_999n, { seats: null }), context)).toBe(false);
       expect(priceRisesTooMuch(at(99_999n, { seats: 0 }), context)).toBe(false);
       expect(priceRisesTooMuch(at(99_999n, { planId: null }), context)).toBe(false);
       expect(priceRisesTooMuch(at(99_999n), { ...context, monthlyPriceByPlan: new Map() })).toBe(false);
     });
+  });
+});
+
+describe('what a proposal is worth (QĐ-109c)', () => {
+  it('BR-MF4-02: a CANCEL line of 50 million is shown and not added', () => {
+    const lines = [line(1, { amountMinor: 100n }), line(2, { lineType: 'CANCEL', amountMinor: 50_000_000n })];
+
+    expect(countedTotalOf(lines)).toBe(100n);
   });
 });
 
@@ -95,6 +121,17 @@ describe('the part of a line that goes over the ceiling of the department (AC-20
       [1, 40n],
       [3, 30n],
     ]);
+  });
+
+  it('QĐ-109c: a CANCEL line is neither added nor flagged, and leaves the flag of the others where it was', () => {
+    const withCancel = [
+      line(1, { amountMinor: 50n }),
+      line(2, { lineType: 'CANCEL', amountMinor: 50_000_000n }),
+      line(3, { amountMinor: 70n }),
+    ];
+
+    expect([...overCeilingParts(withCancel, 90n)]).toEqual([[3, 30n]]);
+    expect(overCeilingParts([line(1, { lineType: 'CANCEL', amountMinor: 999n })], 10n).size).toBe(0);
   });
 
   it('flags nothing when the lines add up to the ceiling or less, or the department has none', () => {

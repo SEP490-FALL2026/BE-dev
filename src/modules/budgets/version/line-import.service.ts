@@ -12,10 +12,13 @@ import { VersionAccessService } from './version-access.service';
 import { VersionHistoryService } from './version-history.service';
 import { VersionLineRepo, type VersionLineRecord } from '../budget/version-line.repo';
 import type { ImportWire } from '../budget/budget.dto';
+import { LINE_TYPES, type LineType } from '../budget/budget-line.types';
 
 const REQUIRED = ['cost_center_code', 'description', 'amount'] as const;
 /** Columns of the file before `QĐ-101n`: a file that still has one is refused as a whole. */
 const RETIRED = ['window_from', 'window_to', 'service_period_months', 'repeat_cycle', 'quote_valid_until'] as const;
+const isLineType = (value: string | undefined): value is LineType => LINE_TYPES.some((type) => type === value);
+
 /** The largest number of lines one file may add to a version. */
 const MAX_ROWS = 1000;
 /** The rows reported back one by one; the count says the rest. */
@@ -132,6 +135,10 @@ export class LineImportService {
     if (amountMinor < 0n) return 'AMOUNT_INVALID';
     const seats = row.seats ? Number(row.seats) : null;
     if (seats !== null && (!Number.isInteger(seats) || seats < 1)) return 'SEATS_INVALID';
+    const lineType = row.line_type?.toUpperCase();
+    if (!isLineType(lineType)) return 'LINE_TYPE_INVALID';
+    const rank = row.priority_rank ? Number(row.priority_rank) : null;
+    if (rank !== null && (!Number.isInteger(rank) || rank < 1)) return 'PRIORITY_RANK_INVALID';
 
     return {
       proposalId: null,
@@ -142,6 +149,9 @@ export class LineImportService {
       amountMinor,
       financeComment: row.note ? row.note : null,
       adjustmentReason: null,
+      lineType,
+      zbb: null,
+      priorityRank: rank,
     };
   }
 }

@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
+import type { LineType, ZbbExplanation } from './budget-line.types';
 
 /**
  * The rules of budget proposals and versions (`US-06-09`, `US-06-10`), as pure decisions: what a line must say, which
@@ -191,6 +192,7 @@ export interface LineFields {
   planId: string | null;
   seats: number | null;
   amountMinor: bigint;
+  lineType: LineType;
 }
 
 const ADJUSTABLE_FIELDS = [
@@ -198,6 +200,7 @@ const ADJUSTABLE_FIELDS = [
   'planId',
   'seats',
   'amountMinor',
+  'lineType',
 ] as const satisfies readonly (keyof LineFields)[];
 
 /** Whether the patch changes what the line of the proposal said: its words, its money, its window, its service or its cycle. */
@@ -212,6 +215,9 @@ export function copiedLineOf(
     planId: string | null;
     seats: number | null;
     amountMinor: bigint;
+    lineType: LineType;
+    zbb: ZbbExplanation | null;
+    priorityRank: number | null;
   },
   origin: { proposalId: string | null; proposalPosition: number | null },
 ) {
@@ -224,6 +230,9 @@ export function copiedLineOf(
     amountMinor: line.amountMinor,
     financeComment: null,
     adjustmentReason: null,
+    lineType: line.lineType,
+    zbb: line.zbb,
+    priorityRank: line.priorityRank,
   };
 }
 

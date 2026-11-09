@@ -66,6 +66,10 @@ export interface DemoBudgetLine {
   plan: string;
   seats: number;
   amount: string;
+  /** What kind of purchase the line is (`QĐ-101n`); the order of the lines in the fixture is their priority rank, from 1. */
+  lineType: 'RENEW' | 'CHANGE' | 'NEW' | 'CANCEL';
+  /** The reduced zero-based-budget explanation, required of a `NEW` line (`QĐ-94l`). */
+  zbb?: { purpose: string; alternatives: string; consequenceIfNot: string; usageIndicator: string };
 }
 
 /**

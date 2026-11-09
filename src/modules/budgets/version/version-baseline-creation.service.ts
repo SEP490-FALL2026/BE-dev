@@ -9,6 +9,7 @@ import { VersionRepo } from '../budget/version.repo';
 import { VersionViewService } from '../budget/version-view.service';
 import type { VersionWire } from '../budget/budget.dto';
 import { BaselineService } from '../cycle/baseline.service';
+import { countedTotalOf } from '../proposal/proposal-line-rules.policy';
 import { VersionTrail } from './version-trail.service';
 
 /**
@@ -47,7 +48,8 @@ export class VersionBaselineCreationService {
       if (await this.versions.inFlight(input.costCenterId, input.year, tx)) throw new BudgetVersionInFlightError();
 
       const lines = await this.baselines.renewalLinesOf(allowed.departmentId, input.year, today, tx);
-      const baseMinor = lines.reduce((sum, line) => sum + line.amountMinor, 0n);
+      // A Cancel line is shown and not added to the base (QĐ-109c).
+      const baseMinor = countedTotalOf(lines);
       const organizationId = await this.facts.organizationId(tx);
       const id = await this.versions.insert(tx, {
         organizationId,

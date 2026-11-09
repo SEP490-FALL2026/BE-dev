@@ -68,6 +68,21 @@ describe('shared dataset v3 single-role accounts', () => {
     }
     for (const budget of SHARED_DEMO_V3.budgets) expect(budget).not.toHaveProperty('reserve');
   });
+  it('BR-MF4-02: every line of a budget and of a proposal has its kind, and a NEW line its zero-based-budget explanation, so the head can send it', () => {
+    const lines = [...SHARED_DEMO_V3.budgets, ...SHARED_DEMO_V3.proposals].flatMap((entry) => entry.lines);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(['RENEW', 'CHANGE', 'NEW', 'CANCEL']).toContain(line.lineType);
+      if (line.lineType === 'NEW')
+        expect(Object.keys(line.zbb ?? {}).sort()).toEqual([
+          'alternatives',
+          'consequenceIfNot',
+          'purpose',
+          'usageIndicator',
+        ]);
+    }
+    expect(lines.some((line) => line.lineType === 'NEW')).toBe(true);
+  });
   it('names nobody a user sees with the word demo or test, and no tenant of the real world', () => {
     // The whole fixture (departments, people, catalog, finance, requests, extras, revocation notes...) and the installation: only the id of the
     // fixture, an identifier and not shown, may carry the word.

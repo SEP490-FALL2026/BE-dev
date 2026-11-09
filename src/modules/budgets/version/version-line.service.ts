@@ -104,6 +104,9 @@ export class VersionLineService {
           amountMinor: await this.facts.money(line.amount, version.currency, tx),
           financeComment: line.note ?? null,
           adjustmentReason: null,
+          lineType: line.lineType,
+          zbb: line.zbb ?? null,
+          priorityRank: line.priorityRank ?? null,
         });
       }
       const first = await this.lines.addLines(tx, id, lines);
