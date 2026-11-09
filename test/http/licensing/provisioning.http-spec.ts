@@ -92,6 +92,8 @@ describe('provisioning queue routes (e2e, no database)', () => {
     ['a completion with an unknown field', 'post', `${BASE}/${ID}/complete`, { evidence: 'x', done: true }],
     ['a reason of over a thousand characters', 'post', `${BASE}/${ID}/report-failure`, { reason: 'x'.repeat(1001) }],
     ['a status that does not exist', 'get', `${BASE}?status=DONE`, undefined],
+    // BR-MF5-04: the filter of the tasks that may be taken today is a flag.
+    ['a claimableNow that is not a flag', 'get', `${BASE}?claimableNow=maybe`, undefined],
     // A hand-off changes only the channel: its body is an empty object, and the evidence is asked when the work by hand completes (F08).
     ['a hand-off that still carries evidence', 'post', `${BASE}/${ID}/hand-off`, { evidence: 'x' }],
     ['a hand-off with an unknown field', 'post', `${BASE}/${ID}/hand-off`, { password: 'p' }],
@@ -145,6 +147,35 @@ describe('provisioning queue routes (e2e, no database)', () => {
 
     expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
   });
+
+  it('BR-MF5-04: accepts the filter of the tasks that may be taken today', async () => {
+    for (const flag of ['true', 'false']) {
+      const response = await request(app.getHttpServer())
+        .get(`${BASE}?claimableNow=${flag}`)
+        .set('Authorization', bearer(principal(['IT_ADMIN'])));
+
+      expect(response.status).not.toBe(422);
+    }
+  });
+
+  it(
+    'BR-MF5-04: documents the 409 NOT_BEFORE of the claim and the completion of a revocation, and the new fields of a task',
+    () => {
+      const document = createOpenApiDocument(app);
+      const conflict = (path: string) =>
+        JSON.stringify(
+          (document.paths[path] as { post: { responses: Record<string, unknown> } }).post.responses['409'],
+        );
+
+      expect(conflict(`${BASE}/{id}/claim`)).toContain('PROVISIONING_TASK.NOT_BEFORE');
+      expect(conflict(`${BASE}/{id}/revocation-completion`)).toContain('PROVISIONING_TASK.NOT_BEFORE');
+      const schemas = JSON.stringify(document.components?.schemas ?? {});
+      for (const field of ['"claimableNow"', '"notBefore"', '"dueOn"', '"withdrawnReasonCount"']) {
+        expect(schemas).toContain(field);
+      }
+    },
+    OPENAPI_DOCUMENT_BUDGET_MS,
+  );
 
   it('answers REQUEST.NOT_FOUND to a grant of a request the gate does not know, and writes nothing', async () => {
     const response = await request(app.getHttpServer())

@@ -11,7 +11,13 @@ import {
 } from '../../public/licensing.errors';
 import { nextStatus } from '../provisioning.policy';
 import { RevocationListeners } from '../../public/licensing.extension-points';
-import { assertRevocationTask, planAccessCut, planCompletion, type CompletionInput } from '../revocation.policy';
+import {
+  assertNotBefore,
+  assertRevocationTask,
+  planAccessCut,
+  planCompletion,
+  type CompletionInput,
+} from '../revocation.policy';
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskViewService, type TaskView } from '../provisioning-task-view.service';
@@ -42,7 +48,7 @@ export class RevocationCompletionService {
   /**
    * Completes the revocation the IT Admin took, the way its kind of provisioning says, and ends the assignment. Throws
    * ProvisioningTaskNotFoundError, ProvisioningTaskStateError, ProvisioningTaskNotManualError,
-   * ProvisioningAnotherItAdminNeededError, RevocationCompletionError, ProvisioningEvidenceRequiredError, whatever the hook
+   * ProvisioningTaskNotBeforeError, ProvisioningAnotherItAdminNeededError, RevocationCompletionError, ProvisioningEvidenceRequiredError, whatever the hook
    * throws and AssignmentNotOpenError.
    */
   async complete(actor: AuthenticatedPrincipal, id: string, input: CompletionInput): Promise<TaskView> {
@@ -53,11 +59,13 @@ export class RevocationCompletionService {
       },
       write: async ({ tx, task: locked, organizationId, now }) => {
         const facts = toRevocationFacts(locked);
+        const today = await this.organizationReads.businessToday(now, tx);
+        // The day not before may have moved back to a later day when a reason with no grace was withdrawn: the work is not done before it.
+        assertNotBefore(locked.notBefore, today);
         await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: facts, now });
         const [plan] = await this.catalog.getPlanRevocationInfo([locked.assignment.planId], tx);
         if (!plan) throw new SeatTargetNotFoundError('PLAN');
         const assignment = await this.ending.lock(tx, locked.assignmentId);
-        const today = await this.organizationReads.businessToday(now, tx);
         const done = planCompletion(input, { type: plan.provisioningType, startsOn: assignment.effectiveFrom, today });
 
         await this.tasks.markRevocationCompleted(tx, locked.id, actor.appUserId, done, now);

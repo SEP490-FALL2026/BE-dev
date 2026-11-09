@@ -62,7 +62,7 @@ export class MySoftwareRepo {
               where: {
                 OR: [
                   { kind: 'GRANT', status: { in: [...OPEN_GRANT_TASK_STATUSES] } },
-                  { kind: 'REVOKE', status: { in: [...OPEN_REVOCATION] } },
+                  { kind: 'REVOKE', status: { in: [...OPEN_REVOCATION] }, reasons: { some: { withdrawnAt: null } } },
                   { kind: 'REVOKE', status: 'COMPLETED', accessState: 'UNTIL_PAID_END' },
                 ],
               },

@@ -156,6 +156,14 @@ describe('the alerts of the rights (a03-license-inbox-alerts, FR-5.14 lines 3, 1
         code: 'GHOST_SEAT_G2_DETECTED',
         params: { recommendationId: ID, employeeId: ID, applicationId: ID },
       }),
+      notice({
+        code: 'REVOCATION_UPCOMING',
+        params: { taskId: ID, planId: ID, applicationId: ID, source: 'GHOST_SEAT', notBefore: '2026-11-08' },
+      }),
+      notice({
+        code: 'REVOCATION_CANCELLED',
+        params: { planId: ID, applicationId: ID, source: 'GHOST_SEAT' },
+      }),
     ];
     for (const input of accepted)
       expect({ code: input.code, refusal: refuseInAppNotification(input) }).toEqual({

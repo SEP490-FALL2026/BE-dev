@@ -16,6 +16,8 @@ import { SUMMARY_SELECT, WITH_ASSIGNMENT, toRecord, type ProvisioningTaskRecord 
 export interface TaskPageFilter {
   channel?: ProvisioningChannel;
   status?: ProvisioningTaskStatus;
+  /** `true`: only the revocations that may be taken today (no day not before, or it has come), and every grant; `false`: only those still in their grace. */
+  claimableOn?: { today: BusinessDate; claimable: boolean };
   /** Only the tasks this employee is in charge of by default. */
   responsibleEmployeeId?: string;
   /** Only the tasks nobody is in charge of, or whose person in charge is one of these (who no longer work). */
@@ -109,7 +111,14 @@ export class ProvisioningTaskRepo {
     });
   }
 
-  async markCompleted(tx: DbTx, id: string, appUserId: string, evidence: string, now: Date, avoidedCosts?: bigint): Promise<void> {
+  async markCompleted(
+    tx: DbTx,
+    id: string,
+    appUserId: string,
+    evidence: string,
+    now: Date,
+    avoidedCosts?: bigint,
+  ): Promise<void> {
     await tx.provisioningTask.update({
       where: { id },
       data: {
@@ -288,6 +297,21 @@ export class ProvisioningTaskRepo {
     return this.find(locked[0].id, tx);
   }
 
+  /** What the reasons that stand ask of a revocation now: the day not before and the due day, as the policy reads them from the reasons. */
+  async markTiming(
+    tx: DbTx,
+    id: string,
+    timing: { dueOn: BusinessDate | null; notBefore: BusinessDate | null },
+  ): Promise<void> {
+    await tx.provisioningTask.update({
+      where: { id },
+      data: {
+        dueOn: timing.dueOn ? toDateColumn(timing.dueOn) : null,
+        notBefore: timing.notBefore ? toDateColumn(timing.notBefore) : null,
+      },
+    });
+  }
+
   /** The completion of a revocation: who did it, the evidence, how it was done and what is known of the access. */
   async markRevocationCompleted(
     tx: DbTx,
@@ -353,7 +377,17 @@ export class ProvisioningTaskRepo {
    * are not selected (`LD-08`); the record carries them as null.
    */
   async page(filter: TaskPageFilter): Promise<{ items: ProvisioningTaskRecord[]; total: number }> {
+    const todayColumn = filter.claimableOn ? toDateColumn(filter.claimableOn.today) : null;
     const where: Prisma.ProvisioningTaskWhereInput = {
+      ...(filter.claimableOn && todayColumn
+        ? {
+            AND: [
+              filter.claimableOn.claimable
+                ? { OR: [{ notBefore: null }, { notBefore: { lte: todayColumn } }] }
+                : { notBefore: { gt: todayColumn } },
+            ],
+          }
+        : {}),
       ...(filter.channel ? { channel: filter.channel } : {}),
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.responsibleEmployeeId ? { defaultResponsibleEmployeeId: filter.responsibleEmployeeId } : {}),

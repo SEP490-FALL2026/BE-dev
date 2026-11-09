@@ -14,7 +14,12 @@ dashboards; gốc `src/app/app.module.ts`.
 
 - Facade, mỗi facade ≤ 8 phụ thuộc, tên method không đổi; consumer inject facade sở hữu method (module export cả bảy):
   - `LicensingApi` ([public/licensing.api.ts](public/licensing.api.ts)) — thu hồi, task grant, ghế của người:
-    - `openRevocation` — cửa duy nhất mở thu hồi một ghế cá nhân, cho mọi nguồn (trả ghế, nghỉ việc, hết hạn…).
+    - `openRevocation` — cửa duy nhất mở thu hồi một ghế cá nhân, cho mọi nguồn (trả ghế, nghỉ việc, hết hạn…); tham số
+      tùy chọn `timing { dueOn?, notBefore? }` (mốc không-trước, ân hạn do MF-5 truyền) và `notice { holder: true }` (báo
+      người giữ `REVOCATION_UPCOMING`, một lần theo `(source, referenceId)`); không truyền ⟹ hành vi như cũ.
+    - `withdrawRevocationReason` — nguồn gỡ lý do của chính mình: còn lý do khác ⟹ `CONTINUES`; hết lý do ⟹ tác vụ
+      `CANCELLED` (`NO_LONGER_APPLIES`, ghế không đổi), riêng tác vụ `IN_PROGRESS` chỉ hủy khi
+      `cancelInProgressClaimedBy` đúng người nhận, ngược lại `IT_ADMIN_TO_CLOSE`; gọi lại ⟹ `NOT_FOUND`/`ALREADY_ENDED`.
     - `lockGrantOfRequest`, `completedGrantOfRequest`, `cancelGrantOfRequest` — task grant của một request;
       `recordProvisioningFailure` — ghi lần thử connector lỗi (US-07-04).
     - `listPersonalSeatsOf`, `countPersonalSeatsOf`, `getSeatsHeldInPlans`, `listTerminatingAccess`,
@@ -55,7 +60,8 @@ dashboards; gốc `src/app/app.module.ts`.
 - Mở `GrantRequestGateHook` (`licensing.grant-request-gate`, Hook) — requests
   `access-request/grant/access-request-grant.listener.ts`.
 - Mở `RevocationListeners` (`licensing.revocation`, Listeners) — licensing `handover/handover-revocation.listener.ts`,
-  requests `return-request/return-revocation.listener.ts`.
+  requests `return-request/return-revocation.listener.ts`. Moment: `OPENED`, `BEFORE_WORK`, `AFTER_WORK`, `CLOSED_FAILED`,
+  `REASON_WITHDRAWN { task, withdrawn, remaining, cancelled }` (bàn giao tính lại duty từ `remaining`; return bỏ qua).
 - Mở `RenewalHoldHook` (`licensing.renewal-hold`, Hook) — requests `renewal-request/renewal-hold.listener.ts`.
 - Mở `ResponsibleDeadlineHook` (`licensing.responsible-deadline`, Hook) — personnel
   `service-account/personnel-file-deadlines.listener.ts`.
@@ -134,6 +140,12 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   chồng thời gian trên cùng subscription/plan (`license_assignments_personal_no_overlap`, INV-02).
 - Thu hồi chỉ mở qua `openRevocation`, trong transaction của nguồn; ghế được trả khi task hoàn tất; gọi lại cùng nguồn
   và reference không đổi gì.
+- Mốc thu hồi (`BR-MF5-04`): mỗi lý do giữ `due_on`/`not_before` của nơi gọi; tác vụ giữ mốc suy ra từ các lý do còn hiệu
+  lực — **lý do không mốc thắng ân hạn** (một lý do không `not_before` ⟹ tác vụ không mốc, R-J08), ngược lại `MIN`.
+  `claim` và `revocation-completion` trước `not_before` ⟹ 409 `PROVISIONING_TASK.NOT_BEFORE` (`details.notBefore`).
+- **Lý do đã gỡ không được đọc ở đâu** (chỉ `listAllOf` cho lịch sử trên thẻ tác vụ): `find`, `listOf`, `countOf`,
+  `listRevocationsOpenedFor`, `listPersonalSeatsOf` (đang thu hồi), bàn giao đều lọc `withdrawn_at IS NULL`; index
+  duy nhất lý do là partial `WHERE withdrawn_at IS NULL` nên mở lại cùng `(source, reference)` trên cùng tác vụ được.
 - Thứ tự khóa: task grant trước request (`lockGrantOfRequest`); đích ghế subscription `FOR UPDATE`, plan nội bộ
   `FOR SHARE`; `createBaselineAssignments` giữ baseline state `FOR SHARE` nên việc đóng baseline phải chờ. Đóng
   baseline là vĩnh viễn (không route mở lại); sau đó assignment chỉ đến từ request.

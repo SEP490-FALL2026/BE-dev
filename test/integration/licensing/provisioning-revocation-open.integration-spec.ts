@@ -281,6 +281,185 @@ describe('opening the revocation of a seat, the one gate of every source (integr
     });
   });
 
+  describe('BR-MF5-04: the timing and the notice a source may ask for', () => {
+    const holderOf = async (assignmentId: string): Promise<string> => {
+      const found = (await h.assignmentsOf({ subscriptionId: k2 })).find(
+        (assignment) => assignment.id === assignmentId,
+      );
+      if (!found) throw new Error('no holder');
+
+      return found.employeeId;
+    };
+
+    it('mốc gộp: a reason with a day not before gives it to the task, one with none takes it away, withdrawing that one gives it back', async () => {
+      const assignmentId = await h.seat({ subscriptionId: k2 }, code());
+      const notBefore = h.inDays(7);
+      const ghost = randomUUID();
+
+      const { taskId } = await h.open(assignmentId, 'GHOST_SEAT', {
+        decision: { referenceKind: 'REVIEW', referenceId: ghost },
+        timing: { notBefore, dueOn: h.inDays(20) },
+      });
+      expect(await h.timingOf(taskId)).toEqual({ not_before: notBefore, due_on: h.inDays(20) });
+
+      await h.open(assignmentId, 'TIME_LIMITED_EXPIRY');
+      expect(await h.timingOf(taskId)).toEqual({ not_before: null, due_on: h.inDays(20) });
+
+      expect(await h.withdraw(assignmentId, 'TIME_LIMITED_EXPIRY', null)).toMatchObject({ outcome: 'CONTINUES' });
+      expect(await h.timingOf(taskId)).toEqual({ not_before: notBefore, due_on: h.inDays(20) });
+    });
+
+    it('R-J08 đè mốc: a sudden departure on a seat in its grace leaves no day not before, so the seat can be taken at once', async () => {
+      const assignmentId = await h.seat({ subscriptionId: k2 }, code());
+      const { taskId } = await h.open(assignmentId, 'GHOST_SEAT', {
+        decision: { referenceKind: 'REVIEW', referenceId: randomUUID() },
+        timing: { notBefore: h.inDays(7) },
+      });
+      expect(h.codeOf(await h.claim(taskId).expect(409))).toBe('PROVISIONING_TASK.NOT_BEFORE');
+
+      await h.open(assignmentId, 'ABRUPT_DEPARTURE');
+
+      expect((await h.timingOf(taskId)).not_before).toBeNull();
+      await h.claim(taskId).expect(200);
+    });
+
+    it('US-10-07 AC-18: a seat in its grace is not taken before the day, with the day in the answer and nothing changed; it is on the day', async () => {
+      const grace = await h.seat({ subscriptionId: k2 }, code());
+      const due = await h.seat({ subscriptionId: k2 }, code());
+      const notBefore = h.inDays(3);
+      const waiting = (
+        await h.open(grace, 'GHOST_SEAT', {
+          timing: { notBefore },
+          decision: { referenceId: randomUUID(), referenceKind: 'REVIEW' },
+        })
+      ).taskId;
+      const today = (
+        await h.open(due, 'GHOST_SEAT', {
+          timing: { notBefore: h.today() },
+          decision: { referenceId: randomUUID(), referenceKind: 'REVIEW' },
+        })
+      ).taskId;
+      const events = (await h.auditEvents('ProvisioningTask', waiting)).length;
+
+      const refused = await h.claim(waiting).expect(409);
+
+      expect(h.codeOf(refused)).toBe('PROVISIONING_TASK.NOT_BEFORE');
+      expect(h.detailsOf(refused)).toMatchObject({ notBefore });
+      expect(await h.revocationOf(waiting)).toMatchObject({ status: 'QUEUED', claimedBy: null });
+      expect((await h.auditEvents('ProvisioningTask', waiting)).length).toBe(events);
+      await h.claim(today).expect(200);
+      expect(await h.revocationOf(today)).toMatchObject({ status: 'IN_PROGRESS' });
+    });
+
+    it('US-10-07 AC-18 hoàn tất: a task in progress whose day not before moved back (a reason with none was withdrawn) is not completed before it', async () => {
+      const assignmentId = await h.seat({ subscriptionId: k2 }, code());
+      const notBefore = h.inDays(5);
+      const { taskId } = await h.open(assignmentId, 'GHOST_SEAT', {
+        timing: { notBefore },
+        decision: { referenceId: randomUUID(), referenceKind: 'REVIEW' },
+      });
+      await h.open(assignmentId, 'ABRUPT_DEPARTURE');
+      await h.claim(taskId).expect(200);
+      await h.withdraw(assignmentId, 'ABRUPT_DEPARTURE', null);
+
+      const refused = await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa' }).expect(409);
+
+      expect(h.codeOf(refused)).toBe('PROVISIONING_TASK.NOT_BEFORE');
+      expect(h.detailsOf(refused)).toMatchObject({ notBefore });
+      expect(await h.revocationOf(taskId)).toMatchObject({ status: 'IN_PROGRESS' });
+      expect(await h.assignmentRow(assignmentId)).toMatchObject({ valid_until: null });
+    });
+
+    it('R-J08: every other source gives no timing: no day not before, taken at once, nobody told', async () => {
+      for (const source of [
+        'RETURN',
+        'ABRUPT_DEPARTURE',
+        'TIME_LIMITED_EXPIRY',
+        'TRANSFER_REVIEW',
+        'SUBSCRIPTION_REDUCTION',
+      ]) {
+        const assignmentId = await h.seat({ subscriptionId: k2 }, code());
+        const holder = await holderOf(assignmentId);
+
+        const { taskId } = await h.open(assignmentId, source);
+
+        expect(await h.timingOf(taskId)).toEqual({ not_before: null, due_on: null });
+        expect(await h.noticesOf(holder, 'REVOCATION_UPCOMING')).toHaveLength(0);
+        await h.claim(taskId).expect(200);
+      }
+    });
+
+    it('input sai: a day not before after the due day is refused and writes nothing', async () => {
+      const assignmentId = await h.seat({ subscriptionId: k2 }, code());
+      const before = { tasks: await tasks(), reasons: await h.count('provisioning_task_reasons') };
+
+      expect(
+        await refusal(h.open(assignmentId, 'GHOST_SEAT', { timing: { notBefore: h.inDays(9), dueOn: h.inDays(2) } })),
+      ).toBe('RevocationInputError');
+
+      expect({ tasks: await tasks(), reasons: await h.count('provisioning_task_reasons') }).toEqual(before);
+    });
+
+    it('AC-2 US-10-06: the holder is told once that the revocation is coming, with the day; asking again tells nothing more', async () => {
+      const assignmentId = await h.seat({ subscriptionId: k2 }, code());
+      const holder = await holderOf(assignmentId);
+      const referenceId = randomUUID();
+      const notBefore = h.inDays(7);
+      const options = {
+        decision: { referenceKind: 'REVIEW', referenceId },
+        timing: { notBefore },
+        notice: { holder: true } as const,
+      };
+
+      const { taskId } = await h.open(assignmentId, 'GHOST_SEAT', options);
+      await h.open(assignmentId, 'GHOST_SEAT', options);
+      // Decided again after the first decision was taken back (another reason keeps the task): the same reference is told once.
+      await h.open(assignmentId, 'TIME_LIMITED_EXPIRY');
+      await h.withdraw(assignmentId, 'GHOST_SEAT', referenceId);
+      await h.open(assignmentId, 'GHOST_SEAT', options);
+
+      const notices = await h.noticesOf(holder, 'REVOCATION_UPCOMING');
+      expect(notices).toHaveLength(1);
+      expect(notices[0].params).toMatchObject({ taskId, source: 'GHOST_SEAT', notBefore });
+    });
+
+    it('does not tell the holder of a seat when the source did not ask, even with a day not before', async () => {
+      const assignmentId = await h.seat({ subscriptionId: k2 }, code());
+      const holder = await holderOf(assignmentId);
+
+      await h.open(assignmentId, 'GHOST_SEAT', { timing: { notBefore: h.inDays(7) } });
+
+      expect(await h.noticesOf(holder, 'REVOCATION_UPCOMING')).toHaveLength(0);
+    });
+
+    it('đọc: the card says the day not before, the due day and whether the task may be taken; the list filters on it', async () => {
+      const assignmentId = await h.seat({ subscriptionId: k2 }, code());
+      const { taskId } = await h.open(assignmentId, 'GHOST_SEAT', {
+        timing: { notBefore: h.inDays(4), dueOn: h.inDays(10) },
+        decision: { referenceId: randomUUID(), referenceKind: 'REVIEW' },
+      });
+      const plain = (await h.open(await h.seat({ subscriptionId: k2 }, code()), 'RETURN')).taskId;
+
+      expect(await h.revocationOf(taskId)).toMatchObject({
+        notBefore: h.inDays(4),
+        dueOn: h.inDays(10),
+        claimableNow: false,
+        revocation: { withdrawnReasonCount: 0, lastWithdrawnAt: null },
+      });
+      expect(await h.revocationOf(plain)).toMatchObject({ notBefore: null, dueOn: null, claimableNow: true });
+      const idsOf = async (query: Record<string, string | number>) =>
+        h
+          .dataOf<{ items: { id: string }[] }>(await h.list({ pageSize: 100, ...query }).expect(200))
+          .items.map((item) => item.id);
+      const claimable = await idsOf({ claimableNow: 'true' });
+      const waiting = await idsOf({ claimableNow: 'false' });
+      expect(claimable).toContain(plain);
+      expect(claimable).not.toContain(taskId);
+      expect(waiting).toContain(taskId);
+      expect(waiting).not.toContain(plain);
+    });
+  });
+
   describe('an IT Admin who is the person revoked (QĐ-77m, US-01-05 AC-12)', () => {
     let own: ApiAccount;
     let ownSeat: string;

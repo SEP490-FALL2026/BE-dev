@@ -81,13 +81,13 @@ flowchart BT
   installation -->|2| finance
   installation -->|11| identity_access
   installation -->|8| organization
-  licensing -->|29| audit
+  licensing -->|30| audit
   licensing -->|50| catalog
   licensing -->|2| finance
   licensing -->|8| identity_access
-  licensing -->|6| notifications
+  licensing -->|7| notifications
   licensing -->|6| operating_parameters
-  licensing -->|53| organization
+  licensing -->|54| organization
   onboarding -->|2| catalog
   onboarding -->|2| data_import
   onboarding -->|2| identity_access

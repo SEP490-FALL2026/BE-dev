@@ -122,6 +122,9 @@ export const IN_APP_NOTIFICATION_CODES = [
   'LEAVER_K1_ACCESS_RUNS_ON',
   // A seat still held by a person who left (`G2`, `US-10-01` AC-2): told once to the IT Admin in charge.
   'GHOST_SEAT_G2_DETECTED',
+  // The revocation of a seat that is coming, told to the person who holds it, and one that no longer applies (`BR-MF5-04`, `US-10-06` AC-2).
+  'REVOCATION_UPCOMING',
+  'REVOCATION_CANCELLED',
   // The renewal of a subscription (EP-11): the milestones, the quality of the contract data, the case and its deadline.
   'SUBSCRIPTION_RENEWAL_ALERT',
   'SUBSCRIPTION_RENEWAL_DATA_QUALITY',

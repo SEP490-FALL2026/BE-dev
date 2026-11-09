@@ -12,7 +12,12 @@ import type {
   OpenHandoverDutiesInput,
   ReconcileHandoverInput,
 } from '../public/licensing-handover.types';
-import type { RevocationContext, RevocationReasonFacts, RevocationTaskFacts } from '../public/licensing.types';
+import {
+  NO_LONGER_APPLIES,
+  type RevocationContext,
+  type RevocationReasonFacts,
+  type RevocationTaskFacts,
+} from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { RevocationViewService } from '../provisioning/revocation-view.service';
 import { isOverdue, requirementOf } from './handover-confirmer.policy';
@@ -141,6 +146,49 @@ export class HandoverService {
       resolveOn: leaverIsHead ? addDays(today, 1) : null,
       dueOn: context.dueOn ?? (await this.facts.dueFor(required.source, today)),
     });
+  }
+
+  /**
+   * The hook of the revocation: a source took one of its reasons back (`BR-MF5-04`, DA6-28). The duty waiting for the seat is looked at again
+   * from the reasons that still stand: it goes when none stands or when it was owed to a role only the withdrawn reason asked for (a ghost
+   * seat is confirmed by the head who decided it; the expiry that stays asks the IT Admin), and what the remaining reasons owe is opened as
+   * for any reason (a confirmation already written that answers it is relied on, `QĐ-64a`).
+   */
+  async reconcileWithdrawn(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    task: RevocationTaskFacts,
+    remaining: readonly RevocationReasonFacts[],
+    cancelled: boolean,
+    now: Date,
+  ): Promise<void> {
+    const open = await this.repo.lockOpenOf(tx, task.assignmentId);
+    if (open) {
+      const [plan] = await this.catalog.getPlanRevocationInfo([task.planId], tx);
+      if (!plan) throw new SeatTargetNotFoundError('PLAN');
+      const asked = remaining
+        .filter((reason) => reason.referenceKind !== RETURN_RECORD)
+        .map((reason) => ({ source: reason.source, decidedByEmployeeId: reason.decidedByEmployeeId }));
+      const required = cancelled
+        ? null
+        : requirementOf(asked, plan.dataLossOnRemoval, { departmentId: open.departmentId });
+      if (!required || required.role !== open.confirmerRole || required.fixedEmployeeId !== open.confirmerEmployeeId) {
+        await this.repo.cancel(tx, open.id, NO_LONGER_APPLIES, now);
+        await this.audit.record(
+          tx,
+          licensingAuditEvent(
+            actor,
+            open.organizationId,
+            'HANDOVER_DUTY.CANCELLED',
+            'HandoverDuty',
+            open.id,
+            { dueOn: open.dueOn },
+            { assignmentId: open.assignmentId, revocationTaskId: task.id, reason: NO_LONGER_APPLIES },
+          ),
+        );
+      }
+    }
+    if (!cancelled && remaining.length > 0) await this.openFromTask(tx, actor, task, remaining, {}, now);
   }
 
   /** The deadline of the case moved: the duties still waiting get the new one, and the reminder starts over (`US-03-04` AC-14). */

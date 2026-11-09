@@ -30449,6 +30449,12 @@
             "schema": { "default": "ALL", "type": "string", "enum": ["ALL", "MINE", "GENERAL"] }
           },
           {
+            "name": "claimableNow",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -30469,7 +30475,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The tasks of both channels in one queue, the oldest first, each with the time it has taken. scope MINE is the IT Admin in charge by default, GENERAL the tasks nobody in charge works, ALL every task.",
+            "description": "The tasks of both channels in one queue, the oldest first, each with the time it has taken. scope MINE is the IT Admin in charge by default, GENERAL the tasks nobody in charge works, ALL every task. A revocation says the day it may not be done before (notBefore), its due day (dueOn) and whether it may be taken today (claimableNow); claimableNow=true lists only what may be taken today, false only the revocations still in their grace.",
             "content": {
               "application/json": {
                 "schema": {
@@ -30896,7 +30902,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed) or PROVISIONING.BENEFICIARY_DEPARTED (close the request as cancelled).",
+            "description": "PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken) or PROVISIONING.BENEFICIARY_DEPARTED (close the request as cancelled).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -30908,6 +30914,18 @@
                       "error": {
                         "code": "PROVISIONING_TASK.NOT_CLAIMABLE",
                         "message": "The task is not in a state that allows this: NOT_CLAIMABLE.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING_TASK.NOT_BEFORE": {
+                    "summary": "The revocation cannot be done before 2026-11-08.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING_TASK.NOT_BEFORE",
+                        "message": "The revocation cannot be done before 2026-11-08.",
+                        "details": { "notBefore": "2026-11-08" },
                         "requestId": "req_example"
                       }
                     }
@@ -32397,7 +32415,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The only decision left on the failed task of a request its requester withdrew: the task ends as cancelled and never as failed, its assignment becomes a cancelled one so the seat is free again, the request ends as withdrawn and what was held for it goes back to the budget.",
+            "description": "The only decision left on the failed task of a request its requester withdrew: the task ends as cancelled and never as failed, its assignment becomes a cancelled one so the seat is free again, the request ends as withdrawn and what was held for it goes back to the budget. A revocation that is in progress or failed and that no reason asks for any more (the source took its reason back) ends as cancelled (NO_LONGER_APPLIES) and its seat stays as it was.",
             "content": {
               "application/json": {
                 "schema": {
@@ -32495,7 +32513,7 @@
             }
           },
           "409": {
-            "description": "The task is not failed (PROVISIONING_TASK.NOT_FAILED), or its request was not withdrawn (PROVISIONING_TASK.NO_WITHDRAWAL): nothing changes.",
+            "description": "The task is not failed (PROVISIONING_TASK.NOT_FAILED; a revocation: not in progress or failed), or nothing was withdrawn (PROVISIONING_TASK.NO_WITHDRAWAL: its request was not withdrawn, or a reason still asks for the revocation): nothing changes.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -32603,7 +32621,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Close the failed task of a withdrawn request as cancelled",
+        "summary": "Close the failed task of a withdrawn request, or a revocation no reason asks for, as cancelled",
         "tags": ["provisioning-tasks"]
       }
     },
@@ -32740,7 +32758,7 @@
             }
           },
           "409": {
-            "description": "The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), is not in progress or is completed already (NOT_IN_PROGRESS), is not for a person (NOT_MANUAL), or the assignment is no longer open (LICENSE_ASSIGNMENT.NOT_OPEN): nothing changes.",
+            "description": "The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), is not in progress or is completed already (NOT_IN_PROGRESS), is not for a person (NOT_MANUAL), is still in its grace (NOT_BEFORE, details.notBefore: the first day it can be completed), or the assignment is no longer open (LICENSE_ASSIGNMENT.NOT_OPEN): nothing changes.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -32763,6 +32781,18 @@
                       "error": {
                         "code": "PROVISIONING_TASK.NOT_IN_PROGRESS",
                         "message": "The task is not in a state that allows this: NOT_IN_PROGRESS.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING_TASK.NOT_BEFORE": {
+                    "summary": "The revocation cannot be done before 2026-11-08.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING_TASK.NOT_BEFORE",
+                        "message": "The revocation cannot be done before 2026-11-08.",
+                        "details": { "notBefore": "2026-11-08" },
                         "requestId": "req_example"
                       }
                     }
@@ -89834,6 +89864,19 @@
                   "accountIdentifier": { "type": "string" },
                   "defaultResponsibleEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
                   "inGeneralQueue": { "type": "boolean" },
+                  "dueOn": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "notBefore": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "claimableNow": { "type": "boolean" },
                   "createdAt": { "type": "string", "format": "date-time" },
                   "claimedBy": { "type": "string", "format": "uuid", "nullable": true },
                   "claimedAt": { "type": "string", "format": "date-time", "nullable": true },
@@ -89926,7 +89969,9 @@
                         ],
                         "additionalProperties": false,
                         "nullable": true
-                      }
+                      },
+                      "withdrawnReasonCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "lastWithdrawnAt": { "type": "string", "format": "date-time", "nullable": true }
                     },
                     "required": [
                       "source",
@@ -89939,7 +89984,9 @@
                       "completionNote",
                       "accessCutOn",
                       "accessEvidence",
-                      "firstReason"
+                      "firstReason",
+                      "withdrawnReasonCount",
+                      "lastWithdrawnAt"
                     ],
                     "additionalProperties": false,
                     "nullable": true
@@ -90019,6 +90066,9 @@
                   "accountIdentifier",
                   "defaultResponsibleEmployeeId",
                   "inGeneralQueue",
+                  "dueOn",
+                  "notBefore",
+                  "claimableNow",
                   "createdAt",
                   "claimedBy",
                   "claimedAt",
@@ -90043,7 +90093,8 @@
                   "handedOffAt",
                   "handOffEvidence",
                   "closedBy",
-                  "closeReason"
+                  "closeReason",
+                  "poolGrantAvoidedCosts"
                 ],
                 "additionalProperties": false
               },
@@ -90115,6 +90166,19 @@
                     "accountIdentifier": { "type": "string" },
                     "defaultResponsibleEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
                     "inGeneralQueue": { "type": "boolean" },
+                    "dueOn": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD.",
+                      "nullable": true
+                    },
+                    "notBefore": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD.",
+                      "nullable": true
+                    },
+                    "claimableNow": { "type": "boolean" },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "claimedBy": { "type": "string", "format": "uuid", "nullable": true },
                     "claimedAt": { "type": "string", "format": "date-time", "nullable": true },
@@ -90215,6 +90279,9 @@
                     "accountIdentifier",
                     "defaultResponsibleEmployeeId",
                     "inGeneralQueue",
+                    "dueOn",
+                    "notBefore",
+                    "claimableNow",
                     "createdAt",
                     "claimedBy",
                     "claimedAt",
@@ -90313,6 +90380,19 @@
                   "accountIdentifier": { "type": "string" },
                   "defaultResponsibleEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
                   "inGeneralQueue": { "type": "boolean" },
+                  "dueOn": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "notBefore": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "claimableNow": { "type": "boolean" },
                   "createdAt": { "type": "string", "format": "date-time" },
                   "claimedBy": { "type": "string", "format": "uuid", "nullable": true },
                   "claimedAt": { "type": "string", "format": "date-time", "nullable": true },
@@ -90405,7 +90485,9 @@
                         ],
                         "additionalProperties": false,
                         "nullable": true
-                      }
+                      },
+                      "withdrawnReasonCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "lastWithdrawnAt": { "type": "string", "format": "date-time", "nullable": true }
                     },
                     "required": [
                       "source",
@@ -90418,7 +90500,9 @@
                       "completionNote",
                       "accessCutOn",
                       "accessEvidence",
-                      "firstReason"
+                      "firstReason",
+                      "withdrawnReasonCount",
+                      "lastWithdrawnAt"
                     ],
                     "additionalProperties": false,
                     "nullable": true
@@ -90498,6 +90582,9 @@
                   "accountIdentifier",
                   "defaultResponsibleEmployeeId",
                   "inGeneralQueue",
+                  "dueOn",
+                  "notBefore",
+                  "claimableNow",
                   "createdAt",
                   "claimedBy",
                   "claimedAt",
@@ -90522,7 +90609,8 @@
                   "handedOffAt",
                   "handOffEvidence",
                   "closedBy",
-                  "closeReason"
+                  "closeReason",
+                  "poolGrantAvoidedCosts"
                 ],
                 "additionalProperties": false
               }
