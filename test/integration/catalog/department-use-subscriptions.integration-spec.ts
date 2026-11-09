@@ -69,6 +69,7 @@ describe('what keeps a department in use: its subscriptions and purchases (integ
           purchasedQuantity: 3,
           unitPrice: { amount: '5000000', currency: 'VND' },
           startDate: '2026-01-05',
+          responsibleItAdminEmployeeId: h.it1.employeeId,
         })
         .expect(201),
     ).id;

@@ -71,6 +71,8 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
             name: 'Thiết kế',
             function: 'thiết kế sản phẩm',
             itAdminEmployeeId: h.it1.employeeId,
+            // No budget cycle yet: the department takes effect today (the installation path of QĐ-104e(3)).
+            effectiveFrom: today(),
           },
         },
       ]);

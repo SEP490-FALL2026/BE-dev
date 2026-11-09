@@ -2,11 +2,15 @@ import type { BusinessDate } from '../../../core/business-date';
 
 export type SubscriptionKind = 'TERM' | 'PERPETUAL';
 export type SubscriptionStatus = 'DRAFT' | 'ACTIVE';
+/** What the database can hold; a new write takes only `MONTHLY` and `ANNUAL` (`SUBSCRIPTION.BILLING_CYCLE_UNSUPPORTED`). */
 export type BillingCycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+export type DeclarableBillingCycle = 'MONTHLY' | 'ANNUAL';
 export type PriceRateSource = 'MANUAL' | 'SAME_CURRENCY';
 export type NoticeSource = 'DECLARED' | 'INFERRED_UNCONFIRMED' | 'BY_END_DATE' | 'MISSING' | 'NOT_APPLICABLE';
+/** The months a purchase commits to (`QĐ-103e`): a month or a year. */
+export type CommitmentTermMonths = 1 | 12;
 export type MissingItem = 'QUANTITY' | 'START_DATE' | 'BILLING_CYCLE' | 'UNIT_PRICE' | 'EXCHANGE_RATE';
-export type SubscriptionWarning = 'NO_ALERT_ANCHOR';
+export type SubscriptionWarning = 'NO_ALERT_ANCHOR' | 'RESPONSIBLE_MISSING' | 'BILLING_CYCLE_LEGACY' | 'SHOULD_MERGE';
 export type PlanPricingModel = 'PER_SEAT' | 'FLAT_RATE' | 'CONCURRENT' | 'CONSUMPTION' | 'PER_HOST';
 export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
 export type ProvisioningType = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
@@ -32,8 +36,8 @@ export interface SubscriptionRecord {
   planId: string;
   planName: string;
   planPricingModel: PlanPricingModel | null;
-  /** The department that owns the purchase: always set, and never changed (`QĐ-89a`). */
-  ownerDepartmentId: string;
+  /** The department that owns the purchase; **Gói 9: nullable — kho dùng chung không gắn với phòng** (`QĐ-103d`). */
+  ownerDepartmentId: string | null;
   applicationId: string;
   applicationName: string;
   applicationKind: ApplicationKind;
@@ -44,6 +48,7 @@ export interface SubscriptionRecord {
   unitPrice: UnitPriceRecord | null;
   priceSnapshot: PriceSnapshotRecord | null;
   billingCycle: BillingCycle | null;
+  commitmentTermMonths: CommitmentTermMonths | null;
   startDate: BusinessDate | null;
   endDate: BusinessDate | null;
   renewalDate: BusinessDate | null;
@@ -51,6 +56,12 @@ export interface SubscriptionRecord {
   noticePeriodDays: number | null;
   autoRenew: boolean;
   allowsMidTermReduction: boolean;
+  /** The IT Admin who answers for the subscription (`QĐ-103v`(4)); null for data older than the rule. */
+  responsibleItAdminEmployeeId: string | null;
+  /** The least number of seats the vendor sells, when it says one (`QĐ-103e`). */
+  vendorMinimumSeats: number | null;
+  /** The subscription that prices its plan when there are several of it; at most one per plan. */
+  isPrimaryForPlan: boolean;
   /** The period this one continues (`QĐ-16`); null for a first period. */
   renewedFromId: string | null;
   createdAt: Date;
@@ -60,14 +71,15 @@ export interface SubscriptionRecord {
 export interface NewSubscription {
   organizationId: string;
   planId: string;
-  /** Required in the type: the one writer of `subscriptions` never stores a subscription without its owner. */
-  ownerDepartmentId: string;
+  /** Gói 9: nullable — kho dùng chung không gắn với phòng; khi tạo BE tự chọn */
+  ownerDepartmentId: string | null;
   kind: SubscriptionKind;
   status: SubscriptionStatus;
   purchasedQuantity: number | null;
   unitPrice: UnitPriceRecord | null;
   priceSnapshot: PriceSnapshotRecord | null;
   billingCycle: BillingCycle | null;
+  commitmentTermMonths: CommitmentTermMonths | null;
   startDate: BusinessDate | null;
   endDate: BusinessDate | null;
   renewalDate: BusinessDate | null;
@@ -75,6 +87,9 @@ export interface NewSubscription {
   noticePeriodDays: number | null;
   autoRenew: boolean;
   allowsMidTermReduction: boolean;
+  responsibleItAdminEmployeeId: string | null;
+  vendorMinimumSeats: number | null;
+  isPrimaryForPlan: boolean;
   /** Only the period a renewal records names the one it continues; set at insert and never changed. */
   renewedFromId?: string | null;
 }
@@ -111,7 +126,7 @@ export interface SubscriptionView {
   id: string;
   planId: string;
   planName: string;
-  ownerDepartmentId: string;
+  ownerDepartmentId: string | null; // Gói 9: nullable kho dùng chung
   applicationId: string;
   applicationName: string;
   vendor: { id: string; name: string };
@@ -131,15 +146,21 @@ export interface SubscriptionView {
     exchangeRateId: string | null;
   } | null;
   billingCycle: BillingCycle | null;
+  commitmentTermMonths: CommitmentTermMonths | null;
   startDate: BusinessDate | null;
   endDate: BusinessDate | null;
   renewalDate: BusinessDate | null;
   noticePeriodDays: number | null;
   autoRenew: boolean;
   allowsMidTermReduction: boolean;
+  responsibleItAdminEmployeeId: string | null;
+  vendorMinimumSeats: number | null;
+  isPrimaryForPlan: boolean;
   noticeDeadline: { value: BusinessDate | null; source: NoticeSource };
   alerts: { baseDate: BusinessDate | null; dates: BusinessDate[] };
   warnings: SubscriptionWarning[];
+  /** The other live subscriptions of the same K2 or K4 plan: set with the warning `SHOULD_MERGE`, empty otherwise (`QĐ-104k`(3)). */
+  mergeCandidateIds: string[];
   taxProfile: { status: 'DECLARED' | 'MISSING'; group: 'T1' | 'T2' | 'T3' | null };
   taxEstimate: TaxEstimateSummary | null;
   createdAt: Date;

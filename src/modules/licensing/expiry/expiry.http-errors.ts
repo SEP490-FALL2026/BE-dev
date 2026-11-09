@@ -43,5 +43,5 @@ export const EXPIRY_ERROR_EXAMPLES = {
   RENEWAL_PENDING: example(new ExpiryError('RENEWAL_PENDING')),
   SCOPE_FORBIDDEN: example(new ExpiryError('SCOPE_FORBIDDEN')),
   ANOTHER_IT_ADMIN_NEEDED: example(new ProvisioningAnotherItAdminNeededError()),
-  REVOCATION_TYPE_NOT_SUPPORTED: example(new RevocationRefusedError('TYPE_NOT_SUPPORTED', 'K4')),
+  REVOCATION_TYPE_NOT_SUPPORTED: example(new RevocationRefusedError('TYPE_NOT_SUPPORTED', 'K3')),
 } as const;

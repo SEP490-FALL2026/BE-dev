@@ -1,4 +1,3 @@
-import { checkTerm, termLimitOf, type TermLimit } from '../../../core/term-limit';
 import type { HeldAccess } from './access-request.types';
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
@@ -15,19 +14,16 @@ import {
 } from './access-request.errors';
 import { hasSpendStep, policyFor, proposalPolicy, type RequestPolicy } from './access-request.policy';
 import type { PricingRecord } from './access-request.types';
-import { priceRequest } from './pricing.policy';
+import { maxEndDateOf, pricingRecordFor, type RequestPriceInput } from './pricing.policy';
 import { RoutingFactsService, type GatheredRouting } from './routing-facts.service';
-import { routeNeedStep, type RoutingDecision } from './routing.policy';
+import { routeNeedStep, requestRoutingOf, type RoutingDecision } from './routing.policy';
 
 /** The parameter that says how long an approval step may wait; read when a request is sent and fixed in its policy. */
 const APPROVAL_SLA_PARAMETER = 'APPROVAL_SLA_WORKING_DAYS';
-/** The month the fiscal year begins in: it gives the budget year of the day the money is expected to go out. */
-const FISCAL_YEAR_PARAMETER = 'FISCAL_YEAR_START_MONTH';
 
 /** The operating parameters a request is judged by, read once before the transaction opens. */
 export interface RequestSettings {
   slaWorkingDays: number;
-  fiscalYearStartMonth: number;
 }
 
 /**
@@ -50,9 +46,10 @@ export interface Assessment {
   pricing: PricingRecord;
   routing: GatheredRouting & { decision: RoutingDecision };
   heldAccess: HeldAccess | null;
-  /** What term the plan takes on the day (`US-05-01` AC-4) and whether the term asked for breaks it. */
-  termLimit: TermLimit;
-  termBeyondLimit: boolean;
+  /** The last day a right asked for may end, and whether the end date asked for breaks it or is missing (`FR-2.8`, `US-05-23` AC-9). */
+  maxEndDate: BusinessDate;
+  endDateOutOfRange: boolean;
+  termRequired: boolean;
 }
 
 /** What a proposal of software that is not in the catalog is judged by: there is no plan, so no price or seat. */
@@ -64,6 +61,10 @@ export interface ProposalAssessment {
   /** Missing until the IT Admin records a quote (`US-05-06` AC-11): the request is not yet priced. */
   pricing: PricingRecord;
   routing: GatheredRouting & { decision: RoutingDecision };
+  /** The last day the right asked for may end, and whether the end date asked for breaks it or is missing (`FR-2.8`, `US-05-23` AC-9). */
+  maxEndDate: BusinessDate;
+  endDateOutOfRange: boolean;
+  termRequired: boolean;
 }
 
 export interface AssessmentInput {
@@ -72,8 +73,10 @@ export interface AssessmentInput {
   /** Who sends it, when it is not the person it is for (`US-03-02`); the need step is routed from them. */
   requesterEmployeeId?: string;
   planId: string;
-  termMonths: number;
-  expectedSpendOn?: BusinessDate;
+  /** The day the right ends, as the sender chose it; null or absent for a right with no end (`QĐ-104a`). */
+  expectedEndDate?: BusinessDate | null;
+  /** The day the new period begins for a request to go on using, when it is not today (`QĐ-109b`). */
+  pricingFrom?: BusinessDate;
   now: Date;
   settings: RequestSettings;
   /** Sending locks the department of the sender against change until commit; showing a preview locks nothing. */
@@ -105,7 +108,6 @@ export class RequestFactsService {
   async settings(): Promise<RequestSettings> {
     return {
       slaWorkingDays: Number(await this.parameters.getValue(APPROVAL_SLA_PARAMETER)),
-      fiscalYearStartMonth: Number(await this.parameters.getValue(FISCAL_YEAR_PARAMETER)),
     };
   }
 
@@ -133,14 +135,13 @@ export class RequestFactsService {
 
     const pricing = await this.priceFor(tx, {
       planId: input.planId,
-      departmentId: unit.departmentId,
       free: policy.branch === 'INTERNAL_FREE',
-      termMonths: input.termMonths,
       beneficiaries: 1,
-      expectedSpendOn: input.expectedSpendOn,
-      today,
-      fiscalYearStartMonth: input.settings.fiscalYearStartMonth,
+      checkDate: today,
+      endDate: input.expectedEndDate ?? null,
+      from: input.pricingFrom,
     });
+    const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
     const gathered = await this.routing.gather(tx, {
       requesterEmployeeId: input.requesterEmployeeId ?? input.employeeId,
       departmentId: unit.departmentId,
@@ -152,18 +153,19 @@ export class RequestFactsService {
       today,
       unit,
       target,
-      policy,
+      policy: policyFor(
+        target.applicationKind,
+        input.settings.slaWorkingDays,
+        requestRoutingOf(routeNeedStep(gathered.facts)),
+      ),
       pricing,
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
       heldAccess: await this.heldAccess(input.employeeId, input.planId),
-      ...(await this.termCheck(tx, {
-        planId: input.planId,
-        departmentId: unit.departmentId,
-        free: policy.branch === 'INTERNAL_FREE',
-        termMonths: input.termMonths,
+      ...this.termCheck({
         today,
-        fiscalYearStartMonth: input.settings.fiscalYearStartMonth,
-      })),
+        expectedEndDate: input.expectedEndDate,
+        employmentType: employee?.employmentType ?? 'STAFF',
+      }),
     };
   }
 
@@ -174,7 +176,7 @@ export class RequestFactsService {
    */
   async assessProposal(
     tx: DbTx,
-    input: Pick<AssessmentInput, 'employeeId' | 'expectedSpendOn' | 'now' | 'settings' | 'lockDepartment'>,
+    input: Pick<AssessmentInput, 'employeeId' | 'expectedEndDate' | 'now' | 'settings' | 'lockDepartment'>,
   ): Promise<ProposalAssessment> {
     const today = await this.organizationReads.businessToday(input.now, tx);
     const found = (await this.organizationReads.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
@@ -183,7 +185,7 @@ export class RequestFactsService {
     if (input.lockDepartment) await this.organizationReads.lockDepartmentShared(tx, unit.departmentId);
 
     const policy = proposalPolicy(input.settings.slaWorkingDays);
-    const expectedSpendOn = input.expectedSpendOn ?? today;
+    const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
     const gathered = await this.routing.gather(tx, {
       requesterEmployeeId: input.employeeId,
       departmentId: unit.departmentId,
@@ -194,44 +196,45 @@ export class RequestFactsService {
     return {
       today,
       unit,
-      policy,
+      policy: proposalPolicy(input.settings.slaWorkingDays, requestRoutingOf(routeNeedStep(gathered.facts))),
       pricing: {
         status: 'MISSING',
         missingReason: 'AWAITING_QUOTE',
-        expectedSpendOn,
-        budgetYear: fiscalYearOf(expectedSpendOn, input.settings.fiscalYearStartMonth),
+        kind: null,
+        expectedEndDate: input.expectedEndDate ?? null,
+        amountMonths: null,
+        budgetYear: fiscalYearOf(today),
         amount: null,
         unitPrice: null,
         billingCycle: null,
-        schedule: null,
+        nextYearAmount: null,
       },
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
+      ...this.termCheck({
+        today,
+        expectedEndDate: input.expectedEndDate,
+        employmentType: employee?.employmentType ?? 'STAFF',
+      }),
     };
   }
 
-  /** The term limit of the plan from today, and whether the term asked for breaks it; a flexible plan is the one the department can cut mid-term. */
-  async termCheck(
-    tx: DbTx,
-    input: {
-      planId: string;
-      departmentId: string;
-      free: boolean;
-      termMonths: number;
-      today: BusinessDate;
-      fiscalYearStartMonth: number;
-    },
-  ): Promise<{ termLimit: TermLimit; termBeyondLimit: boolean }> {
-    const flexible = input.free
-      ? false
-      : ((await this.catalog.getPlanPrice(input.planId, input.departmentId, tx))?.allowsMidTermReduction ?? false);
-    const facts = {
-      start: input.today,
-      months: input.termMonths,
-      flexible,
-      fiscalYearStartMonth: input.fiscalYearStartMonth,
-    };
+  /**
+   * The last day a right may end and whether the end date asked for fits: not before today and not past a year from today
+   * (`US-05-23` AC-9, `QĐ-104a`); a person who is not staff has a term, so no end date is a refusal for them (`FR-2.8`).
+   */
+  termCheck(facts: {
+    today: BusinessDate;
+    expectedEndDate: BusinessDate | null | undefined;
+    employmentType: string;
+  }): Pick<Assessment, 'maxEndDate' | 'endDateOutOfRange' | 'termRequired'> {
+    const maxEndDate = maxEndDateOf(facts.today);
+    const end = facts.expectedEndDate ?? null;
 
-    return { termLimit: termLimitOf(facts), termBeyondLimit: checkTerm(facts) !== null };
+    return {
+      maxEndDate,
+      endDateOutOfRange: end !== null && (end < facts.today || end > maxEndDate),
+      termRequired: end === null && facts.employmentType !== 'STAFF',
+    };
   }
 
   /**
@@ -246,68 +249,12 @@ export class RequestFactsService {
   }
 
   /**
-   * What the request costs (`FR-3.2`): nothing for internal software, which also has no day the money goes out; for paid
-   * software the amount made from the price of its plan, the term and the people it is for, or a missing price that
-   * says why. The day the money is expected to go out is the sender's to give and today when they do not (`OQ-C-14`).
+   * What the request costs (`FR-3.2`, `BR-MF1-06`): nothing for internal software; for paid software the price of the months left
+   * of the calendar year of `checkDate` (the month it starts counted whole, or to the month of the end date), for the people it is for, or a
+   * missing price that says why. The price is the one of the main subscription of the plan, never a department's. `checkDate` is
+   * the day the amount is worked out on (`QĐ-109e`): the day of sending for a provisional amount, later the day of each check.
    */
-  async priceFor(
-    tx: DbTx,
-    input: {
-      planId: string;
-      /** The department of the request: only an active subscription it owns gives a price; never another department's. */
-      departmentId: string;
-      free: boolean;
-      termMonths: number;
-      beneficiaries: number;
-      expectedSpendOn: BusinessDate | undefined;
-      today: BusinessDate;
-      fiscalYearStartMonth: number;
-    },
-  ): Promise<PricingRecord> {
-    if (input.free) {
-      return {
-        status: 'NOT_APPLICABLE',
-        missingReason: null,
-        expectedSpendOn: null,
-        budgetYear: null,
-        amount: null,
-        unitPrice: null,
-        billingCycle: null,
-        schedule: null,
-      };
-    }
-    const expectedSpendOn = input.expectedSpendOn ?? input.today;
-    const price = await this.catalog.getPlanPrice(input.planId, input.departmentId, tx);
-    const priced = priceRequest({
-      unitPrice: price?.unitPrice ?? null,
-      billingCycle: price?.billingCycle ?? null,
-      termMonths: input.termMonths,
-      beneficiaries: input.beneficiaries,
-      expectedSpendOn,
-      fiscalYearStartMonth: input.fiscalYearStartMonth,
-    });
-    if (priced.status === 'MISSING') {
-      return {
-        status: 'MISSING',
-        missingReason: priced.reason,
-        expectedSpendOn,
-        budgetYear: priced.budgetYear,
-        amount: null,
-        unitPrice: null,
-        billingCycle: null,
-        schedule: null,
-      };
-    }
-
-    return {
-      status: 'PRICED',
-      missingReason: null,
-      expectedSpendOn,
-      budgetYear: priced.budgetYear,
-      amount: priced.amount,
-      unitPrice: priced.unitPrice,
-      billingCycle: priced.billingCycle,
-      schedule: priced.periods,
-    };
+  async priceFor(tx: DbTx, input: RequestPriceInput): Promise<PricingRecord> {
+    return pricingRecordFor(input, input.free ? null : await this.catalog.getPlanPrice(input.planId, tx));
   }
 }

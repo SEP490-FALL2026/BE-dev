@@ -93,22 +93,53 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_PROPOSAL_SUBMITTED',
   'BUDGET_PROPOSAL_RETURNED',
   'BUDGET_VERSION_DECIDED',
+  // Not given any more (Finance has no review of a request, `QĐ-97c`): the codes stay so that a notice already in an inbox still reads.
   'REQUEST_FINANCE_REVIEW_OPENED',
   'REQUEST_RETURNED_BY_FINANCE',
   'REQUEST_AWAITING_BUDGET',
   'REQUEST_BUDGET_VERSION_ENDED',
+  // The check of the budget of a request (`BR-MF1-06g`, `BR-MF1-07c`): it uses the reserve and waits for the head, it is blocked, it went back at the decision.
+  'REQUEST_RESERVE_CONFIRMATION_NEEDED',
+  'REQUEST_BUDGET_BLOCKED',
+  'REQUEST_RETURNED_AT_DECISION',
   'BUDGET_VERSION_CLOSED_UNAPPROVED',
   'BUDGET_PROPOSAL_CLOSED_YEAR_END',
   'BUDGET_PROPOSAL_TASK_ASSIGNED',
   'BUDGET_PROPOSAL_TASK_WAITING',
+  'BUDGET_CYCLE_OPENED',
+  'BUDGET_DEPARTMENT_CEILING_PUBLISHED',
+  // The deadlines of the cycle (`QĐ-103i`, `R-I05`): a head who has not proposed, the departments nobody heads, how many departments have
+  // not proposed, the versions still waiting after the decision deadline, a department with no Cost Center yet, and a head named after a
+  // version was built from the baseline.
+  'BUDGET_PROPOSAL_DEADLINE_REMINDER',
+  'BUDGET_NO_HEAD_AT_DEADLINE',
+  'BUDGET_SUBMISSION_DEADLINE_PASSED',
+  'BUDGET_DECISION_DEADLINE_REMINDER',
+  'BUDGET_COST_CENTER_SETUP_DUE',
+  'BUDGET_BASELINE_VERSION_HEAD_ASSIGNED',
   // The alerts of the rights (`a03-license-inbox-alerts`, `FR-5.14`): a right about to end, a handover not confirmed, a service
   // account whose person leaves, a person who left and keeps a K1 access to the end of the paid period. Ids, codes and days only.
   'LICENSE_EXPIRY_REMINDER',
+  // The window of the renewal of a right opened (BR-MF1-08a): told once to the holder and the head of their department.
+  'RENEWAL_WINDOW_OPENED',
   'HANDOVER_CONFIRMATION_DUE',
   'HANDOVER_CONFIRMATION_OVERDUE',
   'SERVICE_ACCOUNT_RESPONSIBLE_DUE',
   'SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE',
   'LEAVER_K1_ACCESS_RUNS_ON',
+  // A seat still held by a person who left (`G2`, `US-10-01` AC-2): told once to the IT Admin in charge.
+  'GHOST_SEAT_G2_DETECTED',
+  // The queue of the head of the department (`qd103-ghost-seat-manager-decision`, `FR-4.12`): new recommendations (one a week), the same told to
+  // the IT Admin in charge for the action tier, a decision past due, a department with no head, a reclaim the IT Admin returned, an exemption ending.
+  'GHOST_SEAT_NEW',
+  'GHOST_SEAT_ACTION_TIER',
+  'GHOST_SEAT_DECISION_OVERDUE',
+  'GHOST_SEAT_WAITING_FOR_HEAD',
+  'GHOST_SEAT_RETURNED',
+  'GHOST_SEAT_EXEMPTION_ENDING',
+  // The revocation of a seat that is coming, told to the person who holds it, and one that no longer applies (`BR-MF5-04`, `US-10-06` AC-2).
+  'REVOCATION_UPCOMING',
+  'REVOCATION_CANCELLED',
   // The renewal of a subscription (EP-11): the milestones, the quality of the contract data, the case and its deadline.
   'SUBSCRIPTION_RENEWAL_ALERT',
   'SUBSCRIPTION_RENEWAL_DATA_QUALITY',
@@ -118,6 +149,10 @@ export const IN_APP_NOTIFICATION_CODES = [
   'SUBSCRIPTION_RENEWAL_LATE',
   'SUBSCRIPTION_AUTO_RENEWAL_INCIDENT',
   'SUBSCRIPTION_EXPIRY_MARKED',
+  // The usage of an application is tracked from a vendor report (`qd103-vendor-usage-import`, `US-08-05` AC-2): told to each person who holds it.
+  'USAGE_TRACKING_NOTICE',
+  // Every vendor report of an application is older than a week, so no seat of it can be judged unused (`qd103-ghost-seat-g3-g4`, `Q-91`): told once to the IT Admin.
+  'USAGE_SOURCE_STALE',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

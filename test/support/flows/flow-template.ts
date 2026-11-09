@@ -3,16 +3,19 @@ import type { AddressInfo, Server } from 'node:net';
 import { Client } from 'pg';
 import { randomBytes } from 'node:crypto';
 import { runSeed } from '../../../src/cli/seed/seed-run';
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
-import { SHARED_DEMO_V3 } from '../../../src/cli/seed/fixture/shared-demo-v3';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v4/installation';
+import { SHARED_DEMO_V4 } from '../../../src/cli/seed/fixture/shared-demo-v4';
 import { BudgetAttachmentExpirySweeper } from '../../../src/modules/budgets/attachment/budget-attachment-expiry.job';
 import { BudgetYearEndSweeper } from '../../../src/modules/budgets/year-end/year-end.job';
 import { DocumentExpirySweeper } from '../../../src/modules/catalog/contract/document-expiry.job';
+import { YearStartCommitmentsSweeper } from '../../../src/modules/requests/year-start-commitments/year-start-commitments.job';
 import { ExpiryReminderSweeper } from '../../../src/modules/licensing/expiry/expiry-reminder.job';
 import { HandoverDutySweeper } from '../../../src/modules/licensing/handover/handover-duty.job';
 import { SaasIssueSweeper } from '../../../src/modules/licensing/saas-issue/saas-issue.job';
 import { ServiceAccountDutySweeper } from '../../../src/modules/licensing/assignment/service-account-duty/service-account-duty.job';
 import { SubscriptionRenewalSweeper } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal.job';
+import { DecisionFollowUpSweeper } from '../../../src/modules/optimization/decision/decision-follow-up.job';
+import { InternalRulesSweeper } from '../../../src/modules/optimization/internal-rules/internal-rules.job';
 import { OrganizationChangeSweeper } from '../../../src/modules/organization/change-announcement/organization-change.job';
 import { LeaveReturnSweeper } from '../../../src/modules/personnel/leave/leave-return.job';
 import { NoticeOverdueSweeper } from '../../../src/modules/personnel/notice/notice-overdue.job';
@@ -50,6 +53,7 @@ export const FLOW_SUPER_ADMIN_EMAIL = INSTALLATION.loginEmail;
 export const SWEEPER_OVERRIDES: { token: unknown; useValue: unknown }[] = [
   BudgetAttachmentExpirySweeper,
   BudgetYearEndSweeper,
+  YearStartCommitmentsSweeper,
   DocumentExpirySweeper,
   ExpiryReminderSweeper,
   HandoverDutySweeper,
@@ -60,6 +64,8 @@ export const SWEEPER_OVERRIDES: { token: unknown; useValue: unknown }[] = [
   LeaveReturnSweeper,
   NoticeOverdueSweeper,
   TransferReviewSweeper,
+  InternalRulesSweeper,
+  DecisionFollowUpSweeper,
 ].map((token) => ({ token, useValue: {} }));
 
 interface TemplateHandle {
@@ -92,7 +98,7 @@ async function seedInto(database: DisposableDatabase): Promise<void> {
     const outcome = await runSeed({
       args: {
         mode: 'apply',
-        fixture: SHARED_DEMO_V3.id,
+        fixture: SHARED_DEMO_V4.id,
         apiUrl,
         operator: 'TEST-FLOWS-1',
         environment: 'LOCAL_TEST',

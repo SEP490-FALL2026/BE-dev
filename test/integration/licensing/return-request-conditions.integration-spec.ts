@@ -33,8 +33,7 @@ describe('which seat may be returned, and what the return leaves behind over Pos
   const written = async (person: Person, unit: Unit, shape: 'K4' | 'SERVICE') => {
     const id = randomUUID();
     // A service seat sits on the subscription its own department owns (QĐ-89a).
-    const target =
-      shape === 'K4' ? await h.subscription(5, 'K4') : h.owned.subscriptionFor(subscriptionId, unit.department.id);
+    const target = shape === 'K4' ? await h.subscription(5, 'K4') : subscriptionId;
     const planId = await h.planOf(target);
     await h.ctx.sql.query(
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
@@ -87,7 +86,7 @@ describe('which seat may be returned, and what the return leaves behind over Pos
       ).toBe(1);
     });
 
-    it('refuses a seat that has ended, a service account, a K4 key and a seat whose grant is not done', async () => {
+    it('refuses a seat that has ended, a service account and a seat whose grant is not done; takes a K4 seat (BR-MF1-09)', async () => {
       const ended = await unitWithSeat();
       const endedTask = (
         await h.returnRow(
@@ -113,7 +112,6 @@ describe('which seat may be returned, and what the return leaves behind over Pos
       const cases: Array<[string, string, string, Person]> = [
         ['NOT_OPEN', ended.assignmentId, 'ended', ended.unit.member],
         ['SERVICE_ACCOUNT', serviceSeat, 'service', service.unit.member],
-        ['PLAN_NOT_SUPPORTED', k4Seat, 'k4', k4.unit.member],
         ['GRANT_NOT_COMPLETED', granted.assignmentId, 'granting', granting.member],
       ];
       for (const [problem, assignmentId, , person] of cases) {
@@ -123,6 +121,8 @@ describe('which seat may be returned, and what the return leaves behind over Pos
       }
 
       expect(await counts()).toEqual(before);
+      // BR-MF1-09 (K4 key pool, QĐ-103d): a K4 seat is returned like any other now; its key goes back to the store at the revocation.
+      await h.returnSeat({ assignmentId: k4Seat, ...reason }, k4.unit.member.account).expect(201);
     });
   });
 

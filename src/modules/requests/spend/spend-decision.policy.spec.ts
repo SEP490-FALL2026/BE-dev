@@ -1,22 +1,4 @@
-import type { YearResult } from './budget-check.policy';
 import { checkSpendDecider, judgeApproval, spendDecisionRecordOf } from './spend-decision.policy';
-
-const year = (value: number, code: YearResult['code']): YearResult => ({
-  year: value,
-  costMinor: 1n,
-  code,
-  versionId: null,
-  budgetMinor: null,
-  heldMinor: null,
-  spentMinor: null,
-  remainingMinor: null,
-  shareBasisPoints: null,
-  pendingMinor: null,
-});
-const check = (
-  years: YearResult[],
-  over: { planLineOverdue?: boolean; staleCostEvidence?: boolean; periodClosed?: boolean } = {},
-) => ({ years, planLineOverdue: false, staleCostEvidence: false, periodClosed: false, ...over });
 
 describe('who decides the spend step (US-06-01 AC-8, US-16-03)', () => {
   const facts = {
@@ -55,92 +37,67 @@ describe('who decides the spend step (US-06-01 AC-8, US-16-03)', () => {
   });
 });
 
-describe('what the check made now allows of an approval (US-06-01 AC-5, AC-16, AC-17, AC-18, AC-21)', () => {
-  it('takes an approval when everything is in order, with no override to give', () => {
-    expect(judgeApproval(check([year(2026, 'BUDGET_OK')]), false, null)).toEqual({ kind: 'OK', overriddenYears: [] });
-  });
-
-  it('takes a high value as it is once Finance has looked at it, and sends it back to Finance when it has not (AC-18)', () => {
-    expect(judgeApproval(check([year(2026, 'HIGH_VALUE')]), true, null)).toEqual({ kind: 'OK', overriddenYears: [] });
-    expect(judgeApproval(check([year(2026, 'HIGH_VALUE')]), false, null)).toEqual({ kind: 'NEEDS_REVIEW' });
-  });
-
-  it('sends back to Finance what turned into an exception since the request was sent', () => {
-    expect(judgeApproval(check([year(2026, 'INSUFFICIENT_BUDGET')]), false, null)).toEqual({ kind: 'NEEDS_REVIEW' });
-    expect(judgeApproval(check([year(2026, 'NO_ACTIVE_BUDGET')]), false, { years: [2026] })).toEqual({
-      kind: 'NEEDS_REVIEW',
-    });
-  });
-
-  it('needs an override for a year with less than the request costs or with no budget, once Finance has looked (AC-5)', () => {
-    expect(judgeApproval(check([year(2026, 'INSUFFICIENT_BUDGET')]), true, null)).toEqual({
-      kind: 'OVERRIDE_REQUIRED',
-      years: [2026],
-    });
-    expect(judgeApproval(check([year(2026, 'INSUFFICIENT_BUDGET')]), true, { years: [2026] })).toEqual({
+describe('BR-MF1-07c: what the check made now allows of an approval', () => {
+  it('BR-MF1-07c: takes an approval that is within the base, with no confirmation to ask for', () => {
+    expect(judgeApproval({ outcome: 'WITHIN_BASE', blockReasons: [] }, false)).toEqual({
       kind: 'OK',
-      overriddenYears: [2026],
+      usesReserve: false,
     });
-    expect(judgeApproval(check([year(2026, 'NO_ACTIVE_BUDGET')]), true, { years: [2026] })).toMatchObject({
+  });
+
+  it('BR-MF1-07c: takes an approval that uses the reserve when the head confirmed it on this step, and says it uses it', () => {
+    expect(judgeApproval({ outcome: 'USES_RESERVE', blockReasons: [] }, true)).toEqual({
       kind: 'OK',
+      usesReserve: true,
     });
   });
 
-  it('wants the override to name exactly the years that need it, and no other (AC-21)', () => {
-    const years = [year(2026, 'BUDGET_OK'), year(2027, 'NO_ACTIVE_BUDGET')];
-
-    expect(judgeApproval(check(years), true, { years: [2027] })).toEqual({ kind: 'OK', overriddenYears: [2027] });
-    expect(judgeApproval(check(years), true, { years: [2026] })).toEqual({ kind: 'OVERRIDE_MISMATCH', years: [2027] });
-    expect(judgeApproval(check(years), true, { years: [2026, 2027] })).toEqual({
-      kind: 'OVERRIDE_MISMATCH',
-      years: [2027],
-    });
-    expect(judgeApproval(check(years), true, null)).toEqual({ kind: 'OVERRIDE_REQUIRED', years: [2027] });
-  });
-
-  it('has no override to accept when nothing needs one', () => {
-    expect(judgeApproval(check([year(2026, 'BUDGET_OK')]), true, { years: [2026] })).toEqual({
-      kind: 'OVERRIDE_NOT_NEEDED',
-    });
-    expect(judgeApproval(check([year(2026, 'HIGH_VALUE')]), true, { years: [2026] })).toEqual({
-      kind: 'OVERRIDE_NOT_NEEDED',
+  it('BR-MF1-07c: a confirmation that is not needed any more (the request is within the base now) is not an obstacle', () => {
+    expect(judgeApproval({ outcome: 'WITHIN_BASE', blockReasons: [] }, true)).toEqual({
+      kind: 'OK',
+      usesReserve: false,
     });
   });
 
-  it('is never accepted by an override when the data is at fault, and goes back to the head (AC-18)', () => {
-    expect(judgeApproval(check([year(2026, 'BUDGET_OK')], { staleCostEvidence: true }), true, null)).toEqual({
-      kind: 'BLOCKED',
-      reason: 'STALE_COST_EVIDENCE',
+  it('BR-MF1-07c: a request that uses the reserve with no confirmation on the step goes back to its head', () => {
+    expect(judgeApproval({ outcome: 'USES_RESERVE', blockReasons: [] }, false)).toEqual({
+      kind: 'RETURNED',
+      reasons: ['RESERVE_UNCONFIRMED'],
     });
-    expect(judgeApproval(check([year(2025, null)], { periodClosed: true }), true, { years: [2025] })).toEqual({
-      kind: 'BLOCKED',
-      reason: 'CLOSED_OR_EXPIRED_BUDGET_PERIOD',
-    });
-    expect(
-      judgeApproval(check([year(2026, 'INSUFFICIENT_BUDGET')], { staleCostEvidence: true }), true, { years: [2026] }),
-    ).toMatchObject({ kind: 'BLOCKED' });
   });
 
-  it('is never accepted by an override while the plan line is overdue: it is for Finance again', () => {
-    expect(judgeApproval(check([year(2026, 'BUDGET_OK')], { planLineOverdue: true }), true, null)).toEqual({
-      kind: 'NEEDS_REVIEW',
+  it('BR-MF1-07c: a request that is blocked now goes back to its head with every reason, confirmed or not (there is no override)', () => {
+    const blocked = { outcome: 'BLOCKED', blockReasons: ['PRICE_EXPIRED', 'OVER_RESERVE'] } as const;
+
+    expect(judgeApproval(blocked, false)).toEqual({ kind: 'RETURNED', reasons: ['PRICE_EXPIRED', 'OVER_RESERVE'] });
+    expect(judgeApproval(blocked, true)).toEqual({ kind: 'RETURNED', reasons: ['PRICE_EXPIRED', 'OVER_RESERVE'] });
+  });
+
+  it('M-12, RV-09: no approved budget in the Cost Center of now is the reason that already exists, not a new one', () => {
+    expect(judgeApproval({ outcome: 'BLOCKED', blockReasons: ['NO_APPROVED_BUDGET'] }, true)).toEqual({
+      kind: 'RETURNED',
+      reasons: ['NO_APPROVED_BUDGET'],
     });
+  });
+
+  it('never approves on a check made before the three outcomes, which has no outcome', () => {
+    expect(judgeApproval({ outcome: null, blockReasons: [] }, true)).toEqual({ kind: 'RETURNED', reasons: [] });
   });
 });
 
 describe('what the decision of the spend step is recorded as (US-06-01 AC-2, AC-4, AC-5)', () => {
-  const step = { id: 'step-1', samePersonAsSpend: false, noIndependentReview: true };
   const request = { id: 'req-1' };
 
-  it('records an approval in the role the person decided in, sends the request to be carried out, and says what was overridden', () => {
+  it('records an approval in the role the person decided in, sends the request to be carried out, and says whether it used the reserve', () => {
     expect(
       spendDecisionRecordOf(
-        { request, step },
+        { request },
         {
           decision: 'APPROVED',
           checkId: 'check-1',
           reason: null,
-          override: { reason: 'Cần gấp', years: [2026, 2027] },
+          usesReserve: true,
+          reserveReason: 'Cần gấp cho dự án',
         },
       ),
     ).toEqual({
@@ -149,43 +106,36 @@ describe('what the decision of the spend step is recorded as (US-06-01 AC-2, AC-
       action: 'ACCESS_REQUEST.SPEND_APPROVED',
       detail: {
         requestId: 'req-1',
+        oneStep: false,
         checkId: 'check-1',
         decision: 'APPROVED',
         deciderRole: 'SPENDING_APPROVER',
-        override: true,
-        overrideYears: '2026,2027',
-        samePersonAsSpend: false,
-        noIndependentReview: true,
+        usesReserve: true,
+        reserveReason: 'Cần gấp cho dự án',
         requestState: 'AWAITING_EXECUTION',
       },
     });
   });
 
-  it('records a refusal as REJECTED, with no override, in the role of the spending approver and no other', () => {
+  it('records a refusal as REJECTED, in the role of the spending approver and no other', () => {
     const recorded = spendDecisionRecordOf(
-      { request, step },
-      { decision: 'REJECTED', checkId: null, reason: 'Không đủ ngân sách', override: null },
+      { request },
+      { decision: 'REJECTED', checkId: null, reason: 'Không cần nữa', usesReserve: false, reserveReason: null },
     );
 
     expect(recorded).toMatchObject({
       deciderRole: 'SPENDING_APPROVER',
       requestState: 'REJECTED',
       action: 'ACCESS_REQUEST.SPEND_REJECTED',
-      detail: {
-        checkId: null,
-        decision: 'REJECTED',
-        override: false,
-        overrideYears: '',
-        deciderRole: 'SPENDING_APPROVER',
-      },
+      detail: { checkId: null, decision: 'REJECTED', usesReserve: false, deciderRole: 'SPENDING_APPROVER' },
     });
   });
 
   it('never writes a substitute for a conflict of interest as the role of the decision', () => {
     for (const decision of ['APPROVED', 'REJECTED'] as const) {
       const recorded = spendDecisionRecordOf(
-        { request, step },
-        { decision, checkId: null, reason: null, override: null },
+        { request },
+        { decision, checkId: null, reason: null, usesReserve: false, reserveReason: null },
       );
 
       expect(recorded.deciderRole).toBe('SPENDING_APPROVER');

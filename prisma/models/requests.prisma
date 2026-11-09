@@ -1,6 +1,11 @@
 // The requests context (C4, ADR-0015): a request for access to software, the people it is for, and the steps that
 // decide it. Money, budgets and commitments are not here yet: the slices that need them add their own tables.
 
+enum RequestRoutingMode {
+  VIA_HEAD
+  ONE_STEP
+}
+
 enum AccessRequestType {
   GRANT
   // A service account asked for after the installation: a non-human subject owned by the department of the person who
@@ -26,6 +31,7 @@ enum AccessRequestBranch {
 }
 
 enum AccessRequestState {
+  AWAITING_REQUESTER_REVISION
   PENDING
   // The need step is approved; the IT Admin carries the grant out by hand (branch INTERNAL_FREE).
   AWAITING_EXECUTION
@@ -74,6 +80,12 @@ enum AccessRequestCancelCause {
   SPENDING_APPROVER_PARTY
 }
 
+// Pricing model of a plan: recurring (monthly/yearly), one-time (perpetual license).
+enum AccessRequestPriceKind {
+  RECURRING
+  ONE_TIME
+}
+
 // Whether the request has an amount: internal software has none; paid software is priced from its plan in the catalog, or
 // is missing its price and cannot be sent on to be decided as spend (FR-3.2, QĐ-82m C, QĐ-84e).
 enum AccessRequestPricingStatus {
@@ -90,6 +102,7 @@ enum AccessRequestStepKind {
 }
 
 enum AccessRequestStepState {
+  NOT_REQUIRED
   PENDING
   WAITING
   APPROVED
@@ -138,6 +151,15 @@ enum ApprovalDeciderRole {
 // `policy` when the request is sent, so a parameter changed later reaches only what is sent after it (US-05-02 AC-3).
 // The department and its Unit Cost Center are those in force on the day it is sent (US-05-02 AC-7).
 model AccessRequest {
+  routingMode RequestRoutingMode @default(VIA_HEAD) @map("routing_mode")
+  oneStepReason String? @map("one_step_reason")
+  oneStepBlockedReason String? @map("one_step_blocked_reason")
+  // GH-3 (BR-MF1-01g): the beneficiary used this many paid applications when it was sent, and why they ask for one more.
+  manyPaidSoftware       Boolean @default(false) @map("many_paid_software")
+  manyPaidSoftwareCount  Int?    @map("many_paid_software_count") @db.SmallInt
+  manyPaidSoftwareReason String? @map("many_paid_software_reason")
+  // Why the request is left out of GH-1/GH-2 (TRANSFER_OVERLAP, ROLE_ENDED; QĐ-108c); null for every other.
+  limitExemption         String? @map("limit_exemption")
   id                    String                     @id @default(uuid()) @db.Uuid
   organizationId        String                     @map("organization_id") @db.Uuid
   type                  AccessRequestType          @default(GRANT)
@@ -151,7 +173,12 @@ model AccessRequest {
   // Null only while the request is a DRAFT (a paid request of a department that has no Cost Center yet; spec L.1).
   costCenterId          String?                    @map("cost_center_id") @db.Uuid
   businessReason        String                     @map("business_reason")
-  termMonths            Int                        @map("term_months")
+  termMonths            Int?                       @map("term_months") // nullable: NULL = no time limit; NEW cols `amountMonths`, `priceKind` take over
+  amountMonths          Int?                       @map("amount_months") // months of the year for recurring pricing (0–12)
+  priceKind             AccessRequestPriceKind?   @map("price_kind") // RECURRING or ONE_TIME
+  grantedOn             DateTime?                  @map("granted_on") @db.Date // day task completed (BR-MF1-06a)
+  // What the first year of a request to go on using would cost, when it begins in the year after the day it is priced: shown, never held (QĐ-109b).
+  nextYearAmountMinor   BigInt?                    @map("next_year_amount_minor")
   // Context only: it changes neither the Cost Center nor the chain (US-05-02 AC-7).
   // Retired in QD-93h phase 1; dropped in phase 2.
   pricingStatus         AccessRequestPricingStatus @default(NOT_APPLICABLE) @map("pricing_status")
@@ -224,6 +251,7 @@ model AccessRequest {
   spendDecisions       SpendDecision[]
   budgetCommitments    BudgetCommitment[]
   budgetInformation    BudgetInformationRequest[]
+  reserveConfirmations RequestReserveConfirmation[]
   controlledWaitAlerts ControlledWaitAlert[]
   stepSlaReminders     StepSlaReminder[]
   serviceAccount       AccessRequestServiceAccount?
@@ -233,6 +261,11 @@ model AccessRequest {
   @@index([requesterEmployeeId, submittedAt])
   @@index([state, submittedAt])
   @@index([planId])
+  @@index([departmentId, routingMode, state], map: "access_requests_department_routing_state_idx")
+  // The history of a department and of the organization, newest sent first (qd103-request-history-by-role). The partial index of
+  // the free internal one-step requests the audit report reads is in the migration only.
+  @@index([departmentId, submittedAt(sort: Desc), id(sort: Desc)], map: "access_requests_department_submitted_idx")
+  @@index([submittedAt(sort: Desc), id(sort: Desc)], map: "access_requests_submitted_idx")
   @@map("access_requests")
 }
 
@@ -295,6 +328,11 @@ model AccessRequestLine {
   cancelCause           AccessRequestCancelCause? @map("cancel_cause")
   withdrawalRequestedAt DateTime?                 @map("withdrawal_requested_at") @db.Timestamptz(3)
   createdAt             DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  // GH-3 of this person (BR-MF1-01g), with the reason the sender gave for them; and why the line is left out of GH-1/GH-2.
+  manyPaidSoftware       Boolean @default(false) @map("many_paid_software")
+  manyPaidSoftwareCount  Int?    @map("many_paid_software_count") @db.SmallInt
+  manyPaidSoftwareReason String? @map("many_paid_software_reason")
+  limitExemption         String? @map("limit_exemption")
 
   request     AccessRequest               @relation(fields: [requestId], references: [id], onDelete: Restrict)
   beneficiary AccessRequestBeneficiary    @relation(fields: [requestId, employeeId], references: [requestId, employeeId], onDelete: Restrict)
@@ -384,6 +422,7 @@ model AccessRequestStep {
   financeReview        RequestFinanceReview?
   spendDecision        SpendDecision?
   budgetInformation    BudgetInformationRequest[]
+  reserveConfirmation  RequestReserveConfirmation?
   controlledWaitAlerts ControlledWaitAlert[]
 
   @@unique([requestId, sequence])
@@ -525,7 +564,7 @@ model AccessRequestAssessment {
 // What set a check of the budget going.
 enum BudgetCheckTrigger {
   SUBMISSION
-  // Finance moved the purchase window of the plan line the request is attached to (US-06-09 AC-17).
+  // Legacy, never written now (CHECK, 20261109141000): Finance moved the purchase window of the plan line (US-06-09 AC-17).
   PLAN_LINE_MOVED
   // A budget version was approved for the Cost Center and year the request waited on (US-06-13 AC-11).
   BUDGET_VERSION_APPROVED
@@ -533,6 +572,15 @@ enum BudgetCheckTrigger {
   SPEND_DECISION
   // Finance gave an outcome while the request waited (spec L.10). Read only here.
   FINANCE_OUTCOME_WHILE_WAITING
+  // The head confirmed that the request uses the reserve: the check is made again for the day of the confirmation (BR-MF1-06h).
+  RESERVE_CONFIRMATION
+}
+
+// What a check of the budget says of a request (BR-MF1-06g): it is within the base, it uses the reserve, or it is blocked.
+enum BudgetCheckOutcome {
+  WITHIN_BASE
+  USES_RESERVE
+  BLOCKED
 }
 
 // Where a check sends the request: nowhere (a problem with the data that only the head or the IT Admin can mend), to
@@ -583,6 +631,15 @@ model RequestBudgetCheck {
   periodClosed      Boolean            @map("period_closed")
   // Information only: the head chose "outside the plan" (US-06-12 AC-10).
   offPlan           Boolean            @map("off_plan")
+  // What the check says (BR-MF1-06g); null only for a check made before (read from its code), never null for a new one (CHECK).
+  outcome           BudgetCheckOutcome?
+  // Why it is blocked: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED; every reason that applies (US-06-12 AC-9).
+  blockReasons      String[]           @default([]) @map("block_reasons")
+  // How much the cost is over what is left of the base (uses the reserve, or blocked for being over the reserve); how much over the reserve.
+  overBaseByMinor   BigInt?            @map("over_base_by_minor")
+  overByMinor       BigInt?            @map("over_by_minor")
+  // The Cost Center the check read: the current one of the department (M-12). Null for a check made before.
+  costCenterId      String?            @map("cost_center_id") @db.Uuid
   currency          String             @db.Char(3)
   // The payments that bind, as the request is held against budgets, in the reporting currency: never compared as a whole.
   bindingTotalMinor BigInt             @map("binding_total_minor")
@@ -597,6 +654,7 @@ model RequestBudgetCheck {
   yearResults    RequestBudgetCheckYear[]
   spendDecisions SpendDecision[]
   commitments    BudgetCommitment[]
+  reserveConfirmation RequestReserveConfirmation?
 
   @@unique([requestId, number])
   @@map("request_budget_checks")
@@ -618,6 +676,11 @@ model RequestBudgetCheckYear {
   shareBasisPoints Int?            @map("share_basis_points")
   // What the other requests of the Cost Center that wait to be decided cost in the year, as their own checks say (US-06-01 AC-9).
   pendingMinor     BigInt?         @map("pending_minor")
+  // The base and the reserve of the approved version, and what is left at the two levels after what is spent, held and waiting (BR-MF1-06e).
+  baseMinor                 BigInt? @map("base_minor")
+  reserveMinor              BigInt? @map("reserve_minor")
+  remainingBaseMinor        BigInt? @map("remaining_base_minor")
+  remainingWithReserveMinor BigInt? @map("remaining_with_reserve_minor")
 
   check RequestBudgetCheck @relation(fields: [checkId], references: [id], onDelete: Restrict)
 
@@ -650,7 +713,10 @@ model RequestFinanceReview {
 // How one request of a batch fared when the head sent it on (US-06-14).
 enum SpendBatchItemOutcome {
   SENT_TO_APPROVER
+  // Legacy: Finance has no review any more (CHECK on the steps, 20261109141000).
   SENT_TO_FINANCE
+  // It uses the reserve and the head has not confirmed it: it stays in their queue (BR-MF1-06h).
+  AWAITING_RESERVE_CONFIRMATION
   // It stayed in the queue of the head, and the reason says why; nothing was made for Finance or the approver.
   STOPPED
 }
@@ -713,18 +779,20 @@ model RequestSupplement {
   reason                String
   changedByEmployeeId   String   @map("changed_by_employee_id") @db.Uuid
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  beforeExpectedSpendOn DateTime @map("before_expected_spend_on") @db.Date
-  afterExpectedSpendOn  DateTime @map("after_expected_spend_on") @db.Date
-  beforeBudgetYear      Int      @map("before_budget_year")
-  afterBudgetYear       Int      @map("after_budget_year")
-  beforeAmountMinor     BigInt   @map("before_amount_minor")
-  afterAmountMinor      BigInt   @map("after_amount_minor")
-  currency              String   @db.Char(3)
+  beforeExpectedSpendOn DateTime?  @map("before_expected_spend_on") @db.Date
+  afterExpectedSpendOn  DateTime?  @map("after_expected_spend_on") @db.Date
+  beforeBudgetYear      Int?       @map("before_budget_year")
+  afterBudgetYear       Int?       @map("after_budget_year")
+  beforeAmountMinor     BigInt?    @map("before_amount_minor")
+  afterAmountMinor      BigInt?    @map("after_amount_minor")
+  beforeExpectedEndDate DateTime?  @map("before_expected_end_date") @db.Date
+  afterExpectedEndDate  DateTime?  @map("after_expected_end_date") @db.Date
+  currency              String?    @db.Char(3)
 
   organization   Organization            @relation(fields: [organizationId], references: [id])
   request        AccessRequest           @relation(fields: [requestId], references: [id], onDelete: Restrict)
   changedBy      Employee                @relation("RequestSupplementAuthor", fields: [changedByEmployeeId], references: [id], onDelete: Restrict)
-  currencyRecord Currency                @relation("RequestSupplementCurrency", fields: [currency], references: [code], onDelete: Restrict)
+  currencyRecord Currency?               @relation("RequestSupplementCurrency", fields: [currency], references: [code], onDelete: Restrict)
   drops          RequestSupplementDrop[]
 
   @@unique([requestId, number])
@@ -766,6 +834,28 @@ model SpendDecision {
 
   @@index([requestId])
   @@map("spend_decisions")
+}
+
+// The head's confirmation that a request uses the reserve, with one line of reason (BR-MF1-06h): for one check and the one spend step it
+// opens. It stays when the head changes. Never changed (INV-05).
+model RequestReserveConfirmation {
+  id                    String   @id @default(uuid(7)) @db.Uuid
+  organizationId        String   @map("organization_id") @db.Uuid
+  requestId             String   @map("request_id") @db.Uuid
+  checkId               String   @unique @map("check_id") @db.Uuid
+  spendStepId           String   @unique @map("spend_step_id") @db.Uuid
+  reason                String
+  confirmedByEmployeeId String   @map("confirmed_by_employee_id") @db.Uuid
+  confirmedAt           DateTime @default(now()) @map("confirmed_at") @db.Timestamptz(3)
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  request      AccessRequest     @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  check        RequestBudgetCheck @relation(fields: [checkId], references: [id], onDelete: Restrict)
+  spendStep    AccessRequestStep @relation(fields: [spendStepId], references: [id], onDelete: Restrict)
+  confirmedBy  Employee          @relation("ReserveConfirmationConfirmer", fields: [confirmedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([requestId])
+  @@map("request_reserve_confirmations")
 }
 
 /// What the spending approver asks Finance while the spend step is theirs, and what Finance answers (US-06-02, US-06-03). The
@@ -963,8 +1053,11 @@ enum SlaSubjectKind {
 enum SlaReminderRole {
   HOLDER
   SUPERIOR
+  // Legacy: the reminder to Finance of a question that is retired; read, never written (QĐ-97c).
   FINANCE_QUESTION
   SUPER_ADMIN
+  // The person who asked for the request, told with the holder of a need step that is late (QĐ-100j).
+  REQUESTER
 }
 
 /// One reminder of a step, or of a request in the queue of the head, that waited past its deadline (US-05-09): at most one for each
@@ -1034,4 +1127,27 @@ model CongestionIncident {
 
   @@index([recordedAt(sort: Desc), id(sort: Desc)])
   @@map("congestion_incidents")
+}
+
+// One pass of 01/01 for an organization and a year (`FR-5.8`(6), `QĐ-109a`): the mark that says the commitments of the new year were made, so that
+// a second pass the same year changes nothing. The row is made when a pass begins and completed when it has been through every request;
+// a pass that failed half way leaves it open and the next one goes on (a commitment is never made twice: the request and the year are unique).
+// The migration marks the year before the deployment as done for the organizations that exist, so the first pass is the one of the year
+// of the deployment. Each step of a pass takes the advisory lock of the organization and the year (`pg_try_advisory_xact_lock`).
+model YearStartCommitmentRun {
+  organizationId String    @map("organization_id") @db.Uuid
+  year           Int
+  startedAt      DateTime  @map("started_at") @db.Timestamptz(3)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(3)
+  // How many passes were made for the year (more than one after a failure), and what all of them made and left, batch by batch.
+  runCount       Int       @default(1) @map("run_count")
+  createdCount   Int       @default(0) @map("created_count")
+  skippedCount   Int       @default(0) @map("skipped_count")
+  // The last request (in order of id) a batch went through: a pass that failed half way goes on after it.
+  resumeAfterId  String?   @map("resume_after_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@id([organizationId, year])
+  @@map("year_start_commitment_runs")
 }

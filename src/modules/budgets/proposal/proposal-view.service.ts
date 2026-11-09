@@ -70,9 +70,8 @@ export class ProposalViewService {
 
   private async scope(actor: AuthenticatedPrincipal): Promise<'ALL' | string[]> {
     if (actor.roles.includes('FINANCE') || (await this.facts.isSpendingApprover(actor.employeeId))) return 'ALL';
-    const own = await this.facts.headedCostCenter(actor.employeeId, await this.facts.today(new Date()));
 
-    return own === null ? [] : [own];
+    return this.facts.headedCostCenters(actor.employeeId, await this.facts.today(new Date()));
   }
 
   async wire(proposal: ProposalRecord): Promise<ProposalWire> {
@@ -141,4 +140,8 @@ const toLineWire = (
   seats: line.seats,
   amount: money(line.amountMinor),
   note: line.note,
+  lineType: line.lineType,
+  zbb: line.zbb,
+  priorityRank: line.priorityRank,
+  overCeiling: line.overCeilingMinor === null ? null : money(line.overCeilingMinor),
 });

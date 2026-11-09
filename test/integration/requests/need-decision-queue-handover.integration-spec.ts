@@ -45,6 +45,18 @@ describe('the queue of the need steps when the person who holds a step changes (
       .post(`/api/v1/access-requests/${id}/need-decision`)
       .set({ ...h.as(account), ...MOBILE })
       .send(body);
+  const spendIdsOf = async (account: ApiAccount) =>
+    h
+      .dataOf<{ items: Array<{ requestId: string }> }>(
+        await request(h.server())
+          .get('/api/v1/spend-approvals')
+          .query({ pageSize: 100 })
+          .set(h.as(account))
+          .expect(200),
+      )
+      .items.map((item) => item.requestId);
+  const spendDecide = (id: string, body: object, account: ApiAccount) =>
+    request(h.server()).post(`/api/v1/access-requests/${id}/spend-approval`).set(h.as(account)).send(body);
   const records = async (id: string) =>
     (
       await h.ctx.sql.query<{ decided_by_employee_id: string; decider_role: string }>(
@@ -76,11 +88,15 @@ describe('the queue of the need steps when the person who holds a step changes (
 
     // The screen the head opened before the change is stale: the step is not theirs, and the decision is not made.
     expect(await idsOf(u.head.account)).toEqual([]);
-    const refused = await decide(r1.id, { decision: 'APPROVE' }, u.head.account).expect(404);
-    expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.NOT_FOUND');
+    // QĐ-104f (MF1-D, L2-02): a paid request waiting for a head who left with no successor becomes one step (HEAD_LEFT); its need step
+    // is closed, so the former head, who held it, is told it is no longer pending.
+    const refused = await decide(r1.id, { decision: 'APPROVE' }, u.head.account).expect(409);
+    expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.STEP_NOT_PENDING');
     expect(await records(r1.id)).toEqual([]);
-    // Nobody takes the step in place of a head (QĐ-93c): it waits, and is in nobody's queue, the spending approver's included.
-    expect(await h.stepOf(r1.id, 'NEED')).toMatchObject({
+    expect(await h.stepOf(r1.id, 'NEED')).toMatchObject({ state: 'CLOSED' });
+    // Nobody takes the need step of an internal request in place of a head (QĐ-93c, Q-33): it waits, and is in nobody's queue, the
+    // spending approver's included.
+    expect(await h.stepOf(other.id, 'NEED')).toMatchObject({
       state: 'WAITING',
       assignee_employee_id: null,
       waiting_reason: 'NO_DEPARTMENT_HEAD',
@@ -90,8 +106,8 @@ describe('the queue of the need steps when the person who holds a step changes (
       expect(ids).not.toContain(r1.id);
       expect(ids).not.toContain(other.id);
     }
-    await decide(r1.id, { decision: 'APPROVE' }, h.boss.account).expect(404);
-    expect(await records(r1.id)).toEqual([]);
+    await decide(other.id, { decision: 'APPROVE' }, h.boss.account).expect(404);
+    expect(await records(other.id)).toEqual([]);
   });
 
   it('hands a step to the new head when the Super Admin names one, with the step keeping its age', async () => {
@@ -112,39 +128,42 @@ describe('the queue of the need steps when the person who holds a step changes (
     await decide(r1.id, { decision: 'APPROVE' }, successor.account).expect(200);
   });
 
-  it('keeps a step nobody holds out of every queue until somebody valid does, then lists it (last two: they change the approver)', async () => {
+  it('keeps the own request of a head out of every need queue, whoever holds the approver role (last two: they change the approver)', async () => {
     const u = await unit();
     await h.clearRole('SPENDING_APPROVER');
     const own = await h.sent(u.head, internal, { termMonths: 1 });
 
-    expect(own.needStep).toMatchObject({ state: 'WAITING', routingRow: 8, assignee: null });
+    // MF1-D (QĐ-104): a head's own request is one step: its need step is not required (routing row 2), so no need queue lists it.
+    expect(own.needStep).toMatchObject({ state: 'NOT_REQUIRED', routingRow: 2, assignee: null });
     for (const account of [u.head.account, h.boss.account, bystander.account, u.member.account, h.it1, h.finance]) {
       expect(await idsOf(account)).not.toContain(own.id);
     }
 
     await h.setRole('SPENDING_APPROVER', h.boss);
 
-    expect((await h.stepOf(own.id, 'NEED')).state).toBe('PENDING');
-    const [item] = (await queue(h.boss.account)).filter((row) => row.requestId === own.id);
-    expect(item).toMatchObject({ requestId: own.id, deciderRole: 'SPENDING_APPROVER' });
-    expect(await idsOf(u.head.account)).not.toContain(own.id);
+    expect((await h.stepOf(own.id, 'NEED')).state).toBe('NOT_REQUIRED');
+    for (const account of [u.head.account, h.boss.account]) expect(await idsOf(account)).not.toContain(own.id);
   });
 
-  it('moves the need step of a head request to the new spending approver, and refuses the former one at the decision', async () => {
+  it('moves the spend step of a head request to the new spending approver, and refuses the former one at the decision', async () => {
     const u = await unit();
+    // A spend step is opened only on an approved budget of the department (else the request goes back to its head).
+    await h.budgetFor(u, { total: 100_000_000, held: 0, spent: 0 });
     const r9 = await h.sent(u.head, plan, { termMonths: 1 });
-    expect(await idsOf(h.boss.account)).toContain(r9.id);
+    // MF1-D: the paid request of a head is one step: no need step, its spend step is the spending approver's.
+    expect(await idsOf(h.boss.account)).not.toContain(r9.id);
+    expect(await spendIdsOf(h.boss.account)).toContain(r9.id);
     const next = await h.staff(await h.departmentWithUnit('P-NXT'), 'NXT-C2');
 
     await h.setRole('SPENDING_APPROVER', next);
 
-    expect(await idsOf(h.boss.account)).not.toContain(r9.id);
-    const [item] = (await queue(next.account)).filter((row) => row.requestId === r9.id);
-    expect(item).toMatchObject({ requestId: r9.id, deciderRole: 'SPENDING_APPROVER' });
-    const refused = await decide(r9.id, { decision: 'APPROVE' }, h.boss.account).expect(404);
-    expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.NOT_FOUND');
+    expect(await spendIdsOf(h.boss.account)).not.toContain(r9.id);
+    expect(await spendIdsOf(next.account)).toContain(r9.id);
+    // The screen of the former approver is stale: the spend step is no longer theirs, and the decision is not made.
+    const refused = await spendDecide(r9.id, { decision: 'APPROVE' }, h.boss.account).expect(403);
+    expect(h.codeOf(refused)).toBe('SPEND.NOT_THE_ASSIGNEE');
     expect(await records(r9.id)).toEqual([]);
-    await decide(r9.id, { decision: 'APPROVE' }, next.account).expect(200);
-    expect(await idsOf(next.account)).not.toContain(r9.id);
+    await spendDecide(r9.id, { decision: 'APPROVE' }, next.account).expect(200);
+    expect(await spendIdsOf(next.account)).not.toContain(r9.id);
   });
 });

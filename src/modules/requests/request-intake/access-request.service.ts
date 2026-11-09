@@ -1,3 +1,4 @@
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -8,12 +9,14 @@ import {
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
-  AccessRequestTermBeyondLimitError,
+  AccessRequestEndDateOutOfRangeError,
+  AccessRequestTermRequiredError,
 } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { RequestFactsService, type RequestSettings } from '../access-request/request-facts.service';
+import { RequestLimitsService, type LimitSettings } from '../request-limits/request-limits.service';
 import { RequestSenderService } from './request-sender.service';
 import { RequestDraftRepo } from '../request-draft/request-draft.repo';
 import type { SubmitBodyDto } from '../access-request/access-request.dto';
@@ -41,17 +44,21 @@ export interface SubmitOptions {
   toleratedSeatId?: string;
   /** The draft this request is sent from: it is locked first, judged again under the lock, and becomes the request. */
   draftId?: string;
+  /** GH-2 and GH-3 as read before the transaction opened; read here when the caller did not. */
+  limitSettings?: LimitSettings;
 }
 
 @Injectable()
 export class AccessRequestService {
   constructor(
+    private readonly spendRouting: SpendRoutingService,
     private readonly runner: TransactionRunner,
     private readonly repo: AccessRequestRepo,
     private readonly sender: RequestSenderService,
     private readonly assessment: RequestFactsService,
     private readonly audit: AuditApi,
     private readonly drafts: RequestDraftRepo,
+    private readonly limits: RequestLimitsService,
   ) {}
 
   async submit(
@@ -61,8 +68,9 @@ export class AccessRequestService {
   ): Promise<AccessRequestRecord> {
     if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const settings = await this.assessment.settings();
+    const limitSettings = options.limitSettings ?? (await this.limits.settings());
 
-    return this.runner.run((tx) => this.submitWithin(tx, actor, body, settings, options));
+    return this.runner.run((tx) => this.submitWithin(tx, actor, body, settings, { ...options, limitSettings }));
   }
 
   /**
@@ -82,12 +90,14 @@ export class AccessRequestService {
     // The person sending is relied on until commit (they cannot be removed from the company between the check and the write), and is
     // judged as a party of a Request before any department is read (`D-S21`).
     const employee = await this.sender.lockEligible(tx, actor);
+    // The limits of the person are judged one sending after the other: the lock is taken before any department is.
+    await this.limits.lock(tx, [actor.employeeId]);
 
     const now = new Date();
     const assessed = await this.assessment.assess(tx, {
       employeeId: actor.employeeId,
       planId: body.planId,
-      termMonths: body.termMonths,
+      expectedEndDate: body.expectedEndDate ?? null,
       now,
       settings,
       lockDepartment: true,
@@ -95,9 +105,16 @@ export class AccessRequestService {
     if (assessed.heldAccess && assessed.heldAccess.assignmentId !== options.toleratedSeatId) {
       throw new AccessRequestAlreadyHoldsAccessError(assessed.heldAccess);
     }
-    if (assessed.termBeyondLimit) {
-      throw new AccessRequestTermBeyondLimitError(assessed.termLimit.maxMonths, assessed.termLimit.endsBy);
-    }
+    if (assessed.endDateOutOfRange) throw new AccessRequestEndDateOutOfRangeError(assessed.maxEndDate);
+    if (assessed.termRequired) throw new AccessRequestTermRequiredError();
+    const manyPaidSoftware = await this.limits.requireForOne(tx, {
+      employeeId: actor.employeeId,
+      planId: body.planId,
+      applicationId: assessed.target.applicationId,
+      today: assessed.today,
+      settings: options.limitSettings ?? (await this.limits.settings()),
+      reason: body.manyPaidSoftwareReason,
+    });
     const sent: SubmittedRequest = {
       actor,
       organizationId: employee.organizationId,
@@ -105,9 +122,11 @@ export class AccessRequestService {
       assessed,
       now,
       draftId: options.draftId,
+      manyPaidSoftware,
     };
     const created = await this.repo.insert(tx, newRequestOf(sent));
     await this.auditSubmitted(tx, actor, sent, created);
+    await this.spendRouting.start(tx, actor, created.id, now);
 
     const record = await this.repo.findById(created.id, tx);
     if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);

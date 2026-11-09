@@ -35,7 +35,8 @@ export interface DeclareApplicationInput {
   dictionaryServiceLineId?: string;
   domains?: string[];
   dataSensitivity: DataSensitivity;
-  businessOwnerEmployeeId: string;
+  /** QĐ-104 removed the Business Owner: optional; an application declared without one has none. */
+  businessOwnerEmployeeId?: string;
   communication: CommunicationAnswers & { note?: string | null };
   functionalGroupId?: string;
 }
@@ -152,7 +153,8 @@ export class ApplicationService {
     },
   ): Promise<ApplicationRecord> {
     const { source, name, domains, note, organizationId } = prepared;
-    await this.guards.requireWorkingOwner(tx, input.businessOwnerEmployeeId);
+    const owner = input.businessOwnerEmployeeId ?? null;
+    if (owner !== null) await this.guards.requireWorkingOwner(tx, owner);
     const group = input.functionalGroupId ? await this.guards.requireActiveGroup(tx, input.functionalGroupId) : null;
     const { ensured, dictionaryServiceLineId } = await this.ensureVendor(tx, organizationId, source);
 
@@ -163,7 +165,7 @@ export class ApplicationService {
       vendorId: ensured?.vendor.id ?? null,
       dictionaryServiceLineId,
       functionalGroupId: group?.id ?? null,
-      businessOwnerEmployeeId: input.businessOwnerEmployeeId,
+      businessOwnerEmployeeId: owner,
       dataSensitivity: input.dataSensitivity,
       communication: {
         personToPersonMessaging: input.communication.personToPersonMessaging,
@@ -174,11 +176,13 @@ export class ApplicationService {
       },
       domains,
     });
-    await this.applications.openOwnerPeriod(tx, {
-      applicationId: created.id,
-      employeeId: input.businessOwnerEmployeeId,
-      assignedByAppUserId: actor.appUserId,
-    });
+    if (owner !== null) {
+      await this.applications.openOwnerPeriod(tx, {
+        applicationId: created.id,
+        employeeId: owner,
+        assignedByAppUserId: actor.appUserId,
+      });
+    }
     await this.auditCreated(tx, actor, created, { ensured, source, name, domains, organizationId });
 
     return created;

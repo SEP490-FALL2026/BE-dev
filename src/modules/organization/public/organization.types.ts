@@ -25,6 +25,8 @@ export interface CreateDepartmentInput {
   organizationId: string;
   code: string;
   name: string;
+  /** The day it takes effect; the installation names today in the calendar of the organization (`QĐ-104e(3)`). */
+  effectiveFrom?: string;
 }
 
 export interface CreateEmployeeWithPlacementInput {
@@ -237,6 +239,8 @@ export interface DepartmentBrief {
   code: string;
   name: string;
   active: boolean;
+  /** The day the department takes effect (`QĐ-104e(3)`): nobody is placed in it, and no head starts, before. */
+  effectiveFrom: string;
   /** A retired Cost Center has no people (`US-04-09` AC-3), so a department charged to one takes nobody in. */
   costCenterActive: boolean;
 }

@@ -111,8 +111,8 @@ describe('the grant of SPENDING_APPROVER and the work that is still open (integr
     );
     await h.ctx.sql.query(
       `INSERT INTO budget_versions (id, organization_id, cost_center_id, year, number, kind, state, proposal_id, base_minor, reserve_minor,
-                                    total_minor, currency, high_value_percent, created_by_employee_id, sent_by_employee_id, sent_at)
-       VALUES ($1, $2, $3, $4, $5, 'INITIAL', $6::"BudgetVersionState", $7, 60, 20, 80, 'VND', 50, $8,
+                                    total_minor, currency, created_by_employee_id, sent_by_employee_id, sent_at)
+       VALUES ($1, $2, $3, $4, $5, 'INITIAL', $6::"BudgetVersionState", $7, 60, 20, 80, 'VND', $8,
                CASE WHEN $6::text <> 'DRAFT' THEN $8::uuid END, CASE WHEN $6::text <> 'DRAFT' THEN now() END)`,
       [id, h.seed.organizationId, rows[0].cost_center_id, rows[0].year, number, state, proposalId, person.employeeId],
     );

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { clearSpendingApprover, setSpendingApprover } from '../../support/builders/account.builder';
+import { createDepartment } from '../../support/builders/organization.builder';
 import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
 import { TransferHarness, type TransferWire } from '../../support/transfer-harness';
 import type { Department, Person } from '../../support/request-harness';
@@ -246,13 +247,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
 
   it('records the move of a person into a department that has no Cost Center, like any other (F44, QĐ-87d(3)): no refusal, the seats of the person stay charged to the old department', async () => {
     // A department the Super Admin created and Finance has not given a Cost Center yet.
-    const bare = h.dataOf<{ id: string; code: string }>(
-      await request(h.server())
-        .post('/api/v1/departments')
-        .set({ Authorization: `Bearer ${h.admin}` })
-        .send({ code: 'P-BARE', name: 'Department P-BARE' })
-        .expect(201),
-    );
+    const bare = await createDepartment(h.ctx, h.admin, { code: 'P-BARE', name: 'Department P-BARE' });
     const person = await h.veteran(des, code('E'));
     const effectiveOn = h.day(20);
 

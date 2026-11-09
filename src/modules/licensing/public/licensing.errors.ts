@@ -48,6 +48,8 @@ export class AssignmentConflictError extends Error {
   constructor(
     readonly conflict: AssignmentConflict,
     readonly index: number,
+    /** For `SEAT_CAPACITY` of a K2 or K4 grant: the seats still free in the other subscriptions of the plan, so the IT Admin grants from there (`BR-MF1-09a`). */
+    readonly freeSeatsInPool?: number,
   ) {
     super(`An assignment conflicts with the data as it is now: ${conflict}.`);
     this.name = 'AssignmentConflictError';
@@ -141,9 +143,12 @@ export class ProvisioningTypeNotSupportedError extends Error {
   }
 }
 
-export type ProvisioningSubscriptionProblem = 'REQUIRED' | 'NOT_ALLOWED' | 'PLAN_MISMATCH';
+export type ProvisioningSubscriptionProblem = 'REQUIRED' | 'NOT_ALLOWED' | 'PLAN_MISMATCH' | 'NOT_GRANTABLE';
 
-/** A grant names a subscription when it needs none (K5), none when it needs one (K1, K2), or one of another plan. */
+/**
+ * A grant names a subscription when it needs none (K5), none when it needs one (K1, K2), one of another plan, or one of the plan a seat
+ * cannot be taken from today (its period ended, or a next period that runs took it over).
+ */
 export class ProvisioningSubscriptionError extends Error {
   constructor(readonly problem: ProvisioningSubscriptionProblem) {
     super(`The subscription of the grant is not right: ${problem}.`);
@@ -337,12 +342,29 @@ export class RevocationRefusedError extends Error {
   }
 }
 
+/** A revocation was opened with a timing that contradicts itself (a day not before that is after the due day): a fault of the source module. */
+export class RevocationInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RevocationInputError';
+  }
+}
+
+/** The revocation may not be taken or completed before the day the source asked for (`US-10-07` AC-18): the day it can be is told. */
+export class ProvisioningTaskNotBeforeError extends Error {
+  constructor(readonly notBefore: string) {
+    super(`The revocation cannot be done before ${notBefore}.`);
+    this.name = 'ProvisioningTaskNotBeforeError';
+  }
+}
+
 export type RevocationCompletionProblem =
   | 'COMPLETION_NOT_ALLOWED'
   | 'NOTE_REQUIRED'
   | 'PAID_THROUGH_REQUIRED'
   | 'ACCESS_STATE_REQUIRED'
-  | 'ACCESS_STATE_INVALID';
+  | 'ACCESS_STATE_INVALID'
+  | 'WITHDRAWAL_REASON_REQUIRED';
 
 /** The way a revocation is completed does not fit its kind of provisioning, or lacks what the kind needs to be stored. */
 export class RevocationCompletionError extends Error {

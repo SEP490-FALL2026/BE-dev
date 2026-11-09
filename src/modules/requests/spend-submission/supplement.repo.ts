@@ -8,13 +8,13 @@ export interface SupplementRecord {
   reason: string;
   changedByEmployeeId: string;
   createdAt: Date;
-  beforeExpectedSpendOn: BusinessDate;
-  afterExpectedSpendOn: BusinessDate;
-  beforeBudgetYear: number;
-  afterBudgetYear: number;
-  beforeAmountMinor: bigint;
-  afterAmountMinor: bigint;
-  currency: string;
+  beforeExpectedEndDate: BusinessDate | null;
+  afterExpectedEndDate: BusinessDate | null;
+  beforeBudgetYear: number | null;
+  afterBudgetYear: number | null;
+  beforeAmountMinor: bigint | null;
+  afterAmountMinor: bigint | null;
+  currency: string | null;
 }
 
 export type NewSupplement = Omit<SupplementRecord, 'number' | 'createdAt'> & {
@@ -41,8 +41,8 @@ export class SupplementRepo {
         reason: input.reason,
         changedByEmployeeId: input.changedByEmployeeId,
         createdAt: input.now,
-        beforeExpectedSpendOn: toDateColumn(input.beforeExpectedSpendOn),
-        afterExpectedSpendOn: toDateColumn(input.afterExpectedSpendOn),
+        beforeExpectedEndDate: input.beforeExpectedEndDate ? toDateColumn(input.beforeExpectedEndDate) : null,
+        afterExpectedEndDate: input.afterExpectedEndDate ? toDateColumn(input.afterExpectedEndDate) : null,
         beforeBudgetYear: input.beforeBudgetYear,
         afterBudgetYear: input.afterBudgetYear,
         beforeAmountMinor: input.beforeAmountMinor,
@@ -69,18 +69,26 @@ export class SupplementRepo {
     reason: string;
     changedByEmployeeId: string;
     createdAt: Date;
-    beforeExpectedSpendOn: Date;
-    afterExpectedSpendOn: Date;
-    beforeBudgetYear: number;
-    afterBudgetYear: number;
-    beforeAmountMinor: bigint;
-    afterAmountMinor: bigint;
-    currency: string;
+    beforeExpectedEndDate: Date | null;
+    afterExpectedEndDate: Date | null;
+    beforeBudgetYear: number | null;
+    afterBudgetYear: number | null;
+    beforeAmountMinor: bigint | null;
+    afterAmountMinor: bigint | null;
+    currency: string | null;
   }): SupplementRecord {
     return {
-      ...row,
-      beforeExpectedSpendOn: fromDateColumn(row.beforeExpectedSpendOn),
-      afterExpectedSpendOn: fromDateColumn(row.afterExpectedSpendOn),
+      number: row.number,
+      reason: row.reason,
+      changedByEmployeeId: row.changedByEmployeeId,
+      createdAt: row.createdAt,
+      beforeExpectedEndDate: row.beforeExpectedEndDate ? fromDateColumn(row.beforeExpectedEndDate) : null,
+      afterExpectedEndDate: row.afterExpectedEndDate ? fromDateColumn(row.afterExpectedEndDate) : null,
+      beforeBudgetYear: row.beforeBudgetYear ?? 0,
+      afterBudgetYear: row.afterBudgetYear ?? 0,
+      beforeAmountMinor: row.beforeAmountMinor ?? null,
+      afterAmountMinor: row.afterAmountMinor ?? null,
+      currency: row.currency ?? 'VND',
     };
   }
 }

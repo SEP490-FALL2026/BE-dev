@@ -8,7 +8,11 @@ import {
   VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
-import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
+import {
+  AuthenticatedOnly,
+  RequireRoles,
+  RequireRolesOrGrants,
+} from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
@@ -63,6 +67,9 @@ const YEAR_ENDED = {
 } as const;
 /** What sending the lines refuses after the request validation: a first proposal and one sent again alike. */
 const SEND_EXAMPLES = [
+  EXAMPLES.PRIORITY_RANK_INVALID,
+  EXAMPLES.ZBB_REQUIRED,
+  EXAMPLES.OVER_CEILING_NOTE_REQUIRED,
   EXAMPLES.PLAN_NOT_FOUND,
   EXAMPLES.YEAR_ENDED,
   EXAMPLES.CURRENCY_NOT_REPORTING,
@@ -88,7 +95,7 @@ export class BudgetProposalsController {
   ) {}
 
   @Post()
-  @RequireRoles('MANAGER')
+  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
   @ApiOperation({ operationId: 'budgetProposalSubmit', summary: 'Send a budget proposal' })
   @ApiSuccessResponse(ProposalResponseDto, {
     status: HttpStatus.CREATED,
@@ -107,14 +114,14 @@ export class BudgetProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), or a proposal for the Cost Center and the year already waits or is being reviewed and no refused version leaves room for a successor (BUDGET.PROPOSAL_ALREADY_OPEN).',
-      examples: [EXAMPLES.FINANCE_SETUP_INCOMPLETE, EXAMPLES.PROPOSAL_ALREADY_OPEN],
+        'The department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), a proposal for the Cost Center and the year already waits or is being reviewed and no refused version leaves room for a successor (BUDGET.PROPOSAL_ALREADY_OPEN), or Finance has not published the budget cycle of the year yet (BUDGET.CYCLE_NOT_PUBLISHED).',
+      examples: [EXAMPLES.FINANCE_SETUP_INCOMPLETE, EXAMPLES.PROPOSAL_ALREADY_OPEN, EXAMPLES.CYCLE_NOT_PUBLISHED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is invalid (VALIDATION_ERROR), a line lacks its window, service period or repeat cycle, with the line and the fields in details.lines (BUDGET.PROPOSAL_INCOMPLETE), a window runs backwards (BUDGET.WINDOW_BACKWARDS), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND), the year has ended (BUDGET.YEAR_ENDED) or an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING).',
-      examples: [VALIDATION_EXAMPLE, ...SEND_EXAMPLES],
+        'The form is invalid (VALIDATION_ERROR), two lines share a priority rank (BUDGET.PRIORITY_RANK_INVALID, details.positions), a line lacks its zero-based-budget explanation (BUDGET.ZBB_REQUIRED, details.positions), a line that carries the proposal over the published ceiling of the department has no note (BUDGET.OVER_CEILING_NOTE_REQUIRED, details.positions), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND), the year has ended (BUDGET.YEAR_ENDED) an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING), or the head answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).',
+      examples: [VALIDATION_EXAMPLE, ...SEND_EXAMPLES, EXAMPLES.COST_CENTER_REQUIRED],
     },
   )
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: BudgetProposalBodyDto) {
@@ -180,7 +187,7 @@ export class BudgetProposalsController {
   }
 
   @Post(':id/withdrawal')
-  @RequireRoles('MANAGER')
+  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
   @ApiOperation({ operationId: 'budgetProposalWithdraw', summary: 'Take a budget proposal back' })
   @ApiSuccessResponse(ProposalResponseDto, {
     message: 'BUDGET_PROPOSAL.WITHDRAWN',
@@ -243,7 +250,7 @@ export class BudgetProposalsController {
   }
 
   @Post(':id/resubmission')
-  @RequireRoles('MANAGER')
+  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
   @ApiOperation({
     operationId: 'budgetProposalResubmit',
     summary: 'Send a budget proposal again after it was given back',
@@ -260,8 +267,13 @@ export class BudgetProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), another waits (BUDGET.PROPOSAL_ALREADY_OPEN), or the Cost Center of the department was retired and has none in use yet, though the head still owns the proposal given back (FINANCE.SETUP_INCOMPLETE).',
-      examples: [EXAMPLES.PROPOSAL_CANNOT_RESUBMIT, EXAMPLES.PROPOSAL_ALREADY_OPEN, EXAMPLES.FINANCE_SETUP_INCOMPLETE],
+        'The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), another waits (BUDGET.PROPOSAL_ALREADY_OPEN), the Cost Center of the department was retired and has none in use yet, though the head still owns the proposal given back (FINANCE.SETUP_INCOMPLETE), or the budget cycle of the year was never published (BUDGET.CYCLE_NOT_PUBLISHED).',
+      examples: [
+        EXAMPLES.PROPOSAL_CANNOT_RESUBMIT,
+        EXAMPLES.PROPOSAL_ALREADY_OPEN,
+        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+        EXAMPLES.CYCLE_NOT_PUBLISHED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

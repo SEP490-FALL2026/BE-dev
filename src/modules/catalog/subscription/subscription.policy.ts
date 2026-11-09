@@ -153,11 +153,15 @@ export function noticeInputOf(record: NoticeInput): NoticeInput {
   };
 }
 
-/** What a subscription is made of once an update is applied: each field the update gives, and the four dates and the notice period cleared by null. */
-export function nextStateOf<B extends string>(
+/** The value an update gives, or the stored one when it gives none; `null` is a value (it clears). */
+const given = <T>(value: T | undefined, stored: T): T => (value === undefined ? stored : value);
+
+/** What a subscription is made of once an update is applied: each field the update gives, and the four dates, the notice period and the vendor's minimum cleared by null. */
+export function nextStateOf<B extends string, C extends number>(
   current: {
     purchasedQuantity: number | null;
     billingCycle: B | null;
+    commitmentTermMonths: C | null;
     startDate: string | null;
     endDate: string | null;
     renewalDate: string | null;
@@ -165,10 +169,14 @@ export function nextStateOf<B extends string>(
     noticePeriodDays: number | null;
     autoRenew: boolean;
     allowsMidTermReduction: boolean;
+    responsibleItAdminEmployeeId: string | null;
+    vendorMinimumSeats: number | null;
+    isPrimaryForPlan: boolean;
   },
   input: {
     purchasedQuantity?: number;
     billingCycle?: B;
+    commitmentTermMonths?: C;
     startDate?: string;
     endDate?: string | null;
     renewalDate?: string | null;
@@ -176,18 +184,28 @@ export function nextStateOf<B extends string>(
     noticePeriodDays?: number | null;
     autoRenew?: boolean;
     allowsMidTermReduction?: boolean;
+    responsibleItAdminEmployeeId?: string;
+    vendorMinimumSeats?: number | null;
+    isPrimaryForPlan?: boolean;
   },
 ) {
   return {
-    purchasedQuantity: input.purchasedQuantity === undefined ? current.purchasedQuantity : input.purchasedQuantity,
-    billingCycle: input.billingCycle ?? current.billingCycle,
-    startDate: input.startDate ?? current.startDate,
-    endDate: input.endDate === undefined ? current.endDate : input.endDate,
-    renewalDate: input.renewalDate === undefined ? current.renewalDate : input.renewalDate,
-    noticeDeadline: input.noticeDeadline === undefined ? current.noticeDeadline : input.noticeDeadline,
-    noticePeriodDays: input.noticePeriodDays === undefined ? current.noticePeriodDays : input.noticePeriodDays,
-    autoRenew: input.autoRenew ?? current.autoRenew,
-    allowsMidTermReduction: input.allowsMidTermReduction ?? current.allowsMidTermReduction,
+    purchasedQuantity: given(input.purchasedQuantity, current.purchasedQuantity),
+    billingCycle: given<B | null>(input.billingCycle, current.billingCycle),
+    commitmentTermMonths: given<C | null>(input.commitmentTermMonths, current.commitmentTermMonths),
+    startDate: given<string | null>(input.startDate, current.startDate),
+    endDate: given(input.endDate, current.endDate),
+    renewalDate: given(input.renewalDate, current.renewalDate),
+    noticeDeadline: given(input.noticeDeadline, current.noticeDeadline),
+    noticePeriodDays: given(input.noticePeriodDays, current.noticePeriodDays),
+    autoRenew: given(input.autoRenew, current.autoRenew),
+    allowsMidTermReduction: given(input.allowsMidTermReduction, current.allowsMidTermReduction),
+    responsibleItAdminEmployeeId: given<string | null>(
+      input.responsibleItAdminEmployeeId,
+      current.responsibleItAdminEmployeeId,
+    ),
+    vendorMinimumSeats: given(input.vendorMinimumSeats, current.vendorMinimumSeats),
+    isPrimaryForPlan: given(input.isPrimaryForPlan, current.isPrimaryForPlan),
   };
 }
 
@@ -227,10 +245,16 @@ export function subscriptionStatusOf(
   return missing.length === 0 ? 'ACTIVE' : 'DRAFT';
 }
 
+/** The value a declaration gives, or the one a subscription starts with when it gives none. */
+const orStart = <T>(value: T | undefined, start: T): T => value ?? start;
+
 /** What a declared subscription starts as: what the declaration gives, nothing recorded for the rest, and the two choices off. */
-export function declaredStateOf<B extends string>(input: {
+export function declaredStateOf<B extends string, C extends number>(input: {
   purchasedQuantity?: number;
   billingCycle?: B;
+  commitmentTermMonths?: C;
+  responsibleItAdminEmployeeId?: string;
+  vendorMinimumSeats?: number;
   startDate?: string;
   endDate?: string;
   renewalDate?: string;
@@ -240,14 +264,18 @@ export function declaredStateOf<B extends string>(input: {
   allowsMidTermReduction?: boolean;
 }) {
   return {
-    purchasedQuantity: input.purchasedQuantity ?? null,
-    billingCycle: input.billingCycle ?? null,
-    startDate: input.startDate ?? null,
-    endDate: input.endDate ?? null,
-    renewalDate: input.renewalDate ?? null,
-    noticeDeadline: input.noticeDeadline ?? null,
-    noticePeriodDays: input.noticePeriodDays ?? null,
-    autoRenew: input.autoRenew ?? false,
-    allowsMidTermReduction: input.allowsMidTermReduction ?? false,
+    purchasedQuantity: orStart<number | null>(input.purchasedQuantity, null),
+    billingCycle: orStart<B | null>(input.billingCycle, null),
+    commitmentTermMonths: orStart<C | null>(input.commitmentTermMonths, null),
+    startDate: orStart<string | null>(input.startDate, null),
+    endDate: orStart<string | null>(input.endDate, null),
+    renewalDate: orStart<string | null>(input.renewalDate, null),
+    noticeDeadline: orStart<string | null>(input.noticeDeadline, null),
+    noticePeriodDays: orStart<number | null>(input.noticePeriodDays, null),
+    autoRenew: orStart(input.autoRenew, false),
+    allowsMidTermReduction: orStart(input.allowsMidTermReduction, false),
+    responsibleItAdminEmployeeId: orStart<string | null>(input.responsibleItAdminEmployeeId, null),
+    vendorMinimumSeats: orStart<number | null>(input.vendorMinimumSeats, null),
+    isPrimaryForPlan: false,
   };
 }

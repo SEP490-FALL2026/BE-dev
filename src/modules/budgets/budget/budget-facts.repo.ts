@@ -37,6 +37,8 @@ export class BudgetFactsRepo {
         versionId: version.id,
         currency: version.currency,
         totalMinor: version.totalMinor,
+        baseMinor: version.baseMinor,
+        reserveMinor: version.reserveMinor,
         heldMinor: held?.held ?? 0n,
         spentMinor: held?.spent ?? 0n,
       });

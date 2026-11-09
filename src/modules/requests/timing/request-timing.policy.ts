@@ -19,7 +19,7 @@ export interface TimingFacts {
   queueSentAt: Date | null;
 }
 
-export type SegmentKind = 'NEED' | 'IT_ASSESSMENT' | 'QUEUE_WAIT' | 'FINANCE_REVIEW' | 'SPEND_DECISION' | 'GRANT';
+export type SegmentKind = 'NEED' | 'IT_ASSESSMENT' | 'QUEUE_WAIT' | 'SPEND_DECISION' | 'GRANT';
 
 export interface TimingSegment {
   kind: SegmentKind;
@@ -54,12 +54,7 @@ const APPROVED_STATES: ReadonlySet<string> = new Set([
 ]);
 
 /** The kinds of step that end a stretch of waiting in the queue of the head: what the request waited for before it could be sent on. */
-const QUEUE_MARKER_KINDS: ReadonlySet<TimingStepKind> = new Set([
-  'NEED',
-  'IT_ASSESSMENT',
-  'FINANCE_REVIEW',
-  'SPEND_APPROVAL',
-]);
+const QUEUE_MARKER_KINDS: ReadonlySet<TimingStepKind> = new Set(['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL']);
 
 const seconds = (from: Date, to: Date): number => Math.round((to.getTime() - from.getTime()) / 1000);
 
@@ -67,7 +62,7 @@ function segment(kind: SegmentKind, startedAt: Date, endedAt: Date | null): Timi
   return { kind, startedAt, endedAt, seconds: endedAt === null ? null : seconds(startedAt, endedAt) };
 }
 
-/** The step of the kind that was made last: a request that went back to Finance or the approver has more than one. */
+/** The step of the kind that was made last: a request that went back to its head and was sent on again has more than one spend step. */
 function latest(steps: readonly TimingStep[], kind: TimingStepKind): TimingStep | null {
   return steps.filter((step) => step.kind === kind).at(-1) ?? null;
 }
@@ -130,13 +125,8 @@ export function timingsOf(facts: TimingFacts): RequestTimings {
   }
   const queue = queueWait(facts);
   if (queue) segments.push(queue);
-  for (const [kind, stepKind] of [
-    ['FINANCE_REVIEW', 'FINANCE_REVIEW'],
-    ['SPEND_DECISION', 'SPEND_APPROVAL'],
-  ] as const) {
-    const step = latest(facts.steps, stepKind);
-    if (step) segments.push(segment(kind, step.createdAt, step.decidedAt));
-  }
+  const spend = latest(facts.steps, 'SPEND_APPROVAL');
+  if (spend) segments.push(segment('SPEND_DECISION', spend.createdAt, spend.decidedAt));
   if (approvedAt) segments.push(segment('GRANT', approvedAt, completedAt));
 
   const approvalSeconds = approvedAt ? seconds(facts.submittedAt, approvedAt) : null;

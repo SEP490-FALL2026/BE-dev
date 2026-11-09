@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 
-export type SpendStepKind = 'FINANCE_REVIEW' | 'SPEND_APPROVAL';
+/** The spend step of the spending approver; the review step of Finance is retired (`QĐ-97c`) and its old rows are not read here. */
+export type SpendStepKind = 'SPEND_APPROVAL';
 export type SpendStepState = 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CLOSED';
 
 /** The row of the routing table of `US-05-03` that gave the step: none, the roles name the holder. */
@@ -17,7 +18,6 @@ export interface SpendStepRecord {
   assigneeEmployeeId: string | null;
   waitingReason: string | null;
   samePersonAsSpend: boolean;
-  noIndependentReview: boolean;
   slaWorkingDays: number;
   createdAt: Date;
   assignedAt: Date | null;
@@ -30,8 +30,6 @@ export interface NewSpendStep {
   /** Null when nobody valid holds it: the step waits and says why. */
   assigneeEmployeeId: string | null;
   waitingReason: string | null;
-  samePersonAsSpend?: boolean;
-  noIndependentReview?: boolean;
   slaWorkingDays: number;
   now: Date;
 }
@@ -45,16 +43,28 @@ const toRecord = (row: {
   assigneeEmployeeId: string | null;
   waitingReason: string | null;
   samePersonAsSpend: boolean;
-  noIndependentReview: boolean;
   slaWorkingDays: number;
   createdAt: Date;
   assignedAt: Date | null;
   decidedAt: Date | null;
-}): SpendStepRecord => ({ ...row, kind: row.kind as SpendStepKind, state: row.state as SpendStepState });
+}): SpendStepRecord => ({
+  id: row.id,
+  requestId: row.requestId,
+  kind: 'SPEND_APPROVAL',
+  sequence: row.sequence,
+  state: row.state as SpendStepState,
+  assigneeEmployeeId: row.assigneeEmployeeId,
+  waitingReason: row.waitingReason,
+  samePersonAsSpend: row.samePersonAsSpend,
+  slaWorkingDays: row.slaWorkingDays,
+  createdAt: row.createdAt,
+  assignedAt: row.assignedAt,
+  decidedAt: row.decidedAt,
+});
 
 /**
- * The review step of Finance and the spend step of the spending approver in `access_request_steps`, which the other repos
- * of the module do not know. At most one of each is open for a request, and the database refuses a second.
+ * The spend step of the spending approver in `access_request_steps`, which the other repos of the module do not know. At most one is
+ * open for a request, and the database refuses a second.
  */
 @Injectable()
 export class SpendStepRepo {
@@ -76,8 +86,7 @@ export class SpendStepRepo {
         assigneeEmployeeId: input.assigneeEmployeeId,
         routingRow: NOT_ROUTED,
         waitingReason: held ? null : input.waitingReason,
-        samePersonAsSpend: input.samePersonAsSpend ?? false,
-        noIndependentReview: input.noIndependentReview ?? false,
+        samePersonAsSpend: false,
         slaWorkingDays: input.slaWorkingDays,
         createdAt: input.now,
         assignedAt: held ? input.now : null,
@@ -158,50 +167,6 @@ export class SpendStepRepo {
          AND NOT EXISTS (SELECT 1 FROM access_request_lines l WHERE l.need_step_id = s.id AND l.state = 'AWAITING_NEED')`;
   }
 
-  /**
-   * Flags the need steps held by the same person as the spend step (`US-05-03` AC-9): a request has one, and a request for a group
-   * has two, which different people hold, so only the step this person holds is flagged (`US-06-14` AC-6).
-   */
-  async flagSamePerson(tx: DbTx, requestId: string, employeeId: string): Promise<void> {
-    await tx.accessRequestStep.updateMany({
-      where: { requestId, kind: 'NEED', assigneeEmployeeId: employeeId },
-      data: { samePersonAsSpend: true },
-    });
-  }
-
-  /** The open review steps, oldest first, with what the queue of Finance shows of each request. */
-  async pageOpenReviews(skip: number, take: number, state?: 'PENDING' | 'WAITING') {
-    const where = { kind: 'FINANCE_REVIEW' as const, state: state ?? { in: ['PENDING' as const, 'WAITING' as const] } };
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.accessRequestStep.findMany({
-        where,
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-        skip,
-        take,
-        select: {
-          id: true,
-          requestId: true,
-          state: true,
-          waitingReason: true,
-          createdAt: true,
-          slaWorkingDays: true,
-          request: {
-            select: {
-              costCenterId: true,
-              requesterEmployeeId: true,
-              planId: true,
-              amountMinor: true,
-              amountCurrency: true,
-            },
-          },
-        },
-      }),
-      this.prisma.accessRequestStep.count({ where }),
-    ]);
-
-    return { rows, total };
-  }
-
   /** The spend steps given to a person that are open (`PENDING`), oldest first, with what the queue of the approver shows. */
   async pageOpenSpendOf(employeeId: string, skip: number, take: number) {
     const where = openSpendWhere(employeeId);
@@ -217,12 +182,13 @@ export class SpendStepRepo {
           createdAt: true,
           slaWorkingDays: true,
           samePersonAsSpend: true,
-          noIndependentReview: true,
           request: {
             select: {
               planId: true,
               costCenterId: true,
               requesterEmployeeId: true,
+              routingMode: true,
+              oneStepReason: true,
               amountMinor: true,
               amountCurrency: true,
               offPlan: true,

@@ -53,10 +53,12 @@ const READ_WORDING: Record<string, { '403'?: string; '422'?: string }> = {
     '403': 'Only Finance and the spending approver read the versions of a budget.',
   },
   operatingParameterList: {
-    '403': 'Only the Super Admin reads the operating parameters, their history and the non-working dates.',
+    '403':
+      'Only the Super Admin and Finance read the operating parameters; Finance reads only the ones it owns and their history.',
   },
   operatingParameterHistory: {
-    '403': 'Only the Super Admin reads the operating parameters, their history and the non-working dates.',
+    '403':
+      'Only the Super Admin and Finance read the operating parameters; Finance reads only the ones it owns and their history.',
   },
   nonWorkingDateList: {
     '403': 'Only the Super Admin reads the operating parameters, their history and the non-working dates.',

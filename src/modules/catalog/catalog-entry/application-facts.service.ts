@@ -45,7 +45,7 @@ export class ApplicationFactsService {
    */
   async renewalAlertRecipient(applicationId: string): Promise<string | null> {
     const application = await this.applications.find(applicationId);
-    if (!application) return null;
+    if (application?.businessOwnerEmployeeId == null) return null;
     const owner = await this.organizationReads.getEmployee(application.businessOwnerEmployeeId);
 
     return owner && owner.status === 'ACTIVE' ? owner.id : null;

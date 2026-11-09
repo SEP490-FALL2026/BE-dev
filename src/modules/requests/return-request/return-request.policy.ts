@@ -40,7 +40,7 @@ export type ReturnableProblem =
   | 'NOT_OPEN'
   /** The right of a service account is answered for by a person and is not returned like a seat (`US-03-08`). */
   | 'SERVICE_ACCOUNT'
-  /** K3 is not granted yet and K4 is a key tied to a device (`g4-device-dependent-features`). */
+  /** K3 is not granted yet; a K4 key goes back to the store like any seat (`QĐ-103d`). */
   | 'PLAN_NOT_SUPPORTED'
   /** The grant was not carried out: a seat that is not real is withdrawn, not returned (`US-05-08`). */
   | 'GRANT_NOT_COMPLETED';
@@ -54,7 +54,7 @@ export function checkReturnable(facts: {
 }): ReturnableProblem | null {
   if (!facts.open) return 'NOT_OPEN';
   if (facts.kind === 'SERVICE') return 'SERVICE_ACCOUNT';
-  if (facts.provisioningType === 'K3' || facts.provisioningType === 'K4') return 'PLAN_NOT_SUPPORTED';
+  if (facts.provisioningType === 'K3') return 'PLAN_NOT_SUPPORTED';
   if (facts.grant === 'NOT_COMPLETED') return 'GRANT_NOT_COMPLETED';
 
   return null;

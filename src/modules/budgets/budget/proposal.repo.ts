@@ -3,6 +3,8 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { ProposalState } from './budget.policy';
+import { proposalLineZbbJson } from './budget-line-zbb.json';
+import type { LineType, ZbbExplanation } from './budget-line-zbb.json';
 
 export interface ProposalLineRecord {
   position: number;
@@ -11,6 +13,12 @@ export interface ProposalLineRecord {
   seats: number | null;
   amountMinor: bigint;
   note: string | null;
+  lineType: LineType;
+  zbb: ZbbExplanation | null;
+  /** Given by the head, once in the proposal (`QT 4.4`). */
+  priorityRank: number;
+  /** The part of the line that carries the proposal over the published ceiling of the department; null = no flag. Set by the server. */
+  overCeilingMinor: bigint | null;
 }
 
 export interface ProposalRecord {
@@ -61,6 +69,10 @@ const toLine = (row: LineRow): ProposalLineRecord => ({
   seats: row.seats,
   amountMinor: row.amountMinor,
   note: row.note,
+  lineType: row.lineType,
+  zbb: proposalLineZbbJson.decode(row.zbb),
+  priorityRank: row.priorityRank,
+  overCeilingMinor: row.overCeilingMinor,
 });
 
 const WITH_SUCCESSOR = { successor: { select: { id: true } } } as const;
@@ -116,11 +128,15 @@ export class ProposalRepo {
         lines: {
           create: input.lines.map((line, index) => ({
             position: index + 1,
+            priorityRank: line.priorityRank,
             description: line.description,
             planId: line.planId,
             seats: line.seats,
             amountMinor: line.amountMinor,
             note: line.note,
+            lineType: line.lineType,
+            zbb: proposalLineZbbJson.encode(line.zbb),
+            overCeilingMinor: line.overCeilingMinor,
           })),
         },
       },
@@ -218,6 +234,36 @@ export class ProposalRepo {
     return rows.map(toLine);
   }
 
+  /** The lines of these proposals by priority rank, by proposal: one statement (the package reads the lines of every department's open proposal). */
+  async linesOfMany(proposalIds: readonly string[], tx?: DbTx): Promise<Map<string, ProposalLineRecord[]>> {
+    const grouped = new Map<string, ProposalLineRecord[]>();
+    if (proposalIds.length === 0) return grouped;
+    const rows = await (tx ?? this.prisma).budgetProposalLine.findMany({
+      where: { proposalId: { in: [...proposalIds] } },
+      orderBy: [{ proposalId: 'asc' }, { priorityRank: 'asc' }],
+    });
+    for (const row of rows) grouped.set(row.proposalId, [...(grouped.get(row.proposalId) ?? []), toLine(row)]);
+
+    return grouped;
+  }
+
+  /** The part over the published ceiling that each of these proposal lines carries, keyed `proposalId:position`; a line that is not flagged is absent. */
+  async overCeilingOf(
+    lines: readonly { proposalId: string; position: number }[],
+    tx?: DbTx,
+  ): Promise<Map<string, bigint>> {
+    const flagged = new Map<string, bigint>();
+    const ids = [...new Set(lines.map((line) => line.proposalId))];
+    if (ids.length === 0) return flagged;
+    const rows = await (tx ?? this.prisma).budgetProposalLine.findMany({
+      where: { proposalId: { in: ids }, overCeilingMinor: { not: null } },
+      select: { proposalId: true, position: true, overCeilingMinor: true },
+    });
+    for (const row of rows) flagged.set(`${row.proposalId}:${row.position}`, row.overCeilingMinor as bigint);
+
+    return flagged;
+  }
+
   async pageLines(
     proposalId: string,
     skip: number,
@@ -249,6 +295,36 @@ export class ProposalRepo {
     ]);
 
     return { items: rows.map(toRecord), total };
+  }
+
+  /** The Cost Centers among these that have a proposal for the year that waits or is being reviewed: the same ones that stop a version built from the baseline (a proposal given back is not one). */
+  async proposedCostCenters(costCenterIds: readonly string[], year: number, tx?: DbTx): Promise<Set<string>> {
+    if (costCenterIds.length === 0) return new Set();
+    const rows = await (tx ?? this.prisma).budgetProposal.findMany({
+      where: { costCenterId: { in: [...costCenterIds] }, year, state: { in: ['SUBMITTED', 'REVIEWED'] } },
+      select: { costCenterId: true },
+      distinct: ['costCenterId'],
+    });
+
+    return new Set(rows.map((row) => row.costCenterId));
+  }
+
+  /** The newest proposal that waits or is being reviewed of each of these Cost Centers for the year, by Cost Center: one statement. */
+  async openOfCostCenters(
+    costCenterIds: readonly string[],
+    year: number,
+    tx?: DbTx,
+  ): Promise<Map<string, ProposalRecord>> {
+    if (costCenterIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).budgetProposal.findMany({
+      where: { costCenterId: { in: [...costCenterIds] }, year, state: { in: ['SUBMITTED', 'REVIEWED'] } },
+      include: WITH_SUCCESSOR,
+      orderBy: [{ submittedAt: 'desc' }, { id: 'asc' }],
+    });
+    const newest = new Map<string, ProposalRecord>();
+    for (const row of rows) if (!newest.has(row.costCenterId)) newest.set(row.costCenterId, toRecord(row));
+
+    return newest;
   }
 
   /** The proposals of a Cost Center and a year, newest first: the history of what was sent, given back and sent again. */

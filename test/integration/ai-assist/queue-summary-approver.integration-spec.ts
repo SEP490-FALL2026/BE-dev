@@ -16,9 +16,9 @@ interface QueueItem {
 
 /**
  * The AI summary of the queue of the spending approver C1 (`US-15-05` AC-8, AC-13, AC-14, AC-15) over the whole application, real
- * PostgreSQL and a local stand-in of the AI service over real HTTP. C1 holds the need step of R9 (sent by the head H1 for
- * themselves), the spend step of R10 (branch (b), in the catalog, 21 million) and of R11 (branch (c), software assessed by the IT
- * Admin); R1 waits for H1 and R12 for the assessment of the IT Admin. The budget of the Cost Center of R10 is the example of
+ * PostgreSQL and a local stand-in of the AI service over real HTTP. C1 holds the spend step of R9 (sent by the head H1 for
+ * themselves: one step, no need step — MF1-D, QĐ-104), of R10 (branch (b), in the catalog, 21 million) and of R11 (branch (c), software
+ * assessed by the IT Admin); R1 waits for H1 and R12 for the assessment of the IT Admin. The budget of the Cost Center of R10 is the example of
  * `US-06-01` AC-1: 100 million, 40 spent, 20 held, 40 left.
  */
 describe('the AI summary of the queue of the spending approver (integration, real HTTP to a stand-in AI service, real PostgreSQL)', () => {
@@ -58,12 +58,13 @@ describe('the AI summary of the queue of the spending approver (integration, rea
     engineering = await h.unit('P-ENG');
     const it = { employeeId: h.it1.employeeId, account: h.it1 };
     await h.setItAdminInCharge(design.department, it);
-    // Whole percent of what is left above which a request is high value: 100, so no review of Finance stands in the way.
     await h.budgetFor(design, { total: 100 * M, held: 20 * M, spent: 40 * M });
     await h.budgetFor(engineering, { total: 100 * M });
 
     r1 = await h.sent(design.member, internal, { businessReason: 'Nhân viên cần công cụ ghi chú' });
     r9 = await h.sent(design.head, plan, { businessReason: 'Trưởng phòng cần công cụ thiết kế' });
+    // The amount of the request is the months left of the year, which depends on the day the suite runs: it is written, so that it is within the base once R10 waits (40 - 21 = 19 million left): its spend step goes straight to C1 (BR-MF1-06g).
+    await h.setPayments(r9.id, { amount: 15 * M });
     r10 = await h.waitingForApprover(design, plan, { amount: 21 * M });
     r11 = await h.staleRequest(engineering, 10 * M);
     await h.ctx.sql.query(
@@ -82,9 +83,9 @@ describe('the AI summary of the queue of the spending approver (integration, rea
       faithfulAnswer(received, (item, line) => {
         if (item.sourceRef === 'R001') return [{ ...line, summary: `${line.summary} Ngân sách còn 40 triệu.` }];
         if (item.sourceRef === 'R002')
-          return [{ ...line, summary: line.summary.replace('{{cost:C001}}', '21 triệu đồng') }];
+          return [{ ...line, summary: line.summary.replace('{{cost:C002}}', '21 triệu đồng') }];
 
-        return [{ ...line, summary: line.summary.replace('{{cost:C002}}', '10000000 VND') }];
+        return [{ ...line, summary: line.summary.replace('{{cost:C003}}', '10000000 VND') }];
       }),
     );
     invalid = await h.summarize(h.boss.account);
@@ -109,20 +110,17 @@ describe('the AI summary of the queue of the spending approver (integration, rea
     expect(view.invocationId).not.toBe(invalid.invocationId);
   });
 
-  it('AC-8: exactly 3 lines, R9 a need step and R10, R11 spend steps, each opening its own step; nothing of R1 or R12', async () => {
+  it('AC-8: exactly 3 lines, R9 (one step, MF1-D), R10 and R11 spend steps, each opening its own step; nothing of R1 or R12', async () => {
     expect(view).toMatchObject({ status: 'COMPLETED', omittedCount: 0, sourceStale: false });
     expect(view.lines.map((line) => [line.requestId, line.stepKind])).toEqual([
-      [r9.id, 'NEED_APPROVAL'],
+      [r9.id, 'SPEND_APPROVAL'],
       [r10, 'SPEND_APPROVAL'],
       [r11, 'SPEND_APPROVAL'],
     ]);
-    const need = h.dataOf<{ request: AccessRequestWire }>(await h.fetch(r9.id, h.boss.account).expect(200)).request;
-    expect(need.needStep).toMatchObject({
-      id: view.lines[0].stepId,
-      state: 'PENDING',
-      assignee: { employeeId: h.boss.employeeId },
-    });
-    for (const line of view.lines.slice(1)) {
+    // The request of a head for themselves has no need step (MF1-D): it is the spending approver's spend step from the start.
+    const own = h.dataOf<{ request: AccessRequestWire }>(await h.fetch(r9.id, h.boss.account).expect(200)).request;
+    expect(own.needStep).toMatchObject({ state: 'NOT_REQUIRED' });
+    for (const line of view.lines) {
       const detail = h.dataOf<{
         spendApproval: { requestId: string; step: { id: string; assignee: { employeeId: string } } };
       }>(await h.approvalOf(line.requestId, h.boss.account).expect(200)).spendApproval;
@@ -146,12 +144,13 @@ describe('the AI summary of the queue of the spending approver (integration, rea
     expect(call.body.context.requests).toEqual([
       {
         sourceRef: 'R001',
-        stepKind: 'NEED_APPROVAL',
+        stepKind: 'SPEND_APPROVAL',
         softwareName: applicationName,
         beneficiaryDisplayName: names[0],
         reason: r9.businessReason,
-        requestedDurationLabel: `${r9.termMonths} tháng`,
-        estimatedCostRef: null,
+        // A request carries an end date now, not months (`QĐ-104a`): the AI source has no duration in months to give.
+        requestedDurationLabel: null,
+        estimatedCostRef: 'C001',
       },
       {
         sourceRef: 'R002',
@@ -159,8 +158,8 @@ describe('the AI summary of the queue of the spending approver (integration, rea
         softwareName: applicationName,
         beneficiaryDisplayName: names[1],
         reason: expect.any(String) as string,
-        requestedDurationLabel: '1 tháng',
-        estimatedCostRef: 'C001',
+        requestedDurationLabel: null,
+        estimatedCostRef: 'C002',
       },
       {
         sourceRef: 'R003',
@@ -168,11 +167,11 @@ describe('the AI summary of the queue of the spending approver (integration, rea
         softwareName: 'Miro',
         beneficiaryDisplayName: names[2],
         reason: expect.any(String) as string,
-        requestedDurationLabel: expect.stringMatching(/^\d+ tháng$/) as string,
-        estimatedCostRef: 'C002',
+        requestedDurationLabel: null,
+        estimatedCostRef: 'C003',
       },
     ]);
-    for (const figure of ['100000000', '40000000', '20000000', '21000000', '10000000']) {
+    for (const figure of ['100000000', '40000000', '20000000', '21000000', '15000000', '10000000']) {
       expect(call.raw).not.toContain(figure);
     }
     expect(call.raw).not.toMatch(/budget|amount|currency|VND|remaining|pending|held|spent/i);
@@ -194,8 +193,12 @@ describe('the AI summary of the queue of the spending approver (integration, rea
       budget: { amount: String(100 * M) },
       held: { amount: String(20 * M) },
       spent: { amount: String(40 * M) },
-      remaining: { amount: String(40 * M) },
     });
+    // MF1-B (RV-10, M-05): R9 waits for C1's spend decision (one step), so what it costs this year is pending and comes off what is left:
+    // 100 - 40 spent - 20 held - pending. Its amount is the months left of the year at its check, which depends on the day the suite runs.
+    const pending = Number(years[0].pending.amount);
+    expect(pending).toBeGreaterThan(0);
+    expect(years[0].remaining).toEqual({ amount: String(40 * M - pending), currency: 'VND' });
   });
 
   it('AC-13: a renewal waiting for its decision stays out of the summary of C1, who no longer reads renewals (QĐ-101, step 13)', async () => {
@@ -251,17 +254,11 @@ describe('the AI summary of the queue of the spending approver (integration, rea
     expect(reread.sourceStale).toBe(true);
   });
 
-  it('AC-14: once C1 approves the need of R9 and Finance has reviewed it, its spend step goes to C1 and a new summary shows R9 as a spend step', async () => {
+  it('AC-14, MF1-D: R9 has no need step for C1 to approve; its spend step is C1s from the start (no review of Finance), and a new summary shows it with R11', async () => {
     h.ai.reset();
-    await h.decide(r9.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
-    // The approval of the need sends R9 to Finance first; Finance holds a review step, which is no step a summary reads.
-    expect(await h.steps(r9.id, 'FINANCE_REVIEW')).toEqual([
-      expect.objectContaining({ state: 'PENDING', assignee_employee_id: h.finance.employeeId }),
-    ]);
+    expect(await h.steps(r9.id, 'NEED')).toEqual([expect.objectContaining({ state: 'NOT_REQUIRED' })]);
+    // Finance has no step of any request (QĐ-97c): it has nothing a summary reads.
     expect(h.codeOf(await h.ask(h.finance, await h.revisionOf(h.finance)).expect(403))).toBe('AI.NO_ASSIGNED_STEPS');
-    await h
-      .completeReview(r9.id, { outcome: 'ASSESSED', opinion: 'Vượt phần còn lại', direction: 'RECOMMEND_OVERRIDE' })
-      .expect(200);
     expect(await h.steps(r9.id, 'SPEND_APPROVAL')).toEqual([
       expect.objectContaining({ state: 'PENDING', assignee_employee_id: h.boss.employeeId }),
     ]);
@@ -269,8 +266,8 @@ describe('the AI summary of the queue of the spending approver (integration, rea
     const again = await h.summarize(h.boss.account);
 
     expect(again.lines.map((line) => [line.requestId, line.stepKind])).toEqual([
-      [r11, 'SPEND_APPROVAL'],
       [r9.id, 'SPEND_APPROVAL'],
+      [r11, 'SPEND_APPROVAL'],
     ]);
     expect(h.ai.accepted()).toHaveLength(1);
   });

@@ -57,6 +57,8 @@ export interface ParameterDefinition {
   description: string;
   /** Where the story that fixes it says so. */
   source: string;
+  /** Who sets it (`QĐ-103z`(1), L1-19): the Super Admin unless the definition says Finance. */
+  owner?: 'SUPER_ADMIN' | 'FINANCE';
 }
 
 /**
@@ -66,10 +68,8 @@ export interface ParameterDefinition {
  *
  * The list is ordered by group (the order of {@link PARAMETER_GROUPS}), so the screen shows it as it comes.
  *
- * The budget period is the fiscal year (`FR-5.1`, `QĐ-82e`), so there is no parameter for its kind and none for a
- * high-value threshold or a 50 % rate (`QĐ-82c`). The two choices that remain are when the fiscal year begins and how
- * long a request may wait to be submitted; the lock on the month once a budget version exists belongs to the budget
- * (G5), which does not exist yet.
+ * The budget period is the calendar year (`FR-5.1`, `QĐ-104e`(1)), so there is no parameter for when it begins, none for
+ * its kind and none for a high-value threshold or a 50 % rate (`QĐ-82c`).
  *
  * Not here on purpose: the time zone (set once at installation, `QĐ-47d`), and the reporting currency, which lock
  * once rates or priced subscriptions exist (AC-9) — it joins when the slice that holds those exists. The same goes
@@ -110,15 +110,40 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'FR-8.2, QĐ-82e',
   },
   {
-    key: 'FISCAL_YEAR_START_MONTH',
-    label: 'Tháng bắt đầu năm tài chính',
-    group: 'BUDGET',
-    shape: { kind: 'int', min: 1, max: 12 },
-    default: 1,
-    unit: 'month of the year',
-    unitLabel: 'tháng trong năm',
-    description: 'The month the fiscal year, which is the budget period of the whole organization, begins.',
-    source: 'FR-8.2, FR-5.1, QĐ-82c',
+    key: 'REQUEST_OPEN_NEW_LIMIT',
+    label: 'Số Request cấp mới đang mở tối đa của một người',
+    group: 'WORKFLOW',
+    shape: { kind: 'int', min: 1, max: 20 },
+    default: 3,
+    unit: 'requests',
+    unitLabel: 'Request',
+    description:
+      'GH-2: a person who already is the beneficiary of this many requests for new access still open cannot be named in another one.',
+    source: 'BR-MF1-01f, QĐ-103c, QĐ-104b',
+  },
+  {
+    key: 'PAID_SOFTWARE_FLAG_THRESHOLD',
+    label: 'Ngưỡng số phần mềm trả phí cần lý do khi xin thêm',
+    group: 'WORKFLOW',
+    shape: { kind: 'int', min: 1, max: 100 },
+    default: 10,
+    unit: 'applications',
+    unitLabel: 'phần mềm',
+    description:
+      'GH-3: a person who already uses this many paid applications may still ask for another one, with a reason, and the request is flagged.',
+    source: 'BR-MF1-01g, QĐ-103c',
+  },
+  {
+    key: 'RENEWAL_WINDOW_DAYS',
+    label: 'Cửa sổ gửi Request tiếp tục trước ngày kết thúc',
+    group: 'WORKFLOW',
+    shape: { kind: 'int', min: 1, max: 90 },
+    default: 30,
+    unit: 'days',
+    unitLabel: 'ngày',
+    description:
+      'How many days before the approved end of a right with an end date its holder may ask to go on using it; a window already open keeps the value it opened with.',
+    source: 'BR-MF1-08a, QĐ-108b',
   },
   {
     key: 'FORECAST_ERROR_THRESHOLD_PERCENT',
@@ -141,6 +166,33 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     unitLabel: '%',
     description: 'The share of the base budget a new version sets aside as its reserve when Finance gives none.',
     source: 'QĐ-98, US-06-09 AC-30',
+    owner: 'FINANCE',
+  },
+  {
+    key: 'BUDGET_ZBB_KPI3_BELOW_PERCENT',
+    label: 'Ngưỡng sử dụng dưới đó dòng ngân sách cần giải trình ZBB',
+    group: 'BUDGET',
+    shape: { kind: 'int', min: 1, max: 100 },
+    default: 70,
+    unit: 'percent',
+    unitLabel: '%',
+    description:
+      'A line of a budget proposal needs the reduced zero-based-budget explanation when the usage of what runs today (KPI-3) is known and below this share.',
+    source: 'QĐ-94l, FR-5.15(1)',
+    owner: 'FINANCE',
+  },
+  {
+    key: 'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
+    label: 'Ngưỡng tăng đơn giá cần giải trình ZBB',
+    group: 'BUDGET',
+    shape: { kind: 'int', min: 1, max: 100 },
+    default: 10,
+    unit: 'percent',
+    unitLabel: '%',
+    description:
+      'A line of a budget proposal needs the reduced zero-based-budget explanation when its unit price is more than this share above the monthly price of today.',
+    source: 'QĐ-94l, FR-5.15(1)',
+    owner: 'FINANCE',
   },
   {
     key: 'TRANSFER_REVIEW_WORKING_DAYS',
@@ -291,6 +343,42 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'FR-4.12',
   },
   {
+    key: 'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
+    label: 'Ân hạn cho ghế mới cấp',
+    group: 'USAGE',
+    shape: { kind: 'int', min: 1, max: 60 },
+    default: 14,
+    unit: 'days',
+    unitLabel: 'ngày',
+    description:
+      'How many days after a seat could first be used it is left out of the rules of unused seats (a person needs time to start).',
+    source: 'FR-4.9, A.4',
+  },
+  {
+    key: 'GHOST_SEAT_DECISION_WORKING_DAYS',
+    label: 'Hạn trưởng phòng quyết định ghost seat',
+    group: 'USAGE',
+    shape: { kind: 'int', min: 1, max: 20 },
+    default: 5,
+    unit: 'working days',
+    unitLabel: 'ngày làm việc',
+    description:
+      'How many working days the head of a department has to keep, reclaim or exempt a seat the system recommends, counted from the day the recommendation entered the queue; past it, only a reminder and a warning to the IT Admin.',
+    source: 'QĐ-66t, FR-4.12',
+  },
+  {
+    key: 'GHOST_SEAT_REVOCATION_GRACE_DAYS',
+    label: 'Ân hạn trước khi gỡ ghost seat',
+    group: 'USAGE',
+    shape: { kind: 'int', min: 0, max: 30 },
+    default: 7,
+    unit: 'calendar days',
+    unitLabel: 'ngày lịch',
+    description:
+      'How many calendar days after the head decides to reclaim a seat the holder is told before the IT Admin may take away the seat.',
+    source: 'QĐ-94j, BR-MF5-04',
+  },
+  {
     key: 'RULE_SCHEDULE_G1_G2',
     label: 'Lịch chạy luật lãng phí (dữ liệu nội bộ)',
     group: 'USAGE',
@@ -351,6 +439,16 @@ const BY_KEY = new Map(PARAMETER_DEFINITIONS.map((definition) => [definition.key
 export function definitionOf(key: string): ParameterDefinition | undefined {
   return BY_KEY.get(key);
 }
+
+/** Who sets the parameter: the role named by its definition, the Super Admin by default. */
+export const parameterOwnerOf = (key: string): 'SUPER_ADMIN' | 'FINANCE' => definitionOf(key)?.owner ?? 'SUPER_ADMIN';
+
+/** Whether a holder of these roles sets the parameter: only the role that owns it does (the Super Admin does not set Finance's). */
+export const rolesMaySet = (roles: readonly string[], key: string): boolean => roles.includes(parameterOwnerOf(key));
+
+/** Whether a holder of these roles reads the parameter and its history: the Super Admin reads all, Finance only its own. */
+export const rolesMayRead = (roles: readonly string[], key: string): boolean =>
+  roles.includes('SUPER_ADMIN') || rolesMaySet(roles, key);
 
 export function defaultValues(): ParameterValues {
   return Object.fromEntries(PARAMETER_DEFINITIONS.map((definition) => [definition.key, definition.default]));

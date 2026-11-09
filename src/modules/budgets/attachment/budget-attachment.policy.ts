@@ -123,7 +123,7 @@ export type BudgetRecordView = 'FULL' | 'AS_LAST_SENT' | 'NONE';
 export function budgetRecordView(params: {
   isFinance: boolean;
   isDecider: boolean;
-  headedCostCenterId: string | null;
+  headedCostCenterIds: readonly string[];
   recordCostCenterId: string;
   versionSentAt?: Date | null;
 }): BudgetRecordView {
@@ -131,7 +131,7 @@ export function budgetRecordView(params: {
     return 'FULL';
   }
 
-  if (params.headedCostCenterId && params.headedCostCenterId === params.recordCostCenterId) {
+  if (params.headedCostCenterIds.includes(params.recordCostCenterId)) {
     if (params.versionSentAt === undefined) {
       return 'FULL';
     }

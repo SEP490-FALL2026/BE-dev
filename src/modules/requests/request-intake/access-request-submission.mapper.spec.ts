@@ -8,7 +8,7 @@ import {
 const base = (decision: unknown, extra: Partial<SubmittedRequest> = {}): SubmittedRequest => ({
   actor: { employeeId: 'emp-1', appUserId: 'user-1' },
   organizationId: 'org-1',
-  body: { planId: 'plan-1', termMonths: 6, businessReason: 'Cần cho dự án' },
+  body: { planId: 'plan-1', businessReason: 'Cần cho dự án' },
   assessed: {
     unit: { departmentId: 'dep-1', costCenter: { id: 'cc-1' } },
     policy: { branch: 'PAID_IN_CATALOG', version: 3, slaWorkingDays: 2, chain: ['NEED', 'SPEND_APPROVAL'] },
@@ -16,7 +16,6 @@ const base = (decision: unknown, extra: Partial<SubmittedRequest> = {}): Submitt
       status: 'COMPUTED',
       amount: { amountMinor: 1200n, currency: 'VND' },
       budgetYear: 2026,
-      expectedSpendOn: '2026-11-01',
     },
     routing: { decision, departmentHeadEmployeeId: 'head-1' },
   } as unknown as SubmittedRequest['assessed'],
@@ -29,7 +28,6 @@ const assigned = {
   row: 1,
   role: 'MANAGER',
   assigneeEmployeeId: 'head-1',
-  samePersonAsSpend: false,
 };
 const waiting = { outcome: 'WAITING', row: 8, reason: 'NO_VALID_APPROVER' };
 
@@ -83,19 +81,20 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
       branch: 'PAID_IN_CATALOG',
       state: 'PENDING',
       planId: 'plan-1',
-      termMonths: 6,
+      expectedEndDate: null,
       requesterEmployeeId: 'emp-1',
       beneficiaryEmployeeIds: ['emp-1'],
       departmentId: 'dep-1',
       costCenterId: 'cc-1',
       policyVersion: 3,
       hasSpendStep: true,
+      // GH-3 (BR-MF1-01g): how many paid applications the person used when it was sent; null when not flagged.
+      manyPaidSoftwareCount: null,
       slaWorkingDays: 2,
       pricingStatus: 'COMPUTED',
       amountMinor: '1200',
       amountCurrency: 'VND',
       budgetYear: 2026,
-      expectedSpendOn: '2026-11-01',
     });
   });
 
@@ -107,7 +106,6 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
       assigneeEmployeeId: 'head-1',
       role: 'MANAGER',
       waitingReason: null,
-      samePersonAsSpend: false,
       requesterEmployeeId: 'emp-1',
       departmentId: 'dep-1',
       departmentHeadEmployeeId: 'head-1',
@@ -117,7 +115,6 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
       assigneeEmployeeId: null,
       role: null,
       waitingReason: 'NO_VALID_APPROVER',
-      samePersonAsSpend: false,
     });
   });
 });

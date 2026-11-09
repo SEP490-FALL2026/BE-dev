@@ -130,7 +130,7 @@ describe('budget attachment access rules (integration)', () => {
       await h.linkAttachment(docId, head.account).expect(404);
     });
 
-    it.each(['APPROVED', 'REJECTED', 'SUPERSEDED'] as const)(
+    it.each(['APPROVED', 'REJECTED'] as const)(
       'still shows the head the documents of a sent version that became %s',
       async (state) => {
         const { head, version } = await waiting();
@@ -142,15 +142,24 @@ describe('budget attachment access rules (integration)', () => {
           await h
             .decideVersion(version.id, { decision: 'REJECT', reason: 'Too high' }, spendingApprover.account)
             .expect(200);
-        } else {
-          await h.makeCurrent(version.id);
-          await h.ctx.sql.query(`UPDATE budget_versions SET state = 'SUPERSEDED' WHERE id = $1`, [version.id]);
         }
 
         expect((await listIds(version.id, head.account)).map((item) => item.id)).toEqual([docId]);
         await h.linkAttachment(docId, head.account).expect(200);
       },
     );
+
+    // The third state of this case, SUPERSEDED, is retired (QĐ-97b, migration BM-10): a version is never replaced, and the database
+    // refuses the state, so a version cannot reach it for the head to read the documents of.
+    it('cannot reach SUPERSEDED any more: the database refuses the state', async () => {
+      const { version } = await waiting();
+      await h.sendVersion(version.id).expect(200);
+      await h.makeCurrent(version.id);
+
+      await expect(
+        h.ctx.sql.query(`UPDATE budget_versions SET state = 'SUPERSEDED' WHERE id = $1`, [version.id]),
+      ).rejects.toMatchObject({ code: '23514' });
+    });
   });
 
   describe('the documents of the latest send (D-S24)', () => {

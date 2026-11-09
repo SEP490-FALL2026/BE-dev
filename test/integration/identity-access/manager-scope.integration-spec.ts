@@ -49,8 +49,11 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
     ['the people of the department', 'get', () => `/api/v1/departments/${departmentId()}/employees`],
   ];
 
+  /** The budget work of the head admits whoever holds the grant (the coming head of a department that starts later): the service judges the unit. */
+  const BUDGET_WORK = new Set(['the budget of the department', 'a budget proposal']);
+
   describe('routes open to the Manager alone', () => {
-    it.each(MANAGER_ONLY)(
+    it.each(MANAGER_ONLY.filter(([group]) => !BUDGET_WORK.has(group)))(
       'refuses a MANAGER who heads nothing with 403 AUTHORIZATION.FORBIDDEN: %s',
       async (_group, method, path) => {
         const response = await call(method, path(), holder.account);
@@ -58,6 +61,75 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
         expect([response.status, h.codeOf(response)]).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
       },
     );
+
+    describe('the eight routes of the budget work admit the grant and refuse a MANAGER with no term, now or to come (QĐ-106k)', () => {
+      const year = () => new Date().getUTCFullYear() + 1;
+      const rows = async (): Promise<string> =>
+        (
+          await h.ctx.sql.query<{ n: string }>(
+            `SELECT (SELECT count(*) FROM budget_proposals) || '/' || (SELECT count(*) FROM budget_attachments) || '/' ||
+                    (SELECT count(*) FROM budget_versions) AS n`,
+          )
+        ).rows[0].n;
+      const refusedWith = async (status: number, code: string, send: () => Promise<request.Response>) => {
+        const before = await rows();
+        const response = await send();
+
+        expect([response.status, h.codeOf(response)]).toEqual([status, code]);
+        expect(await rows()).toBe(before);
+      };
+      const NOT_YOURS = 'BUDGET.NOT_YOUR_COST_CENTER';
+
+      it.each([
+        ['budgetMine', () => call('get', `/api/v1/budgets/mine?year=${year()}`, holder.account)],
+        ['budgetMineLineList', () => call('get', `/api/v1/budgets/mine/lines?year=${year()}`, holder.account)],
+        ['budgetMineVersionList', () => call('get', `/api/v1/budgets/mine/versions?year=${year()}`, holder.account)],
+        [
+          'budgetProposalSubmit',
+          () =>
+            request(h.server())
+              .post('/api/v1/budget-proposals')
+              .set(h.as(holder.account))
+              // The lines of a proposal take the form of BM-10 (MF4-B); a valid body reaches the scope of the caller.
+              .send(h.proposalBody('', undefined, year())),
+        ],
+        [
+          'budgetProposalAttachmentDeclare',
+          () =>
+            request(h.server())
+              .post('/api/v1/budget-proposals/attachments')
+              .set(h.as(holder.account))
+              .send({ fileName: 'quote.pdf', contentType: 'application/pdf', sizeBytes: 1024 }),
+        ],
+      ])('%s answers 403 BUDGET.NOT_YOUR_COST_CENTER and writes nothing', async (_name, send) => {
+        await refusedWith(403, NOT_YOURS, send);
+      });
+
+      it('budgetProposalWithdraw and budgetProposalResubmit find nothing of the proposal of another department (404), and change nothing', async () => {
+        const other = await h.departmentWithHead('P-MS-OTHER');
+        const proposal = await h.budgetProposed(other.head, other.department.unitId);
+
+        await refusedWith(404, 'BUDGET.PROPOSAL_NOT_FOUND', () => h.withdraw(proposal.id, holder.account));
+        await refusedWith(404, 'BUDGET.PROPOSAL_NOT_FOUND', () =>
+          h.resubmit(proposal.id, { lines: h.twoLines() }, holder.account),
+        );
+      });
+
+      it('budgetAttachmentComplete refuses a person who declared a file as a head and answers for no unit any more', async () => {
+        const former = await h.departmentWithHead('P-MS-FORMER');
+        const declared = await request(h.server())
+          .post('/api/v1/budget-proposals/attachments')
+          .set(h.as(former.head.account))
+          .send({ fileName: 'quote.pdf', contentType: 'application/pdf', sizeBytes: 1024 })
+          .expect(201);
+        const id = h.dataOf<{ attachment: { id: string } }>(declared).attachment.id;
+        await h.withoutHead(former.department);
+
+        await refusedWith(403, NOT_YOURS, () =>
+          request(h.server()).post(`/api/v1/budget-attachments/${id}/complete`).set(h.as(former.head.account)),
+        );
+      });
+    });
 
     it.each(MANAGER_ONLY)(
       'lets the head through the same route, which proves the route and not the 403: %s',

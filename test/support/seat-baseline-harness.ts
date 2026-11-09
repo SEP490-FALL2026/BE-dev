@@ -169,9 +169,12 @@ export class SeatHarness {
     };
   }
 
-  /** A plan of a new application; `internal` makes a K5 plan of an internal application with no subscription. */
+  /**
+   * A plan of a new application; `internal` makes a K5 plan of an internal application with no subscription. A K4 plan (keys bought once,
+   * QĐ-103d) is of licensed software, so a perpetual purchase of it can be declared.
+   */
   async plan(type: 'K1' | 'K2' | 'K4' | 'K5' = 'K2', pricing = 'PER_SEAT'): Promise<string> {
-    const application = await this.application(type === 'K5' ? 'INTERNAL' : 'SAAS');
+    const application = await this.application(type === 'K5' ? 'INTERNAL' : type === 'K4' ? 'LICENSED' : 'SAAS');
 
     return declarePlan(this.ctx, this.it1.accessToken, {
       applicationId: application.id,

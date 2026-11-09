@@ -13,6 +13,8 @@ Tầng: T5 (`scripts/arch/tiers.cjs`). Phụ thuộc: audit, organization, ident
     gì.
   - `deviceExists`, `holderRegistrationIds` — máy có trong sổ (kể cả đã ngừng dùng) và mọi đăng ký của máy mà người đó từng giữ
     (`FR-10.1`); lát nhận dữ liệu dùng hai hàm này.
+  - `registrationHolders` — ai giữ mỗi đăng ký và từ ngày nào đến ngày nào (một đăng ký một người giữ suốt vòng đời); `usage` gắn
+    ngày collector gửi với người giữ máy ngày đó (`UsageEvidenceApi`).
 - `public/devices.errors.ts` — `DeviceNotFoundError`, chủ duy nhất của 404 `DEVICE.NOT_FOUND`.
 - `public/devices.types.ts` — input/output của facade.
 

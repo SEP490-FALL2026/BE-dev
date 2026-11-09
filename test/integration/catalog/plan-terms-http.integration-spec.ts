@@ -154,6 +154,8 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
           purchasedQuantity: 10,
           unitPrice: { amount: '1000000', currency: 'VND' },
           billingCycle: 'ANNUAL',
+          commitmentTermMonths: 12,
+          responsibleItAdminEmployeeId: it1.employeeId,
           startDate: '2026-01-01',
           ...extra,
         })
@@ -374,7 +376,13 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
 
     it('AC-9: a subscription with no deadline that ends on 31/12 and does not renew is alerted from its end date, marked as such', async () => {
       const { planId } = await plan({ pricing: 'FLAT_RATE', type: 'K1' });
-      await subscription(planId, { endDate: '2026-12-31', autoRenew: false });
+      // A K1 plan is for one month and paid by the month (R-E01).
+      await subscription(planId, {
+        endDate: '2026-12-31',
+        autoRenew: false,
+        billingCycle: 'MONTHLY',
+        commitmentTermMonths: 1,
+      });
 
       today('2026-12-15');
       expect(await warningsOf(planId)).toEqual([]);
@@ -401,6 +409,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
           purchasedQuantity: 50,
           unitPrice: { amount: '500000', currency: 'VND' },
           startDate: '2026-03-15',
+          responsibleItAdminEmployeeId: it1.employeeId,
         })
         .expect(201);
       await subscription(saas.planId, { autoRenew: true });

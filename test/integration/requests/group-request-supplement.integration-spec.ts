@@ -2,6 +2,9 @@ import { GroupHarness } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
+const M = 1_000_000;
+/** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 
 interface SupplementWire {
   number: number;
@@ -61,7 +64,7 @@ describe('the head leaves people of a group out of the supplementary file over P
       number: 1,
       reason: 'Left the team',
       droppedCount: 1,
-      amount: { before: { amount: '60000000' }, after: { amount: '48000000' } },
+      amount: { before: { amount: String(5 * M * monthsLeft) }, after: { amount: String(4 * M * monthsLeft) } },
     });
     expect(file).not.toHaveProperty('expectedSpendOn');
     expect(await h.lineStates(id)).toEqual([
@@ -71,7 +74,7 @@ describe('the head leaves people of a group out of the supplementary file over P
       'NEED_CONFIRMED',
       'DROPPED',
     ]);
-    expect(await amountOf(id, u.head.account)).toBe('48000000');
+    expect(await amountOf(id, u.head.account)).toBe(String(4 * M * monthsLeft));
     expect(await h.state(id)).toBe('AWAITING_SPEND_SUBMISSION');
     const dropped = await h.ctx.sql.query<{ employee_id: string }>(
       `SELECT employee_id FROM request_supplement_drops WHERE request_id = $1 AND number = 1`,
@@ -118,7 +121,7 @@ describe('the head leaves people of a group out of the supplementary file over P
       )
       .expect(422);
     expect(h.codeOf(withDay)).toBe('VALIDATION_ERROR');
-    expect(await amountOf(id, u.head.account)).toBe('36000000');
+    expect(await amountOf(id, u.head.account)).toBe(String(3 * M * monthsLeft));
 
     const file = supplement(
       await h
@@ -127,7 +130,7 @@ describe('the head leaves people of a group out of the supplementary file over P
     );
 
     expect(file.droppedCount).toBe(1);
-    expect(await amountOf(id, u.head.account)).toBe('24000000');
+    expect(await amountOf(id, u.head.account)).toBe(String(2 * M * monthsLeft));
   });
 
   describe('what is refused', () => {
@@ -145,32 +148,17 @@ describe('the head leaves people of a group out of the supplementary file over P
       expect(await h.lineStates(id)).toEqual(['DROPPED', 'NEED_CONFIRMED']);
     });
 
-    it('does not leave out a person whose need is not confirmed, or who is not in the request', async () => {
+    it('MF1-D: a group with the head as a line, whose line the supplement once left out, is refused when sent (BR-MF1-02)', async () => {
       const u = await unit();
-      const [e1, e2, e3] = await h.colleagues(u, 3);
-      const id = h.dataOf<{ request: { id: string } }>(
-        await h.submitGroup(h.groupBody(paid, [e1, e2, u.head, e3]), u.head.account).expect(201),
-      ).request.id;
-      // The approver refuses the head's own line, so the request is in the queue of the head with that line ended.
-      await h
-        .decideLines(
-          id,
-          { lines: [{ employeeId: u.head.employeeId, decision: 'REJECT', reason: 'No' }] },
-          h.boss.account,
-        )
-        .expect(200);
-      const stranger = await h.colleague(await unit());
+      const [e1, e2] = await h.colleagues(u, 2);
+      const rows = await h.requestRows();
 
-      const notDroppable = await h
-        .addSupplement(id, { dropEmployeeIds: [u.head.employeeId], reason: 'x' }, u.head.account)
-        .expect(409);
-      const outsider = await h
-        .addSupplement(id, { dropEmployeeIds: [stranger.employeeId], reason: 'x' }, u.head.account)
-        .expect(409);
+      // MF1-D (BR-MF1-02): a head is no line of a group any more; the group is refused for that line and nothing is written.
+      const refused = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), u.head.account).expect(422);
 
-      expect(h.codeOf(notDroppable)).toBe('SUPPLEMENT.LINE_NOT_DROPPABLE');
-      expect(h.codeOf(outsider)).toBe('SUPPLEMENT.LINE_NOT_DROPPABLE');
-      expect(await h.lineStates(id)).toEqual(['NEED_CONFIRMED', 'NEED_CONFIRMED', 'NEED_REJECTED', 'NEED_CONFIRMED']);
+      expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+      expect(h.detailsOf(refused)).toEqual({ lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] });
+      expect(await h.requestRows()).toBe(rows);
     });
 
     it('is a file for a group: a request of one person has nobody to leave out', async () => {

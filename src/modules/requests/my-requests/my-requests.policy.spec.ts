@@ -14,8 +14,6 @@ import type { MyRequestRow, OutcomeFacts, SpendStageFacts } from './my-requests.
 
 const NO_FACTS: SpendStageFacts & OutcomeFacts = {
   checks: new Map(),
-  reviews: new Map(),
-  openFinanceReview: new Set(),
   openSpendApproval: new Set(),
   spendRefusals: new Map(),
   needRefusals: new Map(),
@@ -30,7 +28,6 @@ const row = (state: MyRequestRow['state'], extra: Partial<MyRequestRow> = {}) =>
   state,
   ...extra,
 });
-const RAN_AT = new Date('2026-10-01T00:00:00Z');
 
 describe('the states of a request that was sent', () => {
   it('are the states a request wire carries, and never a draft', () => {
@@ -40,7 +37,7 @@ describe('the states of a request that was sent', () => {
 
   it.each([
     ['one state', 'PENDING', ['PENDING']],
-    ['several states', 'PENDING,AWAITING_BUDGET,REJECTED', ['PENDING', 'AWAITING_BUDGET', 'REJECTED']],
+    ['several states', 'PENDING,AWAITING_SPEND_DECISION,REJECTED', ['PENDING', 'AWAITING_SPEND_DECISION', 'REJECTED']],
   ])('reads %s of a state parameter', (_name, value, expected) => {
     expect(parseStateList(value)).toEqual(expected);
   });
@@ -103,12 +100,10 @@ describe('where the request waits at the need step', () => {
 
 describe('where a request that costs money stands', () => {
   it('is nothing for a request with no spend step, whatever its state', () => {
-    expect(spendStageOf(row('AWAITING_BUDGET', { hasSpendStep: false }), NO_FACTS)).toBeNull();
+    expect(spendStageOf(row('AWAITING_SPEND_DECISION', { hasSpendStep: false }), NO_FACTS)).toBeNull();
   });
 
   it.each([
-    ['AWAITING_FINANCE_REVIEW', 'WAITING_FINANCE_REVIEW'],
-    ['AWAITING_BUDGET', 'WAITING_BUDGET'],
     ['AWAITING_SPEND_DECISION', 'WAITING_SPEND_DECISION'],
     ['PENDING', null],
     ['COMPLETED', null],
@@ -116,32 +111,55 @@ describe('where a request that costs money stands', () => {
     expect(spendStageOf(row(state), NO_FACTS)).toBe(stage);
   });
 
-  it('reads the queue of the head from the newest check and review, as the detail of the request does', () => {
-    const blocked = { route: 'BLOCKED' as const, staleCostEvidence: true, ranAt: RAN_AT };
-    const returned = { outcome: 'RETURNED_TO_HEAD' as const, decidedAt: new Date('2026-10-02T00:00:00Z') };
-
-    expect(spendStageOf(row('AWAITING_SPEND_SUBMISSION'), NO_FACTS)).toBe('NOT_SUBMITTED');
-    expect(spendStageOf(row('AWAITING_SPEND_SUBMISSION'), withFacts({ checks: new Map([['r1', blocked]]) }))).toBe(
-      'BLOCKED',
-    );
-    expect(
+  it('BR-MF1-06g/06h: reads the queue of the head from the newest check: blocked, waiting for the reserve to be confirmed, or not sent', () => {
+    const queued = {
+      route: 'SPEND_APPROVAL' as const,
+      staleCostEvidence: false,
+      blockReasons: [],
+      overBaseByMinor: null,
+      overByMinor: null,
+      currency: 'VND',
+    };
+    const blocked = {
+      ...queued,
+      route: 'BLOCKED' as const,
+      outcome: 'BLOCKED' as const,
+      blockReasons: ['OVER_RESERVE' as const],
+      overByMinor: 3n,
+    };
+    const usesReserve = { ...queued, outcome: 'USES_RESERVE' as const, overBaseByMinor: 2n };
+    const stageOf = (check?: typeof blocked | typeof usesReserve) =>
       spendStageOf(
         row('AWAITING_SPEND_SUBMISSION'),
-        withFacts({ checks: new Map([['r1', blocked]]), reviews: new Map([['r1', returned]]) }),
-      ),
-    ).toBe('RETURNED_BY_FINANCE');
+        check ? withFacts({ checks: new Map([['r1', check]]) }) : NO_FACTS,
+      );
+
+    expect(stageOf()).toBe('NOT_SUBMITTED');
+    expect(stageOf(blocked)).toBe('BLOCKED');
+    expect(stageOf(usesReserve)).toBe('RESERVE_CONFIRMATION');
   });
 
-  it('reads a request that waits under control by the step that is open, Finance first', () => {
-    const open = (kinds: Array<'finance' | 'spend'>) =>
-      withFacts({
-        openFinanceReview: new Set(kinds.includes('finance') ? ['r1'] : []),
-        openSpendApproval: new Set(kinds.includes('spend') ? ['r1'] : []),
-      });
+  it('reads a check made before the three outcomes that blocked the request as blocked', () => {
+    const legacy = {
+      outcome: null,
+      route: 'BLOCKED' as const,
+      blockReasons: [],
+      staleCostEvidence: true,
+      overBaseByMinor: null,
+      overByMinor: null,
+      currency: 'VND',
+    };
 
-    expect(spendStageOf(row('WAITING_CONTROLLED'), open(['finance', 'spend']))).toBe('WAITING_FINANCE_REVIEW');
-    expect(spendStageOf(row('WAITING_CONTROLLED'), open(['spend']))).toBe('WAITING_SPEND_DECISION');
-    expect(spendStageOf(row('WAITING_CONTROLLED'), open([]))).toBeNull();
+    expect(spendStageOf(row('AWAITING_SPEND_SUBMISSION'), withFacts({ checks: new Map([['r1', legacy]]) }))).toBe(
+      'BLOCKED',
+    );
+  });
+
+  it('reads a request that waits under control by the spend step that is open', () => {
+    const open = (held: boolean) => withFacts({ openSpendApproval: new Set(held ? ['r1'] : []) });
+
+    expect(spendStageOf(row('WAITING_CONTROLLED'), open(true))).toBe('WAITING_SPEND_DECISION');
+    expect(spendStageOf(row('WAITING_CONTROLLED'), open(false))).toBeNull();
   });
 
   it('says refused only for a request the spending approver refused, not one the head refused at the need', () => {
@@ -192,7 +210,7 @@ describe('whether the sender may withdraw the request now', () => {
     ['WAITING_CONTROLLED', null, true],
     ['AWAITING_IT_ASSESSMENT', null, true],
     ['AWAITING_SPEND_SUBMISSION', 'BLOCKED', true],
-    ['AWAITING_BUDGET', 'WAITING_BUDGET', true],
+    ['AWAITING_SPEND_SUBMISSION', 'RESERVE_CONFIRMATION', true],
     ['AWAITING_SPEND_DECISION', 'WAITING_SPEND_DECISION', true],
     ['EXECUTING', null, true],
     ['AWAITING_IT_CLOSE', null, false],

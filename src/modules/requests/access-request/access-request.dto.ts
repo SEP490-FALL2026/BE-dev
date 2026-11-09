@@ -1,23 +1,26 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** The longest note of a reason or a label a request keeps; the DTO bounds the request with them. */
 export const REASON_MAX_LENGTH = 1000;
-/** The longest term a request may ask for, in months (`QĐ-98`): a year, so a long stay is renewed, not confirmed. */
-export const TERM_MONTHS_MAX = 12;
-/** The longest commitment of a quote the IT Admin enters, in months: a bound against a typo. */
-export const COMMITMENT_MONTHS_MAX = 120;
 
 /**
- * `BM-01` as the person sending it fills it (`US-01-12` AC-1, `US-05-02` AC-6): the plan, the reason and the term are
- * required, and the project is context only. Nothing
- * here chooses the branch, the Cost Center or who decides: the system fixes them from the plan and the department.
+ * `BM-01` as the person sending it fills it (`US-01-12` AC-1, `US-05-02` AC-6): the plan and the reason are required, the day the
+ * right ends is optional (a right has no end unless the sender gives one, at most a year away, and a contractor, a freelancer or an
+ * intern must give it, `QĐ-104a`, `FR-2.8`). Nothing here chooses the branch, the Cost Center or who decides: the system fixes
+ * them from the plan and the department.
  */
 export const submitBodySchema = z.strictObject({
   planId: z.uuid(),
   businessReason: z.string().trim().min(1).max(REASON_MAX_LENGTH),
-  termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
+  expectedEndDate: businessDate.optional(),
+  /**
+   * GH-3 (`BR-MF1-01g`): why the person asks for one more paid application when they already use as many as the threshold. Required
+   * only then (422 `ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED`); ignored and not stored otherwise.
+   */
+  manyPaidSoftwareReason: z.string().trim().min(1).max(REASON_MAX_LENGTH).optional(),
 });
 /**
  * The decision of the need step: a refusal gives its reason (`BR-07.5`), and nothing else is accepted: there is no signature or certificate to attach
@@ -52,12 +55,11 @@ export const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: 
 /** The need step. A step holds one person or none (`US-05-03` AC-10); later steps are a paged subresource, not an array here. */
 const needStepSchema = z.strictObject({
   id: z.uuid(),
-  state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED']),
+  state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED', 'NOT_REQUIRED']),
   assignee: employeeRef.nullable(),
   routingRow: z.number().int().min(1).max(9),
   waitingReason: z.enum(['NO_SPENDING_APPROVER', 'NO_DEPARTMENT_HEAD']).nullable(),
-  samePersonAsSpend: z.boolean(),
-  slaWorkingDays: z.number().int().positive(),
+  slaWorkingDays: z.number().int().positive().nullable(),
   createdAt: z.iso.datetime(),
   assignedAt: z.iso.datetime().nullable(),
   decidedAt: z.iso.datetime().nullable(),
@@ -67,7 +69,7 @@ const needStepSchema = z.strictObject({
 const needDecisionSchema = z.strictObject({
   decision: z.enum(['APPROVED', 'REJECTED']),
   decidedBy: employeeRef,
-  deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER', 'FALLBACK_APPROVER']),
+  deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER']),
   reason: z.string().nullable(),
   decidedAt: z.iso.datetime(),
 });
@@ -93,10 +95,10 @@ export const pricingSchema = z.strictObject({
   amount: moneySchema.nullable(),
   unitPrice: moneySchema.nullable(),
   billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'OTHER']).nullable(),
-  periodCount: z.number().int().positive().nullable(),
-  bindingPeriodCount: z.number().int().nonnegative().nullable(),
-  firstDueOn: z.string().nullable(),
-  lastDueOn: z.string().nullable(),
+  kind: z.enum(['RECURRING', 'ONE_TIME']).nullable(),
+  months: z.number().int().min(0).max(12).nullable(),
+  monthlyPrice: moneySchema.nullable(),
+  nextYearAmount: moneySchema.nullable(),
 });
 
 export const requestStateSchema = z.enum([
@@ -105,9 +107,8 @@ export const requestStateSchema = z.enum([
   'AWAITING_EXECUTION',
   'AWAITING_IT_ASSESSMENT',
   'AWAITING_SPEND_SUBMISSION',
-  'AWAITING_FINANCE_REVIEW',
-  'AWAITING_BUDGET',
   'AWAITING_SPEND_DECISION',
+  'AWAITING_REQUESTER_REVISION',
   'REJECTED',
   'IT_REJECTED',
   'EXECUTING',
@@ -123,6 +124,10 @@ export const requestSchema = z.strictObject({
   type: z.enum(['GRANT', 'SERVICE_ACCOUNT', 'RENEWAL', 'GROUP_GRANT']),
   branch: z.enum(['INTERNAL_FREE', 'PAID_IN_CATALOG', 'NEW_SOFTWARE']),
   state: requestStateSchema,
+  routing: z.strictObject({
+    mode: z.enum(['VIA_HEAD', 'ONE_STEP']),
+    oneStepReason: z.enum(['REQUESTER_IS_HEAD', 'NO_DEPARTMENT_HEAD', 'HEAD_LEFT']).nullable(),
+  }),
   /** The plan asked for; null for software that is not in the catalog until the IT Admin registers and links it. */
   plan: z
     .strictObject({
@@ -151,8 +156,9 @@ export const requestSchema = z.strictObject({
   /** How many people the request is for: 1 for any request but one for a group. */
   lineCount: z.number().int().positive(),
   businessReason: z.string(),
-  termMonths: z.number().int().positive(),
-  /** The day the access of a person who is not staff ends; null for staff. */
+  /** Only a request made before `QĐ-104a` has a term in months; a new one has an end date or none. */
+  termMonths: z.number().int().positive().nullable(),
+  /** The day the right ends, as the sender chose it; null for a right with no end. */
   expectedEndDate: z.string().nullable(),
   /**
    * What a request for a service account adds: why the account exists, the identifier its sender expects (a hint: the IT
@@ -173,6 +179,10 @@ export const requestSchema = z.strictObject({
       }),
     })
     .nullable(),
+  /** GH-3 (`BR-MF1-01g`): the person uses many paid applications, how many and why they ask for more; null when not flagged. */
+  flags: z.strictObject({
+    manyPaidSoftware: z.strictObject({ count: z.number().int().nonnegative(), reason: z.string() }).nullable(),
+  }),
   /**
    * What a request for the renewal of a right adds: the seat it renews, the end it had, the end it asks for, the months the right
    * would run on without a break and, once approved, the record that follows the old one. Null for any other request.
@@ -187,22 +197,26 @@ export const requestSchema = z.strictObject({
     })
     .nullable(),
   /**
-   * Where a request that costs money stands on its way to the spending approver, and for one that stopped, why. It never
-   * carries a figure of the budget, what is left or a code of the check beyond the two problems of the data.
+   * Where a request that costs money stands on its way to the spending approver, and for one that stopped, why (`BR-MF1-06g`): not yet
+   * sent, waiting for the head to confirm the reserve, blocked (with every reason), waiting for the spending approver, or refused. The
+   * requester and the head read how far over the base or the reserve the request is; never what is left of the budget.
    */
   spend: z
     .strictObject({
       stage: z.enum([
         'NOT_SUBMITTED',
+        'RETURNED_TO_REQUESTER',
+        'RESERVE_CONFIRMATION',
         'BLOCKED',
-        'RETURNED_BY_FINANCE',
-        'WAITING_FINANCE_REVIEW',
-        'WAITING_BUDGET',
         'WAITING_SPEND_DECISION',
         'REFUSED',
       ]),
-      blockedReason: z.enum(['STALE_COST_EVIDENCE', 'CLOSED_OR_EXPIRED_BUDGET_PERIOD']).nullable(),
-      financeReturnReason: z.string().nullable(),
+      /** Why the request is blocked, every reason that applies; empty unless the stage is `BLOCKED`. */
+      blockedReasons: z
+        .array(z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING', 'RATE_MISSING']))
+        .max(3),
+      /** How far over the base (it waits for the reserve to be confirmed) or over the reserve (blocked for that); null otherwise. */
+      overBy: moneySchema.nullable(),
       /** What the spending approver wrote when they refused the request. */
       refusalReason: z.string().nullable(),
     })

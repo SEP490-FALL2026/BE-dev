@@ -167,6 +167,32 @@ describe('the requests and grants of a person who left (integration, real Postgr
     );
 
   describe('what is open is listed and nothing changes by itself (AC-24)', () => {
+    it('BR-MF1-02/07: lists a request awaiting requester revision and allows its closure after the beneficiary leaves', async () => {
+      const u = await example();
+      const id = (await h.sent(u.leaver, plan, { termMonths: 1 })).id;
+      await h.ctx.sql.query(
+        `UPDATE access_request_steps SET state = 'NOT_REQUIRED', assignee_employee_id = NULL, assigned_at = NULL,
+           waiting_reason = NULL, waiting_since = NULL WHERE request_id = $1 AND kind = 'NEED'`,
+        [id],
+      );
+      await h.ctx.sql.query(
+        `UPDATE access_requests SET state = 'AWAITING_REQUESTER_REVISION', routing_mode = 'ONE_STEP', one_step_reason = 'HEAD_LEFT' WHERE id = $1`,
+        [id],
+      );
+      const departure = await h.recordedCase(u.leaver);
+
+      expect((await openRequests(departure.id)).items).toContainEqual(
+        expect.objectContaining({ requestId: id, state: 'AWAITING_REQUESTER_REVISION', cancellable: false }),
+      );
+      await h.leaveOnLastDay(departure.id).expect(200);
+      expect((await openRequests(departure.id)).items).toContainEqual(
+        expect.objectContaining({ requestId: id, state: 'AWAITING_REQUESTER_REVISION', cancellable: true }),
+      );
+      expect(wire(await h.cancelForDeparture(id).expect(200)).state).toBe('CANCELLED');
+      expect((await openRequests(departure.id)).items.map((item) => item.requestId)).not.toContain(id);
+      expect(await commitmentOf(id)).toBeUndefined();
+    });
+
     it('lists the request that waits for the need step and the grant being worked beside the record of the departure', async () => {
       const u = await example();
       const waiting = (await h.sent(u.leaver, plan, { termMonths: 1 })).id;
@@ -259,7 +285,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
       const id = await approvedFor(u, u.leaver, 15 * M);
       const task = await granted(id);
       // The seat is on the subscription the department of the request owns (QĐ-89a), not on the one of the seeded department.
-      const ownSubscription = h.owned.subscriptionFor(plans[0].subscriptionId, u.department.id);
+      const ownSubscription = plans[0].subscriptionId;
       const free = await h.freeSeats(ownSubscription);
       expect(await commitmentOf(id)).toMatchObject({ state: 'HELD', released_minor: '0' });
       const wired = await left(u.leaver);
@@ -389,7 +415,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
       });
     });
 
-    it('takes the request out of the batch it was sent in and closes its question to Finance, and no other request changes', async () => {
+    it('takes the request out of the batch it was sent in, and no other request changes', async () => {
       const u = await example();
       const mate = await h.worker(u.department, `LR-M${(n += 1)}`);
       const second = await h.sent(u.leaver, plan, { termMonths: 1 });
@@ -399,7 +425,6 @@ describe('the requests and grants of a person who left (integration, real Postgr
       await h.decide(third.id, { decision: 'APPROVE' }, u.head.account).expect(200);
       await h.setPayments(third.id, { amount: 5 * M });
       await h.sendOn([second.id, third.id], u.head.account).expect(201);
-      await h.askFinance(second.id, { question: 'Is there room in the budget?' }, h.boss.account).expect(201);
       await left(u.leaver);
 
       await h.cancelForDeparture(second.id).expect(200);
@@ -412,11 +437,6 @@ describe('the requests and grants of a person who left (integration, real Postgr
         { request_id: second.id, left_reason: 'REQUEST_CANCELLED' },
         { request_id: third.id, left_reason: null },
       ]);
-      const question = await h.ctx.sql.query<{ state: string; close_reason: string }>(
-        `SELECT state::text, close_reason::text FROM budget_information_requests WHERE request_id = $1`,
-        [second.id],
-      );
-      expect(question.rows).toEqual([{ state: 'CLOSED', close_reason: 'REQUEST_CANCELLED' }]);
       expect(await h.state(third.id)).toBe('AWAITING_SPEND_DECISION');
       expect((await stepStates(third.id)).find((step) => step.kind === 'SPEND_APPROVAL')?.state).toBe('PENDING');
     });

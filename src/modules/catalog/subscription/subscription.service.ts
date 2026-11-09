@@ -16,12 +16,15 @@ import {
   SubscriptionStillDraftError,
 } from './subscription.errors';
 import { assertSubscriptionShape, declaredStateOf, missingData, subscriptionStatusOf } from './subscription.policy';
+import { assertDeclarableCycle, isPooledPlan } from './pool/subscription-pool.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import { snapshotOf, stateOf } from './subscription.mapper';
+import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import { SubscriptionViewService } from './subscription-view.service';
 import type {
   BillingCycle,
+  CommitmentTermMonths,
   SubscriptionRecord,
   SubscriptionKind,
   SubscriptionListFilter,
@@ -32,12 +35,16 @@ import type {
 
 export interface DeclareSubscriptionInput {
   planId: string;
-  /** The department that owns the purchase; required, active, and never changed afterwards. */
-  ownerDepartmentId: string;
+  /**
+   * The department that owns the purchase, never changed afterwards. A `K2`/`K4` purchase is the company's shared pool (`QĐ-103d`) and may
+   * name none; any other must name an active one (`QĐ-89a`).
+   */
+  ownerDepartmentId?: string;
   kind: SubscriptionKind;
   purchasedQuantity?: number;
   unitPrice?: { amount: string; currency: string };
   billingCycle?: BillingCycle;
+  commitmentTermMonths?: CommitmentTermMonths;
   startDate?: BusinessDate;
   endDate?: BusinessDate;
   renewalDate?: BusinessDate;
@@ -45,6 +52,8 @@ export interface DeclareSubscriptionInput {
   noticePeriodDays?: number;
   autoRenew?: boolean;
   allowsMidTermReduction?: boolean;
+  responsibleItAdminEmployeeId?: string;
+  vendorMinimumSeats?: number;
 }
 
 /** The change of a subscription: the plan and the kind are not fields; only the four dates and the notice period clear. */
@@ -52,6 +61,7 @@ export interface UpdateSubscriptionInput {
   purchasedQuantity?: number;
   unitPrice?: { amount: string; currency: string };
   billingCycle?: BillingCycle;
+  commitmentTermMonths?: CommitmentTermMonths;
   startDate?: BusinessDate;
   endDate?: BusinessDate | null;
   renewalDate?: BusinessDate | null;
@@ -59,6 +69,9 @@ export interface UpdateSubscriptionInput {
   noticePeriodDays?: number | null;
   autoRenew?: boolean;
   allowsMidTermReduction?: boolean;
+  responsibleItAdminEmployeeId?: string;
+  vendorMinimumSeats?: number | null;
+  isPrimaryForPlan?: boolean;
 }
 
 /**
@@ -75,6 +88,7 @@ export class SubscriptionService {
     private readonly pricing: SubscriptionPricingService,
     private readonly views: SubscriptionViewService,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly poolRules: SubscriptionPoolService,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -122,8 +136,10 @@ export class SubscriptionService {
    * `assertSubscriptionShape`, and the money errors of the finance facade for the unit price.
    */
   async declare(actor: AuthenticatedPrincipal, input: DeclareSubscriptionInput): Promise<SubscriptionView> {
+    assertDeclarableCycle(input.billingCycle);
     const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
     const organizationId = await this.requireOrganizationId();
+    if (input.responsibleItAdminEmployeeId) await this.poolRules.requireItAdmin(input.responsibleItAdminEmployeeId);
 
     const record = await this.runner.run((tx) => this.declareIn(tx, actor, input, { money, organizationId }));
 
@@ -137,21 +153,23 @@ export class SubscriptionService {
     ctx: { money: { amountMinor: bigint; currency: string } | null; organizationId: string },
   ): Promise<SubscriptionRecord> {
     const { money, organizationId } = ctx;
-    const plan = await this.plans.lockShared(tx, input.planId);
+    // The plan is locked `FOR UPDATE` before anything else: no row of this subscription exists yet to lock, so the plan is what two
+    // declarations of the same K2 or K4 plan take turns on (R-E02); every other writer locks a subscription first, then its plan.
+    const plan = await this.plans.lockExclusive(tx, input.planId);
     if (!plan) throw new SubscriptionPlanNotFoundError();
     if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError();
-    // Held FOR SHARE until commit, so the department cannot be stopped between this check and the row (QĐ-89a).
-    const owner = await this.organizationReads.lockDepartmentShared(tx, input.ownerDepartmentId);
-    if (!owner?.active) throw new SubscriptionOwnerDepartmentInactiveError();
+    await this.poolRules.assertNoLiveDuplicate(tx, plan, null, organizationId);
+    const ownerDepartmentId = await this.ownerOf(tx, plan.provisioningType, input.ownerDepartmentId);
     const state = declaredStateOf(input);
     this.assertShape(plan, input.kind, state);
 
     const priced = await this.pricing.priceToday(tx, money);
     const complete = subscriptionStatusOf(plan, input.kind, { ...state, ...priced });
+    this.poolRules.assert(plan, input.kind, state, complete === 'ACTIVE');
     const created = await this.subscriptions.insert(tx, {
       organizationId,
       planId: plan.id,
-      ownerDepartmentId: owner.id,
+      ownerDepartmentId,
       kind: input.kind,
       ...state,
       ...priced,
@@ -174,6 +192,27 @@ export class SubscriptionService {
   }
 
   /**
+   * The department that owns a purchase being declared: none for a `K2`/`K4` purchase that names none (the shared pool of the company,
+   * `QĐ-103d`; its cost follows the people who hold its seats, `QĐ-103k`), otherwise the one named, which must be active (`QĐ-89a`). It is
+   * held FOR SHARE until commit, so the department cannot be stopped between this check and the row. A purchase of any other kind that
+   * names none is refused like one that names a department that does not exist. Throws SubscriptionOwnerDepartmentInactiveError.
+   */
+  private async ownerOf(
+    tx: DbTx,
+    provisioningType: LockedPlan['provisioningType'],
+    departmentId: string | undefined,
+  ): Promise<string | null> {
+    if (departmentId === undefined) {
+      if (isPooledPlan(provisioningType)) return null;
+      throw new SubscriptionOwnerDepartmentInactiveError();
+    }
+    const owner = await this.organizationReads.lockDepartmentShared(tx, departmentId);
+    if (!owner?.active) throw new SubscriptionOwnerDepartmentInactiveError();
+
+    return owner.id;
+  }
+
+  /**
    * Completes a draft once its data is whole: a price recorded with no rate for its day is converted at the rate now
    * entered for that very day, the day it was recorded on, not today's. Throws SubscriptionNotFoundError and
    * SubscriptionStillDraftError naming what is still missing. An active subscription is answered unchanged.
@@ -185,7 +224,8 @@ export class SubscriptionService {
       const current = await this.subscriptions.lock(tx, id);
       if (!current) throw new SubscriptionNotFoundError();
       if (current.status === 'ACTIVE') return current;
-      const plan = await this.plans.lockShared(tx, current.planId);
+      // The subscription is locked, then its plan `FOR UPDATE`: a draft that becomes live takes its turn against the other writes of the plan.
+      const plan = await this.plans.lockExclusive(tx, current.planId);
       if (!plan) throw new SubscriptionPlanNotFoundError();
 
       const priceSnapshot =
@@ -195,8 +235,16 @@ export class SubscriptionService {
       const state = { ...stateOf(current), priceSnapshot };
       const missing = this.missingOf(plan, current.kind, state);
       if (missing.length > 0) throw new SubscriptionStillDraftError(missing);
+      await this.poolRules.assertActivation(tx, plan, current.kind, state);
+      await this.poolRules.assertNoLiveDuplicate(tx, plan, id, organizationId);
 
-      const completed = await this.subscriptions.update(tx, id, { ...state, status: 'ACTIVE' });
+      // A draft renewal period takes the flag that prices the plan from the period it continues, now that it is active (F-012).
+      const takesPrimary = await this.poolRules.takePrimaryFromPrevious(tx, actor, organizationId, current);
+      const completed = await this.subscriptions.update(tx, id, {
+        ...state,
+        status: 'ACTIVE',
+        isPrimaryForPlan: takesPrimary || state.isPrimaryForPlan,
+      });
       await this.audit.record(
         tx,
         catalogAuditEvent(
@@ -226,6 +274,7 @@ export class SubscriptionService {
       noticeDeadline: BusinessDate | null;
       noticePeriodDays: number | null;
       billingCycle: BillingCycle | null;
+      commitmentTermMonths: CommitmentTermMonths | null;
       autoRenew: boolean;
       allowsMidTermReduction: boolean;
     },

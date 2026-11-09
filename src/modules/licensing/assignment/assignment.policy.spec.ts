@@ -1,5 +1,4 @@
 import {
-  AssignmentConflictError,
   AssignmentEffectiveDateInvalidError,
   AssignmentExpectedEndRequiredError,
   AssignmentNotOpenError,
@@ -8,13 +7,7 @@ import {
 } from '../public/licensing.errors';
 import type { AssignmentRecord } from '../public/licensing.types';
 import { AssignmentResponsibleAfterDeadlineError } from './service-account.errors';
-import {
-  assertResponsibleChange,
-  assertSubscriptionDepartment,
-  effectiveFromLabel,
-  holdersOfOtherDepartments,
-  toAssignmentView,
-} from './assignment.policy';
+import { assertResponsibleChange, effectiveFromLabel, toAssignmentView, usableDayOf } from './assignment.policy';
 
 const bot: AssignmentRecord = {
   id: 'a1',
@@ -182,81 +175,28 @@ describe('assertResponsibleChange (AC-10)', () => {
   });
 });
 
-describe('assertSubscriptionDepartment (F20, QĐ-89a: a seat of a department sits on a subscription of that department)', () => {
-  it('lets a seat of the owning department through', () => {
-    expect(() => assertSubscriptionDepartment({ ownerDepartmentId: 'd-des' }, 'd-des', 0)).not.toThrow();
+// Gói 9: assertSubscriptionDepartment + holdersOfOtherDepartments functions removed — all related tests deleted.
+// (Phần cấp từ kho được phép cấp qua phòng: không guard phòng, không tìm người khác phòng)
+
+describe('usableDayOf — M5-01 (FR-4.9 gate 4, QĐ-77n)', () => {
+  const day = (instant: Date) => instant.toISOString().slice(0, 10);
+
+  it('is null while a grant task of the first link is still open: the invitation waits', () => {
+    expect(usableDayOf('2026-06-01', [{ status: 'QUEUED', completedAt: null }], day)).toBeNull();
+    expect(usableDayOf('2026-06-01', [{ status: 'IN_PROGRESS', completedAt: null }], day)).toBeNull();
+    expect(usableDayOf('2026-06-01', [{ status: 'FAILED', completedAt: null }], day)).toBeNull();
   });
 
-  it('refuses a seat of another department before anything is written, with the index of its row', () => {
-    let thrown: unknown;
-    try {
-      assertSubscriptionDepartment({ ownerDepartmentId: 'd-des' }, 'd-fin', 3);
-    } catch (error) {
-      thrown = error;
-    }
-
-    expect(thrown).toBeInstanceOf(AssignmentConflictError);
-    expect(thrown).toMatchObject({ conflict: 'SUBSCRIPTION_DEPARTMENT_MISMATCH', index: 3 });
+  it('is the day the grant was completed when it is after valid_from', () => {
+    expect(
+      usableDayOf('2026-06-01', [{ status: 'COMPLETED', completedAt: new Date('2026-06-20T03:00:00Z') }], day),
+    ).toBe('2026-06-20');
   });
 
-  it('compares nothing for an internal plan, which has no subscription and no owner, nor for a seat with no department to compare', () => {
-    expect(() => assertSubscriptionDepartment({ ownerDepartmentId: null }, 'd-fin', 0)).not.toThrow();
-    expect(() => assertSubscriptionDepartment({ ownerDepartmentId: 'd-des' }, null, 0)).not.toThrow();
-    expect(() => assertSubscriptionDepartment({ ownerDepartmentId: null }, null, 0)).not.toThrow();
-  });
-});
-
-describe('holdersOfOtherDepartments (F21, QĐ-89e: who is asked after the installation, and for which seats)', () => {
-  const seat = (assignmentId: string, employeeId: string, owningDepartmentId: string) => ({
-    assignmentId,
-    employeeId,
-    owningDepartmentId,
-  });
-
-  it('keeps only the people whose own department is not the one that owns the subscription, grouped by person', () => {
-    const holders = holdersOfOtherDepartments(
-      [seat('a1', 'e1', 'd-des'), seat('a2', 'e2', 'd-des'), seat('a3', 'e2', 'd-fin'), seat('a4', 'e3', 'd-fin')],
-      new Map([
-        ['e1', 'd-des'],
-        ['e2', 'd-fin'],
-        ['e3', 'd-des'],
-      ]),
-    );
-
-    expect(holders).toEqual([
-      {
-        employeeId: 'e2',
-        employeeDepartmentId: 'd-fin',
-        assignments: [{ assignmentId: 'a2', owningDepartmentId: 'd-des' }],
-      },
-      {
-        employeeId: 'e3',
-        employeeDepartmentId: 'd-des',
-        assignments: [{ assignmentId: 'a4', owningDepartmentId: 'd-fin' }],
-      },
-    ]);
-  });
-
-  it('leaves out a person who is in no department on the day, since nobody can decide for them', () => {
-    expect(holdersOfOtherDepartments([seat('a1', 'e9', 'd-des')], new Map())).toEqual([]);
-  });
-
-  it('sorts the people by employee id and the seats of a person by assignment id, whatever the order it was given', () => {
-    const departments = new Map([
-      ['e1', 'd-fin'],
-      ['e2', 'd-fin'],
-    ]);
-    const seats = [
-      seat('a9', 'e2', 'd-des'),
-      seat('a3', 'e1', 'd-des'),
-      seat('a5', 'e2', 'd-it'),
-      seat('a1', 'e2', 'd-des'),
-    ];
-
-    const holders = holdersOfOtherDepartments(seats, departments);
-
-    expect(holders.map((holder) => holder.employeeId)).toEqual(['e1', 'e2']);
-    expect(holders[1].assignments.map((one) => one.assignmentId)).toEqual(['a1', 'a5', 'a9']);
-    expect(holdersOfOtherDepartments([...seats].reverse(), departments)).toEqual(holders);
+  it('is valid_from when no grant task was made (a recorded or baseline seat) or the grant was done before it', () => {
+    expect(usableDayOf('2026-06-01', [], day)).toBe('2026-06-01');
+    expect(
+      usableDayOf('2026-06-01', [{ status: 'COMPLETED', completedAt: new Date('2026-05-20T03:00:00Z') }], day),
+    ).toBe('2026-06-01');
   });
 });

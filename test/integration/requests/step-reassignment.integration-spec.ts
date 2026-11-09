@@ -5,7 +5,7 @@ import { OrganizationChangeListeners } from '../../../src/modules/organization/p
 import { StepReassignmentService } from '../../../src/modules/requests/reassignment/step-reassignment.service';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { ReassignmentHarness } from '../../support/reassignment-harness';
-import type { Person } from '../../support/request-harness';
+import type { Department, Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
 import { changeRoleTo } from '../../support/builders/account.builder';
 
@@ -57,6 +57,14 @@ describe('who holds a step when the organization or a role changes, over Postgre
     counter += 1;
 
     return h.staff(unit.department, `${label}-${counter}`);
+  };
+  /** An internal request already waiting when its department loses its head, rather than a new one-step request. */
+  const waitingInternal = async (department: Department, requester: Person) => {
+    const temporary = await h.staff(department, `WAIT-H${++counter}`);
+    await h.makeHead(department, temporary);
+    const sent = await h.sent(requester, internal);
+    await h.vacateHead(department.id).expect(200);
+    return sent;
   };
   const auditCount = async () =>
     Number(
@@ -217,7 +225,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
       const opsNew = await h.staff(opsDepartment, `OPS-N${counter}`);
       const h3 = await person(des, 'DES-H3');
       const underHead = await h.sent(des.member, internal);
-      const underNobody = await h.sent(opsMember, internal);
+      const underNobody = await waitingInternal(opsDepartment, opsMember);
       const elsewhere = await h.sent(other.member, internal);
       expect(await h.stepOf(underNobody.id, 'NEED')).toMatchObject({
         state: 'WAITING',
@@ -250,14 +258,15 @@ describe('who holds a step when the organization or a role changes, over Postgre
       const headless = await h.departmentWithUnit(`P-HW${counter}`);
       const requester = await h.staff(headless, `HW-E${counter}`);
       const newHead = await h.staff(headless, `HW-H${counter}`);
-      const sent = await h.sent(requester, internal);
+      const sent = await waitingInternal(headless, requester);
       // Three days of waiting for a head: the step is as old as the request, and the stretch of waiting is its own.
       await h.ctx.sql.query(
         `UPDATE access_request_steps SET created_at = created_at - interval '3 days' WHERE request_id = $1`,
         [sent.id],
       );
       const waiting = await h.stepOf(sent.id, 'NEED');
-      expect(waiting).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD', routing_row: 4 });
+      // This internal request was sent while a head held row 1; losing that head preserves its original routing row.
+      expect(waiting).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD', routing_row: 1 });
 
       await h.makeHead(headless, newHead);
 
@@ -292,7 +301,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
       // A member who holds MANAGER and heads nothing is not a head: the step does not go to them (US-01-02 AC-10).
       const manager = await h.staff(headless, `FD-M${counter}`);
       await changeRoleTo(h.ctx, h.admin, manager.employeeId, 'MANAGER');
-      const sent = await h.sent(requester, internal);
+      const sent = await waitingInternal(headless, requester);
       expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD' });
 
       // The head is named from tomorrow: nothing changes today, not for the one who holds MANAGER either.
@@ -343,7 +352,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
       counter += 1;
       const headless = await h.departmentWithUnit(`P-RW${counter}`);
       const requester = await h.staff(headless, `RW-E${counter}`);
-      const sent = await h.sent(requester, internal);
+      const sent = await waitingInternal(headless, requester);
       const step = await h.stepOf(sent.id, 'NEED');
       // The step waits for the spending approver, as a step of a head who sent it did; now the department has no head: the table
       // names nobody again, but for another reason.
@@ -424,41 +433,8 @@ describe('who holds a step when the organization or a role changes, over Postgre
       ).toEqual(['HEAD_CHANGED']);
     });
 
-    it('makes the review of Finance wait when its holder leaves and nobody else holds the role, and gives it back when somebody does', async () => {
-      const unit = await scene();
-      await h.budgetFor(unit, { total: 100 * M, held: 20 * M, spent: 40 * M });
-      counter += 1;
-      const departed = await h.staff(await h.departmentWithUnit(`P-FIN${counter}`), `FIN-D${counter}`);
-      const next = await h.staff(await h.departmentWithUnit(`P-FIN${counter + 100}`), `FIN-N${counter}`);
-      await h.changeRoleOf(h.finance.appUserId, 'EMPLOYEE').expect(200);
-      await h.changeRoleOf(departed.account.appUserId, 'FINANCE').expect(200);
-      const id = await h.paidRequest(unit, paid, { amount: 45 * M });
-      await h.route(id, unit.head.account);
-      expect(await h.stepOf(id, 'FINANCE_REVIEW')).toMatchObject({ assignee_employee_id: departed.employeeId });
-
-      try {
-        await h.changeRoleOf(departed.account.appUserId, 'EMPLOYEE').expect(200);
-        await h.leave(departed.employeeId);
-        expect(await h.stepOf(id, 'FINANCE_REVIEW')).toMatchObject({
-          state: 'WAITING',
-          assignee_employee_id: null,
-          waiting_reason: 'NO_FINANCE_REVIEWER',
-        });
-        expect(await h.state(id)).toBe('WAITING_CONTROLLED');
-
-        await h.changeRoleOf(next.account.appUserId, 'FINANCE').expect(200);
-        expect(await h.stepOf(id, 'FINANCE_REVIEW')).toMatchObject({
-          state: 'PENDING',
-          assignee_employee_id: next.employeeId,
-          waiting_reason: null,
-          waiting_since: null,
-        });
-        expect(await h.state(id)).toBe('AWAITING_FINANCE_REVIEW');
-      } finally {
-        await h.changeRoleOf(next.account.appUserId, 'EMPLOYEE');
-        await h.changeRoleOf(h.finance.appUserId, 'FINANCE');
-      }
-    });
+    // Removed: "makes the review of Finance wait when its holder leaves" (US-06-13 AC-6). Finance has no review any more (QĐ-97c), so no step
+    // waits for the role of Finance; the same movement of a held step is proved by the spend step above and the need step here.
 
     it('makes the assessment of the IT Admin wait when the IT Admin in charge leaves, and gives it to the one named after', async () => {
       const unit = await scene();
@@ -488,17 +464,18 @@ describe('who holds a step when the organization or a role changes, over Postgre
   });
 
   describe('an approval role changes hands (AC-4)', () => {
-    it('gives the spend step and the need step the approver held to the new approver', async () => {
+    it('BR-MF1-02 gives both spend steps to the new approver while the head own need step stays NOT_REQUIRED', async () => {
       const unit = await scene();
       await h.budgetFor(unit, { total: 100 * M });
       counter += 1;
       const c2 = await h.staff(await h.departmentWithUnit(`P-C2-${counter}`), `C2-${counter}`);
       const spend = await h.waitingForApprover(unit, paid, { amount: 5 * M });
       const own = await h.sent(unit.head, paid);
-      expect(await h.stepOf(own.id, 'NEED')).toMatchObject({ assignee_employee_id: h.boss.employeeId, routing_row: 2 });
+      const need = await h.stepOf(own.id, 'NEED');
+      expect(need).toMatchObject({ state: 'NOT_REQUIRED', assignee_employee_id: null, routing_row: 2 });
       const created = {
         spend: (await h.stepOf(spend, 'SPEND_APPROVAL')).created_at,
-        own: (await h.stepOf(own.id, 'NEED')).created_at,
+        own: (await h.stepOf(own.id, 'SPEND_APPROVAL')).created_at,
       };
 
       await h.setRole('SPENDING_APPROVER', c2);
@@ -506,9 +483,10 @@ describe('who holds a step when the organization or a role changes, over Postgre
         const movedSpend = await h.stepOf(spend, 'SPEND_APPROVAL');
         expect(movedSpend).toMatchObject({ state: 'PENDING', assignee_employee_id: c2.employeeId });
         expect(movedSpend.created_at).toEqual(created.spend);
-        const movedOwn = await h.stepOf(own.id, 'NEED');
-        expect(movedOwn).toMatchObject({ state: 'PENDING', assignee_employee_id: c2.employeeId, routing_row: 2 });
+        const movedOwn = await h.stepOf(own.id, 'SPEND_APPROVAL');
+        expect(movedOwn).toMatchObject({ state: 'PENDING', assignee_employee_id: c2.employeeId });
         expect(movedOwn.created_at).toEqual(created.own);
+        expect(await h.stepOf(own.id, 'NEED')).toEqual(need);
         // The role is handed over in two steps (revoke, then grant): the step waits, then goes to the new approver (US-01-03 AC-3, AC-9).
         expect((await h.audit('ACCESS_REQUEST.STEP_WAITING', movedSpend.id))[0].after).toMatchObject({
           trigger: 'ROLE_HOLDER_CHANGED',
@@ -527,20 +505,20 @@ describe('who holds a step when the organization or a role changes, over Postgre
       expect(await h.stepOf(spend, 'SPEND_APPROVAL')).toMatchObject({ assignee_employee_id: h.boss.employeeId });
     });
 
-    it('flags both steps when one person ends up holding the need step and the spend step, and clears it when they do not', async () => {
-      // A head's own request goes to the spending approver for the need (row 2): the check ran when the approver approved it.
+    it('BR-MF1-02 never reinstates retired same-person flags on the one-step route across role changes', async () => {
       const unit = await h.departmentWithHead(`P-C3-${(counter += 1)}`);
       await h.budgetFor(unit, { total: 100 * M });
       const c2 = await h.staff(await h.departmentWithUnit(`P-C3X-${counter}`), `C3-${counter}`);
       const sent = await h.sent(unit.head, paid, { termMonths: 1 });
-      await h.decide(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
-      await h.setPayments(sent.id, { amount: 5 * M });
       const id = sent.id;
-      // One person holds the need step they approved and the spend step: both are flagged (US-05-03 AC-9).
-      expect(await h.stepOf(id, 'NEED')).toMatchObject({ same_person_as_spend: true });
+      expect(await h.stepOf(id, 'NEED')).toMatchObject({
+        state: 'NOT_REQUIRED',
+        assignee_employee_id: null,
+        same_person_as_spend: false,
+      });
       expect(await h.stepOf(id, 'SPEND_APPROVAL')).toMatchObject({
         assignee_employee_id: h.boss.employeeId,
-        same_person_as_spend: true,
+        same_person_as_spend: false,
       });
 
       await h.setRole('SPENDING_APPROVER', c2);

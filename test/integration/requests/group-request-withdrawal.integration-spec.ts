@@ -2,6 +2,9 @@ import { GroupHarness } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
+const M = 1_000_000;
+/** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 
 interface TaskWire {
   id: string;
@@ -88,7 +91,7 @@ describe('withdrawing one person of a request for a group, or what is left of it
       const request = h.dataOf<{ request: { state: string; pricing: { amount: { amount: string } } } }>(
         await h.fetch(id, u.head.account).expect(200),
       ).request;
-      expect(request.pricing.amount.amount).toBe('24000000');
+      expect(request.pricing.amount.amount).toBe(String(2 * M * monthsLeft));
       expect(await h.commitments(id)).toEqual([]);
       const all = [e1, e2, e3].map((p) => ({ employeeId: p.employeeId, decision: 'APPROVE' }));
       expect(h.codeOf(await h.decideSpendLines(id, { lines: all }, h.boss.account).expect(422))).toBe(
@@ -164,7 +167,8 @@ describe('withdrawing one person of a request for a group, or what is left of it
       expect(h.codeOf(real)).toBe('ACCESS_REQUEST.GRANT_COMPLETED');
       expect((real.body as Refused).error.details?.assignmentId).toEqual(expect.any(String));
       expect(await h.lineStates(id)).toEqual(['EXECUTING', 'COMPLETED', 'APPROVED']);
-      expect(await releases(id)).toEqual([]);
+      // The refusals give nothing back; the K2 seat that was granted gave back its days before the grant (M-10, LATE_GRANT).
+      expect((await releases(id)).filter((row) => row.reason !== 'LATE_GRANT')).toEqual([]);
     });
 
     it('lets the line wait for the IT Admin when the grant had failed, and ends it, giving back the share, when the task is cancelled', async () => {
@@ -221,7 +225,8 @@ describe('withdrawing one person of a request for a group, or what is left of it
 
       expect(await h.lineStates(id)).toEqual(['COMPLETED', 'WITHDRAWN', 'WITHDRAWN']);
       expect(await h.state(id)).toBe('COMPLETED');
-      const given = await releases(id);
+      // M-10: the seat granted first gave back its days before the grant (LATE_GRANT); the withdrawal gives back the others' shares.
+      const given = (await releases(id)).filter((row) => row.reason !== 'LATE_GRANT');
       expect(given.every((row) => row.reason === 'REQUEST_WITHDRAWN')).toBe(true);
       expect(sum(given)).toBe(sum(others));
       expect((await taskStatuses(id)).map((task) => task.status).sort()).toEqual(['CANCELLED', 'COMPLETED']);

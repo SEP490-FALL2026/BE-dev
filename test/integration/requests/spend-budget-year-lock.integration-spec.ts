@@ -31,7 +31,7 @@ describe('the lock of the Cost Center and the year under the check of a request 
     await h.stop();
   });
 
-  /** A department with 40 million left of the year, and a threshold of 95 %, so that what is over what is left is the only exception. */
+  /** A department with 40 million left of the base of the year and no reserve, so that what is over what is left is blocked. */
   const unit = async (): Promise<{ u: Unit; versionId: string }> => {
     counter += 1;
     const u = await h.departmentWithHead(`P-LK${counter}`);
@@ -87,14 +87,14 @@ describe('the lock of the Cost Center and the year under the check of a request 
     const [decision] = (await Promise.all(queued)) as [{ status: number }, unknown];
     expect(decision.status).toBe(200);
 
-    // The first is approved and holds 25 of the 40 left; the second is judged after it, finds 25 of the 15 that are left and goes to Finance.
+    // The first is approved and holds 25 of the 40 left; the second is judged after it, finds 25 of the 15 that are left and is blocked (OVER_RESERVE, BR-MF1-06g).
     expect(await checks(first)).toEqual([
       { number: 1, route: 'SPEND_APPROVAL' },
       { number: 2, route: 'SPEND_APPROVAL' },
     ]);
-    expect(await checks(second)).toEqual([{ number: 1, route: 'FINANCE_REVIEW' }]);
+    expect(await checks(second)).toEqual([{ number: 1, route: 'BLOCKED' }]);
     expect(await h.state(first)).toBe('AWAITING_EXECUTION');
-    expect(await h.state(second)).toBe('AWAITING_FINANCE_REVIEW');
+    expect(await h.state(second)).toBe('AWAITING_SPEND_SUBMISSION');
   });
 
   it('computes only once it holds the lock: what another transaction committed while it waited is what it judges', async () => {
@@ -126,18 +126,14 @@ describe('the lock of the Cost Center and the year under the check of a request 
     await routed;
 
     // Judged before the lock it would have been 25 of 40 and in order; judged after it is 25 of 10.
-    expect(await checks(id)).toEqual([{ number: 1, route: 'FINANCE_REVIEW' }]);
+    expect(await checks(id)).toEqual([{ number: 1, route: 'BLOCKED' }]);
   });
 
-  it('takes the lock of every year that binds, not only the first', async () => {
+  it('QĐ-109: takes the lock of the year the amount is counted in, whichever year that is', async () => {
+    // Rewritten from "the lock of every year that binds": a request has one year now, which may be the next.
     const { u } = await unit();
     const id = await h.paidRequest(u, plan, { amount: 10 * M });
-    await h.setPayments(id, {
-      schedule: [
-        { dueOn: `${h.year}-06-15`, amount: 10 * M, year: h.year },
-        { dueOn: `${h.next}-03-15`, amount: 10 * M, year: h.next },
-      ],
-    });
+    await h.setPayments(id, { amount: 10 * M, year: h.next });
     const holder = await hold(u.department.unitId, h.next);
     let routed: Promise<unknown> = Promise.resolve();
     try {

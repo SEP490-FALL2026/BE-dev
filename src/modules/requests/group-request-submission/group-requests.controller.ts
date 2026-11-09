@@ -78,10 +78,10 @@ export class GroupRequestsController {
       const checked = await this.groups.check(actor, body);
       const { pricing } = checked;
       const perPerson =
-        pricing.unitPrice !== null && pricing.schedule !== null
+        pricing.amount !== null && checked.lineCount > 0
           ? await this.money.moneyView({
-              amountMinor: pricing.unitPrice.amountMinor * BigInt(pricing.schedule.length),
-              currency: pricing.unitPrice.currency,
+              amountMinor: pricing.amount.amountMinor / BigInt(checked.lineCount),
+              currency: pricing.amount.currency,
             })
           : null;
 

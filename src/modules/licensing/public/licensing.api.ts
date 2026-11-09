@@ -3,6 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AssignmentService } from '../assignment/assignment.service';
+import { SubscriptionRenewalRepo } from '../subscription-renewal/subscription-renewal.repo';
 import { ProvisioningFailureService, type FailureRecorded } from '../provisioning/provisioning-failure.service';
 import {
   ProvisioningCancellationService,
@@ -10,6 +11,7 @@ import {
 } from '../provisioning/grant-cancellation/provisioning-cancellation.service';
 import { ProvisioningTaskFrame } from '../provisioning/provisioning-task-frame.service';
 import { RevocationViewService } from '../provisioning/revocation-view.service';
+import { RevocationWithdrawalService } from '../provisioning/revocation-withdrawal/revocation-withdrawal.service';
 import { RevocationService } from '../provisioning/revocation.service';
 import type {
   AssignmentRecord,
@@ -19,9 +21,12 @@ import type {
   OpenRevocationInput,
   PersonalSeat,
   ProvisioningFailureKind,
+  SeatHolding,
   RevocationSource,
   SelfExecutionMode,
   TerminatingAccess,
+  WithdrawnRevocation,
+  WithdrawRevocationInput,
 } from './licensing.types';
 
 /**
@@ -36,7 +41,9 @@ export class LicensingApi {
     private readonly cancellations: ProvisioningCancellationService,
     private readonly frame: ProvisioningTaskFrame,
     private readonly revocations: RevocationService,
+    private readonly withdrawals: RevocationWithdrawalService,
     private readonly revocationView: RevocationViewService,
+    private readonly renewals: SubscriptionRenewalRepo,
   ) {}
 
   /**
@@ -49,6 +56,20 @@ export class LicensingApi {
    */
   openRevocation(tx: DbTx, actor: AuthenticatedPrincipal, input: OpenRevocationInput): Promise<OpenedRevocation> {
     return this.revocations.open(tx, actor, input);
+  }
+
+  /**
+   * Takes back the reason a source gave for the revocation of a seat (the source decided otherwise, or its cause ended), in the
+   * transaction of that source: the task goes on while another reason stands, and is cancelled as no longer applying when none does
+   * (a task in progress only when `cancelInProgressClaimedBy` is the IT Admin who took it). Asking twice changes nothing. The
+   * listeners hear `REASON_WITHDRAWN`.
+   */
+  withdrawRevocationReason(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: WithdrawRevocationInput,
+  ): Promise<WithdrawnRevocation> {
+    return this.withdrawals.withdraw(tx, actor, input);
   }
 
   /**
@@ -74,9 +95,49 @@ export class LicensingApi {
     return this.revocationView.heldSoftwareOf(employeeId, onDate, page, tx);
   }
 
+  /** Which of these subscriptions the company has decided to end (the live renewal case was decided `CANCEL`), in one statement. */
+  getSubscriptionIdsToEnd(subscriptionIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.renewals.endingAmong(subscriptionIds, tx);
+  }
+
+  /** How many seats each of these subscriptions holds as of `onDate`, the way the warehouse counts them (a service account and a future start included), in one statement. */
+  countSeatsOfSubscriptions(
+    subscriptionIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, number>> {
+    return this.assignments.countHoldingOfSubscriptions(subscriptionIds, onDate, tx);
+  }
+
+  /**
+   * The seats of these subscriptions held as of `onDate`, counted the way the warehouse counts them (a service account and a future start
+   * included), by the person who holds each or answers for it, in one statement: the baseline charges a seat to that person's department
+   * (`QĐ-103k`).
+   */
+  countSeatsByHolderOfSubscriptions(
+    subscriptionIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<SeatHolding[]> {
+    return this.assignments.countHoldingByHolder(subscriptionIds, onDate, tx);
+  }
+
   /** How many personal seats each of these people holds on `onDate` or will, in one statement (the people with none are absent). */
   countPersonalSeatsOf(employeeIds: readonly string[], onDate: BusinessDate, tx?: DbTx): Promise<Map<string, number>> {
     return this.revocationView.countPersonalSeats(employeeIds, onDate, tx);
+  }
+
+  /**
+   * The paid applications each of these people uses on `onDate` or will, as ids of applications (GH-3, `BR-MF1-01g`): a personal seat
+   * not failed, cancelled or ended, of an application that is not internal and a plan that is not `K5`; two plans of one application
+   * count once. One statement; the people with none are absent.
+   */
+  listPaidApplicationsOf(
+    employeeIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, Set<string>>> {
+    return this.revocationView.paidApplicationsOf(employeeIds, onDate, tx);
   }
 
   /**

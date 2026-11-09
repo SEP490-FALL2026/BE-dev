@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { SpendEntryService } from '../spend/spend-entry.service';
 import {
   AccessRequestNoDepartmentError,
   AccessRequestNotDraftError,
@@ -14,6 +13,7 @@ import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { RequestDraftRepo } from '../request-draft/request-draft.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
 import { RequestFactsService, type RequestSettings } from '../access-request/request-facts.service';
+import { RequestLimitsService, type LimitSettings } from '../request-limits/request-limits.service';
 import {
   GroupRequestDuplicateLineError,
   GroupRequestLinesRefusedError,
@@ -35,8 +35,8 @@ export interface GroupBody {
   planId: string;
   lines: readonly GroupLineInput[];
   businessReason: string;
-  termMonths: number;
-  expectedSpendOn?: string;
+  /** The day the access of every person named ends; absent for no end. */
+  expectedEndDate?: string;
 }
 
 /** What `POST /group-requests/check` says: every reason at once, and nothing written. */
@@ -44,9 +44,14 @@ export interface GroupCheck {
   plan: { eligible: boolean; reason: PlanRefusal | null };
   tooManyLines: { max: number } | null;
   tooFewLines: { min: number } | null;
-  termLimit: { maxMonths: number; endsBy: string | null };
-  termBeyondLimit: boolean;
-  lines: { employeeId: string; ok: boolean; reason: LineReason | 'DUPLICATE_LINE' | null }[];
+  maxEndDate: string;
+  endDateOutOfRange: boolean;
+  lines: {
+    employeeId: string;
+    ok: boolean;
+    reason: LineReason | 'DUPLICATE_LINE' | null;
+    manyPaidSoftware: { count: number; threshold: number } | null;
+  }[];
   pricing: PricingRecord;
   lineCount: number;
 }
@@ -66,32 +71,38 @@ export class GroupRequestService {
     private readonly assessment: RequestFactsService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly requests: AccessRequestRepo,
-    private readonly entry: SpendEntryService,
     private readonly drafts: RequestDraftRepo,
     private readonly writer: GroupRequestWriter,
+    private readonly limits: RequestLimitsService,
   ) {}
 
   /** Every reason the request cannot be sent, and what it would cost, without writing anything. */
   async check(actor: AuthenticatedPrincipal, body: GroupBody): Promise<GroupCheck> {
     const settings = await this.assessment.settings();
+    const limitSettings = await this.limits.settings();
 
     return this.runner.run(async (tx) => {
       await this.requireSender(tx, actor);
       await this.facts.requireEligibleSender(tx, actor.employeeId, { lock: false });
-      const judged = await this.facts.judge(tx, this.input(actor, body, settings, false));
+      const judged = await this.facts.judge(tx, this.input(actor, body, { settings, limitSettings }, false));
       const refused = new Map(judged.refused.map((line) => [line.employeeId, line.reason]));
 
       return {
         plan: { eligible: judged.planRefusal === null, reason: judged.planRefusal },
         tooManyLines: judged.count.tooMany,
         tooFewLines: judged.count.tooFew,
-        termLimit: judged.assessed.termLimit,
-        termBeyondLimit: judged.assessed.termBeyondLimit,
+        maxEndDate: judged.assessed.maxEndDate,
+        endDateOutOfRange: judged.assessed.endDateOutOfRange,
         lines: judged.lines.map((line) => {
           const duplicate = judged.count.duplicates.includes(line.employeeId);
           const reason = duplicate ? ('DUPLICATE_LINE' as const) : (refused.get(line.employeeId) ?? null);
 
-          return { employeeId: line.employeeId, ok: reason === null, reason };
+          return {
+            employeeId: line.employeeId,
+            ok: reason === null,
+            reason,
+            manyPaidSoftware: judged.limits.get(line.employeeId)?.manyPaidSoftware ?? null,
+          };
         }),
         pricing: judged.pricing,
         lineCount: judged.lines.length,
@@ -113,6 +124,7 @@ export class GroupRequestService {
   ): Promise<AccessRequestRecord> {
     if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const settings = await this.assessment.settings();
+    const limitSettings = await this.limits.settings();
 
     return this.runner.run(async (tx) => {
       if (options.draftId) {
@@ -122,7 +134,12 @@ export class GroupRequestService {
       }
       const organizationId = await this.requireSender(tx, actor);
       await this.facts.requireEligibleSender(tx, actor.employeeId, { lock: true });
-      const judged = await this.facts.judge(tx, this.input(actor, body, settings, true));
+      // The limits of every person named are judged one sending after the other (QĐ-106g): locked before any department is.
+      await this.limits.lock(
+        tx,
+        body.lines.map((line) => line.employeeId),
+      );
+      const judged = await this.facts.judge(tx, this.input(actor, body, { settings, limitSettings }, true));
       this.refuse(judged);
 
       const planned = planNeedSteps({
@@ -140,7 +157,6 @@ export class GroupRequestService {
         body,
         draftId: options.draftId ?? null,
       });
-      if (request.state === 'AWAITING_SPEND_SUBMISSION') await this.entry.enter(tx, actor, request);
 
       const final = await this.requests.findById(request.id, tx);
       if (!final) throw new Error(`The request ${request.id} was not found after it was written.`);
@@ -149,12 +165,17 @@ export class GroupRequestService {
     });
   }
 
-  private input(actor: AuthenticatedPrincipal, body: GroupBody, settings: RequestSettings, lockPeople: boolean) {
+  private input(
+    actor: AuthenticatedPrincipal,
+    body: GroupBody,
+    { settings, limitSettings }: { settings: RequestSettings; limitSettings: LimitSettings },
+    lockPeople: boolean,
+  ) {
     return {
+      limitSettings,
       senderEmployeeId: actor.employeeId,
       planId: body.planId,
-      termMonths: body.termMonths,
-      expectedSpendOn: body.expectedSpendOn,
+      expectedEndDate: body.expectedEndDate ?? null,
       lines: body.lines,
       now: new Date(),
       settings,
@@ -175,9 +196,7 @@ export class GroupRequestService {
   private refuse(judged: GroupJudgement): void {
     if (judged.planRefusal !== null) throw new GroupRequestPlanNotEligibleError(judged.planRefusal);
     if (judged.count.tooMany !== null) throw new GroupRequestTooManyLinesError(judged.count.tooMany.max);
-    if (judged.assessed.termBeyondLimit) {
-      throw new GroupRequestTermBeyondLimitError(judged.assessed.termLimit.maxMonths, judged.assessed.termLimit.endsBy);
-    }
+    if (judged.assessed.endDateOutOfRange) throw new GroupRequestTermBeyondLimitError(judged.assessed.maxEndDate);
     if (judged.count.tooFew !== null) throw new GroupRequestTooFewLinesError(judged.count.tooFew.min);
     if (judged.count.duplicates.length > 0) throw new GroupRequestDuplicateLineError(judged.count.duplicates);
     if (judged.refused.length > 0) throw new GroupRequestLinesRefusedError(judged.refused);

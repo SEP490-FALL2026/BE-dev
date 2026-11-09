@@ -8,7 +8,8 @@ describe('AuditApi', () => {
   const countByAction = jest.fn().mockResolvedValue(new Map([['INSTALLATION.EMPLOYEE_CREATED', 2]]));
   const readSince = jest.fn().mockResolvedValue([]);
   const firstAfterField = jest.fn().mockResolvedValue('SHARED');
-  const service = new AuditApi({ insert, countByAction, readSince, firstAfterField });
+  const pageOfResources = jest.fn().mockResolvedValue({ rows: [], total: 0 });
+  const service = new AuditApi({ insert, countByAction, readSince, firstAfterField, pageOfResources });
   const tx = {} as DbTx;
   const base: AuditEventInput = {
     organizationId: '11111111-1111-4111-8111-111111111111',
@@ -73,5 +74,13 @@ describe('AuditApi', () => {
 
     await expect(service.readSince(tx, cursor, options)).resolves.toBe(slice);
     expect(readSince).toHaveBeenCalledWith(tx, cursor, options);
+  });
+
+  it('reads the events of the resources of its owner in the caller transaction, as the repository answers them', async () => {
+    const resources = [{ type: 'ACCESS_REQUEST', id: 'r-1' }];
+    const query = { actions: ['ACCESS_REQUEST.SUBMITTED'], onlySubject: null, skip: 0, take: 20 };
+
+    await expect(service.pageOfResources(tx, resources, query)).resolves.toEqual({ rows: [], total: 0 });
+    expect(pageOfResources).toHaveBeenCalledWith(tx, resources, query);
   });
 });

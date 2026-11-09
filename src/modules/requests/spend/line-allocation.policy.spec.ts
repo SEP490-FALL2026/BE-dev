@@ -1,5 +1,4 @@
-import type { PaymentPeriod } from '../access-request/pricing.policy';
-import { allocateEvenly, scaledPricing, scaleSchedule, shareToRelease, sharesOf } from './line-allocation.policy';
+import { allocateEvenly, scaledPricing, scaleAmount, shareToRelease, sharesOf } from './line-allocation.policy';
 
 const sum = (values: readonly bigint[]) => values.reduce((total, value) => total + value, 0n);
 
@@ -63,34 +62,23 @@ describe('dividing the cost of a year among the people of a group (US-05-17 AC-9
   });
 });
 
-describe('the payments of a request for the people that stay (US-06-14 AC-13, US-05-17 AC-9)', () => {
-  const period = (dueOn: string, amountMinor: bigint, budgetYear = 2026): PaymentPeriod => ({
-    dueOn,
-    amountMinor,
-    budgetYear,
-    binding: true,
-  });
-  const schedule = [period('2026-11-01', 75n), period('2026-12-01', 75n), period('2027-01-01', 75n, 2027)];
-
-  it('lays the payments out for fewer people, in whole minor units, keeping the days, years and whether they bind', () => {
-    expect(scaleSchedule(schedule, 5, 4)).toEqual([
-      period('2026-11-01', 60n),
-      period('2026-12-01', 60n),
-      period('2027-01-01', 60n, 2027),
-    ]);
+describe('the amount of a request for the people that stay (US-06-14 AC-13, US-05-17 AC-9)', () => {
+  it('is the same share of the amount for fewer people', () => {
+    expect(scaleAmount(225n, 5, 4)).toBe(180n);
   });
 
-  it('is the same schedule for the same people', () => {
-    expect(scaleSchedule(schedule, 5, 5)).toEqual(schedule);
+  it('is the same amount for the same people', () => {
+    expect(scaleAmount(225n, 5, 5)).toBe(225n);
   });
 
-  it('is nothing when the payments do not divide: they were not made for that many people', () => {
-    expect(scaleSchedule([period('2026-11-01', 74n)], 5, 4)).toBeNull();
+  it('rounds a part of a minor unit up: a price that does not divide is paid in full (TẠM CHỌN)', () => {
+    expect(scaleAmount(74n, 5, 4)).toBe(60n);
+    expect(scaleAmount(75n, 4, 3)).toBe(57n);
   });
 
   it('is nothing for no people or for more people than it was made for', () => {
-    expect(scaleSchedule(schedule, 5, 0)).toBeNull();
-    expect(scaleSchedule(schedule, 5, 6)).toBeNull();
+    expect(scaleAmount(225n, 5, 0)).toBeNull();
+    expect(scaleAmount(225n, 5, 6)).toBeNull();
   });
 });
 
@@ -111,28 +99,14 @@ describe('what goes back when one person leaves a request (US-05-17 AC-10)', () 
 });
 
 describe('what a request for a group costs once only the people approved are left (US-05-17 AC-9, US-06-01 AC-15)', () => {
-  const period = (amountMinor: bigint, budgetYear: number): PaymentPeriod => ({
-    dueOn: `${budgetYear}-01-15`,
-    amountMinor,
-    budgetYear,
-    binding: true,
-  });
-  const pricing = {
-    amount: { amountMinor: 900n, currency: 'VND' },
-    schedule: [period(600n, 2026), period(300n, 2027)],
-  };
+  const pricing = { amount: { amountMinor: 900n, currency: 'VND' } };
 
-  it('scales the schedule to the people who remain and adds the periods up in the currency of the price', () => {
-    expect(scaledPricing(pricing, 3, 2)).toEqual({
-      amount: { amountMinor: 600n, currency: 'VND' },
-      schedule: [period(400n, 2026), period(200n, 2027)],
-    });
+  it('scales the amount to the people who remain, in the currency of the price', () => {
+    expect(scaledPricing(pricing, 3, 2)).toEqual({ amount: { amountMinor: 600n, currency: 'VND' } });
   });
 
-  it('changes nothing when everybody is approved, when there is no schedule or amount, or when the schedule does not divide', () => {
+  it('changes nothing when everybody is approved or when there is no amount', () => {
     expect(scaledPricing(pricing, 3, 3)).toBeNull();
-    expect(scaledPricing({ ...pricing, schedule: null }, 3, 2)).toBeNull();
-    expect(scaledPricing({ ...pricing, amount: null }, 3, 2)).toBeNull();
-    expect(scaledPricing({ ...pricing, schedule: [period(100n, 2026)] }, 3, 2)).toBeNull();
+    expect(scaledPricing({ amount: null }, 3, 2)).toBeNull();
   });
 });

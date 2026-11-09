@@ -49,7 +49,7 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
         }),
       );
       await refusedWithNothingWritten('access_requests', () =>
-        call().post('NV-DEV3', '/access-requests', { planId: figma, businessReason: 'x', termMonths: 13 }),
+        call().post('NV-DEV3', '/access-requests', { planId: figma, businessReason: 'x', termMonths: 12 }),
       );
       const preview = await call().post('NV-DEV3', '/access-requests/preview', {
         planId: figma,
@@ -61,8 +61,13 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
       const jira = await call().planId('Jira Standard');
       const before = await count('access_requests');
       expect(
-        (await call().post('NV-DEV3', '/access-requests', { planId: jira, businessReason: 'x', termMonths: 12 }))
-          .status,
+        (
+          await call().post('NV-DEV3', '/access-requests', {
+            planId: jira,
+            businessReason: 'x',
+            expectedEndDate: call().inDays(60),
+          })
+        ).status,
       ).toBe(201);
       expect(await count('access_requests')).toBe(before + 1);
     });
@@ -103,11 +108,20 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
               seats: 2,
               amount: { amount: '1000000' },
               windowFrom: call().today(),
+              lineType: 'RENEW',
+              priorityRank: 1,
             },
           ],
         }),
       );
-      const proposalLine = { description: 'Figma', planId: figma, seats: 2, amount: { amount: '1000000' } };
+      const proposalLine = {
+        description: 'Figma',
+        planId: figma,
+        seats: 2,
+        amount: { amount: '1000000' },
+        lineType: 'RENEW',
+        priorityRank: 1,
+      };
       const year = Number(call().today().slice(0, 4));
       const proposals = await count('budget_proposals');
       expect((await call().post('NV-DESH', '/budget-proposals', { year, lines: [proposalLine] })).status).toBe(201);
@@ -137,7 +151,6 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
       const group = await call().post('NV-ENGH', '/group-requests', {
         planId: figma,
         businessReason: 'Cả nhóm',
-        termMonths: 3,
         lines: [
           { employeeId: await world.facts.employeeId('NV-DEV1'), expectedEndDate: call().inDays(60) },
           { employeeId: await world.facts.employeeId('NV-DEV2') },
@@ -217,7 +230,77 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
     });
   });
 
+  describe('F1-05 dùng dự phòng: trình lô, xác nhận, duyệt chi @MF1 @B2', () => {
+    it('BR-MF1-06h: lô không lý do ⟹ chờ xác nhận; xác nhận bằng endpoint ⟹ bước chi mở; duyệt ⟹ một khoản cam kết #B2 @B2', async () => {
+      const year = Number(call().today().slice(0, 4));
+      const sql = world.ctx.sql;
+      const version = await world.facts.one<{ id: string; base_minor: string; reserve_minor: string }>(
+        `SELECT v.id, v.base_minor::text, v.reserve_minor::text
+           FROM budget_versions v JOIN cost_centers c ON c.id = v.cost_center_id
+          WHERE c.code = 'CC-ENG' AND v.year = $1 AND v.state = 'APPROVED'`,
+        [year],
+      );
+      const total = BigInt(version.base_minor) + BigInt(version.reserve_minor);
+      // The base is gone; what is left is left only with the reserve.
+      await sql.query(`UPDATE budget_versions SET base_minor = 1, reserve_minor = $2 WHERE id = $1`, [
+        version.id,
+        String(total - 1n),
+      ]);
+      try {
+        const id = await call().submitRequest('NV-DEV2', figma);
+        expect((await call().approveNeed('NV-ENGH', id)).status).toBe(200);
+
+        const sent = await call().submitBatch('NV-ENGH', [id]);
+        expect(sent.status).toBe(201);
+        const result = call().data<{ results: { outcome: string; reserveConfirmation: string }[] }>(sent).results[0];
+        expect(result).toMatchObject({ outcome: 'AWAITING_RESERVE_CONFIRMATION', reserveConfirmation: 'NOT_GIVEN' });
+        expect(
+          await world.facts.count('access_request_steps', "request_id = $1 AND kind = 'SPEND_APPROVAL'", [id]),
+        ).toBe(0);
+
+        const confirmed = await call().post('NV-ENGH', `/access-requests/${id}/reserve-confirmation`, {
+          reason: 'Cần cho đợt phát hành tháng này',
+        });
+        expect(confirmed.status).toBe(200);
+        expect(call().data<{ reserveConfirmation: { result: string } }>(confirmed).reserveConfirmation).toMatchObject({
+          result: 'SPEND_STEP_OPENED',
+          confirmationKept: true,
+        });
+
+        const approved = await call().post('NV-CEO', `/access-requests/${id}/spend-approval`, { decision: 'APPROVE' });
+        expect(approved.status).toBe(200);
+        expect(await world.facts.count('budget_commitments', 'request_id = $1', [id])).toBe(1);
+      } finally {
+        await sql.query(`UPDATE budget_versions SET base_minor = $2, reserve_minor = $3 WHERE id = $1`, [
+          version.id,
+          version.base_minor,
+          version.reserve_minor,
+        ]);
+      }
+    });
+  });
+
   describe('F1-04 gọi lại không tạo bản ghi trùng @MF1 @D1', () => {
+    it('BR-MF1-02 trưởng phòng tự gửi đi thẳng duyệt chi, không vào lô và chỉ quyết một lần @MF1', async () => {
+      const sent = await call().post('NV-ENGH', '/access-requests', {
+        planId: await call().planId('Jira Standard'),
+        businessReason: 'Trưởng phòng dùng cho điều phối',
+      });
+      expect(sent.status).toBe(201);
+      const own = call().data<{ request: { id: string; routing: { mode: string }; needStep: { state: string } } }>(
+        sent,
+      ).request;
+      expect(own).toMatchObject({ routing: { mode: 'ONE_STEP' }, needStep: { state: 'NOT_REQUIRED' } });
+      expect(await world.facts.count('spend_batch_items', 'request_id = $1', [own.id])).toBe(0);
+      expect(
+        (await call().post('NV-CEO', `/access-requests/${own.id}/spend-approval`, { decision: 'APPROVE' })).status,
+      ).toBe(200);
+      expect(await world.facts.count('approval_records', 'request_id = $1', [own.id])).toBe(1);
+      expect(
+        (await call().post('NV-CEO', `/access-requests/${own.id}/spend-approval`, { decision: 'APPROVE' })).status,
+      ).toBe(409);
+    });
+
     it('trình lô, duyệt chi và hoàn tất cấp: lần hai là 409 và không thêm dòng #B0 @B0', async () => {
       const id = await call().submitRequest('NV-DEV1', figma);
       expect((await call().approveNeed('NV-ENGH', id)).status).toBe(200);

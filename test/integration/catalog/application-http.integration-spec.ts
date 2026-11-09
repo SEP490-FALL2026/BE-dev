@@ -202,11 +202,9 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
       expect(created.usageCollectionDefault).toBeNull();
     });
 
-    it('AC-4: refuses a missing, unknown or departed Business Owner, for a catalogued and for an internal application, storing nothing', async () => {
+    it('AC-4, AF-17 QĐ-104: refuses an unknown or departed Business Owner, for a catalogued and for an internal application, storing nothing; one with none is taken', async () => {
       const before = await counts();
-      const withoutOwner = omit(base(), 'businessOwnerEmployeeId');
 
-      expect(codeOf(await create(withoutOwner).expect(422))).toBe('VALIDATION_ERROR');
       expect(codeOf(await create(base({ businessOwnerEmployeeId: randomUUID() })).expect(422))).toBe(
         'APPLICATION.BUSINESS_OWNER_INVALID',
       );
@@ -220,8 +218,12 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
           ).expect(422),
         ),
       ).toBe('APPLICATION.BUSINESS_OWNER_INVALID');
-
       expect(await counts()).toEqual(before);
+
+      // The Business Owner is no longer required (QĐ-104, AF-17): an application that names none is declared, with no owner.
+      const withoutOwner = omit(base(), 'businessOwnerEmployeeId');
+      const created = await create(withoutOwner).expect(201);
+      expect(JSON.stringify(created.body)).toMatch(/"businessOwner":null/);
     });
 
     it('AC-4: a Business Owner who leaves while the application is being declared does not get through', async () => {

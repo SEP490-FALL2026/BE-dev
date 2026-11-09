@@ -53,6 +53,8 @@ export const BUSINESS_PATTERNS = [
   '^[A-Z]{3}$',
   // An employee or department code (QĐ-93i): uppercase letters or digits joined by single hyphens.
   '^[A-Z0-9]+(-[A-Z0-9]+)*$',
+  // The days of the window of a vendor usage report, sent as multipart fields that the runtime reads by this pattern (MF-5).
+  String.raw`^\d{4}-\d{2}-\d{2}$`,
 ];
 
 /** Visits every object node of the document with its JSON pointer, so a failure names the exact place. */

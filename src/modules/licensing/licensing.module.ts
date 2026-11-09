@@ -19,7 +19,13 @@ import { ServiceAccountDutyService } from './assignment/service-account-duty/ser
 import { ServiceAccountDutySweeper } from './assignment/service-account-duty/service-account-duty.job';
 import { ServiceAccountSpendingApproverGrantCheck } from './assignment/service-account-duty/spending-approver-grant.listener';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
+import { RevocationCompletedFactsReader } from './provisioning/revocation-completion/revocation-completed-facts.service';
+import { AssignmentChainRepo } from './assignment/assignment-chain.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
+import { UsageFactsRepo } from './assignment/usage-facts.repo';
+import { RuleSeatsFactsService } from './assignment/rule-seats-facts.service';
+import { RuleSeatsRepo } from './assignment/rule-seats.repo';
+import { SharedPoolVacancyService } from './shared-pool/shared-pool-vacancy.service';
 import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
 import { AssignmentServiceAccountReader } from './assignment/assignment-service-account.listener';
 import { AssignmentListService } from './assignment/assignment-list.service';
@@ -36,6 +42,10 @@ import { ExpiryQueueService } from './expiry/expiry-queue.service';
 import { ExpiryReminderRepo } from './expiry/expiry-reminder.repo';
 import { ExpiryReminderService } from './expiry/expiry-reminder.service';
 import { ExpiryReminderSweeper } from './expiry/expiry-reminder.job';
+import { ExpiryRenewalWindowSweeper } from './expiry/expiry-renewal-window.job';
+import { ExpiryRenewalWindowRepo } from './expiry/expiry-renewal-window.repo';
+import { ExpiryRenewalWindowService } from './expiry/expiry-renewal-window.service';
+import { ProvisioningExtensionService } from './provisioning/tasks/provisioning-extension.service';
 import { HandoverAlertService } from './handover/handover-alert.service';
 import { HandoverCaseFacts } from './handover/handover-case-facts.service';
 import { HandoverConfirmationService } from './handover/handover-confirmation.service';
@@ -52,6 +62,7 @@ import { HandoverService } from './handover/handover.service';
 import { LicensingAlerts } from './licensing-alerts.service';
 import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-key-cipher.service';
 import { LicenseKeyRepo } from './license-key/license-key.repo';
+import { LicenseKeyAssignmentService } from './license-key/license-key-assignment.service';
 import { LicenseKeyRevealQuotaRepo } from './license-key/license-key-reveal-quota.repo';
 import { LicenseKeyService } from './license-key/license-key.service';
 import { LicenseKeysController } from './license-key/license-keys.controller';
@@ -70,7 +81,10 @@ import {
 import { LicensingApi } from './public/licensing.api';
 import { LicensingDashboardApi } from './public/licensing-dashboard.api';
 import { LicensingHandoverApi } from './public/licensing-handover.api';
+import { LicensingGhostSeatApi } from './public/licensing-ghost-seat.api';
+import { LicensingUsageApi } from './public/licensing-usage.api';
 import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
+import { LicensingPoolStockApi } from './public/licensing-pool-stock.api';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
 import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
 import { LicensingServiceAccountApi } from './public/licensing-service-account.api';
@@ -80,8 +94,10 @@ import { ProvisioningFailureService } from './provisioning/provisioning-failure.
 import { ProvisioningHolderService } from './provisioning/tasks/provisioning-holder.service';
 import { ProvisioningGrantPlanner } from './provisioning/tasks/provisioning-grant-planner.service';
 import { ProvisioningGrantService } from './provisioning/tasks/provisioning-grant.service';
+import { ProvisioningPurchaseRefusal } from './provisioning/tasks/provisioning-purchase-refusal.service';
 import { ProvisioningGrantWriter } from './provisioning/tasks/provisioning-grant-writer.service';
 import { ProvisioningService } from './provisioning/tasks/provisioning.service';
+import { ProvisioningGrantCompletion } from './provisioning/tasks/provisioning-grant-completion.service';
 import { ProvisioningTaskFrame } from './provisioning/provisioning-task-frame.service';
 import { ProvisioningTaskViewService } from './provisioning/provisioning-task-view.service';
 import { ProvisioningTaskRepo } from './provisioning/provisioning-task.repo';
@@ -91,6 +107,7 @@ import { DepartmentOpenWorkReader } from './provisioning/department-use/departme
 import { ProvisioningDepartmentUseRepo } from './provisioning/department-use/provisioning-department-use.repo';
 import { RevocationCompletionService } from './provisioning/revocation-completion/revocation-completion.service';
 import { RevocationLeaverAlert } from './provisioning/revocation-completion/revocation-leaver-alert.service';
+import { RevocationAftermath } from './provisioning/revocation-completion/revocation-aftermath.service';
 import { OpenGrantTaskRepo } from './provisioning/open-grants/open-grant-task.repo';
 import { OpenGrantTaskService } from './provisioning/open-grants/open-grant-task.service';
 import { RevocationReadRepo } from './provisioning/revocation-read.repo';
@@ -98,6 +115,7 @@ import { RevocationViewService } from './provisioning/revocation-view.service';
 import { RevocationRecorder } from './provisioning/revocation-recorder.service';
 import { RevocationTaskFactory } from './provisioning/revocation-task-factory.service';
 import { RevocationService } from './provisioning/revocation.service';
+import { RevocationWithdrawalService } from './provisioning/revocation-withdrawal/revocation-withdrawal.service';
 import { ProvisioningTaskReasonRepo } from './provisioning/provisioning-task-reason.repo';
 import { SaasIssueCalendar } from './saas-issue/saas-issue-calendar.service';
 import { SaasIssueFactsRepo } from './saas-issue/saas-issue-facts.repo';
@@ -109,6 +127,10 @@ import { SaasIssueSweeper } from './saas-issue/saas-issue.job';
 import { SaasIssueViewService } from './saas-issue/saas-issue-view.service';
 import { SaasIssuesController } from './saas-issue/saas-issues.controller';
 import { SeatBaselineController } from './seat-baseline/seat-baseline.controller';
+import { SeatBaselinePhaseListener } from './seat-baseline/seat-baseline-phase.listener';
+import { SharedPoolAvoidedCostRepo } from './shared-pool/shared-pool-avoided-cost.repo';
+import { SharedPoolCapacityRepo } from './shared-pool/shared-pool-capacity.repo';
+import { SharedPoolService } from './shared-pool/shared-pool.service';
 import { SeatBaselineRepo } from './seat-baseline/seat-baseline.repo';
 import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
 import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
@@ -163,6 +185,8 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
   providers: [
     LicensingAlerts,
     AssignmentRepo,
+    AssignmentChainRepo,
+    RevocationCompletedFactsReader,
     AssignmentDepartmentRepo,
     AssignmentSeatOccupancy,
     AssignmentServiceAccountReader,
@@ -183,15 +207,21 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     DepartmentToolsService,
     SeatBaselineRepo,
     SeatBaselineService,
+    SeatBaselinePhaseListener,
     SeatBaselineClosedListeners,
+    SharedPoolCapacityRepo,
+    SharedPoolAvoidedCostRepo,
+    SharedPoolService,
     ProvisioningTaskRepo,
     ProvisioningTaskFrame,
     ProvisioningHolderService,
     ProvisioningTaskViewService,
     ProvisioningGrantPlanner,
     ProvisioningGrantWriter,
+    ProvisioningPurchaseRefusal,
     ProvisioningGrantService,
     ProvisioningService,
+    ProvisioningGrantCompletion,
     ProvisioningDecisionService,
     ProvisioningCancellationService,
     ProvisioningFailureService,
@@ -200,8 +230,10 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     RevocationTaskFactory,
     RevocationRecorder,
     RevocationService,
+    RevocationWithdrawalService,
     RevocationCompletionService,
     RevocationLeaverAlert,
+    RevocationAftermath,
     RevocationReadRepo,
     RevocationViewService,
     OpenGrantTaskRepo,
@@ -221,6 +253,10 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     ExpiryReminderRepo,
     ExpiryReminderService,
     ExpiryReminderSweeper,
+    ExpiryRenewalWindowRepo,
+    ExpiryRenewalWindowService,
+    ExpiryRenewalWindowSweeper,
+    ProvisioningExtensionService,
     ExpiryQueueRepo,
     ExpiryQueueService,
     SaasIssueRepo,
@@ -254,6 +290,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicenseKeyRepo,
     LicenseKeyRevealQuotaRepo,
     LicenseKeyService,
+    LicenseKeyAssignmentService,
     {
       provide: LicenseKeyCipher,
       inject: [ConfigService],
@@ -275,7 +312,14 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingApi,
     LicensingDashboardApi,
     LicensingHandoverApi,
+    LicensingGhostSeatApi,
+    LicensingUsageApi,
+    UsageFactsRepo,
+    RuleSeatsFactsService,
+    RuleSeatsRepo,
+    SharedPoolVacancyService,
     LicensingOpenGrantsApi,
+    LicensingPoolStockApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
     LicensingServiceAccountApi,
@@ -285,7 +329,10 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingApi,
     LicensingDashboardApi,
     LicensingHandoverApi,
+    LicensingGhostSeatApi,
+    LicensingUsageApi,
     LicensingOpenGrantsApi,
+    LicensingPoolStockApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
     LicensingServiceAccountApi,

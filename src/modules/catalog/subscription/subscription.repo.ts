@@ -4,6 +4,10 @@ import { formatRate, parseRate } from '../../../core/money/rate';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { BaselineSubscription } from '../public/catalog.types';
+import { orderBySourcePreference, pickPriceSource, type LivenessFacts } from './pool/subscription-pool.policy';
+import { livePricedOf, PLAN_KIND, PRICE_FIELDS, pricedOn, withPriceSource } from './subscription-priced.repo';
+import { notTakenOverOn } from './subscription-granting.repo';
 import type {
   NewSubscription,
   PriceSnapshotRecord,
@@ -27,23 +31,6 @@ const WITH_PLAN = {
   },
 } as const;
 type Row = Prisma.SubscriptionGetPayload<{ include: typeof WITH_PLAN }>;
-
-/**
- * The subscriptions a department can price a plan by: active, owned by that department, with a unit price, a currency and a
- * billing cycle. A draft has no price to rely on, and the price of another department's subscription is never used.
- */
-const pricedOf = (ownerDepartmentId: string): Prisma.SubscriptionWhereInput => ({
-  ownerDepartmentId,
-  status: 'ACTIVE',
-  unitPriceMinor: { not: null },
-  unitPriceCurrency: { not: null },
-  billingCycle: { not: null },
-});
-/** Of those, the one that prices a plan: the later start first (no start last), then the id. */
-const PRICED_FIRST: Prisma.SubscriptionOrderByWithRelationInput[] = [
-  { startDate: { sort: 'desc', nulls: 'last' } },
-  { id: 'asc' },
-];
 
 const date = (value: Date | null) => (value ? fromDateColumn(value) : null);
 const column = (value: string | null) => (value ? toDateColumn(value) : null);
@@ -80,7 +67,7 @@ function toRecord(row: Row): SubscriptionRecord {
     planId: row.planId,
     planName: row.plan.name,
     planPricingModel: row.plan.pricingModel,
-    ownerDepartmentId: row.ownerDepartmentId,
+    ownerDepartmentId: row.ownerDepartmentId, // Gói 9: nullable kho chung
     applicationId: application.id,
     applicationName: application.name,
     applicationKind: application.kind,
@@ -91,6 +78,8 @@ function toRecord(row: Row): SubscriptionRecord {
     unitPrice,
     priceSnapshot,
     billingCycle: row.billingCycle,
+    commitmentTermMonths:
+      row.commitmentTermMonths === 1 || row.commitmentTermMonths === 12 ? row.commitmentTermMonths : null,
     startDate: date(row.startDate),
     endDate: date(row.endDate),
     renewalDate: date(row.renewalDate),
@@ -98,6 +87,9 @@ function toRecord(row: Row): SubscriptionRecord {
     noticePeriodDays: row.noticePeriodDays,
     autoRenew: row.autoRenew,
     allowsMidTermReduction: row.allowsMidTermReduction,
+    responsibleItAdminEmployeeId: row.responsibleItAdminEmployeeId,
+    vendorMinimumSeats: row.vendorMinimumSeats,
+    isPrimaryForPlan: row.isPrimaryForPlan,
     renewedFromId: row.renewedFromId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -119,6 +111,7 @@ function columnsOf(state: SubscriptionState) {
     priceReportingCurrency: state.priceSnapshot?.reportingCurrency ?? null,
     priceExchangeRateId: state.priceSnapshot?.exchangeRateId ?? null,
     billingCycle: state.billingCycle,
+    commitmentTermMonths: state.commitmentTermMonths,
     startDate: column(state.startDate),
     endDate: column(state.endDate),
     renewalDate: column(state.renewalDate),
@@ -126,6 +119,9 @@ function columnsOf(state: SubscriptionState) {
     noticePeriodDays: state.noticePeriodDays,
     autoRenew: state.autoRenew,
     allowsMidTermReduction: state.allowsMidTermReduction,
+    responsibleItAdminEmployeeId: state.responsibleItAdminEmployeeId,
+    vendorMinimumSeats: state.vendorMinimumSeats,
+    isPrimaryForPlan: state.isPrimaryForPlan,
   };
 }
 
@@ -149,6 +145,23 @@ export class SubscriptionRepo {
     });
 
     return toRecord(row);
+  }
+
+  /** Takes the flag of the subscription that prices its plan off every other subscription of the plan (Q-04); returns the ids that had it. */
+  async clearPrimaryOfPlan(tx: DbTx, planId: string, exceptId: string): Promise<string[]> {
+    const where = { planId, isPrimaryForPlan: true, id: { not: exceptId } };
+    const had = await tx.subscription.findMany({ where, select: { id: true }, orderBy: { id: 'asc' } });
+    await tx.subscription.updateMany({
+      where: { id: { in: had.map((row) => row.id) } },
+      data: { isPrimaryForPlan: false },
+    });
+
+    return had.map((row) => row.id);
+  }
+
+  /** Takes the flag off one subscription: the period a renewal continues hands it to the new period. */
+  async clearPrimary(tx: DbTx, id: string): Promise<void> {
+    await tx.subscription.update({ where: { id }, data: { isPrimaryForPlan: false } });
   }
 
   /** The period that continues each of these, by the id of the one it continues; a period not renewed is absent. */
@@ -207,53 +220,147 @@ export class SubscriptionRepo {
   }
 
   /**
-   * The price a plan is bought at for the department of a request: the unit price and billing cycle of the newest active
-   * subscription of that department that has both, and never the one of another department (`QĐ-89a`, F38). A draft has no
-   * price to rely on; two active subscriptions of one plan are told apart by the later start, then the id.
+   * The subscriptions of these plans, as far as they are K2 or K4 plans, that a later period does not continue: the candidates of the rule
+   * against a second live subscription (`isLiveSubscription` decides on the end date, the repository has no calendar). A draft is one.
+   */
+  async findLivenessOfPooledPlans(planIds: readonly string[], tx?: DbTx): Promise<LivenessFacts[]> {
+    if (planIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: { planId: { in: [...planIds] }, plan: { provisioningType: { in: ['K2', 'K4'] } }, renewedBy: null },
+      select: { id: true, planId: true, status: true, kind: true, endDate: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      planId: row.planId,
+      status: row.status,
+      kind: row.kind,
+      endDate: date(row.endDate),
+      renewed: false,
+    }));
+  }
+
+  /** The subscriptions of one plan a seat can be taken from on `today`, in the order a grant takes them (see `findGrantableOfPlans`). */
+  async findGrantableOfPlan(planId: string, today: BusinessDate, tx?: DbTx) {
+    return (await this.findGrantableOfPlans([planId], today, tx)).get(planId) ?? [];
+  }
+
+  /**
+   * The same for many plans in one read, by plan (a plan with none is absent). A draft is left out (its seats cannot be granted), and so is
+   * a subscription whose period already ended or that a later period has taken over (active and started: `notTakenOverOn`); a period
+   * recorded ahead of its start is in, next to the one that still runs. Per plan the primary subscription comes first, then the one that
+   * would price the plan: the order a grant with no subscription named takes them.
+   */
+  async findGrantableOfPlans(
+    planIds: readonly string[],
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, { subscriptionId: string; purchasedQuantity: number | null; isPrimaryForPlan: boolean }[]>> {
+    const grantable = new Map<
+      string,
+      { subscriptionId: string; purchasedQuantity: number | null; isPrimaryForPlan: boolean }[]
+    >();
+    if (planIds.length === 0) return grantable;
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: {
+        planId: { in: [...planIds] },
+        status: 'ACTIVE',
+        AND: [notTakenOverOn(today), { OR: [{ endDate: null }, { endDate: { gte: toDateColumn(today) } }] }],
+      },
+      select: {
+        id: true,
+        planId: true,
+        purchasedQuantity: true,
+        startDate: true,
+        isPrimaryForPlan: true,
+        unitPriceMinor: true,
+        priceReportingMinor: true,
+        billingCycle: true,
+      },
+    });
+    type Source = ReturnType<typeof withPriceSource<(typeof rows)[number]>>;
+    const byPlan = new Map<string, Source[]>();
+    for (const row of rows) byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), withPriceSource(row)]);
+    for (const [planId, sources] of byPlan) {
+      grantable.set(
+        planId,
+        orderBySourcePreference(sources).map((row) => ({
+          subscriptionId: row.id,
+          purchasedQuantity: row.purchasedQuantity,
+          isPrimaryForPlan: row.isPrimaryForPlan,
+        })),
+      );
+    }
+
+    return grantable;
+  }
+
+  /**
+   * The price a plan is bought at: the unit price and billing cycle of the main subscription of the plan, the newest active one with
+   * a price. The shared pool is the plan's, not a department's, so no department is asked (`BR-MF1-07`, S1-02). With `on`, the main one
+   * among the periods that run on that day first: begun by it (or with no start), not ended before it, and not continued by a later
+   * period that has begun by it, so a price recorded for a period that begins later is not used before its day. When no period
+   * runs on the day (the period ended and its renewal is not recorded yet), the newest priced one as without `on`.
    */
   async findPricedOfPlan(
     planId: string,
-    ownerDepartmentId: string,
     tx?: DbTx,
+    on?: BusinessDate,
   ): Promise<{
+    subscriptionKind: 'TERM' | 'PERPETUAL';
     unitPriceMinor: bigint;
     currency: string;
+    /** The unit price converted to the reporting currency when it was recorded; null when it was not converted. */
+    reporting: { amountMinor: bigint; currency: string } | null;
     billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
     allowsMidTermReduction: boolean;
   } | null> {
-    const row = await (tx ?? this.prisma).subscription.findFirst({
-      where: { planId, ...pricedOf(ownerDepartmentId) },
-      orderBy: PRICED_FIRST,
-      select: { unitPriceMinor: true, unitPriceCurrency: true, billingCycle: true, allowsMidTermReduction: true },
-    });
-    if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null || row.billingCycle === null) return null;
+    const db = tx ?? this.prisma;
+    const select = { id: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND } as const;
+    let row =
+      on === undefined
+        ? null
+        : pickPriceSource(
+            (await db.subscription.findMany({ where: { planId, ...pricedOn(on) }, select })).map(withPriceSource),
+          );
+    row ??= pickPriceSource(
+      (await db.subscription.findMany({ where: { planId, ...livePricedOf() }, select })).map(withPriceSource),
+    );
+    if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null) return null;
 
     return {
+      subscriptionKind: row.plan.provisioningType === 'K4' ? 'PERPETUAL' : row.kind,
       unitPriceMinor: row.unitPriceMinor,
       currency: row.unitPriceCurrency,
+      reporting:
+        row.priceReportingMinor !== null && row.priceReportingCurrency !== null
+          ? { amountMinor: row.priceReportingMinor, currency: row.priceReportingCurrency }
+          : null,
       billingCycle: row.billingCycle,
       allowsMidTermReduction: row.allowsMidTermReduction,
     };
   }
 
-  /**
-   * The billing cycle of the subscription `findPricedOfPlan` would price each of these plans by for the department, in one
-   * read for any number of plans (the same filter and order, the first row of each plan wins); a plan with none is absent.
-   */
+  /** The billing cycles of the main subscriptions pricing these plans, one per plan (`ONE_TIME` for a perpetual purchase); no department is asked. */
   async findPricedCyclesOfPlans(
     planIds: readonly string[],
-    ownerDepartmentId: string,
     tx?: DbTx,
-  ): Promise<Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER'>> {
-    const cycles = new Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER'>();
+  ): Promise<Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>> {
+    const cycles = new Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>();
     if (planIds.length === 0) return cycles;
     const rows = await (tx ?? this.prisma).subscription.findMany({
-      where: { planId: { in: [...planIds] }, ...pricedOf(ownerDepartmentId) },
-      orderBy: [{ planId: 'asc' }, ...PRICED_FIRST],
-      select: { planId: true, billingCycle: true },
+      where: { planId: { in: [...planIds] }, ...livePricedOf() },
+      select: { id: true, planId: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND },
     });
+    const byPlan = new Map<string, Array<ReturnType<typeof withPriceSource> & { kind: SubscriptionKind }>>();
     for (const row of rows) {
-      if (row.billingCycle !== null && !cycles.has(row.planId)) cycles.set(row.planId, row.billingCycle);
+      const kind: SubscriptionKind = row.plan.provisioningType === 'K4' ? 'PERPETUAL' : row.kind;
+      byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), { ...withPriceSource(row), kind }]);
+    }
+    for (const [planId, sources] of byPlan) {
+      const chosen = pickPriceSource(sources);
+      if (chosen) cycles.set(planId, chosen.kind === 'PERPETUAL' ? 'ONE_TIME' : chosen.billingCycle);
     }
 
     return cycles;
@@ -332,6 +439,44 @@ export class SubscriptionRepo {
     });
 
     return rows.map((row) => row.id);
+  }
+
+  /**
+   * Every active subscription of the company, with its plan and application, by id: one statement. Its cost follows the people who hold its
+   * seats, not the department that may own it (`QĐ-103k`), so the baseline reads them all.
+   */
+  async baselineRows(tx?: DbTx): Promise<BaselineSubscription[]> {
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: { status: 'ACTIVE' },
+      select: {
+        id: true,
+        planId: true,
+        purchasedQuantity: true,
+        priceReportingMinor: true,
+        billingCycle: true,
+        startDate: true,
+        endDate: true,
+        renewalDate: true,
+        renewedBy: { select: { id: true } },
+        plan: { select: { name: true, provisioningType: true, application: { select: { name: true } } } },
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => ({
+      subscriptionId: row.id,
+      planId: row.planId,
+      planName: row.plan.name,
+      applicationName: row.plan.application.name,
+      provisioningType: row.plan.provisioningType,
+      purchasedQuantity: row.purchasedQuantity,
+      unitPriceReportingMinor: row.priceReportingMinor,
+      billingCycle: row.billingCycle,
+      startDate: row.startDate ? fromDateColumn(row.startDate) : null,
+      endDate: row.endDate ? fromDateColumn(row.endDate) : null,
+      renewalDate: row.renewalDate ? fromDateColumn(row.renewalDate) : null,
+      hasSuccessor: row.renewedBy !== null,
+    }));
   }
 
   /** The ids of every subscription and purchase a department owns, by id. */

@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { declareSubscriptionBodySchema } from '../../../src/modules/catalog/subscription/subscription.dto';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
@@ -86,13 +87,15 @@ describe('subscription routes (e2e, no database)', () => {
   describe('validation', () => {
     const asIt = () => ({ Authorization: bearer(principal(['IT_ADMIN'])) });
 
+    it('AF-05, QĐ-103d: takes a POST with no owner department at validation; whether the plan needs one (K1) is judged by the service', () => {
+      expect(declareSubscriptionBodySchema.safeParse(without(VALID_SUBSCRIPTION, 'ownerDepartmentId')).success).toBe(
+        true,
+      );
+    });
+
     it.each([
       ['no plan', without(VALID_SUBSCRIPTION, 'planId')],
       ['a plan that is not a uuid', { ...VALID_SUBSCRIPTION, planId: 'P' }],
-      [
-        'no owner department (F02: the department that owns the purchase is required)',
-        without(VALID_SUBSCRIPTION, 'ownerDepartmentId'),
-      ],
       ['an owner department that is not a uuid', { ...VALID_SUBSCRIPTION, ownerDepartmentId: 'D' }],
       ['an owner department that is null', { ...VALID_SUBSCRIPTION, ownerDepartmentId: null }],
       ['no kind', without(VALID_SUBSCRIPTION, 'kind')],

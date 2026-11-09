@@ -98,6 +98,13 @@ export interface SeatHolder {
   seats: number;
 }
 
+/** How many seats of one subscription one person holds (or answers for, a service account): what the baseline charges to their department (`QĐ-103k`). */
+export interface SeatHolding {
+  subscriptionId: string;
+  employeeId: string;
+  seats: number;
+}
+
 export interface SeatUsage {
   subscriptionId: string;
   purchased: number | null;
@@ -117,7 +124,7 @@ export interface AssignmentListFilter {
 }
 
 export type ProvisioningKind = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
-export type ProvisioningTaskKind = 'GRANT' | 'REVOKE';
+export type ProvisioningTaskKind = 'GRANT' | 'REVOKE' | 'EXTEND';
 export type ProvisioningChannel = 'MANUAL' | 'CONNECTOR';
 export type ProvisioningTaskStatus =
   'QUEUED' | 'RETRY_SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CLOSED_FAILED' | 'CANCELLED';
@@ -141,6 +148,7 @@ export type TaskStepCode =
   | 'RECORD_ACCESS_STATE'
   | 'REMOVE_FROM_WORKSPACE'
   | 'REVOKE_IN_INTERNAL_SOFTWARE'
+  | 'DEACTIVATE_KEY_ON_DEVICE'
   | 'CONFIRM_WITH_EVIDENCE';
 
 /** One step of the card of a task. A K2 step is done under the name of whoever does the work: no shared credential. */
@@ -233,6 +241,8 @@ export type GrantCancellation =
 
 /** The reason kept on a task that was cancelled because its request was withdrawn. */
 export const WITHDRAWAL_CANCEL_REASON = 'REQUESTER_WITHDREW';
+/** The cause a source gives for taking its reason for a revocation back, and the close reason of the task left with none (`US-07-05` AC-22). */
+export const NO_LONGER_APPLIES = 'NO_LONGER_APPLIES';
 
 /** How the work a request led to ended: the seat is real, or the IT Admin closed the grant as failed (`FR-2.5`, `QĐ-62i`). */
 export type GrantOutcome = 'COMPLETED' | 'FAILED';
@@ -257,7 +267,11 @@ export const REVOCATION_SOURCES = [
 export type RevocationSource = (typeof REVOCATION_SOURCES)[number];
 
 /** How a revocation was completed: the account removed (K2), already gone, the renewal cancelled (K1), revoked off the system (K5). */
-export type RevocationCompletion = 'ACCOUNT_REMOVED' | 'ALREADY_GONE' | 'RENEWAL_CANCELLED' | 'OFF_SYSTEM_REVOKED';
+export type RevocationCompletion =
+  'ACCOUNT_REMOVED' | 'ALREADY_GONE' | 'RENEWAL_CANCELLED' | 'OFF_SYSTEM_REVOKED' | 'KEY_DEACTIVATED';
+
+/** Where the key of a K4 seat goes when its revocation is completed: back to the store, or back and withdrawn from it at once. */
+export type KeyDisposition = 'RETURN_TO_STORE' | 'WITHDRAW';
 
 /** What is known of the access of a K1 seat once its renewal is cancelled: cut already, or running to the end of the paid period. */
 export type AccessState = 'CUT' | 'UNTIL_PAID_END';
@@ -279,6 +293,14 @@ export interface OpenRevocationInput {
   decision: RevocationDecision;
   /** Handed to the listeners as it is and kept nowhere here: the department, the short deadline, the notice of the handover step. */
   context?: RevocationContext;
+  /**
+   * The timing the source asks for (BR-MF5-04): `notBefore` is the first day the IT Admin may take or complete the work, `dueOn` the day it
+   * is due. Nothing given is no timing: the work is taken at once, as it was before. Only MF-5 gives `notBefore` (the grace of a ghost
+   * seat); a reason with none wins over one that has it when both ask for the same seat.
+   */
+  timing?: { dueOn?: BusinessDate; notBefore?: BusinessDate };
+  /** `{ holder: true }`: the person who holds the seat is told once that its revocation is coming. Nothing given: nobody is told. */
+  notice?: { holder: true };
   now?: Date;
 }
 
@@ -286,6 +308,26 @@ export interface RevocationContext {
   departmentId?: string;
   dueOn?: BusinessDate;
   noticeText?: string;
+}
+
+/** The reason a source takes back (`withdrawRevocationReason`): which seat, which of its own reasons, and why it no longer holds. */
+export interface WithdrawRevocationInput {
+  assignmentId: string;
+  source: RevocationSource;
+  referenceId: string | null;
+  cause: 'NO_LONGER_APPLIES';
+  /** The account that works the task now: a task in progress with no reason left is cancelled only when this account took it. */
+  cancelInProgressClaimedBy?: string;
+}
+
+/**
+ * What the withdrawal did to the task of the seat: `CONTINUES` (other reasons stand), `CANCELLED` (none left: no longer applies),
+ * `IT_ADMIN_TO_CLOSE` (none left but another IT Admin is working it), `ALREADY_ENDED` (done, closed or cancelled), `NOT_FOUND`
+ * (no standing reason of that source and reference).
+ */
+export interface WithdrawnRevocation {
+  taskId: string | null;
+  outcome: 'CONTINUES' | 'CANCELLED' | 'IT_ADMIN_TO_CLOSE' | 'ALREADY_ENDED' | 'NOT_FOUND';
 }
 
 /** What the opening of a revocation did: a task was made, or the seat had one already and the reason was added to it. */
@@ -296,6 +338,39 @@ export interface OpenedRevocation {
   status: ProvisioningTaskStatus;
 }
 
+/**
+ * What a listener needs to tell the money the right still holds, known only when the revocation has been completed (`AFTER_WORK` with the status
+ * `COMPLETED`): the request that made the right, the day it ends and what is paid for it.
+ */
+export interface RevocationCompletedFacts {
+  /** The request whose grant made the right, found through the chain of assignments (a renewal, a handover); null when no request made it. */
+  grantRequestId: string | null;
+  /**
+   * The assignment taken back and every one it continues (`predecessor_id`), the one taken back first: what a request to go on using names, so
+   * the money held for the right by such a request is found too (G4-01, G9-02).
+   */
+  chainAssignmentIds: string[];
+  provisioningType: ProvisioningKind;
+  /** The day the right ends: it holds the seat on every day before it (`valid_until`). */
+  endedOn: BusinessDate | null;
+  /** K1 only: the last day the provider was paid for; the access may run to it. */
+  paidThroughOn: BusinessDate | null;
+  /** Every source that asked for the revocation. */
+  sources: RevocationSource[];
+}
+
+/**
+ * What the request is told of the grant that completed for it, beyond the outcome (`BR-MF1-09c`, `M-10`): whether the seat was taken from the
+ * stock of the pool of its plan with nothing bought, the kind of right, the day the grant was completed (the day the right begins to be
+ * used) and the assignment it made.
+ */
+export interface GrantOutcomeFacts {
+  fromPool: boolean;
+  provisioningType: ProvisioningKind;
+  grantedOn: BusinessDate;
+  assignmentId: string;
+}
+
 /** The facts of a revocation task its listeners are told. */
 export interface RevocationTaskFacts {
   id: string;
@@ -303,6 +378,8 @@ export interface RevocationTaskFacts {
   employeeId: string;
   planId: string;
   status: ProvisioningTaskStatus;
+  /** Set only when the revocation has been completed. */
+  completed?: RevocationCompletedFacts;
 }
 
 /** A reason that asked for the revocation, as its listeners are told it. */
@@ -350,4 +427,29 @@ export interface TerminatingAccess {
   subscriptionId: string | null;
   taskId: string;
   accessUntil: BusinessDate;
+}
+
+/** What the shared pool of a plan holds today, as the queue of the IT Admin shows it: seats (K2), keys (K4) or nothing counted (the other kinds). */
+export interface PlanStock {
+  kind: 'SEATS' | 'KEYS' | 'NONE';
+  /** Seats or keys bought and not held by a right in force today, counted over the subscriptions a grant can take them from. */
+  free: number;
+  /** Seats or keys held by a right whose revocation is still open: not free yet. */
+  inRevocation: number;
+}
+
+/** One seat the baseline wrote on a subscription another department owns, with the department that owns it. */
+export interface SeatBaselineClosedSeat {
+  assignmentId: string;
+  /** The department that owns the subscription the seat sits on. */
+  owningDepartmentId: string;
+}
+
+/** A person who holds seats on subscriptions of other departments than their own on the day step 4 is closed, with those seats. */
+export interface SeatBaselineClosedHolder {
+  employeeId: string;
+  /** The department the person is in on the closing day (the head of this department decides the review, `QĐ-89e`). */
+  employeeDepartmentId: string;
+  /** Sorted by assignment id. */
+  assignments: SeatBaselineClosedSeat[];
 }

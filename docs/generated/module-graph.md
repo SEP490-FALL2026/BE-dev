@@ -35,29 +35,35 @@ flowchart BT
     usage["usage"]
   end
   subgraph T7["T7"]
+    optimization["optimization"]
+  end
+  subgraph T8["T8"]
     dashboards["dashboards"]
   end
   ai_assist -->|8| audit
   ai_assist -->|2| operating_parameters
   ai_assist -->|4| organization
   ai_assist -->|4| requests
-  budgets -->|18| audit
-  budgets -->|2| catalog
+  budgets -->|19| audit
+  budgets -->|5| catalog
   budgets -->|3| finance
   budgets -->|5| identity_access
-  budgets -->|3| notifications
+  budgets -->|2| licensing
+  budgets -->|5| notifications
   budgets -->|4| operating_parameters
-  budgets -->|11| organization
-  catalog -->|18| audit
+  budgets -->|18| organization
+  catalog -->|19| audit
   catalog -->|11| finance
-  catalog -->|2| identity_access
+  catalog -->|3| identity_access
   catalog -->|4| operating_parameters
-  catalog -->|28| organization
+  catalog -->|30| organization
   dashboards -->|3| identity_access
   dashboards -->|4| licensing
+  dashboards -->|3| optimization
   dashboards -->|5| organization
   dashboards -->|4| personnel
   dashboards -->|3| requests
+  dashboards -->|2| usage
   data_import -->|6| audit
   data_import -->|1| catalog
   data_import -->|9| licensing
@@ -76,13 +82,13 @@ flowchart BT
   installation -->|2| finance
   installation -->|11| identity_access
   installation -->|8| organization
-  licensing -->|29| audit
-  licensing -->|49| catalog
+  licensing -->|34| audit
+  licensing -->|55| catalog
   licensing -->|2| finance
   licensing -->|8| identity_access
-  licensing -->|6| notifications
-  licensing -->|6| operating_parameters
-  licensing -->|53| organization
+  licensing -->|7| notifications
+  licensing -->|8| operating_parameters
+  licensing -->|59| organization
   onboarding -->|2| catalog
   onboarding -->|2| data_import
   onboarding -->|2| identity_access
@@ -91,6 +97,15 @@ flowchart BT
   operating_parameters -->|5| audit
   operating_parameters -->|2| finance
   operating_parameters -->|7| organization
+  optimization -->|7| audit
+  optimization -->|8| catalog
+  optimization -->|4| identity_access
+  optimization -->|24| licensing
+  optimization -->|7| notifications
+  optimization -->|6| operating_parameters
+  optimization -->|18| organization
+  optimization -->|6| personnel
+  optimization -->|9| usage
   organization -->|10| audit
   organization -->|5| notifications
   personnel -->|24| audit
@@ -100,21 +115,23 @@ flowchart BT
   personnel -->|30| licensing
   personnel -->|5| notifications
   personnel -->|4| operating_parameters
-  personnel -->|87| organization
+  personnel -->|88| organization
   personnel -->|6| requests
-  requests -->|55| audit
-  requests -->|17| budgets
-  requests -->|26| catalog
-  requests -->|7| finance
-  requests -->|29| identity_access
-  requests -->|40| licensing
+  requests -->|60| audit
+  requests -->|23| budgets
+  requests -->|29| catalog
+  requests -->|9| finance
+  requests -->|30| identity_access
+  requests -->|50| licensing
   requests -->|7| notifications
-  requests -->|10| operating_parameters
-  requests -->|76| organization
-  usage -->|3| audit
-  usage -->|3| catalog
-  usage -->|14| devices
-  usage -->|3| organization
+  requests -->|12| operating_parameters
+  requests -->|85| organization
+  usage -->|7| audit
+  usage -->|7| catalog
+  usage -->|15| devices
+  usage -->|7| licensing
+  usage -->|2| notifications
+  usage -->|10| organization
 ```
 
-78 module edges.
+92 module edges.

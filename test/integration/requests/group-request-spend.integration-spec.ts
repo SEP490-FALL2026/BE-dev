@@ -3,12 +3,17 @@ import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
 const M = 1_000_000;
+/** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 
 interface Detail {
   spendApproval: { step: { state: string }; request: { beneficiary: unknown; lineCount: number } };
 }
 interface Refused {
-  error: { code: string; details?: { lines?: string[]; missing?: string[]; extra?: string[]; years?: number[] } };
+  error: {
+    code: string;
+    details?: { lines?: string[]; missing?: string[]; extra?: string[]; years?: number[]; reasons?: string[] };
+  };
 }
 
 describe('the spend of the people of a request for a group, decided one by one over PostgreSQL (US-05-17 AC-9, US-06-01 AC-15)', () => {
@@ -50,8 +55,8 @@ describe('the spend of the people of a request for a group, decided one by one o
   const total = (rows: Array<{ amount_minor: string }>) =>
     rows.reduce((sum, row) => sum + BigInt(row.amount_minor), 0n);
 
-  describe('the approver decides the people with one record, one check and one commitment for each year (AC-9, AC-15)', () => {
-    it('approves four of five and refuses one: one record, five decisions, a commitment for each year that adds up to what four cost, and a share for each of the four', async () => {
+  describe('the approver decides the people with one record, one check and one commitment of the current year (AC-9, AC-15, BR-MF1-07d)', () => {
+    it('BR-MF1-07d: approves four of five and refuses one: one record, five decisions, one commitment of the current year that adds up to what four cost, and a share for each of the four', async () => {
       const { u, people, id } = await waiting(5);
       const [e1, e2, e3, e4, e5] = people;
 
@@ -75,11 +80,10 @@ describe('the spend of the people of a request for a group, decided one by one o
       expect(decisions.rowCount).toBe(5);
       expect(decisions.rows.filter((row) => row.decision === 'REJECTED')).toHaveLength(1);
 
-      // What four people cost, however many fiscal years the twelve monthly payments fall in: more than the payments, which carry
-      // the tax that is not deducted, and the commitments of the years add up to the shares of the four.
+      // What four people cost in the one year of the request (the months left of it): one commitment, the sum of the shares of the four.
       const commitments = await h.commitments(id);
-      expect(commitments.length).toBeGreaterThanOrEqual(1);
-      expect(total(commitments)).toBeGreaterThanOrEqual(BigInt(4 * 12 * M));
+      expect(commitments.map((commitment) => commitment.year)).toEqual([h.year]);
+      expect(total(commitments)).toBeGreaterThanOrEqual(BigInt(4 * monthsLeft * M));
       const shares = await h.shares(id);
       expect(total(shares)).toBe(total(commitments));
       expect(new Set(shares.map((share) => share.employee_id)).size).toBe(4);
@@ -139,27 +143,84 @@ describe('the spend of the people of a request for a group, decided one by one o
       expect(await h.lineStates(id)).toEqual(['NEED_CONFIRMED', 'NEED_CONFIRMED', 'NEED_CONFIRMED']);
     });
 
-    it('refuses the years that lack the money, and takes no override to get past them (QĐ-97c)', async () => {
+    it('BR-MF1-06g: a request for a group that costs more than the base and the reserve is blocked at the batch, stays in the queue and has no step to decide (rewritten: Finance and the override are gone, QĐ-97c)', async () => {
       const { people, id } = await waiting(2, { total: 1 * M });
       const all = people.map((p) => approve(p.employeeId));
-      // Less money than it costs sends it to Finance first; the approver still cannot approve past the years that lack it.
-      await h
-        .completeReview(id, { outcome: 'ASSESSED', opinion: 'No room: accepted', direction: 'RECOMMEND_OVERRIDE' })
-        .expect(200);
 
-      const refused = await h.decideSpendLines(id, { lines: all }, h.boss.account).expect(422);
-      const years = (refused.body as Refused).error.details?.years ?? [];
-      expect(h.codeOf(refused)).toBe('SPEND.OVERRIDE_REQUIRED');
-      expect(years.length).toBeGreaterThanOrEqual(1);
-      expect(await h.commitments(id)).toEqual([]);
+      expect(await h.state(id)).toBe('AWAITING_SPEND_SUBMISSION');
+      expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([]);
+      const refused = await h.decideSpendLines(id, { lines: all }, h.boss.account).expect(409);
+      expect(h.codeOf(refused)).toBe('SPEND.NO_SPEND_STEP');
 
       // The exception is gone: a body that carries one is not a body.
       const withOverride = await h
-        .decideSpendLines(id, { lines: all, override: { reason: 'The project cannot wait', years } }, h.boss.account)
+        .decideSpendLines(
+          id,
+          { lines: all, override: { reason: 'The project cannot wait', years: [h.year] } },
+          h.boss.account,
+        )
         .expect(422);
       expect(h.codeOf(withOverride)).toBe('VALIDATION_ERROR');
-      expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
       expect(await h.commitments(id)).toEqual([]);
+    });
+
+    describe('BR-MF1-06h: a request for a group that uses the reserve', () => {
+      /** A group submitted but not sent on, the budget then leaving 1 less than its cost of the base and a reserve above that. */
+      const usingReserve = async () => {
+        const u = await unit();
+        const total = 100_000 * M;
+        await h.budgetFor(u, { total, reserve: 50_000 * M });
+        const people = await h.colleagues(u, 2);
+        const sent = h.dataOf<{ request: { id: string } }>(
+          await h.submitGroup(h.groupBody(paid, people), u.head.account).expect(201),
+        ).request;
+        const cost = BigInt(
+          (
+            await h.ctx.sql.query<{ amount_minor: string }>(
+              `SELECT amount_minor::text FROM access_requests WHERE id = $1`,
+              [sent.id],
+            )
+          ).rows[0].amount_minor,
+        );
+        const version = (
+          await h.ctx.sql.query<{ id: string }>(
+            `SELECT id FROM budget_versions WHERE cost_center_id = $1 AND year = $2 AND state = 'APPROVED'`,
+            [u.department.unitId, h.year],
+          )
+        ).rows[0].id;
+        await h.commit(u, version, h.year, Number(BigInt(total) - cost + 1n), 'HELD');
+
+        return { u, people, id: sent.id };
+      };
+
+      it('BR-MF1-06h: stays in the queue of the head until they confirm it with a reason, then goes to the approver and is decided with the reserve noted', async () => {
+        const { u, people, id } = await usingReserve();
+
+        await h.sendOn([id], u.head.account).expect(201);
+        expect(await h.state(id)).toBe('AWAITING_SPEND_SUBMISSION');
+        expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([]);
+        const unconfirmed = await h
+          .decideSpendLines(id, { lines: people.map((p) => approve(p.employeeId)) }, h.boss.account)
+          .expect(409);
+        expect(h.codeOf(unconfirmed)).toBe('SPEND.NO_SPEND_STEP');
+
+        await h.confirmReserve(id, { reason: 'The new team starts on Monday' }, u.head.account).expect(200);
+        expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
+        await h.decideSpendLines(id, { lines: people.map((p) => approve(p.employeeId)) }, h.boss.account).expect(200);
+
+        expect(await h.state(id)).toBe('AWAITING_EXECUTION');
+        expect((await h.commitments(id)).map((commitment) => commitment.year)).toEqual([h.year]);
+      });
+
+      it('BR-MF1-07c: a confirmation given in the act of sending the batch opens the step at once', async () => {
+        const { u, people, id } = await usingReserve();
+
+        await h.sendOn([id], u.head.account, [{ requestId: id, reason: 'Needed now' }]).expect(201);
+
+        expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
+        await h.decideSpendLines(id, { lines: people.map((p) => approve(p.employeeId)) }, h.boss.account).expect(200);
+        expect(await h.commitments(id)).toHaveLength(1);
+      });
     });
 
     it('is not for anybody but the person the step is given to, nor for one of the people', async () => {
@@ -226,7 +287,7 @@ describe('the spend of the people of a request for a group, decided one by one o
       expect(waitingRow).toMatchObject({ beneficiary: null, lineCount: 3 });
       expect(panel.spendApproval.request).toMatchObject({ beneficiary: null, lineCount: 3 });
       expect(lines.map((line) => [line.employee.employeeId, line.cost?.amount])).toEqual(
-        people.map((person) => [person.employeeId, '12000000']),
+        people.map((person) => [person.employeeId, String(1 * M * monthsLeft)]),
       );
     });
   });
@@ -265,25 +326,18 @@ describe('the spend of the people of a request for a group, decided one by one o
   });
 
   describe('the same person on two steps of one request (US-06-14 AC-6)', () => {
-    it('flags the need step of the line of the head as held by the person who also holds the spend step, and not the head’s own step', async () => {
+    it('MF1-D: no line of the head, so nobody holds both a need step of a line and the spend step (US-06-14 AC-6, BR-MF1-02)', async () => {
       const u = await unit();
       await h.budgetFor(u, { total: 100_000 * M });
-      await h.budgetFor(u, { total: 100_000 * M, year: h.next });
       const [e1, e2] = await h.colleagues(u, 2);
-      const sent = h.dataOf<{ request: { id: string } }>(
-        await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), u.head.account).expect(201),
-      ).request;
-      await h.decideLines(sent.id, { lines: [approve(u.head.employeeId)] }, h.boss.account).expect(200);
-      await h.sendOn([sent.id], u.head.account).expect(201);
+      const rows = await h.requestRows();
 
-      const steps = await h.needSteps(sent.id);
-      const spend = await h.steps(sent.id, 'SPEND_APPROVAL');
+      // MF1-D (BR-MF1-02): a head is no line of a group any more; the group is refused for that line and nothing is written.
+      const refused = await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), u.head.account).expect(422);
 
-      expect(steps.map((step) => [step.assignee_employee_id, step.same_person_as_spend])).toEqual([
-        [u.head.employeeId, false],
-        [h.boss.employeeId, true],
-      ]);
-      expect(spend[0]).toMatchObject({ assignee_employee_id: h.boss.employeeId, same_person_as_spend: true });
+      expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+      expect(h.detailsOf(refused)).toEqual({ lines: [{ employeeId: u.head.employeeId, reason: 'HEAD_IN_GROUP' }] });
+      expect(await h.requestRows()).toBe(rows);
     });
   });
 });

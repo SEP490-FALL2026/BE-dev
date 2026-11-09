@@ -9,12 +9,13 @@ import { ProvisioningHarness } from '../../support/provisioning-harness';
 const h = new ProvisioningHarness();
 
 /**
- * F21 (`QĐ-89e`, spec D): step 4 of the installation writes the seats of people of another department on the subscription of the
- * department that owns it; when the IT Admin closes the step, the modules registered for it (personnel, which opens the review decided by
- * the head of the department of each holder) are told, in the transaction of the closing, which people hold a seat on a subscription of
- * another department than their own. A fake listener stands for personnel.
+ * F21 (`QĐ-89e`) as `BR-MF1-09` / `QĐ-103d` changed it: the seats of every subscription of a K2 or K4 plan are one pool shared by all
+ * departments, so there is no longer "a seat on the subscription of another department" to review. Closing step 4 of the installation
+ * still tells the registered listeners, in the transaction of the closing, but with `holders: []` and the audit of the closing says
+ * `holdersOfOtherDepartments: 0`; personnel therefore opens no `POST_SETUP_REVIEW`. (Rewritten: the expectation of two holders became none,
+ * the cases are kept.) A fake listener stands for personnel.
  */
-describe('closing the seat baseline tells who holds a seat of another department (integration, F21, real PostgreSQL)', () => {
+describe('closing the seat baseline tells the listeners, and no seat of another department is reviewed (integration, F21, real PostgreSQL)', () => {
   let design: { id: string; code: string };
   let finance: { id: string; code: string };
   const people: Record<string, string> = {};
@@ -58,7 +59,8 @@ describe('closing the seat baseline tells who holds a seat of another department
       .add('test.recorder', (tx, event) => listener.baselineClosed(tx, event));
     const figma = await h.subscription(10, 'K2', design.id);
     const slack = await h.subscription(10, 'K2', finance.id);
-    // Figma is design's: two of its own people and a person of finance; Slack is finance's: its own person and a person of design.
+    // Figma is design's: two of its own people and a person of finance; Slack is finance's: its own person and a person of design. Before the
+    // shared pool this was two people to review; now it is none.
     await h.written({ subscriptionId: figma }, [seat('D-1', 'figma'), seat('D-2', 'figma'), seat('F-1', 'figma')]);
     await h.written({ subscriptionId: slack }, [seat('F-1', 'slack'), seat('D-1', 'slack')]);
   }, 300000);
@@ -79,7 +81,7 @@ describe('closing the seat baseline tells who holds a seat of another department
     events.length = 0;
   });
 
-  it('tells every listener once, in the transaction of the closing, only the people who hold a seat on a subscription of another department', async () => {
+  it('tells every listener once, in the transaction of the closing, with no holder of another department (the pool is shared)', async () => {
     const response = await h.closeBaseline().expect(200);
 
     expect(h.dataOf<{ closed: boolean; alreadyClosed: boolean }>(response)).toMatchObject({
@@ -90,27 +92,14 @@ describe('closing the seat baseline tells who holds a seat of another department
     const [event] = events;
     expect(event.organizationId).toBe(h.seed.organizationId);
     expect(event.closedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    // D2 holds the seat of its own department's subscription: not asked. D1 holds one seat of Slack (finance's), F1 one of Figma (design's).
-    expect(event.holders).toHaveLength(2);
-    const byPerson = new Map(event.holders.map((holder) => [holder.employeeId, holder]));
-    expect(byPerson.get(people['D-1'])).toMatchObject({
-      employeeDepartmentId: design.id,
-      assignments: [{ owningDepartmentId: finance.id }],
-    });
-    expect(byPerson.get(people['F-1'])).toMatchObject({
-      employeeDepartmentId: finance.id,
-      assignments: [{ owningDepartmentId: design.id }],
-    });
-    expect(byPerson.has(people['D-2'])).toBe(false);
-    expect(event.holders.map((holder) => holder.employeeId)).toEqual(
-      [...event.holders.map((holder) => holder.employeeId)].sort(),
-    );
+    // D1 on Slack (finance's) and F1 on Figma (design's) are not holders to review: a seat of the pool is every department's.
+    expect(event.holders).toEqual([]);
     // In the transaction of the closing: it sees the baseline closed, and nobody else does until it commits.
     expect(inClosingTransaction).toEqual({ seenInside: expect.anything() as unknown, seenOutside: null });
     const [closing] = await h.auditOf('SeatBaseline');
     expect(closing).toMatchObject({
       action: 'SEAT_BASELINE.CLOSED',
-      after: { closed: true, holdersOfOtherDepartments: 2 },
+      after: { closed: true, holdersOfOtherDepartments: 0 },
     });
   });
 

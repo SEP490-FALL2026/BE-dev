@@ -24,7 +24,8 @@ interface RowWire {
   softwareName: string | null;
   beneficiary: EmployeeRef | null;
   lineCount: number;
-  termMonths: number;
+  termMonths: number | null;
+  expectedEndDate: string | null;
   submittedAt: string;
   updatedAt: string;
   needStep: { state: string; assignee: EmployeeRef | null; waitingReason: string | null };
@@ -201,7 +202,6 @@ describe('my requests: whose they are and what a row says (integration, real Pos
           purpose: 'Build bot of the CI pipeline',
           expectedIdentifier: 'ci-bot-2',
           businessReason: 'Run the builds of the product',
-          termMonths: 1,
         })
         .expect(201);
       const sent = h.dataOf<{ request: { id: string } }>(response).request;
@@ -218,7 +218,7 @@ describe('my requests: whose they are and what a row says (integration, real Pos
         await request(h.server())
           .post('/api/v1/access-requests/drafts')
           .set(h.as(person.account))
-          .send({ kind: 'INDIVIDUAL', planId: paid, businessReason: 'Design the new brand', termMonths: 6 })
+          .send({ kind: 'INDIVIDUAL', planId: paid, businessReason: 'Design the new brand' })
           .expect(201),
       ).draft;
 
@@ -257,7 +257,6 @@ describe('my requests: whose they are and what a row says (integration, real Pos
         softwareName: null,
         beneficiary: ref(person),
         lineCount: 1,
-        termMonths: 6,
       });
 
       // The head changes hands, and the step follows: the next read names the new head and not the old.

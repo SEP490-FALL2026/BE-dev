@@ -51,7 +51,8 @@ mount nó sau này mới có validation chặt (`REDIS_HOST`, `REDIS_PASSWORD` �
 | T4   | `catalog`, `licensing`                                          | Ứng dụng, gói, thuê bao; seat, cấp/thu hồi quyền                                               |
 | T5   | `budgets`, `requests`, `data-import`, `devices`                 | Ngân sách; Request và chi; import; sổ máy công ty và thông báo theo dõi                        |
 | T6   | `personnel`, `onboarding`, `installation`, `ai-assist`, `usage` | Vòng đời nhân sự; onboarding; cài đặt, vận hành; tóm tắt AI hàng đợi duyệt; usage từ collector |
-| T7   | `dashboards`                                                    | Trang tổng quan theo vai (chỉ đọc qua facade)                                                  |
+| T7   | `optimization`                                                  | Khuyến nghị seat lãng phí (G1, G2): bảng tối ưu IT, thu hồi G2, KPI-5                          |
+| T8   | `dashboards`                                                    | Trang tổng quan theo vai (chỉ đọc qua facade)                                                  |
 
 Module chỉ import tầng thấp hơn (cạnh cùng tầng được phép: `identity-access → organization`,
 `operating-parameters → finance`, `licensing → catalog`, `requests → budgets`). Khi module dưới cần phản ứng của module

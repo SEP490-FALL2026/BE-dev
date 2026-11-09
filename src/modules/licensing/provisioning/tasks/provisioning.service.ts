@@ -3,14 +3,15 @@ import { Page, pageOf } from '../../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { ProvisioningBeneficiaryDepartedError, ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
-import { GrantRequestGateHook, RevocationListeners } from '../../public/licensing.extension-points';
+import { RevocationListeners } from '../../public/licensing.extension-points';
 import type { ProvisioningChannel, ProvisioningTaskStatus } from '../../public/licensing.types';
 import { cleanEvidence, cleanFailureReason, nextStatus } from '../provisioning.policy';
-import { assertNotRevocationTask } from '../revocation.policy';
+import { assertNotBefore, assertNotRevocationTask } from '../revocation.policy';
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import { ProvisioningTaskViewService, type TaskSummaryView, type TaskView } from '../provisioning-task-view.service';
+import { ProvisioningGrantCompletion } from './provisioning-grant-completion.service';
 
 export type TaskScope = 'ALL' | 'MINE' | 'GENERAL';
 
@@ -26,8 +27,8 @@ export class ProvisioningService {
     private readonly frame: ProvisioningTaskFrame,
     private readonly views: ProvisioningTaskViewService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly gate: GrantRequestGateHook,
     private readonly revocation: RevocationListeners,
+    private readonly completion: ProvisioningGrantCompletion,
   ) {}
 
   /** The queue, the oldest first: `MINE` the tasks this IT Admin is in charge of, `GENERAL` those nobody works by default. */
@@ -37,6 +38,7 @@ export class ProvisioningService {
       channel?: ProvisioningChannel;
       status?: ProvisioningTaskStatus;
       scope: TaskScope;
+      claimableNow?: boolean;
       page: number;
       pageSize: number;
     },
@@ -46,6 +48,9 @@ export class ProvisioningService {
       ...(query.status ? { status: query.status } : {}),
       ...(query.scope === 'MINE' ? { responsibleEmployeeId: actor.employeeId } : {}),
       ...(query.scope === 'GENERAL' ? { generalQueueOf: await this.responsibleWhoLeft() } : {}),
+      ...(query.claimableNow !== undefined
+        ? { claimableOn: { today: await this.organizationReads.businessToday(), claimable: query.claimableNow } }
+        : {}),
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     });
@@ -73,6 +78,8 @@ export class ProvisioningService {
       write: async ({ tx, task: locked, now }) => {
         if (locked.status === 'IN_PROGRESS' && locked.claimedByAppUserId === actor.appUserId) return false;
         if (locked.kind === 'REVOKE') {
+          // A revocation with a day not before is not taken before it (`US-10-07` AC-18): nothing changes and nobody is told.
+          assertNotBefore(locked.notBefore, await this.organizationReads.businessToday(now, tx));
           await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: toRevocationFacts(locked), now });
         } else {
           const beneficiary = await this.organizationReads.getEmployee(locked.assignment.employeeId, tx);
@@ -98,24 +105,37 @@ export class ProvisioningService {
   }
 
   /**
-   * Completes the task of a grant with the note of what was done; a revocation has its own completion. Throws
-   * ProvisioningEvidenceRequiredError, the errors of `claim` except the departed beneficiary, and ProvisioningTaskStateError
-   * (`IS_REVOCATION` for a revocation).
+   * Completes the task of a grant with the note of what was done; a revocation has its own completion. A K4 grant names the free key of
+   * the store its seat is given (`licenseKeyId`, `QĐ-103d`). Throws ProvisioningEvidenceRequiredError, the errors of `claim` except the
+   * departed beneficiary, ProvisioningTaskStateError (`IS_REVOCATION` for a revocation), ProvisioningKeyError, LicenseKeyNotFoundError and
+   * LicenseKeyStateError. A grant taken from the pool, with nothing bought for it, records the cost it avoided once (`BR-MF1-09c`). The day
+   * it is completed is the day the right begins (`BR-MF1-06a`).
    */
-  async complete(actor: AuthenticatedPrincipal, id: string, input: { evidence: string }): Promise<TaskView> {
+  async complete(
+    actor: AuthenticatedPrincipal,
+    id: string,
+    input: { evidence: string; licenseKeyId?: string | undefined },
+  ): Promise<TaskView> {
     const evidence = cleanEvidence(input.evidence);
     const task = await this.frame.work(actor, id, {
       check: (locked) => {
         assertNotRevocationTask(locked.kind);
         nextStatus(locked.status, 'COMPLETE', locked.channel);
       },
-      write: async ({ tx, task: locked, now }) => {
-        await this.repo.markCompleted(tx, locked.id, actor.appUserId, evidence, now);
-        if (locked.requestId !== null) {
-          await this.gate.get().reportOutcome(tx, locked.requestId, 'COMPLETED', locked.assignment.employeeId);
-        }
+      write: async ({ tx, task: locked, now, organizationId }) => {
+        await this.completion.write(
+          tx,
+          actor,
+          { task: locked, now, organizationId },
+          { evidence, licenseKeyId: input.licenseKeyId },
+        );
+        const after = {
+          status: 'COMPLETED',
+          completedBy: actor.appUserId,
+          ...(input.licenseKeyId === undefined ? {} : { licenseKeyId: input.licenseKeyId }),
+        };
 
-        return { action: 'COMPLETED', after: { status: 'COMPLETED', completedBy: actor.appUserId } };
+        return { action: 'COMPLETED', after };
       },
     });
 

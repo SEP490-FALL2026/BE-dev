@@ -17,13 +17,10 @@ export class GroupRequestTooManyLinesError extends Error {
   }
 }
 
-/** The term asked for is longer than the plan takes (`US-05-01` AC-4, `QĐ-98`). */
+/** The end date asked for is before today or more than a year from today (`US-05-23` AC-9, `QĐ-104a`). */
 export class GroupRequestTermBeyondLimitError extends Error {
-  constructor(
-    readonly maxMonths: number,
-    readonly endsBy: string | null,
-  ) {
-    super('The term is longer than a request for a group may ask for.');
+  constructor(readonly maxEndDate: string) {
+    super('The end date is before today or more than a year from today.');
     this.name = 'GroupRequestTermBeyondLimitError';
   }
 }

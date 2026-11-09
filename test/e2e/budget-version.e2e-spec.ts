@@ -52,7 +52,7 @@ describe('a budget version from the proposal to the version in force (e2e)', () 
 
   it('Finance builds the first version from the proposal and sends it to the approver', async () => {
     first = await h.built(proposal.id, { base: h.money(60 * M), reserve: h.money(20 * M) });
-    expect(first).toMatchObject({ kind: 'INITIAL', number: 1, state: 'DRAFT', total: { amount: String(80 * M) } });
+    expect(first).toMatchObject({ number: 1, state: 'DRAFT', total: { amount: String(80 * M) } });
 
     await h.sendVersion(first.id).expect(200);
 

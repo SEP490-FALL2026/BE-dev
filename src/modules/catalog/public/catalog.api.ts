@@ -1,10 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type {
+  BaselineSubscription,
   CatalogOnboardingFacts,
   PlanRevocationInfo,
   PlanSummary,
+  PlanUsageRate,
+  PoolSubscription,
+  RuleSubscription,
+  SubscriptionPrice,
   WorkspaceDuty,
   SeatTarget,
   SeatTargetRef,
@@ -96,11 +102,81 @@ export class CatalogApi {
   }
 
   /**
-   * What a plan is bought at for a department (unit price and billing cycle), from the newest priced active subscription that
-   * department owns; null when it has none. The price of another department's subscription is never used.
+   * What a plan is bought at (kind, unit price and billing cycle), from the main subscription of the plan: the newest priced
+   * active one; null when it has none. It is the plan's price whatever department asks (S1-02). With `on`, the price of that day:
+   * the main one among the periods that run on it (begun, not ended, not yet continued by a later period that has begun), and
+   * the newest priced one as above only when no period runs on it.
    */
-  getPlanPrice(planId: string, ownerDepartmentId: string, tx?: DbTx) {
-    return this.subscriptions.priceOfPlan(planId, ownerDepartmentId, tx);
+  getPlanPrice(planId: string, tx?: DbTx, on?: BusinessDate) {
+    return this.subscriptions.priceOfPlan(planId, tx, on);
+  }
+
+  /** The subscriptions of the plan a seat can be taken from today: the shared pool of the plan (`QĐ-103d`). */
+  getGrantableSubscriptions(planId: string, today: BusinessDate, tx?: DbTx): Promise<PoolSubscription[]> {
+    return this.subscriptions.grantableOfPlan(planId, today, tx);
+  }
+
+  /** The same for many plans in one read, by plan (a plan with none is absent): what the stock of a queue of grants is counted from. */
+  getGrantableSubscriptionsOfPlans(
+    planIds: readonly string[],
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, PoolSubscription[]>> {
+    return this.subscriptions.grantableOfPlans(planIds, today, tx);
+  }
+
+  /**
+   * Buys one more seat on the subscription, in the transaction of the caller, which holds it locked through `lockSeatTarget`: `purchased_quantity`
+   * rises by one (a K2 or K4 pool topped up with a grant, or the seat a K1 grant buys for its holder). It asks no Cost Center of the department
+   * that owns the subscription, if any. Throws PoolSeatNotAddableError for a subscription that is absent or a draft.
+   */
+  addPoolSeat(tx: DbTx, actor: AuthenticatedPrincipal, subscriptionId: string): Promise<number> {
+    return this.subscriptions.addSeat(tx, actor, subscriptionId);
+  }
+
+  /** What one subscription is bought at (unit price and billing cycle); null when it has no price. */
+  getSubscriptionPrice(subscriptionId: string, tx?: DbTx): Promise<SubscriptionPrice | null> {
+    return this.subscriptions.priceOfSubscription(subscriptionId, tx);
+  }
+
+  /**
+   * Every active subscription of the company with its price and term: what the baseline of the budget starts from (`FR-5.15`). Its cost is
+   * charged to the departments of the people who hold its seats, the idle seats to the shared pool (`QĐ-103k`), so none is left out for
+   * owning no department.
+   */
+  getBaselineSubscriptions(tx?: DbTx): Promise<BaselineSubscription[]> {
+    return this.subscriptions.baselineOf(tx);
+  }
+
+  /**
+   * Replaces what the organization knows of the usage of its plans priced per seat with what one weekly pass of the usage rules found
+   * (`KPI-3`, `QĐ-109d`), in the transaction of the caller: the module of the rules pushes it here, so the budget reads it below that module.
+   */
+  replacePlanUsageRates(
+    tx: DbTx,
+    organizationId: string,
+    assessedOn: BusinessDate,
+    rates: readonly PlanUsageRate[],
+  ): Promise<void> {
+    return this.plans.replaceUsageRates(tx, organizationId, assessedOn, rates);
+  }
+
+  /**
+   * `KPI-3` in percent of each of these plans (`QĐ-109d`): the seats with activity in the 30 days before the last pass over the seats bought,
+   * for a plan priced per seat that the pass judged. A plan with no usage known is absent (no figure, never zero).
+   */
+  getPlanKpi3(planIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    return this.plans.kpi3Of(planIds, tx);
+  }
+
+  /** The subscriptions that grant seats on `day` (active, not taken over by a later period that runs, not ended), with their plan facts, in one read. */
+  getSubscriptionsGrantingOn(day: BusinessDate, tx?: DbTx): Promise<RuleSubscription[]> {
+    return this.subscriptions.grantingOn(day, tx);
+  }
+
+  /** The IT Admin named responsible for the subscription; null when it names none: who answers for a seat of the shared pool. */
+  getSubscriptionResponsibleItAdmin(subscriptionId: string, tx?: DbTx): Promise<string | null> {
+    return this.subscriptions.responsibleItAdminOf(subscriptionId, tx);
   }
 
   /** The ids of every subscription and purchase a department owns, by id: for a module that finds what belongs to the department through them. */

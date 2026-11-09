@@ -29,9 +29,6 @@ const quote: NonNullable<AssessmentFields['quote']> = {
   billingCycle: 'MONTHLY',
   validFrom: '2026-01-01',
   validUntil: null,
-  commitmentMonths: null,
-  paymentFrequency: null,
-  firstPaymentOn: null,
 };
 const filled: AssessmentFields = {
   ...empty,

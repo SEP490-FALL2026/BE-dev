@@ -40,8 +40,21 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
     const response = await call().post(headCode, '/budget-proposals', {
       year,
       lines: [
-        { description: 'Figma cho nhóm thiết kế', planId: figma, seats: 3, amount: { amount: '13500000' } },
-        { description: 'Công cụ khác', amount: { amount: '16500000' }, note: 'Chưa chọn nhà cung cấp' },
+        {
+          description: 'Figma cho nhóm thiết kế',
+          planId: figma,
+          seats: 3,
+          amount: { amount: '13500000' },
+          lineType: 'RENEW',
+          priorityRank: 1,
+        },
+        {
+          description: 'Công cụ khác',
+          amount: { amount: '16500000' },
+          note: 'Chưa chọn nhà cung cấp',
+          lineType: 'RENEW',
+          priorityRank: 2,
+        },
       ],
       attachmentIds,
     });
@@ -119,7 +132,8 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
         route: 'SPEND_APPROVAL',
         primaryCode: 'BUDGET_OK',
         yearCount: 1,
-        bindingTotal: { amount: '375000', currency: 'VND' },
+        // The price of the month (375 000) for the months left of the year, the month of today counted whole (BR-MF1-06).
+        bindingTotal: { amount: String(375_000 * (12 - Number(call().today().slice(5, 7)) + 1)), currency: 'VND' },
       });
       expect(
         (await world.facts.one<{ state: string }>(`SELECT state::text FROM access_requests WHERE id = $1`, [id])).state,
@@ -127,24 +141,31 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
     });
   });
 
-  describe('F4-01 chỉ số tiền: Cost Center và tiền tệ không do client gửi @MF4 @D1', () => {
-    it('đề xuất hoặc phiên bản gửi costCenterId, currency (kể cả trong tiền) ⟹ 422 chỉ đúng key đó, không ghi gì #14 @B2', async () => {
+  describe('F4-01 chỉ số tiền: Cost Center chỉ để chọn đơn vị của chính mình, tiền tệ không do client gửi @MF4 @D1', () => {
+    it('đề xuất gửi Cost Center của phòng khác ⟹ 403; phiên bản gửi costCenterId, mọi chỗ gửi currency ⟹ 422 chỉ đúng key đó; không ghi gì #14 @B2', async () => {
       const issuesOf = (response: Response) =>
         (call().detailsOf(response) as { issues: { path: string }[] }).issues.map((issue) => issue.path);
       const proposals = await world.facts.count('budget_proposals');
       const versions = await world.facts.count('budget_versions');
-      const costCenter = (await world.facts.one<{ id: string }>(`SELECT id FROM cost_centers WHERE code = 'CC-FIN'`))
+      const costCenter = (await world.facts.one<{ id: string }>(`SELECT id FROM cost_centers WHERE code = 'CC-DES'`))
         .id;
       const valid = {
         year,
-        lines: [{ description: 'Công cụ khác', amount: { amount: '1000000' } }],
+        lines: [{ description: 'Công cụ khác', amount: { amount: '1000000' }, lineType: 'RENEW', priorityRank: 1 }],
         attachmentIds: [],
       };
 
       const withCostCenter = await call().post('NV-FINH', '/budget-proposals', { ...valid, costCenterId: costCenter });
       const withCurrency = await call().post('NV-FINH', '/budget-proposals', {
         ...valid,
-        lines: [{ description: 'Công cụ khác', amount: { amount: '1000000', currency: 'VND' } }],
+        lines: [
+          {
+            description: 'Công cụ khác',
+            amount: { amount: '1000000', currency: 'VND' },
+            lineType: 'RENEW',
+            priorityRank: 1,
+          },
+        ],
       });
       const baseWithCurrency = await call().post('NV-FIN1', '/budget-versions', {
         proposalId: '5b1b4f7e-0a52-4b0e-9f5b-9f3c1a2d7e10',
@@ -156,11 +177,13 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
         costCenterId: costCenter,
       });
 
-      for (const response of [withCostCenter, withCurrency, baseWithCurrency, versionWithCostCenter]) {
+      // A head may name a Cost Center only to choose among the units they answer for (`QĐ-106k`): the Cost Center of another department is refused.
+      expect(withCostCenter.status).toBe(403);
+      expect(call().codeOf(withCostCenter)).toBe('BUDGET.NOT_YOUR_COST_CENTER');
+      for (const response of [withCurrency, baseWithCurrency, versionWithCostCenter]) {
         expect(response.status).toBe(422);
         expect(call().codeOf(response)).toBe('VALIDATION_ERROR');
       }
-      expect(issuesOf(withCostCenter)).toEqual(['']);
       expect(issuesOf(versionWithCostCenter)).toEqual(['']);
       expect(issuesOf(withCurrency)).toEqual(['lines.0.amount']);
       expect(issuesOf(baseWithCurrency)).toEqual(['base']);
@@ -172,7 +195,7 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
   });
 
   describe('F4-01b dataset có ngân sách năm nay và năm sau @MF4 @D1', () => {
-    it('Request 12 tháng của phòng Kỹ thuật đi thẳng tới duyệt chi, giữ chỗ cả hai năm #14 @B1', async () => {
+    it('Request 12 tháng của phòng Kỹ thuật đi thẳng tới duyệt chi, giữ chỗ một khoản cho năm của số tiền (QĐ-109) #14 @B1', async () => {
       const chatgpt = await call().planId('ChatGPT Plus');
       const id = await call().submitRequest('NV-DEV2', chatgpt, { termMonths: 12 });
       expect((await call().approveNeed('NV-ENGH', id)).status).toBe(200);
@@ -185,7 +208,8 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
       expect(
         (await call().post('NV-CEO', `/access-requests/${id}/spend-approval`, { decision: 'APPROVE' })).status,
       ).toBe(200);
-      expect(await world.facts.count('budget_commitments', 'request_id = $1', [id])).toBe(2);
+      // Rewritten from "giữ chỗ cả hai năm": một Request có một số tiền cho một năm, không có lịch trả nhiều năm.
+      expect(await world.facts.count('budget_commitments', 'request_id = $1', [id])).toBe(1);
     });
   });
 

@@ -253,6 +253,20 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     removeWhen: 'Review when AppRole or the unique index changes.',
   },
   {
+    key: 'meGet#upcomingUnits',
+    classification: 'bounded',
+    findings: [],
+    owner: 'us-01-bootstrap-login-session',
+    businessMaximum: {
+      maxItems: 5,
+      source:
+        'UPCOMING_UNITS_LIMIT in department.repo.ts (upcomingHeadedUnits ends in LIMIT), the maxItems of the schema in me.dto.ts: the departments not yet in effect the caller is to head',
+    },
+    rationale:
+      'The units a person is to head from the day their department takes effect (QĐ-106k); a person heads one department each day.',
+    removeWhen: 'Review when UPCOMING_UNITS_LIMIT changes.',
+  },
+  {
     key: 'appUserList#roles',
     classification: 'bounded',
     findings: [],

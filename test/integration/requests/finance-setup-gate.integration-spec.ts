@@ -114,7 +114,6 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
     purpose: 'Build bot of the CI pipeline',
     expectedIdentifier: `ci-bot-${(counter += 1)}`,
     businessReason: 'Run the builds of the product',
-    termMonths: 1,
     ...extra,
   });
   const saved = async (body: object, account: ApiAccount) =>
@@ -316,7 +315,7 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
     it('rejects what the operation that sends that kind of request would reject, and a kind that is none of the three', async () => {
       const u = await bare();
 
-      const noReason = await save({ kind: 'INDIVIDUAL', planId: plan, termMonths: 6 }, u.member.account).expect(422);
+      const noReason = await save({ kind: 'INDIVIDUAL', planId: plan }, u.member.account).expect(422);
       const unknown = await save({ kind: 'RENEWAL', ...h.form(plan) }, u.member.account).expect(422);
       const noLines = await save({ kind: 'GROUP', ...h.groupBody(plan, []) }, u.head.account).expect(422);
       const noPlan = await save({ kind: 'INDIVIDUAL', ...h.form(randomUUID()) }, u.member.account).expect(404);

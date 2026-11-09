@@ -59,7 +59,7 @@ export class SpendApprovalsController {
   @ApiSuccessResponse(ApprovalListResponseDto, {
     message: 'SPEND_APPROVAL.LISTED',
     description:
-      'The spend steps given to the caller that are open, the oldest first: what each request is, what it costs, the first code of its check, whether one person holds both steps or nobody independent reviewed it, and the batch it was sent in. A request that waits for Finance has no step and is not here.',
+      'The spend steps given to the caller that are open, the oldest first: what each request is, what it costs, the first code of its check, whether the same person holds the need step and this one, whether the head confirmed the reserve for it, and the batch it was sent in.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ApprovalQueryDto) {
@@ -76,7 +76,7 @@ export class SpendApprovalsController {
   @ApiSuccessResponse(ApprovalDetailResponseDto, {
     message: 'SPEND_APPROVAL.FETCHED',
     description:
-      'The step and the request around it for the person it is given to: what the head confirmed, what it costs with the tax that is deducted and the part that is not, what the IT Admin concluded of software that was not in the catalog, and, once decided, what was decided. The check, its years and the opinion of Finance are read from their own routes.',
+      'The step and the request around it for the person it is given to: what the head confirmed, what it costs with the tax that is deducted and the part that is not, what the IT Admin concluded of software that was not in the catalog, the budget snapshot as it is now (base, reserve, spent, committed, waiting to be decided, what is left of the base and with the reserve, and the outcome a check made now gives), and, once decided, what was decided. The check and its year are read from their own routes.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, INVALID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {
@@ -93,7 +93,7 @@ export class SpendApprovalsController {
   @ApiSuccessResponse(ApprovalDetailResponseDto, {
     message: 'SPEND_APPROVAL.DECIDED',
     description:
-      'The person the step is given to approves it or refuses it with a reason. The request is checked again as it is decided and the decision is made on that check, which is kept with it. A request that has less money than it costs in a year of the budget, or none, cannot be approved. A request that turned out to be an exception since it was sent goes back to Finance, and one whose data is at fault goes back to its head; nothing is decided then.',
+      'The person the step is given to approves it or refuses it with a reason. The request is checked again for the day of the decision and the decision is made on that check, which is kept with it. There is no override: a request that is blocked now (over the reserve, no approved budget in the current Cost Center, a quote that is no longer valid), or that uses the reserve with no confirmation of the head on this step, goes back to its head and is not decided; the requester and the head are told.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -108,21 +108,20 @@ export class SpendApprovalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).',
+        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD or SPEND.RECHECKED_RETURNED_TO_REQUESTER for a one-step request, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED).',
       examples: [
         SPEND_ERROR_EXAMPLES.NO_SPEND_STEP,
-        SPEND_ERROR_EXAMPLES.REVIEWER_IS_APPROVER,
         SPEND_ERROR_EXAMPLES.NOT_CHECKABLE,
-        SPEND_ERROR_EXAMPLES.RECHECKED_NEEDS_FINANCE_REVIEW,
         SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_HEAD,
+        SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_REQUESTER,
         SPEND_ERROR_EXAMPLES.GROUP_USES_LINES,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal without a reason), or a year of the budget has less money than the request costs, or none (SPEND.OVERRIDE_REQUIRED, with the years): it cannot be approved.',
-      examples: [VALIDATION_EXAMPLE, SPEND_ERROR_EXAMPLES.OVERRIDE_REQUIRED],
+        'The body is invalid (VALIDATION_ERROR: a refusal without a reason, or a field that is not of the body, such as the override that no longer exists).',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async decide(
@@ -132,7 +131,7 @@ export class SpendApprovalsController {
   ) {
     try {
       const result = await this.decisions.decide(actor, params.id, body);
-      if (result.status === 'BOUNCED') throw toRecheckedApiException(result);
+      if (result.status === 'BOUNCED') throw toRecheckedApiException(result.reasons, result.to, result.overBy);
 
       return { spendApproval: await this.views.detail(actor, params.id) };
     } catch (error) {
@@ -146,7 +145,7 @@ export class SpendApprovalsController {
   @ApiSuccessResponse(BatchDecisionResponseDto, {
     message: 'SPEND_BATCH.DECIDED',
     description:
-      'Approves or refuses the requests chosen of a batch the caller holds, one by one in the order given. Each is checked and decided on its own, with its own record. One that is not in the batch or is not the caller one, has no spend step, needs an override (never given in bulk) or went back when checked again is skipped with its reason and the others go on. A refusal gives one reason for all.',
+      'Approves or refuses the requests chosen of a batch the caller holds, one by one in the order given. Each is checked and decided on its own, with its own record. One that is not in the batch or is not the caller one, has no spend step, or went back to its head when checked again (the requester and the head are told) is skipped with its reason and the others go on. A refusal gives one reason for all.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

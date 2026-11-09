@@ -3,9 +3,10 @@ import { Page, pageOf } from '../../../core/application/pagination';
 
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCostCenterNotFoundError, BudgetVersionNotFoundError } from './budget.errors';
-import { defaultReserveOf, versionWaitingReason } from './budget.policy';
+import { defaultReserveOf, versionLineOverCeiling, versionWaitingReason, type VersionStateName } from './budget.policy';
 import { BudgetFactsService } from './budget-facts.service';
 import { DecisionRepo, type DecisionRecord } from './decision.repo';
+import { ProposalRepo } from './proposal.repo';
 import { VersionLineRepo, type VersionLineRecord } from './version-line.repo';
 import { VersionRepo, type VersionRecord, type VersionState } from './version.repo';
 import type { VersionLineWire, VersionSummaryWire, VersionWire } from './budget.dto';
@@ -17,6 +18,7 @@ export class VersionViewService {
     private readonly versions: VersionRepo,
     private readonly lineRepo: VersionLineRepo,
     private readonly decisions: DecisionRepo,
+    private readonly proposals: ProposalRepo,
     private readonly facts: BudgetFactsService,
   ) {}
 
@@ -66,6 +68,14 @@ export class VersionViewService {
 
   async lineWires(currency: string, lines: readonly VersionLineRecord[]): Promise<VersionLineWire[]> {
     const money = await this.facts.formatter(currency);
+    // The flag over the ceiling is the proposal line's (B3): a line of a version shows the one it adjusts, so the approver reads it at B5.
+    const flagged = await this.proposals.overCeilingOf(
+      lines.flatMap((line) =>
+        line.proposalId !== null && line.proposalPosition !== null
+          ? [{ proposalId: line.proposalId, position: line.proposalPosition }]
+          : [],
+      ),
+    );
 
     return lines.map((line) => ({
       position: line.position,
@@ -76,6 +86,10 @@ export class VersionViewService {
       amount: money(line.amountMinor),
       financeComment: line.financeComment,
       adjustmentReason: line.adjustmentReason,
+      lineType: line.lineType,
+      zbb: line.zbb,
+      priorityRank: line.priorityRank,
+      overCeiling: overCeilingOf(line, flagged, money),
     }));
   }
 
@@ -109,8 +123,7 @@ export class VersionViewService {
           costCenter,
           year: version.year,
           number: version.number,
-          kind: version.kind,
-          state: version.state,
+          state: wireStateOf(version.state),
           proposalId: version.proposalId,
           rejectedPredecessorId: version.rejectedPredecessorId,
           base: money(version.baseMinor),
@@ -119,6 +132,8 @@ export class VersionViewService {
           defaultReserve:
             version.reservePercent === null ? null : money(defaultReserveOf(version.baseMinor, version.reservePercent)),
           reserveReason: version.reserveReason,
+          baseReason: version.baseReason,
+          origin: version.origin,
           total: money(version.totalMinor),
           quarters:
             q1 === undefined || q2 === undefined || q3 === undefined || q4 === undefined
@@ -157,9 +172,22 @@ const summaryOf = (version: VersionWire): VersionSummaryWire => ({
   costCenter: version.costCenter,
   year: version.year,
   number: version.number,
-  kind: version.kind,
   state: version.state,
   total: version.total,
   createdAt: version.createdAt,
   sentAt: version.sentAt,
 });
+
+const overCeilingOf = (
+  line: VersionLineRecord,
+  flagged: ReadonlyMap<string, bigint>,
+  money: (minor: bigint) => { amount: string; currency: string },
+) => {
+  const over = versionLineOverCeiling(line, flagged.get(`${line.proposalId}:${line.proposalPosition}`) ?? null);
+
+  return over === null ? null : money(over);
+};
+
+/** The database refuses `SUPERSEDED` (`budget_versions_no_superseded`), so a version read from it never stands there. */
+const wireStateOf = (state: VersionStateName): Exclude<VersionStateName, 'SUPERSEDED'> =>
+  state as Exclude<VersionStateName, 'SUPERSEDED'>;

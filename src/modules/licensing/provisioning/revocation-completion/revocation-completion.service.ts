@@ -1,28 +1,32 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogApi } from '../../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { AssignmentEndService } from '../../assignment/assignment-end.service';
-import {
-  AssignmentNotOpenError,
-  ProvisioningTaskStateError,
-  SeatTargetNotFoundError,
-} from '../../public/licensing.errors';
+import { AssignmentNotOpenError, ProvisioningTaskStateError } from '../../public/licensing.errors';
 import { nextStatus } from '../provisioning.policy';
 import { RevocationListeners } from '../../public/licensing.extension-points';
-import { assertRevocationTask, planAccessCut, planCompletion, type CompletionInput } from '../revocation.policy';
+import {
+  assertNotBefore,
+  assertRevocationTask,
+  planAccessCut,
+  planCompletion,
+  planKeyReturn,
+  type CompletionInput,
+} from '../revocation.policy';
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskViewService, type TaskView } from '../provisioning-task-view.service';
+import { RevocationCompletedFactsReader } from './revocation-completed-facts.service';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
-import { RevocationLeaverAlert } from './revocation-leaver-alert.service';
+import { RevocationAftermath } from './revocation-aftermath.service';
 
 /**
  * What a person does to a revocation they work (`US-07-05` AC-1→AC-5, AC-8, AC-19): complete it, which is the only thing that
  * gives the seat back, and cut the access of a K1 seat earlier than the end of its paid period. Each is one transaction with its
  * audit events, under the locks of the task, the subscription and the assignment in that order. Nothing here writes savings,
- * an invoice, a contract or a budget (`AC-17`): the seat goes back, and what that saves is for another module to record. A K1 seat
+ * an invoice, a contract or a budget (`AC-17`): the seat goes back, and what that saves is for another module to record. The key of a K4
+ * seat goes back to the store, or back and withdrawn from it, after the assignment (`QĐ-103d`). A K1 seat
  * of a person who leaves whose access runs on to the end of the paid period is told to the IT Admin in charge in the same
  * transaction (`US-12-15` line 38, `QĐ-77l`).
  */
@@ -33,16 +37,16 @@ export class RevocationCompletionService {
     private readonly frame: ProvisioningTaskFrame,
     private readonly views: ProvisioningTaskViewService,
     private readonly ending: AssignmentEndService,
-    private readonly catalog: CatalogApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly revocation: RevocationListeners,
-    private readonly leaverAlert: RevocationLeaverAlert,
+    private readonly aftermath: RevocationAftermath,
+    private readonly completedFacts: RevocationCompletedFactsReader,
   ) {}
 
   /**
    * Completes the revocation the IT Admin took, the way its kind of provisioning says, and ends the assignment. Throws
    * ProvisioningTaskNotFoundError, ProvisioningTaskStateError, ProvisioningTaskNotManualError,
-   * ProvisioningAnotherItAdminNeededError, RevocationCompletionError, ProvisioningEvidenceRequiredError, whatever the hook
+   * ProvisioningTaskNotBeforeError, ProvisioningAnotherItAdminNeededError, RevocationCompletionError, ProvisioningEvidenceRequiredError, whatever the hook
    * throws and AssignmentNotOpenError.
    */
   async complete(actor: AuthenticatedPrincipal, id: string, input: CompletionInput): Promise<TaskView> {
@@ -53,22 +57,37 @@ export class RevocationCompletionService {
       },
       write: async ({ tx, task: locked, organizationId, now }) => {
         const facts = toRevocationFacts(locked);
-        await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: facts, now });
-        const [plan] = await this.catalog.getPlanRevocationInfo([locked.assignment.planId], tx);
-        if (!plan) throw new SeatTargetNotFoundError('PLAN');
-        const assignment = await this.ending.lock(tx, locked.assignmentId);
         const today = await this.organizationReads.businessToday(now, tx);
+        // The day not before may have moved back to a later day when a reason with no grace was withdrawn: the work is not done before it.
+        assertNotBefore(locked.notBefore, today);
+        await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: facts, now });
+        const plan = await this.completedFacts.planOf(tx, locked.assignment.planId);
+        const assignment = await this.ending.lock(tx, locked.assignmentId);
         const done = planCompletion(input, { type: plan.provisioningType, startsOn: assignment.effectiveFrom, today });
+        const key = planKeyReturn(input, plan.provisioningType);
 
         await this.tasks.markRevocationCompleted(tx, locked.id, actor.appUserId, done, now);
         await this.ending.end(tx, actor, { organizationId, assignment, until: done.endOn, taskId: locked.id });
-        await this.revocation.emit(tx, { moment: 'AFTER_WORK', task: { ...facts, status: 'COMPLETED' }, now, actor });
-        await this.leaverAlert.tell(tx, {
+        // The listeners of the end of the work are told what the right held and when it ends, so the money held for it can be given back.
+        const completed = await this.completedFacts.completedOf(tx, locked, {
+          provisioningType: plan.provisioningType,
+          endedOn: done.endOn,
+          paidThroughOn: done.paidThroughOn,
+        });
+        await this.revocation.emit(tx, {
+          moment: 'AFTER_WORK',
+          task: { ...facts, status: 'COMPLETED', completed },
+          now,
+          actor,
+        });
+        const followed = await this.aftermath.follow(tx, actor, {
           organizationId,
           task: locked,
+          key,
           accessState: done.accessState,
           accessUntil: done.paidThroughOn ?? done.endOn,
           today,
+          now,
         });
 
         // The evidence and the notes stay on the task: the audit event says what was done, not what was written about it.
@@ -82,6 +101,8 @@ export class RevocationCompletionService {
             paidThroughOn: done.paidThroughOn,
             validUntil: done.endOn,
             completedBy: actor.appUserId,
+            // A K4 seat: the key that went back to the store (null when the seat held none), and whether it was withdrawn.
+            ...(key ? { licenseKeyId: followed.licenseKeyId, keyDisposition: key.disposition } : {}),
           },
         };
       },

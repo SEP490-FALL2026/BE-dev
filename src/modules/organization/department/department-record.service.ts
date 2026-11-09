@@ -42,8 +42,33 @@ export class DepartmentRecordService {
     tx: DbTx,
     organizationId: string,
     code: string,
+    onDay?: BusinessDate,
   ): Promise<{ id: string; code: string; name: string; active: boolean } | null> {
-    return this.departments.lockByCode(tx, organizationId, code);
+    return this.departments.lockByCode(tx, organizationId, code, onDay);
+  }
+
+  activeIds(year: number, tx?: DbTx): Promise<string[]> {
+    return this.departments.activeDepartmentIds(year, tx);
+  }
+
+  unitCostCenterHistory(departmentIds: readonly string[], tx?: DbTx) {
+    return this.departments.unitCostCenterHistory(departmentIds, tx);
+  }
+
+  unitCostCenterIds(departmentIds: readonly string[], tx?: DbTx) {
+    return this.departments.unitCostCenterIds(departmentIds, tx);
+  }
+
+  hasHeadStartingAfter(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<boolean> {
+    return this.departments.hasHeadStartingAfter(departmentId, today, tx);
+  }
+
+  upcomingHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx) {
+    return this.departments.upcomingHeadOf(departmentId, today, tx);
+  }
+
+  upcomingHeadedUnits(employeeId: string, today: BusinessDate, tx?: DbTx) {
+    return this.departments.upcomingHeadedUnits(employeeId, today, tx);
   }
 
   countActive(tx?: DbTx): Promise<number> {
@@ -88,6 +113,10 @@ export class DepartmentRecordService {
 
   headsOn(departmentIds: string[], onDate: BusinessDate, tx?: DbTx): Promise<Map<string, DepartmentHeadRecord>> {
     return this.heads.currentHeads(departmentIds, onDate, tx);
+  }
+
+  nextHeadPeriodOf(departmentId: string, after: BusinessDate, tx?: DbTx) {
+    return this.heads.nextPeriod(departmentId, after, tx);
   }
 
   headHistory(client: DbTx | undefined, departmentId: string, limit: number): Promise<HeadPeriodRecord[]> {

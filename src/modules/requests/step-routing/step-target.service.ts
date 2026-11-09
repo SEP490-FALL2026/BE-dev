@@ -5,7 +5,7 @@ import { IdentityAccessApi } from '../../identity-access/public/identity-access.
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RoutingFactsService } from '../access-request/routing-facts.service';
 import { routeNeedStep } from '../access-request/routing.policy';
-import { routeFinanceReview, routeSpendStep } from './spend-routing.policy';
+import { routeSpendStep } from './spend-routing.policy';
 import type { StepTarget } from './reassignment.policy';
 import type { ReassignableRequest, ReassignableStep } from './step-reassignment.repo';
 
@@ -14,16 +14,14 @@ export interface TodayFacts {
   today: BusinessDate;
   /** The spending approver when they still work: a role whose holder has left is held by nobody. */
   spendingApproverEmployeeId: string | null;
-  /** Finance on an account that can act now, or null. */
-  financeEmployeeId: string | null;
 }
 
 /**
  * Who each kind of step would be given on today's data, by running the routing tables that gave it in the first place on the
  * facts of today (`FR-3.16`, `US-05-12`). No table of its own: the need step is `routeNeedStep` on the department the
- * requester is in now, the spend step `routeSpendStep`, the review of Finance `routeFinanceReview`, and the assessment goes to
- * the IT Admin in charge of the department of the requester. A person who has left holds nothing, whether or not they are
- * still named, which is also what the spend step and the review are given from (`FR-3.16` last sentence).
+ * requester is in now, the spend step `routeSpendStep`, and the assessment goes to the IT Admin in charge of the department of the
+ * requester. A person who has left holds nothing, whether or not they are still named, which is also what the spend step is given
+ * from (`FR-3.16` last sentence).
  */
 @Injectable()
 export class StepTargetService {
@@ -32,6 +30,11 @@ export class StepTargetService {
     private readonly identity: IdentityAccessApi,
     private readonly routing: RoutingFactsService,
   ) {}
+
+  async assessmentTarget(tx: DbTx, requesterEmployeeId: string, now: Date): Promise<string | null> {
+    const today = await this.organizationReads.businessToday(now, tx);
+    return (await this.organizationReads.getItAdminInCharge(requesterEmployeeId, today, tx))?.itAdminEmployeeId ?? null;
+  }
 
   /**
    * The spending approver now, leaving out one who has left the company. With `forShare` the row of the grant is locked until the
@@ -49,7 +52,6 @@ export class StepTargetService {
     return {
       today: await this.organizationReads.businessToday(now, tx),
       spendingApproverEmployeeId: await this.usableSpendingApproverEmployeeId(tx),
-      financeEmployeeId: await this.identity.findUsableFinanceEmployeeId(tx),
     };
   }
 
@@ -82,7 +84,10 @@ export class StepTargetService {
 
         return decision.outcome === 'ASSIGNED'
           ? { assigneeEmployeeId: decision.assigneeEmployeeId, routingRow: decision.row }
-          : { assigneeEmployeeId: null, reason: decision.reason };
+          : {
+              assigneeEmployeeId: null,
+              reason: decision.outcome === 'NOT_REQUIRED' ? 'NO_DEPARTMENT_HEAD' : decision.reason,
+            };
       }
       case 'SPEND_APPROVAL': {
         const assignment = routeSpendStep(people, facts.spendingApproverEmployeeId);
@@ -90,14 +95,6 @@ export class StepTargetService {
         return assignment.outcome === 'ASSIGNED'
           ? { assigneeEmployeeId: assignment.assigneeEmployeeId, routingRow: null }
           : { assigneeEmployeeId: null, reason: assignment.reason };
-      }
-      case 'FINANCE_REVIEW': {
-        const review = routeFinanceReview(people, facts.financeEmployeeId);
-
-        // Finance being a party to a review that is already open leaves nobody independent to hold it: it waits.
-        return review.outcome === 'ASSIGNED'
-          ? { assigneeEmployeeId: review.assigneeEmployeeId, routingRow: null }
-          : { assigneeEmployeeId: null, reason: 'NO_FINANCE_REVIEWER' };
       }
       case 'IT_ASSESSMENT': {
         const inCharge = await this.organizationReads.getItAdminInCharge(request.requesterEmployeeId, facts.today, tx);

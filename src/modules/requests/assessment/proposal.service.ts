@@ -1,9 +1,14 @@
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
-import { AccessRequestSuperAdminCannotRequestError } from '../access-request/access-request.errors';
+import {
+  AccessRequestEndDateOutOfRangeError,
+  AccessRequestSuperAdminCannotRequestError,
+  AccessRequestTermRequiredError,
+} from '../access-request/access-request.errors';
 import { hasSpendStep, mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
@@ -11,6 +16,13 @@ import { RequestSenderService } from '../request-intake/request-sender.service';
 import { AssessmentRepo } from './assessment.repo';
 import { RequestFactsService } from '../access-request/request-facts.service';
 import type { ProposalBodyDto } from './assessment.dto';
+import { RequestLimitsService } from '../request-limits/request-limits.service';
+
+/** Throws AccessRequestEndDateOutOfRangeError and AccessRequestTermRequiredError (`US-05-23` AC-9, `FR-2.8`). */
+function assertTermAllowed(assessed: { endDateOutOfRange: boolean; maxEndDate: string; termRequired: boolean }): void {
+  if (assessed.endDateOutOfRange) throw new AccessRequestEndDateOutOfRangeError(assessed.maxEndDate);
+  if (assessed.termRequired) throw new AccessRequestTermRequiredError();
+}
 
 /**
  * Sending a proposal of software that is not in the catalog (`US-05-06` AC-1, `US-05-02` AC-8): the Employee names it,
@@ -22,28 +34,44 @@ import type { ProposalBodyDto } from './assessment.dto';
 @Injectable()
 export class ProposalService {
   constructor(
+    private readonly spendRouting: SpendRoutingService,
     private readonly runner: TransactionRunner,
     private readonly repo: AccessRequestRepo,
     private readonly assessments: AssessmentRepo,
     private readonly sender: RequestSenderService,
     private readonly assessment: RequestFactsService,
     private readonly audit: AuditApi,
+    private readonly limits: RequestLimitsService,
   ) {}
 
   /** Throws AccessRequestSuperAdminCannotRequestError, AccessRequestNoDepartmentError and FinanceSetupIncompleteError. */
   async submit(actor: AuthenticatedPrincipal, body: ProposalBodyDto): Promise<AccessRequestRecord> {
     if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     const settings = await this.assessment.settings();
+    const limitSettings = await this.limits.settings();
 
     return this.runner.run(async (tx) => {
       const employee = await this.sender.lockEligible(tx, actor);
+      await this.limits.lock(tx, [actor.employeeId]);
 
       const now = new Date();
+      const expectedEndDate = body.expectedEndDate ?? null;
       const assessed = await this.assessment.assessProposal(tx, {
         employeeId: actor.employeeId,
+        expectedEndDate: expectedEndDate,
         now,
         settings,
         lockDepartment: true,
+      });
+      assertTermAllowed(assessed);
+      // A proposal names no plan: GH-1 has nothing to match, GH-2 counts it, and GH-3 flags it (`BR-MF1-01`).
+      const manyPaidSoftware = await this.limits.requireForOne(tx, {
+        employeeId: actor.employeeId,
+        planId: null,
+        applicationId: null,
+        today: assessed.today,
+        settings: limitSettings,
+        reason: body.manyPaidSoftwareReason,
       });
       const { unit, policy, pricing, routing } = assessed;
       const { decision, departmentHeadEmployeeId } = routing;
@@ -60,17 +88,18 @@ export class ProposalService {
         departmentId: unit.departmentId,
         costCenterId: unit.costCenter.id,
         businessReason: body.purpose,
-        termMonths: body.termMonths,
+        termMonths: null,
+        expectedEndDate: expectedEndDate,
+        manyPaidSoftware,
         pricing,
         policy,
         createdByAppUserId: actor.appUserId,
         now,
         needStep: {
-          state: assigned ? 'PENDING' : 'WAITING',
+          state: decision.outcome === 'NOT_REQUIRED' ? 'NOT_REQUIRED' : assigned ? 'PENDING' : 'WAITING',
           assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
           routingRow: decision.row,
           waitingReason: assigned ? null : decision.reason,
-          samePersonAsSpend: assigned && decision.samePersonAsSpend,
           slaWorkingDays: policy.slaWorkingDays,
         },
       });
@@ -96,7 +125,7 @@ export class ProposalService {
             planId: null,
             softwareName: body.softwareName,
             expectedUsers: body.expectedUsers,
-            termMonths: body.termMonths,
+            expectedEndDate: expectedEndDate,
             requesterEmployeeId: actor.employeeId,
             beneficiaryEmployeeIds: [actor.employeeId],
             departmentId: unit.departmentId,
@@ -106,7 +135,6 @@ export class ProposalService {
             slaWorkingDays: policy.slaWorkingDays,
             pricingStatus: pricing.status,
             budgetYear: pricing.budgetYear,
-            expectedSpendOn: pricing.expectedSpendOn,
           },
         ),
       );
@@ -125,7 +153,6 @@ export class ProposalService {
             assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
             role: assigned ? decision.role : null,
             waitingReason: assigned ? null : decision.reason,
-            samePersonAsSpend: assigned && decision.samePersonAsSpend,
             requesterEmployeeId: actor.employeeId,
             departmentId: unit.departmentId,
             departmentHeadEmployeeId,
@@ -133,6 +160,7 @@ export class ProposalService {
         ),
       );
 
+      await this.spendRouting.start(tx, actor, created.id, now);
       const record = await this.repo.findById(created.id, tx);
       if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
 

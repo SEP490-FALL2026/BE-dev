@@ -4,6 +4,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { REVOCATION_SOURCES } from '../public/licensing.types';
 import { EVIDENCE_MAX_LENGTH, FAILURE_REASON_MAX_LENGTH } from './provisioning.policy';
 import { REVOCATION_NOTE_MAX_LENGTH } from './revocation.policy';
+import { WITHDRAWAL_REASON_MAX_LENGTH } from '../license-key/license-key.policy';
 import { businessDate, responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /**
@@ -13,6 +14,9 @@ import { businessDate, responseBusinessDate } from '../../../infrastructure/http
  * the policy and the service and answers with its own code.
  */
 
+/** What the IT Admin says when buying: only why. The kind of purchase (a seat of K2, a key of K4) follows from the plan, never from the client. */
+const purchaseBodySchema = z.strictObject({ reason: z.string().trim().min(1).max(500).optional() });
+
 export const grantBodySchema = z.strictObject({
   requestId: z.uuid(),
   subscriptionId: z.uuid().optional(),
@@ -21,25 +25,42 @@ export const grantBodySchema = z.strictObject({
   responsibleEmployeeId: z.uuid().optional(),
   /** Only for a request for a group, which is granted one person at a time: the person of the request this grant is for. */
   beneficiaryEmployeeId: z.uuid().optional(),
+  /** Record a purchase with the grant when the pool has nothing free; the kind of purchase follows from the plan (`BR-MF1-09b`). */
+  purchase: purchaseBodySchema.optional(),
 });
-export const completeBodySchema = z.strictObject({ evidence: z.string().max(EVIDENCE_MAX_LENGTH).default('') });
+export const completeBodySchema = z.strictObject({
+  evidence: z.string().max(EVIDENCE_MAX_LENGTH).default(''),
+  /** K4 only, and then required: the free key of the store the seat is given (`QĐ-103d`); a purchased key is imported first. */
+  licenseKeyId: z.uuid().optional(),
+});
 export const failureBodySchema = z.strictObject({ reason: z.string().max(FAILURE_REASON_MAX_LENGTH).default('') });
 /** A hand-off carries nothing: it changes only the channel, and the evidence is asked when the manual work completes (`QĐ-90a`). */
 export const handOffBodySchema = z.strictObject({});
 export const closeFailedBodySchema = failureBodySchema;
+const COMPLETIONS = [
+  'ACCOUNT_REMOVED',
+  'ALREADY_GONE',
+  'RENEWAL_CANCELLED',
+  'OFF_SYSTEM_REVOKED',
+  'KEY_DEACTIVATED',
+] as const;
+
 /**
  * How a revocation was completed. Which way fits which kind of provisioning, which of the fields it needs (a K1 completion
  * needs the day the paid period ends and what is known of the access) and whether the evidence is enough are judged by the
  * policy and answer with their own codes; a note of evidence is never a password or a key.
  */
 export const revocationCompletionBodySchema = z.strictObject({
-  completion: z.enum(['ACCOUNT_REMOVED', 'ALREADY_GONE', 'RENEWAL_CANCELLED', 'OFF_SYSTEM_REVOKED']),
+  completion: z.enum(COMPLETIONS),
   evidence: z.string().max(EVIDENCE_MAX_LENGTH).default(''),
   note: z.string().max(REVOCATION_NOTE_MAX_LENGTH).optional(),
   paidThroughOn: businessDate.optional(),
   accessState: z.enum(['CUT', 'UNTIL_PAID_END']).optional(),
   accessCutOn: businessDate.optional(),
   accessEvidence: z.string().max(EVIDENCE_MAX_LENGTH).optional(),
+  /** K4 only: the key goes back to the store (the default), or back and withdrawn from it at once (`WITHDRAW`, with a reason). */
+  keyDisposition: z.enum(['RETURN_TO_STORE', 'WITHDRAW']).optional(),
+  withdrawalReason: z.string().max(WITHDRAWAL_REASON_MAX_LENGTH).optional(),
 });
 export const accessCutBodySchema = z.strictObject({
   accessCutOn: businessDate,
@@ -64,6 +85,11 @@ export const listTasksQuerySchema = z.strictObject({
   channel: z.enum(['MANUAL', 'CONNECTOR']).optional(),
   status: z.enum(TASK_STATUSES).optional(),
   scope: z.enum(['ALL', 'MINE', 'GENERAL']).default('ALL'),
+  /** `true`: only the tasks that may be taken today (a revocation in its grace is left out); `false`: only those in their grace. */
+  claimableNow: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
   ...pageQuery,
 });
 export const taskIdParamSchema = z.strictObject({ id: z.uuid() });
@@ -79,6 +105,7 @@ const stepSchema = z.strictObject({
     'RECORD_ACCESS_STATE',
     'REMOVE_FROM_WORKSPACE',
     'REVOKE_IN_INTERNAL_SOFTWARE',
+    'DEACTIVATE_KEY_ON_DEVICE',
     'CONFIRM_WITH_EVIDENCE',
   ]),
   accountIdentifier: z.string().optional(),
@@ -88,7 +115,7 @@ const stepSchema = z.strictObject({
 const revocationSummarySchema = z.strictObject({
   source: z.enum(REVOCATION_SOURCES),
   reasonCount: z.number().int().nonnegative(),
-  completion: z.enum(['ACCOUNT_REMOVED', 'ALREADY_GONE', 'RENEWAL_CANCELLED', 'OFF_SYSTEM_REVOKED']).nullable(),
+  completion: z.enum(COMPLETIONS).nullable(),
   accessState: z.enum(['CUT', 'UNTIL_PAID_END']).nullable(),
   paidThroughOn: responseBusinessDate.nullable(),
   terminating: z.boolean(),
@@ -108,11 +135,13 @@ const revocationDetailSchema = revocationSummarySchema.extend({
       decidedAt: z.iso.datetime(),
     })
     .nullable(),
+  withdrawnReasonCount: z.number().int().nonnegative(),
+  lastWithdrawnAt: z.iso.datetime().nullable(),
 });
 /** A row of the list: the task without its steps, evidence and errors; the detail is this and those. */
 const taskSummarySchema = z.strictObject({
   id: z.uuid(),
-  kind: z.enum(['GRANT', 'REVOKE']),
+  kind: z.enum(['GRANT', 'REVOKE', 'EXTEND']),
   channel: z.enum(['MANUAL', 'CONNECTOR']),
   status: z.enum(TASK_STATUSES),
   requestId: z.uuid().nullable(),
@@ -131,6 +160,9 @@ const taskSummarySchema = z.strictObject({
   accountIdentifier: z.string(),
   defaultResponsibleEmployeeId: z.uuid().nullable(),
   inGeneralQueue: z.boolean(),
+  dueOn: responseBusinessDate.nullable(),
+  notBefore: responseBusinessDate.nullable(),
+  claimableNow: z.boolean(),
   createdAt: z.iso.datetime(),
   claimedBy: z.uuid().nullable(),
   claimedAt: z.iso.datetime().nullable(),
@@ -143,6 +175,14 @@ const taskSummarySchema = z.strictObject({
   availableDecisions: z.array(z.enum(['RETRY', 'HAND_OFF', 'CLOSE_FAILED'])),
   closedAt: z.iso.datetime().nullable(),
   revocation: revocationSummarySchema.nullable(),
+  /** What was bought with the grant: every K1 grant (`K1_SUBSCRIPTION`), or a K2/K4 pool that had nothing free; null when the seat came from the pool. */
+  purchase: z
+    .strictObject({
+      kind: z.enum(['POOL_TOP_UP', 'KEY_PURCHASE', 'K1_SUBSCRIPTION']),
+      reason: z.string().nullable(),
+      purchasedAt: z.iso.datetime(),
+    })
+    .nullable(),
   elapsedSeconds: z.number().int().nonnegative(),
 });
 const taskSchema = taskSummarySchema.extend({

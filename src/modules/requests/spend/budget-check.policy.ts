@@ -1,74 +1,100 @@
 /**
- * The check of the budget of a request (`US-06-12`, `FR-3.20`), as a pure judgement. It reads the figures it is given and
- * decides nothing about a person: it says what the result is for every year the request has a binding payment in, and
- * where the request goes. The check never approves or refuses (`SoD-6`); it only decides who looks next.
+ * The check of the budget of a request (`US-06-12`, `FR-3.20`, `BR-MF1-06e..g`), as a pure judgement. It reads the figures it is given and
+ * decides nothing about a person: it says which of three outcomes the request has on the one year it falls in. The check never approves or
+ * refuses (`SoD-6`); it only says whether the request goes to the spending approver, waits for the head to confirm the reserve, or stops.
  *
- * Every year is judged alone, on the slice of the request that falls in it (`QĐ-84c`): a payment of 2 400 in 2026 and one in
- * 2027 are two checks, never 4 800 against the remaining of one year. A year with no budget says so — it is not a budget
- * of nothing (`QĐ-82l`). Two codes are about the data and not the budget, and nothing is routed past them (`QĐ-82d`).
+ * The base and the reserve of the approved version are the two levels: what is left of the base is the base less what is spent, held and
+ * waiting to be decided; what is left with the reserve adds the reserve (it may be negative). Nothing here asks for an override, a review
+ * of Finance or a line of the plan: none of them exists any more (`QĐ-97c`, `QĐ-101n`).
  */
 
-/**
- * What one year says: the most serious of what applies is the one that is kept. `HIGH_VALUE` is no longer given (`QĐ-97c`: no route
- * by the size of a request); it stays in the type so that a check made before that rule still reads.
- */
+/** What one year says. `HIGH_VALUE` is never given any more (`QĐ-97c`); it stays so that a check made before that rule still reads. */
 export type YearCode = 'BUDGET_OK' | 'HIGH_VALUE' | 'INSUFFICIENT_BUDGET' | 'NO_ACTIVE_BUDGET';
 
-/** Every code a check can give: a year's own, the two of the data, and the plan line. */
+/** Every code a check can carry: a year's own, and the two codes of the data that checks made before still have. */
 export type CheckCode = YearCode | 'CLOSED_OR_EXPIRED_BUDGET_PERIOD' | 'STALE_COST_EVIDENCE';
 
-/** The current budget of a Cost Center and year, with what is held and spent against it, in the reporting currency. */
+/** The three outcomes of a check (`BR-MF1-06g`). */
+export type BudgetOutcome = 'WITHIN_BASE' | 'USES_RESERVE' | 'BLOCKED';
+
+/**
+ * Why a request is blocked: every reason that applies is kept (`US-06-12` AC-9). The price is the quote of the proposal only: the plans have
+ * no end date of their price in the model (S1-08), so `PRICE_EXPIRED` is about a quote that is no longer valid.
+ */
+export type BlockReason = 'PRICE_EXPIRED' | 'NO_APPROVED_BUDGET' | 'OVER_RESERVE';
+
+/** Where the request goes next: nowhere (blocked), or to the spending approver. `FINANCE_REVIEW` is read from checks made before. */
+export type CheckRoute = 'BLOCKED' | 'FINANCE_REVIEW' | 'SPEND_APPROVAL';
+
+/**
+ * The route a check is told with on the wire: `BLOCKED` or `SPEND_APPROVAL` only. The review by Finance is gone (`QĐ-100`), so a check made
+ * before that went to Finance is told as blocked when its outcome blocked it, and otherwise as the spend approval it led to.
+ */
+export function wireRouteOf(
+  route: CheckRoute,
+  outcome: 'WITHIN_BASE' | 'USES_RESERVE' | 'BLOCKED',
+): 'BLOCKED' | 'SPEND_APPROVAL' {
+  if (route !== 'FINANCE_REVIEW') return route;
+
+  return outcome === 'BLOCKED' ? 'BLOCKED' : 'SPEND_APPROVAL';
+}
+
+/** The approved version of a Cost Center and year, with what is held and spent against it, in the reporting currency. */
 export interface YearBudget {
   versionId: string;
-  totalMinor: bigint;
+  baseMinor: bigint;
+  reserveMinor: bigint;
   heldMinor: bigint;
   spentMinor: bigint;
 }
 
-/** What the request costs in one year, as the estimate that falls on the company, in the reporting currency. */
+/** What the request costs in its one year, in the reporting currency, with the budget of that year and what waits to be decided. */
 export interface YearSlice {
   year: number;
   costMinor: bigint;
-  /** The year has ended: no budget is kept for it any more (`QĐ-82l`). */
-  closed: boolean;
+  /** Null when the Cost Center has no approved version for the year. */
   budget: YearBudget | null;
-  /** What the other requests of the Cost Center that wait to be decided cost in the year (`US-06-01` AC-9). */
+  /** What the other requests of the Cost Center that wait to be decided cost in the year (`BR-MF1-06f`). */
   pendingMinor: bigint;
 }
 
 export interface CheckInput {
-  slices: readonly YearSlice[];
+  slice: YearSlice;
   /** The quote the cost is taken from is no longer valid. */
-  staleCostEvidence: boolean;
-  /** The request is attached to a plan line whose purchase window has passed. */
-  planLineOverdue: boolean;
+  priceExpired: boolean;
 }
 
 export interface YearResult {
   year: number;
   costMinor: bigint;
-  /** Null for a year that has ended: it is not judged. */
   code: YearCode | null;
   versionId: string | null;
+  /** Base and reserve together (what the old checks called the budget). Null without an approved version. */
   budgetMinor: bigint | null;
+  baseMinor: bigint | null;
+  reserveMinor: bigint | null;
   heldMinor: bigint | null;
   spentMinor: bigint | null;
-  /** The budget less what is held and spent; negative when more is held than the budget allows. Null without a budget. */
+  /** What is left with the reserve; negative when more is held than base and reserve allow. Null without an approved version. */
   remainingMinor: bigint | null;
-  /** The cost as a share of what is left, in basis points; null when nothing is left to compare with. */
+  remainingBaseMinor: bigint | null;
+  remainingWithReserveMinor: bigint | null;
+  /** The cost as a share of what is left with the reserve, in basis points; null when nothing is left to compare with. */
   shareBasisPoints: number | null;
-  /** What the others that wait cost in the year, for the approver to see; not part of the judgement. Null for a year that has ended. */
+  /** What the others that wait cost in the year, for the approver to see. */
   pendingMinor: bigint | null;
 }
 
-/** Where the request goes next: nowhere, to Finance, or straight to the spending approver. */
-export type CheckRoute = 'BLOCKED' | 'FINANCE_REVIEW' | 'SPEND_APPROVAL';
-
 export interface CheckResult {
   years: YearResult[];
+  outcome: BudgetOutcome;
+  /** In the order data first (the quote), then the budget; empty unless the outcome is `BLOCKED`. */
+  blockReasons: BlockReason[];
+  /** How much the cost is over what is left of the base; set when the outcome uses the reserve or is blocked for being over the reserve. */
+  overBaseByMinor: bigint | null;
+  /** How much the cost is over what is left with the reserve; set when `OVER_RESERVE` is a reason. */
+  overByMinor: bigint | null;
   staleCostEvidence: boolean;
-  periodClosed: boolean;
-  planLineOverdue: boolean;
   route: CheckRoute;
 }
 
@@ -79,76 +105,97 @@ const SEVERITY: Readonly<Record<YearCode, number>> = {
   NO_ACTIVE_BUDGET: 3,
 };
 
-function judgeYear(slice: YearSlice): YearResult {
-  const base = { year: slice.year, costMinor: slice.costMinor };
-  if (slice.closed) {
-    return {
-      ...base,
-      code: null,
-      versionId: null,
-      budgetMinor: null,
-      heldMinor: null,
-      spentMinor: null,
-      remainingMinor: null,
-      shareBasisPoints: null,
-      pendingMinor: null,
-    };
-  }
-  const budget = slice.budget;
-  if (!budget) {
-    return {
-      ...base,
-      code: 'NO_ACTIVE_BUDGET',
-      versionId: null,
-      budgetMinor: null,
-      heldMinor: null,
-      spentMinor: null,
-      remainingMinor: null,
-      shareBasisPoints: null,
-      pendingMinor: slice.pendingMinor,
-    };
-  }
+function withoutBudget(slice: YearSlice): YearResult {
+  return {
+    year: slice.year,
+    costMinor: slice.costMinor,
+    code: 'NO_ACTIVE_BUDGET',
+    versionId: null,
+    budgetMinor: null,
+    baseMinor: null,
+    reserveMinor: null,
+    heldMinor: null,
+    spentMinor: null,
+    remainingMinor: null,
+    remainingBaseMinor: null,
+    remainingWithReserveMinor: null,
+    shareBasisPoints: null,
+    pendingMinor: slice.pendingMinor,
+  };
+}
 
-  const remaining = budget.totalMinor - budget.heldMinor - budget.spentMinor;
-  const share = remaining > 0n ? Number((slice.costMinor * 10_000n) / remaining) : null;
-  const code: YearCode = slice.costMinor > remaining ? 'INSUFFICIENT_BUDGET' : 'BUDGET_OK';
+/** The year with a budget: both levels of what is left, and the code (`INSUFFICIENT_BUDGET` is being over the reserve). */
+function judgeYear(slice: YearSlice, budget: YearBudget): YearResult {
+  const remainingBase = budget.baseMinor - budget.spentMinor - budget.heldMinor - slice.pendingMinor;
+  const remainingWithReserve = remainingBase + budget.reserveMinor;
+  const over = slice.costMinor > 0n && slice.costMinor > remainingWithReserve;
 
   return {
-    ...base,
-    code,
+    year: slice.year,
+    costMinor: slice.costMinor,
+    code: over ? 'INSUFFICIENT_BUDGET' : 'BUDGET_OK',
     versionId: budget.versionId,
-    budgetMinor: budget.totalMinor,
+    budgetMinor: budget.baseMinor + budget.reserveMinor,
+    baseMinor: budget.baseMinor,
+    reserveMinor: budget.reserveMinor,
     heldMinor: budget.heldMinor,
     spentMinor: budget.spentMinor,
-    remainingMinor: remaining,
-    shareBasisPoints: share,
+    remainingMinor: remainingWithReserve,
+    remainingBaseMinor: remainingBase,
+    remainingWithReserveMinor: remainingWithReserve,
+    // Capped so a tiny remainder never overflows the INTEGER column (review G23-06): a share above 2^31 − 1 basis points says the same.
+    shareBasisPoints:
+      remainingWithReserve > 0n
+        ? Number(min((slice.costMinor * 10_000n) / remainingWithReserve, 2_147_483_647n))
+        : null,
     pendingMinor: slice.pendingMinor,
   };
 }
 
 /**
- * The result of the check. A problem with the data (the quote has expired, a year has ended) sends the request nowhere: it
- * stays with its head, and nothing is created for Finance or the approver, since neither can mend it. Otherwise anything out
- * of the ordinary — a year that is not `BUDGET_OK`, or a plan line that is overdue — goes to Finance first.
+ * The result of the check. A request that costs nothing this year (a request to go on using whose new period begins next year, `QĐ-109b`)
+ * is never over anything: it is within the base whatever is left, even when that is negative (`A5-2`), and is blocked only when the year has
+ * no approved version or the quote is no longer valid.
  */
 export function checkBudget(input: CheckInput): CheckResult {
-  const years = input.slices.map(judgeYear);
-  const periodClosed = input.slices.some((slice) => slice.closed);
-  const blocked = periodClosed || input.staleCostEvidence;
-  const ordinary = !input.planLineOverdue && years.every((year) => year.code === 'BUDGET_OK');
-  const route: CheckRoute = blocked ? 'BLOCKED' : ordinary ? 'SPEND_APPROVAL' : 'FINANCE_REVIEW';
+  const { slice } = input;
+  const year = slice.budget ? judgeYear(slice, slice.budget) : withoutBudget(slice);
+  const blockReasons = blockReasonsOf(year, input.priceExpired);
+  // A cost of nothing is over nothing, whatever is left.
+  const overBase = over(slice.costMinor, year.remainingBaseMinor);
+  const outcome: BudgetOutcome =
+    blockReasons.length > 0 ? 'BLOCKED' : overBase !== null ? 'USES_RESERVE' : 'WITHIN_BASE';
 
   return {
-    years,
-    staleCostEvidence: input.staleCostEvidence,
-    periodClosed,
-    planLineOverdue: input.planLineOverdue,
-    route,
+    years: [year],
+    outcome,
+    blockReasons,
+    overBaseByMinor: overBase,
+    overByMinor: blockReasons.includes('OVER_RESERVE') ? over(slice.costMinor, year.remainingWithReserveMinor) : null,
+    staleCostEvidence: input.priceExpired,
+    route: outcome === 'BLOCKED' ? 'BLOCKED' : 'SPEND_APPROVAL',
   };
 }
 
-/** Every code the result carries, the data first (`US-06-12` AC-9), then the plan line, then the years from the worst. */
-export function codesOf(result: CheckResult): CheckCode[] {
+/** How much `cost` is over `left`; null when it is not over, when nothing is left to compare with, and always for a cost of nothing. */
+function over(cost: bigint, left: bigint | null): bigint | null {
+  return cost > 0n && left !== null && cost > left ? cost - left : null;
+}
+
+/** Every reason the request is blocked, the data (the quote) first, then the budget. */
+function blockReasonsOf(year: YearResult, priceExpired: boolean): BlockReason[] {
+  const reasons: BlockReason[] = [];
+  if (priceExpired) reasons.push('PRICE_EXPIRED');
+  if (year.code === 'NO_ACTIVE_BUDGET') reasons.push('NO_APPROVED_BUDGET');
+  if (year.code === 'INSUFFICIENT_BUDGET') reasons.push('OVER_RESERVE');
+
+  return reasons;
+}
+
+/** Every code the result carries, the data first (`US-06-12` AC-9), then the year from the worst. */
+export function codesOf(
+  result: Pick<CheckResult, 'years' | 'staleCostEvidence'> & { periodClosed?: boolean },
+): CheckCode[] {
   const codes: CheckCode[] = [];
   if (result.staleCostEvidence) codes.push('STALE_COST_EVIDENCE');
   if (result.periodClosed) codes.push('CLOSED_OR_EXPIRED_BUDGET_PERIOD');
@@ -160,3 +207,5 @@ export function codesOf(result: CheckResult): CheckCode[] {
 
   return codes;
 }
+
+const min = (a: bigint, b: bigint): bigint => (a < b ? a : b);

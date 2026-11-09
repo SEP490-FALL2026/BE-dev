@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import { FORBIDDEN_ERROR } from '../../infrastructure/http/errors/access-errors';
 import { ApiException } from '../../infrastructure/http/errors/api.exception';
 import { toMoneyApiException } from '../../infrastructure/http/errors/money-errors';
 import { toUnavailableApiException } from '../../infrastructure/http/errors/service-unavailable';
@@ -9,8 +10,8 @@ import {
   NonWorkingDateNotFoundError,
   NonWorkingDateReasonInvalidError,
   NonWorkingDateTakenError,
-  ParameterLockedError,
   ParameterNotFoundError,
+  ParameterNotYoursError,
   ReportingCurrencyLockedError,
   ParameterValueInvalidError,
 } from './operating-parameters.errors';
@@ -22,6 +23,9 @@ function refuse(status: HttpStatus, code: string, message: string, details?: Rec
 /** The one place the errors of the parameter routes become HTTP answers; anything else reaches the global filter. */
 export function toOperatingParametersApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  if (error instanceof ParameterNotYoursError) {
+    return refuse(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR.code, FORBIDDEN_ERROR.message);
+  }
   if (error instanceof ParameterNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'PARAMETER.NOT_FOUND', error.message);
   }
@@ -30,9 +34,6 @@ export function toOperatingParametersApiException(error: unknown): unknown {
       key: error.key,
       problem: error.problem,
     });
-  }
-  if (error instanceof ParameterLockedError) {
-    return refuse(HttpStatus.CONFLICT, 'PARAMETER.LOCKED', error.message, { key: error.key, reason: error.reason });
   }
   if (error instanceof NonWorkingDateInPastError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'NON_WORKING_DATE.IN_PAST', error.message, { date: error.date });
@@ -63,7 +64,6 @@ const example = (error: Error) => errorExampleOf(toOperatingParametersApiExcepti
 export const OPERATING_PARAMETERS_ERROR_EXAMPLES = {
   PARAMETER_NOT_FOUND: example(new ParameterNotFoundError('<parameter-key>')),
   PARAMETER_VALUE_INVALID: example(new ParameterValueInvalidError('<parameter-key>', 'OUT_OF_RANGE')),
-  PARAMETER_LOCKED: example(new ParameterLockedError('<parameter-key>', 'BUDGET_VERSION_EXISTS')),
   NON_WORKING_DATE_IN_PAST: example(new NonWorkingDateInPastError('2026-01-01')),
   NON_WORKING_DATE_REASON_INVALID: example(new NonWorkingDateReasonInvalidError()),
   NON_WORKING_DATE_TAKEN: example(new NonWorkingDateTakenError('2026-01-01')),

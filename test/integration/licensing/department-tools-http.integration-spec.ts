@@ -142,21 +142,23 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     await h.stop();
   });
 
-  it('AC-13, F22: lists exactly the seats on the subscriptions the department owns and the service accounts it owns, whoever holds them, and none of another department', async () => {
+  // Rewritten for QĐ-103d (the pool of seats is every department's): a seat carries the department of its holder, not the one that owns the
+  // subscription, so a department's tools are the seats its people hold (and the service accounts it owns), on any subscription.
+  it('AC-13, F22: lists exactly the seats the people of the department hold, on any subscription, and the service accounts it owns, and none of another department', async () => {
     const result = await toolsOf(design.id);
 
     expect(result.pagination.totalItems).toBe(7);
-    // F1 is a person of finance who holds a seat of the subscription of design: it is design's seat, listed once.
+    // D1 holds a seat of Figma and one of Slack (finance's subscription): both are design's. F1, a person of finance, is not listed.
     expect(result.items.map((item) => item.employeeCode).sort()).toEqual([
+      'D-1',
       'D-1',
       'D-2',
       'D-3',
       'D-4',
       'D-5',
       'D-6',
-      'F-1',
     ]);
-    expect(result.items.find((item) => item.employeeCode === 'F-1')).toMatchObject({
+    expect(result.items.find((item) => item.employeeCode === 'D-2')).toMatchObject({
       kind: 'PERSONAL',
       holderStatus: 'ACTIVE',
     });
@@ -165,7 +167,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
       source: 'BASELINE',
       holderStatus: 'ACTIVE',
     });
-    expect(result.summary.map((entry) => entry.seats).sort()).toEqual([2, 5]);
+    expect(result.summary.map((entry) => entry.seats).sort()).toEqual([1, 2, 4]);
     expect(result.items[0]).toEqual(
       expect.objectContaining({
         application: { id: expect.any(String) as unknown, name: expect.any(String) as unknown },
@@ -176,15 +178,14 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     expect(JSON.stringify(result)).not.toContain('ci-bot');
   });
 
-  it('F22: groups by the owner of the seat, not by the department of the holder: a person of design on a subscription of finance is the tool of finance', async () => {
+  it('F22: groups by the department of the holder (QĐ-103d): a person of design on a subscription of finance is a tool of design, not of finance', async () => {
     const result = await toolsOf(finance.id);
 
-    // The Slack seats of F1 and D1 (a person of design), and the seat of F1 on internal software.
+    // The three seats of F1 (Figma, Slack, internal software); the Slack seat of D1 is design's.
     expect(result.pagination.totalItems).toBe(3);
-    expect(result.items.map((item) => item.employeeCode).sort()).toEqual(['D-1', 'F-1', 'F-1']);
+    expect(result.items.map((item) => item.employeeCode).sort()).toEqual(['F-1', 'F-1', 'F-1']);
     expect(result.items.every((item) => item.kind === 'PERSONAL')).toBe(true);
-    // The seat of D1 on Slack is not design's: design lists D1 once, for Figma.
-    expect((await toolsOf(design.id)).items.filter((item) => item.employeeCode === 'D-1')).toHaveLength(1);
+    expect((await toolsOf(design.id)).items.filter((item) => item.employeeCode === 'D-1')).toHaveLength(2);
   });
 
   /**

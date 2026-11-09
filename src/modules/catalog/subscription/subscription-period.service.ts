@@ -8,6 +8,8 @@ import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { SubscriptionPeriodRefusedError } from '../public/subscription-period.errors';
 import type { NextPeriodInput, RenewalPeriodFacts } from '../public/subscription-period.types';
+import { assertPoolTerms } from './pool/subscription-pool.policy';
+import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { snapshotOf } from './subscription.mapper';
 import {
   assertSubscriptionShape,
@@ -18,12 +20,19 @@ import {
 } from './subscription.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import { SubscriptionPricingService } from './subscription-pricing.service';
-import type { SubscriptionRecord } from './subscription.types';
+import type { ApplicationKind, BillingCycle, ProvisioningType, SubscriptionRecord } from './subscription.types';
 
 /** How many periods one pass of the renewal sweep reads at most; the next pass takes the rest. */
 const SWEEP_LIMIT = 500;
 
-function factsOf(record: SubscriptionRecord, renewedById: string | null): RenewalPeriodFacts {
+/** A period that a department head decides on: the subscriptions of the shared pool (K2, K4) have no owner department and are not decided here. */
+type OwnedRecord = SubscriptionRecord & { ownerDepartmentId: string };
+
+function isOwned(record: SubscriptionRecord): record is OwnedRecord {
+  return record.ownerDepartmentId !== null;
+}
+
+function factsOf(record: OwnedRecord, renewedById: string | null): RenewalPeriodFacts {
   const notice = deriveNotice(noticeInputOf(record));
 
   return {
@@ -64,6 +73,7 @@ export class SubscriptionPeriodService {
     private readonly pricing: SubscriptionPricingService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
+    private readonly pool: SubscriptionPoolService,
   ) {}
 
   /** The periods with these ids, by id; an id that does not exist is absent. */
@@ -110,6 +120,7 @@ export class SubscriptionPeriodService {
     const previous = await this.subscriptions.find(input.previousSubscriptionId, tx);
     if (!previous) throw new SubscriptionPeriodRefusedError('NOT_FOUND');
     if (previous.kind !== 'TERM') throw new SubscriptionPeriodRefusedError('NOT_TERM');
+    if (!isOwned(previous)) throw new SubscriptionPeriodRefusedError('NO_OWNER_DEPARTMENT');
     if ((await this.subscriptions.successorsOf([previous.id], tx)).has(previous.id)) {
       throw new SubscriptionPeriodRefusedError('ALREADY_RENEWED');
     }
@@ -119,7 +130,58 @@ export class SubscriptionPeriodService {
     const plan = await this.plans.lockShared(tx, previous.planId);
     if (!plan || plan.applicationStatus === 'RETIRED') throw new SubscriptionPeriodRefusedError('APPLICATION_RETIRED');
 
-    const state = declaredStateOf(input);
+    // The new period carries what the rules of the shared pool made the old one hold: the commitment, the IT Admin who answers for
+    // it and the vendor's minimum; the flag that prices the plan moves to it (QĐ-103e).
+    const state = {
+      ...declaredStateOf(input),
+      commitmentTermMonths: previous.commitmentTermMonths,
+      responsibleItAdminEmployeeId: previous.responsibleItAdminEmployeeId,
+      vendorMinimumSeats: previous.vendorMinimumSeats,
+    };
+    this.assertNextPeriod(plan, state, input.billingCycle, previous);
+    const money = await this.pricing.read(input.unitPrice);
+    const priced = await this.pricing.priceToday(tx, money);
+    const organization = await this.organizationReads.getOrganization(tx);
+    if (!organization) throw new Error('A renewal was recorded before installation');
+
+    // The flag that prices the plan moves to the new period only when it is written active; a draft period leaves it on the one it continues
+    // and `subscriptionComplete` hands it over (F-012).
+    const status = subscriptionStatusOf(plan, 'TERM', { ...state, ...priced });
+    const takesPrimary = status === 'ACTIVE' && previous.isPrimaryForPlan;
+    if (takesPrimary) await this.pool.releasePrimary(tx, actor, organization.id, previous.id);
+    const created = await this.subscriptions.insert(tx, {
+      organizationId: organization.id,
+      planId: previous.planId,
+      ownerDepartmentId: previous.ownerDepartmentId,
+      kind: 'TERM',
+      renewedFromId: previous.id,
+      ...state,
+      ...priced,
+      isPrimaryForPlan: takesPrimary,
+      status,
+    });
+    await this.audit.record(
+      tx,
+      catalogAuditEvent(actor, organization.id, 'SUBSCRIPTION.RENEWED', 'Subscription', created.id, null, {
+        ...snapshotOf(created),
+        renewedFromId: previous.id,
+      }),
+    );
+
+    return factsOf({ ...created, ownerDepartmentId: previous.ownerDepartmentId }, null);
+  }
+
+  /**
+   * The shape of the new period, then the commitment it inherits against the cycle the vendor confirmed as a new write would meet it
+   * (R-G01, R-E01); a cycle of the old kind (QUARTERLY, OTHER) is kept as it is declared until the renewal of W5.
+   * Throws SubscriptionPeriodRefusedError.
+   */
+  private assertNextPeriod(
+    plan: { applicationKind: ApplicationKind; provisioningType: ProvisioningType },
+    state: ReturnType<typeof declaredStateOf> & { commitmentTermMonths: number | null },
+    billingCycle: BillingCycle,
+    previous: SubscriptionRecord,
+  ): void {
     try {
       assertSubscriptionShape({
         kind: 'TERM',
@@ -130,30 +192,17 @@ export class SubscriptionPeriodService {
     } catch {
       throw new SubscriptionPeriodRefusedError('INVALID_DATES');
     }
-    const money = await this.pricing.read(input.unitPrice);
-    const priced = await this.pricing.priceToday(tx, money);
-    const organization = await this.organizationReads.getOrganization(tx);
-    if (!organization) throw new Error('A renewal was recorded before installation');
-
-    const created = await this.subscriptions.insert(tx, {
-      organizationId: organization.id,
-      planId: previous.planId,
-      ownerDepartmentId: previous.ownerDepartmentId,
-      kind: 'TERM',
-      renewedFromId: previous.id,
-      ...state,
-      ...priced,
-      status: subscriptionStatusOf(plan, 'TERM', { ...state, ...priced }),
-    });
-    await this.audit.record(
-      tx,
-      catalogAuditEvent(actor, organization.id, 'SUBSCRIPTION.RENEWED', 'Subscription', created.id, null, {
-        ...snapshotOf(created),
-        renewedFromId: previous.id,
-      }),
-    );
-
-    return factsOf(created, null);
+    try {
+      assertPoolTerms({
+        kind: 'TERM',
+        planProvisioningType: plan.provisioningType,
+        billingCycle,
+        commitmentTermMonths: previous.commitmentTermMonths,
+        activating: false,
+      });
+    } catch {
+      throw new SubscriptionPeriodRefusedError('INVALID_TERMS');
+    }
   }
 
   private async withSuccessors(records: SubscriptionRecord[], tx?: DbTx): Promise<RenewalPeriodFacts[]> {
@@ -162,6 +211,6 @@ export class SubscriptionPeriodService {
       tx,
     );
 
-    return records.map((record) => factsOf(record, successors.get(record.id) ?? null));
+    return records.filter(isOwned).map((record) => factsOf(record, successors.get(record.id) ?? null));
   }
 }

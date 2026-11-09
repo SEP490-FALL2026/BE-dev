@@ -15,6 +15,7 @@ const said = (rows: NoticeRow[]) => rows.map((row) => row.code);
 describe('the status of a request told to the people it concerns, over PostgreSQL (US-05-15)', () => {
   let plan: string;
   let figma: string;
+  let internalPlan: string;
   let subscriptionId: string;
   let counter = 0;
   let superAdminEmployeeId: string;
@@ -25,6 +26,7 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     subscriptionId = await h.subscription(10);
     plan = await h.planOf(subscriptionId);
     figma = await h.planOf(await h.subscription(10));
+    internalPlan = await h.plan('K5');
     await h
       .declareTaxProfile((await h.vendorOf(plan)).id, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }])
       .expect(200);
@@ -286,30 +288,30 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
   });
 
   describe('a step that waits under control and is then given (US-05-15 AC-8)', () => {
-    it('tells a request that was sent with nobody to hold its step that it waits, and the Super Admin once', async () => {
+    it('BR-MF1-02 tells a head whose own request is one-step and has no spending approver to hold its spend step that it waits, and the Super Admin once', async () => {
+      counter += 1;
+      const executive = await h.departmentWithUnit(`P-NW${counter}`);
+      const head = await h.staff(executive, `NW-H${counter}`);
+      await h.makeHead(executive, head);
+      // The budget is decided while an approver still exists; the approver is taken away only after.
+      await h.budgetFor({ department: executive, head, member: head }, { total: 100 * M });
       await h.clearRole('SPENDING_APPROVER');
       try {
-        counter += 1;
-        const executive = await h.departmentWithUnit(`P-NW${counter}`);
-        const head = await h.staff(executive, `NW-H${counter}`);
-        await h.makeHead(executive, head);
         const sent = await h.sent(head, plan, { termMonths: 1 });
         expect(sent.state).toBe('WAITING_CONTROLLED');
         await h.sweep();
         await h.sweep();
         await h.project();
 
-        expect((await h.noticesOf(head.employeeId, 'REQUEST_SUBMITTED'))[0].params).toEqual({
-          requestId: sent.id,
-          stage: 'WAITING_CONTROLLED',
-        });
+        // A one-step request has no need step to route, so the sending says nothing more than the answer of the route did.
+        expect(await h.noticesOf(head.employeeId, 'REQUEST_SUBMITTED')).toEqual([]);
         const alerts = (await h.noticesOf(superAdminEmployeeId, 'CONTROLLED_WAIT_ALERT')).filter(
           (row) => row.subject_id === sent.id,
         );
         expect(alerts).toHaveLength(1);
         expect(alerts[0].params).toMatchObject({
           requestId: sent.id,
-          stepKind: 'NEED',
+          stepKind: 'SPEND_APPROVAL',
           waitingReason: 'NO_SPENDING_APPROVER',
         });
       } finally {
@@ -320,7 +322,8 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     it('tells the requester that a step they were waiting on waits for a head, the Super Admin alone of the alert and nobody else, and then that it is given', async () => {
       const u = await example();
       const successor = await h.staff(u.department, `NW-S${counter}`);
-      const sent = await h.sent(u.member, plan, { termMonths: 1 });
+      // An internal request keeps waiting for the successor; a paid one is turned into a one-step request instead (BR-MF1-02).
+      const sent = await h.sent(u.member, internalPlan, { termMonths: 1 });
       await h.vacateHead(u.department.id).expect(200);
       await h.project();
 

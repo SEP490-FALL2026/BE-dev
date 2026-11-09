@@ -13,6 +13,7 @@ export const snapshotOf = (record: SubscriptionRecord) => ({
     ? `${record.priceSnapshot.reportingMinor} ${record.priceSnapshot.reportingCurrency} at ${formatRate(record.priceSnapshot.rate)} of ${record.priceSnapshot.rateDate}`
     : null,
   billingCycle: record.billingCycle,
+  commitmentTermMonths: record.commitmentTermMonths,
   startDate: record.startDate,
   endDate: record.endDate,
   renewalDate: record.renewalDate,
@@ -20,6 +21,9 @@ export const snapshotOf = (record: SubscriptionRecord) => ({
   noticePeriodDays: record.noticePeriodDays,
   autoRenew: record.autoRenew,
   allowsMidTermReduction: record.allowsMidTermReduction,
+  responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
+  vendorMinimumSeats: record.vendorMinimumSeats,
+  isPrimaryForPlan: record.isPrimaryForPlan,
   status: record.status,
 });
 
@@ -30,6 +34,7 @@ export const stateOf = (record: SubscriptionRecord): SubscriptionState => ({
   unitPrice: record.unitPrice,
   priceSnapshot: record.priceSnapshot,
   billingCycle: record.billingCycle,
+  commitmentTermMonths: record.commitmentTermMonths,
   startDate: record.startDate,
   endDate: record.endDate,
   renewalDate: record.renewalDate,
@@ -37,6 +42,9 @@ export const stateOf = (record: SubscriptionRecord): SubscriptionState => ({
   noticePeriodDays: record.noticePeriodDays,
   autoRenew: record.autoRenew,
   allowsMidTermReduction: record.allowsMidTermReduction,
+  responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
+  vendorMinimumSeats: record.vendorMinimumSeats,
+  isPrimaryForPlan: record.isPrimaryForPlan,
 });
 
 /** The state in one fixed order of keys, with money as text, so that two equal states serialize equally. */
@@ -54,6 +62,7 @@ const canonical = (state: SubscriptionState): string =>
       state.priceSnapshot.exchangeRateId,
     ],
     state.billingCycle,
+    state.commitmentTermMonths,
     state.startDate,
     state.endDate,
     state.renewalDate,
@@ -61,6 +70,9 @@ const canonical = (state: SubscriptionState): string =>
     state.noticePeriodDays,
     state.autoRenew,
     state.allowsMidTermReduction,
+    state.responsibleItAdminEmployeeId,
+    state.vendorMinimumSeats,
+    state.isPrimaryForPlan,
   ]);
 
 /** True when two states hold the same data. */

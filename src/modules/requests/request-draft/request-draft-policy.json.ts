@@ -11,7 +11,7 @@ import { jsonColumn } from '../../../infrastructure/database/json-column';
 const schema = z.object({ draft: z.object({ kind: z.string() }).catchall(z.json()) });
 
 /** Keys saved by older versions and ignored when an old draft is sent (QD-93h phase 1). */
-export const RETIRED_DRAFT_BODY_KEYS = ['projectLabel', 'termConfirmation', 'expectedSpendOn'] as const;
+export const RETIRED_DRAFT_BODY_KEYS = ['projectLabel', 'termConfirmation', 'expectedSpendOn', 'termMonths'] as const;
 
 /** The `policy` of a row that is a draft. */
 export type DraftPolicy = z.output<typeof schema>;

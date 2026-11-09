@@ -90,13 +90,28 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   REQUEST_RETURNED_BY_FINANCE: ['requestId', 'reason'],
   REQUEST_AWAITING_BUDGET: ['requestId', 'costCenterId', 'year'],
   REQUEST_BUDGET_VERSION_ENDED: ['requestId', 'versionId', 'costCenterId', 'year', 'decision'],
+  // The check of the budget of a request: the codes of why, never how far over (a figure is read on the request).
+  REQUEST_RESERVE_CONFIRMATION_NEEDED: ['requestId'],
+  REQUEST_BUDGET_BLOCKED: ['requestId', 'reasons'],
+  REQUEST_RETURNED_AT_DECISION: ['requestId', 'reasons'],
   BUDGET_VERSION_CLOSED_UNAPPROVED: ['versionId', 'costCenterId', 'year'],
   BUDGET_PROPOSAL_CLOSED_YEAR_END: ['proposalId', 'costCenterId', 'year'],
   BUDGET_PROPOSAL_TASK_ASSIGNED: ['costCenterId', 'departmentId', 'year'],
   BUDGET_PROPOSAL_TASK_WAITING: ['proposalId', 'costCenterId', 'year'],
+  // The cycle of a year opened and a department ceiling published: the year and the department, never the figure (FIGURE_WORDS).
+  BUDGET_CYCLE_OPENED: ['cycleId', 'year', 'submissionDeadline'],
+  BUDGET_DEPARTMENT_CEILING_PUBLISHED: ['cycleId', 'year', 'departmentId'],
+  // The deadlines of the cycle: the year, the day, and how many departments or versions (a count, never a figure of money).
+  BUDGET_PROPOSAL_DEADLINE_REMINDER: ['cycleId', 'year', 'costCenterId', 'submissionDeadline'],
+  BUDGET_NO_HEAD_AT_DEADLINE: ['cycleId', 'year', 'departmentId', 'submissionDeadline'],
+  BUDGET_SUBMISSION_DEADLINE_PASSED: ['cycleId', 'year', 'departmentCount', 'submissionDeadline'],
+  BUDGET_DECISION_DEADLINE_REMINDER: ['cycleId', 'year', 'versionCount', 'decisionDeadline'],
+  BUDGET_COST_CENTER_SETUP_DUE: ['cycleId', 'year', 'departmentId'],
+  BUDGET_BASELINE_VERSION_HEAD_ASSIGNED: ['versionId', 'costCenterId', 'year'],
   // The alerts of the rights (`a03-license-inbox-alerts`): the right, the person, the day and the role asked; never a key, an
   // account identifier, a price or the text of a note.
   LICENSE_EXPIRY_REMINDER: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'audience'],
+  RENEWAL_WINDOW_OPENED: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'opensOn', 'audience'],
   HANDOVER_CONFIRMATION_DUE: HANDOVER,
   HANDOVER_CONFIRMATION_OVERDUE: HANDOVER,
   SERVICE_ACCOUNT_RESPONSIBLE_DUE: ['employeeId', 'fileKind', 'fileId', 'dueOn', 'accountCount'],
@@ -109,6 +124,16 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
     'dueOn',
   ],
   LEAVER_K1_ACCESS_RUNS_ON: ['taskId', 'assignmentId', 'employeeId', 'planId', 'accessUntil'],
+  GHOST_SEAT_G2_DETECTED: ['recommendationId', 'employeeId', 'applicationId'],
+  // Ids and a day only (the interface turns ids into names): the week key makes the notice one a week for each recipient.
+  GHOST_SEAT_NEW: ['recommendationId', 'departmentId', 'weekKey'],
+  GHOST_SEAT_ACTION_TIER: ['recommendationId', 'departmentId', 'weekKey'],
+  GHOST_SEAT_DECISION_OVERDUE: ['recommendationId', 'employeeId', 'applicationId', 'decisionDueOn'],
+  GHOST_SEAT_WAITING_FOR_HEAD: ['recommendationId', 'departmentId'],
+  GHOST_SEAT_RETURNED: ['recommendationId', 'employeeId', 'applicationId'],
+  GHOST_SEAT_EXEMPTION_ENDING: ['recommendationId', 'employeeId', 'applicationId', 'exemptUntil'],
+  REVOCATION_UPCOMING: ['taskId', 'planId', 'applicationId', 'source', 'notBefore'],
+  REVOCATION_CANCELLED: ['planId', 'applicationId', 'source'],
   // The renewal of a subscription: ids, the milestone and where it comes from, the choice and when it is carried out. The
   // usage of the seats is only said to be available or not; no figure of money, no person but the recipient.
   SUBSCRIPTION_RENEWAL_ALERT: [
@@ -129,6 +154,11 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   SUBSCRIPTION_RENEWAL_LATE: ['renewalId', 'subscriptionId', 'baseDate'],
   SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate'],
   SUBSCRIPTION_EXPIRY_MARKED: ['subscriptionId', 'baseDate', 'endDate'],
+  // What the person is told before the usage of an application they hold is written (`US-08-05` AC-2): the application by id (the interface turns it into a name), what counts as activity,
+  // the kinds of data, why, how long the usage is kept, and where to read it. Words and one number; never a name or a figure of money.
+  USAGE_TRACKING_NOTICE: ['applicationId', 'activityDefinition', 'dataKinds', 'purpose', 'retentionMonths', 'viewPath'],
+  // The application by id (the interface turns it into a name: no key may be a name), the source by its label, the last day the source covers and how old it is: words and days, no person.
+  USAGE_SOURCE_STALE: ['applicationId', 'source', 'coverageTo', 'freshnessDays'],
 };
 
 /** Whether the code is one of the closed table. */

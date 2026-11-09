@@ -26,6 +26,8 @@ export interface GrantInput {
   responsibleEmployeeId?: string;
   /** The person of a request for a group this grant is for; a request for one person has none to name. */
   beneficiaryEmployeeId?: string;
+  /** Record a purchase with the grant when the pool of the plan has nothing free (`BR-MF1-09b`). */
+  purchase?: { reason?: string };
 }
 
 /**
@@ -67,8 +69,6 @@ export class ProvisioningGrantPlanner {
     // The most tries are fixed here: a parameter changed later reaches only the tasks made after it (US-01-04 AC-13).
     const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT')));
 
-    const fiscalYearStartMonth = Number(await this.parameters.getValue('FISCAL_YEAR_START_MONTH'));
-
-    return { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts, fiscalYearStartMonth };
+    return { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts };
   }
 }

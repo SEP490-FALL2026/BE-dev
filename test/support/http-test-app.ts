@@ -137,6 +137,8 @@ export async function seedInstallation(app: INestApplication): Promise<SeededIns
       code: 'P-OPS',
       name: 'Operations',
     });
+    // It has existed since long ago: suites that move the clock back must still find it in effect (`QĐ-104e(3)`).
+    await tx.department.update({ where: { id: department.id }, data: { effectiveFrom: new Date('2020-01-01') } });
     await organization.createUnitCostCenter(tx, {
       organizationId: org.id,
       code: 'CC-1',

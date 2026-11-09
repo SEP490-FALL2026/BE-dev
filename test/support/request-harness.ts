@@ -1,11 +1,11 @@
 import type { AssessmentWire } from '../../src/modules/requests/assessment/assessment.dto';
 import type { PreviewWire } from '../../src/modules/requests/request-submission/request-preview.dto';
 import request from 'supertest';
+import { addDays } from '../../src/core/business-date';
+import { addMonths } from '../../src/core/fiscal-year';
 import { ApiAccount } from './api-accounts';
-import { declareSubscription } from './builders/catalog.builder';
 import { clearSpendingApprover, insertEmployeeWithoutPlacement, setSpendingApprover } from './builders/account.builder';
 import { assignHead } from './builders/organization.builder';
-import { OwnedSubscriptions } from './owned-subscriptions';
 import { ProvisioningHarness } from './provisioning-harness';
 import { SeatHarness } from './seat-baseline-harness';
 
@@ -17,6 +17,8 @@ export interface EmployeeRefWire {
 
 export interface AccessRequestWire {
   id: string;
+  routing: { mode: 'VIA_HEAD' | 'ONE_STEP'; oneStepReason: string | null };
+  spend: { stage: string; blockedReasons: string[]; overBy: { amount: string; currency: string } | null } | null;
   type: string;
   branch: 'INTERNAL_FREE' | 'PAID_IN_CATALOG' | 'NEW_SOFTWARE';
   state:
@@ -28,6 +30,7 @@ export interface AccessRequestWire {
     | 'AWAITING_FINANCE_REVIEW'
     | 'AWAITING_BUDGET'
     | 'AWAITING_SPEND_DECISION'
+    | 'AWAITING_REQUESTER_REVISION'
     | 'REJECTED'
     | 'IT_REJECTED'
     | 'EXECUTING'
@@ -46,8 +49,8 @@ export interface AccessRequestWire {
   requester: EmployeeRefWire;
   beneficiary: EmployeeRefWire;
   businessReason: string;
-  termMonths: number;
-  expectedSpendOn: string | null;
+  termMonths: number | null;
+  expectedEndDate: string | null;
   budgetYear: number | null;
   pricing: {
     status: 'NOT_APPLICABLE' | 'PRICED' | 'MISSING';
@@ -55,10 +58,10 @@ export interface AccessRequestWire {
     amount: { amount: string; currency: string } | null;
     unitPrice: { amount: string; currency: string } | null;
     billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null;
-    periodCount: number | null;
-    bindingPeriodCount: number | null;
-    firstDueOn: string | null;
-    lastDueOn: string | null;
+    kind: 'RECURRING' | 'ONE_TIME' | null;
+    months: number | null;
+    monthlyPrice: { amount: string; currency: string } | null;
+    nextYearAmount: { amount: string; currency: string } | null;
   };
   policy: { version: number; hasSpendStep: boolean; slaWorkingDays: number };
   submittedAt: string;
@@ -71,12 +74,12 @@ export interface AccessRequestWire {
   } | null;
   needStep: {
     id: string;
-    state: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED';
+    state: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED' | 'CLOSED';
     assignee: EmployeeRefWire | null;
     routingRow: number;
     waitingReason: string | null;
-    samePersonAsSpend: boolean;
-    slaWorkingDays: number;
+    samePersonAsSpend?: boolean;
+    slaWorkingDays: number | null;
     createdAt: string;
     assignedAt: string | null;
     decidedAt: string | null;
@@ -102,30 +105,34 @@ export interface Department {
 export class RequestHarness extends ProvisioningHarness {
   private titleName: string | null = null;
 
-  /** A request is priced, and a seat taken, by the subscription of its own department (F38, F20): see owned-subscriptions.ts. */
-  readonly owned = new OwnedSubscriptions((body) => declareSubscription(this.ctx, this.it1.accessToken, body));
-
-  constructor() {
-    super();
-    // A grant of a request made through the harness is made on the subscription its department owns.
-    const grantOnSeeded = this.grant;
-    this.grant = (body: object, account?: ApiAccount) => grantOnSeeded(this.owned.grantBody(body), account);
+  /**
+   * Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. The suites of
+   * other rules send many requests for one person, often for the same plan while the first is still open, so the disposable database of the
+   * suite leaves every request and every line of a group out of GH-1 and GH-2 (BR-MF1-01e/f): a trigger of the test database only marks each
+   * new row with an exemption, the one value the count of the limits skips and nothing else reads. GH-2 (`REQUEST_OPEN_NEW_LIMIT`) is raised to
+   * its most as well. The suites of the limits call `enforceRequestLimits` to judge the limits as the product does.
+   */
+  override async start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
+    await SeatHarness.prototype.start.call(this, options);
+    await this.setParameter('REQUEST_OPEN_NEW_LIMIT', 20).expect(200);
+    await this.ctx.sql.query(`
+      CREATE OR REPLACE FUNCTION test_harness_exempt_from_request_limits() RETURNS trigger AS $$
+      BEGIN
+        IF NEW.limit_exemption IS NULL THEN NEW.limit_exemption := 'TRANSFER_OVERLAP'; END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql`);
+    for (const table of ['access_requests', 'access_request_lines']) {
+      await this.ctx.sql.query(`CREATE TRIGGER test_harness_exempt_from_request_limits BEFORE INSERT ON ${table}
+        FOR EACH ROW EXECUTE FUNCTION test_harness_exempt_from_request_limits()`);
+    }
   }
 
-  override async subscription(
-    quantity: number | null = 100,
-    type: 'K1' | 'K2' | 'K4' = 'K2',
-    ownerDepartmentId: string = this.seed.departmentId,
-  ): Promise<string> {
-    const id = await super.subscription(quantity, type, ownerDepartmentId);
-    if (ownerDepartmentId === this.seed.departmentId) await this.owned.recordSeed(id, await this.planOf(id), quantity);
-
-    return id;
-  }
-
-  /** Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. */
-  override start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
-    return SeatHarness.prototype.start.call(this, options);
+  /** Judges GH-1, GH-2 and GH-3 as the product does: the exemption of `start` is no longer written on new rows. */
+  async enforceRequestLimits(): Promise<void> {
+    for (const table of ['access_requests', 'access_request_lines']) {
+      await this.ctx.sql.query(`DROP TRIGGER IF EXISTS test_harness_exempt_from_request_limits ON ${table}`);
+    }
   }
 
   /** One job title (free text) for everybody a spec makes. */
@@ -135,10 +142,9 @@ export class RequestHarness extends ProvisioningHarness {
     return this.titleName;
   }
 
-  /** A department with its own Unit Cost Center, and a subscription of every plan the seeded department holds. */
+  /** A department with its own Unit Cost Center. The seats of a plan are one pool for every department (`BR-MF1-09`): it owns no subscription. */
   async departmentWithUnit(code: string): Promise<Department> {
     const created = await this.department(code);
-    await this.owned.give(created.id);
     // The Cost Center Finance created for the department, read through its own link (`QĐ-87d(1)`).
     const { rows } = await this.ctx.sql.query<{ id: string }>(
       `SELECT id FROM cost_centers WHERE department_id = $1 AND status = 'ACTIVE'`,
@@ -190,13 +196,7 @@ export class RequestHarness extends ProvisioningHarness {
   }
 
   submit = (body: object, account: ApiAccount) =>
-    request(this.server()).post('/api/v1/access-requests').set(this.as(account)).send(body);
-  /** Notes the department of a request made through `sent` and `proposed`, so that the seat it takes is on the subscription the department owns (F20). */
-  private remember(wire: AccessRequestWire): AccessRequestWire {
-    this.owned.noteRequest(wire.id, wire.department.id);
-
-    return wire;
-  }
+    request(this.server()).post('/api/v1/access-requests').set(this.as(account)).send(this.endDated(body));
 
   /** The decision of the need step: the head approves or refuses, and no line of the plan is chosen (`QĐ-101n`). */
   decide = (id: string, body: object, account: ApiAccount) =>
@@ -205,11 +205,11 @@ export class RequestHarness extends ProvisioningHarness {
     request(this.server()).get(`/api/v1/access-requests/${id}`).set(this.as(account));
 
   previewRequest = (body: object, account: ApiAccount) =>
-    request(this.server()).post('/api/v1/access-requests/preview').set(this.as(account)).send(body);
+    request(this.server()).post('/api/v1/access-requests/preview').set(this.as(account)).send(this.endDated(body));
 
   /** The preview of a request for the plan, failing on anything but 200. */
   async previewed(person: Person, planId: string, extra: Record<string, unknown> = {}): Promise<PreviewWire> {
-    const response = await this.previewRequest({ planId, termMonths: 6, ...extra }, person.account);
+    const response = await this.previewRequest({ planId, ...this.endDated(extra) }, person.account);
     if (response.status !== 200) throw new Error(`preview: ${response.status} ${JSON.stringify(response.body)}`);
 
     return this.dataOf<{ preview: PreviewWire }>(response).preview;
@@ -222,18 +222,17 @@ export class RequestHarness extends ProvisioningHarness {
     purpose: 'Whiteboards for design reviews',
     dataDescription: 'Product design boards',
     expectedUsers: 5,
-    termMonths: 6,
-    ...extra,
+    ...this.endDated(extra),
   });
   propose = (body: object, account: ApiAccount) =>
-    request(this.server()).post('/api/v1/access-requests/proposals').set(this.as(account)).send(body);
+    request(this.server()).post('/api/v1/access-requests/proposals').set(this.as(account)).send(this.endDated(body));
 
   /** Sends the proposal and returns the request, failing on anything but 201. */
   async proposed(person: Person, extra: Record<string, unknown> = {}): Promise<AccessRequestWire> {
     const response = await this.propose(this.proposeBody(extra), person.account);
     if (response.status !== 201) throw new Error(`propose: ${response.status} ${JSON.stringify(response.body)}`);
 
-    return this.remember(this.dataOf<{ request: AccessRequestWire }>(response).request);
+    return this.dataOf<{ request: AccessRequestWire }>(response).request;
   }
 
   assessmentOf = (id: string, account: ApiAccount) =>
@@ -273,8 +272,6 @@ export class RequestHarness extends ProvisioningHarness {
       billingCycle: 'MONTHLY',
       validFrom: '2026-01-01',
       validUntil: null,
-      commitmentMonths: 6,
-      paymentFrequency: 'MONTHLY',
     },
     ...extra,
   });
@@ -304,12 +301,26 @@ export class RequestHarness extends ProvisioningHarness {
       .set(this.as(this.finance))
       .send({ group: 'T2', lines });
 
-  /** A form of `BM-01` for the plan, complete. */
+  /**
+   * A test that still says how long in months, said in the way the API takes it: the last day of the `termMonths`th month from the month
+   * of today (`QĐ-104a`; the month of today and the month of the end are counted whole, `BR-MF1-06`). No `termMonths` is no end date.
+   */
+  endDated = <T extends object>(extra: T): Record<string, unknown> => {
+    const { termMonths, ...rest } = extra as Record<string, unknown>;
+
+    return typeof termMonths === 'number'
+      ? { ...rest, expectedEndDate: addDays(addMonths(`${this.today().slice(0, 8)}01`, termMonths), -1) }
+      : rest;
+  };
+
+  /** The months of the amount of a request that runs `months` months from the month of today: the months left of the year at most (`BR-MF1-06`). */
+  monthsOf = (months: number): number => Math.min(months, 12 - Number(this.today().slice(5, 7)) + 1);
+
+  /** A form of `BM-01` for the plan, complete: a right with no end unless `extra` gives an end date or `termMonths`. */
   form = (planId: string, extra: Record<string, unknown> = {}) => ({
     planId,
     businessReason: 'Design the new brand',
-    termMonths: 6,
-    ...extra,
+    ...this.endDated(extra),
   });
 
   /** Sends the request and returns it, failing on anything but 201. */
@@ -317,7 +328,7 @@ export class RequestHarness extends ProvisioningHarness {
     const response = await this.submit(this.form(planId, extra), person.account);
     if (response.status !== 201) throw new Error(`submit: ${response.status} ${JSON.stringify(response.body)}`);
 
-    return this.remember(this.dataOf<{ request: AccessRequestWire }>(response).request);
+    return this.dataOf<{ request: AccessRequestWire }>(response).request;
   }
 
   /** The plans' applications share one functional group, made now. */

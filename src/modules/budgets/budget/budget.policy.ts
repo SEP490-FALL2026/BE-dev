@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
+import type { LineType, ZbbExplanation } from './budget-line-zbb.json';
 
 /**
  * The rules of budget proposals and versions (`US-06-09`, `US-06-10`), as pure decisions: what a line must say, which
@@ -16,8 +17,27 @@ export const LINE_DESCRIPTION_MAX = 200;
  * Whether a fiscal year still takes a proposal or a version: the year that is running and the years to come do, a year
  * that has ended does not (`US-06-10` AC-9, `US-06-09` AC-11).
  */
-export const yearIsOpen = (year: number, today: BusinessDate, fiscalYearStartMonth: number): boolean =>
-  year >= fiscalYearOf(today, fiscalYearStartMonth);
+export const yearIsOpen = (year: number, today: BusinessDate): boolean => year >= fiscalYearOf(today);
+
+/**
+ * Whether a line is a saving that is shown and not counted: a `CANCEL` line gives up spend, so its amount is never added to the total of
+ * the proposal, the package or the ceiling check (`QĐ-109c`, C4-16).
+ */
+export const isNotCounted = (line: { lineType: LineType }): boolean => line.lineType === 'CANCEL';
+
+/**
+ * The over-the-ceiling flag a version line shows (`AC-20`, `QĐ-109c`): the part of the proposal line it adjusts that carried the proposal
+ * over the published ceiling (the B3 flag), while the line is still that proposal line. A line Finance changed (it carries an
+ * `adjustmentReason`) or made a `CANCEL` (never added, never flagged) shows none: the flag was about what the head proposed.
+ */
+export const versionLineOverCeiling = (
+  line: { lineType: LineType; adjustmentReason: string | null },
+  proposalOverMinor: bigint | null,
+): bigint | null => (isNotCounted(line) || line.adjustmentReason !== null ? null : proposalOverMinor);
+
+/** The sum a proposal is worth: every line but the `CANCEL` ones (`QĐ-109c`). */
+export const countedTotalOf = (lines: readonly { lineType: LineType; amountMinor: bigint }[]): bigint =>
+  lines.reduce((sum, line) => (isNotCounted(line) ? sum : sum + line.amountMinor), 0n);
 
 export const totalOf = (lines: readonly { amountMinor: bigint }[]): bigint =>
   lines.reduce((sum, line) => sum + line.amountMinor, 0n);
@@ -106,8 +126,7 @@ export function versionWaitingReason(
 }
 
 /** Whether the fiscal year has ended, so that nothing of it is written any more (`QĐ-91c`, `US-06-09` AC-11, `US-06-10` AC-9). */
-export const yearHasEnded = (year: number, today: BusinessDate, fiscalYearStartMonth: number): boolean =>
-  !yearIsOpen(year, today, fiscalYearStartMonth);
+export const yearHasEnded = (year: number, today: BusinessDate): boolean => !yearIsOpen(year, today);
 
 /**
  * What a version becomes when its fiscal year ends (`QĐ-91c`, `QĐ-91e`): the current one stays as the reference budget of the
@@ -193,6 +212,7 @@ export interface LineFields {
   planId: string | null;
   seats: number | null;
   amountMinor: bigint;
+  lineType: LineType;
 }
 
 const ADJUSTABLE_FIELDS = [
@@ -200,6 +220,7 @@ const ADJUSTABLE_FIELDS = [
   'planId',
   'seats',
   'amountMinor',
+  'lineType',
 ] as const satisfies readonly (keyof LineFields)[];
 
 /** Whether the patch changes what the line of the proposal said: its words, its money, its window, its service or its cycle. */
@@ -214,6 +235,9 @@ export function copiedLineOf(
     planId: string | null;
     seats: number | null;
     amountMinor: bigint;
+    lineType: LineType;
+    zbb: ZbbExplanation | null;
+    priorityRank: number | null;
   },
   origin: { proposalId: string | null; proposalPosition: number | null },
 ) {
@@ -226,6 +250,9 @@ export function copiedLineOf(
     amountMinor: line.amountMinor,
     financeComment: null,
     adjustmentReason: null,
+    lineType: line.lineType,
+    zbb: line.zbb,
+    priorityRank: line.priorityRank,
   };
 }
 
@@ -257,3 +284,39 @@ export const reserveReasonMissing = (version: {
   version.reservePercent !== null &&
   version.reserveMinor !== defaultReserveOf(version.baseMinor, version.reservePercent) &&
   !version.reserveReason;
+
+/** A version as the annual check reads it. */
+export interface CountedVersion {
+  id: string;
+  costCenterId: string;
+  number: number;
+  baseMinor: bigint;
+  reserveMinor: bigint;
+  currency: string;
+}
+
+/**
+ * The versions the annual check adds up (`R-I06`, `QĐ-103i`): the newest of each Cost Center among those sent, asked for changes or
+ * approved (the caller reads only those), and the one being sent in the place of its own Cost Center's. A version in another currency
+ * than the cycle is not added up with the others: it is named.
+ */
+export function annualCheck(input: {
+  cycleCurrency: string;
+  availableMinor: bigint;
+  counted: readonly CountedVersion[];
+  sending: CountedVersion;
+}): { kind: 'OK'; totalMinor: bigint } | { kind: 'OVER'; gapMinor: bigint } | { kind: 'CURRENCY'; currency: string } {
+  const newest = new Map<string, CountedVersion>();
+  for (const version of input.counted) {
+    const kept = newest.get(version.costCenterId);
+    if (kept === undefined || version.number > kept.number) newest.set(version.costCenterId, version);
+  }
+  newest.set(input.sending.costCenterId, input.sending);
+  const mismatched = [...newest.values()].find((version) => version.currency !== input.cycleCurrency);
+  if (mismatched) return { kind: 'CURRENCY', currency: mismatched.currency };
+  const total = [...newest.values()].reduce((sum, version) => sum + version.baseMinor + version.reserveMinor, 0n);
+
+  return total > input.availableMinor
+    ? { kind: 'OVER', gapMinor: total - input.availableMinor }
+    : { kind: 'OK', totalMinor: total };
+}

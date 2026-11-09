@@ -3,6 +3,7 @@ import request from 'supertest';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { AccessRequestRepo } from '../../src/modules/requests/access-request/access-request.repo';
+import { FrozenAmounts } from './frozen-amounts';
 import type { CheckTrigger } from '../../src/modules/requests/spend/budget-check.repo';
 import { SpendRoutingService, type RoutingOutcome } from '../../src/modules/requests/spend/spend-routing.service';
 import type { ApiAccount } from './api-accounts';
@@ -18,14 +19,12 @@ export interface Unit {
   member: Person;
 }
 
-/** What a request that costs money says of its payments, written over the request the real routes made. */
+/** What a request that costs money says of its amount, written over the request the real routes made (one amount for one year, `QĐ-109`). */
 export interface PaidSpec {
-  /** One payment in this year, on `dueOn` or on the 15th of June. Ignored when `schedule` is given. */
+  /** The amount of the request, in minor units. */
   amount?: number;
+  /** The year the amount is counted in. */
   year?: number;
-  dueOn?: string;
-  /** Every payment of the request, and whether it binds the company. */
-  schedule?: Array<{ dueOn: string; amount: number; year: number; binding?: boolean }>;
   currency?: string;
 }
 
@@ -34,6 +33,8 @@ export interface BudgetSpec {
   year?: number;
   /** The lines of the plan; one line of the last month of the year when not given. */
   lines?: object[];
+  /** The reserve of the version, on top of the base `total`; none when not given (BR-MF1-06e). */
+  reserve?: number;
   /** What the attached commitments hold, and what has become an expense. */
   held?: number;
   spent?: number;
@@ -45,7 +46,6 @@ export interface StepRow {
   assignee_employee_id: string | null;
   waiting_reason: string | null;
   same_person_as_spend: boolean;
-  no_independent_review: boolean;
 }
 
 export interface Page<T> {
@@ -54,7 +54,7 @@ export interface Page<T> {
 }
 
 /**
- * The harness of the check of the budget and the review of Finance: requests that cost money made through the real routes
+ * The harness of the check of the budget: requests that cost money made through the real routes
  * and then given the payments a test needs, budgets approved through the real decision, and the check run as the submission
  * will run it (the lock, the transaction, the routing). No assertion lives here: the specs make them.
  */
@@ -123,27 +123,29 @@ export class SpendHarness extends BudgetHarness {
     return sent.id;
   }
 
-  /** Writes the payments of a request over what the real routes made of it. */
+  /**
+   * Writes the amount of a request over what the real routes made of it, and keeps it: every check of the budget works the amount out
+   * again for its day (`QĐ-109e`), which a suite about the check cannot have, since it says what the amount is. The repricing has
+   * its own suite (`request-amount-term.integration-spec.ts`); `thawAmounts` gives it back to a test that wants it.
+   */
   async setPayments(requestId: string, spec: PaidSpec): Promise<void> {
     const year = spec.year ?? this.year;
-    const schedule = spec.schedule ?? [
-      { dueOn: spec.dueOn ?? `${year}-06-15`, amount: spec.amount ?? 1_000_000, year, binding: true },
-    ];
-    const periods = schedule.map((period) => ({
-      dueOn: period.dueOn,
-      amountMinor: String(period.amount),
-      budgetYear: period.year,
-      binding: period.binding ?? true,
-    }));
-    const total = schedule.reduce((sum, period) => sum + period.amount, 0);
     await this.ctx.sql.query(
       `UPDATE access_requests
-          SET amount_minor = $2, amount_currency = $3, payment_schedule = $4::jsonb, budget_year = $5, expected_spend_on = $6,
+          SET amount_minor = $2, amount_currency = $3, budget_year = $4,
               pricing_status = 'PRICED', price_missing_reason = NULL,
               unit_price_minor = COALESCE(unit_price_minor, 1000000), billing_cycle = COALESCE(billing_cycle, 'MONTHLY')
         WHERE id = $1`,
-      [requestId, total, spec.currency ?? this.reporting, JSON.stringify(periods), schedule[0].year, schedule[0].dueOn],
+      [requestId, spec.amount ?? 1_000_000, spec.currency ?? this.reporting, year],
     );
+    this.frozen.freeze(this.ctx.app, requestId);
+  }
+
+  private readonly frozen = new FrozenAmounts();
+
+  /** The requests whose amount a test wrote are priced by the real rule again from now on. */
+  thawAmounts(): void {
+    this.frozen.thaw();
   }
 
   /**
@@ -160,8 +162,8 @@ export class SpendHarness extends BudgetHarness {
       proposal: this.proposalBody(unit.department.unitId, spec.lines ?? [this.line()], year),
       version: {
         base: this.money(spec.total),
-        reserve: this.money(0),
-        reserveReason: 'The budget of the test keeps no reserve',
+        reserve: this.money(spec.reserve ?? 0),
+        reserveReason: 'The budget of the test keeps the reserve the spec gives it',
       },
     });
     if (spec.held) await this.commit(unit, version.id, year, spec.held, 'HELD');
@@ -255,7 +257,7 @@ export class SpendHarness extends BudgetHarness {
   async steps(requestId: string, kind: string): Promise<StepRow[]> {
     return (
       await this.ctx.sql.query<StepRow>(
-        `SELECT state, assignee_employee_id, waiting_reason, same_person_as_spend, no_independent_review
+        `SELECT state, assignee_employee_id, waiting_reason, same_person_as_spend
            FROM access_request_steps WHERE request_id = $1 AND kind = $2::"AccessRequestStepKind" ORDER BY sequence`,
         [requestId, kind],
       )
@@ -264,8 +266,18 @@ export class SpendHarness extends BudgetHarness {
 
   spendQueue = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/spend-queue').query(query).set(this.as(account));
-  sendOn = (requestIds: string[], account: ApiAccount) =>
-    request(this.server()).post('/api/v1/spend-batches').set(this.as(account)).send({ requestIds });
+  sendOn = (
+    requestIds: string[],
+    account: ApiAccount,
+    reserveConfirmations?: { requestId: string; reason: string }[],
+  ) =>
+    request(this.server())
+      .post('/api/v1/spend-batches')
+      .set(this.as(account))
+      .send(reserveConfirmations ? { requestIds, reserveConfirmations } : { requestIds });
+  /** The head confirms, with a line of reason, that a request uses the reserve (`spendReserveConfirm`). */
+  confirmReserve = (id: string, body: object, account: ApiAccount) =>
+    request(this.server()).post(`/api/v1/access-requests/${id}/reserve-confirmation`).set(this.as(account)).send(body);
   batchList = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/spend-batches').query(query).set(this.as(account));
   batchOf = (id: string, account: ApiAccount) =>
@@ -306,8 +318,7 @@ export class SpendHarness extends BudgetHarness {
         planId,
         lines: people.map((person) => ({ employeeId: person.employeeId })),
         businessReason: 'The new designers need the tool',
-        termMonths: 1,
-        ...extra,
+        ...this.endDated({ termMonths: 1, ...extra }),
       });
   }
 
@@ -331,20 +342,6 @@ export class SpendHarness extends BudgetHarness {
     request(this.server()).post(`/api/v1/budget-commitments/${id}/release`).set(this.as(account)).send(body);
   commitmentReleases = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/budget-commitments/${id}/releases`).set(this.as(account));
-  askFinance = (id: string, body: object, account: ApiAccount) =>
-    request(this.server())
-      .post(`/api/v1/access-requests/${id}/budget-information-requests`)
-      .set(this.as(account))
-      .send(body);
-  questionsOf = (id: string, account: ApiAccount, query: Record<string, string | number> = {}) =>
-    request(this.server())
-      .get(`/api/v1/access-requests/${id}/budget-information-requests`)
-      .query(query)
-      .set(this.as(account));
-  questions = (account: ApiAccount, query: Record<string, string | number> = {}) =>
-    request(this.server()).get('/api/v1/budget-information-requests').query(query).set(this.as(account));
-  answerQuestion = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/budget-information-requests/${id}/answer`).set(this.as(account)).send(body);
   decideBatch = (batchId: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/spend-batches/${batchId}/decisions`).set(this.as(account)).send(body);
 
@@ -358,10 +355,6 @@ export class SpendHarness extends BudgetHarness {
 
   commitmentList = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/budget-commitments').query(query).set(this.as(account));
-  reviewQueue = (account: ApiAccount, query: Record<string, string | number> = {}) =>
-    request(this.server()).get('/api/v1/finance-reviews').query(query).set(this.as(account));
-  reviewOf = (id: string, account: ApiAccount) =>
-    request(this.server()).get(`/api/v1/access-requests/${id}/finance-review`).set(this.as(account));
   /**
    * Holds the row of the request in another connection and sends the calls one by one: each is waiting for the lock before the next is
    * sent (`waitForLockWaiters`), the lock then goes to them in the order they queued, so the answer of each is the answer of its place.
@@ -390,8 +383,6 @@ export class SpendHarness extends BudgetHarness {
     }
   }
 
-  completeReview = (id: string, body: object, account: ApiAccount = this.finance) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/finance-review`).set(this.as(account)).send(body);
   checkOf = (id: string, account: ApiAccount = this.finance) =>
     request(this.server()).get(`/api/v1/access-requests/${id}/budget-check`).set(this.as(account));
   checkYears = (id: string, account: ApiAccount = this.finance, query: Record<string, string | number> = {}) =>

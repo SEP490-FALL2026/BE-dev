@@ -1,5 +1,3 @@
-import type { PaymentPeriod } from '../access-request/pricing.policy';
-
 /**
  * How the money of a request for a group is divided among its people (`US-05-17` AC-9, AC-10), as pure calculations in whole
  * minor units: a commitment is one for each year, the share of a person is a part of it, and what is given back when one
@@ -33,24 +31,14 @@ export function sharesOf(costs: readonly YearShare[], people: number, index: num
 }
 
 /**
- * The payments of a request made for `priced` people, as they are for `scoped` of them: every payment is the unit price times
- * the people, so it divides exactly, and a schedule that does not divide is a schedule that was not made for those people.
- * Returns null then.
+ * The amount of a request made for `priced` people, as it is for `scoped` of them (`QĐ-109`): the same share of it, rounded up to a whole
+ * minor unit (TẠM CHỌN: a price that does not divide is paid in full, as in `R-B01`). Null for no people or for more than it was made for.
  */
-export function scaleSchedule(
-  schedule: readonly PaymentPeriod[],
-  priced: number,
-  scoped: number,
-): PaymentPeriod[] | null {
+export function scaleAmount(amountMinor: bigint, priced: number, scoped: number): bigint | null {
   if (priced < 1 || scoped < 1 || scoped > priced) return null;
-  const scaled: PaymentPeriod[] = [];
-  for (const period of schedule) {
-    const product = period.amountMinor * BigInt(scoped);
-    if (product % BigInt(priced) !== 0n) return null;
-    scaled.push({ ...period, amountMinor: product / BigInt(priced) });
-  }
+  const divisor = BigInt(priced);
 
-  return scaled;
+  return (amountMinor * BigInt(scoped) + divisor - 1n) / divisor;
 }
 
 /** The shares that go back when a person is withdrawn: all they hold that was not yet given back. */
@@ -63,23 +51,17 @@ export function shareToRelease<T extends { releasedAt: Date | null; budgetYear: 
 }
 
 /**
- * What the request costs once `approved` of the `priced` people are left: the schedule scaled to them and its periods added up in the
- * currency of the price; null when everybody is approved, when there is no price or schedule, or when the schedule does not divide.
+ * What the request costs once `approved` of the `priced` people are left, in the currency of the price; null when everybody is approved,
+ * when there is no amount, or when no people are left.
  */
 export function scaledPricing(
-  pricing: { amount: { amountMinor: bigint; currency: string } | null; schedule: readonly PaymentPeriod[] | null },
+  pricing: { amount: { amountMinor: bigint; currency: string } | null },
   priced: number,
   approved: number,
-): { amount: { amountMinor: bigint; currency: string }; schedule: PaymentPeriod[] } | null {
-  if (pricing.schedule === null || pricing.amount === null || approved === priced) return null;
-  const scaled = scaleSchedule(pricing.schedule, priced, approved);
+): { amount: { amountMinor: bigint; currency: string } } | null {
+  if (pricing.amount === null || approved === priced) return null;
+  const scaled = scaleAmount(pricing.amount.amountMinor, priced, approved);
   if (scaled === null) return null;
 
-  return {
-    amount: {
-      amountMinor: scaled.reduce((sum, period) => sum + period.amountMinor, 0n),
-      currency: pricing.amount.currency,
-    },
-    schedule: scaled,
-  };
+  return { amount: { amountMinor: scaled, currency: pricing.amount.currency } };
 }

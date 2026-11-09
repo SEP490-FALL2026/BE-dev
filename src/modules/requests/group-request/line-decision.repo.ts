@@ -32,9 +32,13 @@ export class LineDecisionRepo {
 
   /** The decisions taken for the people of a request, at most one for each person and stage. */
   async of(requestId: string, tx?: DbTx): Promise<LineDecisionRecord[]> {
-    return (tx ?? this.prisma).accessRequestLineDecision.findMany({
+    const rows = await (tx ?? this.prisma).accessRequestLineDecision.findMany({
       where: { requestId },
       orderBy: [{ employeeId: 'asc' }, { stage: 'asc' }],
     });
+    return rows.map((row) => ({
+      ...row,
+      deciderRole: row.deciderRole === 'MANAGER' ? 'MANAGER' : 'SPENDING_APPROVER',
+    }));
   }
 }

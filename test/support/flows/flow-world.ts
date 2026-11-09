@@ -1,3 +1,5 @@
+import { DecisionFollowUpService } from '../../../src/modules/optimization/decision/decision-follow-up.service';
+import { InternalRulesService } from '../../../src/modules/optimization/internal-rules/internal-rules.service';
 import { RequestStatusProjection } from '../../../src/modules/requests/status/request-status-projector.service';
 import { ExpiryReminderService } from '../../../src/modules/licensing/expiry/expiry-reminder.service';
 import { businessDateAt } from '../../../src/core/business-date';
@@ -50,6 +52,7 @@ export class FlowWorld {
         providerOverrides: [...SWEEPER_OVERRIDES, { token: OBJECT_STORAGE, useValue: storage }],
       });
       const world = new FlowWorld(ctx, database, clock, storage);
+      await world.exemptFromRequestLimits();
       world.registerPasses();
 
       return world;
@@ -58,6 +61,33 @@ export class FlowWorld {
       clock.stop();
       await dropDisposableDatabase(database);
       throw error;
+    }
+  }
+
+  /**
+   * The journeys send requests for people of the dataset who already have one open for the same plan; GH-1 and GH-2 (BR-MF1-01) are
+   * judged by their own suite (`request-limits.integration-spec.ts`). The copy of the template marks the requests of the dataset and every
+   * new one with an exemption, the one value the count of the limits skips and nothing else reads, as the request harness does.
+   */
+  private async exemptFromRequestLimits(): Promise<void> {
+    await this.ctx.sql.query(`
+      CREATE OR REPLACE FUNCTION test_harness_exempt_from_request_limits() RETURNS trigger AS $$
+      BEGIN
+        IF NEW.limit_exemption IS NULL THEN NEW.limit_exemption := 'TRANSFER_OVERLAP'; END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql`);
+    // A line that has ended is never changed (trigger of `access_request_lines`), and an ended one counts for no limit anyway.
+    const open: Record<string, string> = {
+      access_requests: '',
+      access_request_lines: ` AND state NOT IN ('NEED_REJECTED', 'SPEND_REJECTED', 'COMPLETED', 'FAILED', 'WITHDRAWN', 'DROPPED')`,
+    };
+    for (const table of ['access_requests', 'access_request_lines']) {
+      await this.ctx.sql.query(
+        `UPDATE ${table} SET limit_exemption = 'TRANSFER_OVERLAP' WHERE limit_exemption IS NULL${open[table]}`,
+      );
+      await this.ctx.sql.query(`CREATE TRIGGER test_harness_exempt_from_request_limits BEFORE INSERT ON ${table}
+        FOR EACH ROW EXECUTE FUNCTION test_harness_exempt_from_request_limits()`);
     }
   }
 
@@ -83,5 +113,12 @@ export class FlowWorld {
       get(OrganizationChangeService).announceDue(businessDateAt(now, 'Asia/Ho_Chi_Minh')),
     );
     this.clock.register('transferReview', (now) => get(TransferReviewOverdueService).noticeOverdue(now));
+    // MF-5: the daily rules of G1/G2 and the follow-up of the queue of the heads (routing, pause, overdue, exemptions).
+    this.clock.register('ghostSeatRules', async (now) => {
+      await get(InternalRulesService).run(now);
+    });
+    this.clock.register('ghostSeatQueue', async (now) => {
+      await get(DecisionFollowUpService).run(now);
+    });
   }
 }

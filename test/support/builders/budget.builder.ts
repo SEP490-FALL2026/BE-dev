@@ -23,16 +23,34 @@ export interface ApprovedBudgetInput {
   version: Record<string, unknown>;
 }
 
+/** A proposal body whose lines have the kind and the priority rank the form requires (`QT 4.4`), by their place when the suite gives none. */
+function withKindAndRank(proposal: object): object {
+  const { lines } = proposal as { lines?: object[] };
+
+  return lines
+    ? { ...proposal, lines: lines.map((line, index) => ({ lineType: 'RENEW', priorityRank: index + 1, ...line })) }
+    : proposal;
+}
+
 /** Proposed, built, sent and approved; the version as `POST /budget-versions` answers it. */
 export async function approvedBudget<T>(ctx: HttpTestApp, input: ApprovedBudgetInput): Promise<T> {
   const proposal = await ctx.app
     .get(ProposalService, { strict: false })
-    .submit(await principalOf(ctx, input.headToken), BudgetProposalBodyDto.create(sent(input.proposal)));
+    .submit(
+      await principalOf(ctx, input.headToken),
+      BudgetProposalBodyDto.create(sent(withKindAndRank(input.proposal))),
+    );
   const versions = ctx.app.get(VersionService, { strict: false });
   const finance = await principalOf(ctx, input.financeToken);
   const version = await ctx.app
     .get(VersionCreationService, { strict: false })
-    .createFromProposal(finance, VersionBodyDto.create(sent({ proposalId: proposal.id, ...input.version })));
+    .createFromProposal(
+      finance,
+      VersionBodyDto.create(sent({ proposalId: proposal.id, ...input.version })) as Extract<
+        VersionBodyDto,
+        { proposalId: string }
+      >,
+    );
   await versions.send(finance, version.id);
   await ctx.app
     .get(VersionDecisionService, { strict: false })

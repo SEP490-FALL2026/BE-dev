@@ -2,6 +2,7 @@ import { JsonColumnShapeError } from '../../../infrastructure/database/json-colu
 import { requestPolicyJson } from './access-request.json';
 import {
   CURRENT_POLICY_VERSION,
+  canReadRequest,
   canViewRequest,
   chargedCostCenterId,
   mayRequest,
@@ -38,6 +39,59 @@ describe('who may see a request (BM-01: the requester, the people who decide, th
 
   it('lets nobody in through a step nobody holds', () => {
     expect(canViewRequest(person('other'), { ...request, needStepAssigneeEmployeeId: null })).toBe(false);
+  });
+});
+
+describe('who reads a request and its history (FR-3.7, SoD-1, SoD-3, SoD-7)', () => {
+  const facts = {
+    requesterEmployeeId: 'sender',
+    beneficiaryEmployeeIds: ['for-1', 'for-2'],
+    needStepAssigneeEmployeeId: 'head',
+    isGroup: false,
+    departmentId: 'dept-a',
+    actorHeadsDepartmentId: null,
+    spendStepOpened: false,
+    spendApproved: false,
+  };
+  const person = (employeeId: string, ...roles: string[]) => ({ employeeId, roles });
+  const whole = { read: true, onlyLineOf: null };
+
+  it.each([
+    ['the sender', person('sender'), facts],
+    ['the person who holds the need step', person('head', 'MANAGER'), facts],
+    ['an IT Admin', person('it', 'IT_ADMIN'), facts],
+    [
+      'the head today of the department it was sent from',
+      person('h2', 'MANAGER'),
+      { ...facts, actorHeadsDepartmentId: 'dept-a' },
+    ],
+    [
+      'a spending approver once a spend step was opened',
+      person('c1', 'SPENDING_APPROVER'),
+      { ...facts, spendStepOpened: true },
+    ],
+    ['Finance once the spend was approved', person('f1', 'FINANCE'), { ...facts, spendApproved: true }],
+  ])('lets %s read the whole request', (_who, actor, given) => {
+    expect(canReadRequest(actor, given)).toEqual(whole);
+  });
+
+  it.each([
+    ['the head of another department', person('h3', 'MANAGER'), { ...facts, actorHeadsDepartmentId: 'dept-b' }],
+    ['a spending approver before a spend step was opened', person('c1', 'SPENDING_APPROVER'), facts],
+    ['Finance before the spend was approved', person('f1', 'FINANCE'), { ...facts, spendStepOpened: true }],
+    ['a Super Admin, whatever the request (SoD-1)', person('root', 'SUPER_ADMIN'), { ...facts, spendApproved: true }],
+    ['an employee with no part in it', person('other', 'EMPLOYEE'), facts],
+  ])('does not let %s read it', (_who, actor, given) => {
+    expect(canReadRequest(actor, given)).toEqual({ read: false });
+  });
+
+  it('lets a person a request is for read it, and of a request for a group only their own line', () => {
+    expect(canReadRequest(person('for-1'), facts)).toEqual(whole);
+    expect(canReadRequest(person('for-2'), { ...facts, isGroup: true })).toEqual({ read: true, onlyLineOf: 'for-2' });
+  });
+
+  it('gives the whole of a request for a group to a person of it who also reads it in another part', () => {
+    expect(canReadRequest(person('for-1', 'IT_ADMIN'), { ...facts, isGroup: true })).toEqual(whole);
   });
 });
 
@@ -131,14 +185,14 @@ describe('requestPolicyJson (the codec of access_requests.policy)', () => {
     const proposal = proposalPolicy(5);
 
     expect(requestPolicyJson.encode(free)).toEqual({
-      version: 1,
+      version: CURRENT_POLICY_VERSION,
       branch: 'INTERNAL_FREE',
       chain: ['NEED', 'IT_EXECUTION'],
       slaWorkingDays: 2,
     });
-    expect(requestPolicyJson.encode(paid)).toEqual(stored);
+    expect(requestPolicyJson.encode(paid)).toEqual({ ...stored, version: CURRENT_POLICY_VERSION });
     expect(requestPolicyJson.encode(proposal)).toEqual({
-      version: 1,
+      version: CURRENT_POLICY_VERSION,
       branch: 'NEW_SOFTWARE',
       chain: ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION'],
       slaWorkingDays: 5,
@@ -148,4 +202,14 @@ describe('requestPolicyJson (the codec of access_requests.policy)', () => {
       expect(requestPolicyJson.decode(JSON.parse(JSON.stringify(requestPolicyJson.encode(policy))))).toEqual(policy);
     }
   });
+});
+
+describe('BR-MF1-02: one-step policy chains', () => {
+  const routing = { mode: 'ONE_STEP' as const, oneStepReason: 'REQUESTER_IS_HEAD' as const };
+  it('has only IT execution for internal software', () =>
+    expect(policyFor('INTERNAL', 2, routing).chain).toEqual(['IT_EXECUTION']));
+  it('has spend then IT execution for catalog paid software', () =>
+    expect(policyFor('SAAS', 2, routing).chain).toEqual(['SPEND_APPROVAL', 'IT_EXECUTION']));
+  it('keeps assessment then spend for proposed software', () =>
+    expect(proposalPolicy(2, routing).chain).toEqual(['IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION']));
 });

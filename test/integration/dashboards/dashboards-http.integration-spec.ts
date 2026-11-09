@@ -21,6 +21,7 @@ const SECTION_KEYS = {
   itAdmin: [
     'cancellationDeadlines',
     'discrepancies',
+    'ghostSeats',
     'grantTasks',
     'licenseKeys',
     'offboardingHandovers',
@@ -134,7 +135,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
     await request(h.server())
       .post('/api/v1/access-requests/drafts')
       .set(h.as(e1.account))
-      .send({ kind: 'INDIVIDUAL', planId: k5Plan, businessReason: 'Design the new brand', termMonths: 6 })
+      .send({ kind: 'INDIVIDUAL', planId: k5Plan, businessReason: 'Design the new brand' })
       .expect(201);
     await h.sent(des.head, await h.plan('K5'));
   }, 300000);
@@ -144,6 +145,23 @@ describe('role overviews (integration, real PostgreSQL)', () => {
   });
 
   describe('the Employee overview', () => {
+    it('BR-MF1-02/07: counts a request awaiting requester revision as open and removes it only when withdrawn', async () => {
+      const person = await h.employeeIn(des.department, 'D-REVISION');
+      const sent = await h.sent(person, await h.plan('K5'));
+      await h.ctx.sql.query(`UPDATE access_requests SET state = 'AWAITING_REQUESTER_REVISION' WHERE id = $1`, [
+        sent.id,
+      ]);
+
+      expect((await overviewOf(OVERVIEW_PATHS.employee, person.account)).sections.requests).toEqual(
+        countedAs(1, 'meAccessRequestList'),
+      );
+      expect(await h.totalOf('/api/v1/me/access-requests', person.account, { view: 'open' })).toBe(1);
+      await h.withdrawRequest(sent.id, { reason: 'No longer needed' }, person.account).expect(200);
+      expect((await overviewOf(OVERVIEW_PATHS.employee, person.account)).sections.requests).toEqual(
+        countedAs(0, 'meAccessRequestList'),
+      );
+    });
+
     // US-12-15 AC-2: the software held (K1 to K5), the right about to end, the reports and the open requests.
     it('counts the rights and reports of the caller as their own lists show them', async () => {
       const overview = await overviewOf(OVERVIEW_PATHS.employee, e1.account);
@@ -216,7 +234,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       );
       expect(overview.sections.transferReviews.count).toBe(1);
       expect(overview.sections.spending).toEqual(missing('FINANCE_FIGURES_NOT_DELIVERED'));
-      expect(overview.sections.ghostSeats).toEqual(missing('USAGE_DATA_NOT_DELIVERED'));
+      expect(overview.sections.ghostSeats).toEqual(countedAs(0, 'ghostSeatQueueList'));
       expect(overview.sections.needApprovals).toEqual(
         countedAs(await h.totalOf('/api/v1/need-decisions', des.head.account), 'needDecisionList'),
       );
@@ -248,7 +266,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
   });
 
   describe('the IT Admin overview', () => {
-    // US-12-15 AC-4: the work in the IT Admin's charge and the departments in their scope; devices and discrepancies have no source.
+    // US-12-15 AC-4: the work in the IT Admin's charge and the departments in their scope; devices have no source; the discrepancies are the open findings of the vendor usage import.
     it('counts the work of IT1 as the queues show it to IT1', async () => {
       const overview = await overviewOf(OVERVIEW_PATHS.itAdmin, it1);
       const sections = overview.sections;
@@ -270,7 +288,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       expect(sections.offboardingHandovers.count).toBe(1);
       expect(sections.licenseKeys).toEqual(countedAs(2, 'licenseKeyList'));
       expect(sections.unconfirmedDevices).toEqual(missing('DEVICE_REGISTRY_NOT_DELIVERED'));
-      expect(sections.discrepancies).toEqual(missing('USAGE_DATA_NOT_DELIVERED'));
+      expect(sections.discrepancies).toEqual(countedAs(0, 'usageNoAssignmentFindingList'));
       expect(sections.cancellationDeadlines).toMatchObject({
         state: 'AT_SOURCE',
         sourceOperationId: 'subscriptionList',

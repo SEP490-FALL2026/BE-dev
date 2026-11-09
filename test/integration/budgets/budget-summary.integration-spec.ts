@@ -66,6 +66,9 @@ describe('the company-wide budget figures over PostgreSQL (US-12-01)', () => {
       committed: { amount: String(80 * M), currency: h.reporting },
       spent: { amount: '0', currency: h.reporting },
       remaining: { amount: String(70 * M), currency: h.reporting },
+      pendingSpend: { amount: '0', currency: h.reporting },
+      remainingBase: { amount: String(70 * M), currency: h.reporting },
+      remainingWithReserve: { amount: String(70 * M), currency: h.reporting },
       costCenterCount: 2,
       overBudgetCount: 1,
     });
@@ -78,8 +81,8 @@ describe('the company-wide budget figures over PostgreSQL (US-12-01)', () => {
     expect(summary.totals).toEqual({});
   });
 
-  it('turns every other role away', async () => {
-    await h.summary(h.boss.account, { year: h.year }).expect(403);
+  it('BR-MF4-05 admits the spending approver and refuses department heads', async () => {
+    await h.summary(h.boss.account, { year: h.year }).expect(200);
     await h.summary(first.head.account, { year: h.year }).expect(403);
   });
 

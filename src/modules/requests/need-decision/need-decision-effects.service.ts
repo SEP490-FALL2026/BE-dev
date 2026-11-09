@@ -10,7 +10,6 @@ import type { NeedDecisionOutcome } from '../access-request/need-decision.policy
 import { AssessmentStepRepo } from '../assessment/assessment-step.repo';
 import { RequestOutcomeService } from '../outcome/request-outcome.service';
 import { RenewalApplyService } from '../renewal-apply/renewal-apply.service';
-import { SpendEntryService } from '../spend/spend-entry.service';
 
 /**
  * What follows a decision of the need step in the same transaction (`US-05-04`, `US-05-06` AC-2): a refusal ends the request
@@ -24,7 +23,6 @@ export class NeedDecisionEffects {
     private readonly steps: AssessmentStepRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
-    private readonly entry: SpendEntryService,
     private readonly renewals: RenewalApplyService,
     private readonly outcomes: RequestOutcomeService,
   ) {}
@@ -40,14 +38,11 @@ export class NeedDecisionEffects {
     // A refusal ends the request for the person it was for, without a grant.
     if (!approved) await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, decidedAt);
 
-    // A renewal needs nobody to carry it out: approved in full, it is applied here, in the transaction of the decision.
+    // A renewal approved in full is extended by the IT Admin (`BR-MF1-08d`): its task is opened here, in the transaction of the decision.
     if (approved && request.type === 'RENEWAL' && requestState === 'AWAITING_EXECUTION') {
-      await this.renewals.apply(tx, actor, request, decidedAt);
+      await this.renewals.requestExtension(tx, actor, request, decidedAt);
     }
     if (approved && request.branch === 'NEW_SOFTWARE') await this.requestAssessment(tx, actor, request, decidedAt);
-
-    const decided = await this.reread(tx, request.id);
-    if (approved && decided.state === 'AWAITING_SPEND_SUBMISSION') await this.entry.enter(tx, actor, decided);
 
     return this.reread(tx, request.id);
   }

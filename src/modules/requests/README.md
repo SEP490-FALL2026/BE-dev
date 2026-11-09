@@ -36,27 +36,31 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
   `budget_information_requests`.
 - Trạng thái/SLA: `controlled_wait_alerts`, `step_sla_reminders`, `step_sla_reminder_recipients`,
   `congestion_incidents`, `request_status_cursor` (`prisma/models/requests.prisma`).
+- Khoản cam kết 01/01: `year_start_commitment_runs` (dấu chạy của tổ chức và năm, `resume_after_id` = Request cuối lô đã xử lý, số đếm cộng dồn
+  theo lô; migration đánh dấu năm trước năm triển khai đã xong, nên lượt đầu là của năm triển khai, kể cả triển khai sau 01/01).
 
 ## Extension point
 
 - Mở: `RequestOutcomeListeners` (`requests.outcome`, Listeners) — personnel
   `transfer-review/transfer-review-outcome.listener.ts`; phát qua `outcome/request-outcome.service.ts`.
 - Đăng ký vào licensing: `licensing.grant-request-gate` ← `grant/access-request-grant.listener.ts`;
-  `licensing.revocation` ← `return-request/return-revocation.listener.ts`; `licensing.renewal-hold` ←
+  `licensing.revocation` ← `return-request/return-revocation.listener.ts` và `grant/seat-revocation.listener.ts` (G9-02: hoàn tất
+  thu hồi `K1`/`K2` ⟹ giải phóng theo ngày khoản của Request cấp và Request tiếp tục của chuỗi, `grant/seat-release.*`; cấp `K2` muộn
+  ⟹ giải phóng phần trước ngày cấp trong `grant/access-request-grant.listener.ts`); `licensing.renewal-hold` ←
   `renewal-request/renewal-hold.listener.ts`.
 - Đăng ký vào organization: `organization.department-use-readers`, `organization.cost-center-use-readers` ←
   `access-request/open-request/*-open-requests.listener.ts`; `organization.change-listeners` ←
   `reassignment/organization-change.listener.ts`. Vào identity-access: `identity-access.approval-role-change-listeners`
   ← `reassignment/approval-role.listener.ts` (hai listener chuyển bước nằm trong `RequestsWorkFacadeModule`). Chỉ còn
   một vai phê duyệt, `SPENDING_APPROVER` (grant): không approver dự phòng, không người thay thế (QĐ-93c).
-- Đăng ký vào budgets: `budgets.change-listeners` ← `finance-review/spend-budget.listener.ts`;
+- Đăng ký vào budgets: `budgets.pending-spend` (Contributions `PendingSpendContributions`) ← `spend/pending-spend.listener.ts` (định nghĩa duy nhất của _Request đang chờ duyệt chi_, RV-10);
   `budgets.commitment-release-guard` ← `spend/commitment-release.listener.ts`; `budgets.commitment-request-facts` ←
   `spend/commitment-request-facts.listener.ts` (request, plan, người gửi, nhà cung cấp của một trang commitment, đọc theo lô).
 
 ## Tầng trong module
 
 Đồ thị capability → capability của `requests` **không có vòng** (R6; `pnpm arch:capabilities --module requests`, gate
-`capability-graph`): 39 capability, 118 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. **Cột tầng do lệnh tính** từ
+`capability-graph`): 42 capability, 131 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. **Cột tầng do lệnh tính** từ
 cùng đồ thị gate dùng, không viết tay, và `scripts/verify/capability-graph.test.mjs` đọc bảng này so với lệnh (lệch thì test đỏ): có
 controller thì L3; còn lại, không import capability nào thì L0, chỉ import L0 thì L1, import ít nhất một L1 hoặc L2 thì L2.
 
@@ -64,12 +68,12 @@ controller thì L3; còn lại, không import capability nào thì L0, chỉ imp
 `plan-line` vào L1 "lõi nhánh" và `status` riêng một dòng chú thích; đồ thị cho thấy `spend` import `step-routing` và `plan-line`
 import `spend`, nên theo luật tầng chúng là L2, và `status` (không controller, không cạnh) là L0. Sửa bảng, không sửa lệnh. Owner xác nhận bảng này 31/10/2026.
 
-| Tầng | Capability                                                                                                                                                                                                                                                                                                                                                                                                                                          | Quy tắc                                               |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| L0   | `access-request` (lõi: bản ghi, repo, policy, types, errors, định tuyến, giá, `assessment-read.repo`, `withdrawal.policy`), `outcome`; `status` (cô lập: không import, không ai import, không controller; lệnh in `L0 (cô lập)`)                                                                                                                                                                                                                    | không import capability nào của `requests` (gate)     |
-| L1   | lõi nhánh, không controller: `step-routing`, `request-draft`, `renewal-apply`                                                                                                                                                                                                                                                                                                                                                                       | chỉ import L0                                         |
-| L2   | dịch vụ dùng chung, không controller: `spend`, `request-intake`, `request-view`, `assessment`, `budget-information`, `group-request`, `grant`, `request-end`, `spend-approval-view`                                                                                                                                                                                                                                                                 | import ít nhất một L1 hoặc L2, không vòng             |
-| L3   | use case lá, có controller: `proposal-review`, `budget-questions`, `group-line-decisions`, `need-decision`, `need-decision-queue`, `my-requests`, `assessment-queue`, `withdraw`, `finance-review`, `spend-submission`, `spend-approval`, `request-submission`, `cancellation`, `reassignment`, `return-request`, `timing`, `grant-queue`, `renewal-request`, `service-account-request`, `group-request-submission`, `line-closure`, `draft`, `sla` | không ai import lên, trừ năm ngoại lệ dưới đây (gate) |
+| Tầng | Capability                                                                                                                                                                                                                                                                                                                                                                                                                        | Quy tắc                                               |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| L0   | `access-request` (lõi: bản ghi, repo, policy, types, errors, định tuyến, giá, `assessment-read.repo`, `withdrawal.policy`), `outcome`; `status` (cô lập: không import, không ai import, không controller; lệnh in `L0 (cô lập)`)                                                                                                                                                                                                  | không import capability nào của `requests` (gate)     |
+| L1   | lõi nhánh, không controller: `step-routing`, `request-draft`, `renewal-apply`, `repricing`, `request-limits`, `year-start-commitments`                                                                                                                                                                                                                                                                                            | chỉ import L0                                         |
+| L2   | dịch vụ dùng chung, không controller: `spend`, `request-intake`, `request-view`, `assessment`, `reserve-confirmation`, `spend-effects`, `group-request`, `grant`, `request-end`, `spend-approval-view`, `my-requests`                                                                                                                                                                                                             | import ít nhất một L1 hoặc L2, không vòng             |
+| L3   | use case lá, có controller: `proposal-review`, `budget-check`, `group-line-decisions`, `need-decision`, `need-decision-queue`, `request-history`, `assessment-queue`, `withdraw`, `spend-submission`, `spend-approval`, `request-submission`, `cancellation`, `reassignment`, `return-request`, `timing`, `grant-queue`, `renewal-request`, `service-account-request`, `group-request-submission`, `line-closure`, `draft`, `sla` | không ai import lên, trừ năm ngoại lệ dưới đây (gate) |
 
 **Số đo (30/10/2026).** Từ 24 capability, 82 cạnh, một vòng 19 capability → 36 capability, 111 cạnh, không vòng (sau khi tích hợp code dev A ngày 31/10/2026: 39 capability, 118 cạnh, thêm `need-decision-queue`, `my-requests`, `assessment-queue`, cả ba là L3 chỉ đọc, không ai import lên). Cạnh không tính cạnh
 vào `access-request` (29): 82; không tính thêm cạnh vào `outcome` (10): 72; không tính thêm cạnh vào `spend` (15): 57. **Mục tiêu "cạnh ≤ 50"
@@ -103,24 +107,25 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 - **Lõi và dùng chung (không controller)**
   - `access-request/` — `access-request.repo.ts` (writer duy nhất của `access_requests`, `access_request_beneficiaries`,
     `access_request_steps`), `assessment-read.repo.ts`, `routing.policy.ts` + `routing-facts.service.ts` (định tuyến bước nhu cầu),
-    `pricing.policy.ts`, `request-facts.service.ts` (đọc mọi sự kiện mà một request được xét bởi: phòng ban, kế hoạch, giá, người
+    `pricing.policy.ts` (`requestAmountOf`: giá tháng của thuê bao chính × số tháng còn lại của năm của `asOf`, tháng đầu/cuối tính đủ; `K4` = giá mua;
+    Request tiếp tục có kỳ mới năm sau ⟹ 0 + `nextYearAmount`, QĐ-109b; mốc `asOf` theo QĐ-109e: gửi = tạm tính, mỗi lần `BudgetCheckService.run`
+    tính lại và ghi `ACCESS_REQUEST.REPRICED`), `request-facts.service.ts` (đọc mọi sự kiện mà một request được xét bởi: phòng ban, kế hoạch, giá, người
     giữ ghế, định tuyến; trước đây `request-assessment.service`), `need-decision.policy.ts`, `withdrawal.policy.ts`. Con:
     `open-request/`.
   - `outcome/` — `RequestOutcomeService`: mọi service kết thúc request phát `requests.outcome` qua đây.
   - `request-view/` — `AccessRequestView`: `access-request-query.service.ts`, `access-request.mapper.ts`, `pricing-view.service.ts`.
   - `request-intake/` — `AccessRequestService`: gửi một request cá nhân (draft, gia hạn và controller cùng gọi).
   - `request-draft/` — kho bản nháp: `request-draft.repo.ts`, `request-draft.policy.ts`.
-  - `request-end/` — `RequestEndService`: kết thúc request, trả cam kết ngân sách, đóng câu hỏi Finance (cancellation, withdraw dùng).
+  - `request-end/` — `RequestEndService`: kết thúc request, trả cam kết ngân sách (cancellation, withdraw dùng).
   - `grant/` — `access-request-grant.listener.ts`, `grant.policy.ts`: cổng grant của licensing (`licensing.grant-request-gate`).
 - **Chi tiêu**
   - `spend/` — lõi chi tiêu: `budget-check.service.ts`, `spend-routing.service.ts`, `spend-entry.service.ts`, `spend-status.service.ts`,
     `spend-decision.policy.ts`, `line-allocation.policy.ts`, repo của kiểm tra, review, batch, bước và quyết định chi.
   - `step-routing/` — người nhận bước: `step-target.service.ts`, `reassignment.policy.ts`, `step-reassignment.repo.ts`,
     `spend-routing.policy.ts`. Request không gắn dòng kế hoạch (QĐ-101n).
-  - `budget-information/` — hỏi–đáp Finance (US-06-02, US-06-03): `BudgetInformationService`, `spend-effects.service.ts`;
-    `budget-questions/` — `budget-information.controller.ts`.
-  - `finance-review/` (US-06-13; `finance-reviews.controller.ts`; ghi ở `finance-review-writer.service.ts`, nhiều năm ở
-    `spend-years-view.service.ts`), `spend-submission/` (hàng đợi chi, batch, bổ sung; US-06-12, US-06-14; bổ sung chia ba:
+  - `reserve-confirmation/` — xác nhận dùng dự phòng (BR-MF1-06h): `ReserveConfirmationService` (endpoint riêng và trong lô), repo `request_reserve_confirmations` (bất biến, gắn kiểm tra + bước chi); `spend-effects/` — `SpendEffectsService`: giữ **một** khoản cam kết năm hiện hành (số tiền 0 ⟹ không giữ, audit `NO_CURRENT_YEAR_COMMITMENT`) và trả về trưởng phòng khi kiểm lại lúc duyệt (`SPEND_RETURNED_AT_DECISION`); `budget-check/` — `budgetCheckGet`, `budgetCheckYearList` (chuyển từ `finance-review/`, giữ operationId; D-1). Không còn Finance rà soát / hỏi Finance / override / giá trị cao (QĐ-97c).
+  - Kiểm tra ngân sách ba kết quả (`spend/budget-check.policy.ts`): `WITHIN_BASE` ⟹ bước chi ngay; `USES_RESERVE` ⟹ ở lại hàng đợi trưởng phòng tới khi xác nhận kèm một dòng lý do (1–500 ký tự); `BLOCKED` (`OVER_RESERVE`, `NO_APPROVED_BUDGET`, `PRICE_EXPIRED` — chỉ xét báo giá, mô hình chưa có hạn giá gói) ⟹ báo người yêu cầu + trưởng phòng. Kiểm theo Cost Center hiện hành của phòng; lúc duyệt Cost Center khác lần kiểm trước ⟹ `NO_APPROVED_BUDGET` (M-12/RV-09, khoản cũ ở Cost Center cũ). Request số tiền năm hiện tại 0 không bị chặn vì còn lại âm (A5-2). _Đang chờ duyệt chi_: kết quả trong số cơ sở hoặc dùng dự phòng (kể cả chưa xác nhận), chưa quyết, không tính bị chặn.
+  - `spend-submission/` (hàng đợi chi, batch, bổ sung; US-06-12, US-06-14; bổ sung chia ba:
     `supplement-pricing`, `supplement-recorder`, `supplement-query`; **Finance chỉ đọc**: `GET /spend-batches` do `spend-batch-list.service.ts` — mỗi lô kèm
     `approvedCount`, `pendingCount`, `approvedAmounts` theo đồng tiền, tiền lấy từ `BudgetsApi.committedByRequests` một lần cho cả trang —
     và Finance đọc chi tiết/items mọi lô ở `spend-batch-view.service.ts`), `spend-approval/` (spending approver quyết định; US-06-01;
@@ -135,14 +140,22 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     lại, `WithdrawalWriter` ghi, `withdrawal.policy.ts` ở L0); ba controller khai báo
     ngay sau hub trong `requests.module.ts` để thứ tự path của API không đổi.
   - `draft/` — bản nháp: lưu, liệt kê, gửi, xóa; `request-drafts.controller.ts`; `RequestDraftService`.
-  - `assessment/` — thẩm định phần mềm ngoài catalog, đăng ký nội bộ, nối plan, tính lại giá (US-05-06, US-05-18, US-05-20);
+  - `repricing/` — tính lại số tiền của Request theo ngày (QĐ-109e): `RepricingService` (giá thuê bao chính hoặc báo giá của IT Admin, tính theo `asOf`), `quote-pricing.policy.ts` (số tiền từ báo giá); `spend`, `spend-submission`, `group-request`, `assessment` gọi, không import capability nào ngoài lõi `access-request`.
+  - `assessment/` — thẩm định phần mềm ngoài catalog, đăng ký nội bộ, nối plan (US-05-06, US-05-18, US-05-20);
     `AssessmentQueryService` (đọc), `AssessmentService` (lưu), `AssessmentCompletionService`, `AssessmentRejectionService`, qua cổng chung
-    `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `ProposalService`, `RepricingService`,
+    `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `ProposalService`,
     `need-spend.service.ts`, `internal-registration.service.ts` (đăng ký nội bộ; `internalRegistrationBasis`, `registeredShapeOf`,
     `actsForAssignee` ở `assessment.policy.ts`); `proposal-review/` — `proposals.controller.ts`.
   - `grant-queue/` — hàng đợi cấp của IT Admin (US-03-02; gửi thay một người đã gỡ, QĐ-96); `cancellation/` — IT Admin đóng request của người đã nghỉ (US-03-04).
-  - Ba danh sách đọc theo vai, chỉ đọc, không khóa, không ghi (L3): `my-requests/` — `GET /me/access-requests`, Request tôi đã gửi, mọi tài khoản (`QĐ-95d`; `my-requests.service.ts`,
-    `my-requests.repo.ts`, `my-requests-facts.repo.ts`); `need-decision-queue/` — `GET /need-decisions`, bước chờ quyết nhu cầu của người đang được giao
+  - Lịch sử Request theo vai, chỉ đọc (L3 `request-history/`, qd103-request-history-by-role): `GET /me/access-requests` (người gửi; `involvement`
+    SENT/FOR_ME/ALL, người thụ hưởng Request nhóm chỉ thấy `myLine` của mình), `GET /departments/{id}/access-requests` (trưởng phòng hôm nay của
+    phòng), `GET /access-requests` (IT Admin toàn tổ chức; Người duyệt chi Request đã mở bước chi; Finance Request đã duyệt chi),
+    `GET /access-requests/{id}/events` (dòng thời gian, allowlist hành động audit), `GET /access-request-audit-flags` (Super Admin, chỉ cờ
+    `NO_NEED_APPROVER`, không số tiền — `SoD-1`). Super Admin không đọc Request nào. Dòng đọc qua `my-requests/` (L2: `my-requests.service.ts`
+    `pageOf` theo `RequestScope`, `my-requests.repo.ts`, `my-requests-facts.repo.ts`). Chi tiết, thời gian, dòng nhóm và dòng thời gian
+    dùng chung vị từ `canReadRequest` (`access-request.policy.ts`) qua `request-view/request-read-access.service.ts`: danh sách trả dòng nào
+    thì chi tiết đọc được dòng đó; không đọc được ⟹ 404.
+  - Hai hàng chờ đọc theo vai, chỉ đọc, không khóa, không ghi (L3): `need-decision-queue/` — `GET /need-decisions`, bước chờ quyết nhu cầu của người đang được giao
     (`need-decision-queue.service.ts`, `.repo.ts`, `.mapper.ts`); `assessment-queue/` — `GET /assessment-queue`, việc thẩm định của IT Admin trong phạm vi phụ trách
     (`assessment-queue.service.ts`, `.repo.ts`, `.mapper.ts`). `my-requests` và `need-decision-queue` đọc cột `policy` qua `requestPolicyJson` (không ép kiểu).
 - **Request nhóm** (US-05-17)
@@ -158,7 +171,10 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   - `return-request/` (US-05-13; mọi vai trừ Super Admin, `ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST`; `ReturnSeatGate` xét ghế trả, `ReturnHandoverService` mở bàn giao; `return-request.policy.ts`),
     `renewal-request/` (US-05-14; `renewal-requests.controller.ts`; `RenewalRequestWriter` ghi, `renewal-request-submission.mapper.ts`
     dựng dòng và audit) với `renewal-apply/`
-    (`renewal-apply.service.ts`, `renewal-request.repo.ts`: áp gia hạn khi được duyệt), `service-account-request/` (US-05-21).
+    (`renewal-apply.service.ts`, `renewal-request.repo.ts`: duyệt ⟹ mở tác vụ IT `EXTEND` (`requestExtension`), IT hoàn tất ⟹
+    `AccessRequestGrantGate.reportExtended` ⟹ `apply` ghi Assignment kế tiếp, BR-MF1-08d), `service-account-request/` (US-05-21).
+    Request tiếp tục chỉ gửi trong cửa sổ `RENEWAL_WINDOW_DAYS` ngày trước ngày kết thúc (409 `RENEWAL_REQUEST.WINDOW_NOT_OPEN`;
+    cửa sổ đã ghi giữ số ngày lúc mở, QĐ-108b), body `newEndDate` ≤ ngày kết thúc + 12 tháng (422 `RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE`).
 - **Trạng thái, SLA, chuyển bước**
   - `status/` — chiếu audit event của request thành thông báo inbox (US-05-15); nhóm `rules/` là bảng luật sự kiện → thông báo.
   - `timing/` (thời gian từng bước, KPI-2), `sla/` (nhắc bước trễ, tồn đọng, nghẽn; US-05-09, US-05-10),
@@ -166,16 +182,18 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 
 **Tìm X ở đâu**
 
-| Cần tìm                                           | Ở đâu                                                                                    |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Request được đọc ra thế nào (`AccessRequestView`) | `request-view/access-request-query.service.ts`                                           |
-| Request được gửi thế nào                          | `request-intake/access-request.service.ts` (cá nhân), `group-request-submission/` (nhóm) |
-| Bước nhu cầu: quyết định, ghế tương tự, rút       | `need-decision/`, `withdraw/` (controller cạnh service)                                  |
-| Kiểm tra ngân sách của một request                | `spend/budget-check.service.ts`                                                          |
-| Ai giữ một bước, chuyển bước                      | `access-request/routing.policy.ts`, `step-routing/`, `reassignment/`                     |
-| Kết thúc request và phát `requests.outcome`       | `outcome/request-outcome.service.ts`, `request-end/request-end.service.ts`               |
-| Lý do từ chối của spend, hủy, ủy quyền            | `spend/spend.errors.ts`, `access-request/access-request.types.ts` (kiểu lý do)           |
-| Route của một use case                            | `docs/generated/routes.md` (sinh từ code)                                                |
+| Cần tìm                                             | Ở đâu                                                                                                     |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Request được đọc ra thế nào (`AccessRequestView`)   | `request-view/access-request-query.service.ts`                                                            |
+| Request được gửi thế nào                            | `request-intake/access-request.service.ts` (cá nhân), `group-request-submission/` (nhóm)                  |
+| Bước nhu cầu: quyết định, ghế tương tự, rút         | `need-decision/`, `withdraw/` (controller cạnh service)                                                   |
+| Kiểm tra ngân sách của một request                  | `spend/budget-check.service.ts`                                                                           |
+| Giới hạn GH-1/GH-2/GH-3 theo người thụ hưởng        | `request-limits/` (policy thuần, repo đếm + khóa tư vấn theo người, service gọi từ mọi đường gửi cấp mới) |
+| Khoản cam kết tự tạo ngày 01/01 (job, luật số tiền) | `year-start-commitments/` (`*.service.ts` điều phối, `*-batch.service.ts` một lô, `*.policy.ts` số tiền)  |
+| Ai giữ một bước, chuyển bước                        | `access-request/routing.policy.ts`, `step-routing/`, `reassignment/`                                      |
+| Kết thúc request và phát `requests.outcome`         | `outcome/request-outcome.service.ts`, `request-end/request-end.service.ts`                                |
+| Lý do từ chối của spend, hủy, ủy quyền              | `spend/spend.errors.ts`, `access-request/access-request.types.ts` (kiểu lý do)                            |
+| Route của một use case                              | `docs/generated/routes.md` (sinh từ code)                                                                 |
 
 ## Bất biến quan trọng
 
@@ -193,6 +211,17 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   chưa từng có grant giữ). Bước chờ đổi lý do (`REWAIT`) chỉ ghi `waiting_reason`, giữ `waiting_since`.
 - Thứ tự khóa: task grant (`LicensingApi.lockGrantOfRequest`) rồi request (`request-end/request-end.service.ts`); hàng request
   rồi khóa năm ngân sách (`budgets/budget/budget-year-lock.repo.ts`).
+- Khoản 01/01 (`year-start-commitments/`, `BudgetsApi.holdYearStart`): `YearStartCommitmentsSweeper` mỗi giờ trong tiến trình API (ADR-0018); lượt đầu
+  của năm sau 00:00 giờ tổ chức giữ cho mỗi Request trả phí `K1`/`K2` đang chạy hoặc đã duyệt chi chưa cấp một khoản của năm mới (giá tháng của
+  gói hiệu lực ngày 01/01 × số tháng của năm, mỗi seat, quy về tiền tệ báo cáo bằng `FinanceApi.snapshotMoney` tỷ giá 01/01, không có thì tỷ giá
+  ngày chạy, không có nữa ⟹ bỏ qua `NO_RATE`), rồi ghi dấu `year_start_commitment_runs`; lượt sau trong năm không đọc gì. Seat đi theo chuỗi
+  `predecessor_id` tới bản ghi đang chạy; Cost Center của phòng sở hữu bản ghi đó (tài khoản dịch vụ bàn giao sang phòng khác ⟹ phòng mới). Request
+  gia hạn (`RENEWAL`) giữ khoản của bản ghi kế tiếp nó tạo; Request cấp ban đầu không giữ phần đã được gia hạn. Mỗi bước (mở, mỗi lô) một
+  transaction, trước hết `pg_try_advisory_xact_lock` theo (tổ chức, năm) — instance khác đang giữ thì bỏ lượt (`BUSY`); trong lô: khóa hàng Request
+  `FOR UPDATE` theo id, đọc grant (không khóa), tổ chức `FOR SHARE` khi quy đổi, rồi khóa năm của Cost Center theo id — cùng thứ tự với mọi ghi ngân
+  sách. Lượt lỗi giữa chừng: lượt sau đi tiếp sau `resume_after_id`, không ghi lại audit bỏ qua. Tổ chức chưa có dấu: lượt đầu chỉ đánh dấu khi chưa
+  có Request gửi trước năm đó; có dấu cũ nhưng thiếu năm trước ⟹ log cảnh báo. Chạy tay: `YearStartCommitmentsService.run(now)`. Chỉ Request có
+  khoản; quyền không có Request thì không (QĐ-109a).
 - Mọi kết thúc request phát `requests.outcome` trong cùng transaction; listener ném lỗi thì kết thúc bị hoàn tác.
 - Sweep chuyển bước: mỗi request một transaction, khóa theo id, chỉ ghi khi bảng định tuyến chỉ ra người khác người
   đang giữ; sweep SLA chỉ ghi nhắc, thông báo và audit, không đổi bước hay request (`public/*-sweep.api.ts`).
@@ -200,6 +229,24 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 ## Test
 
 - Unit: `src/modules/requests/**/*.spec.ts`; HTTP: `test/http/requests/`; integration: `test/integration/requests/`.
-- Codec của cột JSON (`.json.ts`, [database rules](../../../docs/rules/database-business.md)): `access-request/access-request.json.ts` giữ cả
-  `policy` và `payment_schedule`, nên spec của chúng nằm trong `access-request/access-request.policy.spec.ts` và
-  `access-request/pricing.policy.spec.ts` (thư mục đã đủ 25 file); `request-draft/request-draft-policy.json.ts` (`policy` của bản nháp) có spec cạnh file.
+- Codec của cột JSON (`.json.ts`, [database rules](../../../docs/rules/database-business.md)): `access-request/access-request.json.ts` giữ `policy`
+  (`payment_schedule` không còn ghi hay đọc — một số tiền một năm, QĐ-109; cột còn đó, trigger chặn ghi mới), nên spec của nó nằm trong
+  `access-request/access-request.policy.spec.ts` (thư mục đã đủ 25 file); `request-draft/request-draft-policy.json.ts` (`policy` của bản nháp) có spec cạnh file.
+
+## Request m?t b??c
+
+??nh tuy?n ch?t l?c g?i: tr??ng ph?ng g?i cho ch?nh m?nh ho?c kh?ng c? tr??ng ph?ng hi?u l?c (k? c? ?? ghi k? nhi?m t??ng lai) d?ng
+`ONE_STEP`, b??c nhu c?u `NOT_REQUIRED` kh?ng c? ng??i gi?/SLA. Tr? ph? ki?m ng?n s?ch ngay khi g?i b?ng `BudgetCheckService`:
+?? c? s? ho?c d?ng d? ph?ng m? b??c chi; b? ch?n/thi?u gi?/t? gi? l?u `AWAITING_REQUESTER_REVISION`. Ng??i y?u c?u b? sung qua
+`accessRequestSupplementAdd`, g?i l?i qua `POST /access-requests/{id}/resubmission`, ho?c r?t. Ng??i duy?t chi quy?t m?t l?n c? d? ph?ng.
+N?i b? K5 ?i th?ng IT, audit `ACCESS_REQUEST.NO_NEED_APPROVER`.
+
+Nh?m kh?ng ch?a tr??ng ph?ng (`HEAD_IN_GROUP`), tr?n hi?n t?i gi? 10/100. Nh?m do tr??ng ph?ng g?i v?n x?c nh?n nhu c?u v? v?o l?;
+nh?m nh?n vi?n kh?ng c? tr??ng ph?ng l? m?t b??c. Kh?ng c?n ??nh tuy?n DIRECT theo ng??i quy?t nhu c?u ho?c c? c?ng ng??i hai b??c.
+
+M?t tr??ng ph?ng: listener ch? ??nh d?u Request tr? ph? ?ang ? ch? tr??ng ph?ng (kh?ng c? k? nhi?m ?? ghi), ??ng b??c nhu c?u.
+`OneStepConversionService` ho?n t?t trong sweep, m?i Request m?t transaction, d?ng l?i ki?m ng?n s?ch. Request n?i b? c? v?n ch? c? ki?m so?t.
+`requests-routing-facade.module.ts` gh?p c?ng h?m ??nh tuy?n/ki?m cho API v? worker. D? li?u l?ch s? gi? c?t/enum c?, ng?ng ghi h?nh vi c?.
+
+T?m ??nh tuy?n: `access-request/routing.policy.ts`; g?i l?i: `request-intake/request-resubmission.service.ts`; chuy?n khi m?t tr??ng ph?ng:
+`reassignment/one-step-conversion.service.ts`; hi?n th? k?t qu?: `spend/spend-status.service.ts`.

@@ -177,7 +177,7 @@ describe('ops:preflight, the owner department of a subscription (integration, re
   );
 
   it(
-    'after the migrations of the final release the column is required: nothing is open, nothing is listed, the history is converged',
+    'after the migrations of the final release the column is nullable (shared pool): nothing is open, nothing is listed, the history is converged',
     async () => {
       const deploy = await deployMigrations(database);
       if (deploy.code !== 0) throw new Error(`Deploying the final release failed: ${deploy.stdout}\n${deploy.stderr}`);
@@ -189,7 +189,8 @@ describe('ops:preflight, the owner department of a subscription (integration, re
       const column = await sql.query<{ is_nullable: string }>(
         `SELECT is_nullable FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'owner_department_id'`,
       );
-      expect(column.rows).toEqual([{ is_nullable: 'NO' }]);
+      // Rewritten for QĐ-103d: `shared_pool_grant` made the column nullable (a pool no department owns); W5 drops it.
+      expect(column.rows).toEqual([{ is_nullable: 'YES' }]);
     },
     DEPLOY_TIMEOUT_MS + CLI_COLD_START_MS,
   );

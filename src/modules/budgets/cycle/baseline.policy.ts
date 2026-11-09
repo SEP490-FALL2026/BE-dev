@@ -1,0 +1,275 @@
+import type { BusinessDate } from '../../../core/business-date';
+import type { BaselineVersionRefusal } from '../budget/budget.errors';
+import type { LineType } from '../budget/budget-line-zbb.json';
+
+/**
+ * The monthly price of one seat from the unit price in the reporting currency and the cycle it is paid in (`R-I03`): a year's price
+ * divided by 12, a quarter's by 3, rounded to the nearest minor unit (half up). A cycle that is not one of those (`OTHER`) or a price
+ * not known gives none.
+ */
+export function monthlyUnitPrice(unitPriceMinor: bigint | null, billingCycle: string | null): bigint | null {
+  if (unitPriceMinor === null) return null;
+  switch (billingCycle) {
+    case 'MONTHLY':
+      return unitPriceMinor;
+    case 'QUARTERLY':
+      return (unitPriceMinor * 2n + 3n) / 6n;
+    case 'ANNUAL':
+      return (unitPriceMinor * 2n + 12n) / 24n;
+    default:
+      return null;
+  }
+}
+
+/**
+ * The months of `year` a subscription runs, counting each month it touches: no end date means it runs to the end of the year, no start
+ * date that it ran from the start; one that ends before the year or starts after it runs none (`R-I03`).
+ */
+export function monthsRunning(year: number, startDate: BusinessDate | null, endDate: BusinessDate | null): number {
+  const first = startDate !== null && startDate > `${year}-01-01` ? startDate : `${year}-01-01`;
+  const last = endDate !== null && endDate < `${year}-12-31` ? endDate : `${year}-12-31`;
+  if (first > last || first.slice(0, 4) !== String(year) || last.slice(0, 4) !== String(year)) return 0;
+
+  return Number(last.slice(5, 7)) - Number(first.slice(5, 7)) + 1;
+}
+
+/** What a subscription is estimated to cost over `months` months: seats × monthly price × months; none when a figure is unknown. */
+export function estimatedCost(seats: number | null, monthlyMinor: bigint | null, months: number): bigint | null {
+  return seats === null || monthlyMinor === null ? null : BigInt(seats) * monthlyMinor * BigInt(months);
+}
+
+/** The facts of a subscription that the renewal rule reads. */
+export interface RenewalFacts {
+  startDate: BusinessDate | null;
+  endDate: BusinessDate | null;
+  /** The day it renews by itself, when it does: it stands for the end of a subscription that has no end date. */
+  renewalDate?: BusinessDate | null;
+  /** A later period of the same purchase was recorded: the year to come is that one's, not this one's (`F-105`). */
+  hasSuccessor?: boolean;
+}
+
+/** The day a subscription stops: its end date, or, when it has none, the day it renews by itself (one reading for the months and for the renewal). */
+export const endOf = (subscription: Pick<RenewalFacts, 'endDate' | 'renewalDate'>): BusinessDate | null =>
+  subscription.endDate ?? subscription.renewalDate ?? null;
+
+/**
+ * Whether the subscription will be renewed for the year to come (`Q-162`, TẠM CHỌN): it runs today (it has started, and the day it stops
+ * is not behind us, the day itself included), nobody has ordered it to end, and no later period of it was recorded (that one carries the
+ * year to come). A date on 31 December, in January of the year after or none at all makes no difference.
+ */
+export function willRenew(today: BusinessDate, subscription: RenewalFacts, terminated: boolean): boolean {
+  if (terminated || subscription.hasSuccessor === true) return false;
+  const started = subscription.startDate === null || subscription.startDate <= today;
+  const end = endOf(subscription);
+
+  return started && (end === null || end >= today);
+}
+
+/**
+ * Whether the budget of `year` should propose to renew a subscription (a `Renew` line, `FR-5.15`): it will be renewed (`willRenew`), or
+ * it has not started and stops within the year. One that was ordered to end, or whose next period was recorded, is never proposed.
+ */
+export function shouldSuggestRenewal(
+  year: number,
+  today: BusinessDate,
+  subscription: RenewalFacts,
+  terminated: boolean,
+): boolean {
+  if (terminated || subscription.hasSuccessor === true) return false;
+  const end = endOf(subscription);
+
+  return (
+    willRenew(today, subscription, terminated) || (end !== null && end >= `${year}-01-01` && end <= `${year}-12-31`)
+  );
+}
+
+/**
+ * What one subscription is estimated to cost over a year at the prices of today (`R-I03`): the seats it HOLDS (what is assigned; the
+ * seats bought and idle are the shared pool's, `QĐ-103k`), the monthly price of a seat and the months it runs; a subscription that will
+ * be renewed counts for the twelve months of the year (`Q-162`), any other only for the months it runs, to the day it stops.
+ */
+export function subscriptionCost(
+  year: number,
+  today: BusinessDate,
+  seatsHeld: number,
+  subscription: RenewalFacts & { unitPriceReportingMinor: bigint | null; billingCycle: string | null },
+  terminated = false,
+): { monthlyMinor: bigint | null; months: number; costMinor: bigint | null } {
+  const monthlyMinor = monthlyUnitPrice(subscription.unitPriceReportingMinor, subscription.billingCycle);
+  const months = willRenew(today, subscription, terminated)
+    ? 12
+    : monthsRunning(year, subscription.startDate, endOf(subscription));
+
+  return { monthlyMinor, months, costMinor: estimatedCost(seatsHeld, monthlyMinor, months) };
+}
+
+/** The seats of each subscription held as of a day, for each department and in all: a seat is charged to the department of its holder (`QĐ-103k`). */
+export interface SeatAllocation {
+  /** By department, the seats its people hold (or answer for, a service account), by subscription. */
+  byDepartment: Map<string, Map<string, number>>;
+  /** The seats held in all, by subscription, a holder placed in no department included. */
+  held: Map<string, number>;
+}
+
+/**
+ * Charges each seat held to the department its holder is in (`QĐ-103k`, `QĐ-89a(2)`): the seats of a shared-pool subscription go to as many
+ * departments as its holders are in, whatever department may own the subscription. A holder placed in no department is counted in `held`
+ * only (the seat is taken, so it is not idle), never in a department.
+ */
+export function allocateSeats(
+  holdings: readonly { subscriptionId: string; employeeId: string; seats: number }[],
+  departmentOf: ReadonlyMap<string, string>,
+): SeatAllocation {
+  const byDepartment = new Map<string, Map<string, number>>();
+  const held = new Map<string, number>();
+  for (const holding of holdings) {
+    held.set(holding.subscriptionId, (held.get(holding.subscriptionId) ?? 0) + holding.seats);
+    const departmentId = departmentOf.get(holding.employeeId);
+    if (departmentId === undefined) continue;
+    const seats = byDepartment.get(departmentId) ?? new Map<string, number>();
+    seats.set(holding.subscriptionId, (seats.get(holding.subscriptionId) ?? 0) + holding.seats);
+    byDepartment.set(departmentId, seats);
+  }
+
+  return { byDepartment, held };
+}
+
+/** A `K2` or `K4` purchase is the shared pool of the company (`QĐ-103d`): its idle seats belong to no department. */
+const isSharedPool = (provisioningType: string): boolean => provisioningType === 'K2' || provisioningType === 'K4';
+
+/** The seats bought and not held; none when the purchase has no number of seats, never below zero. */
+const idleSeats = (purchased: number | null, held: number): number | null =>
+  purchased === null ? null : Math.max(0, purchased - held);
+
+/** The idle seats a purchase gives the line of the shared pool: some of a `K2`/`K4` purchase, none of any other or when all are held. */
+export function poolIdleSeats(provisioningType: string, purchased: number | null, held: number): number | null {
+  if (!isSharedPool(provisioningType)) return null;
+  const idle = idleSeats(purchased, held);
+
+  return idle === null || idle === 0 ? null : idle;
+}
+
+/**
+ * Whether Finance may build the first version of a department from the baseline (`QĐ-100h`, `R-I05`): the cycle of the year was
+ * published once and the department is in it (a ceiling there, in effect by the end of the year); the day is after the submission deadline; nobody heads the department today and nobody is to head it later (a
+ * successor, a department made for next year included); and no proposal waits or is being reviewed. The first that fails is named.
+ */
+export function baselineVersionRefusal(input: {
+  cyclePublishedOnce: boolean;
+  inCycle: boolean;
+  today: BusinessDate;
+  submissionDeadline: BusinessDate;
+  headsToday: boolean;
+  headToCome: boolean;
+  openProposal: boolean;
+}): BaselineVersionRefusal | null {
+  if (!input.cyclePublishedOnce) return 'CYCLE_NOT_PUBLISHED';
+  if (!input.inCycle) return 'DEPARTMENT_NOT_IN_CYCLE';
+  if (input.today <= input.submissionDeadline) return 'BEFORE_DEADLINE';
+  if (input.headsToday) return 'HAS_HEAD';
+  if (input.headToCome) return 'HAS_SUCCESSOR';
+  if (input.openProposal) return 'HAS_PROPOSAL';
+
+  return null;
+}
+
+/**
+ * The most departments a baseline or a package lists: a division of the ceiling names at most this many (`budgetDepartmentCeilingsSet`),
+ * and the answer says how many there are in all (`departmentsTotal`) when it lists fewer.
+ */
+export const DEPARTMENTS_LISTED_MAX = 500;
+/** The most subscriptions the baseline lists for one department; `softwareTotal` says how many it owns. */
+export const SOFTWARE_LISTED_MAX = 50;
+
+/** The departments a read lists: the first `DEPARTMENTS_LISTED_MAX` by id, or the one that was asked for when it is among them. */
+export function listedDepartments(inYear: readonly string[], departmentId: string | undefined): string[] {
+  return (departmentId === undefined ? inYear : inYear.filter((id) => id === departmentId)).slice(
+    0,
+    DEPARTMENTS_LISTED_MAX,
+  );
+}
+
+/** Puts what a read returned in the order of the ids it was asked for (a statement `WHERE id = ANY(...)` has no order of its own). */
+export function inOrderOf<T extends { id: string }>(ids: readonly string[], rows: readonly T[]): T[] {
+  const position = new Map(ids.map((id, index) => [id, index]));
+
+  return [...rows].sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
+}
+
+/**
+ * What ending a subscription saves in `year` (`FR-5.15`, `QĐ-109c`): the months of the year after the month it stops, at the seats it
+ * holds and the monthly price of a seat. One that ends before the year saves the whole year, one with no end or that runs past the
+ * year saves nothing, and one a later period follows saves nothing (that period carries the year). None when a figure is unknown.
+ */
+export function cancelledCost(
+  year: number,
+  seatsHeld: number,
+  subscription: Pick<RenewalFacts, 'endDate' | 'renewalDate' | 'hasSuccessor'> & {
+    unitPriceReportingMinor: bigint | null;
+    billingCycle: string | null;
+  },
+): bigint | null {
+  const monthlyMinor = monthlyUnitPrice(subscription.unitPriceReportingMinor, subscription.billingCycle);
+  const end = endOf(subscription);
+  if (subscription.hasSuccessor === true || end === null || end > `${year}-12-31`) return 0n;
+  const monthsSaved = end < `${year}-01-01` ? 12 : 12 - Number(end.slice(5, 7));
+
+  return estimatedCost(seatsHeld, monthlyMinor, monthsSaved);
+}
+
+/** A line of a first version built from the baseline (`QĐ-100h`): what it estimates for one plan, and what kind of line it is. */
+export interface BaselineLine {
+  description: string;
+  planId: string;
+  seats: number | null;
+  amountMinor: bigint;
+  lineType: LineType;
+  zbb: null;
+  priorityRank: number;
+}
+
+/**
+ * The lines of a version built from the baseline (`C4-14`, `QĐ-109c`): what a subscription still costs in the year is a `RENEW` line,
+ * added to the base like the baseline adds it, the months that run before an ordered end included; what ending it saves is a `CANCEL`
+ * line (shown, never added). The periods of one plan of one kind are one line, so that a period and the one that follows it do not
+ * show twice: the amounts add up and the seats are the same people, counted once (the most of them). An unknown or empty amount gives
+ * no line. Ranks follow the order, from 1.
+ */
+export function baselineLinesOf(
+  entries: readonly {
+    planId: string;
+    /** The application and the plan, as the description names them. */
+    label: string;
+    seats: number | null;
+    /** What it costs in the year, as the baseline counts it. */
+    costMinor: bigint | null;
+    /** What ending it saves in the year (`cancelledCost`); zero or none when it runs on. */
+    cancelledMinor: bigint | null;
+  }[],
+): BaselineLine[] {
+  const merged = new Map<string, Omit<BaselineLine, 'priorityRank'>>();
+  const add = (entry: (typeof entries)[number], lineType: LineType, amountMinor: bigint | null): void => {
+    if (amountMinor === null || amountMinor <= 0n) return;
+    const key = `${lineType}:${entry.planId}`;
+    const known = merged.get(key);
+    merged.set(key, {
+      description: known?.description ?? `${lineType === 'CANCEL' ? 'Cancel' : 'Renew'} ${entry.label}`.slice(0, 200),
+      planId: entry.planId,
+      seats: known === undefined ? entry.seats : Math.max(known.seats ?? 0, entry.seats ?? 0),
+      amountMinor: (known?.amountMinor ?? 0n) + amountMinor,
+      lineType,
+      zbb: null,
+    });
+  };
+  for (const entry of entries) {
+    add(entry, 'RENEW', entry.costMinor);
+    add(entry, 'CANCEL', entry.cancelledMinor);
+  }
+  const lines = [...merged.values()];
+  const ordered = [
+    ...lines.filter((line) => line.lineType !== 'CANCEL'),
+    ...lines.filter((line) => line.lineType === 'CANCEL'),
+  ];
+
+  return ordered.map((line, index) => ({ ...line, priorityRank: index + 1 }));
+}

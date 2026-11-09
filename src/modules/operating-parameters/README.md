@@ -14,11 +14,8 @@ Tầng: T3 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit,
   - `getValueAt(key, instant)`, `getValuesAt(key, instants)` — giá trị có hiệu lực tại lúc tạo thứ nó điều khiển.
   - `getNonWorkingDates(from, to)` — các ngày không làm việc, cho phép tính ngày làm việc của workflow.
   - `today()` — ngày nghiệp vụ hiện tại của tổ chức.
-  - `holdValue(tx, key)` — giá trị đang có hiệu lực, đọc trong `tx` và giữ không đổi tới hết `tx` (khóa advisory dùng chung
-    của key): dành cho thứ được tạo dưới giá trị đó, ví dụ phiên bản ngân sách đầu tiên (US-01-04 AC-8).
   - `list`, `history` — phục vụ route của Super Admin. Việc đặt giá trị là `ParameterChangeService`
     ([parameter-change.service.ts](parameter-change.service.ts), chỉ module HTTP của API dùng).
-- `public/operating-parameters.extension-points.ts` — `ParameterLockContributions` và contract `ParameterLockReader`.
 - Lỗi ở `operating-parameters.errors.ts` (gốc module). `OperatingParametersModule` export thêm `NonWorkingDatesService` và
   `OperatingParametersRepo`, ngoài `public/` (chỉ module HTTP cùng thư mục dùng, R10).
 
@@ -30,12 +27,7 @@ Tầng: T3 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit,
 
 ## Extension point
 
-- Mở `ParameterLockContributions` (`operating-parameters.lock-readers`, Contributions): module trên nói một tham số đã bị
-  khóa vì có thứ tạo dưới giá trị của nó. `ParameterChangeService.set` hỏi từng reader của key, sau khi khóa key và sau
-  bước "cùng giá trị thì không đổi", trước khi ghi; reader trả lý do (`BUDGET_VERSION_EXISTS`) thì từ chối bằng
-  `ParameterLockedError` (409 `PARAMETER.LOCKED`). Reader hiện có: budgets `version/fiscal-year-start-lock.listener.ts`
-  (`budgets.fiscal-year-start`, key `FISCAL_YEAR_START_MONTH`).
-- Đăng ký vào: không có.
+- Mở: không có. Đăng ký vào: không có. (Extension point khóa tham số `ParameterLockContributions` đã bỏ cùng tham số `FISCAL_YEAR_START_MONTH`, `QĐ-104e`(1).)
 
 ## Capability → file chính
 
@@ -49,8 +41,7 @@ Module nhỏ, chưa chia capability; mọi file ở gốc module.
   nhóm nên `GET /operating-parameters` trả theo thứ tự nhóm. Wire thêm `label`, `group`, `groupLabel`, `unitLabel`;
   `constraints` là `oneOf` ba dạng (`int`, `enum` kèm `optionLabels`, `int-list`) phân biệt bằng `kind`. Số lựa chọn của
   `enum` bị chặn bởi `ENUM_OPTIONS_MAX` (khóa registry `operatingParameterList#constraints.options`, `LD-17`).
-- `constraints` chỉ tả miền của **từng** tham số. Hai luật xuyên tham số chưa có trong `constraints`: khóa
-  `FISCAL_YEAR_START_MONTH` khi đã có phiên bản ngân sách (`ParameterLockedError`) và `INVITATION_WITHDRAW_DAYS` >
+- `constraints` chỉ tả miền của **từng** tham số. Một luật xuyên tham số chưa có trong `constraints`: `INVITATION_WITHDRAW_DAYS` >
   `INVITATION_REMINDER_DAYS` (`INCONSISTENT`); client vẫn nhận chúng dưới dạng lỗi của `PUT`.
 - Ngày không làm việc: cùng controller (`/non-working-dates*`) → `non-working-dates.service.ts`.
 - Tiền tệ báo cáo: `reporting-currency.controller.ts` (`GET`, `PUT /reporting-currency`) →
@@ -66,12 +57,12 @@ Module nhỏ, chưa chia capability; mọi file ở gốc module.
 - Ngày không làm việc đã qua không bao giờ đổi; một dòng cho mỗi (tổ chức, ngày).
 - Tiền tệ báo cáo khóa khi đã có tỷ giá hoặc giá đã quy đổi: khóa là trigger `organizations_reporting_currency_locked`
   của DB, service chỉ đọc lỗi `55000` (AC-9, `QĐ-42c`).
-- Tháng bắt đầu năm tài chính không đổi được khi đã có bất kỳ phiên bản ngân sách (mọi trạng thái): từ chối không ghi giá trị
-  lẫn audit; cùng giá trị là no-op. Tạo phiên bản đầu tiên giữ `holdValue` (khóa chia sẻ của key) tới commit, còn đổi tham số
-  giữ khóa độc quyền cùng key, nên hai việc xếp hàng và bên sau thấy bên trước (US-01-04 AC-8).
+- Năm tài chính là năm dương lịch, không có tham số tháng bắt đầu (`QĐ-104e`(1)); migration `drop_fiscal_year_start_month` đã đóng giá trị cũ.
 - Chỉ `SUPER_ADMIN` đặt; mỗi lần đổi tham số ghi audit `PARAMETER.CHANGED` trong cùng transaction.
 
 ## Test
 
 - Unit: `src/modules/operating-parameters/**/*.spec.ts`; HTTP: `test/http/operating-parameters/`; integration:
   `test/integration/operating-parameters/`.
+
+- Tham số có chủ: định nghĩa có `owner` (`SUPER_ADMIN` mặc định, `FINANCE` cho `BUDGET_RESERVE_DEFAULT_PERCENT`, `BUDGET_ZBB_KPI3_BELOW_PERCENT` (70) và `BUDGET_ZBB_PRICE_INCREASE_PERCENT` (10): ngưỡng giải trình ZBB của dòng `BM-10`, `QĐ-94l`). `PUT` chỉ vai chủ sửa được (vai khác, kể cả Super Admin với khóa của Finance ⟹ 403); `GET` danh sách và lịch sử: Super Admin đọc mọi khóa, Finance chỉ khóa Finance sở hữu (`QĐ-103z`(1)).

@@ -6,19 +6,19 @@ describe('requests over HTTP: registering internal software (integration, real P
   let design: Department;
   let head: Person;
   let designer: Person;
-  let owner: Person; // a Business Owner who works
   let gone: Person; // one who has left
   let itAdmin: Person; // the IT Admin in charge of design
   let ownIt: Person; // an IT Admin of design who asks for software themselves
   let counter = 0;
   const year = Number(h.today().slice(0, 4));
+  /** The months left of the calendar year of today, the month of today counted whole (`BR-MF1-06a`). */
+  const monthsLeft = 12 - Number(h.today().slice(5, 7)) + 1;
 
   beforeAll(async () => {
     await h.start();
     design = await h.departmentWithUnit('P-DES');
     head = await h.staff(design, 'DES-H1');
     designer = await h.staff(design, 'DES-E1');
-    owner = await h.staff(design, 'DES-BO');
     gone = await h.staff(design, 'DES-GONE');
     ownIt = await h.staff(design, 'DES-IT3', 'IT_ADMIN');
     itAdmin = { employeeId: h.it1.employeeId, account: h.it1 };
@@ -54,7 +54,8 @@ describe('requests over HTTP: registering internal software (integration, real P
     return proposed;
   };
   const register = (id: string, body: object, account = itAdmin.account) => h.registerInternal(id, body, account);
-  const asOwner = (extra: Record<string, unknown> = {}) => ({ businessOwnerEmployeeId: owner.employeeId, ...extra });
+  /** RV-26 (P2-05): the IT Admin no longer names a Business Owner when registering; the legacy column takes the requester. */
+  const asOwner = (extra: Record<string, unknown> = {}) => ({ ...extra });
 
   describe('the way with no spend (US-05-20 AC-3, AC-5)', () => {
     it('registers the software with its Business Owner and a plan granted by hand, and sends the request to the IT Admin', async () => {
@@ -83,7 +84,7 @@ describe('requests over HTTP: registering internal software (integration, real P
       );
       expect(registered.rows[0]).toEqual({
         kind: 'INTERNAL',
-        owner: owner.employeeId,
+        owner: designer.employeeId,
         vendor_id: null,
         type: 'K5',
         model: null,
@@ -129,7 +130,7 @@ describe('requests over HTTP: registering internal software (integration, real P
         status: 'COMPLETED',
         classification: 'INTERNAL',
         step: { state: 'APPROVED' },
-        proposedBusinessOwner: { employeeId: owner.employeeId },
+        proposedBusinessOwner: null,
       });
       await h.saveAssessment(proposed.id, { sso: true }, itAdmin.account).expect(409);
     });
@@ -141,27 +142,24 @@ describe('requests over HTTP: registering internal software (integration, real P
       const events = await h.auditEvents('ACCESS_REQUEST', proposed.id);
       const registered = events.find((event) => event.action === 'ACCESS_REQUEST.INTERNAL_SOFTWARE_REGISTERED');
 
-      expect(registered?.after).toMatchObject({ businessOwnerEmployeeId: owner.employeeId, withSpend: false });
+      // RV-26: the entry names the application and the plan, and no Business Owner any more.
+      expect(registered?.after).toMatchObject({ withSpend: false });
+      expect(Object.keys(registered?.after ?? {})).toEqual(expect.arrayContaining(['applicationId', 'planId']));
+      expect(registered?.after).not.toHaveProperty('businessOwnerEmployeeId');
     });
   });
 
-  describe('a Business Owner is required (AC-4, AC-9)', () => {
+  describe('RV-26: the Business Owner is no longer a field of the registration (AC-4, AC-9, QĐ-104)', () => {
     it.each([
-      [
-        'has left the company',
-        () => ({ businessOwnerEmployeeId: gone.employeeId }),
-        422,
-        'APPLICATION.BUSINESS_OWNER_INVALID',
-      ],
-      ['is not named', () => ({}), 422, 'VALIDATION_ERROR'],
+      ['has left the company', () => ({ businessOwnerEmployeeId: gone.employeeId }), 422, 'VALIDATION_ERROR'],
       [
         'does not exist',
         () => ({ businessOwnerEmployeeId: '00000000-0000-4000-8000-000000000000' }),
         422,
-        'APPLICATION.BUSINESS_OWNER_INVALID',
+        'VALIDATION_ERROR',
       ],
     ])(
-      'refuses a Business Owner who %s, registers nothing and keeps the request with the IT Admin',
+      'refuses the retired field naming a Business Owner who %s, registers nothing and keeps the request with the IT Admin',
       async (_name, body, status, code) => {
         const proposed = await classified();
         const before = await catalogRows();
@@ -281,8 +279,6 @@ describe('requests over HTTP: registering internal software (integration, real P
       billingCycle: 'MONTHLY',
       validFrom: `${year}-01-01`,
       validUntil: null,
-      commitmentMonths: 6,
-      paymentFrequency: 'MONTHLY',
       ...over,
     });
 
@@ -296,7 +292,7 @@ describe('requests over HTTP: registering internal software (integration, real P
       expect(done).toMatchObject({
         branch: 'NEW_SOFTWARE',
         state: 'AWAITING_SPEND_SUBMISSION',
-        pricing: { status: 'PRICED', amount: { amount: '48.00', currency: 'USD' }, bindingPeriodCount: 6 },
+        pricing: { status: 'PRICED', amount: { amount: `${8 * monthsLeft}.00`, currency: 'USD' }, months: monthsLeft },
         policy: { hasSpendStep: true },
       });
       expect(done.plan?.planId).toBeTruthy();

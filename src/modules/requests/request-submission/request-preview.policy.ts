@@ -54,18 +54,19 @@ export function buildChain(policy: RequestPolicy, decision: RoutingDecision, fac
           explanation: NEED_EXPLANATION[decision.row],
           waitingReason: decision.reason,
         };
-  const steps: Array<Omit<PreviewStep, 'sequence'>> = [need];
+  const steps: Array<Omit<PreviewStep, 'sequence'>> = decision.outcome === 'NOT_REQUIRED' ? [] : [need];
 
   if (hasSpendStep(policy)) {
     // The head of the department sends the request on to be decided as spend, then the spending approver decides it.
-    steps.push({
-      kind: 'SPEND_SUBMISSION',
-      role: 'MANAGER',
-      assigneeEmployeeId: facts.departmentHeadEmployeeId,
-      expectedWorkingDays: days,
-      explanation: facts.departmentHeadEmployeeId === null ? 'WAITS_FOR_DEPARTMENT_HEAD' : 'DEPARTMENT_HEAD',
-      waitingReason: null,
-    });
+    if (decision.outcome !== 'NOT_REQUIRED')
+      steps.push({
+        kind: 'SPEND_SUBMISSION',
+        role: 'MANAGER',
+        assigneeEmployeeId: facts.departmentHeadEmployeeId,
+        expectedWorkingDays: days,
+        explanation: facts.departmentHeadEmployeeId === null ? 'WAITS_FOR_DEPARTMENT_HEAD' : 'DEPARTMENT_HEAD',
+        waitingReason: null,
+      });
     steps.push({
       kind: 'SPEND_APPROVAL',
       role: 'SPENDING_APPROVER',

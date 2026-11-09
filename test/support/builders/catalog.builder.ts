@@ -34,10 +34,22 @@ export async function declarePlan(ctx: HttpTestApp, itAdminToken: string, body: 
 /** The IT Admin declares a subscription of a plan (`POST /subscriptions`) and gets its id. */
 export async function declareSubscription(ctx: HttpTestApp, itAdminToken: string, body: object): Promise<string> {
   const actor = await principalOf(ctx, itAdminToken);
+  const { kind, billingCycle } = body as { kind?: string; billingCycle?: string };
+  // A subscription that becomes active names the months it commits to and the IT Admin who answers for it (QĐ-103e, QĐ-103v(4)):
+  // the commitment follows the cycle the body names, and the IT Admin who declares it answers unless the body says otherwise.
+  const commitment =
+    kind === 'PERPETUAL' || billingCycle === undefined
+      ? {}
+      : { commitmentTermMonths: billingCycle === 'MONTHLY' ? 1 : 12 };
 
   return (
     await ctx.app
       .get(SubscriptionService, { strict: false })
-      .declare(actor, DeclareSubscriptionBodyDto.create(sent(body)))
+      .declare(
+        actor,
+        DeclareSubscriptionBodyDto.create(
+          sent({ responsibleItAdminEmployeeId: actor.employeeId, ...commitment, ...body }),
+        ),
+      )
   ).id;
 }

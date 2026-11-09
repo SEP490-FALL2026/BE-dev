@@ -59,8 +59,13 @@ export class EmployeesController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'Invalid date or body.',
-      examples: [VALIDATION_EXAMPLE, EMPLOYEE_ERROR_EXAMPLES.EMPLOYEE_DATE_INVALID],
+      description:
+        'Invalid date or body, or the department takes effect later than the day (DEPARTMENT.NOT_YET_EFFECTIVE: a department made for next year takes nobody in before 1 January).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EMPLOYEE_ERROR_EXAMPLES.EMPLOYEE_DATE_INVALID,
+        EMPLOYEE_ERROR_EXAMPLES.DEPARTMENT_NOT_YET_EFFECTIVE,
+      ],
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   )

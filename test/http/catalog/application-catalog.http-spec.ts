@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { declareApplicationBodySchema } from '../../../src/modules/catalog/catalog-entry/application.dto';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
@@ -86,6 +87,10 @@ describe('application catalog routes (e2e, no database)', () => {
     const without = (key: keyof typeof VALID_APPLICATION) =>
       Object.fromEntries(Object.entries(VALID_APPLICATION).filter(([name]) => name !== key));
     const withoutOwner = without('businessOwnerEmployeeId');
+
+    it('AF-17, QĐ-104: takes a POST that names no Business Owner (the field is optional; the database part is in the integration suite)', () => {
+      expect(declareApplicationBodySchema.safeParse(withoutOwner).success).toBe(true);
+    });
     const withoutCommunication = without('communication');
     const withoutSensitivity = without('dataSensitivity');
 
@@ -93,7 +98,6 @@ describe('application catalog routes (e2e, no database)', () => {
       ['no name', { ...VALID_APPLICATION, name: undefined }],
       ['a kind that is not one', { ...VALID_APPLICATION, kind: 'FREEWARE' }],
       ['no kind', { ...VALID_APPLICATION, kind: undefined }],
-      ['no Business Owner', withoutOwner],
       ['a Business Owner that is not a uuid', { ...VALID_APPLICATION, businessOwnerEmployeeId: 'B1' }],
       ['no sensitivity', withoutSensitivity],
       ['a sensitivity that is not one', { ...VALID_APPLICATION, dataSensitivity: 'EXTREME' }],

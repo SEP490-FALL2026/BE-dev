@@ -84,9 +84,7 @@ describe('mobile channel: sign in, list, act, inbox, sign out (e2e)', () => {
     expect(plans.items.map((plan) => plan.id)).toContain(planId);
     await get(`/api/v1/requestable-plans/${planId}`, employeeSession).expect(200);
 
-    const preview = await post('/api/v1/access-requests/preview', employeeSession, { planId, termMonths: 6 }).expect(
-      200,
-    );
+    const preview = await post('/api/v1/access-requests/preview', employeeSession, { planId }).expect(200);
     expect(h.dataOf<{ preview: { canSubmit: boolean } }>(preview).preview.canSubmit).toBe(true);
 
     const sent = await post('/api/v1/access-requests', employeeSession, h.form(planId)).expect(201);

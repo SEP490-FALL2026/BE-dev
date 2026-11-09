@@ -184,8 +184,10 @@ describe('the grant of the people of a request for a group, one person at a time
 
       expect(await h.lineStates(id)).toEqual(['COMPLETED', 'FAILED', 'COMPLETED']);
       expect(await h.state(id)).toBe('COMPLETED');
-      const released = await releases(id);
-      expect(released.every((row) => row.reason === 'GRANT_FAILED')).toBe(true);
+      // M-10 (G9-02): the K2 seats granted give back their days before the grant (LATE_GRANT); the failed line gives back its share.
+      const all = await releases(id);
+      expect(all.every((row) => row.reason === 'GRANT_FAILED' || row.reason === 'LATE_GRANT')).toBe(true);
+      const released = all.filter((row) => row.reason === 'GRANT_FAILED');
       expect(released.map((row) => BigInt(row.amount_minor)).reduce((sum, value) => sum + value, 0n)).toBe(
         share.map((row) => BigInt(row.amount_minor)).reduce((sum, value) => sum + value, 0n),
       );

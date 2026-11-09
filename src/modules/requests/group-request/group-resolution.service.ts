@@ -4,9 +4,8 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { RepricingService } from '../assessment/repricing.service';
+import { RepricingService } from '../repricing/repricing.service';
 import { RequestFactsService } from '../access-request/request-facts.service';
-import { SpendEntryService } from '../spend/spend-entry.service';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 import { summarizeGroup, type GroupStage } from './group-resolution.policy';
 import { pricedPeople } from '../access-request/group-request.types';
@@ -17,8 +16,6 @@ const BEFORE_APPROVAL: readonly string[] = [
   'PENDING',
   'WAITING_CONTROLLED',
   'AWAITING_SPEND_SUBMISSION',
-  'AWAITING_FINANCE_REVIEW',
-  'AWAITING_BUDGET',
   'AWAITING_SPEND_DECISION',
 ];
 
@@ -43,7 +40,6 @@ export class GroupResolutionService {
     private readonly repricing: RepricingService,
     private readonly assessment: RequestFactsService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly entry: SpendEntryService,
     private readonly steps: SpendStepRepo,
     private readonly ending: GroupResolutionEnding,
   ) {}
@@ -87,20 +83,11 @@ export class GroupResolutionService {
   private async keepPriceInStep(tx: DbTx, request: AccessRequestRecord, now: Date): Promise<void> {
     const { pricing } = request;
     const people = pricedPeople(request.lines.map((line) => line.state));
-    if (pricing.status !== 'PRICED' || pricing.unitPrice === null || pricing.schedule === null || people === 0) return;
-    const first = pricing.schedule[0];
-    if (
-      !first ||
-      pricing.expectedSpendOn === null ||
-      first.amountMinor / pricing.unitPrice.amountMinor === BigInt(people)
-    )
-      return;
+    if (pricing.status !== 'PRICED' || people === 0) return;
 
-    const settings = await this.assessment.settings();
-    const repriced = await this.repricing.reprice(tx, request, pricing.expectedSpendOn, {
-      today: await this.organizationReads.businessToday(now, tx),
-      fiscalYearStartMonth: settings.fiscalYearStartMonth,
-    });
+    // The amount of the day for those who remain (`QĐ-109e`); written only when it differs from what the request already holds.
+    const repriced = await this.repricing.reprice(tx, request, await this.organizationReads.businessToday(now, tx));
+    if (repriced.status === 'PRICED' && repriced.amount?.amountMinor === pricing.amount?.amountMinor) return;
     await this.requests.setPricing(tx, request.id, repriced);
   }
 
@@ -122,14 +109,7 @@ export class GroupResolutionService {
     actor: AuthenticatedPrincipal | null,
     request: AccessRequestRecord,
   ): Promise<void> {
-    const confirmed = request.lines.filter((line) => line.state === 'NEED_CONFIRMED');
     await this.requests.setState(tx, request.id, 'AWAITING_SPEND_SUBMISSION');
-    if (actor === null) return;
-
-    // The way in to the spend is the one of whoever decided the people that remain: the step of the first of them.
-    const stepOf = request.needSteps.find((step) => step.id === confirmed[0]?.needStepId);
-    const fresh = await this.reread(tx, request.id);
-    await this.entry.enter(tx, actor, { ...fresh, needDecision: stepOf?.decision ?? fresh.needDecision });
   }
 
   private async reread(tx: DbTx, requestId: string): Promise<AccessRequestRecord> {

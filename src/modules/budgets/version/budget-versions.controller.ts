@@ -31,6 +31,7 @@ import { VersionDecisionService } from './version-decision.service';
 import { VersionHistoryViewService } from './version-history-view.service';
 import { LineImportService } from './line-import.service';
 import { VersionLineService } from './version-line.service';
+import { VersionBaselineCreationService } from './version-baseline-creation.service';
 import { VersionCreationService } from './version-creation.service';
 import { VersionService } from './version.service';
 import { VersionViewService } from '../budget/version-view.service';
@@ -97,31 +98,41 @@ export class BudgetVersionsController {
     private readonly views: VersionViewService,
     private readonly history: VersionHistoryViewService,
     private readonly imports: LineImportService,
+    private readonly baselineCreations: VersionBaselineCreationService,
   ) {}
 
   @Post()
   @RequireRoles('FINANCE')
-  @ApiOperation({ operationId: 'budgetVersionCreate', summary: 'Build the first version of a budget from a proposal' })
+  @ApiOperation({
+    operationId: 'budgetVersionCreate',
+    summary: 'Build the first version of a budget',
+  })
   @ApiSuccessResponse(VersionResponseDto, {
     status: HttpStatus.CREATED,
     message: 'BUDGET_VERSION.CREATED',
     description:
-      'A draft with the base and the reserve (the default share of the base unless Finance gives another with its reason), and the lines of the proposal copied to be reviewed; the proposal itself is not changed. A proposal whose latest version was refused is made again the same way: the new draft points at the refused one (rejectedPredecessorId).',
+      'A draft with the base and the reserve (the default share of the base unless Finance gives another with its reason), and the lines of the proposal copied to be reviewed; the proposal itself is not changed. A proposal whose latest version was refused is made again the same way: the new draft points at the refused one (rejectedPredecessorId). With source BASELINE (costCenterId and year, no proposal and no base) the draft is built from the baseline of the department when nobody heads it at the deadline: one Renew line for each subscription that runs in the year, the base is their sum, origin is BASELINE_NO_HEAD.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     FINANCE_ONLY,
     {
       status: HttpStatus.NOT_FOUND,
-      description: 'The proposal does not exist (BUDGET.PROPOSAL_NOT_FOUND).',
-      examples: [EXAMPLES.PROPOSAL_NOT_FOUND],
+      description:
+        'The proposal does not exist (BUDGET.PROPOSAL_NOT_FOUND), or the Cost Center of a version built from the baseline does not (BUDGET.COST_CENTER_NOT_FOUND).',
+      examples: [EXAMPLES.PROPOSAL_NOT_FOUND, EXAMPLES.COST_CENTER_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT).',
+        'The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the department is not in the cycle of the year (DEPARTMENT_NOT_IN_CYCLE), the deadline has not passed, somebody heads the department or is to, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).',
       // CURRENT_EXISTS is not shown: a current budget keeps the proposal behind it REVIEWED, so none can wait beside it.
-      examples: [EXAMPLES.FINANCE_SETUP_INCOMPLETE, EXAMPLES.PROPOSAL_NOT_SUBMITTED, EXAMPLES.VERSION_IN_FLIGHT],
+      examples: [
+        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+        EXAMPLES.PROPOSAL_NOT_SUBMITTED,
+        EXAMPLES.VERSION_IN_FLIGHT,
+        EXAMPLES.BASELINE_VERSION_NOT_ALLOWED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -132,6 +143,10 @@ export class BudgetVersionsController {
   )
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: VersionBodyDto) {
     try {
+      if (body.source === 'BASELINE') {
+        return { version: await this.baselineCreations.create(actor, body) };
+      }
+
       return { version: await this.creations.createFromProposal(actor, body) };
     } catch (error) {
       throw toBudgetApiException(error);
@@ -211,8 +226,14 @@ export class BudgetVersionsController {
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED) or the quarters do not add up (BUDGET.QUARTERS_MISMATCH).',
-    examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED, EXAMPLES.QUARTERS_MISMATCH, ...MONEY_EXAMPLES],
+      'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the quarters do not add up (BUDGET.QUARTERS_MISMATCH) or the base is changed with no reason (BUDGET.BASE_REASON_REQUIRED, `baseReason`).',
+    examples: [
+      VALIDATION_EXAMPLE,
+      EXAMPLES.YEAR_ENDED,
+      EXAMPLES.QUARTERS_MISMATCH,
+      EXAMPLES.BASE_REASON_REQUIRED,
+      ...MONEY_EXAMPLES,
+    ],
   })
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -232,7 +253,7 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(VersionResponseDto, {
     message: 'BUDGET_VERSION.SENT',
     description:
-      'The version waits for the spending approver. A reserve that is not the default share of the base is sent with its reason.',
+      'The version waits for the spending approver. A reserve that is not the default share of the base is sent with its reason. The versions of the year (this one in the place of the one of its own Cost Center) must add up to no more than the annual ceiling less the shared-pool reserve of the budget cycle.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -242,7 +263,13 @@ export class BudgetVersionsController {
       status: HttpStatus.CONFLICT,
       description: NOT_EDITABLE_DESCRIPTION,
       // The proposal behind a first version was taken back or given back while it was being built.
-      examples: [EXAMPLES.VERSION_NOT_EDITABLE, EXAMPLES.PROPOSAL_NOT_SUBMITTED],
+      examples: [
+        EXAMPLES.VERSION_NOT_EDITABLE,
+        EXAMPLES.PROPOSAL_NOT_SUBMITTED,
+        EXAMPLES.CYCLE_NOT_PUBLISHED,
+        EXAMPLES.OVER_ANNUAL_CEILING,
+        EXAMPLES.CYCLE_CURRENCY_MISMATCH,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -265,7 +292,7 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(VersionResponseDto, {
     message: 'BUDGET_VERSION.DECIDED',
     description:
-      'The spending approver approves a version that was sent (it becomes the current budget of its Cost Center and year, replaces the one that was current, and takes the commitments that waited for a budget), refuses it with a reason, or sends it back to Finance with a reason. The decision is written as a record that is never changed. No figure is changed here.',
+      'The spending approver approves a version that was sent (it becomes the current budget of its Cost Center and year, which has no other current version, and takes the commitments that waited for a budget), refuses it with a reason, or sends it back to Finance with a reason. The decision is written as a record that is never changed. No figure is changed here.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

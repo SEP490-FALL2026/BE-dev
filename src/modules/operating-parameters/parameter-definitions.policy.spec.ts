@@ -14,7 +14,6 @@ describe('operating parameter definitions (US-01-04)', () => {
 
     expect(defaults.APPROVAL_SLA_WORKING_DAYS).toBe(2);
     expect(defaults.ACTIVITY_WINDOW_MINUTES).toBe(5);
-    expect(defaults.FISCAL_YEAR_START_MONTH).toBe(1);
     expect(defaults.SPEND_SUBMISSION_WAIT_WORKING_DAYS).toBe(2);
     expect(defaults.TRANSFER_REVIEW_WORKING_DAYS).toBe(5);
     expect(defaults.PERSONNEL_NOTICE_REVIEW_WORKING_DAYS).toBe(2);
@@ -24,6 +23,8 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(defaults.BACKLOG_ALERT_THRESHOLD).toBe(10);
     expect(defaults.DETECTION_THRESHOLD_DAYS).toEqual([30, 60, 90]);
     expect(defaults.RENEWAL_ALERT_DAYS_BEFORE_DEADLINE).toEqual([15, 7]);
+    expect(defaults.GHOST_SEAT_DECISION_WORKING_DAYS).toBe(5);
+    expect(defaults.GHOST_SEAT_REVOCATION_GRACE_DAYS).toBe(7);
     expect(defaults.RULE_SCHEDULE_G1_G2).toBe('DAILY');
     expect(defaults.RULE_SCHEDULE_G3_G4).toBe('WEEKLY');
   });
@@ -35,7 +36,8 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(keys.filter((key) => /BUDGET_PERIOD|HIGH_VALUE|THRESHOLD_PERCENT/.test(key))).toEqual([
       'FORECAST_ERROR_THRESHOLD_PERCENT',
     ]);
-    expect(keys).toEqual(expect.arrayContaining(['FISCAL_YEAR_START_MONTH', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS']));
+    expect(keys).toEqual(expect.arrayContaining(['SPEND_SUBMISSION_WAIT_WORKING_DAYS']));
+    expect(definitionOf('FISCAL_YEAR_START_MONTH')).toBeUndefined();
   });
 
   it('gives every parameter a key, a unit, a description and a default that is itself valid', () => {
@@ -64,8 +66,6 @@ describe('operating parameter definitions (US-01-04)', () => {
     ['a fraction', 'APPROVAL_SLA_WORKING_DAYS', 2.5],
     ['zero days', 'APPROVAL_SLA_WORKING_DAYS', 0],
     ['no value', 'APPROVAL_SLA_WORKING_DAYS', null],
-    ['a month that does not exist', 'FISCAL_YEAR_START_MONTH', 13],
-    ['month zero', 'FISCAL_YEAR_START_MONTH', 0],
     ['no waiting days', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS', 0],
     ['more than thirty waiting days', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS', 31],
     ['a backlog threshold of none', 'BACKLOG_ALERT_THRESHOLD', 0],
@@ -113,9 +113,13 @@ const EXPECTED_KEYS = [
   'APPROVAL_SLA_WORKING_DAYS',
   'BACKLOG_ALERT_THRESHOLD',
   'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
-  'FISCAL_YEAR_START_MONTH',
+  'REQUEST_OPEN_NEW_LIMIT',
+  'PAID_SOFTWARE_FLAG_THRESHOLD',
+  'RENEWAL_WINDOW_DAYS',
   'FORECAST_ERROR_THRESHOLD_PERCENT',
   'BUDGET_RESERVE_DEFAULT_PERCENT',
+  'BUDGET_ZBB_KPI3_BELOW_PERCENT',
+  'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
   'TRANSFER_REVIEW_WORKING_DAYS',
   'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
   'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
@@ -129,6 +133,9 @@ const EXPECTED_KEYS = [
   'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
   'ACTIVITY_WINDOW_MINUTES',
   'DETECTION_THRESHOLD_DAYS',
+  'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
+  'GHOST_SEAT_DECISION_WORKING_DAYS',
+  'GHOST_SEAT_REVOCATION_GRACE_DAYS',
   'RULE_SCHEDULE_G1_G2',
   'RULE_SCHEDULE_G3_G4',
   'AI_ENABLED',
@@ -136,7 +143,7 @@ const EXPECTED_KEYS = [
 ];
 
 describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
-  it('pins the twenty-three keys, ordered by group and, inside a group, as the spec table lists them', () => {
+  it('pins the twenty-six keys, ordered by group and, inside a group, as the spec table lists them', () => {
     expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
   });
 
@@ -196,9 +203,25 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['APPROVAL_SLA_WORKING_DAYS', 'Hạn xử lý một bước phê duyệt', 'WORKFLOW', 'working days', 'ngày làm việc'],
       ['BACKLOG_ALERT_THRESHOLD', 'Ngưỡng tồn đọng bước phê duyệt', 'WORKFLOW', 'steps', 'bước'],
       ['SPEND_SUBMISSION_WAIT_WORKING_DAYS', 'Hạn chờ trình duyệt chi', 'WORKFLOW', 'working days', 'ngày làm việc'],
-      ['FISCAL_YEAR_START_MONTH', 'Tháng bắt đầu năm tài chính', 'BUDGET', 'month of the year', 'tháng trong năm'],
+      ['REQUEST_OPEN_NEW_LIMIT', 'Số Request cấp mới đang mở tối đa của một người', 'WORKFLOW', 'requests', 'Request'],
+      [
+        'PAID_SOFTWARE_FLAG_THRESHOLD',
+        'Ngưỡng số phần mềm trả phí cần lý do khi xin thêm',
+        'WORKFLOW',
+        'applications',
+        'phần mềm',
+      ],
+      ['RENEWAL_WINDOW_DAYS', 'Cửa sổ gửi Request tiếp tục trước ngày kết thúc', 'WORKFLOW', 'days', 'ngày'],
       ['FORECAST_ERROR_THRESHOLD_PERCENT', 'Ngưỡng sai số dự báo chi phí', 'BUDGET', 'percent', '%'],
       ['BUDGET_RESERVE_DEFAULT_PERCENT', 'Tỷ lệ dự phòng mặc định của ngân sách năm', 'BUDGET', 'percent', '%'],
+      [
+        'BUDGET_ZBB_KPI3_BELOW_PERCENT',
+        'Ngưỡng sử dụng dưới đó dòng ngân sách cần giải trình ZBB',
+        'BUDGET',
+        'percent',
+        '%',
+      ],
+      ['BUDGET_ZBB_PRICE_INCREASE_PERCENT', 'Ngưỡng tăng đơn giá cần giải trình ZBB', 'BUDGET', 'percent', '%'],
       [
         'TRANSFER_REVIEW_WORKING_DAYS',
         'Hạn rà soát quyền sau điều chuyển',
@@ -242,6 +265,15 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['RENEWAL_ALERT_DAYS_BEFORE_DEADLINE', 'Cảnh báo trước hạn báo hủy thuê bao', 'SUBSCRIPTION', 'days', 'ngày'],
       ['ACTIVITY_WINDOW_MINUTES', 'Số phút tính là một ngày có hoạt động', 'USAGE', 'minutes per day', 'phút mỗi ngày'],
       ['DETECTION_THRESHOLD_DAYS', 'Ngưỡng ngày không dùng của ghế', 'USAGE', 'days', 'ngày'],
+      ['GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS', 'Ân hạn cho ghế mới cấp', 'USAGE', 'days', 'ngày'],
+      [
+        'GHOST_SEAT_DECISION_WORKING_DAYS',
+        'Hạn trưởng phòng quyết định ghost seat',
+        'USAGE',
+        'working days',
+        'ngày làm việc',
+      ],
+      ['GHOST_SEAT_REVOCATION_GRACE_DAYS', 'Ân hạn trước khi gỡ ghost seat', 'USAGE', 'calendar days', 'ngày lịch'],
       ['RULE_SCHEDULE_G1_G2', 'Lịch chạy luật lãng phí (dữ liệu nội bộ)', 'USAGE', 'schedule', 'lịch'],
       ['RULE_SCHEDULE_G3_G4', 'Lịch chạy luật lãng phí (dữ liệu usage)', 'USAGE', 'schedule', 'lịch'],
       ['AI_ENABLED', 'Công tắc tổng của các tính năng AI', 'AI', 'switch', 'công tắc'],

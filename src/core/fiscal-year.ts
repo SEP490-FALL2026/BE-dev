@@ -1,19 +1,12 @@
 import type { BusinessDate } from './business-date';
 
 /**
- * The fiscal year a day belongs to, named after the calendar year it begins in: with a year that begins in April, the
- * 31st of March 2027 is in fiscal year 2026 and the 1st of April 2027 in 2027. With a year that begins in January it is
- * the calendar year. The month the year begins in is an operating parameter (`FISCAL_YEAR_START_MONTH`, `QĐ-82e`), and
- * the budget period of every Cost Center is this year.
+ * The fiscal year a day belongs to: the calendar year, 1 January to 31 December (`QĐ-104e`(1), `FR-5.1`). The year the
+ * budget of every Cost Center is made for, the year of a request and the year a commitment falls in are this year; no
+ * operating parameter moves where it begins.
  */
-export function fiscalYearOf(date: BusinessDate, startMonth: number): number {
-  if (!Number.isInteger(startMonth) || startMonth < 1 || startMonth > 12) {
-    throw new Error(`The fiscal year begins in a month from 1 to 12, not ${startMonth}.`);
-  }
-  const year = Number(date.slice(0, 4));
-  const month = Number(date.slice(5, 7));
-
-  return month >= startMonth ? year : year - 1;
+export function fiscalYearOf(date: BusinessDate): number {
+  return Number(date.slice(0, 4));
 }
 
 const DAYS_IN_MONTH = (year: number, month: number): number => new Date(Date.UTC(year, month, 0)).getUTCDate();

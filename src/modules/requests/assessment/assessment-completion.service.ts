@@ -5,9 +5,8 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
-import { RequestFactsService } from '../access-request/request-facts.service';
 import type { AssessmentRecord, Quote } from '../access-request/assessment-record.types';
-import { SpendEntryService } from '../spend/spend-entry.service';
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import {
   AssessmentIncompleteError,
   AssessmentInternalByRegistrationError,
@@ -31,8 +30,7 @@ export class AssessmentCompletionService {
     private readonly requests: AccessRequestRepo,
     private readonly assessments: AssessmentRepo,
     private readonly audit: AuditApi,
-    private readonly entry: SpendEntryService,
-    private readonly settings: RequestFactsService,
+    private readonly entry: SpendRoutingService,
     private readonly pricing: AssessmentPricingService,
   ) {}
 
@@ -41,8 +39,6 @@ export class AssessmentCompletionService {
    * AssessmentUncontrollableError, AssessmentQuoteRefusedError and AccessRequestNotFoundError.
    */
   async complete(actor: AuthenticatedPrincipal, requestId: string): Promise<AccessRequestRecord> {
-    const { fiscalYearStartMonth } = await this.settings.settings();
-
     return this.runner.run(async (tx) => {
       const request = await this.gate.lockProposal(tx, requestId);
       this.gate.requireAssessor(actor, request);
@@ -50,7 +46,7 @@ export class AssessmentCompletionService {
       const quote = this.completableQuote(assessment);
 
       const now = new Date();
-      const pricing = await this.pricing.priceCompleted(tx, request, quote, { now, fiscalYearStartMonth });
+      const pricing = await this.pricing.priceCompleted(tx, request, quote, { now });
       await this.requests.setPriced(tx, requestId, pricing, 'AWAITING_SPEND_SUBMISSION');
       const standsIn = await this.gate.finishStep(tx, requestId, actor, { now });
       await this.assessments.complete(tx, requestId, actor.employeeId, now);
@@ -84,7 +80,7 @@ export class AssessmentCompletionService {
   private async enterSpend(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string): Promise<AccessRequestRecord> {
     const priced = await this.requests.findById(requestId, tx);
     if (!priced) throw new Error(`The request ${requestId} was not found after its assessment was completed.`);
-    await this.entry.enter(tx, actor, priced);
+    if (priced.routing?.mode === 'ONE_STEP') await this.entry.route(tx, actor, priced, 'SUBMISSION', new Date());
     const record = await this.requests.findById(requestId, tx);
     if (!record) throw new Error(`The request ${requestId} was not found after its assessment was completed.`);
 
@@ -108,8 +104,7 @@ function completedAuditDetail(
     equivalentPlanId: assessment.equivalentPlanId,
     amountMinor: pricing.amount?.amountMinor.toString() ?? null,
     amountCurrency: pricing.amount?.currency ?? null,
-    periods: pricing.schedule?.length ?? null,
-    bindingPeriods: pricing.schedule?.filter((period) => period.binding).length ?? null,
+    months: pricing.amountMonths,
     budgetYear: pricing.budgetYear,
     actingForAssignee,
   };

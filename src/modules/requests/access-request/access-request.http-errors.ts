@@ -9,11 +9,15 @@ import { FinanceSetupIncompleteError } from '../../organization/public/organizat
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   AccessRequestAlreadyHoldsAccessError,
+  AccessRequestManyPaidSoftwareReasonRequiredError,
+  AccessRequestOpenLimitReachedError,
+  AccessRequestOpenRequestExistsError,
   AccessRequestEmployeeRequiredError,
   AccessRequestNotDraftError,
   AccessRequestRoleRequiredError,
   AccessRequestSuperAdminCannotRequestError,
-  AccessRequestTermBeyondLimitError,
+  AccessRequestEndDateOutOfRangeError,
+  AccessRequestTermRequiredError,
   AccessRequestGroupUsesLinesError,
   AccessRequestApplicationRetiredError,
   AccessRequestDecisionRefusedError,
@@ -22,6 +26,8 @@ import {
   AccessRequestWithdrawalRefusedError,
   AccessRequestNoDepartmentError,
   AccessRequestNotFoundError,
+  AccessRequestNotRequesterError,
+  AccessRequestNotAwaitingRevisionError,
   AccessRequestNotPriceableError,
   AccessRequestPlanNotFoundError,
 } from './access-request.errors';
@@ -32,6 +38,10 @@ const refuse = (status: HttpStatus, code: string, message: string): ApiException
 /** Maps the errors of the request routes to their HTTP answers; a database that cannot answer is a 503. */
 export function toAccessRequestApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  if (error instanceof AccessRequestNotRequesterError)
+    return refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.NOT_REQUESTER', error.message);
+  if (error instanceof AccessRequestNotAwaitingRevisionError)
+    return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_AWAITING_REVISION', error.message);
 
   if (error instanceof AccessRequestNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'ACCESS_REQUEST.NOT_FOUND', error.message);
@@ -72,18 +82,42 @@ export function toAccessRequestApiException(error: unknown): unknown {
     );
   }
 
-  if (error instanceof AccessRequestTermBeyondLimitError) {
+  if (error instanceof AccessRequestEndDateOutOfRangeError) {
     return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
-      code: 'ACCESS_REQUEST.TERM_BEYOND_LIMIT',
+      code: 'ACCESS_REQUEST.END_DATE_OUT_OF_RANGE',
       message: error.message,
-      details: { maxMonths: error.maxMonths, endsBy: error.endsBy },
+      details: { maxEndDate: error.maxEndDate },
     });
+  }
+  if (error instanceof AccessRequestTermRequiredError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCESS_REQUEST.TERM_REQUIRED', error.message);
   }
   if (error instanceof AccessRequestAlreadyHoldsAccessError) {
     return new ApiException(HttpStatus.CONFLICT, {
       code: 'ACCESS_REQUEST.ALREADY_HOLDS_ACCESS',
       message: error.message,
       details: { assignment: error.held },
+    });
+  }
+  if (error instanceof AccessRequestOpenRequestExistsError) {
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'ACCESS_REQUEST.OPEN_REQUEST_EXISTS',
+      message: error.message,
+      details: { requestId: error.requestId },
+    });
+  }
+  if (error instanceof AccessRequestOpenLimitReachedError) {
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'ACCESS_REQUEST.OPEN_LIMIT_REACHED',
+      message: error.message,
+      details: { limit: error.limit, openRequestIds: [...error.openRequestIds] },
+    });
+  }
+  if (error instanceof AccessRequestManyPaidSoftwareReasonRequiredError) {
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+      code: 'ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED',
+      message: error.message,
+      details: { count: error.count, threshold: error.threshold },
     });
   }
   if (error instanceof AccessRequestNotAssigneeError) {
@@ -143,10 +177,12 @@ const cancellation = (reason: ConstructorParameters<typeof AccessRequestCancella
 
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
 export const ACCESS_REQUEST_ERROR_EXAMPLES = {
+  NOT_AWAITING_REVISION: example(new AccessRequestNotAwaitingRevisionError()),
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
-  TERM_BEYOND_LIMIT: example(new AccessRequestTermBeyondLimitError(12, '2026-12-31')),
+  END_DATE_OUT_OF_RANGE: example(new AccessRequestEndDateOutOfRangeError('2027-11-09')),
+  TERM_REQUIRED: example(new AccessRequestTermRequiredError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({
@@ -169,6 +205,9 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
       validUntil: null,
     }),
   ),
+  OPEN_REQUEST_EXISTS: example(new AccessRequestOpenRequestExistsError('<request-id>')),
+  OPEN_LIMIT_REACHED: example(new AccessRequestOpenLimitReachedError(3, ['<request-id>'])),
+  MANY_PAID_SOFTWARE_REASON_REQUIRED: example(new AccessRequestManyPaidSoftwareReasonRequiredError(10, 10)),
   NOT_ASSIGNEE: example(new AccessRequestNotAssigneeError()),
   EMPLOYEE_REQUIRED: example(new AccessRequestEmployeeRequiredError()),
   GROUP_USES_LINES: example(new AccessRequestGroupUsesLinesError()),

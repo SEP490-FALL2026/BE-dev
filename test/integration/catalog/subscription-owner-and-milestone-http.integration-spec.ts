@@ -49,13 +49,13 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       );
     });
 
-    it('refuses a declaration with no owner department: 422 VALIDATION_ERROR and nothing is written', async () => {
-      const { planId } = await plan();
+    it('refuses a K1 declaration with no owner department: 422 and nothing is written (AF-05: a K2 or K4 one may name none)', async () => {
+      const { planId } = await plan({ type: 'K1' });
       const before = { subscriptions: await n('subscriptions'), audit: await n('audit_events') };
 
       const response = await create({ planId, kind: 'TERM', ownerDepartmentId: undefined }).expect(422);
 
-      expect(codeOf(response)).toBe('VALIDATION_ERROR');
+      expect(codeOf(response)).toBe('SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE');
       expect({ subscriptions: await n('subscriptions'), audit: await n('audit_events') }).toEqual(before);
     });
 
@@ -105,7 +105,9 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
               WHERE table_name = 'subscriptions' AND column_name = 'owner_department_id'`,
           )
         ).rows[0].is_nullable,
-      ).toBe('NO');
+        // Rewritten for QĐ-103d: the column is nullable since `shared_pool_grant` (a pool no department owns, to be dropped in W5), but the API
+        // still requires the owner of a new subscription and the trigger above keeps it.
+      ).toBe('YES');
       expect(dataOf<SubscriptionWire>(await get(created.id).expect(200)).ownerDepartmentId).toBe(h.seed.departmentId);
     });
 

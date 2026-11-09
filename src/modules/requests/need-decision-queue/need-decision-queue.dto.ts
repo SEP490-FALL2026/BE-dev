@@ -37,7 +37,7 @@ const needQueueItemSchema = z.strictObject({
   /** The kind of step the row is, the same key the list of the spend steps carries, so a client can put the two lists in one. */
   stepKind: z.literal('NEED'),
   /** The role the caller holds in this step as the system gave it: the head, the spending approver or the fallback approver. */
-  deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER', 'FALLBACK_APPROVER']),
+  deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER']),
   type: requestType,
   openedAt: z.iso.datetime(),
   /** When the step was given to the caller; it is later than `openedAt` when the step was handed over. */
@@ -56,7 +56,10 @@ const needQueueItemSchema = z.strictObject({
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
   /** The first part of the reason the sender gave; the request has all of it. */
   businessReasonExcerpt: z.string(),
-  termMonths: z.number().int().positive(),
+  /** Only a request made before `QĐ-104a` has a term in months. */
+  termMonths: z.number().int().positive().nullable(),
+  /** The day the right ends as the sender chose it; null for a right with no end (`QĐ-104a`). */
+  expectedEndDate: z.string().nullable(),
   /** Approving needs the caller to confirm the term in so many words (a term over twelve months). */
   /** What this request costs, as the request itself says; never what is left of a budget. */
   pricing: z.strictObject({
@@ -64,7 +67,6 @@ const needQueueItemSchema = z.strictObject({
     amount: moneySchema.nullable(),
   }),
   /** The same person holds this step and the spend step of the request. */
-  samePersonAsSpend: z.boolean(),
 });
 
 export class NeedQueueQueryDto extends createZodDto(needQueueQuerySchema) {}

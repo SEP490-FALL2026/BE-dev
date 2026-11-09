@@ -78,7 +78,15 @@ describe('what licensing reads of catalog and organization (integration, real Po
       await request(server())
         .post('/api/v1/subscriptions')
         .set(as(it1))
-        .send({ ownerDepartmentId: seed.departmentId, planId, kind: 'TERM', ...extra })
+        .send({
+          ownerDepartmentId: seed.departmentId,
+          planId,
+          kind: 'TERM',
+          // A subscription that becomes active names the months it commits to and the IT Admin who answers for it.
+          commitmentTermMonths: 1,
+          responsibleItAdminEmployeeId: it1.employeeId,
+          ...extra,
+        })
         .expect(201),
     ).id;
 

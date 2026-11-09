@@ -108,12 +108,11 @@ export class StepSlaService {
       const standing = standingOf(step, context.now, calendar);
       if (!isReminderDue(standing, context.today, calendar.nonWorkingDates, false)) return false;
 
-      const questionId =
-        step.kind === 'SPEND_APPROVAL' ? await this.subjects.openFinanceQuestion(tx, step.stepId) : null;
       const people = await this.facts.forStep(tx, {
         holderEmployeeId: step.assigneeEmployeeId,
         today: context.today,
-        questionOpen: questionId !== null,
+        stepKind: step.kind,
+        requesterEmployeeId: step.requesterEmployeeId,
       });
 
       return this.writer.write(tx, {
@@ -126,7 +125,6 @@ export class StepSlaService {
         holderEmployeeId: step.assigneeEmployeeId,
         standing,
         recipients: recipientsOf(people),
-        questionId,
         correlationId: context.correlationId,
       });
     });
@@ -192,7 +190,6 @@ export class StepSlaService {
         holderEmployeeId: people.headEmployeeId,
         standing,
         recipients: queueRecipientsOf(people),
-        questionId: null,
         correlationId: context.correlationId,
       });
     });

@@ -20,6 +20,14 @@ export interface MeView {
   roles: AppRole[];
   /** The department the caller heads today when they hold MANAGER; null otherwise. */
   managerScope: { departmentId: string; departmentCode: string; departmentName: string } | null;
+  /** The departments not yet in effect the caller, holding the MANAGER grant, is to head from the day they take effect (`QĐ-106k`). */
+  upcomingUnits: {
+    departmentId: string;
+    departmentCode: string;
+    departmentName: string;
+    effectiveFrom: string;
+    costCenterId: string | null;
+  }[];
 }
 
 @Injectable()
@@ -50,6 +58,7 @@ export class MeService {
       employee: profile,
       roles,
       managerScope: await this.managerScopeOf(principal, day),
+      upcomingUnits: await this.upcomingUnitsOf(principal, day),
     };
   }
 
@@ -63,5 +72,36 @@ export class MeService {
     const brief = headed ? await this.organizationReads.getDepartmentBrief(headed.departmentId) : null;
 
     return brief ? { departmentId: brief.id, departmentCode: brief.code, departmentName: brief.name } : null;
+  }
+
+  /**
+   * The departments not yet in effect that the caller, holding the MANAGER grant, is to head from the day they take effect, with the
+   * Cost Center Finance made for each: what the screen of the proposal (`BM-10`) needs before the department starts (`QĐ-106k`). The
+   * role MANAGER is not effective for them (`managerScope` stays null); the budget routes judge the work by these units.
+   */
+  private async upcomingUnitsOf(
+    principal: AuthenticatedPrincipal,
+    day: BusinessDate,
+  ): Promise<MeView['upcomingUnits']> {
+    if (!principal.directRoles.includes('MANAGER')) return [];
+    const units = await this.organizationReads.getUpcomingHeadedUnits(principal.employeeId, day);
+    const briefs = await this.organizationReads.getDepartmentBriefs(units.map((unit) => unit.departmentId));
+    const byId = new Map(briefs.map((brief) => [brief.id, brief]));
+
+    return units.flatMap((unit) => {
+      const brief = byId.get(unit.departmentId);
+
+      return brief
+        ? [
+            {
+              departmentId: brief.id,
+              departmentCode: brief.code,
+              departmentName: brief.name,
+              effectiveFrom: unit.effectiveFrom,
+              costCenterId: unit.costCenter?.id ?? null,
+            },
+          ]
+        : [];
+    });
   }
 }

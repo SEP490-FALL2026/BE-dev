@@ -102,3 +102,13 @@ export function assertWorkspaceShape(profile: WorkspaceShape): void {
   if (profile.ownerLimit !== null && owners > profile.ownerLimit) throw new PlanWorkspaceLimitExceededError('OWNER');
   if (profile.adminLimit !== null && admins > profile.adminLimit) throw new PlanWorkspaceLimitExceededError('ADMIN');
 }
+
+/**
+ * `KPI-3` of a plan priced per seat, in percent to one decimal (`QĐ-109d`): the seats with activity in the last 30 days over the seats its
+ * subscriptions bought. None when nothing was bought (no ratio to give).
+ */
+export function kpi3Percent(activeSeats: number, purchasedSeats: number): number | null {
+  if (purchasedSeats <= 0) return null;
+
+  return Math.round((activeSeats * 1000) / purchasedSeats) / 10;
+}

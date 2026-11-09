@@ -1,6 +1,7 @@
 import { ReassignmentHarness } from '../../support/reassignment-harness';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
+import { changeRoleTo } from '../../support/builders/account.builder';
 
 /**
  * `g0-g6-final-business-baseline-remediation`, Task 4.3 (F28, `QĐ-90b`, `FR-3.16`): the event of a department that changes only
@@ -92,17 +93,81 @@ describe('a transfer redetermines the need step of internal requests only (F28)'
     await h.decide(sentPaid.id, APPROVE, successor.account).expect(200);
   });
 
-  it('waits under control, and is never given to the head of where the requester sits now, when nobody heads the department it was sent from', async () => {
+  it('BR-MF1-02 converts a paid request in two phases when its original department loses its head, without following its requester', async () => {
     const from = await scene();
     const to = await scene();
     const sentPaid = await h.sent(from.member, paid);
     await h.moveTo(from.member.employeeId, to.department.id);
 
-    // Nobody heads the department it was sent from now: the step waits, as a step nobody can hold does.
+    const before = await h.stepOf(sentPaid.id, 'NEED');
     await h.vacateHead(from.department.id).expect(200);
 
-    expect(await h.stepOf(sentPaid.id, 'NEED')).toMatchObject({ state: 'WAITING', assignee_employee_id: null });
-    expect((await h.stepOf(sentPaid.id, 'NEED')).assignee_employee_id).not.toBe(to.head.employeeId);
+    expect(await h.stepOf(sentPaid.id, 'NEED')).toMatchObject({ state: 'CLOSED', created_at: before.created_at });
+    expect(
+      await h.ctx.sql.query('SELECT 1 FROM request_budget_checks WHERE request_id = $1', [sentPaid.id]),
+    ).toMatchObject({ rowCount: 0 });
+    await h.sweep();
+    expect(await h.state(sentPaid.id)).toBe('AWAITING_REQUESTER_REVISION');
+    const stored = await h.ctx.sql.query<{ routing_mode: string; one_step_reason: string; department_id: string }>(
+      'SELECT routing_mode::text, one_step_reason, department_id FROM access_requests WHERE id = $1',
+      [sentPaid.id],
+    );
+    expect(stored.rows).toEqual([
+      { routing_mode: 'ONE_STEP', one_step_reason: 'HEAD_LEFT', department_id: from.department.id },
+    ]);
+    expect(await h.stepOf(sentPaid.id, 'SPEND_APPROVAL')).toBeUndefined();
+  });
+
+  it('BR-MF1-02 M-15: a new request in a successor gap is one-step while an existing request waits for the recorded successor', async () => {
+    const from = await scene();
+    const existing = await h.sent(from.member, paid);
+    const next = await colleague(from, 'GAP-H');
+    await changeRoleTo(h.ctx, h.admin, next.employeeId, 'MANAGER');
+    // The head stays a member for the whole period (INV-20): the placement of the head moves back with the period.
+    await h.ctx.sql.query(
+      `UPDATE employee_placements SET valid_from = valid_from - 1
+        WHERE department_id = $1 AND employee_id IN (SELECT employee_id FROM department_head_periods WHERE department_id = $1)`,
+      [from.department.id],
+    );
+    await h.ctx.sql.query('UPDATE department_head_periods SET valid_from = valid_from - 1 WHERE department_id = $1', [
+      from.department.id,
+    ]);
+    await h.ctx.sql.query('UPDATE department_head_periods SET valid_to = $2 WHERE department_id = $1', [
+      from.department.id,
+      h.today(),
+    ]);
+    const period = await h.ctx.sql.query<{ id: string }>(
+      `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+       SELECT gen_random_uuid(), organization_id, id, $2, $3 FROM departments WHERE id = $1 RETURNING id`,
+      [from.department.id, next.employeeId, h.tomorrow()],
+    );
+    await h.sweep();
+    const waiting = await h.stepOf(existing.id, 'NEED');
+    expect(waiting).toMatchObject({
+      state: 'WAITING',
+      assignee_employee_id: null,
+      waiting_reason: 'NO_DEPARTMENT_HEAD',
+    });
+
+    const newcomer = await colleague(from, 'GAP-E');
+    const sent = await h.sent(newcomer, paid);
+    expect(sent).toMatchObject({
+      state: 'AWAITING_REQUESTER_REVISION',
+      routing: { mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' },
+      needStep: { state: 'NOT_REQUIRED' },
+    });
+    await h.ctx.sql.query('UPDATE department_head_periods SET valid_from = $2 WHERE id = $1', [
+      period.rows[0].id,
+      h.today(),
+    ]);
+    await h.sweep();
+    expect(await h.stepOf(existing.id, 'NEED')).toMatchObject({
+      state: 'PENDING',
+      assignee_employee_id: next.employeeId,
+      created_at: waiting.created_at,
+    });
+    expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({ state: 'NOT_REQUIRED', assignee_employee_id: null });
+    expect(await h.state(sent.id)).toBe('AWAITING_REQUESTER_REVISION');
   });
 
   it('leaves a paid request whose requester was transferred and whose pass of the day runs later with the department it was sent from', async () => {

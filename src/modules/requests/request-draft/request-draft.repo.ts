@@ -29,7 +29,8 @@ export interface NewDraft {
   requesterEmployeeId: string;
   departmentId: string;
   businessReason: string;
-  termMonths: number;
+  /** A draft keeps no term: the end date, when there is one, is in its content. */
+  termMonths: number | null;
   /** The content the draft is sent from (`policy.draft`). */
   content: DraftPolicy['draft'];
   createdByAppUserId: string;

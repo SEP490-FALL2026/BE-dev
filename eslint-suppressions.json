@@ -19,14 +19,6 @@
       "count": 1
     }
   },
-  "src/modules/budgets/year-end/year-end.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
   "src/modules/catalog/plan/plan.service.ts": {
     "complexity": {
       "count": 1
@@ -296,11 +288,6 @@
       "count": 2
     }
   },
-  "src/modules/requests/assessment/quote-pricing.policy.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/requests/cancellation/departure-cancellation.service.ts": {
     "complexity": {
       "count": 1
@@ -372,11 +359,6 @@
       "count": 1
     }
   },
-  "src/modules/requests/request-view/pricing-view.service.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/requests/service-account-request/service-account-request.service.ts": {
     "complexity": {
       "count": 1
@@ -400,25 +382,12 @@
       "count": 1
     }
   },
-  "src/modules/requests/spend/budget-check.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/modules/requests/status/request-status-facts.service.ts": {
     "complexity": {
       "count": 1
     }
   },
   "src/modules/requests/status/rules/request-status-rules.policy.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
-  "src/modules/requests/timing/request-timing.policy.ts": {
     "complexity": {
       "count": 1
     }

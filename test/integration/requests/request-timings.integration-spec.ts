@@ -113,21 +113,16 @@ describe('the time a request took over PostgreSQL (US-05-15 AC-1, AC-6, AC-11)',
     });
   });
 
-  describe('where the time went, with the review of Finance (AC-1)', () => {
-    it('has a segment for the need, the wait in the queue, the review of Finance, the decision of the spend and the grant, and no time of Finance after the approval', async () => {
+  describe('where the time went, when the check blocked the request first (AC-1, BR-MF1-06i)', () => {
+    it('has a segment for the need, the wait in the queue, the decision of the spend and the grant, and none of Finance (its review is retired)', async () => {
       const u = await example();
       const id = await h.paidRequest(u, plan, { amount: 45 * M });
       await h.sendOn([id], u.head.account).expect(201);
-      expect(await h.state(id)).toBe('AWAITING_FINANCE_REVIEW');
-      await h
-        .completeReview(id, {
-          outcome: 'ASSESSED',
-          opinion: 'An exception that a revision will mend',
-          direction: 'RECOMMEND_OVERRIDE',
-        })
-        .expect(200);
-      // Nothing is approved past the budget any more: the cost is brought within what is left (the way a revised request would be).
+      // Over the budget, the request is blocked and stays in the queue of its head; nothing is made for Finance.
+      expect(await h.state(id)).toBe('AWAITING_SPEND_SUBMISSION');
+      // The cost is brought within what is left (the way a request shortened by a supplementary file would be) and sent on again.
       await h.setPayments(id, { amount: 10 * M });
+      await h.sendOn([id], u.head.account).expect(201);
       await h.decideSpend(id, { decision: 'APPROVE' }, h.boss.account).expect(200);
       const task = await granted(id);
       await h.claim(task.id).expect(200);
@@ -135,13 +130,7 @@ describe('the time a request took over PostgreSQL (US-05-15 AC-1, AC-6, AC-11)',
 
       const timings = await timingsOf(id);
 
-      expect(present(timings).map(([kind]) => kind)).toEqual([
-        'NEED',
-        'QUEUE_WAIT',
-        'FINANCE_REVIEW',
-        'SPEND_DECISION',
-        'GRANT',
-      ]);
+      expect(present(timings).map(([kind]) => kind)).toEqual(['NEED', 'QUEUE_WAIT', 'SPEND_DECISION', 'GRANT']);
       expect(present(timings).every(([, segment]) => segment.endedAt !== null && segment.seconds !== null)).toBe(true);
       expect(timings.countedInKpi).toBe(true);
       expect(timings.totalSeconds).toBe((timings.approvalSeconds ?? 0) + (timings.grantSeconds ?? 0));
@@ -224,13 +213,11 @@ describe('the time a request took over PostgreSQL (US-05-15 AC-1, AC-6, AC-11)',
       const stranger = await h.staff(await h.departmentWithUnit(`P-TS${counter}`), `TS-X${counter}`);
       const id = await h.waitingForApprover(u, plan, { amount: 5 * M });
 
-      for (const account of [u.member.account, h.it1, u.head.account]) {
+      // P1-10: the spending approver reads a request once its spend step is opened (it waits for them here).
+      for (const account of [u.member.account, h.it1, u.head.account, h.boss.account]) {
         expect((await timingsOf(id, account)).requestId).toBe(id);
       }
-      for (const refused of [
-        await h.timings(id, stranger.account).expect(404),
-        await h.timings(id, h.boss.account).expect(404),
-      ]) {
+      for (const refused of [await h.timings(id, stranger.account).expect(404)]) {
         expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.NOT_FOUND');
       }
       const asSuperAdmin = await request(h.server())

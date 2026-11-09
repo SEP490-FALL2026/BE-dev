@@ -44,6 +44,7 @@ export interface DemoIds {
   subscriptions: Map<string, string>;
   costCenters: Map<string, string>;
   requests: Map<string, string>;
+  usageSources: Map<string, string>;
 }
 
 export interface DemoRunContext {
@@ -78,5 +79,6 @@ export function emptyIds(): DemoIds {
     subscriptions: new Map(),
     costCenters: new Map(),
     requests: new Map(),
+    usageSources: new Map(),
   };
 }

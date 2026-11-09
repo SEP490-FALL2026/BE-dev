@@ -1,3 +1,4 @@
+import request from 'supertest';
 import { IdentityAccessApi } from '../../../src/modules/identity-access/public/identity-access.api';
 import { ProvisioningDecisionService } from '../../../src/modules/licensing/provisioning/tasks/provisioning-decision.service';
 import { ProvisioningGrantService } from '../../../src/modules/licensing/provisioning/tasks/provisioning-grant.service';
@@ -8,10 +9,11 @@ import type { ApiAccount } from '../../support/api-accounts';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
-const MISMATCH = 'LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH';
 
 /**
- * F20 (the grant of a request goes only on a subscription of the department of the request, `QĐ-89a`), F13 (the IT Admin role is judged
+ * F20 as `BR-MF1-09` / `QĐ-103d` changed it (the seats of a plan are one pool for every department: a request is granted on any subscription of
+ * its plan whoever owns it, and the seat carries the department of the person it is for; rewritten from the old rule that refused another
+ * department's subscription with 422, the cases are kept), F13 (the IT Admin role is judged
  * by the policy of the work and not only by the guard of its route) and F24 (`SoD-5`: the IT Admin who serves themselves is counted in
  * the transaction of the act, marked in the audit event and told to the Super Admin), on real PostgreSQL.
  */
@@ -63,20 +65,22 @@ describe('the grant of a seat and the work on a task: the department of the seat
     await h.stop();
   });
 
-  describe('the grant target of a request (F20)', () => {
-    it('refuses a subscription of another department than the one of the request: 422, nothing written, the request still waits', async () => {
+  describe('the grant target of a request (F20, rewritten for the shared pool)', () => {
+    it('grants a subscription owned by another department than the one of the request: 201, the seat carries the department of the person', async () => {
       const person = await h.person('E-DR1');
-      const before = await counts();
       const requestId = h.gate.grantable(person, foreignSubscription.planId);
 
-      const refused = await h.grant({ requestId, subscriptionId: foreignSubscription.subscriptionId }).expect(422);
+      const created = await h.grant({ requestId, subscriptionId: foreignSubscription.subscriptionId }).expect(201);
 
-      expect(h.codeOf(refused)).toBe(MISMATCH);
-      expect(await counts()).toEqual(before);
-      expect(h.gate.outcomes).toEqual([]);
+      const assignmentId = h.dataOf<{ task: { assignmentId: string } }>(created).task.assignmentId;
+      // The subscription is `other`'s, the person is of the seeded department: the seat is the person's department's, not the owner's.
+      expect(await seatOf(assignmentId)).toEqual({
+        owning_department_id: h.seed.departmentId,
+        subscription_id: foreignSubscription.subscriptionId,
+      });
     });
 
-    it('grants the subscription of the department of the request, and the seat carries the department that owns the subscription', async () => {
+    it('grants the subscription of the department of the request, and the seat carries the department of the person', async () => {
       const person = await h.person('E-DR2');
       const task = await h.granted(person, own.planId, { subscriptionId: own.subscriptionId });
 
@@ -86,21 +90,17 @@ describe('the grant of a seat and the work on a task: the department of the seat
       });
     });
 
-    it('grants a request of another department on a subscription of that department: the seat is counted on that subscription alone, with no pool between departments', async () => {
+    it('grants a request of another department on a subscription of the seeded one: the seat is counted on that subscription (one pool for all departments)', async () => {
       const person = await h.person('E-DR3');
       const ownFree = await h.freeSeats(own.subscriptionId);
 
-      const task = await h.granted(person, foreignSubscription.planId, {
-        subscriptionId: foreignSubscription.subscriptionId,
-        departmentId: other.id,
-      });
+      const task = await h.granted(person, own.planId, { subscriptionId: own.subscriptionId, departmentId: other.id });
 
       expect(await seatOf(task.assignmentId)).toEqual({
         owning_department_id: other.id,
-        subscription_id: foreignSubscription.subscriptionId,
+        subscription_id: own.subscriptionId,
       });
-      expect(await h.freeSeats(foreignSubscription.subscriptionId)).toBe(4);
-      expect(await h.freeSeats(own.subscriptionId)).toBe(ownFree);
+      expect(await h.freeSeats(own.subscriptionId)).toBe((ownFree ?? 0) - 1);
     });
   });
 
@@ -140,8 +140,20 @@ describe('the grant of a seat and the work on a task: the department of the seat
       (await h.ctx.sql.query<{ status: string }>(`SELECT status FROM provisioning_tasks WHERE id = $1`, [id])).rows[0]
         .status;
     /** A grant task of a K4 purchase, which the queue does not grant yet (the key vault and the devices come later): written as the database allows. */
+    /** BR-MF1-09: a K4 grant names a free key of the store of its subscription; the key `keyTask` imported for its task. */
+    let k4Key = '';
     const keyTask = async (): Promise<string> => {
       const subscriptionId = await h.subscription(5, 'K4');
+      await request(h.server())
+        .post('/api/v1/license-keys/imports')
+        .set(h.as(h.it1))
+        .send({ subscriptionId, keys: [`EV-K4-${subscriptionId.slice(0, 8)}-ABCDE-12345`] })
+        .expect(201);
+      k4Key = (
+        await h.ctx.sql.query<{ id: string }>(`SELECT id FROM license_keys WHERE subscription_id = $1`, [
+          subscriptionId,
+        ])
+      ).rows[0].id;
       const employeeId = await h.person(`E-K4-${subscriptionId.slice(0, 6)}`);
       const assignmentId = (
         await h.ctx.sql.query<{ id: string }>(
@@ -182,7 +194,9 @@ describe('the grant of a seat and the work on a task: the department of the seat
         }
         expect(await taskStatus(id)).toBe('IN_PROGRESS');
 
-        await h.complete(id, { evidence: `đã làm ${kind}` }).expect(200);
+        await h
+          .complete(id, { evidence: `đã làm ${kind}`, ...(kind === 'K4' ? { licenseKeyId: k4Key } : {}) })
+          .expect(200);
         expect(await taskStatus(id)).toBe('COMPLETED');
       },
     );

@@ -1,14 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import {
-  REASON_MAX_LENGTH,
-  TERM_MONTHS_MAX,
-  COMMITMENT_MONTHS_MAX,
-  employeeRef,
-  moneySchema,
-  pricingSchema,
-} from '../access-request/access-request.dto';
+import { REASON_MAX_LENGTH, employeeRef, moneySchema, pricingSchema } from '../access-request/access-request.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** A web address with a host: the homepage of the software, which a screen links to. */
@@ -37,20 +30,20 @@ export const proposalBodySchema = z.strictObject({
   purpose: text(REASON_MAX_LENGTH),
   dataDescription: text(REASON_MAX_LENGTH),
   expectedUsers: z.number().int().min(1).max(1_000_000),
-  termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
+  /** The day the right ends; optional, at most a year from today, and required for a contractor, a freelancer or an intern. */
+  expectedEndDate: businessDate.optional(),
+  /** GH-3 (`BR-MF1-01g`): required when the person already uses as many paid applications as the threshold; ignored otherwise. */
+  manyPaidSoftwareReason: text(REASON_MAX_LENGTH).optional(),
 });
 
 const moneyInput = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
 
-/** The quote the IT Admin records: what one person costs for one billing cycle, and how the contract binds and is paid. */
+/** The quote the IT Admin records: what one person costs for one billing cycle and the days it is in force (`BR-MF1-06`). */
 const quoteInput = z.strictObject({
   unitPrice: moneyInput,
   billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL']),
   validFrom: businessDate,
   validUntil: businessDate.nullable().optional(),
-  commitmentMonths: z.number().int().min(1).max(COMMITMENT_MONTHS_MAX).nullable().optional(),
-  paymentFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'UPFRONT_ONCE']).nullable().optional(),
-  firstPaymentOn: businessDate.nullable().optional(),
 });
 
 /**
@@ -75,7 +68,6 @@ export const assessmentPatchSchema = z
       .strictObject({ status: z.enum(['OBTAINED', 'NOT_AVAILABLE']), note: text(REASON_MAX_LENGTH).optional() })
       .nullable(),
     equivalentPlanId: z.uuid().nullable(),
-    proposedBusinessOwnerEmployeeId: z.uuid().nullable(),
     controlLevel: z.enum(['FULL', 'PARTIAL', 'UNCONTROLLABLE']),
     controlRiskNote: text(REASON_MAX_LENGTH).nullable(),
     quote: quoteInput.nullable(),
@@ -95,19 +87,29 @@ export const catalogLinkBodySchema = z.strictObject({ planId: z.uuid() });
  * software that is not eligible for the catalog (there is no outcome for free software, `QĐ-82n`), the reason that must
  * go with it, and the alternative when the IT Admin has one: a plan of the catalog, a note, or neither.
  */
-export const assessmentRejectionBodySchema = z.strictObject({
-  kind: z.enum(['UNCONTROLLABLE', 'NOT_ELIGIBLE']),
-  reason: text(REASON_MAX_LENGTH),
-  alternativePlanId: z.uuid().optional(),
-  alternativeNote: text(REASON_MAX_LENGTH).optional(),
-});
+export const assessmentRejectionBodySchema = z
+  .strictObject({
+    kind: z.enum(['UNCONTROLLABLE', 'NOT_ELIGIBLE']),
+    reason: text(REASON_MAX_LENGTH),
+    alternativePlanId: z.uuid().optional(),
+    alternativeNote: text(REASON_MAX_LENGTH).optional(),
+  })
+  .superRefine((body, context) => {
+    if (body.kind === 'UNCONTROLLABLE' && body.alternativePlanId === undefined && body.alternativeNote === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['alternativeNote'],
+        message: 'Give an alternative plan or note for software that cannot be controlled.',
+      });
+    }
+  })
+  .meta({ description: 'UNCONTROLLABLE requires alternativePlanId or alternativeNote.' });
 
 /**
  * Registering software the company built itself (`US-05-20`): its Business Owner, who must still work, and the name when it
  * is not the one proposed. A payment that the grant needs (`US-05-20` AC-10) comes with the quote that prices it.
  */
 export const internalRegistrationBodySchema = z.strictObject({
-  businessOwnerEmployeeId: z.uuid(),
   softwareName: text(200).optional(),
   dataSensitivity: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
   spend: z.strictObject({ quote: quoteInput }).optional(),
@@ -118,9 +120,6 @@ const quoteView = z.strictObject({
   billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL']),
   validFrom: z.string(),
   validUntil: z.string().nullable(),
-  commitmentMonths: z.number().int().positive().nullable(),
-  paymentFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'UPFRONT_ONCE']).nullable(),
-  firstPaymentOn: z.string().nullable(),
 });
 
 const assessmentSchema = z.strictObject({
@@ -136,7 +135,7 @@ const assessmentSchema = z.strictObject({
   /** The step of the IT Admin: who holds it, how long it may wait, and when it was done. */
   step: z
     .strictObject({
-      state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED']),
+      state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED', 'NOT_REQUIRED']),
       assignee: employeeRef.nullable(),
       waitingReason: z.string().nullable(),
       slaWorkingDays: z.number().int().positive(),

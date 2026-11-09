@@ -303,15 +303,13 @@ describe('the backlog alert and the board of the Super Admin, over PostgreSQL (U
         ...(await Promise.all(h.decisionCalls(spend, batchId, h.admin))),
       ];
 
-      // The Super Admin is not the holder of the step, and does not see the request to decide it; no route takes the decision.
+      // The Super Admin is not the holder of the step, and does not see the request to decide it; no route takes the decision (the Finance route that was a fourth call is gone with the Finance review, QĐ-97c).
       expect(answers.map((answer) => [answer.status, h.codeOf(answer)])).toEqual([
         [404, 'ACCESS_REQUEST.NOT_FOUND'],
         [409, 'SPEND.NO_SPEND_STEP'],
-        [403, 'AUTHORIZATION.FORBIDDEN'],
         [404, 'SPEND.BATCH_NOT_FOUND'],
         [404, 'ACCESS_REQUEST.NOT_FOUND'],
         [403, 'SPEND.NOT_THE_ASSIGNEE'],
-        [403, 'AUTHORIZATION.FORBIDDEN'],
         [404, 'SPEND.BATCH_NOT_FOUND'],
       ]);
       expect(await h.decisionState()).toEqual(before);

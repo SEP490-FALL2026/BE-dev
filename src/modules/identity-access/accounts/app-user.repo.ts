@@ -212,6 +212,22 @@ export class AppUserRepo {
     return new Set(rows.map((row) => row.employeeId));
   }
 
+  /** Every employee who holds an effective IT_ADMIN grant on an account that can act, by employee code. */
+  async findAllUsableItAdminEmployeeIds(tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).appUser.findMany({
+      where: {
+        status: 'ACTIVE',
+        activationState: 'ACTIVATED',
+        employee: { status: 'ACTIVE' },
+        roleGrants: { some: { role: 'IT_ADMIN', revokedAt: null } },
+      },
+      orderBy: { employee: { employeeCode: 'asc' } },
+      select: { employeeId: true },
+    });
+
+    return rows.map((row) => row.employeeId);
+  }
+
   /** The employee with the smallest employee code who holds an effective IT_ADMIN grant on an account that can act, or null. */
   async findFirstUsableItAdminEmployeeId(tx?: DbTx): Promise<string | null> {
     const row = await (tx ?? this.prisma).appUser.findFirst({

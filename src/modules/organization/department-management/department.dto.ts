@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { DEPARTMENT_FUNCTION_MAX_LENGTH, DEPARTMENT_NAME_MAX_LENGTH } from '../department/department.types';
-import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
+import { businessDate, responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /**
  * The schema is the real limit of the name and the function: accents are composed (NFC) and the ends trimmed before the length is
@@ -94,6 +94,8 @@ const departmentSchema = z.strictObject({
   memberCount: z.number().int().nonnegative(),
   /** What the department still lacks: a head, a usable IT Admin in charge, a Cost Center in use (finance configuration incomplete). */
   warnings: z.array(z.enum(['MISSING_HEAD', 'MISSING_IT_ADMIN', 'MISSING_COST_CENTER'])),
+  /** The day the department takes effect (`QĐ-104e(3)`): one made for next year takes effect on 1 January, before that it takes no member. */
+  effectiveFrom: responseBusinessDate,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   deactivatedAt: z.iso.datetime().nullable(),

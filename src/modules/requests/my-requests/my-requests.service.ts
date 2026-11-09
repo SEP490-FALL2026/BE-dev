@@ -8,7 +8,13 @@ import { MyRequestsFactsRepo } from './my-requests-facts.repo';
 import { toSummary, type MyRequestLookups } from './my-requests.mapper';
 import { parseStateList, statesOf } from './my-requests.policy';
 import { MyRequestsRepo } from './my-requests.repo';
-import type { MyRequestRow, MyRequestView } from './my-requests.types';
+import type {
+  MyRequestFilter,
+  MyRequestInvolvement,
+  MyRequestRow,
+  MyRequestView,
+  RequestScope,
+} from './my-requests.types';
 
 export interface MyRequestsQuery {
   page: number;
@@ -18,16 +24,23 @@ export interface MyRequestsQuery {
   type?: MyRequestRow['type'];
   from?: string;
   to?: string;
+  involvement?: MyRequestInvolvement;
 }
+
+/** The scope each answer to "which of my requests" reads. */
+const SCOPE_OF = { SENT: 'SENT_BY', FOR_ME: 'FOR', ALL: 'SENT_BY_OR_FOR' } as const satisfies Record<
+  MyRequestInvolvement,
+  RequestScope['kind']
+>;
 
 const idsOf = <T>(rows: readonly MyRequestRow[], pick: (row: MyRequestRow) => T | null): T[] => [
   ...new Set(rows.map(pick).filter((value): value is T => value !== null)),
 ];
 
 /**
- * "My requests" (`US-16-01` AC-2): the requests the caller sent, never a draft and never one that somebody else sent, for the web and
- * the phone alike. Whose they are is one condition, the person who sent them; there is no way to name another person, and the person it
- * is for, the person who holds a step and the IT Admin read a request by its detail, not here. Everything about the page is read in a
+ * "My requests" (`US-16-01` AC-2): the requests the caller sent, and on asking those somebody else sent for them (one line of a request
+ * for a group included), never a draft, for the web and the phone alike. There is no way to name another person: the history the people
+ * who oversee requests read goes through `pageOf` with their own scope. Everything about the page is read in a
  * number of statements that does not grow with the rows. Every signed-in account reads its own historical requests, regardless of its current role.
  */
 @Injectable()
@@ -40,23 +53,58 @@ export class MyRequestsService {
   ) {}
 
   async list(actor: AuthenticatedPrincipal, query: MyRequestsQuery): Promise<Page<MyRequestSummaryWire>> {
-    const { rows, total } = await this.requests.pageOf({
-      requesterEmployeeId: actor.employeeId,
-      states: statesOf(query.view, query.state === undefined ? undefined : (parseStateList(query.state) ?? [])),
-      type: query.type,
-      from: query.from === undefined ? undefined : new Date(query.from),
-      to: query.to === undefined ? undefined : new Date(query.to),
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
-    });
-    const lookups = await this.lookupsFor(rows);
+    const me = actor.employeeId;
+    const involvement = query.involvement ?? 'SENT';
+    const { rows, total, lookups } = await this.pageOf(
+      {
+        scope: { kind: SCOPE_OF[involvement], employeeId: me },
+        states: statesOf(query.view, query.state === undefined ? undefined : (parseStateList(query.state) ?? [])),
+        type: query.type,
+        from: query.from === undefined ? undefined : new Date(query.from),
+        to: query.to === undefined ? undefined : new Date(query.to),
+      },
+      query,
+    );
+    // The caller's own line, only in a request for a group that somebody else sent for them (the sender reads every line).
+    const lines = await this.facts.linesOf(
+      idsOf(rows, (row) => (row.type === 'GROUP_GRANT' && row.requesterEmployeeId !== me ? row.id : null)),
+      me,
+    );
 
     return pageOf(
-      rows.map((row) => toSummary(row, actor.employeeId, lookups)),
+      rows.map((row) => {
+        const sent = row.requesterEmployeeId === me;
+        const summary = toSummary(row, row.requesterEmployeeId, lookups);
+
+        return {
+          ...summary,
+          involvement: sent ? ('SENT' as const) : ('FOR_ME' as const),
+          myLine: lines.get(row.id) ?? null,
+          // Only the person who sent a request withdraws it from here; a person it is for has nothing to withdraw (`SoD-4`).
+          canWithdraw: sent && summary.canWithdraw,
+        };
+      }),
       total,
       query.page,
       query.pageSize,
     );
+  }
+
+  /**
+   * One page of the requests of a scope with what its rows need from the other contexts, for "my requests" and for the history the
+   * people who oversee requests read. The number of statements does not grow with the rows.
+   */
+  async pageOf(
+    filter: Omit<MyRequestFilter, 'skip' | 'take'>,
+    page: { page: number; pageSize: number },
+  ): Promise<{ rows: MyRequestRow[]; total: number; lookups: MyRequestLookups }> {
+    const { rows, total } = await this.requests.pageOf({
+      ...filter,
+      skip: (page.page - 1) * page.pageSize,
+      take: page.pageSize,
+    });
+
+    return { rows, total, lookups: await this.lookupsFor(rows) };
   }
 
   /** What the rows of the page need: the people and plans by name, the name of proposed software, the stage and the reasons. */
@@ -67,20 +115,18 @@ export class MyRequestsService {
     const queued = withSpend('AWAITING_SPEND_SUBMISSION');
     const rejected = withSpend('REJECTED');
     const personIds = idsOf(rows, (row) => row.beneficiaryEmployeeId).concat(
+      idsOf(rows, (row) => row.requesterEmployeeId),
       idsOf(rows, (row) => (row.needStep.state === 'PENDING' ? row.needStep.assigneeEmployeeId : null)),
     );
     const planIds = idsOf(rows, (row) => row.planId);
-    const [people, plans, softwareNames, checks, reviews, openFinanceReview, openSpendApproval, spendRefusals] =
-      await Promise.all([
-        personIds.length === 0 ? Promise.resolve([]) : this.organizationReads.getEmployees([...new Set(personIds)]),
-        planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
-        this.requests.proposalNames(idsOf(rows, (row) => (row.branch === 'NEW_SOFTWARE' ? row.id : null))),
-        this.facts.latestChecks(queued),
-        this.facts.latestReviews(queued),
-        this.facts.withOpenStep(controlled, 'FINANCE_REVIEW'),
-        this.facts.withOpenStep(controlled, 'SPEND_APPROVAL'),
-        this.facts.spendRefusals(rejected),
-      ]);
+    const [people, plans, softwareNames, checks, openSpendApproval, spendRefusals] = await Promise.all([
+      personIds.length === 0 ? Promise.resolve([]) : this.organizationReads.getEmployees([...new Set(personIds)]),
+      planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
+      this.requests.proposalNames(idsOf(rows, (row) => (row.branch === 'NEW_SOFTWARE' ? row.id : null))),
+      this.facts.latestChecks(queued),
+      this.facts.withOpenSpendStep(controlled),
+      this.facts.spendRefusals(rejected),
+    ]);
     const needRefused = rows.filter((row) => row.state === 'REJECTED' && row.type !== 'GROUP_GRANT');
     const [needRefusals, assessmentRefusals] = await Promise.all([
       this.facts.needRefusals(needRefused.map((row) => row.needStepId)),
@@ -95,8 +141,6 @@ export class MyRequestsService {
       softwareNames,
       facts: {
         checks,
-        reviews,
-        openFinanceReview,
         openSpendApproval,
         spendRefusals,
         needRefusals,

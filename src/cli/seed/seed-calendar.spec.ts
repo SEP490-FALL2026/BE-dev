@@ -1,10 +1,9 @@
 import { businessYearOf, calendarRefusal, seedCalendar } from './seed-calendar';
 
-const facts = (mode: 'plan' | 'apply', today: string, datasetYear: number | null = null, fiscalYearStartMonth = 1) => ({
+const facts = (mode: 'plan' | 'apply', today: string, datasetYear: number | null = null) => ({
   mode,
   today,
   datasetYear,
-  fiscalYearStartMonth,
 });
 
 describe('the calendar of the demo dataset', () => {
@@ -34,10 +33,6 @@ describe('the calendar of the demo dataset', () => {
     expect(businessYearOf('2026-12-31T18:30:00.000Z', 'Asia/Ho_Chi_Minh')).toBe(2027);
     expect(businessYearOf('2027-01-01T03:00:00.000Z', 'America/Los_Angeles')).toBe(2026);
     expect(businessYearOf('2026-10-30T09:00:00.000Z', 'UTC')).toBe(2026);
-  });
-
-  it('refuses a fiscal year that does not begin in January', () => {
-    expect(calendarRefusal(facts('apply', '2026-05-10', null, 4))).toMatch(/FISCAL_YEAR_START_MONTH/);
   });
 });
 

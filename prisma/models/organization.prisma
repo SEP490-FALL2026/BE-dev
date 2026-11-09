@@ -73,6 +73,7 @@ model Organization {
   subscriptionRenewals               SubscriptionRenewal[]
   subscriptionDeadlineEvents         SubscriptionDeadlineEvent[]
   provisioningTasks                  ProvisioningTask[]
+  poolGrantAvoidedCosts              PoolGrantAvoidedCost[]
   returnRequests                     ReturnRequest[]
   handoverDuties                     HandoverDuty[]
   accessRequests                     AccessRequest[]
@@ -82,10 +83,13 @@ model Organization {
   congestionIncidents                CongestionIncident[]
   requestBudgetChecks                RequestBudgetCheck[]
   spendBatches                       SpendBatch[]
+  requestReserveConfirmations        RequestReserveConfirmation[]
   requestSupplements                 RequestSupplement[]
   budgetProposals                    BudgetProposal[]
+  budgetCycles                       BudgetCycle[]
   budgetVersions                     BudgetVersion[]
   budgetCommitments                  BudgetCommitment[]
+  yearStartCommitmentRuns            YearStartCommitmentRun[]
   invoices                           Invoice[]
   applicationRetirementConfirmations ApplicationRetirementConfirmation[]
   contracts                          Contract[]
@@ -102,6 +106,7 @@ model Organization {
   employeeLeaves                     EmployeeLeave[]
   offboardingCases                   OffboardingCase[]
   personnelNotices                   PersonnelNotice[]
+  planUsageRates                     PlanUsageRate[]
 
   @@map("organizations")
 }
@@ -146,9 +151,13 @@ model Department {
   createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   deactivatedAt       DateTime?        @map("deactivated_at") @db.Timestamptz(3)
+  // The day the department takes effect (QĐ-104e(3)): one made in the budgeting period takes effect on 1 January of the next year.
+  // The application always names it (the installation too, in the calendar of the organization); the default is only for plain SQL.
+  effectiveFrom       DateTime         @default(dbgenerated("CURRENT_DATE")) @map("effective_from") @db.Date
 
   organization            Organization                  @relation(fields: [organizationId], references: [id])
   costCenters             CostCenter[]                  @relation("CostCenterDepartment")
+  budgetCeilings          BudgetDepartmentCeiling[]     @relation("BudgetDepartmentCeilingDepartment")
   costCenterLinks         CostCenterDepartmentLink[]
   itAdmin                 Employee?                     @relation("DepartmentItAdmin", fields: [itAdminEmployeeId], references: [id], onDelete: Restrict)
   placements              EmployeePlacement[]
@@ -261,6 +270,7 @@ model Employee {
   workspacePrimaryOwnerOf         PlanWorkspaceProfile[]              @relation("WorkspacePrimaryOwner")
   workspaceEmergencyHolderOf      PlanWorkspaceProfile[]              @relation("WorkspaceEmergencyHolder")
   workspaceMemberships            PlanWorkspaceAdmin[]                @relation("WorkspaceMember")
+  subscriptionsInCharge           Subscription[]                      @relation("SubscriptionResponsibleItAdmin")
   planTermOpinions                PlanTermOpinion[]
   applicationBusinessOwners       ApplicationBusinessOwner[]
   licenseAssignments              LicenseAssignment[]
@@ -288,9 +298,12 @@ model Employee {
   requestBudgetChecksRun          RequestBudgetCheck[]                @relation("RequestBudgetCheckRanBy")
   spendBatchesSubmitted           SpendBatch[]                        @relation("SpendBatchSubmitter")
   spendDecisionsGiven             SpendDecision[]                     @relation("SpendDecisionDecider")
+  reserveConfirmationsGiven       RequestReserveConfirmation[]        @relation("ReserveConfirmationConfirmer")
   budgetQuestionsAsked            BudgetInformationRequest[]          @relation("BudgetInformationAsker")
   commitmentReleases              BudgetCommitmentRelease[]           @relation("CommitmentReleaser")
   invoicesRecorded                Invoice[]                           @relation("InvoiceRecorder")
+  budgetCyclesOpened              BudgetCycle[]                       @relation("BudgetCycleOpener")
+  budgetCyclesPublished           BudgetCycle[]                       @relation("BudgetCyclePublisher")
   budgetQuestionsAnswered         BudgetInformationRequest[]          @relation("BudgetInformationAnswerer")
   stepSlaRemindersHeld            StepSlaReminder[]                   @relation("StepSlaReminderHolder")
   stepSlaRemindersReceived        StepSlaReminderRecipient[]          @relation("StepSlaReminderRecipient")
