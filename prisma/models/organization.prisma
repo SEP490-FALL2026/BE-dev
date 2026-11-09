@@ -82,6 +82,7 @@ model Organization {
   congestionIncidents                CongestionIncident[]
   requestBudgetChecks                RequestBudgetCheck[]
   spendBatches                       SpendBatch[]
+  requestReserveConfirmations        RequestReserveConfirmation[]
   requestSupplements                 RequestSupplement[]
   budgetProposals                    BudgetProposal[]
   budgetCycles                       BudgetCycle[]
@@ -294,6 +295,7 @@ model Employee {
   requestBudgetChecksRun          RequestBudgetCheck[]                @relation("RequestBudgetCheckRanBy")
   spendBatchesSubmitted           SpendBatch[]                        @relation("SpendBatchSubmitter")
   spendDecisionsGiven             SpendDecision[]                     @relation("SpendDecisionDecider")
+  reserveConfirmationsGiven       RequestReserveConfirmation[]        @relation("ReserveConfirmationConfirmer")
   budgetQuestionsAsked            BudgetInformationRequest[]          @relation("BudgetInformationAsker")
   commitmentReleases              BudgetCommitmentRelease[]           @relation("CommitmentReleaser")
   invoicesRecorded                Invoice[]                           @relation("InvoiceRecorder")
