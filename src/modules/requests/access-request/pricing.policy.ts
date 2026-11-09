@@ -21,6 +21,8 @@ const CYCLE_MONTHS: Readonly<Record<Exclude<BillingCycleCode, 'OTHER'>, number>>
 };
 
 export interface PricingInput {
+  /** Pricing model: RECURRING (monthly/yearly) or ONE_TIME (perpetual license). */
+  kind: 'RECURRING' | 'ONE_TIME';
   /** The unit price per person per billing period of the plan; null when the plan has no priced subscription. */
   unitPrice: Money | null;
   billingCycle: BillingCycleCode | null;
@@ -59,9 +61,27 @@ export function priceRequest(input: PricingInput): Pricing {
   const budgetYear = fiscalYearOf(input.expectedSpendOn);
   // A price of nothing is no price: a paid request never costs 0 (`FR-3.2`), so the price data is incomplete and the request is not
   // checked, instead of reaching an approval that cannot hold a commitment of 0.
-  if (input.unitPrice === null || input.unitPrice.amountMinor <= 0n || input.billingCycle === null) {
+  if (input.unitPrice === null || input.unitPrice.amountMinor <= 0n) {
     return { status: 'MISSING', reason: 'NO_PRICED_SUBSCRIPTION', budgetYear };
   }
+
+  // ONE_TIME pricing: single payment period, no term-based calculation (BR-MF1-07, QĐ-106d)
+  if (input.kind === 'ONE_TIME') {
+    const perPeriod = input.unitPrice.amountMinor * BigInt(input.beneficiaries);
+    const total = perPeriod; // one-time, no multiplication by periods
+    if (total > MAX_AMOUNT_MINOR) return { status: 'MISSING', reason: 'AMOUNT_TOO_LARGE', budgetYear };
+    return {
+      status: 'PRICED',
+      amount: { amountMinor: total, currency: input.unitPrice.currency },
+      unitPrice: input.unitPrice,
+      billingCycle: 'OTHER', // one-time has no billing cycle
+      periods: [{ dueOn: input.expectedSpendOn, amountMinor: perPeriod, budgetYear, binding: true }],
+      budgetYear,
+    };
+  }
+
+  // RECURRING pricing: schedule across term
+  if (input.billingCycle === null) return { status: 'MISSING', reason: 'NO_PRICED_SUBSCRIPTION', budgetYear };
   if (input.billingCycle === 'OTHER') return { status: 'MISSING', reason: 'CYCLE_UNKNOWN', budgetYear };
 
   const cycleMonths = CYCLE_MONTHS[input.billingCycle];

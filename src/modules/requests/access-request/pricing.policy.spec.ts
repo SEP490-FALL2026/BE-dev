@@ -5,6 +5,7 @@ import { priceRequest, type PaymentPeriod, type PricingInput } from './pricing.p
 const FIGMA = { amountMinor: 1500n, currency: 'USD' }; // 15.00 per seat per month
 
 const input = (patch: Partial<PricingInput> = {}): PricingInput => ({
+  kind: 'RECURRING',
   unitPrice: FIGMA,
   billingCycle: 'MONTHLY',
   termMonths: 6,
@@ -164,6 +165,52 @@ describe('paymentScheduleJson (the codec of access_requests.payment_schedule)', 
     expect(() => paymentScheduleJson.decode(value)).toThrow(JsonColumnShapeError);
     expect(() => paymentScheduleJson.decode(value)).toThrow('access_requests.payment_schedule');
     expect(() => paymentScheduleJson.decode(value)).not.toThrow(/12\.5|2026-13-45/);
+  });
+
+  // JSON has no big integers: the amounts go out as text, key for key as they were written before the codec.
+  it('writes the amounts as text and the same keys as the schedule has always been written with', () => {
+    const schedule: PaymentPeriod[] = [
+      { dueOn: '2026-11-30', amountMinor: 1_200_000n, budgetYear: 2026, binding: true },
+      { dueOn: '2027-11-30', amountMinor: 9_007_199_254_740_993n, budgetYear: 2027, binding: false },
+    ];
+
+    expect(paymentScheduleJson.encode(schedule)).toEqual([
+      { dueOn: '2026-11-30', amountMinor: '1200000', budgetYear: 2026, binding: true },
+      { dueOn: '2027-11-30', amountMinor: '9007199254740993', budgetYear: 2027, binding: false },
+    ]);
+    expect(paymentScheduleJson.decode(JSON.parse(JSON.stringify(paymentScheduleJson.encode(schedule))))).toEqual(
+      schedule,
+    );
+  });
+
+  describe('BR-MF1-07: ONE_TIME pricing (perpetual licenses)', () => {
+    it('is the unit price times the people, one payment period (R-B01 ca 1)', () => {
+      const priced = priceRequest(input({ kind: 'ONE_TIME', beneficiaries: 3, unitPrice: { amountMinor: 5000n, currency: 'USD' } }));
+
+      expect(priced).toMatchObject({
+        status: 'PRICED',
+        amount: { amountMinor: 15000n, currency: 'USD' },
+        periods: [{ dueOn: '2026-10-23', amountMinor: 15000n, budgetYear: 2026 }],
+        billingCycle: 'OTHER',
+      });
+      expect(priced.status === 'PRICED' && priced.periods).toHaveLength(1);
+    });
+
+    it('ignores termMonths for ONE_TIME (R-B01 ca 2)', () => {
+      const without = priceRequest(input({ kind: 'ONE_TIME', termMonths: 6 }));
+      const with12 = priceRequest(input({ kind: 'ONE_TIME', termMonths: 12 }));
+
+      expect(without).toEqual(with12); // termMonths does not matter
+    });
+
+    it('respects beneficiaries count (R-B01 ca 3)', () => {
+      const one = priceRequest(input({ kind: 'ONE_TIME', beneficiaries: 1 }));
+      const three = priceRequest(input({ kind: 'ONE_TIME', beneficiaries: 3 }));
+
+      if (one.status === 'PRICED' && three.status === 'PRICED') {
+        expect(three.amount.amountMinor).toBe(one.amount.amountMinor * 3n);
+      }
+    });
   });
 
   // JSON has no big integers: the amounts go out as text, key for key as they were written before the codec.
